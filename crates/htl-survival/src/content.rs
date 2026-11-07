@@ -2130,6 +2130,15 @@ pub struct MobDef {
     /// Harmless: it never fights back, and runs from a blow (a rabbit, a sheep).
     #[serde(default)]
     pub critter: bool,
+    /// An ally of the heroes: it never takes up a fight against one, their blows and shots pass
+    /// it by, and a heal aimed at a friend can land on it (its number floats over it). None in the
+    /// rules yet; `.es ally` sets one down to try.
+    #[serde(default)]
+    pub friendly: bool,
+    /// Set down by a hero (a `totem`) yet a heal can reach it: help aimed at a friend lands on
+    /// it as on an ally (a Priest's orb). A totem without it never takes a heal.
+    #[serde(default)]
+    pub healable: bool,
     /// Its voice (`SoundEntries.dbc`): as it turns on a foe, at its second wind, as it falls.
     #[serde(default)]
     pub aggro_sound: u32,

@@ -64,6 +64,9 @@ const MISS_PARRY: u8 = 4;
 const MISS_BLOCK: u8 = 5;
 /// A tick of damage over time shows as this spell's (Immolate's burn).
 const DOT_SPELL: u32 = 348;
+/// From this client level a heal on a friend floats over their head (patch 0060), so the healer is
+/// sent the heal log instead of the add-on's `HO` line.
+pub(crate) const HEAL_FLOAT_LEVEL: u8 = 28;
 
 impl SurvivalGame {
     pub(crate) fn play(&mut self, events: Vec<Event>) {
@@ -1165,9 +1168,20 @@ impl SurvivalGame {
                 *self.healed.entry(id).or_default() += amount;
             }
             Event::HealedOther { healer, target, amount } => {
-                // `HO\t<name>\t<amount>`: the healer sees what they mended on a friend.
-                let name = self.sim.players.get(&target).map(|p| p.name.clone()).unwrap_or_default();
-                if let Some(c) = self.conn_of(healer).filter(|c| self.has_addon(*c)) {
+                // The healer sees what they mended on a friend (a hero or an allied creature):
+                // from `ac28` a green number over the friend's head, as WoW floats it (`SMSG_SPELLHEALLOG`, spell 0 as the mend
+                // has no 1.12 spell; patch 0060); on an older client the add-on's `HO` line,
+                // `<amount> <name>` rising mid-screen.
+                let Some(c) = self.conn_of(healer) else { return };
+                if self.world_of(c).is_some_and(|w| w.level >= HEAL_FLOAT_LEVEL) {
+                    if let (Some(t), Some(h)) = (self.guid_of(target), self.guid_of(healer)) {
+                        self.send(c, packets::spell_heal(t, h, 0, amount, false));
+                    }
+                } else if self.has_addon(c) {
+                    let name = match self.sim.players.get(&target) {
+                        Some(p) => p.name.clone(),
+                        None => self.sim.mobs.get(&target).map(|m| self.sim.content.mobs[m.def].name.clone()).unwrap_or_default(),
+                    };
                     self.ui_line(c, &format!("HO\t{name}\t{amount}"));
                 }
             }

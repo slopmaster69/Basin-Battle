@@ -148,6 +148,79 @@ fn help_aimed_at_a_friend_heals_and_shields_them_not_the_caster() {
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == a)), "no word");
 }
 
+/// An ally among the creatures (none in the rules yet; `.es ally` sets one down): help aimed at a
+/// friend can land on it, and the healer sees the number over it.
+#[test]
+fn help_aimed_at_a_friend_heals_an_allied_creature() {
+    let mut s = world(false, MEND);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ha = halve(&mut s, a);
+    s.spawn_ally(a, "grunt", 10.0, 0.5).unwrap();
+    let ally = *s.targets.keys().next().expect("the ally");
+    assert!(s.mobs[&ally].friendly, "on her side");
+    let (before, max) = (s.mobs[&ally].health, s.mobs[&ally].max_health);
+    let ev = cast(&mut s, a, "t_mend");
+    assert!(looked_at(&ev, a, 2061, ally), "its look from her to it");
+    assert_eq!(s.mobs[&ally].health, before + (max as f32 * 0.2).round() as u32, "a fifth of its health");
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, .. } if *healer == a && *target == ally)), "she sees what she mended");
+    assert!(ev.iter().any(|e| matches!(e, Event::Health { id, .. } if *id == ally)), "its bar fills");
+    assert_eq!(s.players[&a].health, ha, "not hers");
+    assert!(!s.has_cc(a, "shield"), "and the shield isn't hers either");
+}
+
+/// Two kinds of thing a hero sets down: a totem never takes a heal (the help goes to the caster),
+/// but one its rules make `healable` (a Priest's orb) does, as an ally.
+#[test]
+fn a_totem_takes_no_heal_but_a_healable_one_does() {
+    for healable in [false, true] {
+        let mut s = world(false, MEND);
+        let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let ha = halve(&mut s, a);
+        let orb = mob(&mut s, "healing_stream_totem", [10.0, 0.0, 0.0]);
+        let def = s.mobs[&orb].def;
+        assert!(s.content.mobs[def].totem, "a totem");
+        s.content.mobs[def].healable = healable;
+        let max = s.mobs[&orb].max_health;
+        s.mobs.get_mut(&orb).unwrap().health = max / 2;
+        s.totems.push(crate::sim::abilities::Totem { mob: orb, owner: a, ability: 0, until: 1e9, next: 1e9 });
+        let ev = cast(&mut s, a, "t_mend");
+        let healed_it = ev.iter().any(|e| matches!(e, Event::HealedOther { target, .. } if *target == orb));
+        if healable {
+            assert!(healed_it && s.mobs[&orb].health > max / 2, "the orb takes it");
+            assert_eq!(s.players[&a].health, ha, "not her");
+        } else {
+            assert!(!healed_it && s.mobs[&orb].health == max / 2, "the totem takes nothing");
+            assert!(s.players[&a].health > ha, "it lands on her instead");
+        }
+    }
+}
+
+/// An allied creature never turns on a hero, and a hero's blows and shots pass it by, friendly
+/// fire or not.
+#[test]
+fn an_allied_creature_never_fights_a_hero_and_their_blows_pass_it_by() {
+    let mut s = world(true, MEND);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ally = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.mobs.get_mut(&ally).unwrap().friendly = true;
+    let hp = s.players[&a].health;
+    for _ in 0..60 {
+        let _ = s.step(DT);
+    }
+    assert!(matches!(s.mobs[&ally].state, MobState::Idle { .. }), "it never took her on: {:?}", s.mobs[&ally].state);
+    assert_eq!(s.players[&a].health, hp, "nor struck her");
+    s.engage(ally, crate::sim::mobs::Foe::Hero(a));
+    assert!(matches!(s.mobs[&ally].state, MobState::Idle { .. }), "even drawn in");
+    let h = s.mobs[&ally].health;
+    s.hurt_mob_as(ally, a, 10, "Melee");
+    assert_eq!(s.mobs[&ally].health, h, "her blow takes nothing");
+    assert!(!s.bodies(a).iter().any(|b| b.0 == ally), "her shots go past it");
+    // A creature that isn't an ally takes her on.
+    let foe = mob(&mut s, "grunt", [-2.0, 0.0, 0.0]);
+    s.engage(foe, crate::sim::mobs::Foe::Hero(a));
+    assert!(!matches!(s.mobs[&foe].state, MobState::Idle { .. }), "a foe does");
+}
+
 #[test]
 fn help_aimed_at_nothing_finds_a_friend_near_the_reticle_or_lands_on_the_caster() {
     // A friend behind her, far off the reticle: it's hers.
@@ -423,4 +496,39 @@ fn a_silence_or_its_key_again_ends_a_beam() {
     let hp = s.mobs[&m].health;
     run_still(&mut s, &[m], 0.6);
     assert_eq!(s.mobs[&m].health, hp, "no more ticks");
+}
+
+/// The health bar's heal ahead (Corey: "showing what your health will likely end up at after the
+/// heal is finished assuming no damage"): a meal's and a mending boon's healing still to come, and
+/// the hero ends up there if nothing hurts them. Their own regeneration between fights isn't in it.
+#[test]
+fn the_heal_ahead_is_where_the_health_ends_up_if_nothing_hurts() {
+    let mut s = world(false, MEND);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    assert_eq!(s.heal_ahead(a), 0, "nothing coming");
+    let max = s.players[&a].max_health;
+    s.players.get_mut(&a).unwrap().health = max * 3 / 10;
+    assert_eq!(s.heal_ahead(a), 0, "hurt, but nothing coming");
+    let now = s.clock;
+    // A meal: a tenth of their health a second for 3 sec; a mending: a twentieth at each of 4 ticks.
+    s.players.get_mut(&a).unwrap().effects.push(Effect { kind: MEAL.to_string(), amount: 0.1, until: now + 3.0, name: "Roast".into() });
+    assert!(s.apply_cc(a, a, "regen", 4.0, 0.05, 0.0, "Renew"));
+    let ahead = s.heal_ahead(a);
+    let want = (max as f32 * 0.5).round() as u32;
+    assert!(ahead.abs_diff(want) <= 2, "half their health to come: {ahead} of {want}");
+    let from = s.players[&a].health;
+    // In a fight throughout, so no regeneration of their own adds to it (the bar leaves that out).
+    for _ in 0..120 {
+        let now = s.clock;
+        s.players.get_mut(&a).unwrap().combat_at = now;
+        let _ = s.step(DT);
+    }
+    let end = s.players[&a].health;
+    assert!(end.abs_diff(from + ahead) <= 3, "they end where it said: {end}, said {}", from + ahead);
+    assert_eq!(s.heal_ahead(a), 0, "and nothing's left to come");
+    // Never more than they're missing.
+    s.players.get_mut(&a).unwrap().health = max - 5;
+    let now = s.clock;
+    s.players.get_mut(&a).unwrap().effects.push(Effect { kind: MEAL.to_string(), amount: 0.1, until: now + 3.0, name: "Roast".into() });
+    assert_eq!(s.heal_ahead(a), 5, "capped at what they're missing");
 }

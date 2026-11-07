@@ -2760,7 +2760,9 @@ impl Survival {
     pub(crate) fn ally_target(&self, id: Id, range: f32, radius: f32) -> Id {
         let Some(me) = self.players.get(&id) else { return id };
         let pos = me.pos;
-        let friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
+        let mut friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
+        // And the creatures help can reach (allies, a Priest's orb; never a totem).
+        friends.extend(self.mobs.iter().filter(|(mid, _)| self.takes_help(id, **mid)).map(|(mid, m)| (*mid, m.pos)));
         if friends.is_empty() {
             return id;
         }
@@ -2833,23 +2835,31 @@ impl Survival {
         if d.impact_kit != 0 {
             self.events.push(Event::Visual { id: target, kit: d.impact_kit, by: None });
         }
-        if d.ally_heal > 0.0 {
-            let amount = self.players.get(&target).map_or(0, |p| (p.max_health as f32 * d.ally_heal * self.weakened(id)).round() as u32);
-            self.heal_hero_by(target, amount, id, &d.name);
+        // On an allied creature: its heal only (a cleanse and boons are a hero's).
+        if let Some(max) = self.mobs.get(&target).map(|m| m.max_health) {
+            if d.ally_heal > 0.0 {
+                let amount = (max as f32 * d.ally_heal * self.weakened(id)).round() as u32;
+                self.heal_creature_by(target, amount, id, &d.name);
+            }
+        } else {
+            if d.ally_heal > 0.0 {
+                let amount = self.players.get(&target).map_or(0, |p| (p.max_health as f32 * d.ally_heal * self.weakened(id)).round() as u32);
+                self.heal_hero_by(target, amount, id, &d.name);
+            }
+            if d.cleanse {
+                self.cleanse(target, &crate::content::HARMFUL);
+            }
+            let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
+            if !boons.is_empty() {
+                self.apply_effects(id, target, &boons, share, &d.name);
+            }
+            // Power Word: Shield on a friend: marked for the blow about to land on them.
+            if d.parry_for && target != id {
+                self.mark_shield(id, target, ability);
+            }
         }
-        if d.cleanse {
-            self.cleanse(target, &crate::content::HARMFUL);
-        }
-        let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
-        if !boons.is_empty() {
-            self.apply_effects(id, target, &boons, share, &d.name);
-        }
-        // Power Word: Shield on a friend: marked for the blow about to land on them.
-        if d.parry_for && target != id {
-            self.mark_shield(id, target, ability);
-        }
-        // On another hero: Valor for it (not for helping yourself). No word names them: the
-        // spell's look lands on them, and a heal's green number for them comes (`HO`).
+        // On another hero or an ally: Valor for it (not for helping yourself). No word names
+        // them: the spell's look lands on them, and a heal's green number floats over them.
         if target != id {
             let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
             self.gain_valor(id, v);
@@ -3210,9 +3220,28 @@ impl Survival {
 
     /// A hero's totem or summon (Summon Infernal's demon) that `by` mustn't hurt: their own, or a
     /// friend's (a hero they can't harm: always in co-op, only a Siege partner in Siege). With
-    /// friendly fire on in the open world, another hero's is fair game; your own never is.
+    /// friendly fire on in the open world, another hero's is fair game; your own never is. An ally
+    /// of the heroes (a `friendly` creature) is spared every hero, friendly fire or not.
     pub(crate) fn own_totem(&self, mid: Id, by: Id) -> bool {
+        if self.players.contains_key(&by) && self.mobs.get(&mid).is_some_and(|m| m.friendly) {
+            return true;
+        }
         self.totems.iter().any(|t| t.mob == mid && (t.owner == by || (self.players.contains_key(&by) && !self.hostile(by, t.owner))))
+    }
+
+    /// Whether help from hero `by` (a heal aimed at a friend) can reach creature `mid`: one on the
+    /// heroes' side (a `friendly` creature, or set down by `by` or a friend of theirs) that isn't
+    /// a totem, or a totem its rules make `healable` (a Priest's orb). A totem never otherwise.
+    pub(crate) fn takes_help(&self, by: Id, mid: Id) -> bool {
+        let Some(m) = self.mobs.get(&mid) else { return false };
+        if m.health == 0 || m.hidden {
+            return false;
+        }
+        let d = &self.content.mobs[m.def];
+        if d.totem && !d.healable {
+            return false;
+        }
+        m.friendly || self.totems.iter().any(|t| t.mob == mid && (t.owner == by || self.helpable(by, t.owner)))
     }
 
     fn cone(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {
@@ -4212,6 +4241,27 @@ impl Survival {
         if !still {
             self.engage(mid, mobs::Foe::Hero(id));
         }
+        Ok(self.content.mobs[def].name.clone())
+    }
+
+    /// An ally to try help on (a dev command, `.es ally`): creature `key` set down `yards` ahead
+    /// (1 to 40) on the heroes' side, standing still, at `hp` of its health (a share, 0.01 to 1):
+    /// a heal aimed at a friend can land on it. `.es target clear` takes it away.
+    pub fn spawn_ally(&mut self, id: Id, key: &str, yards: f32, hp: f32) -> Result<String, String> {
+        let def = self.content.mob(key).ok_or_else(|| format!("No creature called {key}."))?;
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        let yards = yards.clamp(1.0, 40.0);
+        let at = self.ground_near(p.pos[0] + p.facing.cos() * yards, p.pos[1] + p.facing.sin() * yards, p.pos[2]);
+        let face = facing(at, p.pos);
+        let mid = self.spawn_mob(def, at, None, false);
+        if let Some(m) = self.mobs.get_mut(&mid) {
+            m.friendly = true;
+            m.facing = face;
+            m.home = at;
+            m.state = mobs::MobState::Idle { wander_at: f32::MAX };
+            m.health = ((m.max_health as f32 * hp.clamp(0.01, 1.0)).round() as u32).max(1);
+        }
+        self.targets.insert(mid, true);
         Ok(self.content.mobs[def].name.clone())
     }
 
