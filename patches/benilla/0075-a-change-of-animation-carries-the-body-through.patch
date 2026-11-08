@@ -1,0 +1,754 @@
+From 312e224b9184ea7a0eceff8b3e1ca9c5c9af306d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 21:52:57 -0600
+Subject: [PATCH] A change of animation carries the body through instead of
+ popping (inertial blending, patch 0075)
+
+When the clips on a rig change at once (a clip cut in or restarted, or the first frame of a
+cross-fade, which jumps straight to an even mix of the two), the gap between the pose on screen and
+the new one is kept as an offset per bone, with the motion the bone had at that instant, and dies
+away along a critically damped spring (rate 18/s: half gone in about 0.09 s, all but gone in a
+quarter second). The body carries through into the new move: a swing cancelled into a dodge, a
+blow chained into the next, a jump's last pose into the landing. Between such moments nothing is
+added, so a fast swing stays as fast as its clip, and a held clock (hit-stop) is no change.
+
+Only a part a clip keyed this frame takes a new offset, and a part still carrying one is posed from
+the value it had without it, so a bone the clips leave unkeyed never gathers offsets; switching the
+blending off gives back every part still easing. The pass runs in the evaluator after the clips
+(and the borrowed bones' return to rest), before the body twist and the action tilts.
+
+It runs while an add-on drives the action layer and `actionBlend` (benilla's own, registered "1")
+is on: the stock client blends as 1.12 does.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/creature_anim.rs       |   2 +
+ .../benilla-app/src/creature_anim/action.rs   |  28 ++
+ crates/benilla-app/src/cvars/mod.rs           |  19 +
+ crates/benilla-app/src/cvars/table.rs         |  11 +
+ crates/benilla-world/src/rig_anim.rs          |   3 +
+ crates/benilla-world/src/rig_anim/inertia.rs  | 476 ++++++++++++++++++
+ crates/benilla-world/src/rig_anim/pose.rs     |  33 +-
+ 7 files changed, 570 insertions(+), 2 deletions(-)
+ create mode 100644 crates/benilla-world/src/rig_anim/inertia.rs
+
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index 6d843c7e..7eda0749 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -32,6 +32,8 @@ mod lod;
+ /// Basin Battle's action animation: timed clips, trails, hit-stop, shake, the roll, the aim pitch
+ /// and the camera's unit collision, all driven by an add-on.
+ mod action;
++#[cfg(test)]
++pub(crate) use action::on_blend_cvar;
+ pub(crate) use action::{lock_point, unit_hit, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 5182d9b6..d794d4e4 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1469,6 +1469,32 @@ pub(super) fn reset_action_on_world_exit(
+     }
+ }
+ 
++/// `actionBlend` (benilla's own): the inertial blending between animations on or off.
++pub(crate) fn on_blend_cvar(
++    ev: On<crate::cvars::CvarChanged>,
++    inertia: Option<ResMut<benilla_world::rig_anim::PoseInertia>>,
++) {
++    if ev.key() != "actionblend" {
++        return;
++    }
++    if let Some(mut inertia) = inertia {
++        inertia.on = ev.flag();
++        info!(
++            "action: blending between animations {}",
++            if inertia.on { "on" } else { "off" }
++        );
++    }
++}
++
++/// The inertial blending runs while an add-on drives the action layer, as everything here does.
++fn blend_while_layer_live(inertia: Option<ResMut<benilla_world::rig_anim::PoseInertia>>) {
++    let Some(mut inertia) = inertia else { return };
++    let live = action_combat::layer_live();
++    if inertia.live != live {
++        inertia.live = live;
++    }
++}
++
+ /// A new UI VM (a `ReloadUI`, an add-on turned off): what the old one's add-on held is let go, as
+ /// nothing is left to undo it; an add-on that wants it again asks again.
+ pub(super) fn reset_action_on_new_vm(
+@@ -1686,8 +1712,10 @@ pub(super) fn plugin(app: &mut App) {
+                     .after(drain_action_calls)
+                     .before(crate::weapon_trail::fire_weapon_trails),
+                 reset_action_on_new_vm,
++                blend_while_layer_live,
+             ),
+         )
++        .add_observer(on_blend_cvar)
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+             (reset_action_on_world_exit, afterimage::clear_afterimages),
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index bf8a264f..d76d298c 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1676,6 +1676,21 @@ mod tests {
+         assert!(res::<LookWater>(&app).on);
+     }
+ 
++    /// `actionBlend` (benilla's own) turns the inertial blending between animations off and on,
++    /// registered "1" to match `PoseInertia`'s default; whether an add-on drives the layer is not
++    /// the setting's to change.
++    #[test]
++    fn action_blend_switches_the_blending() {
++        use benilla_world::rig_anim::PoseInertia;
++        let mut app = cvar_app();
++        assert!(res::<PoseInertia>(&app).on, "registered \"1\"");
++        assert_eq!(apply(&mut app, "actionBlend", "0"), SetOutcome::Changed);
++        assert!(!res::<PoseInertia>(&app).on);
++        assert!(!res::<PoseInertia>(&app).live, "the layer's own flag is untouched");
++        apply(&mut app, "actionBlend", "1");
++        assert!(res::<PoseInertia>(&app).on);
++    }
++
+     /// `worldWind` and `worldSky` (benilla's own) turn the new look's wind and its painted sky off
+     /// and on, each by itself, registered "1" to match `LookWind`'s and `LookSky`'s defaults.
+     #[test]
+@@ -2816,6 +2831,7 @@ mod tests {
+             .init_resource::<FollowConfig>()
+             .init_resource::<VideoConfig>()
+             .init_resource::<benilla_world::ffx_glow::FfxSwitches>()
++            .init_resource::<benilla_world::rig_anim::PoseInertia>()
+             // `worldLook`'s registered "1", as `VideoPlugin` inserts it.
+             .insert_resource(benilla_world::look::WorldLook::NEW)
+             .init_resource::<benilla_world::look::LookAo>()
+@@ -2860,6 +2876,9 @@ mod tests {
+         |app| {
+             app.add_observer(crate::video::on_cvar);
+         },
++        |app| {
++            app.add_observer(crate::creature_anim::on_blend_cvar);
++        },
+         |app| {
+             app.add_observer(crate::player::camera::on_cvar);
+         },
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index 51803fbf..197f907b 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -836,6 +836,17 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — the reference has no off-screen buffer to hang a resolution dial \
+          on; its nearest equivalent, `gxResolution`, drops the interface with the world",
+     ),
++    // benilla's own: inertial blending between animations while an add-on drives the action
++    // layer (a change of clip carries the body's motion through instead of popping), "0" for
++    // 1.12's cuts and cross-fades. The knob is `benilla_world::rig_anim::PoseInertia::on`, set by
++    // `creature_anim::action::on_blend_cvar`; inert while no add-on drives the layer.
++    ours(
++        "actionBlend",
++        "1",
++        "benilla's own — 1.12 cuts and cross-fades between a unit's animations; this carries the \
++         body's motion through a change of animation (inertial blending) while an add-on drives \
++         the action layer",
++    ),
+     // benilla's own: the new look (WoW Forever-style zone light, a longer view, bloom and a
+     // colour grade, god rays and mist), "0" for 1.12's exactly. The knob is
+     // `benilla_world::look::WorldLook`, set by `video::on_cvar`.
+diff --git a/crates/benilla-world/src/rig_anim.rs b/crates/benilla-world/src/rig_anim.rs
+index 63972ede..7200eaec 100644
+--- a/crates/benilla-world/src/rig_anim.rs
++++ b/crates/benilla-world/src/rig_anim.rs
+@@ -8,12 +8,14 @@ use bevy::prelude::*;
+ mod compose;
+ mod global_seq;
+ mod bones;
++mod inertia;
+ mod pose;
+ 
+ pub(crate) use compose::seed_rig_rows;
+ pub use bones::{map_bones, retarget, striking_link, Bones};
+ pub use compose::{finalize_rig_worlds, PosePost};
+ pub use global_seq::GlobalSeqDrive;
++pub use inertia::PoseInertia;
+ pub use pose::{ExtraClips, PoseEval, PoseExtra, RigAnchor, RigFrame, RigPose};
+ 
+ /// A scene's own clock in seconds, on each model root that stands in a scene that keeps one: a
+@@ -34,6 +36,7 @@ pub struct AnimParked;
+ /// Registers the rig machinery; `WorldPlugins` adds it, so a program with no game still poses its
+ /// rigs.
+ pub fn plugin(app: &mut App) {
++    app.init_resource::<PoseInertia>();
+     global_seq::plugin(app);
+     pose::plugin(app);
+     compose::plugin(app);
+diff --git a/crates/benilla-world/src/rig_anim/inertia.rs b/crates/benilla-world/src/rig_anim/inertia.rs
+new file mode 100644
+index 00000000..780696c9
+--- /dev/null
++++ b/crates/benilla-world/src/rig_anim/inertia.rs
+@@ -0,0 +1,476 @@
++//! Basin Battle: inertial blending between animations (not in 1.12.1). When the clips on a rig
++//! change at once (a clip cut in or restarted, or the first frame of a cross-fade, which jumps
++//! straight to an even mix), the gap between the pose on screen and the new one is kept as an
++//! offset, with the motion the body had at that instant, and dies away along a critically damped
++//! spring: the body carries through into the new move instead of popping to it. Between such
++//! moments nothing is added, so a fast swing stays as fast as its clip. Only a part a clip keyed
++//! this frame takes a new offset, and one still carrying an offset is posed from the value it had
++//! without it, so a bone the clips leave unkeyed never gathers offsets. Inert unless an add-on
++//! drives the action layer and `actionBlend` is on: the stock client blends as 1.12 does.
++
++use bevy::prelude::*;
++
++use super::pose::{BORROWED_R, BORROWED_T};
++
++/// The switch: `actionBlend` (benilla's own, registered "1") and whether an add-on drives the
++/// action layer now, which the app writes each frame. The blending runs while both hold.
++#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
++pub struct PoseInertia {
++    pub on: bool,
++    pub live: bool,
++}
++
++impl Default for PoseInertia {
++    fn default() -> Self {
++        Self {
++            on: true,
++            live: false,
++        }
++    }
++}
++
++impl PoseInertia {
++    pub fn active(&self) -> bool {
++        self.on && self.live
++    }
++}
++
++/// The spring's rate (1/s): an offset is half gone in about 0.09 s and all but gone in a quarter
++/// second, the length of a quick cross-fade.
++pub(crate) const RATE: f32 = 18.0;
++/// A node's share of the blend moving this much in one frame is a cut.
++const SHARE_JUMP: f32 = 0.2;
++/// A node with at least this share whose clock runs back, or leaps further ahead than any clip
++/// plays in a frame, is a cut (a restart, a seek).
++const SEEK_SHARE: f32 = 0.15;
++const SEEK_BACK: f32 = 0.05;
++const MAX_CLIP_RATE: f32 = 4.0;
++const SEEK_SLACK: f32 = 0.1;
++/// A gap between two poses longer than this (a parked rig waking) starts over with no offset.
++const GAP: f32 = 0.25;
++/// The motion carried into a cut, at most: radians a second, and model units (yards) a second.
++const MAX_SPIN: f32 = 25.0;
++const MAX_SPEED: f32 = 15.0;
++/// An offset and its motion both under this are gone.
++const GONE: f32 = 1.0e-4;
++
++/// One node in this frame's blend: its graph index, its share of the weights, its clip time.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub(crate) struct Contribution {
++    pub node: usize,
++    pub share: f32,
++    pub seek: f32,
++}
++
++/// A rig's blending state, per bone in skeleton order. Translation and rotation each keep the
++/// value shown last frame and its motion, the offset and the offset's motion, and the value the
++/// clips gave (what a part still carrying an offset is posed from once no clip keys it).
++#[derive(Default)]
++pub(crate) struct InertiaState {
++    sig: Vec<Contribution>,
++    last: f64,
++    shown_t: Vec<Vec3>,
++    shown_r: Vec<Quat>,
++    vel_t: Vec<Vec3>,
++    vel_r: Vec<Vec3>,
++    off_t: Vec<Vec3>,
++    off_tv: Vec<Vec3>,
++    off_r: Vec<Vec3>,
++    off_rv: Vec<Vec3>,
++    clean_t: Vec<Vec3>,
++    clean_r: Vec<Quat>,
++    /// Per bone, the parts carrying an offset now ([`BORROWED_T`], [`BORROWED_R`]).
++    carrying: Vec<u8>,
++}
++
++impl InertiaState {
++    /// Blend this frame's pose: `locals` as the clips just wrote them, `written` per bone the parts
++    /// a clip keyed, `sig` the nodes in the blend, `now` the world clock in seconds. A cut since the
++    /// last frame keeps the gap from the shown pose as an offset; every carried offset eases out.
++    pub(crate) fn apply(
++        &mut self,
++        locals: &mut [Transform],
++        written: &[u8],
++        sig: Vec<Contribution>,
++        now: f64,
++    ) {
++        let n = locals.len();
++        let dt = (now - self.last) as f32;
++        if self.shown_t.len() != n || dt.is_nan() || dt <= 0.0 || dt > GAP {
++            self.release(locals, written);
++            self.start(locals, sig, now);
++            return;
++        }
++        let cut = is_cut(&self.sig, &sig, dt);
++        self.sig = sig;
++        self.last = now;
++        for (b, local) in locals.iter_mut().enumerate() {
++            let keyed = written.get(b).copied().unwrap_or(0);
++            self.translation(b, local, keyed & BORROWED_T != 0, cut, dt);
++            self.rotation(b, local, keyed & BORROWED_R != 0, cut, dt);
++        }
++    }
++
++    fn translation(&mut self, b: usize, local: &mut Transform, keyed: bool, cut: bool, dt: f32) {
++        let carrying = self.carrying[b] & BORROWED_T != 0;
++        if !keyed && !carrying {
++            // Untouched: follow what's there, so a later cut starts from it.
++            self.shown_t[b] = local.translation;
++            self.vel_t[b] = Vec3::ZERO;
++            return;
++        }
++        let clean = if keyed {
++            local.translation
++        } else {
++            self.clean_t[b]
++        };
++        if cut && keyed {
++            let expected = self.shown_t[b] + self.vel_t[b] * dt;
++            self.off_t[b] = expected - clean;
++            self.off_tv[b] = self.vel_t[b];
++            self.carrying[b] |= BORROWED_T;
++        } else if carrying {
++            let (x, v) = spring(self.off_t[b], self.off_tv[b], dt);
++            if x.length() < GONE && v.length() < GONE {
++                self.off_t[b] = Vec3::ZERO;
++                self.off_tv[b] = Vec3::ZERO;
++                self.carrying[b] &= !BORROWED_T;
++            } else {
++                self.off_t[b] = x;
++                self.off_tv[b] = v;
++            }
++        }
++        let shown = if self.carrying[b] & BORROWED_T != 0 {
++            clean + self.off_t[b]
++        } else {
++            clean
++        };
++        local.translation = shown;
++        self.clean_t[b] = clean;
++        self.vel_t[b] = ((shown - self.shown_t[b]) / dt).clamp_length_max(MAX_SPEED);
++        self.shown_t[b] = shown;
++    }
++
++    fn rotation(&mut self, b: usize, local: &mut Transform, keyed: bool, cut: bool, dt: f32) {
++        let carrying = self.carrying[b] & BORROWED_R != 0;
++        if !keyed && !carrying {
++            self.shown_r[b] = local.rotation;
++            self.vel_r[b] = Vec3::ZERO;
++            return;
++        }
++        let clean = if keyed {
++            local.rotation
++        } else {
++            self.clean_r[b]
++        };
++        if cut && keyed {
++            let expected =
++                (Quat::from_scaled_axis(self.vel_r[b] * dt) * self.shown_r[b]).normalize();
++            self.off_r[b] = arc(expected * clean.inverse());
++            self.off_rv[b] = self.vel_r[b];
++            self.carrying[b] |= BORROWED_R;
++        } else if carrying {
++            let (x, v) = spring(self.off_r[b], self.off_rv[b], dt);
++            if x.length() < GONE && v.length() < GONE {
++                self.off_r[b] = Vec3::ZERO;
++                self.off_rv[b] = Vec3::ZERO;
++                self.carrying[b] &= !BORROWED_R;
++            } else {
++                self.off_r[b] = x;
++                self.off_rv[b] = v;
++            }
++        }
++        let shown = if self.carrying[b] & BORROWED_R != 0 {
++            (Quat::from_scaled_axis(self.off_r[b]) * clean).normalize()
++        } else {
++            clean
++        };
++        local.rotation = shown;
++        self.clean_r[b] = clean;
++        self.vel_r[b] = (arc(shown * self.shown_r[b].inverse()) / dt).clamp_length_max(MAX_SPIN);
++        self.shown_r[b] = shown;
++    }
++
++    /// Give back every part still carrying an offset that no clip keyed this frame (a keyed one
++    /// was just rewritten by its clip), so the blending can stop without leaving a bone bent.
++    pub(crate) fn release(&mut self, locals: &mut [Transform], written: &[u8]) {
++        for (b, local) in locals.iter_mut().enumerate() {
++            let carrying = self.carrying.get(b).copied().unwrap_or(0);
++            let keyed = written.get(b).copied().unwrap_or(0);
++            if carrying & BORROWED_T != 0 && keyed & BORROWED_T == 0 {
++                local.translation = self.clean_t[b];
++            }
++            if carrying & BORROWED_R != 0 && keyed & BORROWED_R == 0 {
++                local.rotation = self.clean_r[b];
++            }
++        }
++        self.carrying.iter_mut().for_each(|c| *c = 0);
++    }
++
++    /// Begin from the pose as it stands, still and with no offset.
++    fn start(&mut self, locals: &[Transform], sig: Vec<Contribution>, now: f64) {
++        let n = locals.len();
++        self.sig = sig;
++        self.last = now;
++        self.shown_t = locals.iter().map(|l| l.translation).collect();
++        self.shown_r = locals.iter().map(|l| l.rotation).collect();
++        self.clean_t = self.shown_t.clone();
++        self.clean_r = self.shown_r.clone();
++        for v in [
++            &mut self.vel_t,
++            &mut self.vel_r,
++            &mut self.off_t,
++            &mut self.off_tv,
++            &mut self.off_r,
++            &mut self.off_rv,
++        ] {
++            v.clear();
++            v.resize(n, Vec3::ZERO);
++        }
++        self.carrying.clear();
++        self.carrying.resize(n, 0);
++    }
++}
++
++/// Whether the blend changed at once between two frames `dt` apart: a node's share jumping, a
++/// node coming or going with a real share, or a weighty node's clock running back or leaping.
++pub(crate) fn is_cut(prev: &[Contribution], now: &[Contribution], dt: f32) -> bool {
++    let find = |s: &[Contribution], node: usize| s.iter().find(|c| c.node == node).copied();
++    for c in now {
++        match find(prev, c.node) {
++            None if c.share >= SHARE_JUMP => return true,
++            None => {}
++            Some(p) => {
++                if (c.share - p.share).abs() >= SHARE_JUMP {
++                    return true;
++                }
++                let ds = c.seek - p.seek;
++                if c.share >= SEEK_SHARE
++                    && (ds < -SEEK_BACK || ds > dt * MAX_CLIP_RATE + SEEK_SLACK)
++                {
++                    return true;
++                }
++            }
++        }
++    }
++    prev.iter()
++        .any(|p| p.share >= SHARE_JUMP && find(now, p.node).is_none())
++}
++
++/// A critically damped spring toward zero over `dt`: `x(t) = (x0 + (v0 + w·x0)·t)·e^(−w·t)`.
++fn spring(x: Vec3, v: Vec3, dt: f32) -> (Vec3, Vec3) {
++    let e = (-RATE * dt).exp();
++    let j = v + x * RATE;
++    ((x + j * dt) * e, (v - j * (RATE * dt)) * e)
++}
++
++/// A turn as an axis scaled by its angle, the short way round.
++fn arc(q: Quat) -> Vec3 {
++    let q = if q.w < 0.0 { -q } else { q };
++    q.to_scaled_axis()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    const FRAME: f64 = 1.0 / 60.0;
++
++    fn one(node: usize, seek: f32) -> Vec<Contribution> {
++        vec![Contribution {
++            node,
++            share: 1.0,
++            seek,
++        }]
++    }
++
++    fn angle(a: Quat, b: Quat) -> f32 {
++        arc(a * b.inverse()).length()
++    }
++
++    /// A clip turning the bone at 2 rad/s and sliding it at 1 yd/s, cut to another holding a
++    /// different pose: on the cut the bone carries on where its motion was taking it (no pop), then
++    /// eases into the new pose, all but there in a quarter second and exactly there soon after.
++    #[test]
++    fn a_cut_carries_the_body_on_and_eases_into_the_new_pose() {
++        let mut s = InertiaState::default();
++        let mut locals = vec![Transform::default()];
++        let mut now = 0.0;
++        for f in 0..30 {
++            let t = f as f32 * FRAME as f32;
++            locals[0].rotation = Quat::from_rotation_z(2.0 * t);
++            locals[0].translation = Vec3::X * t;
++            s.apply(&mut locals, &[BORROWED_T | BORROWED_R], one(0, t), now);
++            now += FRAME;
++        }
++        let before = locals[0];
++        let target = Transform {
++            translation: Vec3::new(0.0, 2.0, 0.0),
++            rotation: Quat::from_rotation_x(1.0),
++            ..default()
++        };
++        locals[0] = target;
++        s.apply(&mut locals, &[BORROWED_T | BORROWED_R], one(1, 0.0), now);
++        let step = FRAME as f32;
++        let carried = Quat::from_rotation_z(2.0 * step) * before.rotation;
++        assert!(
++            angle(locals[0].rotation, carried) < 1.0e-3,
++            "the turn carries on through the cut"
++        );
++        assert!(
++            (locals[0].translation - (before.translation + Vec3::X * step)).length() < 1.0e-3,
++            "and the slide"
++        );
++        let mut worst = 0.0f32;
++        for f in 1..=60 {
++            now += FRAME;
++            locals[0] = target;
++            s.apply(
++                &mut locals,
++                &[BORROWED_T | BORROWED_R],
++                one(1, f as f32 * step),
++                now,
++            );
++            if f == 15 {
++                assert!(
++                    angle(locals[0].rotation, target.rotation) < 0.15,
++                    "most of the way there in a quarter second"
++                );
++            }
++            worst = worst.max(angle(locals[0].rotation, target.rotation));
++        }
++        assert!(worst < 1.6, "never swings wide of the gap it closes");
++        assert_eq!(locals[0], target, "and exactly there once it settles");
++    }
++
++    /// A clip playing on with no change in the blend is posed exactly as its clip gives it.
++    #[test]
++    fn with_no_cut_the_clip_is_shown_as_it_is() {
++        let mut s = InertiaState::default();
++        let mut locals = vec![Transform::default(); 2];
++        let mut now = 0.0;
++        for f in 0..40 {
++            let t = f as f32 * FRAME as f32;
++            let want = [
++                Transform::from_rotation(Quat::from_rotation_y(3.0 * t)),
++                Transform::from_translation(Vec3::splat(t)),
++            ];
++            locals.copy_from_slice(&want);
++            s.apply(&mut locals, &[BORROWED_R, BORROWED_T], one(0, t), now);
++            assert_eq!(locals, want, "frame {f}");
++            now += FRAME;
++        }
++    }
++
++    /// A part keyed at the cut that the new clip doesn't key keeps easing from the value the old
++    /// clip left, and ends on exactly that value: it never gathers an offset.
++    #[test]
++    fn a_part_the_new_clip_leaves_unkeyed_settles_on_its_last_value() {
++        let mut s = InertiaState::default();
++        let mut locals = vec![Transform::default()];
++        let mut now = 0.0;
++        for f in 0..20 {
++            locals[0].rotation = Quat::from_rotation_z(0.05 * f as f32);
++            s.apply(&mut locals, &[BORROWED_R], one(0, f as f32 * 0.016), now);
++            now += FRAME;
++        }
++        // The cut: a new clip keys the bone this one frame, then never again.
++        let held = Quat::from_rotation_x(0.8);
++        locals[0].rotation = held;
++        s.apply(&mut locals, &[BORROWED_R], one(1, 0.0), now);
++        for f in 1..=90 {
++            now += FRAME;
++            // Unkeyed: the evaluator leaves the value shown last frame in place.
++            s.apply(&mut locals, &[0], one(1, f as f32 * 0.016), now);
++        }
++        assert_eq!(
++            locals[0].rotation, held,
++            "settled on the value, no offset left in it"
++        );
++    }
++
++    /// Letting go mid-ease puts back a part no clip keys, so switching the blending off never
++    /// leaves a bone bent.
++    #[test]
++    fn letting_go_mid_ease_gives_back_an_unkeyed_part() {
++        let mut s = InertiaState::default();
++        let mut locals = vec![Transform::default()];
++        s.apply(&mut locals, &[BORROWED_R], one(0, 0.0), 0.0);
++        s.apply(&mut locals, &[BORROWED_R], one(0, 0.016), FRAME);
++        let new = Quat::from_rotation_y(1.2);
++        locals[0].rotation = new;
++        s.apply(&mut locals, &[BORROWED_R], one(1, 0.0), 2.0 * FRAME);
++        assert!(
++            angle(locals[0].rotation, new) > 1.0,
++            "easing from the old pose"
++        );
++        s.release(&mut locals, &[0]);
++        assert_eq!(locals[0].rotation, new);
++    }
++
++    /// A rig woken after a long park starts over from its pose: no offset across the gap.
++    #[test]
++    fn a_long_gap_starts_over_with_no_offset() {
++        let mut s = InertiaState::default();
++        let mut locals = vec![Transform::default()];
++        s.apply(&mut locals, &[BORROWED_R], one(0, 0.0), 0.0);
++        let woke = Quat::from_rotation_x(2.0);
++        locals[0].rotation = woke;
++        s.apply(&mut locals, &[BORROWED_R], one(1, 0.0), 1.0);
++        assert_eq!(locals[0].rotation, woke);
++    }
++
++    #[test]
++    fn the_cut_reader_tells_a_change_of_blend_from_a_clip_playing_on() {
++        let c = |node, share, seek| Contribution { node, share, seek };
++        let dt = 1.0 / 60.0;
++        // Playing on, and a looping clip a frame further on: no cut.
++        assert!(!is_cut(&[c(0, 1.0, 0.5)], &[c(0, 1.0, 0.52)], dt));
++        // A cross-fade's first frame: the new clip in at half, the old down to half.
++        assert!(is_cut(
++            &[c(0, 1.0, 0.5)],
++            &[c(0, 0.5, 0.52), c(1, 0.5, 0.0)],
++            dt
++        ));
++        // The same fade a few frames on: shares drifting by a few hundredths.
++        assert!(!is_cut(
++            &[c(0, 0.45, 0.6), c(1, 0.55, 0.1)],
++            &[c(0, 0.40, 0.62), c(1, 0.60, 0.12)],
++            dt
++        ));
++        // A clip restarted, or seeked ahead past any rate.
++        assert!(is_cut(&[c(0, 1.0, 0.8)], &[c(0, 1.0, 0.0)], dt));
++        assert!(is_cut(&[c(0, 1.0, 0.1)], &[c(0, 1.0, 0.6)], dt));
++        // A clip cut away, and a faint one appearing (an overlay at a sliver's weight).
++        assert!(is_cut(&[c(0, 1.0, 0.5)], &[c(1, 1.0, 0.0)], dt));
++        assert!(!is_cut(
++            &[c(0, 1.0, 0.5)],
++            &[c(0, 0.95, 0.52), c(1, 0.05, 0.0)],
++            dt
++        ));
++        // A held clock (hit-stop) is no cut.
++        assert!(!is_cut(&[c(0, 1.0, 0.5)], &[c(0, 1.0, 0.5)], dt));
++    }
++
++    #[test]
++    fn the_switch_needs_the_setting_and_a_live_layer() {
++        assert!(
++            !PoseInertia::default().active(),
++            "off until an add-on drives the layer"
++        );
++        assert!(
++            PoseInertia {
++                on: true,
++                live: true
++            }
++            .active()
++        );
++        assert!(
++            !PoseInertia {
++                on: false,
++                live: true
++            }
++            .active()
++        );
++    }
++}
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index b1388f84..dc878e1f 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -43,6 +43,8 @@ pub struct RigPose {
+     /// swing's last turn of it would stay for good (a shield left crooked after the swing): once
+     /// no clip writes such a property, it goes back to rest. Empty until a borrowed clip plays.
+     pub(crate) borrowed: Vec<u8>,
++    /// Basin Battle: the inertial blending's state ([`super::inertia`]), while it runs.
++    pub(crate) inertia: Option<Box<super::inertia::InertiaState>>,
+ }
+ 
+ /// [`RigPose::borrowed`]'s bits: translation, rotation, scale.
+@@ -78,6 +80,7 @@ impl RigPose {
+             anchors: Vec::new(),
+             pose_dirty: true,
+             borrowed: Vec::new(),
++            inertia: None,
+         };
+         rig.compose();
+         rig
+@@ -214,6 +217,8 @@ struct Active {
+ 
+ /// Pose every live rig where `animate_targets` runs, after `advance_animations`.
+ fn evaluate_rig_poses(
++    time: Res<Time>,
++    inertia: Option<Res<super::inertia::PoseInertia>>,
+     mut rigs: Query<
+         (
+             &AnimationPlayer,
+@@ -224,6 +229,9 @@ fn evaluate_rig_poses(
+         Without<AnimParked>,
+     >,
+ ) {
++    // Basin Battle: the inertial blending runs while the add-on drives the action layer.
++    let blending = inertia.is_some_and(|i| i.active());
++    let now = time.elapsed_secs_f64();
+     // Parallel: a rig reads shared clips and writes only its own pose.
+     rigs.par_iter_mut()
+         .for_each(|(player, anims, mut rig, extra)| {
+@@ -271,7 +279,9 @@ fn evaluate_rig_poses(
+                     static MARKS: std::cell::RefCell<(Vec<u8>, Vec<u8>)> =
+                         const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
+                 }
+-                let track = active.iter().any(|a| a.extra) || !rig.borrowed.is_empty();
++                let track_borrowed = active.iter().any(|a| a.extra) || !rig.borrowed.is_empty();
++                // The blending reads the same marks, and so does its letting go.
++                let track = track_borrowed || blending || rig.inertia.is_some();
+                 MARKS.with(|marks| {
+                 let (written, ext) = &mut *marks.borrow_mut();
+                 written.clear();
+@@ -324,9 +334,28 @@ fn evaluate_rig_poses(
+                         blend_rig(src, extra, many, &mut rig, track.then_some((&mut *written, &mut *ext)));
+                     }
+                 }
+-                if track {
++                if track_borrowed {
+                     settle_borrowed(&mut rig, written, ext);
+                 }
++                let rig = &mut *rig;
++                if blending {
++                    let total: f32 = active.iter().map(|a| a.weight).sum();
++                    let sig = active
++                        .iter()
++                        .map(|a| super::inertia::Contribution {
++                            node: a.node,
++                            share: if total > 0.0 { a.weight / total } else { 0.0 },
++                            seek: a.seek,
++                        })
++                        .collect();
++                    rig.inertia
++                        .get_or_insert_with(Default::default)
++                        .apply(&mut rig.locals, written, sig, now);
++                    rig.pose_dirty = true;
++                } else if let Some(mut state) = rig.inertia.take() {
++                    state.release(&mut rig.locals, written);
++                    rig.pose_dirty = true;
++                }
+                 });
+             });
+         });
+-- 
+2.56.0.windows.4
+
