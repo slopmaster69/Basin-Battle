@@ -2397,6 +2397,8 @@ impl Survival {
                     }
                     let released = self.mobs[&id].pattern;
                     let completed = released.map(|(k, _)| k);
+                    // A hit can mercy-cancel the pattern; retain the step that actually released.
+                    let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
                     self.release(id, foe);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
@@ -2431,6 +2433,11 @@ impl Survival {
                         self.machinery_string_landed(id, completed, a.damage);
                         self.kitchen_string_landed(id, released);
                         self.vancleef_string_landed(id, completed);
+                    }
+                    // Install the authored opening after ordinary recovery/cooldown bookkeeping,
+                    // which must not shorten it. Earlier interrupted blows never reach this point.
+                    if !a.ranged && lodge > 0.0 {
+                        self.boss_weapon_lodges(id, lodge);
                     }
                 } else {
                     self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: t2, mark, shown };
@@ -2810,7 +2817,7 @@ impl Survival {
                 self.strike_fair(id, h, a.damage, pos, a.blockable, a.heavy, a.blockable, Blow::Light, area, combat::Follow::None);
             }
         }
-        // A boss's blow: burning ground where a heated weapon lands, a weapon that lodges.
+        // A boss's blow: burning ground where a heated weapon lands.
         self.boss_blow_lands(id, pos, f, a.range, a.arc, a.heavy);
         // A War Banner in the blow's way takes it, as hard as a hero would.
         let share = self.foe_blow_share(id);
