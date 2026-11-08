@@ -205,11 +205,16 @@ impl Survival {
         true
     }
 
-    pub(crate) fn kitchen_string_landed(&mut self, id: Id, pattern: Option<usize>) {
+    pub(crate) fn kitchen_string_landed(&mut self, id: Id, released: Option<(usize, usize)>) {
         if !self.is_kitchen(id) { return; }
-        let Some(k) = pattern else { return };
+        let Some((k, step)) = released else { return };
         let m = &self.mobs[&id];
-        let name = self.content.mobs[m.def].patterns[k].name.as_str();
+        let pattern = &self.content.mobs[m.def].patterns[k];
+        // A hit can mercy-cancel the remaining blows inside release (zero network grace),
+        // or later when the queued hit settles. An absent pattern alone is not completion.
+        // Count the final authored release even if that final hit itself leaves a hero reeling.
+        if step + 1 != pattern.steps.len() { return; }
+        let name = pattern.name.as_str();
         let Some(c) = self.kitchen.cooks.get_mut(&id) else { return };
         if name != "steam" { c.completed = if self.content.mobs[m.def].key == GORGED { (c.completed + 1) % 2 } else { c.completed.saturating_add(1) }; }
         if matches!(name, "steam" | "belch") { self.kitchen_cough(id, COUGH); }

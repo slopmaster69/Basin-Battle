@@ -2395,7 +2395,8 @@ impl Survival {
                     if let Some(mk) = mark {
                         self.unmark(mk);
                     }
-                    let completed = self.mobs[&id].pattern.map(|(k, _)| k);
+                    let released = self.mobs[&id].pattern;
+                    let completed = released.map(|(k, _)| k);
                     self.release(id, foe);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
@@ -2428,7 +2429,7 @@ impl Survival {
                     }
                     if self.mobs[&id].pattern.is_none() {
                         self.machinery_string_landed(id, completed, a.damage);
-                        self.kitchen_string_landed(id, completed);
+                        self.kitchen_string_landed(id, released);
                         self.vancleef_string_landed(id, completed);
                     }
                 } else {

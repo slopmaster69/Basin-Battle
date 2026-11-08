@@ -26,7 +26,8 @@ second-form handoff stay in the existing dungeon system.
 Native assets checked against local 1.12.1 data:
 
 - Displays 1305 and 1773 both use Murloc. Their native multipliers are 1.3 and 2.0. Gorged's
-  authored scale is now 1.15, so the second form visibly grows instead of matching Cookie's size.
+  authored scale of 1.15 targets a larger second form; apparent growth still needs native
+  verification and is not established by those values alone.
 - Murloc has Attack1H 17, Special1H 57, AttackThrown 107, LoadThrown 112, SpellCast 32 and
   CombatWound 9. It does not have clip 54 or dedicated eating, working, coughing or inhale clips.
   The scoop uses LoadThrown and the recovery uses CombatWound as stand-ins. No attached vessel,
