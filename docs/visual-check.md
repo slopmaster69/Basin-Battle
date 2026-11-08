@@ -145,6 +145,7 @@ include _setup                # another file's lines, at their own times
   `{aim}` is the camera's facing and elevation both, as the add-on sends them.
 - **The camera** is held where `cam` says from the moment the hero is in the world: yaw is a map
   facing in degrees (0 is behind the hero `.es goto` leaves facing north), pitch below 0 looks down.
+  `cam off` holds no camera at all, for a scenario that turns it itself (`lua` steps).
 - **Bursts**: 0.05 to 0.1 s apart is dense enough to step through an animation; the client takes
   at most one still a frame. Keep the count to what the moment needs: each still is a file.
 - **Moving**: a script can't press the movement or jump keys (they're protected), so a strafe is
