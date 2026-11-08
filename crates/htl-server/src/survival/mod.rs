@@ -278,6 +278,11 @@ pub struct SurvivalGame {
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
     clock_at: Instant,
+    /// A clock running faster than real time (`[world] clock_speed`): when it started and from
+    /// what hour, and the pin and speed it started for (a change of either starts it again).
+    clock_epoch: Instant,
+    clock_start: [u32; 2],
+    clock_seen: (Option<[u32; 2]>, f32),
 }
 
 /// A hero's name: their save's (a character's own), else their account's (its first footman).
@@ -376,6 +381,9 @@ impl SurvivalGame {
             dirty: true,
             saved_at: Instant::now(),
             clock_at: Instant::now(),
+            clock_epoch: Instant::now(),
+            clock_start: [0, 0],
+            clock_seen: (None, 1.0),
             lab: None,
             lab_mobs: Vec::new(),
             lab_stage: None,
@@ -406,20 +414,50 @@ impl SurvivalGame {
         }
     }
 
-    /// The game clock this world shows: pinned (`[world] clock`, Elwynn's night) above ground,
-    /// the time it is now below (a dungeon has its own light) and in Siege's Arathi.
+    /// The game clock this world shows now: pinned (`[world] clock`, Elwynn's morning) above
+    /// ground, or where a faster clock (`clock_speed`) has got to since it started; the time it
+    /// is now below (a dungeon has its own light) and in Siege's Arathi.
     pub(crate) fn clock(&self) -> Option<[u32; 2]> {
-        self.sim.content.world.clock.filter(|_| !self.realm.below && !self.realm.siege)
+        if self.realm.below || self.realm.siege {
+            return None;
+        }
+        let w = &self.sim.content.world;
+        if w.clock_speed > 1.0 {
+            Some(packets::clock_after(self.clock_start, self.clock_epoch.elapsed().as_secs_f32(), w.clock_speed))
+        } else {
+            w.clock
+        }
     }
 
-    /// A pinned clock set again now and then, so it never runs on into the dawn.
+    /// How fast this world's clock runs (`[world] clock_speed`): real time below and in Siege.
+    pub(crate) fn clock_speed(&self) -> f32 {
+        if self.realm.below || self.realm.siege {
+            1.0
+        } else {
+            self.sim.content.world.clock_speed.max(1.0)
+        }
+    }
+
+    /// A pinned clock set again now and then, so it never runs on into the dusk; a faster clock
+    /// set to where it has got to, so everyone sees the same hour. A change of the pin or the
+    /// speed (tuned in play) starts the clock again from the pin, at once.
     fn hold_clock(&mut self) {
+        let w = &self.sim.content.world;
+        let seen = (w.clock, w.clock_speed.max(1.0));
+        if seen != self.clock_seen {
+            self.clock_seen = seen;
+            self.clock_epoch = Instant::now();
+            self.clock_start = w.clock.unwrap_or_else(packets::real_clock);
+            self.clock_at = Instant::now();
+            self.broadcast(&packets::login_set_time_speed_rate(self.clock(), self.clock_speed()));
+            return;
+        }
         let Some(c) = self.clock() else { return };
         if self.clock_at.elapsed().as_secs_f32() < self.sim.content.world.clock_every.max(10.0) {
             return;
         }
         self.clock_at = Instant::now();
-        self.broadcast(&packets::login_set_time_speed_at(Some(c)));
+        self.broadcast(&packets::login_set_time_speed_rate(Some(c), self.clock_speed()));
     }
 
     pub(crate) fn save(&mut self) {
@@ -751,7 +789,7 @@ impl SurvivalGame {
         let spawn = self.spawn_point();
         self.send(conn, packets::tutorial_flags_all_seen());
         self.send(conn, packets::bindpoint(spawn, self.realm.map, self.realm.area));
-        self.send(conn, packets::login_set_time_speed_at(self.clock()));
+        self.send(conn, packets::login_set_time_speed_rate(self.clock(), self.clock_speed()));
         self.send(conn, packets::initial_spells(&[packets::DUEL_SPELL]));
         self.send(conn, packets::action_buttons_empty());
         self.send(conn, packets::initialize_factions_empty());

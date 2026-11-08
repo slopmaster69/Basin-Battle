@@ -1,0 +1,33 @@
+# Ambient life (client 0072): the open field at the Brackwell pumpkin patch at noon, for the
+# butterflies (a couple at a time, out on open ground away from the trees); then looklife 3,
+# worldLife 0 and worldLook 0.
+# Look for: one or two small butterflies (white, yellow, orange or pale blue) fluttering low over
+# the field, wings flapping quickly, wandering about a spot and now and then flying off; lit by the
+# day, not glowing; never a swarm; at looklife 3 about six. If none show in the first 20 s, say so:
+# the field may count as under trees.
+hero warrior
+cam 0 -8 8
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+8.0 video
+8.5 shots meadow 48 0.25
+21.0 lua ConsoleExec("looklife 3")
+26.0 shots life-x3 32 0.25
+34.5 lua ConsoleExec("looklife grade")
+34.55 lua SetCVar("worldLife", "0")
+36.0 shots worldlife-0 2 0.5
+37.5 lua SetCVar("worldLife", "1")
+37.55 lua SetCVar("worldLook", "0")
+37.6 lua ClearWorldFog()
+39.0 shots classic 2 0.5
+40.5 lua SetCVar("worldLook", "1")
+40.55 lua ClearWorldFog()
+40.6 lua ConsoleExec("lookweather server")
+42 end

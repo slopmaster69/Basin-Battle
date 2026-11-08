@@ -1,0 +1,28 @@
+# The foam round reeds (client 0070, `look-tune-1`): Crystal Lake at golden hour (17:30), the view of
+# the sky's lake film (take 270, clouds-in-water-00), where every reed base standing in the shallows
+# had a crisp white foam ring. The same froth as round a wading hero's legs now: the tuned water,
+# a burst for the ripples, then worldWater 0 and 1.12's look.
+# Look for: at each reed's base a little soft, lumpy froth that thins out over the ripples, or none
+# where the reeds stand thin; no crisp white rings or ovals; the shore's band softer and patchy.
+hero warrior
+cam 250 -8 9
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("looksky grade")
+5.5 shots tuned 3 0.5
+7.1 shots ripples 6 0.25
+9.0 lua SetCVar("worldWater", "0")
+10.0 shots worldwater-0 2 0.5
+11.1 lua SetCVar("worldWater", "1")
+11.15 lua SetCVar("worldLook", "0")
+11.2 lua ClearWorldFog()
+12.0 shots classic 2 0.5
+13.1 lua SetCVar("worldLook", "1")
+13.15 lua ClearWorldFog()
+14 end

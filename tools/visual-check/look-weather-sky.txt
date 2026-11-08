@@ -1,0 +1,31 @@
+# Visible weather (client 0071) and the revised sky (0068): the sky over Crystal Lake at noon and at
+# golden hour, the camera pitched up, clear, overcast, heavy rain and a storm (lookweather).
+# Look for: overcast and heavier: the revised sky's grey, darker cover (darker under the thick
+# parts, a few thinner places), never a flat white sheet; at golden hour the gold capped and dimmed
+# under the cloud; in the storm a flash lighting the clouds from inside for a moment.
+hero warrior
+cam 200 30 4
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua SetCVar("worldSky", "1")
+4.3 lua ConsoleExec("lookweather clear")
+5.5 shots noon-clear 2 0.5
+7.0 lua ConsoleExec("lookweather overcast 1")
+20.0 shots noon-overcast 2 0.5
+22.0 lua ConsoleExec("lookweather rain 1")
+35.0 shots noon-rain 2 0.5
+37.0 lua ConsoleExec("lookweather storm 1")
+50.0 video
+50.5 shots noon-storm 4 5.0
+71.0 lua ConsoleExec("worldclock 1110")
+71.5 lua ConsoleExec("lookweather clear")
+84.0 shots golden-clear 2 0.5
+86.0 lua ConsoleExec("lookweather rain 1")
+100.0 shots golden-rain 2 0.5
+102.0 lua ConsoleExec("lookweather server")
+104 end

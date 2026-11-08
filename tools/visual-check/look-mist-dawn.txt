@@ -1,0 +1,15 @@
+# #215's morning mist at first light (worldclock 330), Crystal Lake's hollow: from above (a high
+# camera), then 1.12's look from the same spot. Look for: mist lying
+# in the low ground and thinning up the slopes, the ground near the hero still readable.
+hero warrior
+cam 0 -16 14
+include _setup
+4.2 .es dummy clear
+4.5 .es goto crystal_lake
+6.0 lua ConsoleExec("worldclock 330")
+6.2 lua UIParent:Hide()
+7.5 shots above 3 0.6
+10.5 shots above2 3 0.6
+12.5 lua SetCVar("worldLook","0")
+13.0 shots old 3 0.6
+15 end

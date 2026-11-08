@@ -1,0 +1,34 @@
+# Ambient life (client 0072): the woods by Crystal Lake at night (23:00), the camera turned from
+# the water toward the trees. Fireflies in the dark woods, and the hero sidestepping left then
+# right (the camera moving with them) to show that nothing pops; then worldLife 0 and worldLook 0.
+# Look for: fireflies glowing and blinking among the trunks and over the grass in the blue-black
+# night, the bloom around each; their light a small green pool on the ground under the nearest; as
+# the camera moves, the glows staying put in the world (no swimming), none appearing or vanishing
+# at once anywhere on screen; no motes or butterflies at night, and only a rare leaf.
+hero warrior
+cam 250 -6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+12.0 video
+12.5 shots night 16 0.25
+17.0 lua ActionDash(3, 3, "l")
+17.0 shots step-left 12 0.25
+20.5 lua ActionDash(3, 3, "r")
+20.5 shots step-right 12 0.25
+24.0 lua SetCVar("worldLife", "0")
+25.5 shots worldlife-0 2 0.5
+27.0 lua SetCVar("worldLife", "1")
+27.05 lua SetCVar("worldLook", "0")
+27.1 lua ClearWorldFog()
+28.5 shots classic 2 0.5
+30.0 lua SetCVar("worldLook", "1")
+30.05 lua ClearWorldFog()
+30.1 lua ConsoleExec("lookweather server")
+32 end

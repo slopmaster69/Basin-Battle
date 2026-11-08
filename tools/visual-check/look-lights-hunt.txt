@@ -1,0 +1,41 @@
+# The new look's lights after the hunt for them (client 0057, tuned): Goldshire at night (23:00), the
+# camera facing the cart and the lamp posts along the road, every light at 0, tuned, 3 and 6 times
+# (`looklights`), then a Fireball and a Frostbolt cast toward the cart at the tuned strength.
+# Look for: a warm pool under each lamp post and by the cart you'd notice from here (15-20 yd),
+# painterly orange, not white; the Fireball lighting the road orange as it flies and bursting
+# brighter; the Frostbolt a pale ice light that shows on the dark ground, steady.
+hero warrior
+cam 180 -8 12
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("looklights 0")
+5.5 shots off 2 0.5
+6.6 lua ConsoleExec("looklights tuned")
+7.5 shots tuned 3 0.5
+9.1 lua ConsoleExec("looklights 3")
+10.0 shots x3 2 0.5
+11.1 lua ConsoleExec("looklights 6")
+12.0 shots x6 2 0.5
+13.1 lua ConsoleExec("looklights tuned")
+13.3 .es slot q fireball
+14.50 .es in ab 0 0
+14.70 .es in a {facing} 0
+14.75 .es in au {facing} 0
+14.60 shots fireball 14 0.08
+17.0 video
+17.50 .es in ab 0 0
+17.70 .es in a {facing} 0
+17.75 .es in au {facing} 0
+20.5 .es slot q frostbolt
+21.50 .es in ab 0 0
+21.70 .es in a {facing} 0
+21.75 .es in au {facing} 0
+21.60 shots frostbolt 14 0.08
+24.50 .es in ab 0 0
+24.70 .es in a {facing} 0
+24.75 .es in au {facing} 0
+27.5 end

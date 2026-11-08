@@ -1,0 +1,25 @@
+# The new look's contact shadows (client 0064): what they cost. Goldshire at golden hour, standing
+# still, the fps journal on (benilla-config/Diagnostics/fps-journal.csv, a row a second with each
+# pass's GPU time): 8 s with worldAO 1, 8 s with worldAO 0, 8 s with it on again.
+# Look for: in the CSV, the GPU time with it on against off: gpu_ms, and the "other" column, where
+# the look pass and the AO's three passes (world_ao, world_ao_blur_x, world_ao_blur_y) land; the
+# difference is what the AO costs. Please send the CSV with the film, and say the GPU and the
+# window size (and renderScale, gxMultisample if not the defaults).
+hero warrior
+cam 0 -6 8
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldAO", "1")
+4.25 lua ConsoleExec("lookao grade")
+4.3 lua SetCVar("fpsJournal", "1")
+6.0 shots cost-on 1 1.0
+12.5 lua SetCVar("worldAO", "0")
+14.0 shots cost-off 1 1.0
+20.5 lua SetCVar("worldAO", "1")
+22.0 shots cost-on-again 1 1.0
+28.5 lua SetCVar("fpsJournal", "0")
+29 end

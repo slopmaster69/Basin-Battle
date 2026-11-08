@@ -1,0 +1,24 @@
+# The new look's sun shadows (client 0065): Goldshire facing the inn at dawn, high. 06:00 (none
+# yet), 06:30 (coming in), 07:00 (long and cool).
+# Look for: the shadows fading in between 06:15 and 06:45 rather than popping; long cool shade at
+# 07:00 with the blue fill; acne on the ground under a low sun.
+hero warrior
+cam 0 -6 8
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 360")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookshadow grade")
+6.5 shots 0600 2 0.6
+8.0 lua ConsoleExec("worldclock 390")
+9.5 shots 0630 3 0.6
+11.5 lua ConsoleExec("worldclock 405")
+13.0 shots 0645 2 0.6
+14.5 lua ConsoleExec("worldclock 420")
+16.0 shots 0700 3 0.6
+18.0 lua SetCVar("worldShadows", "0")
+19.5 shots 0700-off 2 0.6
+21 end

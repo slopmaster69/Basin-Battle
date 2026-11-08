@@ -1,0 +1,32 @@
+# The new look's wind and sky (client 0068): the woods by Crystal Lake at golden hour (17:30),
+# toward the low sun. The trees in the world's own wind (calmer toward evening), a run long enough
+# for a gust, then lookwind 2, lookwind 0, worldWind 0 and 1.12's look.
+# Look for: the crowns swaying against the gold sky, slower and gentler than at noon; the long
+# shadows of the swaying trees moving with them on the ground; the clouds over the trees gold
+# underneath; nothing jittering at the leaf edges in the backlight.
+hero warrior
+cam 250 -4 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWind", "1")
+4.25 lua SetCVar("worldSky", "1")
+4.3 lua ConsoleExec("lookwind grade")
+4.35 lua ConsoleExec("looksky grade")
+5.5 shots sway 16 0.25
+9.6 shots gust 40 0.75
+40.0 lua ConsoleExec("lookwind 2")
+41.0 shots wind-x2 12 0.25
+44.5 lua ConsoleExec("lookwind 0")
+45.5 shots still 4 0.5
+48.0 lua ConsoleExec("lookwind grade")
+48.05 lua SetCVar("worldWind", "0")
+49.0 shots worldwind-0 4 0.5
+51.5 lua SetCVar("worldWind", "1")
+51.55 lua SetCVar("worldLook", "0")
+51.6 lua ClearWorldFog()
+52.5 shots classic 4 0.5
+55 end

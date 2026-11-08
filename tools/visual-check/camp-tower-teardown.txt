@@ -1,0 +1,23 @@
+# Tear down the test Watchtower north of the campfire: .es demolish wants it within 6.5 yd and
+# the ghost landed further ahead than guessed, so the hero asks from a ring of spots.
+hero warrior
+cam 0 -10 9
+1 .es debug on
+2 .es goto -9606 677.5 36.5 0
+3 .es demolish yes
+5 .es goto -9602 677.5 36.5 0
+6 .es demolish yes
+8 .es goto -9598 677.5 36.5 0
+9 .es demolish yes
+11 .es goto -9606 683 36.5 0
+12 .es demolish yes
+14 .es goto -9606 672 36.5 0
+15 .es demolish yes
+17 .es goto -9600 683 36.5 0
+18 .es demolish yes
+20 .es goto -9600 672 36.5 0
+21 .es demolish yes
+23 .es goto -9594 677.5 36.5 0
+24 .es demolish yes
+26 .es status
+28 end
