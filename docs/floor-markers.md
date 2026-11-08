@@ -18,7 +18,8 @@ passed 1,114 tests (19 ignored). Repository rules passed with no warnings. On Wi
 the add-on harness needed a local import library for the native UCRT timezone functions;
 no repository source or shared toolchain was changed for that workaround.
 
-A focused harness verified absent settings, an unset preference, saved `1`, explicit `false`,
+The committed add-on scenario asserts the default, Controls toggle, and immediate clearing.
+A focused harness also verified absent settings, an unset preference, saved `1`, explicit `false`,
 the Controls labels and toggle, suppression of TG/TA/MK overlays, and immediate clearing.
 Real-client rendering and persistence through an actual save and reload remain untested.
 Use a fresh temporary client home for that check; the player's settings must stay untouched.
