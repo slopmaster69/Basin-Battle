@@ -510,6 +510,9 @@ fn a_machine_that_falls_lets_its_driver_out_and_comes_back_whole_if_he_wins() {
     assert!(find(&s, "dm_sneed").is_none());
     let back = find(&s, "dm_shredder").expect("the shredder is back");
     assert_eq!(s.mobs[&back].health, s.mobs[&back].max_health);
+    // Return from the lamp for the next pull; an abandoned driver's fight resets immediately.
+    let at = s.mobs[&back].pos;
+    s.move_player(id, [at[0] + 2.5, at[1], at[2]], std::f32::consts::PI, Moving::default());
     // Beaten both ways: gone for good.
     s.engage(back, mobs::Foe::Hero(id));
     s.hurt_mob(back, id, 1_000_000);

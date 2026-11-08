@@ -23,7 +23,8 @@ original post. A lamp rest and a driver death remove any retained wreck.
 The implementation is in `sim/machinery.rs`, with small attack and lifecycle hooks. Other boss
 content, shared boss-run behavior, the client patches and the native creature models stay with
 their existing owners. The native Throw Wrench spell 13398 was verified against the rig's client
-data: `Spells\Missile_Wrench.mdx`, speed 20. Smoke and work use existing spell visuals 1856 and
+data: `Spells\Missile_Wrench.mdx`, speed 20. Sneed uses GoblinMale's native AttackThrown 107,
+whose release event is at 0.20 sec in its 0.67 sec take; that model has no clip 61. Smoke and work use existing spell visuals 1856 and
 2575. The native model audit confirmed attack 16 takes 0/1, special 130 and StandWound 8; it
 has no separate stun clip. Sweep uses take 0, stamp uses 130 and grind uses take 1, with native
 attack/pre-aggro/aggro sounds 1977/1981/1982. Stall uses StandWound and wound sound 1979. The
