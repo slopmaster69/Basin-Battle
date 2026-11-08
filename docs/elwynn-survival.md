@@ -4,8 +4,8 @@ A soulslike survival game on the benilla client, run by the same host as Basin B
 hero of Goldshire: fight with aimed, committed blows, a guard, a parry and a dodge, with five
 abilities picked from any of nine classes; gather timber, meat and Fargodeep copper; bank it at the
 camp; build a cooking fire and a smithing anvil in the old Westbrook garrison's yard; and, when
-you're ready, ring the bell and hold the camp against the Horde's raids. It is always night, under
-Duskwood's mist. Past the camp the whole of Elwynn Forest is open, from Northshire to the Westfall
+you're ready, ring the bell and hold the camp against the Horde's raids. It is always mid-morning,
+in Elwynn's own light. Past the camp the whole of Elwynn Forest is open, from Northshire to the Westfall
 bridge and the Redridge road: its places are marked on the world map, and each has its foes, its
 goods, its chests and secrets, and the shrines and champions that teach the camp its cards. Below
 lie the dungeons and the Bookmaker's Wager; the camp's book also opens Siege, camp against camp.
@@ -1214,11 +1214,12 @@ The camp's people are drawn as creatures (friendly, never fought, never in the w
 A camp from before the move keeps its stations: each standing outside the new building ground is
 carried over to the nearest good spot in it as the save is read.
 
-**Night and fog.** The game clock is pinned at half past eleven at night (`[world] clock`), set
-again every five minutes so it never runs on to the dawn (not below, not in Siege). The add-on
-asks the client for Duskwood's mist over it (`[world] fog`; `raid_fog`, thicker and redder, from
-the bell until the raid is over), through client patch 0018's `SetWorldFog`; a client without it
-keeps Elwynn's own night.
+**The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set
+again every five minutes so it never runs on to the dusk (not below, not in Siege); until 7 Nov
+it was half past eleven at night under Duskwood's mist, and every game was night and fog. By day
+no mist of ours lies over Elwynn's own air (`[world] fog` is unset). While a raid is called, the
+add-on asks the client for a thicker, redder fog (`raid_fog`, from the bell until the raid is
+over) through client patch 0018's `SetWorldFog`; a client without it keeps Elwynn's own.
 
 ## Resources, stations and what they make
 
