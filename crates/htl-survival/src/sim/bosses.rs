@@ -33,8 +33,8 @@ const WAIT_FOR: f32 = 22.0;
 const WAIT_MOST: f32 = 30.0;
 /// A leg it has made no way along for this long: it's set down at the leg's end.
 const STUCK: f32 = 3.0;
-/// It runs its route a quarter quicker than it chases: ahead of the heroes, there first.
-const RUN_HASTE: f32 = 1.25;
+/// It runs its route this much quicker than it chases: well ahead of the heroes, there first.
+const RUN_HASTE: f32 = 1.6;
 /// A leg taking this many times longer than a straight run along it is helped along.
 const LEG_SLACK: f32 = 2.5;
 /// Burning ground bites a hero standing in it this often.
@@ -167,7 +167,7 @@ impl Survival {
                 r.leg += 1;
                 let (leg, of) = (r.leg, e.run_to.len());
                 let name = self.content.mobs[def].name.clone();
-                self.events.push(Event::Log(format!("{name} on its run: point {leg} of {of} at {:.0} {:.0} {:.0}", pos[0], pos[1], pos[2])));
+                self.events.push(Event::Log(format!("{name} on its run: point {leg} of {of} at {:.0} {:.0} {:.0}, {:.1} s in", pos[0], pos[1], pos[2], now - run.leg_at)));
                 if leg >= of {
                     self.bosses.runs.get_mut(&id).unwrap().arrived = Some(now);
                     self.halt(id);
