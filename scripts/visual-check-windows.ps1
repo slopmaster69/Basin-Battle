@@ -51,6 +51,7 @@ $Defaults = [ordered]@{
     warrior       = "Vcwarrior"
     resolution    = "1280x720"
     monitor       = ""
+    mute          = "1"
     format        = "jpg"
     width         = "1280"
     video         = "screen"
@@ -70,6 +71,7 @@ $SettingsHelp = @(
     "# monitor: which screen the game window goes on, and the video films. Empty or 0: wherever Windows opens",
     "#   it. 1 is the main screen (the one with the taskbar by default), 2 the next, and so on, the others in",
     "#   the order Windows lists them; or a name like DISPLAY2 (Settings > System > Display > Identify).",
+    "# mute: 1 (the default) mutes the game's sound in Windows' mixer from the moment it starts; 0 leaves it.",
     "# video: screen (the game window's rectangle, by Desktop Duplication: the one that sees a Vulkan",
     "#   window's frames), title or desktop (GDI: they see only a few stale frames of benilla's window), or off.",
     "#   ffmpeg: ffmpeg.exe (empty: Documents\visual-check\ffmpeg).",
@@ -384,6 +386,88 @@ public static class VisualCheckWin {
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    public delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    // Every visible window of the process (not a minimized one, nor a tiny helper) to (x, y), its
+    // size kept; how many there are. By the windows themselves, not Process.MainWindowHandle. For a
+    // client that doesn't read WOW_WINDOW_AT: its window shows where Windows puts it, and moves
+    // once the client answers (about a second and a half in).
+    public static int MoveAll(int pid, int x, int y) {
+        int n = 0;
+        EnumWindows(delegate (IntPtr h, IntPtr l) {
+            uint wp; GetWindowThreadProcessId(h, out wp);
+            RECT r;
+            if (wp != (uint)pid || !IsWindowVisible(h) || IsIconic(h) || !GetWindowRect(h, out r) || r.Right - r.Left < 100) return true;
+            n++;
+            // SWP_NOSIZE 0x1 | SWP_NOZORDER 0x4 | SWP_NOACTIVATE 0x10
+            if (r.Left != x || r.Top != y) SetWindowPos(h, IntPtr.Zero, x, y, 0, 0, 0x15);
+            return true;
+        }, IntPtr.Zero);
+        return n;
+    }
+}
+
+// The game's sound muted in Windows' mixer (its audio sessions on every playback device), as a
+// player would from the volume mixer: benilla has no setting of its own for it.
+public static class VisualCheckAudio {
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator {}
+    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceEnumerator { int EnumAudioEndpoints(int flow, int state, out IMMDeviceCollection c); }
+    [ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceCollection { int GetCount(out int n); int Item(int i, out IMMDevice d); }
+    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDevice { int Activate(ref Guid iid, int ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o); }
+    [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionManager2 {
+        int GetAudioSessionControl(IntPtr a, int b, out IntPtr c);
+        int GetSimpleAudioVolume(IntPtr a, int b, out IntPtr c);
+        int GetSessionEnumerator(out IAudioSessionEnumerator e);
+    }
+    [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionEnumerator { int GetCount(out int n); int GetSession(int i, out IAudioSessionControl2 s); }
+    [ComImport, Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionControl2 {
+        int GetState(out int s); int GetDisplayName(out IntPtr p); int SetDisplayName(IntPtr a, IntPtr b);
+        int GetIconPath(out IntPtr p); int SetIconPath(IntPtr a, IntPtr b); int GetGroupingParam(out Guid g);
+        int SetGroupingParam(IntPtr a, IntPtr b); int RegisterAudioSessionNotification(IntPtr a);
+        int UnregisterAudioSessionNotification(IntPtr a);
+        int GetSessionIdentifier(out IntPtr p); int GetSessionInstanceIdentifier(out IntPtr p); int GetProcessId(out uint pid);
+    }
+    [ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface ISimpleAudioVolume {
+        int SetMasterVolume(float v, ref Guid ctx); int GetMasterVolume(out float v);
+        int SetMute([MarshalAs(UnmanagedType.Bool)] bool m, ref Guid ctx); int GetMute([MarshalAs(UnmanagedType.Bool)] out bool m);
+    }
+    // The process's sessions found (each muted now if it wasn't).
+    public static int Mute(int pid) { int muted; return Sessions(pid, true, out muted); }
+    // The process's sessions, and how many of them are muted (muting them first if `mute`).
+    public static int Sessions(int pid, bool mute, out int muted) {
+        int n = 0; muted = 0;
+        IMMDeviceCollection devs;
+        if (((IMMDeviceEnumerator)new MMDeviceEnumerator()).EnumAudioEndpoints(0, 1, out devs) != 0) return 0;
+        int count; devs.GetCount(out count);
+        Guid iid = typeof(IAudioSessionManager2).GUID;
+        for (int i = 0; i < count; i++) {
+            IMMDevice d; object o; IAudioSessionEnumerator se; int sc;
+            if (devs.Item(i, out d) != 0 || d.Activate(ref iid, 23, IntPtr.Zero, out o) != 0) continue;
+            if (((IAudioSessionManager2)o).GetSessionEnumerator(out se) != 0) continue;
+            se.GetCount(out sc);
+            for (int k = 0; k < sc; k++) {
+                IAudioSessionControl2 c; uint sp;
+                if (se.GetSession(k, out c) != 0 || c.GetProcessId(out sp) != 0 || sp != (uint)pid) continue;
+                var vol = (ISimpleAudioVolume)c;
+                bool m; vol.GetMute(out m);
+                Guid g = Guid.Empty;
+                if (!m && mute) { vol.SetMute(true, ref g); vol.GetMute(out m); }
+                if (m) muted++;
+                n++;
+            }
+        }
+        return n;
+    }
 }
 "@
 [void][VisualCheckWin]::SetProcessDPIAware()
@@ -412,13 +496,6 @@ function Get-WantedMonitor($setting) {
     }
     Say "  monitor = $($setting): this PC has $($screens.Count) screen(s) ($(($screens | ForEach-Object { $_.DeviceName.TrimStart([char]92, '.') }) -join ', ')); leaving the window where Windows opens it."
     return $null
-}
-
-# Moves the window's top-left corner to the top-left of the screen's working area, its size kept.
-function Move-ToMonitor($hwnd, $screen) {
-    $wa = $screen.WorkingArea
-    # SWP_NOSIZE 0x1 | SWP_NOZORDER 0x4 | SWP_NOACTIVATE 0x10
-    [void][VisualCheckWin]::SetWindowPos($hwnd, [IntPtr]::Zero, $wa.X, $wa.Y, 0, 0, 0x15)
 }
 
 # ddagrab's output_idx for a screen: DXGI lists the outputs in an order of its own, so each index is
@@ -507,6 +584,9 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
         WOW_UNATTENDED = "1"; WOW_BG = "0"
         WOW_PROBE_EXIT_AT = [string]($timeout - 5)
     }
+    # The window made on its monitor from the start (a client that reads WOW_WINDOW_AT).
+    $screen = Get-WantedMonitor $s.monitor
+    if ($screen) { $common["WOW_WINDOW_AT"] = "$($screen.WorkingArea.X),$($screen.WorkingArea.Y)" }
     foreach ($k in $vars.Keys) { $common[$k] = $vars[$k] }
     $saved = @{}
     foreach ($k in $common.Keys) {
@@ -516,7 +596,7 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
     $p = $null
     $rec = $null
     $shotsDir = Join-Path $chome "Screenshots"
-    $screen = Get-WantedMonitor $s.monitor
+    $muteNext = Get-Date
     # The outputs ddagrab sees are looked at now, not when the video is due.
     if ($v -and $s.video -eq "screen" -and $s.ffmpeg) { $null = Get-OutputIdx $s.ffmpeg ([System.Windows.Forms.Screen]::PrimaryScreen) }
     try {
@@ -527,14 +607,12 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
             # The window goes to its monitor the moment it exists, and is put back if the client
             # moves it, until the video starts (its offsets are taken then).
             if ($screen -and -not $rec) {
-                $p.Refresh()
-                if ($p.MainWindowHandle -ne [IntPtr]::Zero) {
-                    $wr = New-Object VisualCheckWin+RECT
-                    $wa = $screen.WorkingArea
-                    if ([VisualCheckWin]::GetWindowRect($p.MainWindowHandle, [ref]$wr) -and ($wr.Left -ne $wa.X -or $wr.Top -ne $wa.Y)) {
-                        Move-ToMonitor $p.MainWindowHandle $screen
-                    }
-                }
+                $wa = $screen.WorkingArea
+                [void][VisualCheckWin]::MoveAll($p.Id, $wa.X, $wa.Y)
+            }
+            # Its sound muted as soon as it has any, and kept muted (a new device, a new session).
+            if ($s.mute -ne "0" -and ((Get-Date) -ge $muteNext)) {
+                try { if ([VisualCheckAudio]::Mute($p.Id) -gt 0) { $muteNext = (Get-Date).AddSeconds(1) } } catch { $muteNext = (Get-Date).AddSeconds(1) }
             }
             if ($v -and -not $rec -and (Test-Path $shotsDir) -and (Get-ChildItem $shotsDir -Filter *.png)) {
                 $rec = Start-Video $v $p $s.video
@@ -546,7 +624,8 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
                 $v.Duration = [Math]::Max(1.0, $v.Duration - ((Get-Date) - $v.Started).TotalSeconds)
                 $rec = Start-Video $v $p $(if ($v.How -eq "screen") { "title" } else { "desktop" })
             }
-            Start-Sleep -Milliseconds 100
+            # Quick while the window is still to be caught.
+            Start-Sleep -Milliseconds $(if ($rec -or -not $screen) { 100 } else { 15 })
         }
         return $p.HasExited
     } finally {

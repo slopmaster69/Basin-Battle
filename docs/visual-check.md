@@ -36,6 +36,7 @@ watcher, below).
    | `hunter`, `warrior` | `Vchunter`, `Vcwarrior` | the test heroes the scenarios play |
    | `resolution` | `1280x720` | the client's window while it runs |
    | `monitor` | empty | which screen the game window goes on and the video films: empty or `0` is wherever Windows opens it; `1` is the main screen, `2` the next, and so on (the others in the order Windows lists them); or a name like `DISPLAY2` (Settings > System > Display > Identify shows which is which) |
+   | `mute` | `1` | `1` mutes the game's sound in Windows' volume mixer from the moment it has any (the client has no sound setting of its own); `0` leaves it |
    | `format`, `width` | `jpg`, `1280` | the stills: JPG (or `png`), scaled down past this width |
    | `video` | `screen` | `screen` records the game window's rectangle by Desktop Duplication (it sees every frame); `title` and `desktop` are GDI's grabs, which see only a few stale frames of benilla's Vulkan window; `off` none |
    | `ffmpeg` | `Documents\visual-check\ffmpeg\ffmpeg.exe` | |
@@ -178,9 +179,11 @@ branch's and none of the player's settings are touched. benilla's env probes do 
   rectangle on the screen the window is on, which works while the window is on top (as it is during a run) and
   the screen isn't locked: keep the PC awake and unlocked while checks run. GDI's grabs see only a
   few stale frames of a Vulkan window, so they're the fallback, not the way.
-- With `monitor` set the client's window is moved to the top-left of that screen's working area as
-  soon as it exists (its size kept), and put back there if the client moves it before the video
-  starts. The video finds that screen's `ddagrab` output by its size, because DXGI numbers outputs in
+- With `monitor` set the client is told to make its window at the top-left of that screen's working
+  area (`WOW_WINDOW_AT`, read by a client with that patch), so it never shows on another screen. A
+  client without it makes its window where Windows puts it and answers a move only once it's
+  started (about a second and a half in): the rig moves it then (its size kept), and puts it back
+  there if the client moves it before the video starts. The video finds that screen's `ddagrab` output by its size, because DXGI numbers outputs in
   an order of its own, and takes the window's rectangle from the screen's own top-left. A number
   this PC has no screen for is said so in the run's output, and the window stays where Windows
   opens it. The stills are the client's own screenshots, so they don't depend on the screen.
