@@ -1,7 +1,7 @@
 # Gilnid: trouble above the furnace
 
-Status: implemented in PR #295; automated verification passed on November 8, 2026. Real-client
-capture and unassisted fight validation are still required.
+Status: mechanics merged in PR #295 and checked in controlled real-client footage. PR #299
+follows up the visible tells; an unassisted fight and solo-versus-duo validation remain open.
 
 Codex owns this encounter, following the independent Codex and Claude design comparison.
 Claude's monster yells and Rhahk'Zor engine are already on main.
@@ -45,10 +45,24 @@ valve regardless of his health. His 2.2 sec opening can be delayed by a stagger;
 then travels through three separated floor points, leaving dry space to either side. The valve
 sequence runs once. Boss death or reset removes workers, props, warning steam and pending throws.
 
-Small native valve-steam props warn overflow points even with optional floor circles disabled.
-These use `DeadMineValveSteam02` (display 353) at scale 0.8 and expire at impact. The exact steam
-footprint and readability still require client footage; the native Molten Metal impact, support
-silhouette, dynamite arc/fuse and continuous falling motion have the same visual acceptance.
+Five native valve-steam props now cover each overflow's width, even with optional floor circles
+disabled. `DeadMineValveSteam02` (display 353) at scale 1.4 uses anchors inside the existing damage
+disk and expires at impact. Only encounter-owned steam (353), low debris (1108), and the valve
+wheel (755) reuse client patch 0017's immediate, noncolliding-object flag. Cargo (36) and planks
+(6481) keep their collision hulls and ordinary fade: workers rely on those surfaces for client
+floor projection. Ordinary 2 sec fades had hidden most of the 1.4 sec warning. Damage,
+the three 2.2 yd discharge radii, and the global minimum ground-spell radius are unchanged.
+
+Perched engineers hold native red dynamite (item display 18575), with Heavy Dynamite's ready
+pose, fuse effect and arc (spell 4062), plus the native fire-lighting sound 6155. On landing,
+`MobGear` from PR #298 switches the same body to wrench 1610. Takeoff dust is removed; landing
+dust remains. Low native Deadmines lumber (1108) appears immediately when the support is
+removed, with a wooden impact sound; the structural support keeps its ordinary client fade.
+This is a broken-state swap, not a simulated tipping support.
+
+Gilnid faces the valve before using the goblin's native standing interaction (Opening 21651,
+animation 123), with the Deadmines steam whistle (3431). The opening remains 2.2 sec and can be
+staggered; it grants no invulnerability. There is no wheel animation or guaranteed hand contact.
 
 The Windows GNU timezone compatibility shim now lives once in the server library so examples,
 the executable and integration tests link it consistently. The standalone protocol bot, which
@@ -72,6 +86,28 @@ The `gilnid-perches` and `gilnid-perch-shot` recording scenarios parse successfu
 optional floor markers and explicitly describe controlled demonstration footage. They use debug
 healing and selected debug kills; neither is evidence of an unassisted full-fight clear.
 
-Not tested yet: the authored Foundry geometry and visuals in the real client, a full unassisted
-fight with markers disabled, or solo-versus-duo balance. Cargo supports are static rather than
-animated to sway. Keep `needs playtest` until these acceptance checks are recorded.
+Controlled recordings on `8dc26de` with client `skyB` showed real projectile contact dropping a
+worker while Gilnid stayed at full health, both automatic descents, grounded melee, the valve
+trigger and cleanup. They also exposed tiny warning steam, weak dynamite preparation and dust
+obscuring the fall. These recordings are video-only and cannot prove sound audibility.
+
+PR #299 passed 1,084 release tests but failed in the real client: its broad immediate-prop
+predicate removed the cargo and plank hulls, hiding both perched bodies. PR #302 reverts that
+merge first. Exact revert `b97f8d9` restored both visible bodies in a same-camera comparison on
+client `skyB` (watcher request `gilnid-revert-b97f8d9-platforms`).
+
+PR #304 restores the cues with a visual-only predicate. The simulation regression checks owned
+visuals, structural props, unrelated objects, and cleanup. The server regression runs the real
+crew through warning and drop, asserting that cargo/plank renderer flags never remove hulls
+while steam, valve, and debris render immediately. Existing tests retain direct-hit versus
+splash, finite crew, landing gear, warning bounds, safe dry side, and valve interruption checks.
+
+`gilnid-tells-valve` keeps the canonical camera yaw 0 before spawning; camera yaw also affects
+the hero's facing and therefore the boss's home. It scripts crew deaths, then moves along the
+dry side during the actual discharge. `gilnid-tells-direct-hit` isolates one real Fireball on a
+stationary debug boss's worker, with normal crew/controller behavior. These scenarios hide
+floor markers and remain controlled QA, not unassisted fight or balance acceptance.
+
+Restoration validation and client evidence are recorded in PR #304 when complete. Still
+unverified: an unassisted clear, solo-versus-duo balance, audio audibility, support rocking or
+tipping, and valve hand contact. Keep `needs playtest` for those remaining acceptance gaps.
