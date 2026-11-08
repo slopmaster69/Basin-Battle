@@ -1,4 +1,4 @@
-# Froth round wading legs (client 0070, #270's fourth round): Crystal Lake at 17:30, the camera
+# Froth round wading legs (client 0081, #270's fourth round): Crystal Lake at 17:30, the camera
 # over open water facing the shore (yaw 20, pitched 20 down, 6 yd) while the hero backs out into
 # the shallows, then deeper; worldWater 0 and 1.12's look. The wade-in stills may still look
 # through reeds; judge the standing ones.

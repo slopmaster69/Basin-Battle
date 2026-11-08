@@ -1,4 +1,4 @@
-# The water's mirror at the screen's edge (client 0070, `look-tune-1`): Crystal Lake in the morning
+# The water's mirror at the screen's edge (client 0081, `look-tune-1`): Crystal Lake in the morning
 # (07:30), the camera low (7 yd out, nearly level), where the first films (take 236, tuned-00)
 # showed a flat, lighter, sky-coloured sheet at the bottom left where the mirrored rays leave the
 # screen. The tuned water, a burst of ripples, the mirror at none (lookwater 0, the sky and body

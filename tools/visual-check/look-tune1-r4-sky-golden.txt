@@ -1,4 +1,4 @@
-# The golden-hour glare and looksky clouds 0 (client 0070, #270's fourth round): the Brackwell
+# The golden-hour glare and looksky clouds 0 (client 0081, #270's fourth round): the Brackwell
 # pumpkin patch at 17:30, facing the sun (yaw 45) pitched up 35 degrees (the ground stops the
 # camera here; the oaks sit low at the sides), the day's own cover, then looksky clouds 0, 0.6,
 # worldSky 0 and worldLook 0; then dawn (06:00) with clouds 0.
