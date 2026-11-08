@@ -4,14 +4,14 @@
 # at 30% they walk away, no waves, safe minimum windups and a real final recovery.
 # unbar all opens the secret too: killing VanCleef should hand off to exactly one Unbowed.
 hero warrior
-cam 0 -28 15
+cam 180 -28 15
 0 .es debug quiet
 1 .es travel landing
 10 .es debug quiet
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
 11 .es clearfoes
 12 .es unbar all
-13 .es goto -92 -820 39.5 0
+13 .es goto -76 -820 40.2 3.141593
 14 .es heal
 15 .es spawn dm_vancleef
 15.1 video

@@ -37,6 +37,12 @@ Invitation. Reset, return, wipe, death and handoff remove encounter poses, smoke
 
 ## Verification and filming
 
+The installed-data regression in `crates/htl-server/tests/vancleef_native.rs` uses the actual
+pack at (-84, -820), with the hero at (-76, -820, 40.2). It checks observer creation before
+the health gate, every 50 ms of departure, both arrivals before cleanup, no attacks or
+replacements, and the complete smoke/retreat/arrival/advance sequence. The hero is healed
+and health gates are injected; this is movement proof, not an unassisted clear.
+
 Deterministic tests cover actual solo/duo/4-hero AI, exact strings and recovery, waiting,
 melee and projectile contact, the second simultaneous hitter, rear/splash/periodic immunity
 to provocation, CC precedence, posture reward, continuous retreat, blocked/rooted fallback,
@@ -54,9 +60,20 @@ Read-only data queries verified display 2029 and 2357 use HumanMale, native Huma
 patch 0010 holds that guard pose; the HumanMale57 correction from PR285 remains intact.
 Sound kits 5780/5781/5782 and smoke display45 resolve in the local 1.12 data. The smoke is a
 particle emitter with no mesh; its opacity and timing need real-client inspection.
-The native floor probe found both observer standing points and exits on the stern's floor
-(39.1-39.8 yd high), with walking paths from VanCleef's home. It also found the drop south
-of the stern at (-84, -824): the same-floor retreat check rejects that candidate.
+The original observer posts were valid, but their northbound departures around the cabin
+measured 35.760 and 20.351 yd against a 19.4 yd short-route limit after the native navigation
+repair. Every segment passed; total length rejected both observers before they spawned.
+The posts stay at (-88, -818.5) and (-80, -818.5). Their exits now follow the cabin's southern
+lip toward (-78, -816) and (-72, -820), on the same dry deck. Boss home, floor/height checks,
+detour bounds, movement speed and the 8 sec cleanup remain unchanged. Custom terrain that
+cannot support a standing point or departure still omits that observer.
+
+The original short smoke retreat already works at home and after 12 sec of actual AI on
+this floor, so its combat source is unchanged. From a posture break, allow about 2.2 sec
+for the full stagger reward, then 1 sec to walk 4 yd. The cloud lasts 0.65 sec and is gone
+before arrival; the advance begins about 4.2 sec after the break, with its full 1.1 sec
+first windup. Frame the cabin frontage through that whole interval. The drop south at
+(-84, -824) remains rejected rather than used as a retreat.
 
 ## Not tested in the client
 
