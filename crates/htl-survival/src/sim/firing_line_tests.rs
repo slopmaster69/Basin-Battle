@@ -245,20 +245,26 @@ fn a_solo_vanish_keeps_the_encounter_and_its_existing_crew() {
 
 #[test]
 fn normal_charged_projectile_inputs_can_kill_a_gunner() {
-    let (mut s, h, _, crew, _) = fight(false);
+    let (mut s, h, boss, crew, _) = fight(false);
     let g = crew[0];
     s.slot_ability(h, "ranged", "frostbolt").unwrap();
     let key = crate::content::SLOTS.iter().position(|k| *k == "ranged").unwrap() as u8;
     for _ in 0..12 {
         if !s.mobs.get(&g).is_some_and(|m| m.health > 0) { break; }
         let at = s.mobs[&g].pos;
-        let pos = [at[0] + 8.0, at[1], at[2]];
+        // Reposition to a clear flank between casts. The captain is a real blocking body;
+        // standing on one ray and firing through him tests interception, not gunner access.
+        let flank = facing(s.mobs[&boss].pos, at) + std::f32::consts::FRAC_PI_2;
+        let pos = [at[0] + flank.cos() * 24.0, at[1] + flank.sin() * 24.0, at[2]];
         s.move_player(h, pos, facing(pos, at), Moving::default());
+        s.set_aim_line(h, facing(pos, at), -(0.9f32).atan2(24.0));
+        s.events.clear();
         s.input(h, Input::Ability(key, false));
         s.input(h, Input::Attack);
         tick(&mut s, 1.2);
+        s.set_aim_line(h, facing(pos, at), -(0.9f32).atan2(24.0));
         s.input(h, Input::AttackUp);
-        tick(&mut s, 2.0);
+        tick(&mut s, 2.6);
     }
     assert!(!s.mobs.get(&g).is_some_and(|m| m.health > 0), "normal ranged input must reach and kill the deck crew");
 }
@@ -289,10 +295,10 @@ fn killing_the_captain_first_clears_his_elite_pack_and_pays_once() {
     s.hurt_mob(boss, h, u32::MAX);
     assert!(s.slain("greenskin"));
     assert!(crew.iter().all(|g| !s.mobs.contains_key(g)));
-    let bags = s.players[&h].bags.clone();
+    let bags = s.players[&h].bag.clone();
     let kills = s.camp.counts.get("kill:dm_greenskin").copied();
     s.hurt_mob(boss, h, u32::MAX);
-    assert_eq!(s.players[&h].bags, bags);
+    assert_eq!(s.players[&h].bag, bags);
     assert_eq!(s.camp.counts.get("kill:dm_greenskin").copied(), kills);
     assert_eq!(kills, Some(1));
 }

@@ -132,7 +132,11 @@ impl Survival {
             self.events.push(Event::MobGear { id });
         }
         self.firing_line.aims.retain(|id, _| self.mobs.get(id).is_some_and(|m| m.health > 0 && matches!(m.state, MobState::Windup { .. })));
-        self.firing_line.shouldered.retain(|id| self.firing_line.aims.contains_key(id));
+        let released: Vec<_> = self.firing_line.shouldered.iter().copied().filter(|id| !self.firing_line.aims.contains_key(id)).collect();
+        for id in released {
+            self.firing_line.shouldered.remove(&id);
+            self.events.push(Event::ClipStop { id });
+        }
     }
 
     pub(crate) fn remove_firing_line(&mut self, owner: Id) {
@@ -142,7 +146,7 @@ impl Survival {
         for id in &ids {
             self.firing_line.owners.remove(id);
             self.firing_line.aims.remove(id);
-            self.firing_line.shouldered.remove(id);
+            if self.firing_line.shouldered.remove(id) { self.events.push(Event::ClipStop { id: *id }); }
             self.firing_line.drawn.remove(id);
             self.events.push(Event::CastEnd { caster: *id });
             if *id != owner { self.dismiss(*id); }
@@ -160,7 +164,7 @@ impl Survival {
         self.remove_firing_line(id);
         if !self.firing_line.owners.contains_key(&id) { return; }
         self.firing_line.aims.remove(&id);
-        self.firing_line.shouldered.remove(&id);
+        if self.firing_line.shouldered.remove(&id) { self.events.push(Event::ClipStop { id }); }
         self.missiles.retain(|m| m.owner != id);
         self.pending.retain(|s| s.attacker != id);
     }
@@ -283,6 +287,7 @@ impl Survival {
 
     pub(crate) fn firing_release(&mut self, id: Id) -> bool {
         let Some(at) = self.firing_line.aims.remove(&id) else { return false };
+        if self.firing_line.shouldered.remove(&id) { self.events.push(Event::ClipStop { id }); }
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
         let pos = m.pos;
