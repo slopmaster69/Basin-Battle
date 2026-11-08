@@ -351,7 +351,7 @@ impl App {
     }
 
     fn install(&mut self, r: net::Release) {
-        if let Some(why) = update::not_now() {
+        if let Some(why) = update::not_now(&self.paths.root) {
             self.log(&format!("update {} waits: {why}", r.version));
             self.note = why.into();
             self.become_ready();
