@@ -67,6 +67,17 @@ const DOT_SPELL: u32 = 348;
 /// From this client level a heal on a friend floats over their head (patch 0060), so the healer is
 /// sent the heal log instead of the add-on's `HO` line.
 pub(crate) const HEAL_FLOAT_LEVEL: u8 = 28;
+/// From this client level an ability's cast clip can play on the torso while the legs walk (patch
+/// 0079, the body word `auto`); an older client is sent `full`, as it played every cast before.
+pub(crate) const LAYER_LEVEL: u8 = 29;
+
+/// The body word an `AN` cast line carries to a client of round `level`.
+fn clip_body_word(body: htl_survival::sim::ClipBody, level: u8) -> &'static str {
+    match body {
+        htl_survival::sim::ClipBody::Auto if level < LAYER_LEVEL => "full",
+        b => b.word(),
+    }
+}
 
 impl SurvivalGame {
     pub(crate) fn play(&mut self, events: Vec<Event>) {
@@ -1102,10 +1113,10 @@ impl SurvivalGame {
                 let Some(g) = self.guid_of(id) else { return };
                 let mine = self.conn_of(id);
                 let impact = if at > 0.0 { at.min(secs) } else { secs * 0.5 };
-                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
-                for c in conns {
+                let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, w)| (*c, w.level)).collect();
+                for (c, level) in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}\t{}", secs - impact, from.as_deref().unwrap_or(""), body.word());
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}\t{}", secs - impact, from.as_deref().unwrap_or(""), clip_body_word(body, level));
                     self.ui_line(c, &line);
                 }
             }
@@ -1296,4 +1307,24 @@ fn arrow_ammo(c: &htl_survival::content::Content, spell: u32) -> Option<u32> {
         || ARROW_SPELLS.contains(&spell)
         || c.abilities.iter().any(|a| a.plants && (a.spell == spell || a.full_spell == spell));
     arrow.then_some(ARROW_DISPLAY)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use htl_survival::sim::ClipBody;
+
+    /// An ability's cast on the torso while the legs walk goes as `auto` to a client that plays it
+    /// (`ac29`) and `full` to an older one, which played every cast on the whole body; the other
+    /// bodies go as they are to both.
+    #[test]
+    fn a_cast_on_the_walking_torso_goes_full_to_an_older_client() {
+        assert_eq!(clip_body_word(ClipBody::Auto, LAYER_LEVEL), "auto");
+        assert_eq!(clip_body_word(ClipBody::Auto, LAYER_LEVEL - 1), "full");
+        for level in [LAYER_LEVEL - 1, LAYER_LEVEL] {
+            assert_eq!(clip_body_word(ClipBody::Full, level), "full");
+            assert_eq!(clip_body_word(ClipBody::Upper, level), "upper");
+            assert_eq!(clip_body_word(ClipBody::Lower, level), "lower");
+        }
+    }
 }
