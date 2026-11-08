@@ -4,8 +4,8 @@
 # on, then off (`animLayer 0`, today's slide), then on again running forward at 7 yd/s (a dash
 # keeps its own speed, so the legs Run), then one swing standing still. The Proving Ring at 10:00,
 # the interface hidden. Movement is ActionDash (a script can't press the movement keys); each
-# swing's lunge is a dash of its own that replaces ours for 0.18 s, so the dash is given again half
-# a second after each press. Look for, layer on: the feet keep stepping forward through every
+# swing's lunge is a dash of its own that replaces ours for 0.18 s, so the dash is given again after
+# each press (see Take 292 below). Look for, layer on: the feet keep stepping forward through every
 # swing; no frame where both feet stand planted while the body glides; the stride unbroken from one
 # swing to the next (no stop, no restart at the first frame of a swing); the legs keeping their
 # gait through the lunge (no flick from a walk into a run and back, or from a run into a walk); the
@@ -22,6 +22,9 @@
 # The Proving Ring, not Brackwell: Brackwell's Defias joined in during take 281. The first pass
 # after the first goto was filmed from behind in takes 281 and 289, and every pass after a later
 # goto side-on, so the first pass is a warm-up with no shots.
+# Take 292 (third films): the dash is given again 0.42 s after each press, as the 0.18 s lunge ends,
+# so the body no longer halts between a lunge and the next dash. The 7 yd/s pass starts at the
+# ring's south edge (`.es goto -9928 98`) and runs north, so it stays in open ground by blow 3.
 hero hunter
 cam 90 -6 8
 include _look_setup
@@ -38,13 +41,13 @@ include _look_setup
 8.00 lua ActionDash(2.0, 3, "f")
 8.60 .es in a
 8.65 .es in au
-9.10 lua ActionDash(2.0, 3, "f")
+9.02 lua ActionDash(2.0, 3, "f")
 9.50 .es in a
 9.55 .es in au
-10.00 lua ActionDash(2.0, 3, "f")
+9.92 lua ActionDash(2.0, 3, "f")
 10.40 .es in a
 10.45 .es in au
-10.90 lua ActionDash(1.0, 3, "f")
+10.82 lua ActionDash(1.0, 3, "f")
 # Back to the start, the layer still on.
 12.50 .es goto proving_ring
 14.40 .es heal
@@ -54,13 +57,13 @@ include _look_setup
 15.50 shots on-forward 30 0.08
 15.60 .es in a
 15.65 .es in au
-16.10 lua ActionDash(2.0, 3, "f")
+16.02 lua ActionDash(2.0, 3, "f")
 16.50 .es in a
 16.55 .es in au
-17.00 lua ActionDash(2.0, 3, "f")
+16.92 lua ActionDash(2.0, 3, "f")
 17.40 .es in a
 17.45 .es in au
-17.90 lua ActionDash(1.0, 3, "f")
+17.82 lua ActionDash(1.0, 3, "f")
 # Back to the start, the layer off: today's look.
 19.50 .es goto proving_ring
 21.40 .es heal
@@ -70,15 +73,15 @@ include _look_setup
 22.50 shots off-forward 30 0.08
 22.60 .es in a
 22.65 .es in au
-23.10 lua ActionDash(2.0, 3, "f")
+23.02 lua ActionDash(2.0, 3, "f")
 23.50 .es in a
 23.55 .es in au
-24.00 lua ActionDash(2.0, 3, "f")
+23.92 lua ActionDash(2.0, 3, "f")
 24.40 .es in a
 24.45 .es in au
-24.90 lua ActionDash(1.0, 3, "f")
+24.82 lua ActionDash(1.0, 3, "f")
 # Back to the start, the layer on again.
-26.50 .es goto proving_ring
+26.50 .es goto -9928 98
 28.40 .es heal
 28.50 lua SetCVar("animLayer", "1")
 # Layer on, running forward at 7 yd/s (a dash keeps its own speed, so the legs Run).
@@ -86,13 +89,13 @@ include _look_setup
 29.50 shots on-forward-2 30 0.08
 29.60 .es in a
 29.65 .es in au
-30.10 lua ActionDash(2.0, 7, "f")
+30.02 lua ActionDash(2.0, 7, "f")
 30.50 .es in a
 30.55 .es in au
-31.00 lua ActionDash(2.0, 7, "f")
+30.92 lua ActionDash(2.0, 7, "f")
 31.40 .es in a
 31.45 .es in au
-31.90 lua ActionDash(1.0, 7, "f")
+31.82 lua ActionDash(1.0, 7, "f")
 # Standing still, the layer on: the whole-body swing as today.
 33.50 .es goto proving_ring
 35.40 .es heal
