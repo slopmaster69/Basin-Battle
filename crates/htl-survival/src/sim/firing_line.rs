@@ -20,6 +20,7 @@ pub(crate) struct FiringLine {
     crews: BTreeMap<Id, Crew>,
     owners: BTreeMap<Id, Id>,
     aims: BTreeMap<Id, Vec3>,
+    shouldered: BTreeSet<Id>,
     hooks: BTreeSet<(Id, u32)>,
     drawn: BTreeSet<Id>,
 }
@@ -131,6 +132,7 @@ impl Survival {
             self.events.push(Event::MobGear { id });
         }
         self.firing_line.aims.retain(|id, _| self.mobs.get(id).is_some_and(|m| m.health > 0 && matches!(m.state, MobState::Windup { .. })));
+        self.firing_line.shouldered.retain(|id| self.firing_line.aims.contains_key(id));
     }
 
     pub(crate) fn remove_firing_line(&mut self, owner: Id) {
@@ -140,6 +142,7 @@ impl Survival {
         for id in &ids {
             self.firing_line.owners.remove(id);
             self.firing_line.aims.remove(id);
+            self.firing_line.shouldered.remove(id);
             self.firing_line.drawn.remove(id);
             self.events.push(Event::CastEnd { caster: *id });
             if *id != owner { self.dismiss(*id); }
@@ -157,6 +160,7 @@ impl Survival {
         self.remove_firing_line(id);
         if !self.firing_line.owners.contains_key(&id) { return; }
         self.firing_line.aims.remove(&id);
+        self.firing_line.shouldered.remove(&id);
         self.missiles.retain(|m| m.owner != id);
         self.pending.retain(|s| s.attacker != id);
     }
@@ -185,6 +189,7 @@ impl Survival {
         let Some(owner) = self.firing_line.owners.get(&id).copied() else { return false };
         self.halt(id);
         if self.disabled(id) || self.mobs[&id].stagger_until > self.clock { return true; }
+        self.firing_shoulder(id);
         if matches!(self.mobs[&id].state, MobState::Windup { .. }) {
             self.think(id, dt);
         } else if let Some(h) = self.firing_foe(owner) {
@@ -194,6 +199,7 @@ impl Survival {
     }
 
     pub(crate) fn step_firing_captain(&mut self, id: Id) -> bool {
+        self.firing_shoulder(id);
         let Some(c) = self.firing_line.crews.get(&id) else { return false };
         let Some(hero) = self.firing_foe(id) else { return true };
         let foe = Foe::Hero(hero);
@@ -254,11 +260,23 @@ impl Survival {
         let name = self.mobs.get(&id).and_then(|m| m.pattern.map(|(k, _)| self.content.mobs[m.def].patterns[k].name.as_str()));
         if !gunner && !(self.is_firing_captain(id) && matches!(name, Some("pistol shot" | "harpoon"))) { return; }
         self.firing_line.aims.insert(id, to);
+        self.firing_line.shouldered.remove(&id);
         if name == Some("pistol shot") {
             self.firing_line.drawn.insert(id);
             self.events.push(Event::MobGear { id });
             self.events.push(Event::Sound { id, sound: 700 });
         }
+    }
+
+    fn firing_shoulder(&mut self, id: Id) {
+        if !self.firing_line.aims.contains_key(&id) || self.firing_line.shouldered.contains(&id) { return; }
+        let Some(MobState::Windup { t, .. }) = self.mobs.get(&id).map(|m| &m.state) else { return };
+        let a = self.attack_now(id);
+        if *t < 0.6 || a.spell != 8682 { return; }
+        let secs = (a.windup - *t).max(0.1);
+        self.firing_line.shouldered.insert(id);
+        // Native loading hands first, then the gun held to the shoulder until release.
+        self.events.push(Event::Clip { id, clip: 48, take: 0, from: None, secs, at: 0.0, body: ClipBody::Full });
     }
 
     pub(crate) fn firing_release(&mut self, id: Id) -> bool {
@@ -270,6 +288,9 @@ impl Survival {
         let land_at = self.clock + dist2d(pos, at) / a.speed.max(1.0);
         self.events.push(Event::CastEnd { caster: id });
         self.events.push(Event::Missile { caster: id, spell: a.spell, target: Target::Point(at) });
+        if hook {
+            self.events.push(Event::Clip { id, clip: 107, take: 0, from: None, secs: 0.65, at: 0.0, body: ClipBody::Full });
+        }
         // No ground disk: load/shoulder, committed facing, release and sound carry the tell.
         self.missiles.push(combat::Missile { owner: id, from: pos, at, radius: a.radius,
             damage: a.damage, blockable: a.blockable, heavy: false, land_at, mark: 0, look: 0 });
