@@ -392,6 +392,9 @@ impl Survival {
                 hidden: false,
                 lost_at: None,
                 plan_to: None,
+                footing: self.land.footing(at),
+                floor_failures: 0,
+                floor_recovery: None,
                 form_of: None,
                 panic_stride: 0.0,
                 voiced: false,
@@ -1296,6 +1299,14 @@ impl Survival {
         let committed = self.is_vancleef(id) && self.mobs.get(&id).is_some_and(|m| matches!(m.state, MobState::Windup { .. }));
         let below = self.is_below();
         let now = self.clock;
+        // A stopped walker can already be over a missing floor. Recover before the empty-path
+        // early return, rather than waiting for another path to fail from that airborne start.
+        if below && self.mobs.get(&id).is_some_and(|m| m.thrown_until <= now
+            && self.land.footing(m.pos).is_none()
+            && m.footing.is_none_or(|p| dist2d(p, m.pos) > 0.75)) {
+            self.recover_footing(id);
+            return;
+        }
         let Some(m) = self.mobs.get_mut(&id) else { return };
         if m.path.is_empty() || m.speed <= 0.0 {
             return;
@@ -1303,6 +1314,9 @@ impl Survival {
         // Thrown up: it goes along the ground under its arc, and is put back up on it after.
         m.pos[2] -= moves::loft_at(m.thrown_lift, m.thrown_until, now - dt);
         let start = m.pos;
+        if below {
+            if let Some(at) = self.land.footing(start) { m.footing = Some(at); }
+        }
         let mut left = m.speed * dt;
         while left > 0.0 && !m.path.is_empty() {
             let next = m.path[0];
@@ -1351,9 +1365,41 @@ impl Survival {
         }
         // Below, fallen through its floor however it came to (more of a drop at once than any walk
         // or slide makes): back where it stood, in whatever fight it was in; on its way home, home.
-        if below && start[2] - z > FELL_THROUGH.max(FALL + SLIDE_SLOPE * walked) {
-            let to = if matches!(m.state, MobState::Return) { m.home } else { start };
-            self.set_back(id, to, "fell through the floor");
+        let unsupported = below && self.land.footing([x, y, z]).is_none()
+            && m.footing.is_none_or(|p| dist2d(p, [x, y, z]) > 0.75);
+        let lifted = z - start[2] > FELL_THROUGH.max(FALL + WALK_SLOPE * walked);
+        if below && (start[2] - z > FELL_THROUGH.max(FALL + SLIDE_SLOPE * walked) || lifted || unsupported) {
+            self.recover_footing(id);
+        } else if below {
+            if let Some(at) = self.land.footing([x, y, z]) {
+                let m = self.mobs.get_mut(&id).unwrap();
+                m.footing = Some(at);
+                if m.floor_recovery.is_some_and(|p| dist2d(p, at) >= 2.0) {
+                    m.floor_failures = 0;
+                    m.floor_recovery = None;
+                }
+            }
+        }
+    }
+
+    fn recover_footing(&mut self, id: Id) {
+        let m = &self.mobs[&id];
+        let fallback = self.boss_fight_home(id).unwrap_or(m.home);
+        let Some(at) = m.footing.and_then(|p| self.land.footing(p)).or_else(|| self.land.footing(fallback)) else {
+            self.halt(id);
+            self.mobs.get_mut(&id).unwrap().state = MobState::Return;
+            return;
+        };
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.floor_failures = m.floor_failures.saturating_add(1);
+        m.floor_recovery = Some(at);
+        if m.floor_failures >= 2 {
+            let home = self.land.footing(fallback).unwrap_or(at);
+            m.home = home;
+            m.state = MobState::Return;
+            self.set_back(id, home, "repeated floor failure: fight reset");
+        } else {
+            self.set_back(id, at, "fell through the floor");
         }
     }
 
@@ -1361,9 +1407,14 @@ impl Survival {
     /// down at `at` at once (everyone sees it there), its walk dropped and its fight kept. The log
     /// says so, so that the next time can be looked into.
     pub(crate) fn set_back(&mut self, id: Id, at: Vec3, why: &str) {
+        let Some(at) = self.land.footing(at) else {
+            self.halt(id);
+            return;
+        };
         let Some(m) = self.mobs.get_mut(&id) else { return };
         let was = m.pos;
         m.pos = at;
+        m.footing = Some(at);
         m.path.clear();
         m.speed = 0.0;
         m.sidle = None;
@@ -1394,6 +1445,11 @@ impl Survival {
         let speed = speed * self.speed_share(id);
         let Some(m) = self.mobs.get(&id) else { return };
         let from = m.pos;
+        if self.is_below() && self.land.footing(to).is_none() {
+            self.mobs.get_mut(&id).unwrap().lost_at.get_or_insert(self.clock);
+            self.halt(id);
+            return;
+        }
         // Straight only where a walker could: nothing solid in the way (a trunk, a wall) and no
         // slope too steep (a cliff); else round by the land's own way.
         // (A step away is straight too, but only on its own floor: a spot under the deck it stands
@@ -2012,6 +2068,8 @@ impl Survival {
                     }
                     m.fighters = 1;
                     m.health = m.max_health;
+                    m.floor_failures = 0;
+                    m.floor_recovery = None;
                     // Whole again: its second wind and its posture with it, its voice too.
                     m.enraged = false;
                     m.phase = 0;

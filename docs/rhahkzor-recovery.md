@@ -27,5 +27,6 @@ The rollback's release server build and full release test sweep passed: 1,102 te
 confirms the Rhahk definition exactly matches #291 and all 29 other mob definitions match
 main `7d2747d`. Every Cargo invocation used the Windows Rust setup script and one build job.
 
-Codex owns the subsequent route repair. No new client run of the restored forge encounter,
-repaired gauntlet run, or unassisted clear is claimed.
+The follow-up [native route repair](rhahkzor-route-repair.md), PR #306, restores the gauntlet
+after native walking, hold-release and wipe checks. No new client run of the restored forge
+encounter or repaired gauntlet, or unassisted clear, is claimed by these server checks.
