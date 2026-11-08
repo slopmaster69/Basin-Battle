@@ -1,4 +1,4 @@
-# Sun shadows with shapes (client 0069): the hero sidestepping on the open ground of the Brackwell
+# Sun shadows with shapes (client 0080): the hero sidestepping on the open ground of the Brackwell
 # pumpkin patch at 17:30, seen from the side so their shadow lies beside them (the same shot as
 # 0065's hero walk, which showed none). High, then low, then worldShadows 0 (1.12's blob).
 # Look for: the hero's own shadow, a whole body with legs and arms moving as they step, joined at

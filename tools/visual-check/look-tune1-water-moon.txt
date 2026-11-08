@@ -1,4 +1,4 @@
-# The moon's path on the water (client 0070, `look-tune-1`): Crystal Lake at 23:00 and 23:30 (the
+# The moon's path on the water (client 0081, `look-tune-1`): Crystal Lake at 23:00 and 23:30 (the
 # server's own night hour), facing the moon. Where the moon is: the sky code (`daynight::
 # moon_direction`) keeps the white moon on the sun's bearing, azimuth 45 degrees in WoW's frame
 # (+x north, +y west), so north-west, map facing (yaw) 45; its elevation table puts it 24 degrees up

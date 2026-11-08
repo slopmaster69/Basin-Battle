@@ -1,4 +1,4 @@
-# The froth round a wading hero (client 0070), shot again with a clear camera: take 271's wade looked
+# The froth round a wading hero (client 0081), shot again with a clear camera: take 271's wade looked
 # through the shore's reeds and hid the hero for most of it. Crystal Lake at golden hour (17:30).
 # Here the camera faces the shore (yaw 20) from over the open water, 6 yd off and pitched 20 degrees
 # down, so the reeds stand behind the hero, not in front of the camera; the hero backs out into the

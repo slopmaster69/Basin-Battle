@@ -1,4 +1,4 @@
-# Sun shadows (client 0069, #269's fourth round): the Brackwell pumpkin patch at 10:00, the hero
+# Sun shadows (client 0080, #269's fourth round): the Brackwell pumpkin patch at 10:00, the hero
 # put inside the patch (its centre, then 12 yd west and 12 yd east of it, so a pumpkin node stands
 # near him in at least one), the camera at the side (yaw 315, pitched down 35, 6 yd) so the
 # shadows run across the frame (the sun keeps the north-west bearing, yaw 45; shadows fall toward

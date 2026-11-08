@@ -1,4 +1,4 @@
-# The foam round reeds (client 0070, `look-tune-1`): Crystal Lake at golden hour (17:30), the view of
+# The foam round reeds (client 0081, `look-tune-1`): Crystal Lake at golden hour (17:30), the view of
 # the sky's lake film (take 270, clouds-in-water-00), where every reed base standing in the shallows
 # had a crisp white foam ring. The same froth as round a wading hero's legs now: the tuned water,
 # a burst for the ripples, then worldWater 0 and 1.12's look.

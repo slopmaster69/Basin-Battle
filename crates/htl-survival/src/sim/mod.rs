@@ -13,6 +13,7 @@ use crate::land::Land;
 pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
+pub(crate) mod bosses;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -393,6 +394,9 @@ pub enum Event {
     HealedOther { healer: Id, target: Id, amount: u32, critical: bool },
     /// A unit says something (`SoundEntries.dbc`): a creature's voice.
     Sound { id: Id, sound: u32 },
+    /// A creature yells a line from where it stands (a boss's words as it turns on a foe, at a
+    /// phase, over a felled hero, as it falls): a monster yell, with its speech bubble.
+    Yell { id: Id, text: String },
     /// How the Proving Ring stands changed for a hero (in it, or just out of it).
     Arena { player: Id },
     /// How Siege stands changed for a hero in its world (the hall, the match).
@@ -966,6 +970,14 @@ pub struct Mob {
     pub wary_until: f32,
     /// It has run from its hero once already (its temperament's `flee_below`).
     pub fled: bool,
+    /// Its own quirks within its kind (`[ai] quirk`, `favourite`), set as it appears: its pace
+    /// between strings and its readiness to give ground, each times this, and its favourite string.
+    pub quirk_pace: f32,
+    pub quirk_retreat: f32,
+    pub favourite: Option<usize>,
+    /// Its part in its fight's plan (`[[plan]]`), and when it was given.
+    pub role: mobs::Role,
+    pub role_at: f32,
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
@@ -1194,6 +1206,8 @@ pub struct Survival {
     pub(crate) beta: beta::Beta,
     /// The Warlord's (the Warrior's second choices): Tackles under way.
     pub(crate) warlord: warlord::Warlord,
+    /// Basin Battle's boss beats under way: a boss on its run, burning blows, burning ground.
+    pub(crate) bosses: bosses::Bosses,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1294,6 +1308,7 @@ impl Survival {
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
             warlord: warlord::Warlord::default(),
+            bosses: bosses::Bosses::default(),
         }
     }
 
@@ -1431,6 +1446,17 @@ impl Survival {
         let text = text.into();
         self.events.push(Event::Log(text.clone()));
         self.events.push(Event::Announce { text });
+    }
+
+    /// A creature yells `text` (nothing for an empty line); the log keeps it with its name.
+    pub(crate) fn yell(&mut self, id: Id, text: impl Into<String>) {
+        let text = text.into();
+        if text.is_empty() {
+            return;
+        }
+        let name = self.mobs.get(&id).map_or("", |m| self.content.mobs[m.def].name.as_str());
+        self.events.push(Event::Log(format!("{name}: {text}")));
+        self.events.push(Event::Yell { id, text });
     }
 
     // --- heroes ---------------------------------------------------------------------------------

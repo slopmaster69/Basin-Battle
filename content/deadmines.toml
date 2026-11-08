@@ -884,11 +884,14 @@ slay_sound = 5781
   min_range = 3.5
   max_range = 10.0
   steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.5, lunge = 6.0, damage = 28, recovery = 0.9 } ]
-  # A blade held back, glowing: dodge early and it finds you.
+  # A blade held back, glowing: dodge early and it finds you. His own body's special (a human man's
+  # clip 57, as his Unbowed string ends on): the dwarf woman's opens in a crouched leap, and on his
+  # long legs it folded his knees up under him in the air for half a second (Corey, Nov 8: "his legs
+  # tweak out during one of his special attacks"; the +4 run, 5:28 in).
   [[mob.pattern]]
   name = "riposte stance"
   weight = 1.5
-  steps = [ { from = "DwarfFemale", clip = 57, take = 0, windup = 1.4, damage = 40, arc = 140.0, heavy = true, recovery = 1.1, kit = 379 } ]
+  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 1.4, damage = 40, arc = 140.0, heavy = true, recovery = 1.1, kit = 379 } ]
   [[mob.pattern]]
   name = "blade storm"
   weight = 0.0
@@ -1993,7 +1996,18 @@ respawn = 0.0
   weight = 4.0
   steps = [ { from = "NightElfFemale", clip = 95, take = 0, ranged = false, windup = 0.35, damage = 7, range = 2.6, arc = 80.0, blockable = true, recovery = 0.6 } ]
 
-# Rhahk'Zor, the Brotherhood's foreman: huge, slow, wide; at the last, a roar that throws all down.
+# Rhahk'Zor, the Brotherhood's foreman, the last thing between the heroes and daylight (the final
+# boss, Corey Nov 8: "the final boss needs to feel like a final boss... runs back to his default
+# fight in the FORGE"). Three acts across the mine:
+# 1. The front door: a broad sweep, an overhead that sticks a moment, a shoulder rush.
+# 2. At about two thirds he brings the mouth's props down (rocks over the tunnel; the front door
+#    barred while he fights) and runs back through the galleries, the Mast Room and the workshop to
+#    the Foundry, rocks shaken loose behind him (light ones), waiting there for the heroes.
+# 3. The forge: his maul heated in the smelter, every heavy blow leaves burning iron; at a third a
+#    slam brings the Foundry's ceiling down over three spots (a dry way between); at the last the
+#    pound, and the maul lodges in the floor: the best opening of the run.
+# No miners at a health line, no roar that throws all down: the ogre changes the place, not the
+# count.
 [[mob]]
 key = "dm_rhahkzor"
 name = "Rhahk'Zor"
@@ -2015,6 +2029,9 @@ trophy = { rhahkzor_maul = 1 }
 gear = ["rhahkzor_maul", "rhahkzor_helm"]
 respawn = 0.0
 aggro_sound = 5774
+aggro_text = "VanCleef pay big for your heads!"
+slay_text = "Rhahk'Zor smash you flat!"
+death_text = "...VanCleef... never pay..."
   [mob.attack]
   windup = 0.95
   damage = 40
@@ -2026,42 +2043,51 @@ aggro_sound = 5774
   lock = 0.35
   blockable = true
   heavy = true
-  # Turns: at three quarters a roar, and the miners come running; at two fifths the roar that
-  # throws all down and the maul faster; at the last he pounds the floor till it cracks.
+  # Act 2: he brings the mouth's props down (rocks over the tunnel behind him), then runs back to
+  # the forge by the way the heroes came, and waits for them at the smelter.
   [[mob.phase]]
-  at = 0.75
+  at = 0.65
   speed = 0.95
-  pattern = "roar"
-  text = "\"VanCleef pay big for your heads!\""
-  summon = ["dm_miner", "dm_miner"]
+  text = "Nobody leave Rhahk'Zor's mine!"
+  debris = [[-30.0, -388.0, 56.0], [-25.0, -381.0, 57.5], [-34.0, -379.0, 56.0]]
+  run_to = [[-70.0, -380.0, 54.2], [-112.5, -405.0, 59.9], [-140.0, -400.0, 58.2], [-190.0, -442.5, 53.6], [-190.0, -480.0, 54.0], [-244.0, -482.0, 48.9], [-288.0, -505.0, 50.0], [-290.3, -537.0, 49.4], [-300.0, -580.0, 47.2], [-250.0, -578.0, 51.1], [-240.0, -579.0, 51.2], [-178.0, -580.0, 45.6], [-186.0, -599.0, 37.4], [-205.0, -592.0, 21.0]]
+  run_falls = 3.0
+  wait_for = 24.0
+  arrive_text = "Mine now. Now you burn!"
+  arrive_kit = 38
+  burn = { radius = 3.0, damage = 9, secs = 7.0, look = 22191 }
+  # Act 3, a third: a slam brings the Foundry's ceiling down over three spots, a dry way between.
   [[mob.phase]]
-  at = 0.4
+  at = 0.35
+  speed = 0.85
+  might = 1.1
+  pattern = "slam"
+  text = "RHAHK'ZOR... SMASH!"
+  debris = [[-214.0, -584.0, 21.0], [-197.0, -600.0, 21.0], [-198.0, -578.0, 21.0]]
+  # The last: he pounds the floor, and the maul sticks in it (`lodge`): haul it free he must.
+  [[mob.phase]]
+  at = 0.12
   speed = 0.8
-  pattern = "roar"
-  text = "\"Rhahk'Zor smash you all flat!\""
-  [[mob.phase]]
-  at = 0.15
-  speed = 0.72
-  might = 1.25
+  might = 1.2
   pattern = "pound"
-  text = "\"RHAHK'ZOR... SMASH!\""
-  shove = 7.0
+  text = "Rhahk'Zor... not... done!"
+  shove = 6.0
   look = 26271
   [[mob.pattern]]
   name = "pound"
   weight = 2.0
-  below = 0.15
+  below = 0.12
   max_range = 40.0
-  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 26271 }, { clip = 54, windup = 0.7, range = 7.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 0.2, look = 26271 }, { clip = 58, windup = 0.9, damage = 56, arc = 80.0, heavy = true, recovery = 1.8, kit = 379 } ]
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 26271 }, { clip = 54, windup = 0.7, range = 7.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 0.2, look = 26271 }, { clip = 58, windup = 0.9, damage = 56, arc = 80.0, heavy = true, recovery = 1.8, kit = 379, lodge = 3.0 } ]
   [[mob.pattern]]
   name = "two swings"
   weight = 3.0
   steps = [ { clip = 18, take = 1, windup = 0.9, damage = 38, arc = 150.0, recovery = 0.3 }, { clip = 17, take = 1, windup = 0.7, damage = 40, arc = 150.0, recovery = 1.3 } ]
-  # The maul held high: it waits out a panicked dodge.
+  # The maul held high: it waits out a panicked dodge, and sticks a moment where it lands.
   [[mob.pattern]]
   name = "slam"
   weight = 2.0
-  steps = [ { clip = 58, take = 0, windup = 1.45, damage = 60, arc = 70.0, recovery = 1.6, kit = 379 } ]
+  steps = [ { clip = 58, take = 0, windup = 1.45, damage = 60, arc = 70.0, recovery = 1.6, kit = 379, lodge = 1.2 } ]
   [[mob.pattern]]
   name = "stomp"
   weight = 1.5

@@ -638,6 +638,23 @@ pub fn chat(kind: u8, language: u32, sender: u64, text: &str) -> Packet {
     Packet::new(op::SMSG_MESSAGECHAT, b)
 }
 
+pub const CHAT_MONSTER_YELL: u8 = 0x0C;
+
+/// A creature's yell (`CHAT_MSG_MONSTER_YELL`): the client prints "<name> yells: <text>" in the
+/// yell colour and raises a speech bubble over `sender`. The shape is `BuildChatPacket`'s monster
+/// branch: the sender's guid, its name, the addressee's guid (0: everyone), then the text.
+pub fn monster_yell(sender: u64, name: &str, text: &str) -> Packet {
+    let mut b = Body::new();
+    b.u8(CHAT_MONSTER_YELL)
+        .u32(LANG_UNIVERSAL)
+        .u64(sender)
+        .len_str(name)
+        .u64(0)
+        .len_str(text)
+        .u8(0);
+    Packet::new(op::SMSG_MESSAGECHAT, b)
+}
+
 pub fn notification(text: &str) -> Packet {
     let mut b = Body::new();
     b.cstr(text);
@@ -1118,6 +1135,24 @@ mod clock_tests {
         // Out of range wraps, never spills into the date.
         let w = wow_time_at(Some([25, 61]));
         assert_eq!((w & 0x3f, (w >> 6) & 0x1f), (1, 1));
+    }
+
+    /// A monster yell in `BuildChatPacket`'s monster shape, as the client reads it: type, language,
+    /// the sender's guid, its name, the addressee (0), the text, the chat tag.
+    #[test]
+    fn a_monster_yell_carries_the_sender_its_name_and_the_text() {
+        let p = monster_yell(0xF130_0000_0000_0042, "Rhahk'Zor", "Mine now.");
+        let b = &p.body;
+        assert_eq!(b[0], CHAT_MONSTER_YELL);
+        assert_eq!(u32::from_le_bytes(b[1..5].try_into().unwrap()), LANG_UNIVERSAL);
+        assert_eq!(u64::from_le_bytes(b[5..13].try_into().unwrap()), 0xF130_0000_0000_0042);
+        let name_len = u32::from_le_bytes(b[13..17].try_into().unwrap()) as usize;
+        assert_eq!(&b[17..17 + name_len], b"Rhahk'Zor\0");
+        let at = 17 + name_len;
+        assert_eq!(u64::from_le_bytes(b[at..at + 8].try_into().unwrap()), 0, "said to everyone");
+        let text_len = u32::from_le_bytes(b[at + 8..at + 12].try_into().unwrap()) as usize;
+        assert_eq!(&b[at + 12..at + 12 + text_len], b"Mine now.\0");
+        assert_eq!(b.len(), at + 12 + text_len + 1, "then the chat tag");
     }
 
     #[test]

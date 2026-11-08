@@ -1,0 +1,557 @@
+From d61045e623eb4ced972a4c091268b82129ffdd7f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 22:19:32 -0600
+Subject: [PATCH] A limb moves through its keys on a curve, not from key to key
+ in straight lines (patch 0076)
+
+1.12's character clips are keyed sparsely and played linearly, so a limb snaps from pose to pose
+with a kink in its motion at every key. While the action layer is live, the evaluator now samples
+each translation and rotation on a curve through the keys: a cubic Hermite with monotone tangents
+(per axis, the harmonic mean of the slopes on either side of a key, and nothing where the motion
+turns back). It passes through every key exactly and carries one speed across it, and it never
+overshoots a key or bulges through a held pose, so an impact frame lands where it is keyed and a
+hold stays held. A turn takes the same curve in its log space about the segment's first key.
+
+`PoseTrack::sample` stays Bevy's exact linear and slerp (the oracle tests compare it key for key);
+the curve is `PoseTrack::sample_smooth`. It runs while an add-on drives the action layer and
+`actionCurves` (benilla's own, registered "1") is on.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/creature_anim.rs       |   2 +-
+ .../benilla-app/src/creature_anim/action.rs   |  18 ++
+ crates/benilla-app/src/cvars/mod.rs           |  18 ++
+ crates/benilla-app/src/cvars/table.rs         |  10 +
+ crates/benilla-assets/src/model/pose.rs       | 242 +++++++++++++++++-
+ crates/benilla-world/src/rig_anim.rs          |   3 +
+ crates/benilla-world/src/rig_anim/curves.rs   |  21 ++
+ crates/benilla-world/src/rig_anim/pose.rs     |  34 ++-
+ 8 files changed, 339 insertions(+), 9 deletions(-)
+ create mode 100644 crates/benilla-world/src/rig_anim/curves.rs
+
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index 7eda0749..968b8606 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -33,7 +33,7 @@ mod lod;
+ /// and the camera's unit collision, all driven by an add-on.
+ mod action;
+ #[cfg(test)]
+-pub(crate) use action::on_blend_cvar;
++pub(crate) use action::{on_blend_cvar, on_curves_cvar};
+ pub(crate) use action::{lock_point, unit_hit, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index d794d4e4..2cdcf06c 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1486,6 +1486,23 @@ pub(crate) fn on_blend_cvar(
+     }
+ }
+ 
++/// `actionCurves` (benilla's own): smooth curves through the animations' keys on or off.
++pub(crate) fn on_curves_cvar(
++    ev: On<crate::cvars::CvarChanged>,
++    curves: Option<ResMut<benilla_world::rig_anim::PoseCurves>>,
++) {
++    if ev.key() != "actioncurves" {
++        return;
++    }
++    if let Some(mut curves) = curves {
++        curves.on = ev.flag();
++        info!(
++            "action: smooth curves through the animations' keys {}",
++            if curves.on { "on" } else { "off" }
++        );
++    }
++}
++
+ /// The inertial blending runs while an add-on drives the action layer, as everything here does.
+ fn blend_while_layer_live(inertia: Option<ResMut<benilla_world::rig_anim::PoseInertia>>) {
+     let Some(mut inertia) = inertia else { return };
+@@ -1716,6 +1733,7 @@ pub(super) fn plugin(app: &mut App) {
+             ),
+         )
+         .add_observer(on_blend_cvar)
++        .add_observer(on_curves_cvar)
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+             (reset_action_on_world_exit, afterimage::clear_afterimages),
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index d76d298c..cfa8f74e 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1691,6 +1691,20 @@ mod tests {
+         assert!(res::<PoseInertia>(&app).on);
+     }
+ 
++    /// `actionCurves` (benilla's own) turns the smooth curves through the animations' keys off and
++    /// on, registered "1" to match `PoseCurves`' default, and leaves the blending alone.
++    #[test]
++    fn action_curves_switches_the_curves() {
++        use benilla_world::rig_anim::{PoseCurves, PoseInertia};
++        let mut app = cvar_app();
++        assert!(res::<PoseCurves>(&app).on, "registered \"1\"");
++        assert_eq!(apply(&mut app, "actionCurves", "0"), SetOutcome::Changed);
++        assert!(!res::<PoseCurves>(&app).on);
++        assert!(res::<PoseInertia>(&app).on, "the blending stays");
++        apply(&mut app, "actionCurves", "1");
++        assert!(res::<PoseCurves>(&app).on);
++    }
++
+     /// `worldWind` and `worldSky` (benilla's own) turn the new look's wind and its painted sky off
+     /// and on, each by itself, registered "1" to match `LookWind`'s and `LookSky`'s defaults.
+     #[test]
+@@ -2832,6 +2846,7 @@ mod tests {
+             .init_resource::<VideoConfig>()
+             .init_resource::<benilla_world::ffx_glow::FfxSwitches>()
+             .init_resource::<benilla_world::rig_anim::PoseInertia>()
++            .init_resource::<benilla_world::rig_anim::PoseCurves>()
+             // `worldLook`'s registered "1", as `VideoPlugin` inserts it.
+             .insert_resource(benilla_world::look::WorldLook::NEW)
+             .init_resource::<benilla_world::look::LookAo>()
+@@ -2879,6 +2894,9 @@ mod tests {
+         |app| {
+             app.add_observer(crate::creature_anim::on_blend_cvar);
+         },
++        |app| {
++            app.add_observer(crate::creature_anim::on_curves_cvar);
++        },
+         |app| {
+             app.add_observer(crate::player::camera::on_cvar);
+         },
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index 197f907b..b4ad53e5 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -847,6 +847,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+          body's motion through a change of animation (inertial blending) while an add-on drives \
+          the action layer",
+     ),
++    // benilla's own: smooth curves through the animations' keys while an add-on drives the action
++    // layer (a sparsely keyed limb moves without a kink at each key), "0" for 1.12's straight
++    // lines between keys. The knob is `benilla_world::rig_anim::PoseCurves::on`, set by
++    // `creature_anim::action::on_curves_cvar`; inert while no add-on drives the layer.
++    ours(
++        "actionCurves",
++        "1",
++        "benilla's own — 1.12 plays an animation's keys with straight lines between them; this \
++         draws a smooth curve through them while an add-on drives the action layer",
++    ),
+     // benilla's own: the new look (WoW Forever-style zone light, a longer view, bloom and a
+     // colour grade, god rays and mist), "0" for 1.12's exactly. The knob is
+     // `benilla_world::look::WorldLook`, set by `video::on_cvar`.
+diff --git a/crates/benilla-assets/src/model/pose.rs b/crates/benilla-assets/src/model/pose.rs
+index 55abd1ce..bc42b1cb 100644
+--- a/crates/benilla-assets/src/model/pose.rs
++++ b/crates/benilla-assets/src/model/pose.rs
+@@ -77,6 +77,119 @@ impl<T: Animatable + Clone> PoseTrack<T> {
+     pub fn keys(&self) -> impl Iterator<Item = (f32, &T)> {
+         self.times.iter().copied().zip(self.values.iter())
+     }
++
++    /// The segment `t` falls inside, between two distinct keys, and how far along it: `None` on a
++    /// key, before the first or past the last, where [`Self::sample`] already gives the key.
++    #[inline]
++    fn segment(&self, t: f32) -> Option<(usize, f32)> {
++        let times = &self.times;
++        if times.len() < 2 {
++            return None;
++        }
++        match times.binary_search_by(|pt| pt.partial_cmp(&t).unwrap()) {
++            Err(i) if i > 0 && i < times.len() => {
++                Some((i - 1, (t - times[i - 1]) / (times[i] - times[i - 1])))
++            }
++            _ => None,
++        }
++    }
++
++    /// The keys around segment `i`: the one before it (or its own start, at the first), its two
++    /// ends, and the one after it (or its own end, at the last), with their times.
++    #[inline]
++    fn around(&self, i: usize) -> ([f32; 4], [&T; 4]) {
++        let last = self.times.len() - 1;
++        let (a, d) = (i.saturating_sub(1), (i + 2).min(last));
++        (
++            [
++                self.times[a],
++                self.times[i],
++                self.times[i + 1],
++                self.times[d],
++            ],
++            [
++                &self.values[a],
++                &self.values[i],
++                &self.values[i + 1],
++                &self.values[d],
++            ],
++        )
++    }
++}
++
++/// Basin Battle: smooth sampling, a curve through the keys in place of straight lines between
++/// them. 1.12's character clips are keyed sparsely and played linearly, so a limb snaps from key
++/// to key with a kink in its motion at each; this curve passes through every key with no kink. Its
++/// tangents are monotone (the harmonic mean of the two slopes beside a key, nothing where the
++/// motion turns back), so it never overshoots a key or bulges through a held pose: an impact frame
++/// lands where it is keyed. The evaluator samples this way only while the action layer's curves are
++/// on; [`PoseTrack::sample`] stays Bevy's exact linear.
++impl PoseTrack<Vec3> {
++    pub fn sample_smooth(&self, t: f32) -> Option<Vec3> {
++        let Some((i, s)) = self.segment(t) else {
++            return self.sample(t);
++        };
++        let (times, [p0, p1, p2, p3]) = self.around(i);
++        Some(monotone_hermite(times, [*p0, *p1, *p2, *p3], s))
++    }
++}
++
++impl PoseTrack<Quat> {
++    /// The same curve for a turn, drawn in the turn's log space about the segment's first key
++    /// (every neighbour taken the short way round from it), so its ends are the keys exactly.
++    pub fn sample_smooth(&self, t: f32) -> Option<Quat> {
++        let Some((i, s)) = self.segment(t) else {
++            return self.sample(t);
++        };
++        let (times, [q0, q1, q2, q3]) = self.around(i);
++        let base = *q1;
++        let inv = base.inverse();
++        let log = |q: &Quat| {
++            let r = inv * *q;
++            let r = if r.w < 0.0 { -r } else { r };
++            r.to_scaled_axis()
++        };
++        let curve = monotone_hermite(times, [log(q0), Vec3::ZERO, log(q2), log(q3)], s);
++        Some((base * Quat::from_scaled_axis(curve)).normalize())
++    }
++}
++
++/// The cubic Hermite through `p1` and `p2` (at fraction `s` of the way), with monotone tangents
++/// from the slopes of the segments on either side (`p0` and `p3` the keys beyond; at an end the
++/// segment's own slope stands in). Per axis, a tangent is the harmonic mean of its two slopes when
++/// they agree in sign and zero when they don't, which keeps the curve inside its keys' range.
++fn monotone_hermite(times: [f32; 4], p: [Vec3; 4], s: f32) -> Vec3 {
++    let [t0, t1, t2, t3] = times;
++    let h = t2 - t1;
++    let mid = (p[2] - p[1]) / h;
++    let before = if t1 > t0 {
++        (p[1] - p[0]) / (t1 - t0)
++    } else {
++        mid
++    };
++    let after = if t3 > t2 {
++        (p[3] - p[2]) / (t3 - t2)
++    } else {
++        mid
++    };
++    let m1 = monotone_tangent(before, mid) * h;
++    let m2 = monotone_tangent(mid, after) * h;
++    let (s2, s3) = (s * s, s * s * s);
++    p[1] * (2.0 * s3 - 3.0 * s2 + 1.0)
++        + m1 * (s3 - 2.0 * s2 + s)
++        + p[2] * (-2.0 * s3 + 3.0 * s2)
++        + m2 * (s3 - s2)
++}
++
++fn monotone_tangent(a: Vec3, b: Vec3) -> Vec3 {
++    let axis = |a: f32, b: f32| {
++        if a * b <= 0.0 {
++            0.0
++        } else {
++            2.0 * a * b / (a + b)
++        }
++    };
++    Vec3::new(axis(a.x, b.x), axis(a.y, b.y), axis(a.z, b.z))
+ }
+ 
+ /// One bone's channels in one clip; a bone with no channel is left out.
+@@ -215,9 +328,11 @@ mod tests {
+         }
+ 
+         // Two keys at one time: Bevy's constructor fails, so the channel is absent.
+-        assert!(PoseTrack::new(&[(0.5, Vec3::X), (0.5, Vec3::Y)])
+-            .sample(0.5)
+-            .is_none());
++        assert!(
++            PoseTrack::new(&[(0.5, Vec3::X), (0.5, Vec3::Y)])
++                .sample(0.5)
++                .is_none()
++        );
+     }
+ 
+     #[test]
+@@ -245,4 +360,125 @@ mod tests {
+             "sorted; the empty bone 5 dropped"
+         );
+     }
++
++    /// Basin Battle: the smooth curve lands on every key, and before the first or past the last
++    /// it holds the end key as the linear sample does.
++    #[test]
++    fn the_smooth_curve_passes_through_every_key() {
++        let keys = [
++            (0.0, Vec3::ZERO),
++            (0.2, Vec3::new(1.0, 0.5, 0.0)),
++            (0.5, Vec3::new(1.5, -1.0, 2.0)),
++            (0.6, Vec3::new(0.0, 0.0, 1.0)),
++        ];
++        let track = PoseTrack::new(&keys);
++        for (t, v) in keys {
++            assert!(
++                (track.sample_smooth(t).unwrap() - v).length() < 1.0e-6,
++                "key at {t}"
++            );
++        }
++        for t in [-0.5, 0.9] {
++            assert_eq!(track.sample_smooth(t), track.sample(t));
++        }
++        assert!(PoseTrack::<Vec3>::new(&[]).sample_smooth(0.1).is_none());
++        let single = PoseTrack::new(&[(0.3, Vec3::Y)]);
++        assert_eq!(single.sample_smooth(1.0), Some(Vec3::Y));
++    }
++
++    /// Keys evenly spaced along a line stay a line: the curve only rounds the corners there are.
++    #[test]
++    fn evenly_spaced_keys_on_a_line_stay_straight() {
++        let keys: Vec<(f32, Vec3)> = (0..5)
++            .map(|i| (i as f32 * 0.1, Vec3::X * i as f32))
++            .collect();
++        let track = PoseTrack::new(&keys);
++        for i in 0..=40 {
++            let t = i as f32 * 0.01;
++            let (a, b) = (track.sample_smooth(t).unwrap(), track.sample(t).unwrap());
++            assert!((a - b).length() < 1.0e-5, "t={t}: {a} vs {b}");
++        }
++    }
++
++    /// A held pose (two equal keys) stays exactly held, and the curve never goes past a key it
++    /// turns back at: no overshoot through an impact frame or a hold.
++    #[test]
++    fn a_held_pose_is_held_and_nothing_overshoots() {
++        let keys = [
++            (0.0, Vec3::ZERO),
++            (0.1, Vec3::X * 2.0),
++            (0.3, Vec3::X * 2.0),
++            (0.35, Vec3::ZERO),
++            (0.6, Vec3::X * -1.0),
++        ];
++        let track = PoseTrack::new(&keys);
++        for i in 0..=60 {
++            let t = i as f32 * 0.01;
++            let v = track.sample_smooth(t).unwrap();
++            assert!(
++                v.x <= 2.0 + 1.0e-5 && v.x >= -1.0 - 1.0e-5,
++                "t={t}: {v} left the keys' range"
++            );
++            if (0.1..=0.3).contains(&t) {
++                assert!((v.x - 2.0).abs() < 1.0e-5, "t={t}: the hold sags to {v}");
++            }
++        }
++    }
++
++    /// Across a key where the motion bends, the linear sample's speed jumps; the curve's doesn't.
++    #[test]
++    fn the_curve_has_no_kink_at_a_key() {
++        let keys = [
++            (0.0, Vec3::ZERO),
++            (0.2, Vec3::X),
++            (0.4, Vec3::X * 3.0),
++            (0.6, Vec3::X * 6.0),
++        ];
++        let track = PoseTrack::new(&keys);
++        let e = 1.0e-3;
++        let speed = |f: &dyn Fn(f32) -> Vec3, t: f32| (f(t + e) - f(t)).x / e;
++        let lin = |t: f32| track.sample(t).unwrap();
++        let smooth = |t: f32| track.sample_smooth(t).unwrap();
++        let k = 0.2;
++        let lin_jump = (speed(&lin, k + e) - speed(&lin, k - 2.0 * e)).abs();
++        let smooth_jump = (speed(&smooth, k + e) - speed(&smooth, k - 2.0 * e)).abs();
++        assert!(
++            lin_jump > 4.0,
++            "linear: speed 5 then 10 across the key ({lin_jump})"
++        );
++        assert!(
++            smooth_jump < 0.5,
++            "smooth: one speed across it ({smooth_jump})"
++        );
++    }
++
++    /// A turn's curve lands on its keys (the short way round), holds a held turn, and stays a
++    /// unit quaternion between them.
++    #[test]
++    fn a_turns_curve_lands_on_its_keys_and_holds() {
++        let keys = [
++            (0.0, Quat::from_rotation_y(0.2)),
++            (0.25, Quat::from_rotation_x(1.1)),
++            (0.4, Quat::from_rotation_x(1.1)),
++            (0.7, Quat::from_axis_angle(Vec3::new(0.6, 0.8, 0.0), 2.5)),
++        ];
++        let track = PoseTrack::new(&keys);
++        for (t, q) in keys {
++            assert!(
++                track.sample_smooth(t).unwrap().angle_between(q) < 1.0e-4,
++                "key at {t}"
++            );
++        }
++        for i in 0..=70 {
++            let t = i as f32 * 0.01;
++            let q = track.sample_smooth(t).unwrap();
++            assert!((q.length() - 1.0).abs() < 1.0e-4, "t={t}: not unit");
++            if (0.25..=0.4).contains(&t) {
++                assert!(
++                    q.angle_between(keys[1].1) < 1.0e-4,
++                    "t={t}: the held turn drifts"
++                );
++            }
++        }
++    }
+ }
+diff --git a/crates/benilla-world/src/rig_anim.rs b/crates/benilla-world/src/rig_anim.rs
+index 7200eaec..f255d514 100644
+--- a/crates/benilla-world/src/rig_anim.rs
++++ b/crates/benilla-world/src/rig_anim.rs
+@@ -6,6 +6,7 @@
+ use bevy::prelude::*;
+ 
+ mod compose;
++mod curves;
+ mod global_seq;
+ mod bones;
+ mod inertia;
+@@ -14,6 +15,7 @@ mod pose;
+ pub(crate) use compose::seed_rig_rows;
+ pub use bones::{map_bones, retarget, striking_link, Bones};
+ pub use compose::{finalize_rig_worlds, PosePost};
++pub use curves::PoseCurves;
+ pub use global_seq::GlobalSeqDrive;
+ pub use inertia::PoseInertia;
+ pub use pose::{ExtraClips, PoseEval, PoseExtra, RigAnchor, RigFrame, RigPose};
+@@ -37,6 +39,7 @@ pub struct AnimParked;
+ /// rigs.
+ pub fn plugin(app: &mut App) {
+     app.init_resource::<PoseInertia>();
++    app.init_resource::<PoseCurves>();
+     global_seq::plugin(app);
+     pose::plugin(app);
+     compose::plugin(app);
+diff --git a/crates/benilla-world/src/rig_anim/curves.rs b/crates/benilla-world/src/rig_anim/curves.rs
+new file mode 100644
+index 00000000..f2a18352
+--- /dev/null
++++ b/crates/benilla-world/src/rig_anim/curves.rs
+@@ -0,0 +1,21 @@
++//! Basin Battle: smooth curves through the clips' keys (not in 1.12.1). The evaluator samples each
++//! translation and rotation with [`benilla_assets::PoseTrack::sample_smooth`], a monotone curve
++//! through every key, in place of 1.12's straight lines between them, so a sparsely keyed limb
++//! moves without a kink at each key and never overshoots one. Inert unless an add-on drives the
++//! action layer ([`super::PoseInertia::live`]) and `actionCurves` is on: the stock client
++//! samples as 1.12 does.
++
++use bevy::prelude::*;
++
++/// The switch: `actionCurves` (benilla's own, registered "1"); it acts while the action layer is
++/// live, the flag [`super::PoseInertia`] carries.
++#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
++pub struct PoseCurves {
++    pub on: bool,
++}
++
++impl Default for PoseCurves {
++    fn default() -> Self {
++        Self { on: true }
++    }
++}
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index dc878e1f..2782932c 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -219,6 +219,7 @@ struct Active {
+ fn evaluate_rig_poses(
+     time: Res<Time>,
+     inertia: Option<Res<super::inertia::PoseInertia>>,
++    curves: Option<Res<super::curves::PoseCurves>>,
+     mut rigs: Query<
+         (
+             &AnimationPlayer,
+@@ -230,7 +231,9 @@ fn evaluate_rig_poses(
+     >,
+ ) {
+     // Basin Battle: the inertial blending runs while the add-on drives the action layer.
+-    let blending = inertia.is_some_and(|i| i.active());
++    let blending = inertia.as_ref().is_some_and(|i| i.active());
++    // Basin Battle: so do the smooth curves through the keys.
++    let smooth = curves.is_some_and(|c| c.on) && inertia.is_some_and(|i| i.live);
+     let now = time.elapsed_secs_f64();
+     // Parallel: a rig reads shared clips and writes only its own pose.
+     rigs.par_iter_mut()
+@@ -309,11 +312,11 @@ fn evaluate_rig_poses(
+                                 continue;
+                             };
+                             let mut bits = 0;
+-                            if let Some(v) = pb.translation.sample(one.seek) {
++                            if let Some(v) = sample_t(&pb.translation, one.seek, smooth) {
+                                 tf.translation = v;
+                                 bits |= BORROWED_T;
+                             }
+-                            if let Some(v) = pb.rotation.sample(one.seek) {
++                            if let Some(v) = sample_r(&pb.rotation, one.seek, smooth) {
+                                 tf.rotation = v;
+                                 bits |= BORROWED_R;
+                             }
+@@ -331,7 +334,7 @@ fn evaluate_rig_poses(
+                     }
+                     many => {
+                         rig.pose_dirty = true;
+-                        blend_rig(src, extra, many, &mut rig, track.then_some((&mut *written, &mut *ext)));
++                        blend_rig(src, extra, many, &mut rig, track.then_some((&mut *written, &mut *ext)), smooth);
+                     }
+                 }
+                 if track_borrowed {
+@@ -378,6 +381,26 @@ fn clip_in<'a>(
+     }
+ }
+ 
++/// A translation channel at `t`: Bevy's linear sample, or Basin Battle's smooth curve.
++#[inline]
++fn sample_t(track: &benilla_assets::PoseTrack<Vec3>, t: f32, smooth: bool) -> Option<Vec3> {
++    if smooth {
++        track.sample_smooth(t)
++    } else {
++        track.sample(t)
++    }
++}
++
++/// A rotation channel at `t`: Bevy's slerp, or Basin Battle's smooth curve.
++#[inline]
++fn sample_r(track: &benilla_assets::PoseTrack<Quat>, t: f32, smooth: bool) -> Option<Quat> {
++    if smooth {
++        track.sample_smooth(t)
++    } else {
++        track.sample(t)
++    }
++}
++
+ /// Several animations: merge-walk the bone-sorted clips, folding each property in node order.
+ fn blend_rig(
+     src: &PoseSource,
+@@ -385,6 +408,7 @@ fn blend_rig(
+     active: &mut [Active],
+     rig: &mut RigPose,
+     mut marks: Option<(&mut Vec<u8>, &mut Vec<u8>)>,
++    smooth: bool,
+ ) {
+     // Every clip here was found when gathered; one gone since poses nothing rather than panicking.
+     let clip = |a: &Active| clip_in(src, extra, a.extra, a.clip).unwrap_or(&NO_CLIP);
+@@ -407,7 +431,7 @@ fn blend_rig(
+             if bone_mask & a.mask != 0 {
+                 continue; // masked out: no contribution, but the cursor advanced
+             }
+-            let (t, r, sc) = (pb.translation.sample(a.seek), pb.rotation.sample(a.seek), pb.scale.sample(a.seek));
++            let (t, r, sc) = (sample_t(&pb.translation, a.seek, smooth), sample_r(&pb.rotation, a.seek, smooth), pb.scale.sample(a.seek));
+             if a.extra {
+                 from_extra |= if t.is_some() { BORROWED_T } else { 0 } | if r.is_some() { BORROWED_R } else { 0 } | if sc.is_some() { BORROWED_S } else { 0 };
+             }
+-- 
+2.56.0.windows.4
+
