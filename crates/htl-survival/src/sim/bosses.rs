@@ -17,6 +17,10 @@ use super::mobs::MobState;
 use super::*;
 use crate::content::BurnDef;
 
+#[cfg(test)]
+#[path = "bosses_tests.rs"]
+mod tests;
+
 /// The dust over a spot where rocks are about to come down, and where they land.
 const DUST: u32 = 7272;
 /// How long the dust shows before the rocks of a set piece fall, how wide they come down, and
@@ -525,8 +529,7 @@ impl Survival {
         }
     }
 
-    /// A boss's blow has landed (melee): burning ground where a heavy one lands, and a weapon
-    /// that lodges where its blow says so.
+    /// A boss's melee blow leaves burning ground where a heated weapon lands.
     pub(crate) fn boss_blow_lands(&mut self, id: Id, pos: Vec3, facing: f32, range: f32, arc: f32, heavy: bool) {
         let now = self.clock;
         if heavy {
@@ -542,10 +545,19 @@ impl Survival {
                 self.bosses.fires.push(Fire { at, radius: b.radius, damage: b.damage, until: now + b.secs, bite_at: now + BURN_TICK * 0.5, owner: id, obj });
             }
         }
-        let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
-        if lodge > 0.0 {
-            self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
-            self.stagger_mob(id, lodge, false);
+    }
+
+    /// The released step's weapon lodges after its ordinary recovery has been recorded.
+    pub(crate) fn boss_weapon_lodges(&mut self, id: Id, secs: f32) {
+        let recovery = match self.mobs.get(&id).map(|m| &m.state) {
+            Some(MobState::Recover { until, .. }) => *until,
+            _ => self.clock,
+        };
+        self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+        self.stagger_mob(id, secs, false);
+        // A short lodge (the ordinary slam) must not shorten a longer normal recovery either.
+        if let Some(Mob { state: MobState::Recover { until, .. }, .. }) = self.mobs.get_mut(&id) {
+            *until = until.max(recovery);
         }
     }
 
