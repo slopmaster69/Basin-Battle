@@ -1,0 +1,23 @@
+# Corey via Desktop (7 Nov): the Deadmines ramp down to Mr. Smite can't be walked onto from the
+# top, where you step off the ship; you have to jump. First take: the hero is set down on the
+# scaffold's lower ring (-24, -832, z 19.4) facing Smite's island (-2, -768), walks toward it in
+# short runs with `.es where` after each, then hops and walks again. Camera from the hero's side.
+hero warrior
+cam -19 -12 9
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+14 .es where
+15 .es goto -24 -832 19.4 1.24
+17 .es where
+18 shots ring 1 1
+19 .es lab fireball one dummy hud cam none stage here do walk:2.5,wait:2.7 shots 14@500
+25 .es where
+26 .es lab fireball one dummy hud cam none stage here do walk:2.5,wait:2.7 shots 14@500
+32 .es where
+33 .es lab fireball one dummy hud cam none stage here do walk:2.5,wait:2.7 shots 14@500
+39 .es where
+40 .es hop
+41 .es lab fireball one dummy hud cam none stage here do walk:2.5,wait:2.7 shots 14@500
+47 .es where
+50 end

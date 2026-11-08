@@ -18,6 +18,10 @@ const WALL_TO: f32 = 2.2;
 const DEEP_WATER: f32 = 1.2;
 /// A walker coming from height z stands on the highest floor no more than this above it.
 pub const STEP_UP: f32 = 1.3;
+/// A cell with no floor between two cells whose floors are no more than this apart is a seam
+/// between them (the edge of a raised walkway, where no surface lies over the cell's middle), and
+/// takes the higher of the two.
+const SEAM_STEP: f32 = 1.2;
 
 /// One walkable surface over a cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -172,6 +176,30 @@ impl Layers {
                     }
                 }
             }
+        }
+        // Seams: a cell the floors on both sides of it miss (the Deadmines' walkway up to the
+        // Shredder, a raised deck 0.8 yards over the cave floor on either side: its two edges were
+        // a line of cells with only the ground 250 yards above, and a creature stepping there was
+        // lifted to it, Nov 7) takes the higher of the two, as a walker steps across it.
+        let mut seams = Vec::new();
+        for j in 1..h.saturating_sub(1) {
+            for i in 1..w.saturating_sub(1) {
+                let k = j * w + i;
+                for (a, b) in [(k - 1, k + 1), (k - w, k + w)] {
+                    for &za in &floors[a] {
+                        let Some(zb) = floors[b].iter().copied().filter(|zb| (zb - za).abs() <= SEAM_STEP).min_by(|x, y| (x - za).abs().total_cmp(&(y - za).abs())) else {
+                            continue;
+                        };
+                        let z = za.max(zb);
+                        if !floors[k].iter().any(|&zk| (zk - z).abs() <= SEAM_STEP + STEP_UP) {
+                            seams.push((k, z));
+                        }
+                    }
+                }
+            }
+        }
+        for (k, z) in seams {
+            floors[k].push(z);
         }
         for t in src.liquid {
             paint(t, &mut wet);
@@ -680,6 +708,22 @@ mod tests {
             .find_path([5.0, -8.0, 0.0], [25.0, -8.0, 0.0], 1.2, None)
             .expect("a way under");
         assert!(low.iter().all(|p| p[2] < 0.5));
+    }
+
+    #[test]
+    fn a_seam_between_a_walkway_and_the_floor_beside_it_is_stepped_across() {
+        // A walkway 0.8 over the cave floor, with a hairline between them on the x 5 line (each
+        // cell's middle is on a whole yard): the only other floor there is the hillside far above.
+        let mut solid = quad(0.0, 4.9, -5.0, 5.0, 0.8, true);
+        solid.extend(quad(5.1, 10.0, -5.0, 5.0, 0.0, true));
+        let terrain = |_x: f32, _y: f32| Some(300.0);
+        let g = Layers::build([0.0, -5.0], [10.0, 5.0], 1.0, &Sources { terrain: &terrain, solid: &solid, liquid: &[] });
+        // Nov 7 a creature stepping on it was lifted 250 yards, to the hillside.
+        assert!((g.height_near(5.0, 0.0, 0.0) - 0.8).abs() < 0.01, "{}", g.height_near(5.0, 0.0, 0.0));
+        assert!((g.height_near(5.0, 0.0, 0.8) - 0.8).abs() < 0.01);
+        assert!(!g.blocked_near(5.0, 0.0, 0.0));
+        // A real drop isn't a seam: off the walkway's end, the hillside is all there is.
+        assert!(g.floor_near(11.0, 0.0, 0.0).is_none() || g.height_near(11.0, 0.0, 0.0) > 100.0);
     }
 
     #[test]
