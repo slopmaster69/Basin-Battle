@@ -590,7 +590,8 @@ impl Survival {
                 return;
             }
         }
-        if self.due_enrage(mid) && self.mobs[&mid].stagger_until <= now {
+        // (A boss on its run takes up its next phase once it fights again.)
+        if self.due_enrage(mid) && self.mobs[&mid].stagger_until <= now && !self.boss_running(mid) {
             self.enrage(mid, by);
             return;
         }
@@ -744,6 +745,7 @@ impl Survival {
         let Some(m) = self.mobs.get_mut(&mid) else { return };
         m.enraged = true;
         let k = m.phase;
+        let begun = k;
         m.phase += 1;
         let def = m.def;
         let foe = m.state.foe().unwrap_or(Foe::Hero(by));
@@ -812,6 +814,8 @@ impl Survival {
                 m.think = 0.0;
             }
         }
+        // Its beats beyond the phase's own (`sim::bosses`): a run, burning blows, debris.
+        self.begin_boss_beats(mid, begun);
     }
 
     /// Whether what a creature's death wakes (`then_needs`) is so: a secret or door below opened,
@@ -875,6 +879,7 @@ impl Survival {
     fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
         self.death_mark_reset(mid);
+        self.boss_gone(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1115,6 +1120,7 @@ impl Survival {
 
     pub(crate) fn step_mobs(&mut self, dt: f32) {
         self.step_rises();
+        self.step_boss_fires();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1172,6 +1178,10 @@ impl Survival {
                 continue;
             }
             if self.disabled(id) {
+                continue;
+            }
+            // A boss on its run (`sim::bosses`): its run is its thinking.
+            if self.step_boss_run(id) {
                 continue;
             }
             // A second wind that was due while it reeled comes once it stands again.
@@ -1253,7 +1263,7 @@ impl Survival {
     /// Below: a creature fallen through its floor, or cut off from its foe and its home alike, set
     /// down at `at` at once (everyone sees it there), its walk dropped and its fight kept. The log
     /// says so, so that the next time can be looked into.
-    fn set_back(&mut self, id: Id, at: Vec3, why: &str) {
+    pub(crate) fn set_back(&mut self, id: Id, at: Vec3, why: &str) {
         let Some(m) = self.mobs.get_mut(&id) else { return };
         let was = m.pos;
         m.pos = at;
@@ -1282,7 +1292,7 @@ impl Survival {
         !self.land.walk_clear(pos, home) && self.land.path(pos, home).is_none_or(|p| p.is_empty())
     }
 
-    fn go(&mut self, id: Id, to: Vec3, speed: f32) {
+    pub(crate) fn go(&mut self, id: Id, to: Vec3, speed: f32) {
         // Snared: slower, as everyone sees it.
         let speed = speed * self.speed_share(id);
         let Some(m) = self.mobs.get(&id) else { return };
@@ -1656,7 +1666,7 @@ impl Survival {
         self.events.push(Event::MobMove { id, path: vec![from, to], speed, face });
     }
 
-    fn halt(&mut self, id: Id) {
+    pub(crate) fn halt(&mut self, id: Id) {
         let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
         // In the air it comes down where it was thrown: nothing stops it short.
@@ -1898,6 +1908,8 @@ impl Survival {
                     let (h, mx) = (m.health, m.max_health);
                     m.state = MobState::Idle { wander_at: now + 3.0 };
                     self.events.push(Event::Health { id, health: h, max: mx });
+                    // A boss that ran to another room goes back to where its fight began.
+                    self.boss_home(id);
                 } else if self.mobs[&id].path.is_empty() {
                     self.go(id, home, d.run_speed);
                 }
@@ -2586,6 +2598,8 @@ impl Survival {
                 self.strike_fair(id, h, a.damage, pos, a.blockable, a.heavy, a.blockable, Blow::Light, area, combat::Follow::None);
             }
         }
+        // A boss's blow: burning ground where a heated weapon lands, a weapon that lodges.
+        self.boss_blow_lands(id, pos, f, a.range, a.arc, a.heavy);
         // A War Banner in the blow's way takes it, as hard as a hero would.
         let share = self.foe_blow_share(id);
         self.banners_struck(pos, f, a.range, a.arc, a.damage as f32 * share);
