@@ -48,6 +48,10 @@ const WARN_EVERY: f32 = 1.1;
 const DUST_EVERY: f32 = 0.6;
 /// A hero farther than this off the route is not on it (another floor, a side cave).
 const OFF_ROUTE: f32 = 20.0;
+/// Its hero this far past the warning band has run off: the boss holds the line, and hurls rock at
+/// them this often.
+const LINE_SLACK: f32 = 6.0;
+const HURL_EVERY: f32 = 4.0;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Bosses {
@@ -88,6 +92,8 @@ struct Collapse {
     dust_at: f32,
     /// The boss was kept from falling before the end (said once).
     held: bool,
+    /// When it next hurls rock at a hero who ran off ahead.
+    hurl_at: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -168,6 +174,7 @@ impl Survival {
                 warn_at: now + 0.5,
                 dust_at: now,
                 held: false,
+                hurl_at: now,
             });
             let name = self.content.mobs[def].name.clone();
             self.events.push(Event::Log(format!("{name} brings the place down: a collapse along {:.0} yd at {:.1} yd/s", self.bosses.collapse.as_ref().unwrap().along.last().copied().unwrap_or(0.0), c.speed)));
@@ -306,6 +313,45 @@ impl Survival {
             self.yell(mid, line);
         }
         most
+    }
+
+    /// A boss whose collapse is coming down holds the line, in place of its thinking, when its
+    /// hero has run off ahead of the fight (past the warning band): it walks the route with the
+    /// front, smashing as it comes, and hurls rock down the tunnel at whoever ran. The collapse and
+    /// the boss set where the fight is, never the heroes. False when its hero is in reach of the
+    /// fight (it fights as ever) or for any other creature.
+    pub(crate) fn step_boss_holdline(&mut self, id: Id) -> bool {
+        let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == id && !c.done) else { return false };
+        let (front, lead, total) = (c.front, c.lead, *c.along.last().unwrap());
+        let Some(m) = self.mobs.get(&id) else { return false };
+        let Some(mobs::Foe::Hero(h)) = m.state.foe() else { return false };
+        let Some(hero) = self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos) else { return false };
+        let now = self.clock;
+        let (route, along) = (c.route.clone(), c.along.clone());
+        let Some((hero_at, _)) = route_progress(&route, &along, hero) else { return false };
+        let line = (front + lead + LINE_SLACK).min(total);
+        let lost = m.lost_at.is_some_and(|t| now - t >= STUCK);
+        if hero_at <= line && !lost {
+            return false;
+        }
+        let def = m.def;
+        let to = route_point(&route, &along, (front + lead * 0.5).min(total));
+        if lost {
+            // No way to its hero: set back on the route at the front, not given up.
+            self.set_back(id, to, "the collapse: no way to its hero, back at the front");
+        } else if self.mobs[&id].path.is_empty() || self.mobs[&id].plan_to.is_some_and(|p| dist2d(p, to) > 3.0) {
+            let speed = self.content.mobs[def].run_speed;
+            self.go(id, to, speed);
+        }
+        // Rock hurled down the tunnel at the hero who ran.
+        let c = self.bosses.collapse.as_mut().unwrap();
+        if now >= c.hurl_at {
+            c.hurl_at = now + HURL_EVERY;
+            let damage = self.boss_blow(id, DEBRIS_SHARE);
+            self.events.push(Event::Emote { id, emote: mobs::ROAR_EMOTE });
+            self.rocks_fall(id, hero, DEBRIS_RADIUS, DEBRIS_WARN, damage, true);
+        }
+        true
     }
 
     /// Whether a boss's collapse is still coming down: it chases its heroes however far they run.
@@ -548,6 +594,27 @@ impl Survival {
         }
         self.hurt_mob_as(mid, me, health - to, "debug");
         Ok(format!("{name} is down to {}%.", (share * 100.0).round()))
+    }
+
+    /// (Debug) Every creature below taken away but those whose name or key holds `keep`, for
+    /// filming one fight with nothing else in it. They're back at the next rest or reset.
+    pub fn dev_clear_foes(&mut self, keep: &str) -> Result<String, String> {
+        let keep = keep.to_lowercase();
+        let gone: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| !m.friendly && !self.content.mobs[m.def].inert())
+            .filter(|(_, m)| {
+                let d = &self.content.mobs[m.def];
+                keep.is_empty() || !(d.key.to_lowercase().contains(&keep) || d.name.to_lowercase().contains(&keep))
+            })
+            .map(|(id, _)| *id)
+            .collect();
+        for id in &gone {
+            self.mobs.remove(id);
+            self.events.push(Event::MobGone { id: *id });
+        }
+        Ok(format!("Took away {} creatures.", gone.len()))
     }
 
     /// This share of the boss's own blow (as hard as its fight has grown).

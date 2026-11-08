@@ -2144,9 +2144,10 @@ fn a_collapse_runs_its_route_crushing_the_buried_and_warning_those_just_ahead() 
     s.move_player(warned, [132.0, 0.0, 0.0], 0.0, Moving::default());
     s.move_player(clear, [160.0, 50.0, 0.0], 0.0, Moving::default());
     let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
-    s.engage(boss, mobs::Foe::Hero(clear));
+    // Its fight is with the hero in the band; the one far ahead is a bystander.
+    s.engage(boss, mobs::Foe::Hero(warned));
     let max = s.mobs[&boss].max_health;
-    s.hurt_mob(boss, clear, max / 5);
+    s.hurt_mob(boss, warned, max / 5);
     assert_eq!(s.collapse_front(), Some((0.0, false)), "the collapse has begun");
     let hp = |s: &Survival, h: Id| s.players[&h].health;
     let (b0, c0) = (hp(&s, buried), hp(&s, clear));
@@ -2157,6 +2158,8 @@ fn a_collapse_runs_its_route_crushing_the_buried_and_warning_those_just_ahead() 
     assert!(ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == warned)), "the hero just ahead warned");
     assert_eq!(hp(&s, clear), c0, "the hero far ahead untouched");
     assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 7272, .. })), "dust and rock where it comes down");
+    // The hero in the fight retreats ahead of the front, as one must.
+    s.move_player(warned, [160.0, 45.0, 0.0], 0.0, Moving::default());
     let ev = run(&mut s, 10.0);
     assert_eq!(s.collapse_front(), Some((120.0, true)), "at its end");
     assert!(ev.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == "At the ship.")));
@@ -2236,10 +2239,11 @@ fn another_way_out_ends_the_run_once_the_exit_boss_is_down() {
     assert!(ev.iter().any(|e| matches!(e, Event::Travel { player, to: None } if *player == id)), "out by the other way");
 }
 
-/// A boss whose collapse is coming down chases a hero who has run far ahead, past its leash, and
-/// keeps the fight (the collapse with it).
+/// A boss whose collapse is coming down doesn't chase a hero who ran off ahead of the fight: it
+/// holds the line, walking the route with the front, and hurls rock down the tunnel at them. The
+/// fight (and the collapse) goes on; the boss and the front set where it is, not the hero.
 #[test]
-fn a_boss_with_its_collapse_coming_down_chases_a_hero_far_ahead_and_keeps_the_fight() {
+fn a_boss_holds_the_collapse_line_and_hurls_rock_at_a_hero_who_runs_off_ahead() {
     use crate::content::{CollapseDef, EnrageDef};
     let mut c = content();
     let w = c.mob("warlord").unwrap();
@@ -2254,10 +2258,19 @@ fn a_boss_with_its_collapse_coming_down_chases_a_hero_far_ahead_and_keeps_the_fi
     s.engage(boss, mobs::Foe::Hero(id));
     let max = s.mobs[&boss].max_health;
     s.hurt_mob(boss, id, max / 5);
-    // The hero runs far down the route, well past the boss's leash.
-    s.move_player(id, [200.0, 0.0, 0.0], 0.0, Moving::default());
-    run(&mut s, 6.0);
-    assert!(s.collapse_front().is_some_and(|f| !f.1), "the collapse still coming down");
-    assert!(matches!(s.mobs[&boss].state.foe(), Some(mobs::Foe::Hero(h)) if h == id), "still after the hero");
-    assert!(s.mobs[&boss].pos[0] > 120.0, "and coming on down the route: {:?}", s.mobs[&boss].pos);
+    // The hero runs far down the route, well past the fight.
+    s.move_player(id, [220.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 8.0);
+    let (front, done) = s.collapse_front().unwrap();
+    assert!(!done, "the collapse still coming down");
+    assert!(matches!(s.mobs[&boss].state.foe(), Some(mobs::Foe::Hero(h)) if h == id), "still in the fight with the hero");
+    let x = s.mobs[&boss].pos[0];
+    assert!(x > 100.0 + front - 2.0 && x < 100.0 + front + 10.0 + 6.0, "on the line, with the front ({front}): {x}");
+    let hurled = ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == id));
+    assert!(hurled, "rock hurled at the hero who ran");
+    // The hero comes back to the fight: the boss fights them as ever.
+    let at = s.mobs[&boss].pos;
+    s.move_player(id, [at[0] + 3.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.5);
+    assert!(!s.step_boss_holdline(boss), "in reach of the fight: no holding the line");
 }

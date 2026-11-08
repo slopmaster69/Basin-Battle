@@ -1240,6 +1240,10 @@ impl Survival {
             if self.step_boss_run(id) {
                 continue;
             }
+            // A boss holding the line of its collapse: the route and the front set where it goes.
+            if self.step_boss_holdline(id) {
+                continue;
+            }
             // A second wind that was due while it reeled comes once it stands again.
             if self.due_enrage(id) && self.mobs[&id].stagger_until <= now {
                 if self.mobs[&id].state.foe().is_some() {
@@ -2034,7 +2038,7 @@ impl Survival {
                     return;
                 }
                 // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
-                if !raider && (lost || (!self.boss_unleashed(id) && self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def)))) {
+                if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
                     let gone = match foe {
