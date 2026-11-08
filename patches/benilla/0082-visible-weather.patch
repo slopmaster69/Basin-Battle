@@ -1,4 +1,4 @@
-From 8ca61b9120e3e7c95cd96d40dd75ca0b12790d9c Mon Sep 17 00:00:00 2001
+From b2059e323c4cde47532d1fef5ac59f089ae34711 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 14:39:42 -0700
 Subject: [PATCH] Visible weather under the new look: grey skies, lit rain, wet
@@ -96,6 +96,17 @@ Revised after the fourth films (#271, take 280):
   0.035 s. It rises over 0.09 s now, three frames at 30 fps, and its
   flicker climbs too and comes later (0.24 s, was 0.17).
 
+Revised after the fifth films (#271, take 291):
+
+- Goldshire's lamp posts made no light: lamppost.m2 #12341 stood 19 yd
+  from the camera with no light in the table nearer than 26.9 yd, so no
+  streak on the wet road (and no glow in the mist, #273). A prop casts
+  light only through a point light in its own model, and the lamp posts
+  have none that casts. Under the new look each lamp or lantern prop
+  with no light of its own within 2.5 yd now gets a stock torch's light
+  half a yard under its top (look::lamps); it goes with its prop and
+  with worldLook 0, and each is logged once ("[look lamps]").
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -109,9 +120,10 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  .../benilla-assets/src/shaders/terrain.wgsl   |  106 +-
  crates/benilla-formats/src/sound_entries.rs   |    5 +
  .../src/lighting/global_light.rs              |   18 +-
+ crates/benilla-world/src/look/lamps.rs        |  241 ++++
  crates/benilla-world/src/look/lights.rs       |   11 +
  crates/benilla-world/src/look/mist.rs         |    8 +-
- crates/benilla-world/src/look/mod.rs          |   34 +-
+ crates/benilla-world/src/look/mod.rs          |   36 +-
  crates/benilla-world/src/look/pass.rs         |    7 +-
  crates/benilla-world/src/look/shadows.rs      |    7 +-
  crates/benilla-world/src/look/water.rs        |   47 +-
@@ -121,7 +133,8 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/weather/mod.rs       |   27 +-
  .../benilla-world/src/weather/precip/mod.rs   |   50 +-
  .../src/weather/precip/render.rs              |   40 +
- 22 files changed, 2025 insertions(+), 44 deletions(-)
+ 23 files changed, 2268 insertions(+), 44 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/lamps.rs
  create mode 100644 crates/benilla-world/src/look/weather.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
@@ -580,13 +593,13 @@ index 4bdb888..47d787f 100644
              if let Some(mut sky) = sky {
                  sky.on = ev.flag();
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 39401b2..f715ad8 100644
+index cce4249..2c5ba5b 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
-@@ -132,6 +132,13 @@ impl Plugin for WorldConsolePlugin {
+@@ -139,6 +139,13 @@ impl Plugin for WorldConsolePlugin {
+             Some("<strength 0-4> | classic | grade"),
+             look_glare,
          );
-         // benilla's own: the new look's painted sky held for tuning on film.
-         app.console_command("looksky", GRAPHICS, Some("clouds <0-1> | grade"), look_sky);
 +        // benilla's own: a weather held for film, no server needed.
 +        app.console_command(
 +            "lookweather",
@@ -597,7 +610,7 @@ index 39401b2..f715ad8 100644
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -318,11 +325,48 @@ fn look_lights(world: &mut World, args: &str) -> Vec<String> {
+@@ -325,11 +332,48 @@ fn look_lights(world: &mut World, args: &str) -> Vec<String> {
          return vec!["Usage: looklights <scale 0-10> | tuned".to_string()];
      };
      *world.get_resource_or_init::<LookLightTune>() = tune;
@@ -648,7 +661,7 @@ index 39401b2..f715ad8 100644
  }
  
  /// `lookao <scale> [radius]`, benilla's own (1.12 has no such command): holds the new look's
-@@ -496,6 +540,58 @@ fn look_wind(world: &mut World, args: &str) -> Vec<String> {
+@@ -503,6 +547,58 @@ fn look_wind(world: &mut World, args: &str) -> Vec<String> {
  /// the day and the weather say notwithstanding, for tuning on film (the server sends no weather
  /// yet); `looksky grade`, or no argument, lets go. `worldSky 0` and the classic look (`worldLook
  /// 0`) have 1.12's sky either way.
@@ -707,7 +720,7 @@ index 39401b2..f715ad8 100644
  fn look_sky(world: &mut World, args: &str) -> Vec<String> {
      use benilla_world::look::{LookSky, WorldLook};
      let Some(clouds) = LookSky::parse(args) else {
-@@ -937,6 +1033,16 @@ mod tests {
+@@ -966,6 +1062,16 @@ mod tests {
          );
          assert_eq!(scale(&mut app), 1.5);
          assert_eq!(run(&mut app, "looklights 0"), ["Look lights held at 0."]);
@@ -724,7 +737,7 @@ index 39401b2..f715ad8 100644
          assert_eq!(scale(&mut app), 0.0);
          assert_eq!(
              run(&mut app, "looklights 11"),
-@@ -1147,6 +1253,42 @@ mod tests {
+@@ -1176,6 +1282,42 @@ mod tests {
          assert_eq!(lines[1], "worldWind is 0: the world stands still.");
      }
  
@@ -768,7 +781,7 @@ index 39401b2..f715ad8 100644
      /// of range leaves it as it was with the usage line.
      #[test]
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index 89c2290..e29b1e5 100644
+index 38ae8bc..dfbd806 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -80,7 +80,7 @@ struct WowLight {
@@ -780,7 +793,7 @@ index 89c2290..e29b1e5 100644
  //   10-22 the new look's painted sky (`look::sky::pack_rows`, `LookSkyRows`), all zero while off.
  @group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
  @group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
-@@ -607,6 +607,44 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
+@@ -614,6 +614,44 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
      return 1.0 - head.y * (1.0 - lit);
  }
  
@@ -825,7 +838,7 @@ index 89c2290..e29b1e5 100644
  // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
  // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
  // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
-@@ -642,7 +680,12 @@ fn look_water(
+@@ -649,7 +687,12 @@ fn look_water(
      let shore = smoothstep(0.0, water.rows[7].w, depth_v);
  
      // Ripples, calmed into the shore.
@@ -1053,6 +1066,253 @@ index 842bd8c..1a75eab 100644
      // `WOW_POINTS_DUMP=1` prints the nearest 8 packed lights once a second; `=frame` every frame,
      // which a pool that changes frame to frame needs.
      static POINTS_DUMP: std::sync::OnceLock<Option<std::ffi::OsString>> =
+diff --git a/crates/benilla-world/src/look/lamps.rs b/crates/benilla-world/src/look/lamps.rs
+new file mode 100644
+index 0000000..266ddec
+--- /dev/null
++++ b/crates/benilla-world/src/look/lamps.rs
+@@ -0,0 +1,241 @@
++//! Street lamps that light under the new look (benilla's own). A prop casts light only through an
++//! M2 point light in its file (`terrain_stream::spawn::fx`), and Goldshire's lamp posts have none
++//! that casts: take 291 found `lamppost.m2` #12341 19 yd from the camera with no light in the
++//! table nearer than 26.9 yd, so its lamp made no pool on the road, no streak on the wet stone
++//! (#271) and no glow in the mist (#273). Under [`WorldLook::NEW`] each lamp-like prop (its model's
++//! file named for a lamp or a lantern, [`is_lamp`]) that has no authored light within
++//! [`tune::NEAR_LIGHT`] of its lamp gets one: a stock torch's light ([`tune::COLOR`],
++//! [`tune::SCALE`]) a little under the top of the prop. It is an ordinary authored light from
++//! there on (the hour, the flicker, the ranking, the wet streaks, the fog's glow), and it goes with
++//! its prop or with the new look, so `worldLook 0` is 1.12's exactly. Each lamp lit is logged once
++//! (`[look lamps]`) with its place.
++
++use std::collections::HashMap;
++
++use bevy::camera::primitives::Aabb;
++use bevy::prelude::*;
++
++use super::WorldLook;
++use crate::interact::WorldObject;
++use crate::lighting::WorldPointLight;
++use crate::model_render::ModelKind;
++
++pub mod tune {
++    /// The light's colour and scale, the stock torch's (`look::lights`' test light), so a lamp
++    /// casts a torch's warm, flickering pool.
++    pub const COLOR: [f32; 3] = [0.466_666_7, 0.290_196_1, 0.133_333_34];
++    pub const SCALE: f32 = 3.0;
++    /// How far under the top of the prop the lamp sits (yd): a lamp post's lantern hangs at its
++    /// head.
++    pub const BELOW_TOP: f32 = 0.5;
++    /// An authored light this near the lamp (yd) is its own: the prop then gets no second one.
++    pub const NEAR_LIGHT: f32 = 2.5;
++}
++
++/// Whether a model path names a lamp: its file, not its folder, has "lamp" or "lantern" in it.
++pub fn is_lamp(path: &str) -> bool {
++    let name = path
++        .rsplit(['/', '\\'])
++        .next()
++        .unwrap_or(path)
++        .to_ascii_lowercase();
++    (name.contains("lamp") || name.contains("lantern"))
++        && (name.ends_with(".m2") || name.ends_with(".mdx"))
++}
++
++/// A light the new look added to a lamp prop: the prop's placement id and one of its meshes, so
++/// the light goes when the prop does.
++#[derive(Component, Clone, Copy, Debug)]
++pub struct LampLight {
++    pub id: u32,
++    pub mesh: Entity,
++}
++
++/// Where a lamp's light sits: under the top of its meshes' boxes, over their middle.
++pub fn lamp_point(boxes: &[(Vec3, Vec3)]) -> Option<Vec3> {
++    let (mut lo, mut hi) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
++    for (a, b) in boxes {
++        lo = lo.min(*a);
++        hi = hi.max(*b);
++    }
++    (lo.x <= hi.x).then(|| {
++        let mid = (lo + hi) * 0.5;
++        Vec3::new(mid.x, (hi.y - tune::BELOW_TOP).max(lo.y), mid.z)
++    })
++}
++
++/// A lamp prop being lit: one of its meshes, its model's path and its meshes' world boxes.
++type LampProp = (Entity, String, Vec<(Vec3, Vec3)>);
++
++type LampMesh = (
++    Entity,
++    &'static WorldObject,
++    &'static GlobalTransform,
++    Option<&'static Aabb>,
++);
++
++/// Light the lamp props that came in this frame, drop the lights whose prop went, and all of them
++/// under the classic look.
++pub(crate) fn light_lamps(
++    mut commands: Commands,
++    look: Res<WorldLook>,
++    fresh: Query<LampMesh, Added<WorldObject>>,
++    all: Query<LampMesh>,
++    authored: Query<&GlobalTransform, (With<WorldPointLight>, Without<LampLight>)>,
++    lit: Query<(Entity, &LampLight)>,
++    meshes: Query<(), With<WorldObject>>,
++    mut was_on: Local<bool>,
++) {
++    if !look.on {
++        if *was_on {
++            for (e, _) in &lit {
++                commands.entity(e).despawn();
++            }
++            *was_on = false;
++        }
++        return;
++    }
++    // Turned on: every prop is new to the look.
++    let rescan = !*was_on;
++    *was_on = true;
++    for (e, lamp) in &lit {
++        if meshes.get(lamp.mesh).is_err() {
++            commands.entity(e).despawn();
++        }
++    }
++    // The lamp props to light: each new lamp mesh's prop, with all its meshes' world boxes.
++    let mut props: HashMap<u32, LampProp> = HashMap::new();
++    let wanted = |o: &WorldObject| {
++        o.id != 0 && matches!(o.kind, ModelKind::Doodad | ModelKind::GameObject) && is_lamp(&o.label)
++    };
++    let mut want_ids: Vec<u32> = Vec::new();
++    let mut want = |o: &WorldObject| {
++        if wanted(o) && !want_ids.contains(&o.id) {
++            want_ids.push(o.id);
++        }
++    };
++    if rescan {
++        all.iter().for_each(|(_, o, _, _)| want(o));
++    } else {
++        fresh.iter().for_each(|(_, o, _, _)| want(o));
++    }
++    if want_ids.is_empty() {
++        return;
++    }
++    let lit_ids: Vec<u32> = lit.iter().map(|(_, l)| l.id).collect();
++    want_ids.retain(|id| !lit_ids.contains(id));
++    for (e, o, gt, aabb) in &all {
++        if !want_ids.contains(&o.id) || !wanted(o) {
++            continue;
++        }
++        let entry = props
++            .entry(o.id)
++            .or_insert_with(|| (e, o.label.clone(), Vec::new()));
++        if let Some(aabb) = aabb {
++            let c = gt.transform_point(Vec3::from(aabb.center));
++            let h = Vec3::from(aabb.half_extents) * gt.scale().abs();
++            entry.2.push((c - h, c + h));
++        }
++    }
++    for (id, (mesh, label, boxes)) in props {
++        let Some(at) = lamp_point(&boxes) else {
++            continue;
++        };
++        if authored
++            .iter()
++            .any(|gt| gt.translation().distance(at) < tune::NEAR_LIGHT)
++        {
++            continue;
++        }
++        let w = benilla_assets::coords::bevy_to_wow(at);
++        info!(
++            "[look lamps] {label} #{id} gets a lamp's light at ({:.1}, {:.1}, {:.1})",
++            w[0], w[1], w[2]
++        );
++        commands.spawn((
++            crate::terrain_stream::point_light(tune::COLOR, tune::SCALE),
++            LampLight { id, mesh },
++            Transform::from_translation(at),
++        ));
++    }
++}
++
++pub(crate) fn build(app: &mut App) {
++    app.add_systems(Update, light_lamps);
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// A lamp post's or a lantern's file is a lamp; its folder alone, a torch or a tree is not.
++    #[test]
++    fn a_lamp_is_named_for_one() {
++        assert!(is_lamp(
++            r"World\Generic\Human\Passive Doodads\Lampposts\LampPost.m2"
++        ));
++        assert!(is_lamp("world/generic/human/passive doodads/lanterns/lantern01.mdx"));
++        assert!(is_lamp(r"World\Azeroth\Elwynn\PassiveDoodads\StreetLamp\StreetLamp01.m2"));
++        assert!(!is_lamp(r"World\Generic\Human\Lampposts\Bench.m2"));
++        assert!(!is_lamp(r"World\Generic\Human\Passive Doodads\Torches\GeneralTorch01.m2"));
++        assert!(!is_lamp("Elwynn Oak"));
++    }
++
++    /// The lamp hangs half a yard under the top of the prop, over its middle.
++    #[test]
++    fn the_lamp_sits_under_the_top() {
++        let p = lamp_point(&[
++            (Vec3::new(-0.2, 0.0, -0.2), Vec3::new(0.2, 3.0, 0.2)),
++            (Vec3::new(-0.5, 2.6, -0.1), Vec3::new(0.3, 3.4, 0.1)),
++        ])
++        .unwrap();
++        assert!((p.y - (3.4 - tune::BELOW_TOP)).abs() < 1e-5);
++        assert!((p.x + 0.1).abs() < 1e-5 && p.z.abs() < 1e-5);
++        assert!(lamp_point(&[]).is_none());
++    }
++
++    /// Under the new look a lamp prop gets one light, kept on later frames; with no authored
++    /// light near, not twice; the classic look takes it away.
++    #[test]
++    fn a_lamp_lights_under_the_new_look_only() {
++        let mut app = App::new();
++        app.insert_resource(WorldLook::NEW);
++        app.add_systems(Update, light_lamps);
++        let lamp = WorldObject {
++            kind: ModelKind::Doodad,
++            label: r"World\Generic\Human\Passive Doodads\Lampposts\LampPost.m2".to_string(),
++            id: 12341,
++            detail: String::new(),
++        };
++        let aabb = Aabb::from_min_max(Vec3::new(-0.2, 0.0, -0.2), Vec3::new(0.2, 3.0, 0.2));
++        let mesh = app
++            .world_mut()
++            .spawn((lamp, GlobalTransform::from_xyz(10.0, 0.0, 5.0), aabb))
++            .id();
++        let lights = |app: &mut App| {
++            app.world_mut()
++                .query::<(&LampLight, &Transform)>()
++                .iter(app.world())
++                .map(|(l, t)| (l.id, t.translation))
++                .collect::<Vec<_>>()
++        };
++        app.update();
++        app.update();
++        let lit = lights(&mut app);
++        assert_eq!(lit.len(), 1, "{lit:?}");
++        assert_eq!(lit[0].0, 12341);
++        assert!((lit[0].1 - Vec3::new(10.0, 2.5, 5.0)).length() < 1e-4);
++        app.update();
++        assert_eq!(lights(&mut app).len(), 1, "once");
++        app.insert_resource(WorldLook::CLASSIC);
++        app.update();
++        assert!(lights(&mut app).is_empty(), "the classic look has none");
++        app.insert_resource(WorldLook::NEW);
++        app.update();
++        assert_eq!(lights(&mut app).len(), 1, "back with the new look");
++        app.world_mut().entity_mut(mesh).despawn();
++        app.update();
++        app.update();
++        assert!(lights(&mut app).is_empty(), "gone with its prop");
++    }
++}
 diff --git a/crates/benilla-world/src/look/lights.rs b/crates/benilla-world/src/look/lights.rs
 index 1aabb5d..20ee969 100644
 --- a/crates/benilla-world/src/look/lights.rs
@@ -1102,7 +1362,7 @@ index 4ed3eb1..69ab9d3 100644
          live: clock.live,
          forced: tune.day.is_some(),
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index bb213c6..1ca8ccc 100644
+index 7fe8111..157d989 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -3,8 +3,9 @@
@@ -1117,7 +1377,15 @@ index bb213c6..1ca8ccc 100644
  //! switch, [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look
  //! is then exactly the reference's.
  
-@@ -27,6 +28,7 @@ pub mod sky;
+@@ -17,6 +18,7 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
+ 
+ pub mod ao;
+ pub mod grade;
++pub mod lamps;
+ pub mod lights;
+ pub mod mist;
+ pub mod pass;
+@@ -27,6 +29,7 @@ pub mod sky;
  pub mod switch_watch;
  pub mod water;
  pub mod water_pass;
@@ -1125,15 +1393,15 @@ index bb213c6..1ca8ccc 100644
  pub mod wind;
  pub use ao::LookAo;
  pub use grade::{GradeKey, PostLook, Tint};
-@@ -36,6 +38,7 @@ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+@@ -36,6 +39,7 @@ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
  pub use shadows::{LookShadows, ShadowFrame};
- pub use sky::{LookSky, SkyFrame};
+ pub use sky::{LookGlare, LookSky, SkyFrame};
  pub use water::{LookWater, WaterFrame};
 +pub use weather::{LookWeather, WeatherLook};
  pub use wind::{LookWind, WindFrame};
  
  /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
-@@ -147,11 +150,14 @@ pub(crate) struct LookInputs<'w> {
+@@ -147,11 +151,14 @@ pub(crate) struct LookInputs<'w> {
      area: Option<Res<'w, crate::terrain_stream::CurrentArea>>,
      ramp: ResMut<'w, ZoneRamp>,
      grade: ResMut<'w, LookGrade>,
@@ -1150,7 +1418,7 @@ index bb213c6..1ca8ccc 100644
      pub(crate) fn apply(
          &mut self,
          atmo: Atmosphere,
-@@ -177,7 +183,11 @@ impl LookInputs<'_> {
+@@ -177,7 +184,11 @@ impl LookInputs<'_> {
          if *self.grade != next {
              *self.grade = next;
          }
@@ -1163,7 +1431,7 @@ index bb213c6..1ca8ccc 100644
      }
  }
  
-@@ -234,6 +244,7 @@ pub(crate) fn init_resources(app: &mut App) {
+@@ -234,6 +245,7 @@ pub(crate) fn init_resources(app: &mut App) {
      water::init_resources(app);
      wind::init_resources(app);
      sky::init_resources(app);
@@ -1171,7 +1439,7 @@ index bb213c6..1ca8ccc 100644
  }
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
-@@ -249,6 +260,19 @@ impl Plugin for LookPlugin {
+@@ -249,6 +261,19 @@ impl Plugin for LookPlugin {
                  (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
              )
              .add_systems(PreUpdate, sync_view_look)
@@ -1191,8 +1459,16 @@ index bb213c6..1ca8ccc 100644
              // The wind and the sky after the light they read is resolved; the water's block after
              // the sky it mirrors, and its scene copy sized to the view once that is known.
              .add_systems(
+@@ -278,6 +303,7 @@ impl Plugin for LookPlugin {
+         shadow_pass::build(app);
+         water_pass::build(app);
+         switch_watch::build(app);
++        lamps::build(app);
+     }
+ 
+     fn finish(&self, app: &mut App) {
 diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
-index 0835ddd..0e3a32e 100644
+index cd780d5..7e0b069 100644
 --- a/crates/benilla-world/src/look/pass.rs
 +++ b/crates/benilla-world/src/look/pass.rs
 @@ -84,6 +84,7 @@ fn publish_frame(
@@ -1242,10 +1518,10 @@ index 2ab1ca3..832ba1e 100644
          };
          if light.strength <= 0.0 {
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index aec8189..0961a44 100644
+index e172c10..ec1dc9f 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -192,7 +192,7 @@ pub mod tune {
+@@ -212,7 +212,7 @@ pub mod tune {
  ///   2 `[glint colour (linear), sharpness]` · 3 `[sky zenith (linear), ripple slope]` ·
  ///   4 `[sky horizon (linear), ripple wavelength (yd)]` · 5 `[shallow (sRGB), tint weight]` ·
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
@@ -1254,7 +1530,7 @@ index aec8189..0961a44 100644
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
  ///   the mirror's sky runs through, so the lakes mirror the clouds.
  pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS;
-@@ -352,6 +352,7 @@ pub fn pack_rows(
+@@ -372,6 +372,7 @@ pub fn pack_rows(
      held: &LookWater,
      light: &WowLighting,
      sky: &super::SkyFrame,
@@ -1262,7 +1538,7 @@ index aec8189..0961a44 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -407,7 +408,7 @@ pub fn pack_rows(
+@@ -427,7 +428,7 @@ pub fn pack_rows(
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
          tune::OCEAN_CLEAR_YD * clarity,
@@ -1271,7 +1547,7 @@ index aec8189..0961a44 100644
      ];
      rows
  }
-@@ -418,12 +419,15 @@ pub(crate) fn publish_water(
+@@ -438,12 +439,15 @@ pub(crate) fn publish_water(
      water: Res<LookWater>,
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
@@ -1288,7 +1564,7 @@ index aec8189..0961a44 100644
      };
      if *frame != next {
          *frame = next;
-@@ -500,7 +504,13 @@ mod tests {
+@@ -520,7 +524,13 @@ mod tests {
  
      #[test]
      fn the_block_is_zero_when_off() {
@@ -1303,7 +1579,7 @@ index aec8189..0961a44 100644
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
  
-@@ -508,16 +518,31 @@ mod tests {
+@@ -528,16 +538,31 @@ mod tests {
      /// mirror and the clarity, and lets go again.
      #[test]
      fn the_block_carries_the_tuning_and_the_hold() {
@@ -1337,7 +1613,7 @@ index aec8189..0961a44 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -802,7 +827,13 @@ mod tests {
+@@ -828,7 +853,13 @@ mod tests {
      /// with it off, those rows stay zero and the glint whole.
      #[test]
      fn the_painted_sky_reaches_the_water() {
@@ -1352,7 +1628,7 @@ index aec8189..0961a44 100644
          assert!(off[10..].iter().all(|r| *r == [0.0; 4]));
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
-@@ -811,7 +842,7 @@ mod tests {
+@@ -837,7 +868,7 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
