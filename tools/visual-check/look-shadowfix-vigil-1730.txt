@@ -1,4 +1,4 @@
-# Sun shadows with shapes (client 0069): Heroes' Vigil at 17:30, the camera behind the hero looking
+# Sun shadows with shapes (client 0080): Heroes' Vigil at 17:30, the camera behind the hero looking
 # north toward the memorial (if the statue is behind the camera, try cam 180). Low with slice 0 of
 # its map, slice 1, high, then worldShadows 0.
 # Look for: the statue and its plinth casting a long shadow toward the camera and to the right, the
