@@ -1,4 +1,4 @@
-# Ambient life (client 0072): the woods across Crystal Lake at dusk (20:45), the camera low on the
+# Ambient life (client 0083): the woods across Crystal Lake at dusk (20:45), the camera low on the
 # shore looking over the water to the trees. The fireflies coming out: at the grade's density, then
 # looklife 2 and looklife 0, worldLife 0 (none) and worldLook 0 (1.12).
 # Look for: a few dozen small warm green-gold glows low over the water's edge and under the trees,

@@ -1,4 +1,4 @@
-# Ambient life (client 0072): the woods by Crystal Lake at golden hour (17:30), facing the low sun
+# Ambient life (client 0083): the woods by Crystal Lake at golden hour (17:30), facing the low sun
 # (the sun sits at yaw 45), the camera pitched a little up into the god rays; then looklife 3,
 # worldLife 0 and worldLook 0. look-life-woods-golden-back is the same with the sun behind.
 # Look for: tiny warm specks drifting slowly in the air toward the sun, sparkling where a shaft of

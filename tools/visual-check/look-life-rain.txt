@@ -1,8 +1,8 @@
-# Ambient life (client 0072) in the weather (client 0071): the woods across Crystal Lake at night
+# Ambient life (client 0083) in the weather (client 0082): the woods across Crystal Lake at night
 # (22:30) with the fireflies out, then rain (lookweather rain 0.7), then clear again.
 # Look for: the fireflies fading away over a few seconds as the rain sets in (not vanishing in one
 # frame), none at all in the rain; after lookweather clear, coming back over a few seconds as the
-# rain eases off. The rain itself is 0071's.
+# rain eases off. The rain itself is 0082's.
 hero warrior
 cam 200 -6 6
 include _look_setup

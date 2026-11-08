@@ -1,4 +1,4 @@
-# Clouds in the water (0068's sky in 0066/0070's water): Stone Cairn Lake, whose far shore is low,
+# Clouds in the water (0068's sky in 0066/0081's water): Stone Cairn Lake, whose far shore is low,
 # at 12:00 and 17:30, the camera level across the lake (yaw 45, pitched 4 down, 6 yd), the day's
 # cover, then looksky clouds 0.8 and 0, and worldSky 0.
 # The goto line answers with where the hero stands; if it is in the water or the camera sinks

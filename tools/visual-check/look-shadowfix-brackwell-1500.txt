@@ -1,4 +1,4 @@
-# Sun shadows with shapes (client 0069): the Brackwell pumpkin patch at 15:00, the camera 5 yd behind
+# Sun shadows with shapes (client 0080): the Brackwell pumpkin patch at 15:00, the camera 5 yd behind
 # the hero looking north. The sun stands high (about 56 degrees), on its fixed bearing in the north-west, so every
 # shadow falls toward the camera and to the right. Low (worldShadows 1) with slices 0 and 1 of its
 # map in the corner, high (2) with slice 0, then worldShadows 0 to compare.

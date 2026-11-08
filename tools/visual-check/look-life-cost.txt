@@ -1,4 +1,4 @@
-# Ambient life (client 0072): what it costs. Crystal Lake facing the low sun at golden hour (17:30:
+# Ambient life (client 0083): what it costs. Crystal Lake facing the low sun at golden hour (17:30:
 # motes, each asking whether the sun reaches it, and leaves), then night (23:00: fireflies and their
 # lights), standing still, the fps journal on (benilla-config/Diagnostics/fps-journal.csv): 10 s at
 # the grade's density, 10 s at looklife 3, 10 s with worldLife 0, 10 s with worldLook 0, at each

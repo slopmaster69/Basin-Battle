@@ -52,6 +52,10 @@ pub struct Content {
     /// How each kind of creature fights (`[[temper]]`): a creature's `temper` names one.
     #[serde(rename = "temper", default)]
     pub tempers: Vec<TemperDef>,
+    /// How a fight of two or more goes (`[[plan]]`): one is picked as it begins, from those that
+    /// fit who's in it.
+    #[serde(rename = "plan", default)]
+    pub plans: Vec<PlanDef>,
     #[serde(default)]
     pub pvp: PvpDef,
     /// Two heroes' duel: a challenge, a countdown, and a fight until one would fall.
@@ -884,6 +888,26 @@ pub struct TemperDef {
     pub pace: f32,
 }
 
+/// A fight's plan (`[[plan]]`): picked as a fight of two creatures or more begins, so the same
+/// pack doesn't fight the same way twice. `key` is one the rules know: `all_in` (every fighter
+/// presses), `pincer` (one holds the hero's front, another works round to their back), `screen`
+/// (a fighter stands between the hero and the fight's caster or shooter), `bait` (one fights,
+/// another holds back for an opening or its fellow's fall), `waves` (half the fighters wait their
+/// turn out of reach).
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanDef {
+    pub key: String,
+    /// How likely, against the others that fit.
+    #[serde(default = "one_f")]
+    pub weight: f32,
+    /// Fighters up close it needs (not casters or shooters).
+    #[serde(default)]
+    pub min_melee: usize,
+    /// It needs a caster or a shooter in the fight.
+    #[serde(default)]
+    pub ranged: bool,
+}
+
 /// A creature's tactics, as Yharnam's hunters learned them the hard way: it goes for whoever
 /// hurts it, the one alone and the one with their guard down; it presses an opening (a heal, a
 /// swing's follow-through, a spell drawn back, a stagger) at once, past the turn it would wait;
@@ -962,6 +986,13 @@ pub struct AiDef {
     pub space_streak: f32,
     pub space_most: f32,
     pub space_band: f32,
+    /// Each creature its own within its kind: as it appears, its pace between strings and its
+    /// readiness to give ground are each its kind's give or take this share, and one of its
+    /// strings is its favourite, `favourite` times as likely as its kind's own weight says.
+    #[serde(default)]
+    pub quirk: f32,
+    #[serde(default = "one_f")]
+    pub favourite: f32,
 }
 
 impl Default for AiDef {
@@ -995,6 +1026,8 @@ impl Default for AiDef {
             space_streak: 0.2,
             space_most: 0.8,
             space_band: 0.5,
+            quirk: 0.0,
+            favourite: 1.0,
         }
     }
 }
@@ -2080,6 +2113,10 @@ pub struct SpecialDef {
     /// Its own sound as it winds up (see [`AttackDef::sound`]).
     #[serde(default)]
     pub sound: Option<u32>,
+    /// Basin Battle: its weapon sticks where this blow lands, and it hauls at it this long
+    /// (seconds; 0: no), open to every blow: the best opening of a fight.
+    #[serde(default)]
+    pub lodge: f32,
 }
 
 fn one_u32() -> u32 {
@@ -2248,6 +2285,15 @@ pub struct MobDef {
     /// Said over a hero it has just felled.
     #[serde(default)]
     pub slay_sound: u32,
+    /// What it yells (a monster yell from where it stands, with a speech bubble) as it turns on a
+    /// foe, over a hero it has just felled, and as it falls. Empty: nothing. A phase's `text` and a
+    /// second form's `then_text` are yelled the same way.
+    #[serde(default)]
+    pub aggro_text: String,
+    #[serde(default)]
+    pub slay_text: String,
+    #[serde(default)]
+    pub death_text: String,
     /// Its voice as it begins a string up close (the first blow's wind-up), from where it stands,
     /// so a blow from behind is heard coming: a grunt, a shout. `heavy_sound` for a heavy first
     /// blow (else `windup_sound`). 0: none.
@@ -2265,7 +2311,7 @@ impl MobDef {
 }
 
 /// A creature's second wind (`[mob.enrage]`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct EnrageDef {
     /// At or below this share of its health.
     pub at: f32,
@@ -2295,6 +2341,41 @@ pub struct EnrageDef {
     /// It throws down every hero this near as it turns (0: none).
     #[serde(default)]
     pub shove: f32,
+    /// Basin Battle's boss beats (`sim::bosses`). The boss breaks off and runs along these points
+    /// (by the land's ways between them), heeding nobody, and fights again where the last one is
+    /// once a hero has come within `wait_for` yards of it (its home from then: a lost fight
+    /// puts it back where it began). Empty: it stays.
+    #[serde(default)]
+    pub run_to: Vec<[f32; 3]>,
+    /// On the run, rocks shaken loose behind it this often (seconds; 0: none): dust first, then
+    /// the fall, a light blow.
+    #[serde(default)]
+    pub run_falls: f32,
+    #[serde(default)]
+    pub wait_for: f32,
+    /// Yelled, and its flash on it, as it takes up the fight again at the run's end.
+    #[serde(default)]
+    pub arrive_text: String,
+    #[serde(default)]
+    pub arrive_kit: u32,
+    /// From this phase on its heavy blows leave burning ground where they land.
+    #[serde(default)]
+    pub burn: Option<BurnDef>,
+    /// Rocks brought down as it turns: dust over each of these points, then the fall a moment
+    /// later (a heavy blow), and a dry way left between them.
+    #[serde(default)]
+    pub debris: Vec<[f32; 3]>,
+}
+
+/// Burning ground a boss's heavy blow leaves (`[mob.phase.burn]`): how wide, what it does each
+/// second to a hero standing in it, how long it burns, and its look (a ground spell).
+#[derive(Debug, Clone, Deserialize)]
+pub struct BurnDef {
+    pub radius: f32,
+    pub damage: u32,
+    pub secs: f32,
+    #[serde(default)]
+    pub look: u32,
 }
 
 /// One of the journal's goals: done when the camp has `kind` (`bank`, `build`, `craft`, `kill`,
@@ -3257,6 +3338,11 @@ impl Content {
         for p in &self.packs {
             if !p.camp.is_empty() && !self.camps.iter().any(|c| c.key == p.camp) {
                 bail!("pack of {}: no [[camp]] {}", p.mob, p.camp);
+            }
+        }
+        for pl in &self.plans {
+            if !["all_in", "pincer", "screen", "bait", "waves"].contains(&pl.key.as_str()) {
+                bail!("plan {}: no such plan (all_in, pincer, screen, bait, waves)", pl.key);
             }
         }
         for c in &self.camps {

@@ -1165,6 +1165,12 @@ impl SurvivalGame {
                     self.broadcast(&packets::play_object_sound(g, sound));
                 }
             }
+            Event::Yell { id, text } => {
+                let name = self.sim.mobs.get(&id).map(|m| self.sim.content.mobs[m.def].name.clone());
+                if let (Some(g), Some(name)) = (self.guid_of(id), name) {
+                    self.broadcast(&packets::monster_yell(g, &name, &text));
+                }
+            }
             Event::Healed { id, amount } => {
                 *self.healed.entry(id).or_default() += amount;
             }

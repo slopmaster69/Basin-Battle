@@ -1,4 +1,4 @@
-# Sun shadows with shapes (client 0069): Goldshire at 17:30 facing the inn, as the first films did. Low
+# Sun shadows with shapes (client 0080): Goldshire at 17:30 facing the inn, as the first films did. Low
 # (worldShadows 1) with slice 0 of its map in the corner, then slice 1, high (2), then worldShadows 0.
 # Look for: the inn's shadow, a big hard-edged block across the cobbles on the side away from the
 # sun (it casts now even if its walls belong to the building's indoor groups); the hero's own shadow

@@ -2590,10 +2590,16 @@ impl Survival {
             self.siege_fell(id, last.filter(|k| self.players.contains_key(k)));
         }
         // A creature's word over the hero it felled.
-        if let Some((k, sound)) = last.and_then(|k| self.mobs.get(&k).map(|m| (k, self.content.mobs[m.def].slay_sound))) {
+        if let Some((k, sound, line)) = last.and_then(|k| {
+            self.mobs.get(&k).map(|m| {
+                let d = &self.content.mobs[m.def];
+                (k, d.slay_sound, d.slay_text.clone())
+            })
+        }) {
             if sound != 0 {
                 self.events.push(Event::Sound { id: k, sound });
             }
+            self.yell(k, line);
         }
         // The log says what felled them too (the recap's last blow), for tuning the fights.
         let why = self.death_recap(id).lines.into_iter().next().map_or(String::new(), |l| format!(": {l}"));

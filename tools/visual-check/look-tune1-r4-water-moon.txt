@@ -1,4 +1,4 @@
-# The moon's lane (client 0070, #270's fourth round): Crystal Lake at 23:00 and 23:30 facing the
+# The moon's lane (client 0081, #270's fourth round): Crystal Lake at 23:00 and 23:30 facing the
 # moon (yaw 45, the moon's north-west bearing, 24 then 41 degrees up), the hero backed out into
 # the lake. Then worldWater 0, 1.12's look, and back to the new look: the zone's grade now comes
 # back at once (it started its 3 s ramp over on the switch, so take 273's tuned-again, a second
