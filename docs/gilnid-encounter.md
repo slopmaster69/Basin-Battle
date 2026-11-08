@@ -93,6 +93,13 @@ at landing, the gear handoff, and valve facing/gesture cancellation. `gilnid-tel
 `gilnid-tells-valve` are short controlled presentation scenarios; ambient foes are cleared and
 worker kills are scripted for the valve check. Both explicitly hide optional floor markers.
 
+On the final combined source, all 14 focused Gilnid tests passed. The workspace release suite
+passed 1,084 tests with 19 ignored (915 survival tests passed). One initial full run missed the
+timing-sensitive client parry check; its isolated rerun passed, and the subsequent complete
+workspace rerun passed without failures. Merging main `b32e942` changed only Smite's documentation;
+the tested encounter source was unchanged. Native floor queries also confirmed the dry exit
+from (-205, -595) to (-205, -591.4) at floor 21; unsafe outer steam anchors are omitted.
+
 Still unverified: the revised tells in the client, an unassisted clear, and solo-versus-duo
 balance. Supports do not rock or tip, and valve hand contact is not established. Keep
 `needs playtest` until the remaining acceptance is recorded.
