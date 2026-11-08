@@ -313,7 +313,8 @@ impl Survival {
         let edge = (radius - 0.7).max(0.0);
         for [x, y] in [[0.0, 0.0], [-edge, 0.0], [edge, 0.0], [0.0, -edge], [0.0, edge]] {
             let p = self.ground_near(at[0] + x, at[1] + y, at[2]);
-            if (p[2] - at[2]).abs() > 1.0 || self.land.water_near(p[0], p[1], p[2]) { continue; }
+            if (p[2] - at[2]).abs() > 1.0 || self.land.water_near(p[0], p[1], p[2])
+                || self.land.blocked_near(p[0], p[1], p[2]) || !self.land.walk_clear(at, p) { continue; }
             let steam = self.perch_prop(p, 353, 1.4);
             self.perches.crews.get_mut(&owner).unwrap().steam.push((steam, self.clock + warn));
         }
