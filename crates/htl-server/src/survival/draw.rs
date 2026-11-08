@@ -1432,7 +1432,7 @@ mod rope_tests {
     #[test]
     fn gilnid_platforms_keep_collision_while_visual_cues_appear_immediately() {
         use htl_survival::{content::Content, land::FlatLand};
-        let mut game = super::SurvivalGame::new(Content::dev(), Box::new(FlatLand::default()), None, 7);
+        let mut game = super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
         game.sim.mobs.clear();
         game.sim.objs.clear();
         let hero = game.sim.join("smith", "Smith", None);
