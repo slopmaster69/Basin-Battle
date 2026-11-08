@@ -35,6 +35,8 @@ const WAIT_MOST: f32 = 30.0;
 const STUCK: f32 = 3.0;
 /// It runs its route a quarter quicker than it chases: ahead of the heroes, there first.
 const RUN_HASTE: f32 = 1.25;
+/// A leg taking this many times longer than a straight run along it is helped along.
+const LEG_SLACK: f32 = 2.5;
 /// Burning ground bites a hero standing in it this often.
 const BURN_TICK: f32 = 1.0;
 
@@ -63,6 +65,10 @@ struct Run {
     /// Where it last made headway, and when: a run that stands still this long is helped along.
     went_from: Vec3,
     went_at: f32,
+    /// When it set off on this leg, and from where: a leg taking far longer than a run along it
+    /// would is helped along too.
+    leg_at: f32,
+    leg_from: Vec3,
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +108,8 @@ impl Survival {
                     arrived: None,
                     went_from: home,
                     went_at: now,
+                    leg_at: now,
+                    leg_from: home,
                 },
             );
             // Whatever it was winding up is let go: it runs.
@@ -159,16 +167,25 @@ impl Survival {
                     self.halt(id);
                     return true;
                 }
+                let r = self.bosses.runs.get_mut(&id).unwrap();
+                r.leg_at = now;
+                r.leg_from = pos;
                 let next = e.run_to[leg];
                 let speed = self.content.mobs[def].run_speed * RUN_HASTE;
                 self.go(id, next, speed);
-            } else if self.mobs[&id].lost_at.is_some_and(|t| now - t >= STUCK) || (now - run.went_at >= STUCK && dist2d(pos, run.went_from) < 1.0) {
-                // No way along this leg, or no headway on it: set down at its end rather than
-                // standing in the wall (the log says where, to be looked into).
+            } else if self.mobs[&id].lost_at.is_some_and(|t| now - t >= STUCK)
+                || (now - run.went_at >= STUCK && dist2d(pos, run.went_from) < 1.0)
+                || now - run.leg_at > dist2d(run.leg_from, to) / (self.content.mobs[def].run_speed * RUN_HASTE).max(1.0) * LEG_SLACK + STUCK
+            {
+                // No way along this leg, no headway on it, or far longer on it than a run along
+                // it takes: set down at its end rather than standing in the wall or working along
+                // a ledge (the log says where, to be looked into).
                 self.set_back(id, to, "boss run, no headway on the leg");
                 let r = self.bosses.runs.get_mut(&id).unwrap();
                 r.went_from = to;
                 r.went_at = now;
+                r.leg_at = now;
+                r.leg_from = to;
             } else if self.mobs[&id].path.is_empty() {
                 let speed = self.content.mobs[def].run_speed * RUN_HASTE;
                 self.go(id, to, speed);
