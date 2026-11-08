@@ -1,0 +1,15 @@
+# The scaffold's ramp up from Mr. Smite's island (-4, -778, 9.8) to its top (-20, -796, 19.0),
+# heading 225 degrees (cam 225): a run up it, `.es where` after.
+hero warrior
+cam 225 -12 9
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+14 lua FlipCameraYaw(90)
+15 .es goto -4 -778 9.8
+17 .es where
+18 shots island 1 1
+19 .es lab fireball one dummy hud cam none stage here do walk:3,wait:3.2 shots 20@400
+27 .es where
+30 end

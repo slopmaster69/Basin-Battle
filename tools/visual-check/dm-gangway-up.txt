@@ -1,0 +1,19 @@
+# The gangway the other way: from the plank's top at (-31.5, -804.5, 31.4) heading 140 degrees
+# back up onto the gun deck, a slow walk then a run. `.es where` after each.
+hero warrior
+cam 140 -25 9
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -31.5 -804.5 31.4
+17 .es where
+18 shots plank 1 1
+19 lua ActionDash(2, 2.5, "f")
+19.2 shots walk 10 0.4
+24 .es where
+25 .es goto -31.5 -804.5 31.4
+27 lua ActionDash(2, 7, "f")
+27.2 shots run 8 0.4
+32 .es where
+35 end

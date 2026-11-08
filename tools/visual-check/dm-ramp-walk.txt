@@ -1,0 +1,24 @@
+# The scaffold's ramp down to Mr. Smite's island (Desktop's probe: top (-20, -796, 19.0), bottom
+# (-8, -784, 11.6), heading 45 degrees). The hero is set down at the top heading down it (cam 45:
+# the hero faces the camera's yaw) and runs with a plain ActionDash (no spell lab: the lab's
+# training dummy 5 yd ahead and its lock-on had the hero circling in the earlier takes).
+# `.es where` after; then a slow walk (run_speed 2.5) from the top too.
+hero warrior
+cam 45 -12 9
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -20 -796 19.0
+17 .es where
+18 shots top 1 1
+19 lua ActionDash(3, 7, "f")
+19.2 shots run 20 0.4
+27 .es where
+28 .es goto -20 -796 19.0
+30 .es tune player.run_speed 2.5
+31 lua ActionDash(4, 2.5, "f")
+31.2 shots walk 12 0.5
+38 .es where
+39 .es tune player.run_speed 7
+42 end

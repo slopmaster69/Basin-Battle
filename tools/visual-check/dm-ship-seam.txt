@@ -1,0 +1,32 @@
+# Desktop's map seam by the ship: between x -38 (floor 34.6) and x -36 (34.9, flagged a wall) at
+# y -812, and the same at y -828. Heading north (+x, cam 0), plain ActionDash runs (no spell lab):
+# a slow walk over the seam (run_speed 2.5), a run, a hop then a run, and the notch at y -828.
+# `.es where` after each.
+hero warrior
+cam 0 -12 8
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -40 -812 34.6
+17 .es where
+18 shots seam 1 1
+19 .es tune player.run_speed 2.5
+20 lua ActionDash(2.4, 2.5, "f")
+20.2 shots slow 12 0.4
+26 .es where
+27 .es tune player.run_speed 7
+28 .es goto -40 -812 34.6
+30 lua ActionDash(0.9, 7, "f")
+30.2 shots run 8 0.3
+35 .es where
+36 .es goto -40 -812 34.6
+38 .es hop
+38.3 lua ActionDash(0.9, 7, "f")
+38.4 shots hop 8 0.3
+43 .es where
+44 .es goto -40 -828 34.6
+46 lua ActionDash(0.9, 7, "f")
+46.2 shots notch 8 0.3
+51 .es where
+54 end

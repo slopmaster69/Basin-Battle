@@ -195,6 +195,8 @@ function Read-Scenario($name, $depth = 0) {
         if (-not $line) { continue }
         $where = "$name.txt line $n"
         if ($line -match '^hero\s+(\S+)$') { $sc.Hero = $Matches[1].ToLower(); continue }
+        # `cam off`: the camera isn't held (a scenario that turns it itself, as the god-ray circles do).
+        if ($line -match '^cam\s+off$') { $sc.Cam = "off"; continue }
         if ($line -match '^cam\s+(\S+)\s+(\S+)\s+(\S+)$') {
             $sc.Cam = "$(Fmt (Num $Matches[1])),$(Fmt (Num $Matches[2])),$(Fmt (Num $Matches[3]))@0"
             continue
@@ -582,9 +584,9 @@ function Invoke-Scenario($s, $name, $out) {
     $timeout = [int]((Num $s.login_timeout) + $settle + $sc.End + 30)
     Say "$name : $hero, $([int]$sc.End) s, $asked stills (closed after $timeout s at most)"
     $log = Join-Path $out "client.log"
-    $quit = Invoke-Client $s @{
-        WOW_CHAR = $hero; WOW_PROBE_LUA = $lua; WOW_PROBE_LUA_AT = "1"; WOW_PROBE_CAM = $cam
-    } $timeout $chome $log $v
+    $vars = @{ WOW_CHAR = $hero; WOW_PROBE_LUA = $lua; WOW_PROBE_LUA_AT = "1" }
+    if ($cam -ne "off") { $vars.WOW_PROBE_CAM = $cam }
+    $quit = Invoke-Client $s $vars $timeout $chome $log $v
     $shots = Save-Shots $s (Join-Path $chome "Screenshots") $out $log ($null -ne $v)
     $runLog = @()
     if (Test-Path $log) {
