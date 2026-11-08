@@ -2066,11 +2066,16 @@ fn a_heated_bosss_heavy_blow_leaves_burning_ground_and_a_lodged_blow_holds_it() 
     assert!(s.players[&id].health < hp, "bitten by the burning iron");
     run(&mut s, 3.0);
     assert!(!s.objs.contains_key(&fire.unwrap()), "burned out");
-    // The lodged blow: it hauls at its weapon, open.
-    let now = s.clock;
+    // The lodged blow: drive its actual windup/release bookkeeping, then it hauls at its weapon.
     s.mobs.get_mut(&boss).unwrap().pattern = Some((0, 0));
-    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, false);
-    assert!(s.mobs[&boss].stagger_until >= now + 1.9, "held, open, as long as the blow says");
+    s.windup(boss, mobs::Foe::Hero(id), s.players[&id].pos);
+    let deadline = s.clock + s.attack_now(boss).windup + 1.0;
+    while matches!(s.mobs[&boss].state, mobs::MobState::Windup { .. }) && s.clock < deadline {
+        s.step(0.02);
+    }
+    assert!(s.mobs[&boss].stagger_until >= s.clock + 1.9, "held, open, as long as the blow says");
+    assert!(matches!(s.mobs[&boss].state, mobs::MobState::Recover { until, .. } if until >= s.clock + 1.9),
+        "ordinary release bookkeeping must preserve the authored opening");
 }
 
 /// Debris: dust over each point first, then the rocks, a heavy blow there.
