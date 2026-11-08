@@ -1,0 +1,24 @@
+# Control for the gangway fix: a run (7 yd/s, 2 s) across the gun deck heading 140 degrees,
+# starting PAST the slab at (-36, -801, 31.5), then the same from the slab's deck end (-38, -799).
+# Tells whether a running hero drops at (-45, -793) without the slab being involved.
+hero warrior
+cam 140 -25 9
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -36 -801 31.5
+17 .es where
+18 shots deck 1 1
+19 lua ActionDash(2, 7, "f")
+19.2 shots run1 8 0.4
+24 .es where
+25 .es goto -38 -799 32
+27 lua ActionDash(2, 7, "f")
+27.2 shots run2 8 0.4
+32 .es where
+33 .es goto -36 -801 31.5
+35 lua ActionDash(2, 2.5, "f")
+35.2 shots walk 8 0.6
+41 .es where
+43 end
