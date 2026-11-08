@@ -94,6 +94,10 @@ struct Collapse {
     held: bool,
     /// When it next hurls rock at a hero who ran off ahead.
     hurl_at: f32,
+    /// Next walking corner while holding the line. Kept in order through hairpins where
+    /// the same position occurs twice; a nearest-point projection alone can go backwards.
+    boss_leg: usize,
+    holding: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -150,16 +154,20 @@ impl Survival {
             }
         }
         if let Some(c) = e.collapse.filter(|c| c.route.len() >= 2) {
+            let Some(route) = crate::land::walking_route(self.land.as_ref(), &c.route) else {
+                self.events.push(Event::Log(format!("{}: collapse route has no safe walk; phase stopped", self.content.mobs[def].name)));
+                return;
+            };
             let now = self.clock;
             self.bosses.began.entry(mid).or_insert(home);
             let mut along = vec![0.0];
-            for w in c.route.windows(2) {
+            for w in route.windows(2) {
                 let d = dist3(w[0], w[1]);
                 along.push(along.last().unwrap() + d);
             }
             self.bosses.collapse = Some(Collapse {
                 boss: mid,
-                route: c.route.clone(),
+                route,
                 along,
                 front: 0.0,
                 speed: c.speed.max(0.5),
@@ -175,6 +183,8 @@ impl Survival {
                 dust_at: now,
                 held: false,
                 hurl_at: now,
+                boss_leg: 1,
+                holding: false,
             });
             let name = self.content.mobs[def].name.clone();
             self.events.push(Event::Log(format!("{name} brings the place down: a collapse along {:.0} yd at {:.1} yd/s", self.bosses.collapse.as_ref().unwrap().along.last().copied().unwrap_or(0.0), c.speed)));
@@ -237,8 +247,9 @@ impl Survival {
         }
         // Its leash runs from wherever it is while the place comes down round it.
         if !c.done {
-            let pos = m.pos;
-            self.mobs.get_mut(&boss).unwrap().home = pos;
+            if let Some(pos) = self.land.footing(m.pos) {
+                self.mobs.get_mut(&boss).unwrap().home = pos;
+            }
         }
         let total = *c.along.last().unwrap();
         let mut c = c;
@@ -323,30 +334,44 @@ impl Survival {
     pub(crate) fn step_boss_holdline(&mut self, id: Id) -> bool {
         let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == id && !c.done) else { return false };
         let (front, lead, total) = (c.front, c.lead, *c.along.last().unwrap());
+        let (mut leg, holding) = (c.boss_leg, c.holding);
         let Some(m) = self.mobs.get(&id) else { return false };
         let Some(mobs::Foe::Hero(h)) = m.state.foe() else { return false };
         let Some(hero) = self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos) else { return false };
         let now = self.clock;
         let (route, along) = (c.route.clone(), c.along.clone());
-        let Some((hero_at, _)) = route_progress(&route, &along, hero) else { return false };
+        let Some((hero_at, hero_off)) = route_progress(&route, &along, hero) else { return false };
         let line = (front + lead + LINE_SLACK).min(total);
         let lost = m.lost_at.is_some_and(|t| now - t >= STUCK);
-        if hero_at <= line && !lost {
+        if hero_at <= line && hero_off <= OFF_ROUTE && !lost {
+            self.bosses.collapse.as_mut().unwrap().holding = false;
             return false;
         }
         let def = m.def;
-        // The next of the route's own points past the middle of the band (each one ground a body
-        // stands on; a point between two may be over water or in the rock).
+        // Follow the next native corner, never the chord from the creature to a distant
+        // front. A hero on another floor doesn't pull it out of the route either.
         let want = (front + lead * 0.5).min(total);
-        let k = along.iter().position(|a| *a >= want).unwrap_or(route.len() - 1);
-        // (A long straight leg: its point on the line, as walkable as the leg.)
-        let to = if along[k] - want <= lead { route[k] } else { route_point(&route, &along, want) };
-        if lost {
-            // No way to its hero: set back on the route at the front, not given up.
-            self.set_back(id, to, "the collapse: no way to its hero, back at the front");
-        } else if self.mobs[&id].path.is_empty() || self.mobs[&id].plan_to.is_some_and(|p| dist2d(p, to) > 3.0) {
+        if !holding {
+            let start = leg.saturating_sub(1);
+            let (at, _) = route_progress(&route[start..], &along[start..], m.pos).unwrap();
+            leg = along.iter().position(|a| *a > at + 0.01).unwrap_or(route.len() - 1).max(1);
+        }
+        while leg + 1 < route.len() && dist3(m.pos, route[leg]) < 0.08 { leg += 1; }
+        let (boss_at, boss_off) = route_progress(&route[leg-1..=leg], &along[leg-1..=leg], m.pos).unwrap();
+        let to = if boss_off > 1.0 {
+            route_point(&route, &along, boss_at)
+        } else {
+            route_point(&route, &along, want.min(along[leg]).max(boss_at))
+        };
+        let c = self.bosses.collapse.as_mut().unwrap();
+        c.boss_leg = leg;
+        c.holding = true;
+        if let Some(to) = self.land.footing(to).filter(|_| boss_at < want || boss_off > 1.0) {
             let speed = self.content.mobs[def].run_speed;
-            self.go(id, to, speed);
+            let end = self.mobs[&id].path.last().copied();
+            if end.is_none_or(|end| dist3(end, to) > 0.5) { self.go(id, to, speed); }
+        } else if !self.mobs[&id].path.is_empty() {
+            self.halt(id);
         }
         // Rock hurled down the tunnel at the hero who ran.
         let c = self.bosses.collapse.as_mut().unwrap();
@@ -362,6 +387,10 @@ impl Survival {
     /// Whether a boss's collapse is still coming down: it chases its heroes however far they run.
     pub(crate) fn boss_unleashed(&self, id: Id) -> bool {
         self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id && !c.done)
+    }
+
+    pub(crate) fn boss_fight_home(&self, id: Id) -> Option<Vec3> {
+        self.bosses.began.get(&id).copied()
     }
 
     /// The collapse's front, as far along its route as it has come (for tests and the log).

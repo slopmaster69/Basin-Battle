@@ -2277,3 +2277,102 @@ fn a_boss_holds_the_collapse_line_and_hurls_rock_at_a_hero_who_runs_off_ahead() 
     run(&mut s, 0.5);
     assert!(!s.step_boss_holdline(boss), "in reach of the fight: no holding the line");
 }
+
+/// A coarse chord crosses rock, while the real walking route bends around it. The hero on
+/// another floor cannot lure the boss onto that floor, and every actual stride stays grounded.
+#[test]
+fn the_collapse_and_its_boss_follow_native_bends_without_resetting() {
+    use crate::content::{CollapseDef, EnrageDef};
+    use crate::land::Land;
+    struct Bend;
+    impl Land for Bend {
+        fn height(&self, x: f32, y: f32) -> f32 {
+            if x > 110.0 && x < 130.0 && y < 10.0 { 300.0 } else { 0.0 }
+        }
+        fn plans(&self) -> bool { true }
+        fn walk_clear(&self, a: Vec3, b: Vec3) -> bool {
+            let steps = (dist2d(a, b) / 0.1).ceil().max(1.0) as usize;
+            (0..=steps).all(|i| {
+                let t = i as f32 / steps as f32;
+                self.footing([a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t]).is_some()
+            })
+        }
+        fn path(&self, a: Vec3, b: Vec3) -> Option<Vec<Vec3>> {
+            if a[0] <= 110.0 && b[0] >= 130.0 && b[2] == 0.0 {
+                Some(vec![[110.0, 12.0, 0.0], [130.0, 12.0, 0.0], b])
+            } else { None }
+        }
+    }
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef {
+        route: vec![[100.0, 0.0, 0.0], [140.0, 0.0, 0.0]], speed: 2.0, lead: 4.0, crush: 0.2, hold: 0.26,
+        end_text: String::new(), held_text: String::new(),
+    }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(Bend), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [140.0, 0.0, 50.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    let mut previous = s.mobs[&boss].pos;
+    let mut max_y = 0.0_f32;
+    for _ in 0..500 {
+        let ev = s.step(DT);
+        let at = s.mobs[&boss].pos;
+        assert!(s.land().footing(at).is_some(), "grounded at {at:?}");
+        assert!(dist2d(previous, at) <= s.content.mobs[w].run_speed * DT + 0.01, "no teleport: {previous:?} -> {at:?}");
+        assert!(!ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("put back"))));
+        previous = at;
+        max_y = max_y.max(at[1]);
+        s.players.get_mut(&id).unwrap().health = s.players[&id].max_health;
+    }
+    assert!(max_y >= 11.9, "walked the bend: {max_y}");
+    assert!(s.mobs[&boss].pos[0] >= 135.0, "past both corners: {:?}", s.mobs[&boss].pos);
+    assert!(s.collapse_front().unwrap().0 > 40.0, "native distance exceeds the authored chord");
+}
+
+#[test]
+fn a_collapse_passes_a_repeated_hairpin_point_in_order() {
+    use crate::content::{CollapseDef, EnrageDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef {
+        route: vec![[100.0, 0.0, 0.0], [110.0, 0.0, 0.0], [110.2, 0.0, 0.0], [110.0, 0.0, 0.0], [110.0, 10.0, 0.0], [140.0, 10.0, 0.0]],
+        speed: 2.0, lead: 4.0, crush: 0.0, hold: 0.26, end_text: String::new(), held_text: String::new(),
+    }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [140.0, 10.0, 50.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| m.def == w).unwrap().0;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    for _ in 0..500 {
+        let p = s.players.get_mut(&id).unwrap();
+        p.health = p.max_health;
+        let ev = s.step(DT);
+        assert!(!ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("put back"))));
+    }
+    assert!(s.mobs[&boss].pos[0] > 136.0, "passed the repeated point instead of cycling there: {:?}", s.mobs[&boss].pos);
+}
+
+#[test]
+fn collapse_route_samples_the_floor_between_corners_and_rejects_wet_targets() {
+    use crate::land::{Land, walking_route};
+    struct Hill;
+    impl Land for Hill {
+        fn height(&self, x: f32, _y: f32) -> f32 { (x / 50.0 * std::f32::consts::PI).sin() * 4.0 }
+        fn walk_clear(&self, _a: Vec3, _b: Vec3) -> bool { true }
+        fn wet_near(&self, _x: f32, y: f32, _z: f32) -> bool { y > 5.0 }
+    }
+    let route = walking_route(&Hill, &[[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]]).unwrap();
+    assert!(route.iter().any(|p| p[2] > 3.9));
+    assert!(route.iter().all(|p| Hill.footing(*p).is_some()));
+    assert!(walking_route(&Hill, &[[0.0, 0.0, 0.0], [50.0, 6.0, 0.0]]).is_none());
+}
