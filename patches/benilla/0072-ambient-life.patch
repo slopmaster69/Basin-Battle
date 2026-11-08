@@ -1,0 +1,2653 @@
+From 5c06e46febfdfffbce2421a703590f134c114801 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 16:57:01 -0700
+Subject: [PATCH] Ambient life under the new look: fireflies, falling leaves,
+ motes in the sun and butterflies
+
+Elwynn's woods feel lived in now, as WoW Forever's do. A few small things
+move near the camera, never many and never far from it.
+
+Fireflies come out after dusk (19:45 to 21:00) and go before first light:
+warm green-gold glows low over the grass, more under the trees and over
+the water, each blinking softly on its own beat and drifting slowly.
+They are drawn bright enough for the bloom, and the three nearest that
+are flashing light the ground a little through the look's light table.
+
+By day leaves fall from the crowns of the trees near the camera (the
+doodads whose model is a tree, by the same model-path test the wind
+sways them by): a few at a time, green with some gold and rust, tumbling
+and swinging as they fall and carried downwind in the look's wind, more
+as a gust front passes the tree (the shaders' gust, now on the CPU too).
+They land and fade.
+
+Motes of pollen and dust drift in the air, lit only where the sun reaches
+them (a ray toward the sun through the world's collision, and the crowns
+between with gaps in their leaves, so the light comes in shafts), seen
+mostly looking toward the sun, and as bright as the grade's god rays at
+that hour: they sparkle at dawn and golden hour and are gone in shade.
+
+A couple of butterflies flutter over open ground by day, two flapping
+wings on a wandering flight, from a sprite drawn here (1.12 has none).
+
+Rain stops the fireflies, the butterflies and the motes, softly over a
+few seconds; the leaves keep falling, more and faster; while the ground
+is still wet after rain, more motes hang in the sun.
+
+Everything spawns within 20 to 40 yd of the camera in pools allocated
+once, fades in where it is born and out at the edge of its radius, and
+is drawn on the effect stream from one small atlas made at startup: two
+draws a frame. Nothing is drawn on the ground but a landed leaf for a
+moment. Indoors and under water there is none.
+
+worldLife 0 turns it off on its own; looklife <0-3> scales how much
+there is for film and looklife grade follows the hour again. worldLook 0
+draws none of it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/cvars/mod.rs           |   20 +
+ crates/benilla-app/src/cvars/table.rs         |   10 +
+ crates/benilla-app/src/video.rs               |   13 +-
+ crates/benilla-app/src/world_console.rs       |   64 +
+ crates/benilla-world/src/lighting/mod.rs      |    5 +
+ crates/benilla-world/src/look/life.rs         | 2121 +++++++++++++++++
+ crates/benilla-world/src/look/mod.rs          |   28 +-
+ crates/benilla-world/src/look/wind.rs         |   55 +
+ crates/benilla-world/src/terrain_stream.rs    |   29 +-
+ .../benilla-world/src/terrain_stream/merge.rs |    1 +
+ .../src/terrain_stream/spawn/mod.rs           |    1 +
+ .../benilla-world/src/terrain_stream/weld.rs  |    1 +
+ 12 files changed, 2342 insertions(+), 6 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/life.rs
+
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 239f408..5b98c10 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1720,6 +1720,25 @@ mod tests {
+         assert!(res::<LookWeather>(&app).on);
+     }
+ 
++    /// `worldLife` (benilla's own) turns the new look's ambient life off and on by itself,
++    /// registered "1" to match `LookLife`'s default.
++    #[test]
++    fn world_life_switches_alone() {
++        use benilla_world::look::{LookLife, LookWeather, WorldLook};
++        let mut app = cvar_app();
++        assert!(res::<LookLife>(&app).on, "registered \"1\"");
++        assert_eq!(apply(&mut app, "worldLife", "0"), SetOutcome::Changed);
++        assert!(!res::<LookLife>(&app).on);
++        assert!(res::<LookWeather>(&app).on, "the weather stays");
++        assert_eq!(
++            *res::<WorldLook>(&app),
++            WorldLook::NEW,
++            "the rest of the look stays"
++        );
++        apply(&mut app, "worldLife", "1");
++        assert!(res::<LookLife>(&app).on);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2843,6 +2862,7 @@ mod tests {
+             .init_resource::<benilla_world::look::LookWind>()
+             .init_resource::<benilla_world::look::LookSky>()
+             .init_resource::<benilla_world::look::LookWeather>()
++            .init_resource::<benilla_world::look::LookLife>()
+             // Literal, not Default: RenderScale::default() reads $WOW_RENDER_SCALE.
+             .insert_resource(RenderScale(1.0))
+             // Literal: `Realmlist::default()` reads `$WOW_HOST`.
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index 9362de6..3b82ee0 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -902,6 +902,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — 1.12's rain is grey streaks; this turns the new look's weather (lit \
+          rain, wet ground, rings on the water, lightning) off on its own",
+     ),
++    // benilla's own: the new look's ambient life (fireflies at night, falling leaves, motes in
++    // the sun's shafts, butterflies by day), "0" for none under the rest of the new look. The
++    // knob is `benilla_world::look::LookLife::on`, set by `video::on_cvar`; inert under
++    // `worldLook 0`.
++    ours(
++        "worldLife",
++        "1",
++        "benilla's own — 1.12's world has no fireflies, leaves or motes; this turns the new \
++         look's ambient life off on its own",
++    ),
+     // benilla's own: `/console fpsJournal 1` appends a per-second row of position, frame cost and
+     // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
+     // [`crate::perf::FpsJournalSetting`].
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 47d787f..7d232e2 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -320,6 +320,7 @@ type LookSwitches<'w> = (
+     Option<ResMut<'w, benilla_world::look::LookWind>>,
+     Option<ResMut<'w, benilla_world::look::LookSky>>,
+     Option<ResMut<'w, benilla_world::look::LookWeather>>,
++    Option<ResMut<'w, benilla_world::look::LookLife>>,
+ );
+ 
+ /// The change callbacks of the reference's video-options registration block (`0x688470`); each
+@@ -340,7 +341,7 @@ pub(crate) fn on_cvar(
+     mut look: ResMut<benilla_world::look::WorldLook>,
+     // The new look's own switches: its contact shadows, its sun shadows, its water, its wind and
+     // its sky.
+-    (ao, shadows, water, wind, sky, look_weather): LookSwitches,
++    (ao, shadows, water, wind, sky, look_weather, life): LookSwitches,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+     use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+@@ -400,6 +401,16 @@ pub(crate) fn on_cvar(
+         }
+         // benilla's own: the new look's painted sky on its own, read every frame.
+         // benilla's own: the new look's weather on its own, read every frame.
++        // benilla's own: the new look's ambient life on its own, read every frame.
++        "worldlife" => {
++            if let Some(mut life) = life {
++                life.on = ev.flag();
++                info!(
++                    "video: the new look's ambient life {}",
++                    if life.on { "on" } else { "off" }
++                );
++            }
++        }
+         "worldweather" => {
+             if let Some(mut look_weather) = look_weather {
+                 look_weather.on = ev.flag();
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 295f8a9..08e8223 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -139,6 +139,8 @@ impl Plugin for WorldConsolePlugin {
+             Some("<clear|overcast|rain|storm> [0-1] | server | grade"),
+             look_weather,
+         );
++        // benilla's own: the new look's ambient life scaled for tuning on film.
++        app.console_command("looklife", GRAPHICS, Some("<0-3> | grade"), look_life);
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -555,6 +557,41 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++/// `looklife <density>`, benilla's own (1.12 has no such command): scales how much ambient life
++/// the new look puts about the camera (`benilla_world::look::life`: fireflies, falling leaves,
++/// motes in the sun, butterflies) from 0 (none) to 3, for tuning on film; `looklife grade`, or no
++/// argument, follows the hour again. Says what is out now. `worldLife 0` and the classic look
++/// (`worldLook 0`) have none.
++fn look_life(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::life::Life;
++    use benilla_world::look::{LookLife, WorldLook};
++    let Some(density) = LookLife::parse(args) else {
++        return vec!["Usage: looklife <0-3> | grade".to_string()];
++    };
++    let on = {
++        let mut life = world.get_resource_or_init::<LookLife>();
++        life.density = density;
++        life.on
++    };
++    let mut lines = vec![match density {
++        None => "Life follows the hour.".to_string(),
++        Some(d) => format!("Life held at {d} times the hour's."),
++    }];
++    if let Some(life) = world.get_resource::<Life>() {
++        let [flies, leaves, motes, butterflies] = life.counts();
++        lines.push(format!(
++            "Out now: {flies} fireflies, {leaves} leaves, {motes} motes, {butterflies} butterflies."
++        ));
++    }
++    if !on {
++        lines.push("worldLife is 0: no ambient life.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has no ambient life.".to_string());
++    }
++    lines
++}
++
+ fn look_sky(world: &mut World, args: &str) -> Vec<String> {
+     use benilla_world::look::{LookSky, WorldLook};
+     let Some(clouds) = LookSky::parse(args) else {
+@@ -1242,6 +1279,33 @@ mod tests {
+         assert_eq!(lines[1], "worldWeather is 0: 1.12's look of the weather.");
+     }
+ 
++    /// `looklife`: a density holds the scale, `grade` or nothing lets go, and anything out of
++    /// range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_life_holds_and_lets_go() {
++        use benilla_world::look::{LookLife, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let held = |app: &mut App| app.world_mut().get_resource_or_init::<LookLife>().density;
++        assert_eq!(
++            run(&mut app, "looklife 2"),
++            ["Life held at 2 times the hour's."]
++        );
++        assert_eq!(held(&mut app), Some(2.0));
++        assert_eq!(
++            run(&mut app, "looklife 5"),
++            ["Usage: looklife <0-3> | grade"]
++        );
++        assert_eq!(held(&mut app), Some(2.0), "a bad value changes nothing");
++        assert_eq!(run(&mut app, "looklife grade"), ["Life follows the hour."]);
++        assert_eq!(held(&mut app), None);
++        app.world_mut().resource_mut::<LookLife>().on = false;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        let lines = run(&mut app, "looklife 0");
++        assert_eq!(lines.len(), 3, "{lines:?}");
++        assert_eq!(lines[1], "worldLife is 0: no ambient life.");
++    }
++
+     /// `looksky`: `clouds <cover>` holds the cover, `grade` or nothing lets go, and anything out
+     /// of range leaves it as it was with the usage line.
+     #[test]
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index ecfa3d3..e64177e 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -322,6 +322,11 @@ mod ordering_tests {
+                 "look/sky.rs",
+                 "publish_sky joins LightingConsumeSet where look/mod.rs adds it",
+             ),
++            (
++                "look/life.rs",
++                "scan_crowns, step_life and light_fireflies join LightingConsumeSet where \
++                 look/mod.rs adds them",
++            ),
+         ];
+         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+         let mut offenders = Vec::new();
+diff --git a/crates/benilla-world/src/look/life.rs b/crates/benilla-world/src/look/life.rs
+new file mode 100644
+index 0000000..a66b42b
+--- /dev/null
++++ b/crates/benilla-world/src/look/life.rs
+@@ -0,0 +1,2121 @@
++//! Ambient life, the new look's own (no reference behaviour): WoW Forever's woods feel lived in.
++//! A few small things move near the camera, never far from it and never many:
++//! 1. **fireflies** at dusk and night: warm green motes that drift and blink low over the grass,
++//!    more under the trees and over the water, fading in after sunset and out before dawn. They
++//!    are drawn bright enough for the bloom, and the nearest few light the ground a little
++//!    (`look::lights`, [`FireflyLights`]);
++//! 2. **falling leaves** by day: from the crowns of the trees near the camera (the doodads whose
++//!    model is a tree, [`is_tree`], the same model-path test the wind sways them by), a few at a
++//!    time, tumbling down and downwind in the wind and more as a gust passes ([`wind::gust_at`],
++//!    the shaders' own gust), landing and fading;
++//! 3. **motes in the light**: pollen and dust drifting in the air, lit only where the sun reaches
++//!    them (not behind a hill, a building or a crown, with gaps in the leaves letting shafts
++//!    through), and seen mostly toward the sun, so they sparkle in the god rays at dawn and at
++//!    golden hour and are gone in shade;
++//! 4. **butterflies** by day over open ground, a couple at a time: two flapping wings on a
++//!    wandering flight, from a sprite drawn here (1.12 has no butterfly model);
++//! 5. **the weather** (`look::weather`): rain stops the fireflies, the butterflies and the motes;
++//!    the leaves still fall, more and faster; after the rain, while the ground is wet, a few more
++//!    motes hang in the sun.
++//!
++//! Everything spawns within [`tune`]'s radii of the camera, in fixed-capacity pools allocated once
++//! ([`Life::new`]), fades in where it is born and out at the edge of its radius, so turning or
++//! walking never pops anything; nothing is drawn on the ground but a landed leaf for a moment.
++//! It all goes on the shared effect stream ([`push_life`]): the fireflies and the motes as
++//! additive glows, the leaves and the butterflies as lit alpha sprites, from one small atlas made
++//! here ([`atlas_image`]).
++//!
++//! Every tunable is in [`tune`]. `worldLife 0` ([`LookLife::on`]) turns it all off on its own;
++//! `looklife <0-3>` scales how much there is for film, `looklife grade` follows the hour again.
++//! `worldLook 0` draws none of it.
++
++use avian3d::prelude::SpatialQuery;
++use bevy::asset::RenderAssetUsages;
++use bevy::ecs::system::SystemParam;
++use bevy::image::{ImageSampler, ImageSamplerDescriptor};
++use bevy::prelude::*;
++use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
++
++use super::wind::{self, WindFrame, WIND_ROWS};
++use super::{LookGrade, LookLight, SkyFrame, WeatherLook, WorldLook};
++use crate::lighting::{GameClock, WowLighting};
++use crate::particles::buffer::{
++    EffectBlend, EffectDrawSpec, EffectFog, EffectLighting, EffectQuads, EffectVertex,
++};
++use crate::view::WorldCamera;
++
++/// Every tunable of the ambient life, in one place. A first pass, to tune on film with
++/// `looklife`. Counts are at `looklife 1`, lengths in yards, times in seconds, minutes of the game
++/// day for the hours, colours the gamma frame's (an additive colour over 1 blooms).
++pub mod tune {
++    /// `looklife` scales every count by up to this; the pools hold this many times each count.
++    pub const SCALE_MAX: f32 = 3.0;
++    /// At most this many of a kind are born in one frame, so a scene fills over a few seconds.
++    pub const SPAWN_PER_FRAME: usize = 2;
++    /// Nothing nearer the camera than the first is drawn; it fades in by the second.
++    pub const NEAR_FROM: f32 = 0.6;
++    pub const NEAR_TO: f32 = 2.0;
++    /// A thing fades out over the outer share of its radius, and goes past it.
++    pub const EDGE_FADE: f32 = 0.25;
++    /// The smallest a glow is drawn on screen (pixels across): farther ones grow to this and dim
++    /// to match, so a far firefly is a faint point rather than a flickering sub-pixel.
++    pub const GLOW_MIN_PX: f32 = 3.0;
++
++    // ---- the weather ----
++    /// Rain from the first density to the second stops the fireflies, the butterflies and the
++    /// motes; they fade out (and back after the rain) over about this long.
++    pub const RAIN_STOP_FROM: f32 = 0.02;
++    pub const RAIN_STOP_TO: f32 = 0.2;
++    pub const WEATHER_FADE_S: f32 = 2.5;
++    /// While the ground is still wet after rain, this many more motes (a share, at soaked).
++    pub const MOTES_AFTER_RAIN: f32 = 1.5;
++
++    // ---- fireflies ----
++    /// How many around the camera at full night, and how far out.
++    pub const FIREFLIES: f32 = 30.0;
++    pub const FIREFLY_RADIUS: f32 = 30.0;
++    /// They come out over the first pair of minutes (19:45 to 21:00, after Elwynn's 19:30 dusk)
++    /// and go over the second (04:15 to 05:30, before first light).
++    pub const FIREFLY_IN: (f32, f32) = (1185.0, 1260.0);
++    pub const FIREFLY_OUT: (f32, f32) = (255.0, 330.0);
++    /// Where they are born: the chance a spot in the open keeps one, beside the trees (within the
++    /// reach of a crown's edge) and over the water.
++    pub const FIREFLY_OPEN: f32 = 0.3;
++    pub const FIREFLY_WOODS: f32 = 1.0;
++    pub const FIREFLY_WOODS_REACH: f32 = 8.0;
++    pub const FIREFLY_WATER: f32 = 1.0;
++    /// How high over the ground or the water (yards, from and to).
++    pub const FIREFLY_HEIGHT: (f32, f32) = (0.5, 2.4);
++    /// A life (from, to), and how long it fades in and out.
++    pub const FIREFLY_LIFE: (f32, f32) = (12.0, 30.0);
++    pub const FIREFLY_FADE_S: f32 = 1.5;
++    /// The drift: how far a firefly wanders from where it was born (across, up), and how slowly
++    /// (radians a second, from and to).
++    pub const FIREFLY_WANDER: (f32, f32) = (1.4, 0.35);
++    pub const FIREFLY_WANDER_RATE: (f32, f32) = (0.15, 0.45);
++    /// The blink: one flash a period (seconds, from and to), this sharp (its half-width as a share
++    /// of the period), with this much left between flashes.
++    pub const FIREFLY_BLINK_PERIOD: (f32, f32) = (2.2, 5.0);
++    pub const FIREFLY_BLINK_WIDTH: f32 = 0.11;
++    pub const FIREFLY_BLINK_FLOOR: f32 = 0.06;
++    /// The glow: its colour at full flash (green-gold, over 1 to bloom), and the sprite's size
++    /// (yards across, the halo; the bright core is the middle fifth).
++    pub const FIREFLY_RGB: [f32; 3] = [1.25, 1.75, 0.5];
++    pub const FIREFLY_SIZE: f32 = 0.32;
++    /// The nearest few that are flashing light the ground: how many, how far a light reaches
++    /// (yd), how strong (`look::lights`' intensity), and how close to the camera they must be.
++    pub const FIREFLY_LIGHTS: usize = 3;
++    pub const FIREFLY_LIGHT_RADIUS: f32 = 2.5;
++    pub const FIREFLY_LIGHT: f32 = 0.6;
++    pub const FIREFLY_LIGHT_COLOR: [f32; 3] = [0.75, 1.0, 0.35];
++    pub const FIREFLY_LIGHT_REACH: f32 = 14.0;
++
++    // ---- leaves ----
++    /// The trees a leaf can fall from are those whose crown is this near the camera; at most this
++    /// many of the nearest, looked for again this often or after the camera moves this far.
++    pub const LEAF_RADIUS: f32 = 40.0;
++    pub const CROWNS_MAX: usize = 48;
++    pub const CROWN_SCAN_S: f32 = 0.5;
++    pub const CROWN_SCAN_MOVE: f32 = 4.0;
++    /// At most this many falling at once.
++    pub const LEAVES: f32 = 40.0;
++    /// A crown drops this many a second on a still day, plus this many per unit of the wind's
++    /// strength and of the gust passing it; rain drops more (a share, at full rain).
++    pub const LEAF_RATE_CALM: f32 = 0.012;
++    pub const LEAF_RATE_WIND: f32 = 0.02;
++    pub const LEAF_RATE_GUST: f32 = 0.12;
++    pub const LEAF_RAIN: f32 = 1.5;
++    /// By day only, mostly: they start falling over the first pair of minutes (05:30 to 07:00)
++    /// and stop over the second (19:30 to 21:00), down to this share at night.
++    pub const LEAF_DAY_IN: (f32, f32) = (330.0, 420.0);
++    pub const LEAF_DAY_OUT: (f32, f32) = (1170.0, 1260.0);
++    pub const LEAF_NIGHT: f32 = 0.2;
++    /// The fall (yd/s, from and to), faster in rain (a share, at full rain).
++    pub const LEAF_FALL: (f32, f32) = (0.7, 1.2);
++    pub const LEAF_RAIN_FALL: f32 = 1.2;
++    /// Downwind: yd/s per unit of the wind's strength and per unit of gust, and how quickly a leaf
++    /// takes up the air's speed (seconds).
++    pub const LEAF_DRIFT: f32 = 1.1;
++    pub const LEAF_DRIFT_GUST: f32 = 3.5;
++    pub const LEAF_DRAG_S: f32 = 0.8;
++    /// The swing of a falling leaf, side to side (yd), its period (s, from and to), and its spin
++    /// (radians a second, from and to).
++    pub const LEAF_SWING: f32 = 0.45;
++    pub const LEAF_SWING_PERIOD: (f32, f32) = (1.6, 3.0);
++    pub const LEAF_SPIN: (f32, f32) = (1.5, 5.0);
++    /// A leaf's size (yd, from and to), and how long it lies before it is gone.
++    pub const LEAF_SIZE: (f32, f32) = (0.16, 0.26);
++    pub const LEAF_REST_S: f32 = 2.5;
++    /// A leaf lies this far over the ground, so it never sinks into it.
++    pub const LEAF_LIFT: f32 = 0.05;
++    /// A falling leaf longer than this is gone (caught in a building's roof, say).
++    pub const LEAF_MAX_FALL_S: f32 = 40.0;
++    /// Elwynn's leaves: summer greens with a few turning gold and rust (gamma, lit by the hour).
++    pub const LEAF_COLORS: [[f32; 3]; 5] = [
++        [0.42, 0.55, 0.16],
++        [0.34, 0.46, 0.13],
++        [0.58, 0.6, 0.18],
++        [0.75, 0.55, 0.16],
++        [0.66, 0.36, 0.13],
++    ];
++
++    // ---- motes ----
++    /// How many by day around the camera, how far out, and how high (yd over the ground).
++    pub const MOTES: f32 = 90.0;
++    pub const MOTE_RADIUS: f32 = 20.0;
++    pub const MOTE_HEIGHT: (f32, f32) = (0.3, 9.0);
++    pub const MOTE_LIFE: (f32, f32) = (6.0, 14.0);
++    pub const MOTE_FADE_S: f32 = 2.0;
++    /// The drift: yd/s of their own, and the share of the wind's speed (per unit strength) they
++    /// ride.
++    pub const MOTE_DRIFT: f32 = 0.12;
++    pub const MOTE_WIND: f32 = 0.25;
++    /// The sun on them: how bright under the grade's god rays (`PostLook::rays`, 0.3 at noon, 0.9
++    /// at golden hour) plus this floor, from the sun's height (degrees, from and to).
++    pub const MOTE_RAYS_FLOOR: f32 = 0.15;
++    pub const MOTE_SUN_UP_DEG: (f32, f32) = (-1.0, 6.0);
++    /// Seen toward the sun: the glow looking away from the sun as a share of looking into it, and
++    /// how tight the forward lobe is (a power of the cosine).
++    pub const MOTE_BACK: f32 = 0.12;
++    pub const MOTE_LOBE: f32 = 6.0;
++    /// Their colour at full sun (the sun's own, warmed; over 1 to sparkle), and size (yd across).
++    pub const MOTE_GAIN: f32 = 1.7;
++    pub const MOTE_WARM: [f32; 3] = [1.0, 0.92, 0.75];
++    pub const MOTE_SIZE: f32 = 0.07;
++    /// The twinkle: depth and rate (Hz, from and to).
++    pub const MOTE_TWINKLE: f32 = 0.5;
++    pub const MOTE_TWINKLE_HZ: (f32, f32) = (0.6, 2.5);
++    /// The shade test: each mote asks again this often whether the sun reaches it (a ray toward
++    /// the sun through the world's collision, this long), and eases in and out of a shaft over
++    /// this long.
++    pub const MOTE_CHECK_S: f32 = 0.3;
++    pub const MOTE_SUN_RAY: f32 = 80.0;
++    pub const MOTE_LIT_EASE_S: f32 = 0.15;
++    /// The crowns between a mote and the sun shade it but for gaps: shafts this wide (yd) across
++    /// the sun's direction, this share of them shut.
++    pub const SHAFT_CELL: f32 = 0.9;
++    pub const CANOPY_SHUT: f32 = 0.78;
++
++    // ---- butterflies ----
++    /// How many by day, how far out (from and to), and the clear ground they want: no crown
++    /// nearer than this.
++    pub const BUTTERFLIES: f32 = 2.0;
++    pub const BUTTERFLY_RING: (f32, f32) = (6.0, 22.0);
++    pub const MEADOW_CLEAR: f32 = 6.0;
++    /// By day: out over the first pair of minutes (07:30 to 09:00), gone over the second (17:30
++    /// to 19:00); a full overcast keeps this share.
++    pub const BUTTERFLY_DAY_IN: (f32, f32) = (450.0, 540.0);
++    pub const BUTTERFLY_DAY_OUT: (f32, f32) = (1050.0, 1140.0);
++    pub const BUTTERFLY_OVERCAST: f32 = 0.3;
++    pub const BUTTERFLY_LIFE: (f32, f32) = (25.0, 50.0);
++    /// The flight: speed (yd/s), turn (radians a second), how far from home it wanders, how high
++    /// (yd over the ground, from and to), and a new aim every (s, from and to).
++    pub const BUTTERFLY_SPEED: f32 = 1.4;
++    pub const BUTTERFLY_TURN: f32 = 3.0;
++    pub const BUTTERFLY_WANDER: f32 = 4.0;
++    pub const BUTTERFLY_HEIGHT: (f32, f32) = (0.4, 1.8);
++    pub const BUTTERFLY_AIM_S: (f32, f32) = (0.8, 2.5);
++    /// The wings: each this long along the body and this wide (yd), flapping at (Hz, from and to)
++    /// through this angle (radians either side of this lift).
++    pub const WING_LEN: f32 = 0.16;
++    pub const WING_SPAN: f32 = 0.14;
++    pub const FLAP_HZ: (f32, f32) = (7.0, 10.0);
++    pub const FLAP: f32 = 0.95;
++    pub const FLAP_LIFT: f32 = 0.35;
++    /// Elwynn's butterflies: cabbage white, brimstone, orange tip and a pale blue (gamma, lit).
++    pub const BUTTERFLY_COLORS: [[f32; 3]; 4] = [
++        [0.95, 0.95, 0.88],
++        [1.0, 0.86, 0.32],
++        [0.98, 0.58, 0.22],
++        [0.62, 0.74, 1.0],
++    ];
++}
++
++/// `worldLife` and the film's hold: `on` (on by default, inert under the classic look) and
++/// `density`, a scale on every count from 0 to [`tune::SCALE_MAX`] (`looklife`).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookLife {
++    pub on: bool,
++    pub density: Option<f32>,
++}
++
++impl Default for LookLife {
++    /// On, the `worldLife` CVar's registered "1".
++    fn default() -> Self {
++        Self {
++            on: true,
++            density: None,
++        }
++    }
++}
++
++impl LookLife {
++    /// `looklife`'s argument: a density from 0 to [`tune::SCALE_MAX`], or nothing (or `grade`) to
++    /// follow the hour again; `None` for anything else, which changes nothing.
++    pub fn parse(args: &str) -> Option<Option<f32>> {
++        let mut words = args.split_whitespace();
++        let held = match words.next() {
++            None => None,
++            Some(w) if w.eq_ignore_ascii_case("grade") => None,
++            Some(w) => Some(
++                w.parse::<f32>()
++                    .ok()
++                    .filter(|v| (0.0..=tune::SCALE_MAX).contains(v))?,
++            ),
++        };
++        words.next().is_none().then_some(held)
++    }
++
++    /// The density this frame: the hold, else 1.
++    pub fn scale(&self) -> f32 {
++        self.density.unwrap_or(1.0)
++    }
++}
++
++/// Whether a doodad's model is a tree a leaf falls from: a plant the wind sways
++/// ([`wind::sways`]) whose path names a tree or a canopy, and whose file is not a bush, a fern or
++/// the like that sits in a trees folder.
++pub fn is_tree(path: &str) -> bool {
++    const LOW: [&str; 12] = [
++        "bush", "shrub", "fern", "grass", "flower", "reed", "cattail", "weed", "wheat", "vine",
++        "ivy", "hedge",
++    ];
++    if !wind::sways(path) {
++        return false;
++    }
++    let p = path.to_ascii_lowercase();
++    let file = p.rsplit(['\\', '/']).next().unwrap_or(&p);
++    (p.contains("tree") || p.contains("canopy")) && !LOW.iter().any(|w| file.contains(w))
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// A span of the day that comes in over `inn` and goes over `out` (minutes; `inn` before `out`
++/// for a day span, after it for one across midnight): 0 to 1.
++pub fn hour_window(minute: f32, inn: (f32, f32), out: (f32, f32)) -> f32 {
++    let m = minute.rem_euclid(1440.0);
++    if inn.0 < out.0 {
++        smoothstep(inn.0, inn.1, m) * (1.0 - smoothstep(out.0, out.1, m))
++    } else {
++        // Across midnight: in after `inn`, or before `out` is done.
++        smoothstep(inn.0, inn.1, m).max(1.0 - smoothstep(out.0, out.1, m))
++    }
++}
++
++/// The fireflies' hour: out after dusk, gone before dawn.
++pub fn firefly_hour(minute: f32) -> f32 {
++    hour_window(minute, tune::FIREFLY_IN, tune::FIREFLY_OUT)
++}
++
++/// The leaves' hour: by day, a little at night.
++pub fn leaf_hour(minute: f32) -> f32 {
++    tune::LEAF_NIGHT
++        + (1.0 - tune::LEAF_NIGHT) * hour_window(minute, tune::LEAF_DAY_IN, tune::LEAF_DAY_OUT)
++}
++
++/// The butterflies' hour.
++pub fn butterfly_hour(minute: f32) -> f32 {
++    hour_window(minute, tune::BUTTERFLY_DAY_IN, tune::BUTTERFLY_DAY_OUT)
++}
++
++/// The fair-weather share: 1 dry, 0 once the rain is past [`tune::RAIN_STOP_TO`].
++pub fn fair(rain: f32) -> f32 {
++    1.0 - smoothstep(tune::RAIN_STOP_FROM, tune::RAIN_STOP_TO, rain)
++}
++
++/// A firefly's flash at `t` seconds of its life: one soft pulse a `period`, at `offset` in it,
++/// over a floor.
++pub fn blink(t: f32, period: f32, offset: f32) -> f32 {
++    let c = ((t / period.max(0.1)) + offset).rem_euclid(1.0) - 0.5;
++    let w = tune::FIREFLY_BLINK_WIDTH;
++    tune::FIREFLY_BLINK_FLOOR + (1.0 - tune::FIREFLY_BLINK_FLOOR) * (-(c * c) / (w * w)).exp()
++}
++
++/// How a mote is seen against the sun: dim looking away, bright looking into it. `view` runs from
++/// the camera to the mote, `to_sun` toward the sun, both unit.
++pub fn mote_phase(view: Vec3, to_sun: Vec3) -> f32 {
++    let c = view.dot(to_sun).max(0.0);
++    tune::MOTE_BACK + (1.0 - tune::MOTE_BACK) * c.powf(tune::MOTE_LOBE)
++}
++
++/// A tree's crown near the camera: an upright ellipsoid.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct Crown {
++    pub center: Vec3,
++    /// Across (yd) and half its height.
++    pub radius: f32,
++    pub half_height: f32,
++}
++
++impl Crown {
++    /// The crown of a tree placed at `tf` whose model's authored box (WoW model space, Z up) runs
++    /// from `min` to `max`: the box's upper part, a little inside its sides. `None` for a box too
++    /// small to be a tree.
++    pub fn of(tf: &Transform, min: [f32; 3], max: [f32; 3]) -> Option<Self> {
++        let s = tf.scale.x.abs().max(0.01);
++        let height = (max[2] - min[2]) * s;
++        if height < 2.5 {
++            return None;
++        }
++        let bottom = min[2] + 0.4 * (max[2] - min[2]);
++        let mid = [
++            0.5 * (min[0] + max[0]),
++            0.5 * (min[1] + max[1]),
++            0.5 * (bottom + max[2]),
++        ];
++        let center = tf.transform_point(benilla_assets::coords::wow_to_bevy(mid));
++        let radius = 0.4 * (max[0] - min[0]).max(max[1] - min[1]) * s;
++        Some(Self {
++            center,
++            radius: radius.max(1.0),
++            half_height: (0.5 * (max[2] - bottom) * s).max(1.0),
++        })
++    }
++
++    /// Whether a ray from `p` along `dir` (unit) passes through the crown.
++    pub fn blocks(&self, p: Vec3, dir: Vec3) -> bool {
++        let k = Vec3::new(self.radius, self.half_height, self.radius);
++        let o = (p - self.center) / k;
++        let d = dir / k;
++        let a = d.length_squared();
++        let b = o.dot(d);
++        let c = o.length_squared() - 1.0;
++        if c < 0.0 {
++            return true; // inside the crown
++        }
++        let disc = b * b - a * c;
++        disc >= 0.0 && b < 0.0
++    }
++}
++
++/// What the world answers the life about places: implemented over the terrain, the water and the
++/// collision world in the app, and over a flat field in the tests.
++pub trait LifeWorld {
++    /// The ground's height (Bevy y) under (x, z), `None` off the loaded world.
++    fn ground(&mut self, x: f32, z: f32) -> Option<f32>;
++    /// The water's surface (Bevy y) over (x, z) if water lies above `ground` there.
++    fn water(&mut self, x: f32, z: f32, ground: f32) -> Option<f32>;
++    /// Whether nothing solid (a hill, a building) stands between `p` and the sun along `to_sun`.
++    fn sunlit(&mut self, p: Vec3, to_sun: Vec3) -> bool;
++}
++
++/// What the hour, the weather, the wind and the camera give the life this frame.
++#[derive(Clone, Copy, Debug)]
++pub struct LifeEnv {
++    pub cam: Vec3,
++    pub dt: f32,
++    /// The minute of the game day the light is drawn at (the film's clock under `worldclock`).
++    pub minute: f32,
++    /// `looklife`'s density.
++    pub density: f32,
++    pub rain: f32,
++    pub wet: f32,
++    pub overcast: f32,
++    /// The grade's god rays this hour, at its zone weight.
++    pub rays: f32,
++    /// Camera to sun (unit), and how much of it the clouds leave.
++    pub sun: Vec3,
++    pub sun_clear: f32,
++    /// The sun's light (the resolved diffuse, gamma).
++    pub sun_rgb: [f32; 3],
++    /// The wind block (`look::wind::pack_rows`), all zero when still.
++    pub wind: [[f32; 4]; WIND_ROWS],
++}
++
++impl LifeEnv {
++    fn wind_dir(&self) -> Vec3 {
++        Vec3::new(self.wind[0][0], 0.0, self.wind[0][1])
++    }
++
++    fn wind_strength(&self) -> f32 {
++        if self.wind[0][3] > 0.5 {
++            self.wind[0][2]
++        } else {
++            0.0
++        }
++    }
++
++    fn gust(&self, p: Vec3) -> f32 {
++        wind::gust_at(&self.wind, Vec2::new(p.x, p.z))
++    }
++
++    /// The sun's height over the horizon, 0 to 1 by [`tune::MOTE_SUN_UP_DEG`].
++    fn sun_up(&self) -> f32 {
++        let deg = self
++            .sun
++            .normalize_or_zero()
++            .y
++            .clamp(-1.0, 1.0)
++            .asin()
++            .to_degrees();
++        smoothstep(tune::MOTE_SUN_UP_DEG.0, tune::MOTE_SUN_UP_DEG.1, deg)
++    }
++}
++
++#[derive(Clone, Copy, Debug)]
++struct Firefly {
++    home: Vec3,
++    age: f32,
++    life: f32,
++    phase: [f32; 3],
++    rate: [f32; 3],
++    period: f32,
++    offset: f32,
++}
++
++impl Firefly {
++    fn pos(&self) -> Vec3 {
++        let (a, up) = tune::FIREFLY_WANDER;
++        let t = self.age;
++        self.home
++            + Vec3::new(
++                a * (t * self.rate[0] + self.phase[0]).sin(),
++                up * (t * self.rate[2] * 1.7 + self.phase[2]).sin(),
++                a * (t * self.rate[1] + self.phase[1]).sin(),
++            )
++    }
++
++    /// Its glow this frame before the hour, the weather and the edge: blink and fade.
++    fn glow(&self) -> f32 {
++        let f = tune::FIREFLY_FADE_S;
++        let fade = smoothstep(0.0, f, self.age) * smoothstep(0.0, f, self.life - self.age);
++        blink(self.age, self.period, self.offset) * fade
++    }
++}
++
++#[derive(Clone, Copy, Debug)]
++struct Leaf {
++    pos: Vec3,
++    /// Its horizontal speed (yd/s, x and z).
++    vel: Vec2,
++    fall: f32,
++    ground: f32,
++    axis: Vec3,
++    angle: f32,
++    spin: f32,
++    swing_phase: f32,
++    swing_rate: f32,
++    size: f32,
++    color: [f32; 3],
++    age: f32,
++    /// Seconds since it landed, `None` while it falls.
++    landed: Option<f32>,
++}
++
++#[derive(Clone, Copy, Debug)]
++struct Mote {
++    pos: Vec3,
++    drift: Vec3,
++    age: f32,
++    life: f32,
++    twinkle_hz: f32,
++    twinkle_phase: f32,
++    /// How much of the sun reaches it, eased toward `lit_target`.
++    lit: f32,
++    lit_target: f32,
++    next_check: f32,
++}
++
++#[derive(Clone, Copy, Debug)]
++struct Butterfly {
++    pos: Vec3,
++    home: Vec3,
++    heading: f32,
++    aim: Vec3,
++    next_aim: f32,
++    flap_hz: f32,
++    flap_phase: f32,
++    color: [f32; 3],
++    age: f32,
++    life: f32,
++}
++
++/// The ambient life near the camera: its pools, the crowns it drops leaves from and its dice.
++#[derive(Resource)]
++pub struct Life {
++    flies: Vec<Firefly>,
++    leaves: Vec<Leaf>,
++    motes: Vec<Mote>,
++    butterflies: Vec<Butterfly>,
++    /// The tree crowns near the camera ([`scan_crowns`]).
++    pub crowns: Vec<Crown>,
++    /// Where the crowns were last looked for, and how long ago.
++    scanned_at: Option<Vec3>,
++    scan_age: f32,
++    /// The fair-weather share, eased ([`tune::WEATHER_FADE_S`]).
++    gate: f32,
++    /// The hour and weather weights of this frame, for the draw.
++    fly_level: f32,
++    mote_level: f32,
++    butterfly_level: f32,
++    /// The sun on the motes this frame, colour times strength, and toward it (unit).
++    mote_rgb: [f32; 3],
++    mote_sun: Vec3,
++    clock: f32,
++    rng: u32,
++}
++
++impl Default for Life {
++    fn default() -> Self {
++        Self::new()
++    }
++}
++
++/// Pool capacities: each count at [`tune::SCALE_MAX`], fixed at birth.
++fn cap(count: f32) -> usize {
++    (count * tune::SCALE_MAX).ceil() as usize
++}
++
++impl Life {
++    /// Empty pools, each with room for its count at [`tune::SCALE_MAX`]: nothing grows later.
++    pub fn new() -> Self {
++        Self {
++            flies: Vec::with_capacity(cap(tune::FIREFLIES)),
++            leaves: Vec::with_capacity(cap(tune::LEAVES)),
++            motes: Vec::with_capacity(cap(tune::MOTES)),
++            butterflies: Vec::with_capacity(cap(tune::BUTTERFLIES)),
++            crowns: Vec::with_capacity(tune::CROWNS_MAX),
++            scanned_at: None,
++            scan_age: 0.0,
++            gate: 1.0,
++            fly_level: 0.0,
++            mote_level: 0.0,
++            butterfly_level: 0.0,
++            mote_rgb: [0.0; 3],
++            mote_sun: Vec3::Y,
++            clock: 0.0,
++            rng: 0x2545_F491,
++        }
++    }
++
++    /// Everything gone (the look or the life switched off, indoors, under water).
++    pub fn clear(&mut self) {
++        self.flies.clear();
++        self.leaves.clear();
++        self.motes.clear();
++        self.butterflies.clear();
++        self.crowns.clear();
++        self.scanned_at = None;
++    }
++
++    /// How many of each are alive: fireflies, leaves, motes, butterflies.
++    pub fn counts(&self) -> [usize; 4] {
++        [
++            self.flies.len(),
++            self.leaves.len(),
++            self.motes.len(),
++            self.butterflies.len(),
++        ]
++    }
++
++    /// The pools' capacities, which never change.
++    pub fn capacities(&self) -> [usize; 4] {
++        [
++            self.flies.capacity(),
++            self.leaves.capacity(),
++            self.motes.capacity(),
++            self.butterflies.capacity(),
++        ]
++    }
++
++    /// Whether the crowns want looking for again: after [`tune::CROWN_SCAN_S`], or once the
++    /// camera has moved [`tune::CROWN_SCAN_MOVE`].
++    pub fn wants_scan(&self, cam: Vec3) -> bool {
++        match self.scanned_at {
++            None => true,
++            Some(at) => {
++                self.scan_age >= tune::CROWN_SCAN_S || at.distance(cam) >= tune::CROWN_SCAN_MOVE
++            }
++        }
++    }
++
++    /// Takes the crowns near `cam` from `trees`, the nearest [`tune::CROWNS_MAX`] within
++    /// [`tune::LEAF_RADIUS`].
++    pub fn set_crowns(&mut self, cam: Vec3, trees: impl Iterator<Item = Crown>) {
++        self.crowns.clear();
++        let reach = tune::LEAF_RADIUS;
++        for c in trees {
++            let d = Vec2::new(c.center.x - cam.x, c.center.z - cam.z).length() - c.radius;
++            if d > reach {
++                continue;
++            }
++            if self.crowns.len() < tune::CROWNS_MAX {
++                self.crowns.push(c);
++                continue;
++            }
++            // Full: this one replaces the farthest if nearer.
++            let far = |c: &Crown| c.center.distance_squared(cam);
++            if let Some((i, worst)) = self
++                .crowns
++                .iter()
++                .enumerate()
++                .map(|(i, k)| (i, far(k)))
++                .max_by(|a, b| a.1.total_cmp(&b.1))
++            {
++                if far(&c) < worst {
++                    self.crowns[i] = c;
++                }
++            }
++        }
++        self.scanned_at = Some(cam);
++        self.scan_age = 0.0;
++    }
++
++    fn rand(&mut self) -> f32 {
++        let mut x = self.rng;
++        x ^= x << 13;
++        x ^= x >> 17;
++        x ^= x << 5;
++        self.rng = x;
++        (x >> 8) as f32 / (1u32 << 24) as f32
++    }
++
++    fn range(&mut self, r: (f32, f32)) -> f32 {
++        r.0 + (r.1 - r.0) * self.rand()
++    }
++
++    /// A point on the disc of `radius` around `cam` (x, z), uniform over its area, at least
++    /// `inner` out.
++    fn disc(&mut self, cam: Vec3, inner: f32, radius: f32) -> (f32, f32) {
++        let r = (inner * inner + (radius * radius - inner * inner) * self.rand()).sqrt();
++        let a = self.rand() * std::f32::consts::TAU;
++        (cam.x + r * a.cos(), cam.z + r * a.sin())
++    }
++
++    /// Whether (x, z) is under or beside a crown, within `reach` of its edge.
++    fn near_crown(&self, x: f32, z: f32, reach: f32) -> bool {
++        self.crowns
++            .iter()
++            .any(|c| Vec2::new(c.center.x - x, c.center.z - z).length() < c.radius + reach)
++    }
++
++    /// One frame of life under `env`, asking `world` about places.
++    pub fn step(&mut self, env: &LifeEnv, world: &mut impl LifeWorld) {
++        let dt = env.dt.clamp(0.0, 0.1);
++        self.clock += dt;
++        self.scan_age += dt;
++        let density = env.density.clamp(0.0, tune::SCALE_MAX);
++        // The weather's gate, eased so they go and come back softly.
++        let fair = fair(env.rain);
++        let k = (dt / tune::WEATHER_FADE_S).min(1.0);
++        self.gate += (fair - self.gate) * k;
++        let gate = self.gate;
++
++        self.fly_level = firefly_hour(env.minute) * gate;
++        self.butterfly_level = butterfly_hour(env.minute)
++            * gate
++            * (1.0 - (1.0 - tune::BUTTERFLY_OVERCAST) * env.overcast.clamp(0.0, 1.0));
++        let sun = env.sun_up()
++            * env.sun_clear.clamp(0.0, 1.0)
++            * (1.0 - 0.9 * env.overcast.clamp(0.0, 1.0))
++            * (tune::MOTE_RAYS_FLOOR + env.rays.max(0.0));
++        self.mote_level = gate * sun;
++        self.mote_rgb =
++            std::array::from_fn(|i| env.sun_rgb[i] * tune::MOTE_WARM[i] * tune::MOTE_GAIN);
++        self.mote_sun = env.sun.normalize_or(Vec3::Y);
++
++        self.step_flies(env, world, density, dt);
++        self.step_leaves(env, world, density, dt);
++        let after_rain = 1.0 + tune::MOTES_AFTER_RAIN * env.wet.clamp(0.0, 1.0) * fair;
++        let mote_target = if env.sun_up() > 0.0 {
++            tune::MOTES * density * gate * after_rain
++        } else {
++            0.0
++        };
++        self.step_motes(env, world, mote_target, dt);
++        self.step_butterflies(env, world, density, dt);
++    }
++
++    fn edge_alive(cam: Vec3, p: Vec3, radius: f32) -> bool {
++        Vec2::new(p.x - cam.x, p.z - cam.z).length() <= radius
++    }
++
++    fn step_flies(&mut self, env: &LifeEnv, world: &mut impl LifeWorld, density: f32, dt: f32) {
++        let r = tune::FIREFLY_RADIUS;
++        let cam = env.cam;
++        self.flies.retain_mut(|f| {
++            f.age += dt;
++            f.age < f.life && Self::edge_alive(cam, f.pos(), r)
++        });
++        let target = (tune::FIREFLIES * density * firefly_hour(env.minute) * self.gate).round();
++        if target <= 0.0 {
++            // None wanted: the last are all but faded (their glow carries the hour and the gate).
++            self.flies.clear();
++            return;
++        }
++        let room = self.flies.capacity();
++        for _ in 0..tune::SPAWN_PER_FRAME {
++            if self.flies.len() as f32 >= target || self.flies.len() >= room {
++                break;
++            }
++            // A few tries for a spot that keeps one: by the trees, over the water, or in the open
++            // at a lower chance.
++            for _ in 0..3 {
++                let (x, z) = self.disc(cam, tune::NEAR_TO, r);
++                let Some(ground) = world.ground(x, z) else {
++                    continue;
++                };
++                let water = world.water(x, z, ground);
++                let keep = if water.is_some() {
++                    tune::FIREFLY_WATER
++                } else if self.near_crown(x, z, tune::FIREFLY_WOODS_REACH) {
++                    tune::FIREFLY_WOODS
++                } else {
++                    tune::FIREFLY_OPEN
++                };
++                if self.rand() >= keep {
++                    continue;
++                }
++                let base = water.unwrap_or(ground).max(ground);
++                let home = Vec3::new(x, base + self.range(tune::FIREFLY_HEIGHT), z);
++                let tau = std::f32::consts::TAU;
++                let fly = Firefly {
++                    home,
++                    age: 0.0,
++                    life: self.range(tune::FIREFLY_LIFE),
++                    phase: [self.rand() * tau, self.rand() * tau, self.rand() * tau],
++                    rate: [
++                        self.range(tune::FIREFLY_WANDER_RATE),
++                        self.range(tune::FIREFLY_WANDER_RATE),
++                        self.range(tune::FIREFLY_WANDER_RATE),
++                    ],
++                    period: self.range(tune::FIREFLY_BLINK_PERIOD),
++                    offset: self.rand(),
++                };
++                self.flies.push(fly);
++                break;
++            }
++        }
++    }
++
++    fn spawn_leaf(&mut self, crown: Crown, world: &mut impl LifeWorld, rain: f32) {
++        // A point in the crown's lower half, toward its rim.
++        let a = self.rand() * std::f32::consts::TAU;
++        let rr = crown.radius * (0.35 + 0.6 * self.rand().sqrt());
++        let y = crown.center.y - crown.half_height * (0.6 * self.rand());
++        let (x, z) = (crown.center.x + rr * a.cos(), crown.center.z + rr * a.sin());
++        let Some(ground) = world.ground(x, z) else {
++            return;
++        };
++        if y <= ground + 1.0 {
++            return;
++        }
++        let axis = Vec3::new(self.rand() - 0.5, self.rand() - 0.5, self.rand() - 0.5)
++            .normalize_or(Vec3::X);
++        let color = tune::LEAF_COLORS
++            [(self.rand() * tune::LEAF_COLORS.len() as f32) as usize % tune::LEAF_COLORS.len()];
++        let leaf = Leaf {
++            pos: Vec3::new(x, y, z),
++            vel: Vec2::ZERO,
++            fall: self.range(tune::LEAF_FALL) * (1.0 + tune::LEAF_RAIN_FALL * rain),
++            ground: world.water(x, z, ground).unwrap_or(ground).max(ground),
++            axis,
++            angle: self.rand() * std::f32::consts::TAU,
++            spin: self.range(tune::LEAF_SPIN) * if self.rand() < 0.5 { -1.0 } else { 1.0 },
++            swing_phase: self.rand() * std::f32::consts::TAU,
++            swing_rate: std::f32::consts::TAU / self.range(tune::LEAF_SWING_PERIOD),
++            size: self.range(tune::LEAF_SIZE),
++            color,
++            age: 0.0,
++            landed: None,
++        };
++        self.leaves.push(leaf);
++    }
++
++    fn step_leaves(&mut self, env: &LifeEnv, world: &mut impl LifeWorld, density: f32, dt: f32) {
++        let cam = env.cam;
++        let strength = env.wind_strength();
++        let dir = env.wind_dir();
++        let rain = env.rain.clamp(0.0, 1.0);
++        for leaf in &mut self.leaves {
++            leaf.age += dt;
++            if let Some(t) = leaf.landed.as_mut() {
++                *t += dt;
++                continue;
++            }
++            // The air downwind, the leaf taking it up over its drag.
++            let air =
++                dir * (tune::LEAF_DRIFT * strength + tune::LEAF_DRIFT_GUST * env.gust(leaf.pos));
++            let k = (dt / tune::LEAF_DRAG_S).min(1.0);
++            leaf.vel += (Vec2::new(air.x, air.z) - leaf.vel) * k;
++            // The swing side to side across its fall, slowing as it turns.
++            let s = (leaf.age * leaf.swing_rate + leaf.swing_phase).sin();
++            let c = (leaf.age * leaf.swing_rate + leaf.swing_phase).cos();
++            let across = Vec3::new(-dir.z, 0.0, dir.x);
++            let across = if across.length_squared() > 0.5 {
++                across
++            } else {
++                Vec3::X
++            };
++            let swing = across * (tune::LEAF_SWING * leaf.swing_rate * c);
++            let fall = leaf.fall * (0.6 + 0.4 * s.abs());
++            leaf.pos += (Vec3::new(leaf.vel.x, -fall, leaf.vel.y) + swing) * dt;
++            leaf.angle += leaf.spin * dt;
++            // The ground under it again as it comes near.
++            if leaf.pos.y - leaf.ground < 2.0 {
++                if let Some(g) = world.ground(leaf.pos.x, leaf.pos.z) {
++                    leaf.ground = world.water(leaf.pos.x, leaf.pos.z, g).unwrap_or(g).max(g);
++                }
++            }
++            if leaf.pos.y <= leaf.ground + tune::LEAF_LIFT {
++                leaf.pos.y = leaf.ground + tune::LEAF_LIFT;
++                leaf.landed = Some(0.0);
++            }
++        }
++        self.leaves.retain(|l| {
++            l.landed.is_none_or(|t| t < tune::LEAF_REST_S)
++                && l.age < tune::LEAF_MAX_FALL_S
++                && Self::edge_alive(cam, l.pos, tune::LEAF_RADIUS + 5.0)
++        });
++        // New leaves from each crown, more in the wind, in a gust and in the rain.
++        let hour = leaf_hour(env.minute);
++        let cap = ((tune::LEAVES * density).round() as usize).min(self.leaves.capacity());
++        let rain_more = 1.0 + tune::LEAF_RAIN * rain;
++        let mut born = 0;
++        for i in 0..self.crowns.len() {
++            if self.leaves.len() >= cap || born >= tune::SPAWN_PER_FRAME {
++                break;
++            }
++            let crown = self.crowns[i];
++            let rate = (tune::LEAF_RATE_CALM
++                + tune::LEAF_RATE_WIND * strength
++                + tune::LEAF_RATE_GUST * env.gust(crown.center))
++                * density
++                * hour
++                * rain_more;
++            if self.rand() < rate * dt {
++                self.spawn_leaf(crown, world, rain);
++                born += 1;
++            }
++        }
++    }
++
++    fn step_motes(&mut self, env: &LifeEnv, world: &mut impl LifeWorld, target: f32, dt: f32) {
++        let r = tune::MOTE_RADIUS;
++        let cam = env.cam;
++        let wind = env.wind_dir() * (tune::MOTE_WIND * env.wind_strength());
++        let to_sun = env.sun.normalize_or(Vec3::Y);
++        let clock = self.clock;
++        let ease = (dt / tune::MOTE_LIT_EASE_S).min(1.0);
++        let mut motes = std::mem::take(&mut self.motes);
++        motes.retain_mut(|m| {
++            m.age += dt;
++            m.pos += (m.drift + wind) * dt;
++            if clock >= m.next_check {
++                m.next_check = clock + tune::MOTE_CHECK_S;
++                m.lit_target =
++                    if self.shaded_by_crowns(m.pos, to_sun) || !world.sunlit(m.pos, to_sun) {
++                        0.0
++                    } else {
++                        1.0
++                    };
++            }
++            m.lit += (m.lit_target - m.lit) * ease;
++            m.age < m.life && Self::edge_alive(cam, m.pos, r)
++        });
++        self.motes = motes;
++        let target = target.round().min(self.motes.capacity() as f32);
++        if target <= 0.0 {
++            // None wanted (night, rain): the last are all but faded with the gate.
++            self.motes.clear();
++            return;
++        }
++        for _ in 0..tune::SPAWN_PER_FRAME {
++            if self.motes.len() as f32 >= target {
++                break;
++            }
++            let (x, z) = self.disc(cam, 0.0, r);
++            let Some(ground) = world.ground(x, z) else {
++                continue;
++            };
++            let base = world.water(x, z, ground).unwrap_or(ground).max(ground);
++            let pos = Vec3::new(x, base + self.range(tune::MOTE_HEIGHT), z);
++            let drift = Vec3::new(
++                self.rand() - 0.5,
++                0.3 * (self.rand() - 0.5),
++                self.rand() - 0.5,
++            )
++            .normalize_or_zero()
++                * tune::MOTE_DRIFT;
++            let mote = Mote {
++                pos,
++                drift,
++                age: 0.0,
++                life: self.range(tune::MOTE_LIFE),
++                twinkle_hz: self.range(tune::MOTE_TWINKLE_HZ),
++                twinkle_phase: self.rand() * std::f32::consts::TAU,
++                lit: 0.0,
++                lit_target: 0.0,
++                // Its first look for the sun this frame; then staggered by its own clock.
++                next_check: clock,
++            };
++            self.motes.push(mote);
++        }
++    }
++
++    /// Whether the crowns shade `p` from the sun, but for the gaps in their leaves: shafts across
++    /// the sun's direction, fixed in the world, so a drifting mote passes in and out of them.
++    fn shaded_by_crowns(&self, p: Vec3, to_sun: Vec3) -> bool {
++        let side = to_sun.cross(Vec3::Y).normalize_or(Vec3::X);
++        let up = side.cross(to_sun);
++        let cell = (
++            (p.dot(side) / tune::SHAFT_CELL).floor() as i32,
++            (p.dot(up) / tune::SHAFT_CELL).floor() as i32,
++        );
++        self.crowns.iter().enumerate().any(|(i, c)| {
++            c.blocks(p, to_sun) && shaft_hash(cell.0, cell.1, i as u32) < tune::CANOPY_SHUT
++        })
++    }
++
++    fn step_butterflies(
++        &mut self,
++        env: &LifeEnv,
++        world: &mut impl LifeWorld,
++        density: f32,
++        dt: f32,
++    ) {
++        let cam = env.cam;
++        let outer = tune::BUTTERFLY_RING.1 + 4.0;
++        let mut flock = std::mem::take(&mut self.butterflies);
++        flock.retain_mut(|b| {
++            b.age += dt;
++            if self.clock >= b.next_aim {
++                b.next_aim = self.clock + self.range(tune::BUTTERFLY_AIM_S);
++                let leaving = b.age > b.life;
++                // Wandering about its home; at the end of its life, away out of sight.
++                let (reach, centre) = if leaving {
++                    (outer * 2.0, b.pos)
++                } else {
++                    (tune::BUTTERFLY_WANDER, b.home)
++                };
++                let a = self.rand() * std::f32::consts::TAU;
++                let d = reach * self.rand().sqrt();
++                let (x, z) = (centre.x + d * a.cos(), centre.z + d * a.sin());
++                let ground = world.ground(x, z).unwrap_or(b.pos.y - 1.0);
++                b.aim = Vec3::new(x, ground + self.range(tune::BUTTERFLY_HEIGHT), z);
++            }
++            let to = b.aim - b.pos;
++            let want = to.z.atan2(to.x);
++            let mut turn = (want - b.heading + std::f32::consts::PI)
++                .rem_euclid(std::f32::consts::TAU)
++                - std::f32::consts::PI;
++            let max = tune::BUTTERFLY_TURN * dt;
++            turn = turn.clamp(-max, max);
++            b.heading += turn;
++            let flap = (b.age * b.flap_hz * std::f32::consts::TAU + b.flap_phase).sin();
++            let fwd = Vec3::new(b.heading.cos(), 0.0, b.heading.sin());
++            let climb = (to.y * 1.5).clamp(-0.8, 0.8) + 0.35 * flap;
++            b.pos += (fwd * tune::BUTTERFLY_SPEED + Vec3::Y * climb) * dt;
++            Self::edge_alive(cam, b.pos, outer)
++        });
++        self.butterflies = flock;
++        let target = (tune::BUTTERFLIES * density * self.butterfly_level).round();
++        if target <= 0.0 && self.butterfly_level < 0.02 {
++            self.butterflies.clear();
++            return;
++        }
++        if (self.butterflies.len() as f32) < target
++            && self.butterflies.len() < self.butterflies.capacity()
++        {
++            for _ in 0..3 {
++                let (x, z) = self.disc(cam, tune::BUTTERFLY_RING.0, tune::BUTTERFLY_RING.1);
++                if self.near_crown(x, z, tune::MEADOW_CLEAR) {
++                    continue;
++                }
++                let Some(ground) = world.ground(x, z) else {
++                    continue;
++                };
++                if world.water(x, z, ground).is_some() {
++                    continue;
++                }
++                let home = Vec3::new(x, ground + self.range(tune::BUTTERFLY_HEIGHT), z);
++                let color = tune::BUTTERFLY_COLORS[(self.rand()
++                    * tune::BUTTERFLY_COLORS.len() as f32)
++                    as usize
++                    % tune::BUTTERFLY_COLORS.len()];
++                let b = Butterfly {
++                    pos: home,
++                    home,
++                    heading: self.rand() * std::f32::consts::TAU,
++                    aim: home,
++                    next_aim: self.clock,
++                    flap_hz: self.range(tune::FLAP_HZ),
++                    flap_phase: self.rand() * std::f32::consts::TAU,
++                    color,
++                    age: 0.0,
++                    life: self.range(tune::BUTTERFLY_LIFE),
++                };
++                self.butterflies.push(b);
++                break;
++            }
++        }
++    }
++
++    /// The fireflies glowing brightest near `cam`, nearest first: their place and glow (0 to 1,
++    /// with the hour and the weather), at most `out.len()`; returns how many.
++    pub fn bright_flies(&self, cam: Vec3, out: &mut [(Vec3, f32)]) -> usize {
++        let mut n = 0;
++        for f in &self.flies {
++            let p = f.pos();
++            let d = p.distance(cam);
++            if d > tune::FIREFLY_LIGHT_REACH {
++                continue;
++            }
++            let g = f.glow() * self.fly_level;
++            if g < 0.3 {
++                continue;
++            }
++            if n < out.len() {
++                out[n] = (p, g);
++                n += 1;
++            } else if let Some(far) =
++                (0..n).max_by(|&a, &b| out[a].0.distance(cam).total_cmp(&out[b].0.distance(cam)))
++            {
++                if d < out[far].0.distance(cam) {
++                    out[far] = (p, g);
++                }
++            }
++        }
++        n
++    }
++}
++
++/// A fixed hash of a shaft cell and a crown, 0 to 1.
++fn shaft_hash(x: i32, y: i32, crown: u32) -> f32 {
++    let mut h = (x as u32).wrapping_mul(73_856_093)
++        ^ (y as u32).wrapping_mul(19_349_663)
++        ^ crown.wrapping_mul(83_492_791);
++    h = (h ^ (h >> 15)).wrapping_mul(2_246_822_519);
++    h ^= h >> 13;
++    (h >> 8) as f32 / 16_777_216.0
++}
++
++// ===== the atlas =====
++
++/// The atlas's side (texels), four cells of half that: the glow, the mote, the leaf, the wing.
++pub const ATLAS: u32 = 128;
++/// Mip levels: down to cells of 8 texels, so a cell never bleeds into its neighbour.
++pub const ATLAS_MIPS: u32 = 4;
++
++/// The four cells' UV corners: `[u0, v0]`, each half the atlas.
++const CELL_GLOW: [f32; 2] = [0.0, 0.0];
++const CELL_MOTE: [f32; 2] = [0.5, 0.0];
++const CELL_LEAF: [f32; 2] = [0.0, 0.5];
++const CELL_WING: [f32; 2] = [0.5, 0.5];
++
++/// One cell's texel at (u, v) in 0..1 across the cell: white-ish RGB (the vertex colour tints it)
++/// and the shape in alpha.
++fn cell_texel(cell: usize, u: f32, v: f32) -> [f32; 4] {
++    let (x, y) = (u * 2.0 - 1.0, v * 2.0 - 1.0);
++    let r2 = x * x + y * y;
++    match cell {
++        // The firefly: a hot core in a soft halo.
++        0 => {
++            let a = (-r2 / 0.012).exp() + 0.45 * (-r2 / 0.12).exp();
++            let edge = 1.0 - smoothstep(0.8, 1.0, r2.sqrt());
++            [1.0, 1.0, 1.0, (a * edge).min(1.0)]
++        }
++        // The mote: a small soft disc.
++        1 => {
++            let a = (-r2 / 0.08).exp() * (1.0 - smoothstep(0.75, 1.0, r2.sqrt()));
++            [1.0, 1.0, 1.0, a]
++        }
++        // The leaf: pointed at both ends along v, a darker midrib, a short stem.
++        2 => {
++            let t = v; // 0 tip .. 1 stem end
++            let along = (t - 0.08) / 0.8;
++            let half = if (0.0..=1.0).contains(&along) {
++                0.42 * (std::f32::consts::PI * along).sin().powf(0.8)
++            } else {
++                0.0
++            };
++            let inside = half - x.abs() * 0.5;
++            let blade = smoothstep(-0.02, 0.02, inside);
++            let stem = if t > 0.86 && t < 0.97 && x.abs() < 0.04 {
++                1.0
++            } else {
++                0.0
++            };
++            let rib = 1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.05, x.abs()));
++            let vein = 0.85 + 0.15 * smoothstep(0.0, half.max(0.01), x.abs() * 0.5);
++            let shade = rib * vein;
++            [shade, shade, shade, blade.max(stem)]
++        }
++        // A wing, hinged along u = 0: a big forewing and a smaller hindwing, a dark rim and a
++        // spot.
++        _ => {
++            let fore = |px: f32, py: f32| {
++                let dx = (px - 0.5) / 0.48;
++                let dy = (py - 0.32) / 0.3;
++                dx * dx + dy * dy
++            };
++            let hind = |px: f32, py: f32| {
++                let dx = (px - 0.36) / 0.34;
++                let dy = (py - 0.72) / 0.24;
++                dx * dx + dy * dy
++            };
++            let f = fore(u, v);
++            let h = hind(u, v);
++            let d = f.min(h);
++            let a = 1.0 - smoothstep(0.85, 1.0, d);
++            let rim = smoothstep(0.55, 0.85, d);
++            let spot = {
++                let dx = (u - 0.62) / 0.08;
++                let dy = (v - 0.3) / 0.08;
++                1.0 - smoothstep(0.6, 1.0, dx * dx + dy * dy)
++            };
++            let shade = (1.0 - 0.6 * rim) * (1.0 - 0.55 * spot);
++            [shade, shade, shade, a]
++        }
++    }
++}
++
++/// The atlas's bytes, every mip level after the first, box-filtered.
++pub fn atlas_bytes() -> Vec<u8> {
++    let n = ATLAS as usize;
++    let cell = n / 2;
++    let mut level: Vec<[f32; 4]> = vec![[0.0; 4]; n * n];
++    for j in 0..n {
++        for i in 0..n {
++            let c = (i / cell) + 2 * (j / cell);
++            // Supersampled 2×2 within the texel, for clean edges.
++            let mut acc = [0.0f32; 4];
++            for sy in 0..2 {
++                for sx in 0..2 {
++                    let u = ((i % cell) as f32 + 0.25 + 0.5 * sx as f32) / cell as f32;
++                    let v = ((j % cell) as f32 + 0.25 + 0.5 * sy as f32) / cell as f32;
++                    let t = cell_texel(c, u, v);
++                    for (a, t) in acc.iter_mut().zip(t) {
++                        *a += 0.25 * t;
++                    }
++                }
++            }
++            level[j * n + i] = acc;
++        }
++    }
++    let mut bytes = Vec::new();
++    let mut side = n;
++    for mip in 0..ATLAS_MIPS {
++        if mip > 0 {
++            let half = side / 2;
++            let mut next = vec![[0.0f32; 4]; half * half];
++            for j in 0..half {
++                for i in 0..half {
++                    let mut acc = [0.0f32; 4];
++                    for (dy, dx) in [(0, 0), (0, 1), (1, 0), (1, 1)] {
++                        let t = level[(2 * j + dy) * side + 2 * i + dx];
++                        for (a, t) in acc.iter_mut().zip(t) {
++                            *a += 0.25 * t;
++                        }
++                    }
++                    next[j * half + i] = acc;
++                }
++            }
++            level = next;
++            side = half;
++        }
++        for t in &level {
++            bytes.extend(t.iter().map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8));
++        }
++    }
++    bytes
++}
++
++/// The atlas as an image: gamma bytes (`Rgba8Unorm`, as the effect lane's sprites), its mips,
++/// linear filtering, clamped.
++pub fn atlas_image() -> Image {
++    let bytes = atlas_bytes();
++    let n = ATLAS as usize;
++    let mut image = Image::new(
++        Extent3d {
++            width: ATLAS,
++            height: ATLAS,
++            depth_or_array_layers: 1,
++        },
++        TextureDimension::D2,
++        bytes[..n * n * 4].to_vec(),
++        TextureFormat::Rgba8Unorm,
++        RenderAssetUsages::RENDER_WORLD,
++    );
++    image.texture_descriptor.mip_level_count = ATLAS_MIPS;
++    image.data = Some(bytes);
++    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::linear());
++    image
++}
++
++/// The atlas the life draws from.
++#[derive(Resource)]
++pub struct LifeAtlas(pub Handle<Image>);
++
++/// The few lights the nearest flashing fireflies hang (`look::lights`), as entities kept for
++/// good and moved from firefly to firefly.
++#[derive(Resource, Default)]
++pub struct FireflyLights(pub Vec<Entity>);
++
++/// Makes the atlas, the pools and the fireflies' lights.
++pub(crate) fn setup_life(mut commands: Commands, images: Option<ResMut<Assets<Image>>>) {
++    if let Some(mut images) = images {
++        commands.insert_resource(LifeAtlas(images.add(atlas_image())));
++    }
++    let lights = (0..tune::FIREFLY_LIGHTS)
++        .map(|_| {
++            commands
++                .spawn((
++                    Name::new("firefly light"),
++                    Transform::default(),
++                    LookLight::new(tune::FIREFLY_LIGHT_COLOR, 0.0, tune::FIREFLY_LIGHT_RADIUS),
++                ))
++                .id()
++        })
++        .collect();
++    commands.insert_resource(FireflyLights(lights));
++}
++
++/// The places the life asks about, over the app's world.
++#[derive(SystemParam)]
++pub(crate) struct LifePlaces<'w, 's> {
++    heights: crate::world_point::TerrainHeights<'w>,
++    point: crate::world_point::WorldPoint<'w, 's>,
++    spatial: SpatialQuery<'w, 's>,
++}
++
++struct PlacesWorld<'a, 'w, 's> {
++    places: &'a LifePlaces<'w, 's>,
++    filter: avian3d::prelude::SpatialQueryFilter,
++}
++
++impl LifeWorld for PlacesWorld<'_, '_, '_> {
++    fn ground(&mut self, x: f32, z: f32) -> Option<f32> {
++        self.places.heights.under(Vec3::new(x, 0.0, z))
++    }
++
++    fn water(&mut self, x: f32, z: f32, ground: f32) -> Option<f32> {
++        let wow = benilla_assets::coords::bevy_to_wow(Vec3::new(x, ground + 2.0, z));
++        self.places
++            .point
++            .water_surface_at(crate::world_point::Subject::Eye, wow)
++            .filter(|&s| s > ground)
++    }
++
++    fn sunlit(&mut self, p: Vec3, to_sun: Vec3) -> bool {
++        let Ok(dir) = Dir3::new(to_sun) else {
++            return false;
++        };
++        self.places
++            .spatial
++            .cast_ray(p, dir, tune::MOTE_SUN_RAY, true, &self.filter)
++            .is_none()
++    }
++}
++
++/// Whether the life is out this frame: the new look and `worldLife` on, the camera outdoors and
++/// above water.
++fn life_shown(
++    look: &WorldLook,
++    life: &LookLife,
++    claim: Option<&crate::wmo_portal::CameraInteriorClaim>,
++    underwater: Option<&crate::liquid::Underwater>,
++) -> bool {
++    look.on
++        && life.on
++        && !claim.is_some_and(|c| c.0.is_some_and(|c| !c.exterior_visible))
++        && !underwater.is_some_and(|u| u.0.any())
++}
++
++impl LifeInputs<'_> {
++    fn shown(&self) -> bool {
++        life_shown(
++            &self.look,
++            &self.switch,
++            self.claim.as_deref(),
++            self.underwater.as_deref(),
++        )
++    }
++}
++
++/// What the life's frame reads, as one system parameter.
++#[derive(SystemParam)]
++pub(crate) struct LifeInputs<'w> {
++    look: Res<'w, WorldLook>,
++    switch: Res<'w, LookLife>,
++    clock: Res<'w, GameClock>,
++    light: Res<'w, WowLighting>,
++    grade: Res<'w, LookGrade>,
++    wind: Res<'w, WindFrame>,
++    sky: Res<'w, SkyFrame>,
++    weather: Option<Res<'w, WeatherLook>>,
++    claim: Option<Res<'w, crate::wmo_portal::CameraInteriorClaim>>,
++    underwater: Option<Res<'w, crate::liquid::Underwater>>,
++    time: Res<'w, Time>,
++}
++
++/// Looks for the tree crowns near the camera every so often.
++pub(crate) fn scan_crowns(
++    inputs: LifeInputs,
++    cam: Query<&GlobalTransform, With<WorldCamera>>,
++    placements: Option<Res<crate::terrain_stream::Placements>>,
++    models: Option<Res<Assets<benilla_assets::M2Model>>>,
++    mut life: ResMut<Life>,
++) {
++    let (Some(placements), Some(models)) = (placements, models) else {
++        return;
++    };
++    if !inputs.shown() {
++        return;
++    }
++    let Ok(cam) = cam.single() else { return };
++    let cam = cam.translation();
++    if !life.wants_scan(cam) {
++        return;
++    }
++    let reach = tune::LEAF_RADIUS + 30.0;
++    let trees = placements.trees().filter_map(|(tf, model)| {
++        if tf.translation.distance_squared(cam) > reach * reach {
++            return None;
++        }
++        let b = models.get(model)?.bounds.as_ref()?;
++        Crown::of(tf, b.bbox_min, b.bbox_max)
++    });
++    life.set_crowns(cam, trees);
++}
++
++/// One frame of the life.
++pub(crate) fn step_life(
++    inputs: LifeInputs,
++    cam: Query<&GlobalTransform, With<WorldCamera>>,
++    places: LifePlaces,
++    mut life: ResMut<Life>,
++) {
++    if !inputs.shown() {
++        if life.counts() != [0; 4] || !life.crowns.is_empty() {
++            life.clear();
++        }
++        return;
++    }
++    let Ok(cam) = cam.single() else { return };
++    let w = inputs.weather.as_deref().filter(|w| w.on);
++    let env = LifeEnv {
++        cam: cam.translation(),
++        dt: inputs.time.delta_secs(),
++        minute: inputs.clock.minute as f32,
++        density: inputs.switch.scale(),
++        rain: w.map_or(0.0, |w| w.rain),
++        wet: w.map_or(0.0, |w| w.wet),
++        overcast: w.map_or(0.0, |w| w.overcast),
++        rays: inputs.grade.post.rays * inputs.grade.strength,
++        sun: inputs.light.celestial_dir,
++        sun_clear: if inputs.sky.on {
++            inputs.sky.sun_clear
++        } else {
++            1.0
++        },
++        sun_rgb: inputs.light.diffuse,
++        wind: inputs.wind.rows,
++    };
++    let mut world = PlacesWorld {
++        places: &places,
++        filter: crate::collision::WorldCollision::body_filter(),
++    };
++    life.step(&env, &mut world);
++}
++
++/// Moves the fireflies' lights onto the nearest flashing ones, glowing as they glow; dark when
++/// there are none.
++pub(crate) fn light_fireflies(
++    life: Res<Life>,
++    lights: Res<FireflyLights>,
++    cam: Query<&GlobalTransform, With<WorldCamera>>,
++    mut q: Query<(&mut Transform, &mut LookLight)>,
++) {
++    let mut bright = [(Vec3::ZERO, 0.0f32); tune::FIREFLY_LIGHTS];
++    let n = cam
++        .single()
++        .map_or(0, |c| life.bright_flies(c.translation(), &mut bright));
++    for (i, &e) in lights.0.iter().enumerate() {
++        let Ok((mut tf, mut light)) = q.get_mut(e) else {
++            continue;
++        };
++        let (pos, glow) = if i < n {
++            bright[i]
++        } else {
++            (tf.translation, 0.0)
++        };
++        let intensity = tune::FIREFLY_LIGHT * glow;
++        if tf.translation != pos {
++            tf.translation = pos;
++        }
++        if light.intensity != intensity {
++            light.intensity = intensity;
++        }
++    }
++}
++
++/// The camera's terms for the sprites.
++struct SpriteView {
++    eye: Vec3,
++    forward: Vec3,
++    right: Vec3,
++    up: Vec3,
++    /// World size of a pixel per yard of view depth.
++    px: f32,
++}
++
++impl SpriteView {
++    /// The fade by distance: in from [`tune::NEAR_FROM`] and out over the last
++    /// [`tune::EDGE_FADE`] of `radius` (measured flat from the eye).
++    fn fade(&self, p: Vec3, radius: f32) -> f32 {
++        let d = p.distance(self.eye);
++        let flat = Vec2::new(p.x - self.eye.x, p.z - self.eye.z).length();
++        smoothstep(tune::NEAR_FROM, tune::NEAR_TO, d)
++            * (1.0 - smoothstep(radius * (1.0 - tune::EDGE_FADE), radius, flat))
++    }
++
++    /// A camera-facing glow of `size` yards across at `p`, grown to [`tune::GLOW_MIN_PX`] and
++    /// dimmed to match when far.
++    fn glow(
++        &self,
++        out: &mut Vec<EffectVertex>,
++        p: Vec3,
++        size: f32,
++        rgb: [f32; 3],
++        a: f32,
++        cell: [f32; 2],
++    ) {
++        let z = (p - self.eye).dot(self.forward);
++        if z <= 0.05 || a <= 0.002 {
++            return;
++        }
++        let half = 0.5 * size;
++        let min_half = 0.5 * tune::GLOW_MIN_PX * z * self.px;
++        let (half, a) = if half < min_half {
++            (min_half, a * (half / min_half).powi(2))
++        } else {
++            (half, a)
++        };
++        let r = self.right * half;
++        let u = self.up * half;
++        quad(
++            out,
++            [p - r - u, p + r - u, p + r + u, p - r + u],
++            cell,
++            [rgb[0], rgb[1], rgb[2], a.min(1.0)],
++        );
++    }
++}
++
++/// One quad of a cell, perimeter order (bl, br, tr, tl).
++fn quad(out: &mut Vec<EffectVertex>, corners: [Vec3; 4], cell: [f32; 2], color: [f32; 4]) {
++    let (u0, u1) = (cell[0], cell[0] + 0.5);
++    let (v0, v1) = (cell[1], cell[1] + 0.5);
++    for (pos, uv) in [
++        (corners[0], [u0, v1]),
++        (corners[1], [u1, v1]),
++        (corners[2], [u1, v0]),
++        (corners[3], [u0, v0]),
++    ] {
++        out.push(EffectVertex {
++            pos: pos.to_array(),
++            uv,
++            color,
++        });
++    }
++}
++
++impl Life {
++    /// The glows (fireflies and motes), additive, onto `out`.
++    fn push_glows(&self, out: &mut Vec<EffectVertex>, view: &SpriteView) {
++        if self.fly_level > 0.0 {
++            for f in &self.flies {
++                let p = f.pos();
++                let a = f.glow() * self.fly_level * view.fade(p, tune::FIREFLY_RADIUS);
++                view.glow(out, p, tune::FIREFLY_SIZE, tune::FIREFLY_RGB, a, CELL_GLOW);
++            }
++        }
++        if self.mote_level > 0.0 {
++            for m in &self.motes {
++                let to = m.pos - view.eye;
++                let Some(dir) = to.try_normalize() else {
++                    continue;
++                };
++                let f = tune::MOTE_FADE_S;
++                let life = smoothstep(0.0, f, m.age) * smoothstep(0.0, f, m.life - m.age);
++                let tw = 1.0 - tune::MOTE_TWINKLE
++                    + tune::MOTE_TWINKLE
++                        * (0.5
++                            + 0.5
++                                * (m.age * m.twinkle_hz * std::f32::consts::TAU + m.twinkle_phase)
++                                    .sin());
++                let a = self.mote_level
++                    * m.lit
++                    * life
++                    * tw
++                    * mote_phase(dir, self.mote_sun)
++                    * view.fade(m.pos, tune::MOTE_RADIUS);
++                view.glow(
++                    out,
++                    m.pos,
++                    tune::MOTE_SIZE,
++                    self.mote_rgb,
++                    a.min(1.0),
++                    CELL_MOTE,
++                );
++            }
++        }
++    }
++
++    /// The leaves and the butterflies, alpha-blended and lit by the hour, onto `out`.
++    fn push_sprites(&self, out: &mut Vec<EffectVertex>, view: &SpriteView) {
++        for l in &self.leaves {
++            let rest = l.landed.map_or(1.0, |t| {
++                1.0 - smoothstep(0.3 * tune::LEAF_REST_S, tune::LEAF_REST_S, t)
++            });
++            let a = rest * smoothstep(0.0, 0.6, l.age) * view.fade(l.pos, tune::LEAF_RADIUS);
++            if a <= 0.01 {
++                continue;
++            }
++            // Tumbling as it falls; lying flat once down.
++            let rot = if l.landed.is_some() {
++                Quat::from_rotation_y(l.angle)
++            } else {
++                Quat::from_axis_angle(l.axis, l.angle) * Quat::from_rotation_y(l.angle * 0.37)
++            };
++            let along = rot * Vec3::Z * (0.5 * l.size);
++            let across = rot * Vec3::X * (0.25 * l.size);
++            let p = l.pos;
++            let c = l.color;
++            quad(
++                out,
++                [
++                    p - across + along,
++                    p + across + along,
++                    p + across - along,
++                    p - across - along,
++                ],
++                CELL_LEAF,
++                [c[0], c[1], c[2], a],
++            );
++        }
++        if self.butterfly_level <= 0.0 {
++            return;
++        }
++        for b in &self.butterflies {
++            let a = self.butterfly_level
++                * smoothstep(0.0, 1.0, b.age)
++                * view.fade(b.pos, tune::BUTTERFLY_RING.1 + 4.0);
++            if a <= 0.01 {
++                continue;
++            }
++            let fwd = Vec3::new(b.heading.cos(), 0.0, b.heading.sin());
++            let side = Vec3::new(-fwd.z, 0.0, fwd.x);
++            let flap = tune::FLAP_LIFT
++                + tune::FLAP * (b.age * b.flap_hz * std::f32::consts::TAU + b.flap_phase).sin();
++            let half_len = fwd * (0.5 * tune::WING_LEN);
++            let c = b.color;
++            for dir in [1.0f32, -1.0] {
++                let out_dir = (side * dir * flap.cos() + Vec3::Y * flap.sin()) * tune::WING_SPAN;
++                let p = b.pos;
++                // The hinge along the body at u = 0, the wing's tip edge at u = 1; v runs head (0)
++                // to tail (1).
++                let corners = [
++                    p - half_len,
++                    p - half_len + out_dir,
++                    p + half_len + out_dir,
++                    p + half_len,
++                ];
++                // `quad`'s order is (bl, br, tr, tl) = (u0 v1, u1 v1, u1 v0, u0 v0): the tail at
++                // v1, the head at v0, either wing.
++                quad(out, corners, CELL_WING, [c[0], c[1], c[2], a]);
++            }
++        }
++    }
++}
++
++/// Pushes the frame's life onto the effect stream: the glows additive (fogged toward black, so
++/// the far ones fade into the dark), the leaves and the butterflies alpha-blended and lit by the
++/// scene's light.
++pub(crate) fn push_life(
++    life: Option<Res<Life>>,
++    atlas: Option<Res<LifeAtlas>>,
++    look: Res<WorldLook>,
++    switch: Res<LookLife>,
++    cam: Query<(Entity, &GlobalTransform, &Camera, &Projection), With<WorldCamera>>,
++    mut quads: ResMut<EffectQuads>,
++) {
++    let (Some(life), Some(atlas)) = (life, atlas) else {
++        return;
++    };
++    if !look.on || !switch.on || life.counts() == [0; 4] {
++        return;
++    }
++    let Ok((cam_entity, cam_tf, camera, proj)) = cam.single() else {
++        return;
++    };
++    let Some(vp) = camera.physical_viewport_size().filter(|v| v.y > 0) else {
++        return;
++    };
++    let fov = match proj {
++        Projection::Perspective(p) => p.fov,
++        _ => crate::view::CAM_FOVY,
++    };
++    let view = SpriteView {
++        eye: cam_tf.translation(),
++        forward: cam_tf.forward().as_vec3(),
++        right: cam_tf.right().as_vec3(),
++        up: cam_tf.up().as_vec3(),
++        px: 2.0 * (0.5 * fov).tan() / vp.y as f32,
++    };
++    let spec = |blend: EffectBlend, fog: EffectFog, lighting: EffectLighting| EffectDrawSpec {
++        cam: cam_entity,
++        texture: atlas.0.id(),
++        blend,
++        fog,
++        lighting,
++        anchor: view.eye,
++        bias: 0.0,
++        raster_bias: 0,
++        raster_slope: 0.0,
++        cam_relative: false,
++        no_depth_test: false,
++        main_entity: Entity::PLACEHOLDER,
++        light: None,
++        clip: None,
++    };
++    let start = quads.begin();
++    life.push_glows(&mut quads.verts, &view);
++    quads.commit_quads(
++        start,
++        spec(EffectBlend::Add, EffectFog::Black, EffectLighting::None),
++    );
++    let start = quads.begin();
++    life.push_sprites(&mut quads.verts, &view);
++    quads.commit_quads(
++        start,
++        spec(EffectBlend::Alpha, EffectFog::Scene, EffectLighting::Scene),
++    );
++}
++
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookLife>()
++        .init_resource::<Life>()
++        .init_resource::<FireflyLights>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// A flat field at y = 0 with a pond west of x = −20, the sun reaching everywhere.
++    struct Field {
++        asked: usize,
++    }
++
++    impl LifeWorld for Field {
++        fn ground(&mut self, _x: f32, _z: f32) -> Option<f32> {
++            self.asked += 1;
++            Some(0.0)
++        }
++        fn water(&mut self, x: f32, _z: f32, ground: f32) -> Option<f32> {
++            (x < -20.0).then_some(ground + 0.5)
++        }
++        fn sunlit(&mut self, _p: Vec3, _to_sun: Vec3) -> bool {
++            true
++        }
++    }
++
++    fn breezy() -> [[f32; 4]; WIND_ROWS] {
++        let state = wind::WindState {
++            dir: Vec2::X,
++            strength: 1.0,
++            gust: 0.8,
++        };
++        wind::pack_rows(true, &wind::LookWind::default(), state, 1.76e9, Vec3::ZERO)
++    }
++
++    fn env(minute: f32) -> LifeEnv {
++        LifeEnv {
++            cam: Vec3::new(0.0, 1.7, 0.0),
++            dt: 1.0 / 30.0,
++            minute,
++            density: 1.0,
++            rain: 0.0,
++            wet: 0.0,
++            overcast: 0.0,
++            rays: 0.9,
++            sun: Vec3::new(0.7, 0.25, 0.0).normalize(),
++            sun_clear: 1.0,
++            sun_rgb: [1.0, 0.8, 0.5],
++            wind: breezy(),
++        }
++    }
++
++    fn crown_at(x: f32, z: f32) -> Crown {
++        Crown {
++            center: Vec3::new(x, 9.0, z),
++            radius: 4.0,
++            half_height: 3.5,
++        }
++    }
++
++    fn run(life: &mut Life, e: &LifeEnv, secs: f32) {
++        let mut field = Field { asked: 0 };
++        let frames = (secs / e.dt) as usize;
++        for _ in 0..frames {
++            life.step(e, &mut field);
++        }
++    }
++
++    #[test]
++    fn trees_drop_leaves_and_the_rest_does_not() {
++        for p in [
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Trees\\ElwynnTreeCanopy02.m2",
++            "world/azeroth/elwynn/passivedoodads/trees/elwynnpine01.m2",
++            "World\\Generic\\PassiveDoodads\\Trees\\TreeMid01.m2",
++        ] {
++            assert!(is_tree(p), "{p}");
++        }
++        for p in [
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Trees\\ElwynnBush09.m2",
++            "World\\Generic\\PassiveDoodads\\Trees\\TreeStump01.m2",
++            "World\\Generic\\PassiveDoodads\\Plants\\Fern01.m2",
++            "world/azeroth/elwynn/passivedoodads/lamppost/lamppost.m2",
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Trees\\ElwynnLog01.m2",
++        ] {
++            assert!(!is_tree(p), "{p}");
++        }
++    }
++
++    #[test]
++    fn looklife_parses_its_argument() {
++        assert_eq!(LookLife::parse(""), Some(None));
++        assert_eq!(LookLife::parse("grade"), Some(None));
++        assert_eq!(LookLife::parse("GRADE"), Some(None));
++        assert_eq!(LookLife::parse("2"), Some(Some(2.0)));
++        assert_eq!(LookLife::parse("0"), Some(Some(0.0)));
++        assert_eq!(LookLife::parse("4"), None);
++        assert_eq!(LookLife::parse("-1"), None);
++        assert_eq!(LookLife::parse("1 1"), None);
++        assert_eq!(LookLife::parse("lots"), None);
++    }
++
++    /// The fireflies are out from dusk to before dawn, none by day; the leaves mostly by day; the
++    /// butterflies by day only.
++    #[test]
++    fn each_kind_keeps_its_hours() {
++        assert_eq!(firefly_hour(12.0 * 60.0), 0.0);
++        assert_eq!(firefly_hour(19.0 * 60.0), 0.0, "not before dusk");
++        assert_eq!(firefly_hour(22.0 * 60.0), 1.0);
++        assert_eq!(firefly_hour(2.0 * 60.0), 1.0, "across midnight");
++        assert_eq!(firefly_hour(6.0 * 60.0), 0.0, "gone by first light");
++        let mid = firefly_hour(20.5 * 60.0);
++        assert!(mid > 0.0 && mid < 1.0, "fading in: {mid}");
++        assert_eq!(leaf_hour(12.0 * 60.0), 1.0);
++        assert_eq!(leaf_hour(0.0), tune::LEAF_NIGHT);
++        assert_eq!(butterfly_hour(12.0 * 60.0), 1.0);
++        assert_eq!(butterfly_hour(20.0 * 60.0), 0.0);
++        assert_eq!(butterfly_hour(6.0 * 60.0), 0.0);
++    }
++
++    /// One flash a period, bright at its peak and low between.
++    #[test]
++    fn a_firefly_blinks() {
++        let p = 4.0;
++        let samples: Vec<f32> = (0..400).map(|i| blink(i as f32 * 0.01, p, 0.0)).collect();
++        let peak = samples.iter().copied().fold(0.0, f32::max);
++        let low = samples.iter().copied().fold(1.0, f32::min);
++        assert!(
++            peak > 0.99 && low < tune::FIREFLY_BLINK_FLOOR + 0.01,
++            "{peak} {low}"
++        );
++        let lit = samples.iter().filter(|&&g| g > 0.5).count();
++        assert!((10..=80).contains(&lit), "a short flash: {lit} of 400");
++    }
++
++    #[test]
++    fn motes_shine_toward_the_sun() {
++        let sun = Vec3::new(1.0, 0.2, 0.0).normalize();
++        let into = mote_phase(sun, sun);
++        let away = mote_phase(-sun, sun);
++        assert!((into - 1.0).abs() < 1e-5 && (away - tune::MOTE_BACK).abs() < 1e-5);
++    }
++
++    #[test]
++    fn a_crown_blocks_the_sun_through_it_only() {
++        let c = crown_at(5.0, 0.0);
++        let up_and_east = Vec3::new(1.0, 1.0, 0.0).normalize();
++        assert!(c.blocks(Vec3::new(0.0, 4.0, 0.0), up_and_east));
++        assert!(
++            !c.blocks(Vec3::new(0.0, 4.0, 0.0), -up_and_east),
++            "behind it"
++        );
++        assert!(
++            !c.blocks(Vec3::new(0.0, 4.0, 20.0), up_and_east),
++            "beside it"
++        );
++        assert!(c.blocks(c.center, Vec3::Y), "inside it");
++    }
++
++    /// A crown from a model box: over the upper part of the box, at the placement, scaled.
++    #[test]
++    fn a_crown_sits_in_the_top_of_its_tree() {
++        let tf =
++            Transform::from_translation(Vec3::new(100.0, 20.0, -50.0)).with_scale(Vec3::splat(1.5));
++        let c = Crown::of(&tf, [-4.0, -4.0, 0.0], [4.0, 4.0, 12.0]).expect("a tree");
++        assert!((c.center.x - 100.0).abs() < 1e-3 && (c.center.z + 50.0).abs() < 1e-3);
++        // The box's top 60% (4.8 to 12) is the crown, its middle at 8.4 × 1.5 over the base.
++        assert!(
++            (c.center.y - (20.0 + 8.4 * 1.5)).abs() < 1e-3,
++            "{}",
++            c.center.y
++        );
++        assert!((c.half_height - 3.6 * 1.5).abs() < 1e-3);
++        assert!(
++            Crown::of(&tf, [-0.5; 3], [0.5, 0.5, 1.0]).is_none(),
++            "a shrub"
++        );
++    }
++
++    /// Night by the woods and the pond: fireflies come, never more than the count, near the
++    /// camera, and the pools never grow.
++    #[test]
++    fn fireflies_gather_at_night_within_their_count() {
++        let mut life = Life::new();
++        let caps = life.capacities();
++        life.crowns = vec![crown_at(8.0, 8.0), crown_at(-10.0, 12.0)];
++        let mut e = env(23.0 * 60.0);
++        e.sun = Vec3::new(0.7, -0.4, 0.0).normalize();
++        run(&mut life, &e, 20.0);
++        let [flies, _, motes, butterflies] = life.counts();
++        assert!(flies >= 20 && flies as f32 <= tune::FIREFLIES, "{flies}");
++        assert_eq!(
++            (motes, butterflies),
++            (0, 0),
++            "no motes or butterflies at night"
++        );
++        assert_eq!(life.capacities(), caps, "nothing allocated");
++        for f in &life.flies {
++            let p = f.pos();
++            let flat = Vec2::new(p.x, p.z).length();
++            assert!(flat <= tune::FIREFLY_RADIUS + 0.1, "{p}");
++            // The pond's surface is 0.5 up; the wander lifts a little over the birth height.
++            let top = 0.5 + tune::FIREFLY_HEIGHT.1 + tune::FIREFLY_WANDER.1;
++            assert!(p.y > 0.0 && p.y <= top + 1e-3, "low over the grass: {p}");
++        }
++        // Three times the density, still within the pools.
++        e.density = tune::SCALE_MAX;
++        run(&mut life, &e, 20.0);
++        assert!(life.counts()[0] > flies);
++        assert_eq!(life.capacities(), caps);
++    }
++
++    /// By day: no fireflies, motes about, butterflies over the open ground away from the crowns.
++    #[test]
++    fn the_day_has_motes_and_butterflies() {
++        let mut life = Life::new();
++        life.crowns = vec![crown_at(8.0, 8.0)];
++        run(&mut life, &env(12.0 * 60.0), 20.0);
++        let [flies, _, motes, butterflies] = life.counts();
++        assert_eq!(flies, 0);
++        assert!(motes as f32 >= 0.8 * tune::MOTES, "{motes}");
++        assert!(
++            butterflies >= 1 && butterflies as f32 <= tune::BUTTERFLIES,
++            "{butterflies}"
++        );
++        for b in &life.butterflies {
++            assert!(b.pos.y > 0.0 && b.pos.y < 4.0, "{}", b.pos);
++        }
++    }
++
++    /// Leaves fall from the crowns, downwind, and land; a gusty, rainy wind brings more.
++    #[test]
++    fn leaves_fall_downwind_and_land() {
++        let mut life = Life::new();
++        life.crowns = (0..8)
++            .map(|i| crown_at(-15.0 + 4.0 * i as f32, 10.0))
++            .collect();
++        let mut e = env(12.0 * 60.0);
++        let mut landed = 0;
++        let mut downwind = 0.0f32;
++        let mut field = Field { asked: 0 };
++        for _ in 0..(60.0 / e.dt) as usize {
++            life.step(&e, &mut field);
++            for l in &life.leaves {
++                if l.landed == Some(0.0) {
++                    landed += 1;
++                    downwind += l.vel.x;
++                }
++            }
++        }
++        assert!(landed >= 3, "{landed} landed");
++        assert!(downwind > 0.0, "carried downwind (+x)");
++        for l in &life.leaves {
++            assert!(l.pos.y >= tune::LEAF_LIFT - 1e-4, "never under the ground");
++        }
++        assert!(life.counts()[1] as f32 <= tune::LEAVES);
++        // Rain: more of them.
++        let calm = {
++            let mut l = Life::new();
++            l.crowns = life.crowns.clone();
++            run(&mut l, &e, 30.0);
++            l.counts()[1]
++        };
++        e.rain = 1.0;
++        let wet = {
++            let mut l = Life::new();
++            l.crowns = life.crowns.clone();
++            run(&mut l, &e, 30.0);
++            l.counts()[1]
++        };
++        assert!(wet >= calm, "{wet} in rain, {calm} dry");
++    }
++
++    /// Rain sends the fireflies, the motes and the butterflies away (softly), and they come back
++    /// after it; the leaves keep falling.
++    #[test]
++    fn rain_stops_the_fliers() {
++        let mut life = Life::new();
++        life.crowns = vec![crown_at(8.0, 8.0)];
++        let mut e = env(12.0 * 60.0);
++        run(&mut life, &e, 15.0);
++        assert!(life.mote_level > 0.0 && life.counts()[2] > 0);
++        e.rain = 0.6;
++        run(&mut life, &e, 15.0);
++        assert!(life.mote_level < 0.01, "{}", life.mote_level);
++        assert!(life.butterfly_level < 0.01);
++        assert_eq!(life.counts()[2], 0, "the motes have gone");
++        e.rain = 0.0;
++        e.wet = 1.0;
++        run(&mut life, &e, 30.0);
++        assert!(
++            life.counts()[2] as f32 > tune::MOTES * 1.5,
++            "more motes in the sun after the rain: {}",
++            life.counts()[2]
++        );
++    }
++
++    /// The motes under a crown, toward the sun through it, are mostly in shade; out in the open
++    /// they are all lit.
++    #[test]
++    fn the_crowns_shade_the_motes_but_for_shafts() {
++        let mut life = Life::new();
++        let sun = Vec3::new(0.0, 1.0, 0.3).normalize();
++        life.crowns = vec![Crown {
++            center: Vec3::new(0.0, 10.0, 3.0),
++            radius: 12.0,
++            half_height: 4.0,
++        }];
++        let mut shut = 0;
++        let n = 400;
++        for i in 0..n {
++            let p = Vec3::new(
++                (i % 20) as f32 * 0.5 - 5.0,
++                2.0,
++                (i / 20) as f32 * 0.5 - 5.0,
++            );
++            shut += usize::from(life.shaded_by_crowns(p, sun));
++        }
++        let share = shut as f32 / n as f32;
++        assert!((0.6..0.95).contains(&share), "{share} shut");
++        assert!(!life.shaded_by_crowns(Vec3::new(60.0, 2.0, 0.0), sun));
++    }
++
++    /// Leaving moves nothing out at once: what is past its radius goes, and what is new comes in
++    /// at the edge where it is faded.
++    #[test]
++    fn the_camera_moving_keeps_things_near_it() {
++        let mut life = Life::new();
++        let mut e = env(23.0 * 60.0);
++        e.sun = Vec3::new(0.7, -0.4, 0.0).normalize();
++        run(&mut life, &e, 15.0);
++        e.cam = Vec3::new(200.0, 1.7, 0.0);
++        run(&mut life, &e, 15.0);
++        for f in &life.flies {
++            let p = f.pos();
++            assert!(Vec2::new(p.x - 200.0, p.z).length() <= tune::FIREFLY_RADIUS + 0.1);
++        }
++        assert!(life.counts()[0] > 0);
++    }
++
++    #[test]
++    fn the_atlas_has_its_mips_and_shapes() {
++        let bytes = atlas_bytes();
++        let n = ATLAS as usize;
++        let total: usize = (0..ATLAS_MIPS).map(|m| (n >> m) * (n >> m) * 4).sum();
++        assert_eq!(bytes.len(), total);
++        let alpha = |i: usize, j: usize| bytes[(j * n + i) * 4 + 3];
++        // Each cell's middle is solid or bright, its corners empty.
++        assert!(alpha(32, 32) > 200, "the glow's core");
++        assert!(alpha(96, 32) > 200, "the mote");
++        assert!(alpha(32, 96) > 200, "the leaf");
++        for (i, j) in [(0, 0), (63, 63), (64, 0), (127, 127), (0, 127)] {
++            assert!(alpha(i, j) < 8, "a corner at ({i}, {j})");
++        }
++        let img = atlas_image();
++        assert_eq!(img.texture_descriptor.mip_level_count, ATLAS_MIPS);
++        assert_eq!(img.texture_descriptor.format, TextureFormat::Rgba8Unorm);
++    }
++
++    #[test]
++    fn the_brightest_flies_are_the_nearest() {
++        let mut life = Life::new();
++        let mut e = env(23.0 * 60.0);
++        e.sun = Vec3::new(0.7, -0.4, 0.0).normalize();
++        e.density = 3.0;
++        run(&mut life, &e, 20.0);
++        let mut out = [(Vec3::ZERO, 0.0); tune::FIREFLY_LIGHTS];
++        let n = life.bright_flies(e.cam, &mut out);
++        assert!(n <= tune::FIREFLY_LIGHTS);
++        for (p, g) in &out[..n] {
++            assert!(*g >= 0.3 && p.distance(e.cam) <= tune::FIREFLY_LIGHT_REACH);
++        }
++    }
++
++    /// The fade by distance: nothing at the lens, nothing past the radius, all between.
++    #[test]
++    fn sprites_fade_at_the_lens_and_the_edge() {
++        let view = SpriteView {
++            eye: Vec3::ZERO,
++            forward: Vec3::NEG_Z,
++            right: Vec3::X,
++            up: Vec3::Y,
++            px: 0.001,
++        };
++        assert_eq!(view.fade(Vec3::new(0.0, 0.0, -0.3), 30.0), 0.0);
++        assert_eq!(view.fade(Vec3::new(0.0, 0.0, -10.0), 30.0), 1.0);
++        assert_eq!(view.fade(Vec3::new(0.0, 0.0, -30.0), 30.0), 0.0);
++        let mut out = Vec::new();
++        view.glow(
++            &mut out,
++            Vec3::new(0.0, 0.0, -10.0),
++            0.3,
++            [1.0; 3],
++            1.0,
++            CELL_GLOW,
++        );
++        assert_eq!(out.len(), 4);
++        view.glow(
++            &mut out,
++            Vec3::new(0.0, 0.0, 10.0),
++            0.3,
++            [1.0; 3],
++            1.0,
++            CELL_GLOW,
++        );
++        assert_eq!(out.len(), 4, "behind the eye: nothing");
++        // Far: grown to the pixel floor and dimmed to match.
++        out.clear();
++        view.glow(
++            &mut out,
++            Vec3::new(0.0, 0.0, -1000.0),
++            0.3,
++            [1.0; 3],
++            1.0,
++            CELL_GLOW,
++        );
++        let half = (Vec3::from(out[1].pos) - Vec3::from(out[0].pos)).length() * 0.5;
++        assert!((half - 0.5 * tune::GLOW_MIN_PX * 1000.0 * 0.001).abs() < 1e-3);
++        assert!(out[0].color[3] < 0.2);
++    }
++}
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index aef83ef..ee4a890 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -5,9 +5,10 @@
+ //! the moon cast real shadows ([`shadows`]), the water mirrors the shore and shows its bed
+ //! ([`water`]), one wind sways the trees and the grass ([`wind`]), the sky is painted, its
+ //! clouds drifting in that wind ([`sky`]), and the server's weather shows: grey skies, lit rain,
+-//! wet ground and lightning ([`weather`]). One
+-//! switch, [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look
+-//! is then exactly the reference's.
++//! wet ground and lightning ([`weather`]), and the woods are lived in: fireflies at night,
++//! falling leaves, motes in the sun's shafts and butterflies by day ([`life`]). One switch,
++//! [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look is then
++//! exactly the reference's.
+ 
+ use bevy::ecs::system::SystemParam;
+ use bevy::prelude::*;
+@@ -18,6 +19,7 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
+ 
+ pub mod ao;
+ pub mod grade;
++pub mod life;
+ pub mod lights;
+ pub mod mist;
+ pub mod pass;
+@@ -31,6 +33,7 @@ pub mod weather;
+ pub mod wind;
+ pub use ao::LookAo;
+ pub use grade::{GradeKey, PostLook, Tint};
++pub use life::LookLife;
+ pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
+ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+@@ -240,6 +243,7 @@ pub(crate) fn init_resources(app: &mut App) {
+     wind::init_resources(app);
+     sky::init_resources(app);
+     weather::init_resources(app);
++    life::init_resources(app);
+ }
+ 
+ /// The new look's world side: its resources, the area table its zone lookup reads, and the
+@@ -254,6 +258,7 @@ impl Plugin for LookPlugin {
+                 Startup,
+                 (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
+             )
++            .add_systems(Startup, life::setup_life)
+             .add_systems(PreUpdate, sync_view_look)
+             // The weather: the film's hold drives the wire's override before the weather ticks,
+             // and the look is read from this frame's state before the light is resolved, which it
+@@ -287,6 +292,23 @@ impl Plugin for LookPlugin {
+                     .after(crate::skybox::SkyboxResolve)
+                     .after(crate::liquid::SubmersionVerdict),
+             )
++            // The life after the wind, the sky and the weather it reads: the crowns, the frame,
++            // then the fireflies' lights; drawn on the effect stream once it is cleared and the
++            // camera has its frame's place.
++            .add_systems(
++                Update,
++                (life::scan_crowns, life::step_life, life::light_fireflies)
++                    .chain()
++                    .after(wind::publish_wind)
++                    .after(sky::SkyPublish)
++                    .in_set(crate::lighting::LightingConsumeSet),
++            )
++            .add_systems(
++                PostUpdate,
++                life::push_life
++                    .after(crate::particles::buffer::begin_effect_frame)
++                    .after(bevy::transform::TransformSystems::Propagate),
++            )
+             .add_systems(PostUpdate, water::size_water_scene)
+             // Camera-anchored after transform propagation, like 1.12's cloud dome.
+             .add_systems(
+diff --git a/crates/benilla-world/src/look/wind.rs b/crates/benilla-world/src/look/wind.rs
+index 2ead7ed..b1036db 100644
+--- a/crates/benilla-world/src/look/wind.rs
++++ b/crates/benilla-world/src/look/wind.rs
+@@ -354,6 +354,35 @@ pub fn pack_rows(
+     rows
+ }
+ 
++/// The shaders' `wind_hash`, on the CPU.
++fn wind_hash(n: u32) -> f32 {
++    let mut h = n.wrapping_mul(2_654_435_761);
++    h = (h ^ (h >> 15)).wrapping_mul(2_246_822_519);
++    h ^= h >> 13;
++    (h >> 8) as f32 * (1.0 / 16_777_216.0)
++}
++
++/// How hard the gusts blow at `p` (world x, z) under the block `rows`: the shaders' `wind_gust`
++/// on the CPU, for what moves in the wind outside the vertex stage (`look::life`'s falling
++/// leaves), so a leaf lifts as the front that bends its tree passes. Zero when the block is off.
++pub fn gust_at(rows: &[[f32; 4]; WIND_ROWS], p: Vec2) -> f32 {
++    if rows[0][3] < 0.5 || rows[1][1] <= 0.0 || rows[2][3] <= 0.0 {
++        return 0.0;
++    }
++    let dir = Vec2::new(rows[0][0], rows[0][1]);
++    let q = p - Vec2::new(rows[2][0], rows[2][1]);
++    let along = q.dot(dir);
++    let across = q.dot(Vec2::new(-dir.y, dir.x));
++    let a = along + 18.0 * (across * 0.013 + 1.7).sin() + 9.0 * (across * 0.031).sin();
++    let x = (a - rows[1][2]) / rows[1][1];
++    let k = (x + 0.5).floor();
++    let f = x - k;
++    let n = (k as i32).wrapping_sub(rows[1][3] as i32);
++    let w = rows[2][3];
++    let patchy = 0.55 + 0.45 * (across * 0.009 + n as f32 * 2.1).sin();
++    rows[1][0] * (0.35 + 0.65 * wind_hash(n as u32)) * patchy * (-(f * f) / (w * w)).exp()
++}
++
+ /// This frame's wind, from [`publish_wind`] to the shared light's pack (`build_light_data`) and the
+ /// clouds (`look::sky`): `rows` are [`pack_rows`]'s, all zero when off; `secs` the server's clock
+ /// it was taken at.
+@@ -584,6 +613,32 @@ mod tests {
+         }
+     }
+ 
++    /// The CPU's gust is the shaders': zero with the block off, never more than the block's gust
++    /// strength, and a front that passes a point and moves on downwind.
++    #[test]
++    fn the_cpu_gust_follows_the_fronts() {
++        let state = wind_state(1.76e9, &noon());
++        assert_eq!(
++            gust_at(&[[0.0; 4]; WIND_ROWS], Vec2::new(10.0, 3.0)),
++            0.0,
++            "off"
++        );
++        let mut peak = 0.0f32;
++        let mut quiet = f32::MAX;
++        // One point, a gust train's whole spacing of time, a second apart.
++        let steps = (tune::GUST_SPACING_YD / tune::GUST_SPEED_YD) as i32 + 1;
++        for s in 0..steps {
++            let secs = 1.76e9 + f64::from(s);
++            let rows = pack_rows(true, &LookWind::default(), state, secs, Vec3::ZERO);
++            let g = gust_at(&rows, Vec2::new(40.0, -25.0));
++            assert!((0.0..=rows[1][0] + 1e-6).contains(&g), "{g}");
++            peak = peak.max(g);
++            quiet = quiet.min(g);
++        }
++        assert!(peak > 0.03 * state.gust, "a front passed: {peak}");
++        assert!(quiet < 0.01 * state.gust, "and went: {quiet}");
++    }
++
+     #[test]
+     fn the_front_origin_snaps_to_its_grid() {
+         let o = front_origin(Vec3::new(9_100.0, 50.0, -300.0));
+diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
+index 4215eb6..ea23ecb 100644
+--- a/crates/benilla-world/src/terrain_stream.rs
++++ b/crates/benilla-world/src/terrain_stream.rs
+@@ -203,6 +203,18 @@ impl Placements {
+             .flat_map(|p| p.entities.iter().copied())
+             .collect()
+     }
++
++    /// The M2 doodads the new look's leaves fall from (`look::life::is_tree`): each one's
++    /// placement transform and model, whose bounds give its crown.
++    pub(crate) fn trees(&self) -> impl Iterator<Item = (&Transform, AssetId<M2Model>)> + '_ {
++        self.by_id
++            .values()
++            .filter(|p| p.tree)
++            .filter_map(|p| match &p.model {
++                ModelHandle::M2(h) => Some((&p.transform, h.id())),
++                ModelHandle::Wmo(_) => None,
++            })
++    }
+ }
+ 
+ /// A shared placement: its model, transform and spawned entities.
+@@ -226,6 +238,8 @@ struct Placement {
+     /// The tile owning an M2 doodad's hull weld and merged blobs, first the registering tile;
+     /// WMOs never read it.
+     owner: (i32, i32),
++    /// An M2 tree the new look's leaves fall from (`look::life::is_tree` of its model path).
++    tree: bool,
+ }
+ 
+ /// How much of the world wanted around the view focus is there, read by the loading bar and by
+@@ -1199,6 +1213,7 @@ fn register_doodad(
+             portal_instance: None,
+             refs: 1,
+             owner: tile,
++            tree: crate::look::life::is_tree(&d.model),
+         },
+     );
+     placements.pending_spawns += 1;
+@@ -1216,8 +1231,16 @@ pub(crate) struct MapBridge;
+ ///    data leaves a 5 yd hole between the deck's sloping edge (z 30) and the plank's top
+ ///    (z 31.5), over a trough at z 27.7, which players had to jump.
+ const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 2] = [
+-    [[-33.0, -799.3, 30.2], [-36.5, -802.0, 31.4], [-34.6, -807.0, 30.5]],
+-    [[-33.0, -799.3, 30.2], [-34.6, -807.0, 30.5], [-31.0, -804.3, 31.5]],
++    [
++        [-33.0, -799.3, 30.2],
++        [-36.5, -802.0, 31.4],
++        [-34.6, -807.0, 30.5],
++    ],
++    [
++        [-33.0, -799.3, 30.2],
++        [-34.6, -807.0, 30.5],
++        [-31.0, -804.3, 31.5],
++    ],
+ ];
+ 
+ /// The pieces added to the map in directory `dir`.
+@@ -1253,6 +1276,7 @@ fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &Wmo
+             portal_instance: None,
+             refs: 1,
+             owner: (0, 0), // unread for WMOs: their prop hulls weld per placement
++            tree: false,
+         },
+     );
+     placements.pending_spawns += 1;
+@@ -1643,6 +1667,7 @@ mod straddler_tests {
+             portal_instance: None,
+             refs: 1,
+             owner,
++            tree: false,
+         }
+     }
+ 
+diff --git a/crates/benilla-world/src/terrain_stream/merge.rs b/crates/benilla-world/src/terrain_stream/merge.rs
+index 7482ce7..acef121 100644
+--- a/crates/benilla-world/src/terrain_stream/merge.rs
++++ b/crates/benilla-world/src/terrain_stream/merge.rs
+@@ -733,6 +733,7 @@ mod tests {
+             portal_instance,
+             refs: 1,
+             owner: (0, 0),
++            tree: false,
+         }
+     }
+ 
+diff --git a/crates/benilla-world/src/terrain_stream/spawn/mod.rs b/crates/benilla-world/src/terrain_stream/spawn/mod.rs
+index 304b31c..8d04a3b 100644
+--- a/crates/benilla-world/src/terrain_stream/spawn/mod.rs
++++ b/crates/benilla-world/src/terrain_stream/spawn/mod.rs
+@@ -945,6 +945,7 @@ mod retire_tests {
+             portal_instance: None,
+             refs: 1,
+             owner: (0, 0),
++            tree: false,
+         }
+     }
+ 
+diff --git a/crates/benilla-world/src/terrain_stream/weld.rs b/crates/benilla-world/src/terrain_stream/weld.rs
+index f16de28..b31bfe9 100644
+--- a/crates/benilla-world/src/terrain_stream/weld.rs
++++ b/crates/benilla-world/src/terrain_stream/weld.rs
+@@ -200,6 +200,7 @@ mod tests {
+             portal_instance: None,
+             refs: 1,
+             owner: (0, 0),
++            tree: false,
+         }
+     }
+ 
+-- 
+2.43.0
+
