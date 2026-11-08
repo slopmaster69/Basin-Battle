@@ -101,6 +101,37 @@ const LUNGE_SECS: f32 = 0.25;
 pub(crate) const MAX_ATTACKERS: usize = 2;
 /// An opening this near draws a creature in at once (past its turn).
 pub(crate) const PRESS_RANGE: f32 = 7.0;
+
+/// A creature's part in its fight's plan (`[[plan]]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Role {
+    /// Fights as its kind does.
+    #[default]
+    None,
+    /// Presses: its pace between strings 0.85 of its own (`all_in`).
+    Eager,
+    /// Works round to its hero's back and strikes from there while another is on them (`pincer`).
+    Flanker,
+    /// Waits between its hero and its fight's caster or shooter (`screen`).
+    Guard,
+    /// Holds back out of reach while another of its fight is on its hero (`bait`, `waves`).
+    Reserve,
+}
+
+/// A held-back creature comes in after this long at most.
+pub(crate) const RESERVE_MOST: f32 = 12.0;
+/// A flanker strikes only from its hero's back for this long into its fight (then as it can).
+pub(crate) const FLANK_MOST: f32 = 8.0;
+
+/// A number in 0..1 from a creature's id and what it's for: the same for that creature every
+/// time it's asked, different from the next creature's (splitmix64).
+pub(crate) fn roll01(id: Id, salt: u64) -> f32 {
+    let mut z = (id as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ salt.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z >> 40) as f32 / (1u64 << 24) as f32
+}
 /// A creature this far from its foe is coming at them from afar: reaching them within
 /// `ARRIVE_WINDOW` seconds, it settles `ai.arrive_beat` before its blow. Closer, it's only stepping
 /// round them, and swings without stopping first (Corey, Nov 7: "bosses stutter step").
@@ -313,6 +344,13 @@ impl Survival {
     pub(crate) fn spawn_mob(&mut self, def: usize, at: Vec3, pack: Option<usize>, raider: bool) -> Id {
         let id = self.alloc();
         let health = self.base_health(def);
+        // Its own quirks, from its id (not the world's dice, which every other roll shares). Not a
+        // boss's: each is one of a kind already, tuned as it is.
+        let q = if self.content.mobs[def].boss { 0.0 } else { self.content.ai.quirk.clamp(0.0, 0.9) };
+        let n = self.content.mobs[def].patterns.len();
+        let quirk_pace = 1.0 + (roll01(id, 1) * 2.0 - 1.0) * q;
+        let quirk_retreat = 1.0 + (roll01(id, 2) * 2.0 - 1.0) * q * 2.0;
+        let favourite = (n > 1 && q > 0.0).then(|| ((roll01(id, 3) * n as f32) as usize).min(n - 1));
         let facing = self.rng.gen::<f32>() * std::f32::consts::TAU;
         self.mobs.insert(
             id,
@@ -362,6 +400,11 @@ impl Survival {
                 fighters: 1,
                 wary_until: 0.0,
                 fled: false,
+                quirk_pace,
+                quirk_retreat,
+                favourite,
+                role: Role::None,
+                role_at: 0.0,
                 whiff_until: 0.0,
                 last_pattern: None,
                 close_run: 0,
@@ -492,6 +535,8 @@ impl Survival {
     pub(crate) fn engage(&mut self, mid: Id, first: Foe) {
         let mut queue = vec![mid];
         let mut seen = vec![mid];
+        // Those that took up this fight just now (not one already in it): their plan.
+        let mut fresh = Vec::new();
         while let Some(m) = queue.pop() {
             let foe = if m == mid { first } else { self.spread_foe(m, first) };
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
@@ -513,6 +558,9 @@ impl Survival {
                 // A patrol's leash runs from where it was caught, not from where it was bound.
                 if matches!(mob.state, MobState::Idle { .. }) && mob.pack.is_some_and(|k| !self.content.packs[k].route.is_empty()) {
                     mob.home = mob.pos;
+                }
+                if matches!(mob.state, MobState::Idle { .. } | MobState::Return) {
+                    fresh.push(m);
                 }
                 mob.state = MobState::Chase { foe };
                 mob.think = 0.0;
@@ -544,6 +592,11 @@ impl Survival {
                 seen.push(n);
                 queue.push(n);
             }
+        }
+        if fresh.len() >= 2 {
+            self.plan_fight(&fresh);
+        } else if let Some(m) = fresh.first().and_then(|id| self.mobs.get_mut(id)) {
+            m.role = Role::None;
         }
     }
 
@@ -1427,6 +1480,11 @@ impl Survival {
         let bolt = hp.is_some_and(|hp| self.missiles.iter().any(|ms| ms.owner != id && ms.land_at > now && dist2d(ms.at, hp) <= ms.radius + 4.0));
         let winding = self.mobs.iter().any(|(oid, o)| *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h));
         let temper = self.temper(id);
+        // A flanker (its fight's plan) strikes from its hero's back while another of its fight is
+        // on them, early in the fight; facing it, it waits and works round.
+        if me.role == Role::Flanker && now - me.role_at < FLANK_MOST && !open && !self.behind(id, h) && self.others_on(h, id) {
+            return true;
+        }
         // A backstabber strikes from behind its hero (or at an opening), whoever's turn it is;
         // facing it, it waits and works round.
         if temper.is_some_and(|t| t.backstab) {
@@ -1493,6 +1551,15 @@ impl Survival {
         }
         let d = self.content.mobs[m.def].clone();
         let (pos, dir) = (m.pos, m.circle);
+        // A guard waits between its hero and the caster it covers.
+        if m.role == Role::Guard && radius < HOLD_BACK {
+            if let Some(spot) = self.guard_spot(id, hero, to) {
+                if dist2d(pos, spot) > 0.8 {
+                    self.sidle(id, spot, d.walk_speed.max(1.5), hero);
+                }
+                return;
+            }
+        }
         // Toward their back, the shorter way round.
         let dir = self.flank_way(id, hero).unwrap_or(dir);
         let bearing = facing(to, pos) + dir * CIRCLE_STEP;
@@ -2011,6 +2078,15 @@ impl Survival {
                     let mut busy = false;
                     let mut ready = ready;
                     if let Foe::Hero(h) = foe {
+                        // Its fight's plan: held back out of reach until it comes in.
+                        if self.mobs[&id].role == Role::Reserve {
+                            if self.reserve_comes(id, h, dist) {
+                                self.mobs.get_mut(&id).unwrap().role = Role::None;
+                            } else {
+                                self.circle_foe(id, h, to, HOLD_BACK);
+                                return;
+                            }
+                        }
                         // Its temperament's: a coward hurt runs from its hero, once, and comes
                         // back; a commander holds back while others of its fight are on its hero.
                         if let Some(t) = self.temper(id).cloned() {
@@ -2356,6 +2432,7 @@ impl Survival {
         // (A plan to back off and use one from afar keeps only until its wait is out.)
         let now = self.clock;
         let (last, planned) = (m.last_pattern, m.space.filter(|(until, _)| now < *until).map(|(_, k)| k));
+        let (favourite, fav) = (if d.boss { None } else { m.favourite }, self.content.ai.favourite.max(0.0));
         let fits: Vec<(usize, f32)> = d
             .patterns
             .iter()
@@ -2367,6 +2444,7 @@ impl Survival {
                 let max = if p.max_range > 0.0 { p.max_range } else { reach };
                 let w = if guarded && p.steps.iter().any(|s| s.blockable == Some(false) || s.heavy == Some(true)) { p.weight * breaks } else { p.weight };
                 let w = if last == Some(k) { w * again } else { w };
+                let w = if favourite == Some(k) { w * fav } else { w };
                 (dist >= p.min_range && dist <= max).then_some((k, w.max(0.0)))
             })
             .collect();

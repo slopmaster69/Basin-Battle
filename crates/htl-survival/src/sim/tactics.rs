@@ -8,7 +8,7 @@
 //! running, holds a blow a beat now and then, stops a long string short or goes straight into
 //! another, and backs off to where its charges, lunges and throws can come from.
 
-use super::mobs::{Foe, MobState};
+use super::mobs::{roll01, Foe, MobState, Role};
 use super::*;
 
 /// A hero this far off isn't worth turning for.
@@ -21,6 +21,10 @@ const SPACE_PACE: f32 = 1.6;
 const SPACE_MOST: f32 = 12.0;
 /// Backed off, it waits this long at most for its blow from afar before it closes in again.
 const SPACE_WAIT: f32 = 2.0;
+/// An eager creature's pace between strings, times its own (`all_in`).
+const EAGER_PACE: f32 = 0.85;
+/// A guard waits this far off its hero, toward the caster it covers.
+const GUARD_OFF: f32 = 2.6;
 
 impl Survival {
     /// A hero hurt this creature: it remembers (the memory fades).
@@ -211,9 +215,11 @@ impl Survival {
         self.content.tempers.iter().find(|t| &t.key == key)
     }
 
-    /// Its cooldown between strings, as its temperament paces it.
+    /// Its cooldown between strings, as its temperament paces it, its own quirk, and its part in
+    /// its fight's plan.
     pub(crate) fn pace(&self, id: Id) -> f32 {
-        self.temper(id).map_or(1.0, |t| t.pace)
+        let own = self.mobs.get(&id).map_or(1.0, |m| m.quirk_pace * if m.role == Role::Eager { EAGER_PACE } else { 1.0 });
+        self.temper(id).map_or(1.0, |t| t.pace) * own
     }
 
     /// Whether creature `id` stands behind `hero` (outside the half of the world they face).
@@ -250,6 +256,7 @@ impl Survival {
             None => (ai.retreat, ai.retreat_yards, false),
         };
         let Some(m) = self.mobs.get(&id) else { return };
+        let chance = chance * m.quirk_retreat;
         let d = &self.content.mobs[m.def];
         if chance <= 0.0 || (d.boss && !own) || d.attack.ranged || m.raider && self.is_siege_foe(id) && self.rng.gen::<f32>() < 0.5 {
             return;
@@ -270,10 +277,16 @@ impl Survival {
     /// Which way round a waiting creature steps: toward the hero's back (the shorter way), or its
     /// own way once it's there.
     pub(crate) fn flank_way(&self, id: Id, hero: Id) -> Option<f32> {
-        if !self.temper(id).and_then(|t| t.flank).unwrap_or(self.content.ai.flank) {
+        let m = self.mobs.get(&id)?;
+        // Its fight's plan first: a flanker goes round, a guard holds its line.
+        let flanks = match m.role {
+            Role::Flanker => true,
+            Role::Guard => false,
+            _ => self.temper(id).and_then(|t| t.flank).unwrap_or(self.content.ai.flank),
+        };
+        if !flanks {
             return None;
         }
-        let m = self.mobs.get(&id)?;
         let p = self.players.get(&hero)?;
         // Where it stands round them, against where their back is.
         let at = facing(p.pos, m.pos);
@@ -283,6 +296,131 @@ impl Survival {
             return None;
         }
         Some(if off > 0.0 { -1.0 } else { 1.0 })
+    }
+
+    /// A fight begins (the creatures drawn in together, `ids`): if two or more of them, not a
+    /// boss's, it takes one of the plans that fit who's in it, and each its part. Rolled from the
+    /// first one's id and the hour, not the world's dice.
+    pub(crate) fn plan_fight(&mut self, ids: &[Id]) {
+        let now = self.clock;
+        let mut fight: Vec<Id> = ids
+            .iter()
+            .copied()
+            .filter(|id| self.mobs.get(id).is_some_and(|m| m.health > 0 && !m.friendly && matches!(m.state.foe(), Some(Foe::Hero(_)))))
+            .collect();
+        fight.sort_unstable();
+        for id in &fight {
+            let m = self.mobs.get_mut(id).unwrap();
+            m.role = Role::None;
+            m.role_at = now;
+        }
+        let boss = fight.iter().any(|id| self.content.mobs[self.mobs[id].def].boss);
+        if fight.len() < 2 || boss {
+            return;
+        }
+        let ranged = |s: &Self, id: &Id| s.content.mobs[s.mobs[id].def].attack.ranged;
+        let melee: Vec<Id> = fight.iter().copied().filter(|id| !ranged(self, id) && !self.content.mobs[self.mobs[id].def].patterns.is_empty()).collect();
+        let shooters = fight.iter().filter(|id| ranged(self, id)).count();
+        let fits: Vec<(String, f32)> = self
+            .content
+            .plans
+            .iter()
+            .filter(|p| p.weight > 0.0 && melee.len() >= p.min_melee.max(1) && (!p.ranged || shooters > 0))
+            .map(|p| (p.key.clone(), p.weight))
+            .collect();
+        let total: f32 = fits.iter().map(|f| f.1).sum();
+        if total <= 0.0 {
+            return;
+        }
+        let mut roll = roll01(fight[0] ^ now.to_bits(), 7) * total;
+        let mut plan = fits[fits.len() - 1].0.clone();
+        for (k, w) in &fits {
+            if roll < *w {
+                plan = k.clone();
+                break;
+            }
+            roll -= w;
+        }
+        // Who can take a part: a coward or a commander keeps its own way, and a bruiser plods
+        // straight in (it never goes round, nor hangs back).
+        let temper = |s: &Self, id: &Id| s.temper(*id).map(|t| t.key.clone()).unwrap_or_default();
+        let free: Vec<Id> = melee.iter().copied().filter(|id| !matches!(temper(self, id).as_str(), "commander" | "coward")).collect();
+        let roams: Vec<Id> = free.iter().copied().filter(|id| temper(self, id) != "bruiser").collect();
+        let first = melee.first().copied();
+        let mut parts: Vec<(Id, Role)> = Vec::new();
+        match plan.as_str() {
+            "all_in" => parts.extend(melee.iter().map(|id| (*id, Role::Eager))),
+            // One holds the front (the first of them), the next that can go round goes round.
+            "pincer" => {
+                if let Some(id) = roams.iter().find(|id| Some(**id) != first && temper(self, id) != "backstabber") {
+                    parts.push((*id, Role::Flanker));
+                }
+            }
+            "screen" => {
+                if let Some(id) = free.iter().find(|id| temper(self, id) != "backstabber") {
+                    parts.push((*id, Role::Guard));
+                }
+            }
+            // The last that can hang back does, while the rest fight.
+            "bait" => {
+                if let Some(id) = roams.iter().rev().find(|id| Some(**id) != first) {
+                    parts.push((*id, Role::Reserve));
+                }
+            }
+            "waves" => {
+                let n = melee.len() / 2;
+                parts.extend(roams.iter().rev().filter(|id| Some(**id) != first).take(n).map(|id| (*id, Role::Reserve)));
+            }
+            _ => {}
+        }
+        for (id, role) in parts {
+            if let Some(m) = self.mobs.get_mut(&id) {
+                m.role = role;
+            }
+        }
+        let names: Vec<String> = fight
+            .iter()
+            .map(|id| {
+                let m = &self.mobs[id];
+                let name = &self.content.mobs[m.def].name;
+                if m.role == Role::None { name.clone() } else { format!("{name} ({})", format!("{:?}", m.role).to_lowercase()) }
+            })
+            .collect();
+        self.events.push(Event::Log(format!("A fight begins, {plan}: {}", names.join(", "))));
+    }
+
+    /// A held-back creature (`Role::Reserve`) comes in: when nobody else of its fight is on its
+    /// hero, one of them is hurt past half, its hero opens up near it, or it has waited long enough.
+    pub(crate) fn reserve_comes(&self, id: Id, hero: Id, dist: f32) -> bool {
+        let Some(m) = self.mobs.get(&id) else { return true };
+        if self.clock - m.role_at >= mobs::RESERVE_MOST || self.presses(id, hero, dist) {
+            return true;
+        }
+        let Some(hp) = self.players.get(&hero).map(|p| p.pos) else { return true };
+        let mut others = false;
+        for (oid, o) in &self.mobs {
+            if *oid == id || o.state.target() != Some(hero) || dist2d(o.pos, hp) > 20.0 {
+                continue;
+            }
+            if o.health > 0 && (o.health as f32) < 0.5 * o.max_health as f32 {
+                return true;
+            }
+            others |= o.health > 0 && o.role != Role::Reserve;
+        }
+        !others
+    }
+
+    /// Where a guard (`Role::Guard`) waits: between its hero and the nearest caster or shooter of
+    /// its fight, a little off the hero.
+    pub(crate) fn guard_spot(&self, id: Id, hero: Id, to: Vec3) -> Option<Vec3> {
+        let m = self.mobs.get(&id)?;
+        let shooter = self
+            .mobs
+            .iter()
+            .filter(|(oid, o)| **oid != id && o.health > 0 && o.state.target() == Some(hero) && self.content.mobs[o.def].attack.ranged)
+            .min_by(|a, b| dist2d(a.1.pos, m.pos).total_cmp(&dist2d(b.1.pos, m.pos)))?;
+        let way = facing(to, shooter.1.pos);
+        Some(self.ground_near(to[0] + way.cos() * GUARD_OFF, to[1] + way.sin() * GUARD_OFF, to[2]))
     }
 
     /// A creature begins one of its strings: remembered (a boss seldom begins the same one next).

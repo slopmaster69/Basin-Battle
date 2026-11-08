@@ -969,6 +969,14 @@ pub struct Mob {
     pub wary_until: f32,
     /// It has run from its hero once already (its temperament's `flee_below`).
     pub fled: bool,
+    /// Its own quirks within its kind (`[ai] quirk`, `favourite`), set as it appears: its pace
+    /// between strings and its readiness to give ground, each times this, and its favourite string.
+    pub quirk_pace: f32,
+    pub quirk_retreat: f32,
+    pub favourite: Option<usize>,
+    /// Its part in its fight's plan (`[[plan]]`), and when it was given.
+    pub role: mobs::Role,
+    pub role_at: f32,
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
