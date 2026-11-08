@@ -793,6 +793,7 @@ impl Survival {
     fn stir(&mut self) {
         self.reset_arsenals();
         self.reset_machinery();
+        self.reset_kitchens();
         let fallen = std::mem::take(&mut self.below.as_mut().unwrap().fallen);
         for (def, home, pack) in fallen {
             if pack.is_some_and(|k| self.pack_slain(k)) {
