@@ -92,8 +92,8 @@ trigger and cleanup. They also exposed tiny warning steam, weak dynamite prepara
 obscuring the fall. These recordings are video-only and cannot prove sound audibility.
 
 PR #299 passed 1,084 release tests but failed in the real client: its broad immediate-prop
-predicate removed the cargo and plank hulls, hiding both perched bodies. PR #302 reverts that
-merge first. Exact revert `b97f8d9` restored both visible bodies in a same-camera comparison on
+predicate removed the cargo and plank hulls, hiding both perched bodies. PR #302 reverted that
+merge first (main `22d65ad`). Exact revert `b97f8d9` restored both visible bodies in a same-camera comparison on
 client `skyB` (watcher request `gilnid-revert-b97f8d9-platforms`).
 
 PR #304 restores the cues with a visual-only predicate. The simulation regression checks owned
@@ -108,6 +108,15 @@ dry side during the actual discharge. `gilnid-tells-direct-hit` isolates one rea
 stationary debug boss's worker, with normal crew/controller behavior. These scenarios hide
 floor markers and remain controlled QA, not unassisted fight or balance acceptance.
 
-Restoration validation and client evidence are recorded in PR #304 when complete. Still
-unverified: an unassisted clear, solo-versus-duo balance, audio audibility, support rocking or
-tipping, and valve hand contact. Keep `needs playtest` for those remaining acceptance gaps.
+The restored production source was filmed at `299ac99` on `skyB` in watcher request
+`gilnid-safe-299ac99-comparison`. Both perched bodies remain visible. The isolated Fireball
+reduces one engineer from 80 to 59 health while Gilnid stays at 1,300; the worker visibly
+descends and remains on the floor. The valve scene shows the correct-home boss working the
+valve, then a dry-side traversal out and back during warning/discharge with health held at
+200/200. The last debug heal is at scenario t=30; movement runs t=33-36.8 with no further heal.
+The MP4s are 25.5 and 11 sec, 1,942 by 1,136, video only. Local evidence is retained under
+`outputs/gilnid/safe-299ac99-*`, with detailed limits in `recovery-review.json`.
+
+Still unverified: an unassisted clear, solo-versus-duo balance, audio audibility, normal-player
+fuse readability, support rocking or tipping, and valve hand contact. Native impact effects
+still obscure parts of the brief fall. Keep `needs playtest` for those remaining acceptance gaps.
