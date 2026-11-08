@@ -794,6 +794,7 @@ impl Survival {
         self.reset_firing_lines();
         self.reset_arsenals();
         self.reset_machinery();
+        self.reset_duels();
         let fallen = std::mem::take(&mut self.below.as_mut().unwrap().fallen);
         for (def, home, pack) in fallen {
             if pack.is_some_and(|k| self.pack_slain(k)) {
