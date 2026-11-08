@@ -223,6 +223,30 @@ fn lighting_a_lamp_makes_it_a_page_and_resting_fills_the_draughts_and_wakes_the_
 }
 
 #[test]
+fn rest_pressed_again_and_again_is_one_rest() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
+    s.interact(id, Some(lamp));
+    s.step(DT);
+    let rests = |ev: &[Event]| {
+        ev.iter()
+            .filter(|e| matches!(e, Event::Announce { text } if text.contains("rested at the lamp")))
+            .count()
+    };
+    for _ in 0..3 {
+        s.rest(id).unwrap();
+    }
+    assert_eq!(rests(&s.step(DT)), 1, "Nov 7: thirty presses, thirty lines in chat");
+    assert_eq!(rests(&run(&mut s, 1.0)), 0);
+    s.rest(id).unwrap();
+    assert_eq!(rests(&s.step(DT)), 0, "still the same rest");
+    run(&mut s, 3.0);
+    s.rest(id).unwrap();
+    assert_eq!(rests(&s.step(DT)), 1, "a rest later on is a rest");
+}
+
+#[test]
 fn a_boss_stays_dead_and_its_fog_door_bars_the_room_while_it_fights() {
     let mut s = below();
     let id = s.join("ayla", "Ayla", None);

@@ -1,0 +1,10 @@
+# Probe 3: light the lamp and go home in the first instant, before the landing's pirates notice.
+hero warrior
+cam 0 -8 10
+0.0 .es interact
+0.0 .es home
+0.05 .es debug quiet
+1.0 .es goto goldshire
+5.0 shots t5 1 0.5
+9.0 shots t9 1 0.5
+10 end

@@ -1,0 +1,22 @@
+# The new look's lights (client 0057): a Frostbolt at night (23:00) in Goldshire. Look for: an ice
+# blue light on the ground under its path, steady (no flicker, unlike fire), and a blue flash where
+# it lands.
+hero warrior
+cam 0 -4 7
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("looklights tuned")
+4.4 .es slot q frostbolt
+5.50 .es in ab 0 0
+5.70 .es in a {facing} 0
+5.75 .es in au {facing} 0
+5.60 shots frostbolt 12 0.08
+8.0 video
+8.50 .es in ab 0 0
+8.70 .es in a {facing} 0.3
+8.75 .es in au {facing} 0.3
+11.5 end

@@ -1,0 +1,30 @@
+# Visible weather (client 0071): Goldshire at night (23:00) in rain, the camera on the road by the
+# cart and the lamp posts. Held with lookweather.
+# Look for: once the ground is wet (a minute in), each lamp post and the inn's torches pooling on
+# the wet road and cobbles, a warm glistening patch that slides as the camera moves (it is a
+# reflection), not a white blot; the rain streaks near a torch catching its orange light, the rest
+# faint blue-grey; the moon's light dimmed by the overcast. Then worldWeather 0 and worldLook 0.
+hero warrior
+cam 180 -8 12
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.5 shots dry 2 0.5
+7.0 lua ConsoleExec("lookweather rain 0.9")
+60.0 video
+60.5 shots wet 4 1.0
+68.0 lua SetCVar("worldWeather", "0")
+69.5 shots worldweather-0 2 0.5
+71.0 lua SetCVar("worldWeather", "1")
+71.05 lua SetCVar("worldLook", "0")
+71.1 lua ClearWorldFog()
+72.5 shots classic 2 0.5
+74.0 lua SetCVar("worldLook", "1")
+74.05 lua ClearWorldFog()
+74.1 lua ConsoleExec("lookweather server")
+76 end

@@ -1,0 +1,9 @@
+# The new look's films start here: debug quiet, every spell, no cooldowns, the hero whole, no dummy.
+# Each film's own goto follows at 1.0.
+0.0 .es debug quiet
+0.3 .es spells
+0.6 .es cd off
+3.0 .es dummy clear
+3.1 .es target clear
+3.6 .es heal
+3.9 .es valor full

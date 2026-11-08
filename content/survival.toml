@@ -49,16 +49,25 @@ rack_scale = 1.3
 book_stand_display = 234
 book_stand_scale = 0.8
 book_stand_height = 1.05
-# Elwynn is always night: the game clock pinned at half past eleven (hour, minute) and set again
-# every `clock_every` seconds, so it never runs on to the dawn. Elwynn's own Light.dbc night is
-# moonlit blue, dark enough to feel it and light enough to read a fight. Take the line out for the
-# time it is now. Not below (a dungeon has its own light) nor in Siege.
-clock = [23, 30]
+# Elwynn by day: the game clock pinned at ten in the morning (hour, minute) and set again every
+# `clock_every` seconds, so it never runs on to the dusk. Until 7 Nov it was pinned at half past
+# eleven at night under Duskwood's mist, and every game Corey sat down to was night and fog. Take
+# the line out for the time it is now (on an evening's game, the night again). Not below (a
+# dungeon has its own light) nor in Siege.
+clock = [10, 0]
 clock_every = 300.0
-# Duskwood's mist over the night, asked of the client by the add-on (a client without patch 0018
-# keeps Elwynn's own): a grey-blue fog closing in at 120 yards, a third of the way from the eye,
-# laid fully over Elwynn's and the light a quarter darker. Thicker while a raid is called.
-fog = { color = [0.20, 0.23, 0.30], end = 120.0, start = 0.25, weight = 1.0, darken = 0.25, secs = 8.0 }
+# How fast the clock runs: 1, a minute a minute, the pin holding the hour. To watch every hour of
+# the look in one sitting, `.es tune world.clock_speed 120` runs a whole day in 12 minutes (96, a
+# quarter of an hour) from the pinned hour, everyone set to the same hour every `clock_every`
+# seconds; `.es tune reload` brings the morning back. Real time below and in Siege.
+clock_speed = 1.0
+# No mist by day: Elwynn's own air. The night's mist, should the night come back, was this: a
+# grey-blue fog closing in at 120 yards, a third of the way from the eye, laid fully over Elwynn's
+# and the light a quarter darker, asked of the client by the add-on (a client without patch 0018
+# keeps its own).
+# fog = { color = [0.20, 0.23, 0.30], end = 120.0, start = 0.25, weight = 1.0, darken = 0.25, secs = 8.0 }
+# While a raid is called, a thicker, redder fog closes in to 80 yards and the light goes a third
+# darker, from the bell until the raid is over.
 raid_fog = { color = [0.24, 0.18, 0.18], end = 80.0, start = 0.15, weight = 1.0, darken = 0.35, secs = 12.0 }
 
 # --- the hero -------------------------------------------------------------------------------------

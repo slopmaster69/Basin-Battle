@@ -1,0 +1,47 @@
+# A camera probe for the painted sky's open-sky films (client 0068): which site gives open sky
+# toward the sun (yaw 45) from solid ground, the camera pitched up 35 degrees so the ground stops it
+# (over the lake it sank under the water in take 273). Each site at 17:30 and at 06:00, one still each.
+# Look for: the site where the oaks sit low and the sky fills most of the frame.
+hero warrior
+cam 45 35 6
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+6.0 shots brackwell-golden 1 0.5
+6.5 lua ConsoleExec("worldclock 360")
+8.0 shots brackwell-dawn 1 0.5
+8.5 .es goto heroes_vigil
+11.5 lua ConsoleExec("worldclock 1050")
+11.55 lua ClearWorldFog()
+13.0 shots vigil-golden 1 0.5
+13.5 lua ConsoleExec("worldclock 360")
+15.0 shots vigil-dawn 1 0.5
+15.5 .es goto echo_ridge
+18.5 lua ConsoleExec("worldclock 1050")
+18.55 lua ClearWorldFog()
+20.0 shots ridge-golden 1 0.5
+20.5 lua ConsoleExec("worldclock 360")
+22.0 shots ridge-dawn 1 0.5
+22.5 .es goto vineyards
+25.5 lua ConsoleExec("worldclock 1050")
+25.55 lua ClearWorldFog()
+27.0 shots vineyards-golden 1 0.5
+27.5 lua ConsoleExec("worldclock 360")
+29.0 shots vineyards-dawn 1 0.5
+29.5 .es goto goldshire
+32.5 lua ConsoleExec("worldclock 1050")
+32.55 lua ClearWorldFog()
+34.0 shots goldshire-golden 1 0.5
+34.5 lua ConsoleExec("worldclock 360")
+36.0 shots goldshire-dawn 1 0.5
+36.5 .es goto crystal_lake
+39.5 lua ConsoleExec("worldclock 1050")
+39.55 lua ClearWorldFog()
+41.0 shots lake-golden 1 0.5
+41.5 lua ConsoleExec("worldclock 360")
+43.0 shots lake-dawn 1 0.5
+44 end

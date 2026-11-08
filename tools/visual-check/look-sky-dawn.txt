@@ -1,0 +1,33 @@
+# The new look's painted sky (client 0068) at dawn (worldclock 360), the camera pitched up: the
+# day's own cover (looksky grade), then held clear (looksky clouds 0) and well clouded (looksky
+# clouds 0.8, a few stills apart to see the drift), then worldSky 0 (1.12's sky under the rest of
+# the new look) and worldLook 0.
+# Look for: pink-lit clouds toward the rising sun, the sun's halo low and warm, the stars gone; the
+# clouds soft and painted, with no visible tiling, banding or shimmer, thinning into the haze toward
+# the horizon; the clouds drifting slowly downwind between stills; 1.12's sun or moon disc behind a
+# cloud covered, its glare dimmed; worldSky 0 bringing back 1.12's own clouds (if the hour has any).
+hero warrior
+cam 70 30 4
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 360")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("looksky grade")
+5.5 shots day 2 0.5
+7.0 lua ConsoleExec("looksky clouds 0")
+8.0 shots clear 2 0.5
+9.5 lua ConsoleExec("looksky clouds 0.8")
+10.5 shots clouds-08 6 2.0
+23.0 lua ConsoleExec("looksky grade")
+23.05 lua SetCVar("worldSky", "0")
+24.0 shots worldsky-0 2 0.5
+25.5 lua SetCVar("worldSky", "1")
+25.55 lua SetCVar("worldLook", "0")
+25.6 lua ClearWorldFog()
+26.5 shots classic 2 0.5
+28.0 lua SetCVar("worldLook", "1")
+28.05 lua ClearWorldFog()
+29 end

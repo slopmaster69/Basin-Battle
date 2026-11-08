@@ -1,0 +1,18 @@
+# Torch hunt: Goldshire at 23:00, the camera at heading 270, lights off (looklights 0), then held at 3.
+# Look for any warm pool that appears between the two: proof the torches light the ground.
+hero warrior
+cam 270 -8 12
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+5.0 lua ConsoleExec("looklights 0")
+5.05 lua ClearWorldFog()
+6.0 shots off 1 0.5
+7.0 lua ConsoleExec("looklights 3")
+8.0 shots x3 1 0.5
+9.0 lua ConsoleExec("looklights tuned")
+10.0 shots tuned 1 0.5
+11 end

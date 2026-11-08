@@ -1,0 +1,33 @@
+# The new look's wind and sky (client 0068): what they cost. The woods by Crystal Lake at noon,
+# looking out over the trees with plenty of sky and cloud in frame (looksky clouds 0.8), standing
+# still, the fps journal on (benilla-config/Diagnostics/fps-journal.csv, a row a second with each
+# pass's GPU time): 8 s with both on, 8 s with worldSky 0, 8 s with worldWind 0 too, 8 s with both
+# on again.
+# Look for: in the CSV, gpu_ms with each on against off: the sky's layer lands in the transparent
+# pass's column, the wind's sway in the opaque pass's (and the shadow pass's). Please send the CSV
+# with the film, and say the GPU and the window size (and renderScale, gxMultisample if not the
+# defaults).
+hero warrior
+cam 200 8 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWind", "1")
+4.25 lua SetCVar("worldSky", "1")
+4.3 lua ConsoleExec("lookwind grade")
+4.35 lua ConsoleExec("looksky clouds 0.8")
+4.4 lua SetCVar("fpsJournal", "1")
+6.0 shots cost-on 1 1.0
+12.5 lua SetCVar("worldSky", "0")
+14.0 shots cost-nosky 1 1.0
+20.5 lua SetCVar("worldWind", "0")
+22.0 shots cost-off 1 1.0
+28.5 lua SetCVar("worldWind", "1")
+28.55 lua SetCVar("worldSky", "1")
+30.0 shots cost-on-again 1 1.0
+36.5 lua SetCVar("fpsJournal", "0")
+36.55 lua ConsoleExec("looksky grade")
+37 end

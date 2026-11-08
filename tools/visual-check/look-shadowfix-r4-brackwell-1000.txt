@@ -1,0 +1,45 @@
+# Sun shadows (client 0069, #269's fourth round): the Brackwell pumpkin patch at 10:00, the hero
+# put inside the patch (its centre, then 12 yd west and 12 yd east of it, so a pumpkin node stands
+# near him in at least one), the camera at the side (yaw 315, pitched down 35, 6 yd) so the
+# shadows run across the frame (the sun keeps the north-west bearing, yaw 45; shadows fall toward
+# the south-east). High with lookshadow map 1, low, worldShadows 0.
+# PLEASE run the client with WOW_SHADOW_STATS=1 and send client.log: every second it now prints
+# "[shadows near]", each model mesh within 25 yd of the camera with its distance, its verdict
+# (casts solid / cut / blended, or left out and why) and its texture path. Find the pumpkin and
+# the strongbox in it: that is what this round could not see without WoW data.
+# Look for: each pumpkin's own crescent of shadow on the soil beside it on high, against
+# worldShadows 0 (crop 1:1 round a pumpkin and the hero's feet); the hero's crisp shadow as take
+# 273 found it. The goto lines answer with where the hero stands.
+hero warrior
+cam 315 -35 6
+include _look_setup
+1.0 .es goto -9810 -900
+4.0 lua ConsoleExec("worldclock 600")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookshadow grade")
+4.35 lua ConsoleExec("lookshadow map off")
+6.0 shots centre-high 2 0.5
+7.2 lua ConsoleExec("lookshadow map 1")
+8.0 shots centre-map1 1 0.5
+8.6 lua ConsoleExec("lookshadow map off")
+8.65 lua SetCVar("worldShadows", "1")
+9.5 shots centre-low 1 0.5
+10.1 lua SetCVar("worldShadows", "0")
+11.0 shots centre-worldshadows-0 1 0.5
+11.6 lua SetCVar("worldShadows", "2")
+12.0 .es goto -9810 -888
+15.0 shots west-high 2 0.5
+16.2 lua SetCVar("worldShadows", "0")
+17.0 shots west-worldshadows-0 1 0.5
+17.6 lua SetCVar("worldShadows", "2")
+18.0 .es goto -9810 -912
+21.0 shots east-high 2 0.5
+22.2 lua SetCVar("worldShadows", "0")
+23.0 shots east-worldshadows-0 1 0.5
+23.6 lua SetCVar("worldShadows", "2")
+23.65 lua ConsoleExec("lookweather server")
+25 end

@@ -1,0 +1,32 @@
+# The painted sky at dawn over open sky (client 0068, revised): the Brackwell pumpkin patch at 06:00,
+# the camera at yaw 45 pitched up 35 degrees, where the probe (take 274) showed the sky filling most
+# of the frame. The day's own cover, held clear, held at 0.8 with stills 1 s apart for the drift,
+# then worldSky 0 and 1.12's look.
+# Look for: pink-lit clouds, the stars gone; soft painted clouds thinning into the haze at the
+# horizon, no tiling, banding or shimmer; drifting slowly between stills; at 0.8 a grey-pink cover,
+# darker underneath, not a bright sheet; the colours against 1.12's own cyan dawn.
+hero warrior
+cam 45 35 6
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua ConsoleExec("worldclock 360")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("looksky grade")
+6.0 shots day 3 1.0
+9.5 lua ConsoleExec("looksky clouds 0")
+10.5 shots clear 2 0.7
+12.0 lua ConsoleExec("looksky clouds 0.8")
+13.0 shots clouds-08 4 1.0
+17.5 lua ConsoleExec("looksky grade")
+17.55 lua SetCVar("worldSky", "0")
+18.5 shots worldsky-0 2 0.7
+20.0 lua SetCVar("worldSky", "1")
+20.05 lua SetCVar("worldLook", "0")
+20.1 lua ClearWorldFog()
+21.0 shots classic 2 0.7
+22.5 lua SetCVar("worldLook", "1")
+22.55 lua ClearWorldFog()
+23.5 end

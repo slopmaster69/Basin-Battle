@@ -1,0 +1,33 @@
+# Heavy cover at noon (client 0068, revised): Crystal Lake at 12:00, the camera pitched up across the
+# lake. The day's own cover, then held at 0.5 (an ordinary cloudy day's top), 0.8 and 1.0 (what
+# the overcast weather will drive), then worldSky 0 and 1.12's look.
+# Look for: at 0.5 white clouds on blue as before; at 0.8 the sky grey, darker under the thick of
+# the clouds, with some breaks and shape left, dimmer overall than the clear sky (not a bright white
+# sheet); at 1.0 a dull grey overcast with darker patches and a few thin places; no banding.
+hero warrior
+cam 200 30 4
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+5.5 shots day 2 0.5
+7.0 lua ConsoleExec("looksky clouds 0.5")
+8.0 shots clouds-05 2 0.5
+9.5 lua ConsoleExec("looksky clouds 0.8")
+10.5 shots clouds-08 3 1.0
+13.5 lua ConsoleExec("looksky clouds 1")
+14.5 shots clouds-10 3 1.0
+17.5 lua ConsoleExec("looksky grade")
+17.55 lua SetCVar("worldSky", "0")
+18.5 shots worldsky-0 2 0.5
+20.0 lua SetCVar("worldSky", "1")
+20.05 lua SetCVar("worldLook", "0")
+20.1 lua ClearWorldFog()
+21.0 shots classic 2 0.5
+22.5 lua SetCVar("worldLook", "1")
+22.55 lua ClearWorldFog()
+23.5 end

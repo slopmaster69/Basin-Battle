@@ -1,0 +1,19 @@
+# The new look (worldLook 1) against 1.12's (worldLook 0): from Echo Ridge at noon: the far view south over Northshire
+# Look for: the light, the colour, the fog's distance, the bloom, rays and mist; then the same view as 1.12 had it.
+hero warrior
+cam 180 3 8
+include _look_setup
+1.0 .es goto echo_ridge
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.10 lua UIParent:Hide()
+4.1 lua SetCVar("worldLook", "1")
+4.15 lua ClearWorldFog()
+5.5 shots new 3 1.0
+9.0 lua SetCVar("worldLook", "0")
+9.05 lua ClearWorldFog()
+10.0 shots old 3 1.0
+13.5 lua SetCVar("worldLook", "1")
+13.55 lua ClearWorldFog()
+14.5 shots new-again 2 1.5
+18 end

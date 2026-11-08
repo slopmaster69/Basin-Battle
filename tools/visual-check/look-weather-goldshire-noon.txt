@@ -1,0 +1,45 @@
+# Visible weather (client 0071), the server's path: Goldshire at noon, the camera on the inn and the
+# road, the sky in the top of the frame. The server holds the weather (.es weather, everyone sees
+# it): clear, overcast, rain, a storm, then back to the clock (clear) and the ground drying. Then
+# the storm again against worldWeather 0 and worldLook 0.
+# Look for: overcast: the clouds close over grey and darker under their thick parts (not a white
+# sheet), the sun's light dimmer and cooler, softer shadows, no god rays, a little more mist; rain:
+# the streaks catching the daylight and leaning with the wind, the road, the cobbles and the roofs
+# darkening over about a minute with a soft sheen toward the sky; storm: heavier rain, the trees
+# tossing harder, and a lightning flash or two (a brief cool flash over everything, the bloom
+# catching it; the video shows it), thunder a few seconds after if the client found a thunder
+# sound; clearing: the sky opening, the ground still wet and shining a while, drying over minutes.
+# worldWeather 0: 1.12's grey streaks, no wet ground, no flash. worldLook 0: 1.12 exactly.
+hero warrior
+cam 200 4 10
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 .es weather clear
+6.0 shots clear 2 0.5
+7.5 .es weather overcast 1
+20.0 shots overcast 3 1.0
+23.5 .es weather rain 0.7
+38.0 shots rain-falling 2 1.0
+70.0 shots rain-wet 3 1.0
+74.0 .es weather storm 1
+88.0 video
+88.5 shots storm 6 5.0
+120.0 .es weather auto
+135.0 shots clearing-wet 2 1.0
+200.0 shots drying 2 1.0
+203.0 .es weather storm 1
+218.0 lua SetCVar("worldWeather", "0")
+219.5 shots storm-worldweather-0 2 0.5
+221.0 lua SetCVar("worldWeather", "1")
+221.05 lua SetCVar("worldLook", "0")
+221.1 lua ClearWorldFog()
+222.5 shots storm-classic 2 0.5
+224.0 lua SetCVar("worldLook", "1")
+224.05 lua ClearWorldFog()
+224.1 .es weather auto
+226 end
