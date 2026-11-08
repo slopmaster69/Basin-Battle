@@ -1,0 +1,21 @@
+# The gangway off the Juggernaut's gun deck onto the plank down to Smite (the hole the bridge
+# piece fills). Heading 320 degrees from the deck at (-38, -799, 31.9): a slow walk, then a run;
+# then from the plank's top at (-31.5, -804.5, 31.4) heading 140 back up onto the deck. Before
+# the fix a walker fell into the trough (z 27.7) at about (-33.5, -802.7). `.es where` after each.
+hero warrior
+cam 320 -25 9
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -38 -799 31.9
+17 .es where
+18 shots deck 1 1
+19 lua ActionDash(2, 2.5, "f")
+19.2 shots walk 10 0.4
+24 .es where
+25 .es goto -38 -799 31.9
+27 lua ActionDash(2, 7, "f")
+27.2 shots run 8 0.4
+32 .es where
+35 end

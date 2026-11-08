@@ -1,0 +1,22 @@
+# The scaffold ramp down to Smite, walked slowly: a run from the top (-20, -796, 19.0) went 14 yd
+# down it, but a 2.5 yd/s walk stopped after 5 yd at (-16.5, -792.5, 16.9) (take 154). Here: a
+# long slow walk from the top, then a crawl from just above that spot, with the client's movement
+# trace on (step verdicts), and `.es where` after each. Camera low and close.
+hero warrior
+cam 45 -6 5
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -20 -796 19.0
+17 .es where
+18 shots top 1 1
+19 lua ActionDash(6, 2.5, "f")
+19.2 shots slow 16 0.4
+27 .es where
+28 .es goto -18 -794 17.8
+30 .es where
+31 lua ActionDash(5, 1.0, "f")
+31.2 shots crawl 12 0.4
+37 .es where
+40 end

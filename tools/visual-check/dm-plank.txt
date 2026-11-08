@@ -1,0 +1,23 @@
+# The gangplank off the Juggernaut toward Smite's dock, seen from above in take 158 to the
+# north-west of (-30, -812). The hero is set at the deck edge heading north-west (cam 45, a high
+# camera), walks slowly toward the plank with the movement trace on, `.es where` after; then the
+# same from the 38.9 floor at (-34, -806).
+hero warrior
+cam 45 -35 14
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -30 -812 39.4
+17 .es where
+18 shots nw 1 1
+19 lua ActionDash(2, 2.5, "f")
+19.2 shots walk 10 0.4
+24 .es where
+25 .es goto -34 -806 38.9
+27 .es where
+28 shots p1 1 1
+29 lua ActionDash(2, 2.5, "f")
+29.2 shots walk2 10 0.4
+34 .es where
+37 end
