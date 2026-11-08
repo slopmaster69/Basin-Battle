@@ -75,3 +75,17 @@ healing and selected debug kills; neither is evidence of an unassisted full-figh
 Not tested yet: the authored Foundry geometry and visuals in the real client, a full unassisted
 fight with markers disabled, or solo-versus-duo balance. Cargo supports are static rather than
 animated to sway. Keep `needs playtest` until these acceptance checks are recorded.
+
+## Presentation follow-up claim
+
+Codex is following up the recorded PR #295 encounter in `codex/gilnid-tells`. The direct-hit
+fall and finite-workforce mechanics are already verified. This branch improves the bounded
+native discharge warning with a visible dry route, dynamite preparation, unobscured descent,
+and valve-facing/action feedback. It preserves damage, projectile scheduling, safe-floor
+projection and all other encounters. Native support sway and precise hand-to-valve contact may
+remain limited by the existing client; any remaining limitations will be stated explicitly.
+
+The current controlled footage confirms that the small steam outlets do not explain the
+hazard footprint, the fuse is weak, and takeoff dust masks the body. Source changes will begin
+only after this claim is published as a draft PR. Targeted real-client checks will name the exact
+commit and retain the older evidence; silent recordings will not be presented as audio proof.
