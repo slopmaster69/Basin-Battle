@@ -490,7 +490,7 @@ pub(crate) const VERSION: u32 = 2;
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
 /// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
 /// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
-pub(crate) const ADDON_NEWEST: u32 = 59;
+pub(crate) const ADDON_NEWEST: u32 = 60;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
