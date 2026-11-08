@@ -49,6 +49,8 @@ fn one_projectile_drops_once_then_lands_stunned_as_a_melee_worker() {
     assert!(m.stagger_until > s.clock + 2.0);
     assert!(!s.content.mobs[m.def].attack.ranged);
     assert!(matches!(s.perches.workers[&id].state, Place::Ground));
+    assert_eq!(s.content.mobs[m.def].weapon, 1610);
+    assert!(s.events.iter().any(|e| matches!(e, Event::MobGear { id: who } if *who == id)));
 }
 
 #[test]
@@ -217,4 +219,95 @@ fn a_surviving_party_member_keeps_the_same_crew_and_can_drop_a_worker() {
     shot(&mut s, second, crew[0], 1.0, HitKind::Projectile);
     assert!(matches!(s.perches.workers[&crew[0]].state, Place::Falling { .. }));
     assert_eq!(s.perches.workers.len(), 2);
+}
+
+#[test]
+fn channel_steam_spans_its_damage_disk_and_leaves_the_dry_side_safe() {
+    let (mut s, hero, boss, _) = fight();
+    let dry = s.join("dry", "Dry", None);
+    s.players.get_mut(&hero).unwrap().pos = [0.0, -3.0, 0.0];
+    s.players.get_mut(&dry).unwrap().pos = [0.0, 0.0, 0.0];
+    let before = (s.players[&hero].health, s.players[&dry].health);
+    for x in [-6.0, 0.0, 6.0] {
+        s.perch_overflow(boss, [x, -3.0, 0.0], 1.8, 2.2, 30);
+    }
+    let steam = s.perches.crews[&boss].steam.clone();
+    assert_eq!(steam.len(), 15);
+    for m in s.missiles.iter().filter(|m| m.owner == boss) {
+        let vents: Vec<_> = steam.iter().map(|(id, _)| s.objs[id].pos)
+            .filter(|p| dist2d(*p, m.at) < m.radius).collect();
+        assert_eq!(vents.len(), 5);
+        assert!(vents.iter().any(|p| p[1] > m.at[1] + 1.4));
+        assert!(vents.iter().any(|p| p[1] < m.at[1] - 1.4));
+        assert!(dist2d(s.players[&dry].pos, m.at) > m.radius);
+    }
+    assert!(steam.iter().all(|(id, _)| s.is_perch_visual_prop(*id)));
+    let unrelated = s.perch_prop([15.0, 0.0, 0.0], 353, 1.0);
+    assert!(!s.is_perch_visual_prop(unrelated), "the immediate flag is encounter-owned, not display-wide");
+    s.clock += 1.9;
+    s.step_missiles();
+    s.step_perch_crews();
+    assert!(s.players[&hero].health < before.0, "standing in the channel takes the discharge");
+    assert_eq!(s.players[&dry].health, before.1, "the visible dry side remains safe");
+    assert!(steam.iter().all(|(id, _)| !s.objs.contains_key(id)));
+}
+
+#[test]
+fn the_drop_replaces_support_with_low_wood_and_saves_dust_for_landing() {
+    let (mut s, _, boss, crew) = fight();
+    let id = crew[0];
+    let base = s.perches.workers[&id].base;
+    let support = s.perches.workers[&id].support;
+    s.events.clear();
+    s.drop_perch(id);
+    assert!(!s.objs.contains_key(&support));
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Visual { id: who, .. } if *who == id)));
+    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id: who, sound: 3720 } if *who == id)));
+    let debris = *s.perches.crews[&boss].props.last().unwrap();
+    assert_eq!(s.objs[&debris].pos, base);
+    assert!(matches!(s.objs[&debris].kind, ObjKind::Prop { display: 1108, .. }));
+    tick(&mut s, 0.9);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Visual { id: who, kit: combat::KIT_FALL_DUST, .. } if *who == id)));
+    s.remove_perch_crew(boss);
+    assert!(!s.objs.contains_key(&debris));
+}
+
+#[test]
+fn valve_opening_faces_the_wheel_and_uses_the_native_standing_gesture() {
+    let (mut s, _, boss, _) = fight();
+    let valve = s.perches.crews[&boss].valve;
+    s.mobs.get_mut(&boss).unwrap().pos = [valve[0] + 1.0, valve[1], valve[2]];
+    s.mobs.get_mut(&boss).unwrap().facing = 0.0;
+    s.perches.crews.get_mut(&boss).unwrap().stage = Stage::ToValve { since: s.clock };
+    s.events.clear();
+    s.step_perch_valve(boss);
+    assert!(angle_between(s.mobs[&boss].facing, facing(s.mobs[&boss].pos, valve)) < 0.01);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Cast { caster, spell: WORK_VALVE, ms: 2200 } if *caster == boss)));
+    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id, sound: 3431 } if *id == boss)));
+    s.stagger_mob(boss, 1.0, false);
+    s.step_perch_valve(boss);
+    assert!(matches!(s.perches.crews[&boss].stage, Stage::ToValve { .. }));
+    assert!(s.events.iter().any(|e| matches!(e, Event::CastEnd { caster } if *caster == boss)));
+}
+
+#[test]
+fn immediate_visuals_exclude_structural_platforms_and_unowned_props() {
+    let (mut s, _, boss, crew) = fight();
+    for id in &crew {
+        let w = &s.perches.workers[id];
+        assert!(!s.is_perch_visual_prop(w.support));
+        assert!(!s.is_perch_visual_prop(w.platform));
+    }
+    let valve = *s.perches.crews[&boss].props.last().unwrap();
+    assert!(s.is_perch_visual_prop(valve));
+    for display in [36, 6481, 353, 755, 1108] {
+        let unrelated = s.perch_prop([20.0, 0.0, 0.0], display, 1.0);
+        assert!(!s.is_perch_visual_prop(unrelated));
+    }
+    s.drop_perch(crew[0]);
+    let debris = *s.perches.crews[&boss].props.last().unwrap();
+    assert!(s.is_perch_visual_prop(debris));
+    s.remove_perch_crew(boss);
+    assert!(!s.is_perch_visual_prop(valve));
+    assert!(!s.is_perch_visual_prop(debris));
 }

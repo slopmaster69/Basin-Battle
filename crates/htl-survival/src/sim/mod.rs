@@ -14,7 +14,11 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub(crate) mod bosses;
+pub(crate) mod machinery;
+pub(crate) mod vancleef;
 pub(crate) mod perches;
+pub(crate) mod arsenal;
+pub(crate) mod kitchen;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -255,6 +259,8 @@ pub enum Event {
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
     Gear { player: Id },
+    /// A creature changed its held equipment at an encounter milestone.
+    MobGear { id: Id },
     /// A unit takes a blow, for the clients that play clips: the reaction (`anim`, held `hold`
     /// seconds, looping, for a stagger) and how far it's thrown back from where the blow came.
     /// `fit`: the clip's whole length fitted to that many seconds (a knockdown), 0 its own.
@@ -1209,7 +1215,11 @@ pub struct Survival {
     pub(crate) warlord: warlord::Warlord,
     /// Basin Battle's boss beats under way: a boss on its run, burning blows, burning ground.
     pub(crate) bosses: bosses::Bosses,
+    pub(crate) machinery: machinery::Machinery,
+    pub(crate) vancleef: vancleef::VanCleef,
     pub(crate) perches: perches::Perches,
+    pub(crate) arsenal: arsenal::Arsenal,
+    pub(crate) kitchen: kitchen::Kitchen,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1311,7 +1321,11 @@ impl Survival {
             beta: beta::Beta::default(),
             warlord: warlord::Warlord::default(),
             bosses: bosses::Bosses::default(),
+            machinery: machinery::Machinery::default(),
+            vancleef: vancleef::VanCleef::default(),
             perches: perches::Perches::default(),
+            arsenal: arsenal::Arsenal::default(),
+            kitchen: kitchen::Kitchen::default(),
         }
     }
 

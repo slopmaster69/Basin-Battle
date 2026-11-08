@@ -634,6 +634,8 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
+        if damage > 0 { self.arsenal_hurt(mid); }
+        self.machinery_hurt(mid, damage);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
         // weapons count more, and a blow in its recovery more again).
         if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 {
@@ -685,6 +687,7 @@ impl Survival {
 
     /// Whether a creature's next phase is due (below its share, and not had yet).
     pub(crate) fn due_enrage(&self, mid: Id) -> bool {
+        if self.has_arsenal(mid) { return false; }
         self.mobs.get(&mid).is_some_and(|m| {
             m.health > 0 && self.content.mobs[m.def].phases.get(m.phase).is_some_and(|e| m.health as f32 <= e.at * m.max_health as f32)
         })
@@ -700,7 +703,8 @@ impl Survival {
     /// in its fight as its health takes (0: it has none).
     pub fn posture_limit(&self, mid: Id) -> u32 {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
-        let limit = self.content.mobs[m.def].posture;
+        // Greed leaves Cookie's hands occupied. Ordinary light blows can spoil the scoop too.
+        let limit = if self.kitchen_scooping(mid) { 60 } else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }
@@ -736,6 +740,8 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
+        self.kitchen_broken(mid);
+        self.vancleef_broken(mid);
         // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
         // on the screen of the hero who broke it.
         self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
@@ -938,6 +944,10 @@ impl Survival {
         self.remove_perch_crew(mid);
         self.death_mark_reset(mid);
         self.boss_gone(mid);
+        self.remove_arsenal(mid);
+        self.machinery_died(mid);
+        self.remove_kitchen(mid);
+        self.remove_duel(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1072,6 +1082,7 @@ impl Survival {
             } else {
                 self.rise(s, killer, def);
             }
+            self.machinery_handoff(mid, s);
         }
         // A pack's creatures come back; one called up for testing doesn't. Below, they come
         // back when a hero rests (and a boss never does).
@@ -1180,7 +1191,11 @@ impl Survival {
         self.step_rises();
         self.step_boss_fires();
         self.step_boss_collapse(dt);
+        self.clean_machinery();
+        self.clean_duels();
         self.step_perch_crews();
+        self.clean_arsenals();
+        self.clean_kitchens();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1245,7 +1260,13 @@ impl Survival {
             if self.targets.get(&id).copied().unwrap_or(false) {
                 continue;
             }
+            if self.step_machinery(id) {
+                continue;
+            }
             if self.step_perch_valve(id) { continue; }
+            if self.step_arsenal(id) { continue; }
+            if self.step_kitchen(id) { continue; }
+            if self.step_vancleef(id) { continue; }
             if self.disabled(id) {
                 continue;
             }
@@ -1270,6 +1291,9 @@ impl Survival {
 
     /// Move along the current path.
     fn walk(&mut self, id: Id, dt: f32) {
+        // A committed duel lunge retains its exact heading even at a path endpoint
+        // where floating-point rounding can make facing(next, next) turn to zero.
+        let committed = self.is_vancleef(id) && self.mobs.get(&id).is_some_and(|m| matches!(m.state, MobState::Windup { .. }));
         let below = self.is_below();
         let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
@@ -1290,7 +1314,7 @@ impl Survival {
             } else {
                 let t = left / d;
                 m.pos = [m.pos[0] + (next[0] - m.pos[0]) * t, m.pos[1] + (next[1] - m.pos[1]) * t, m.pos[2]];
-                m.facing = facing(m.pos, next);
+                if !committed { m.facing = facing(m.pos, next); }
                 left = 0.0;
             }
         }
@@ -1770,7 +1794,7 @@ impl Survival {
         }
     }
 
-    fn foe_pos(&self, foe: Foe) -> Option<Vec3> {
+    pub(crate) fn foe_pos(&self, foe: Foe) -> Option<Vec3> {
         match foe {
             Foe::Hero(h) => self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos),
             Foe::Obj(o) => self.objs.get(&o).filter(|o| matches!(o.kind, ObjKind::Station { damaged: false, .. })).map(|o| o.pos),
@@ -1779,7 +1803,7 @@ impl Survival {
 
     /// Whether another standing creature is within `r` of `at`.
     fn crowded(&self, id: Id, at: Vec3, r: f32) -> bool {
-        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && dist2d(m.pos, at) < r)
+        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && !self.duel_observer(*o) && dist2d(m.pos, at) < r)
     }
 
     /// Where to stand `r` from a foe at `foe`, coming from `from`: on its own side of them, or
@@ -1866,7 +1890,7 @@ impl Survival {
 
     /// A creature called up in a fight goes, out of the world: its wind-up's mark and what it
     /// had in the air with it.
-    fn dismiss(&mut self, id: Id) {
+    pub(crate) fn dismiss(&mut self, id: Id) {
         let Some(m) = self.mobs.remove(&id) else { return };
         if let MobState::Windup { mark: Some(mk), .. } = m.state {
             self.unmark(mk);
@@ -2309,6 +2333,7 @@ impl Survival {
                     if let Some(mk) = mark {
                         self.unmark(mk);
                     }
+                    let completed = self.mobs[&id].pattern.map(|(k, _)| k);
                     self.release(id, foe);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
@@ -2338,6 +2363,11 @@ impl Survival {
                             let cd = self.string_cooldown(a.cooldown * self.pace(id));
                             self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
                         }
+                    }
+                    if self.mobs[&id].pattern.is_none() {
+                        self.machinery_string_landed(id, completed, a.damage);
+                        self.kitchen_string_landed(id, completed);
+                        self.vancleef_string_landed(id, completed);
                     }
                 } else {
                     self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: t2, mark, shown };
@@ -2398,6 +2428,11 @@ impl Survival {
             (None, Some(s), true) => s.over(&d.attack),
             _ => d.attack.clone(),
         };
+        // The grind locks at its first pose and keeps that line, regardless of its target.
+        if self.machine_grind(id) || self.kitchen_committed(id) {
+            a.turn_rate = 0.0;
+            a.lock = a.windup;
+        }
         // A blow held a beat (the delayed swing).
         a.windup += m.hold;
         // Quicker (and harder) in its later phases.
@@ -2456,6 +2491,9 @@ impl Survival {
 
     /// One of a creature's patterns that suits a foe `dist` off (`size` its body), weighted.
     pub(crate) fn pick_pattern(&mut self, id: Id, dist: f32, size: f32) -> Option<usize> {
+        if self.is_machine(id) { return self.machine_pattern(id, dist, size); }
+        if self.is_kitchen(id) { return self.kitchen_pattern(id, dist, size); }
+        if self.is_vancleef(id) { return self.vancleef_pattern(id, dist, size); }
         let m = self.mobs.get(&id)?;
         let d = &self.content.mobs[m.def];
         // A raised guard in front of it: it reaches for the blow no guard stops.
@@ -2471,7 +2509,8 @@ impl Survival {
             .patterns
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32)
+            .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32
+                && self.arsenal_pattern_allowed(id, &p.name))
             .filter_map(|(k, p)| {
                 let first = p.steps.first()?;
                 let reach = first.range.unwrap_or(d.attack.range) + size - 0.3 + first.lunge;
@@ -2501,6 +2540,7 @@ impl Survival {
     }
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
+        if self.vancleef_invitation(id, foe, to) { return; }
         // A spell lab body swings only when the lab asks it to.
         if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) && !self.lab_stringing(id) {
             return;
@@ -2540,7 +2580,8 @@ impl Survival {
             _ => None,
         };
         let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
-        let mark = if a.ranged {
+        let tele = if self.machine_grind(id) { Telegraph { reach: 7.5, width: 3.0, at: Some((pos, face)), ..tele } } else { tele };
+        let mark = if let Some(mark) = self.kitchen_pour_mark(id, tele) { Some(mark) } else if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked
             // through the whole wind-up and flight, so the ring is there to read and step out of,
@@ -2629,11 +2670,16 @@ impl Survival {
             self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery, blockable: a.blockable, from });
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
+        self.machinery_windup(id);
+        self.kitchen_windup(id);
     }
 
     /// The blow lands (or the missile flies): every hero in the arc and in reach of the creature's
     /// committed facing, or a station in the way.
     fn release(&mut self, id: Id, foe: Foe) {
+        // The moving saw hits along its actual swept path, once per hero, in machinery.
+        if self.machine_grind(id) { return; }
+        if self.kitchen_release(id) { return; }
         let now = self.clock;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
@@ -2645,7 +2691,7 @@ impl Survival {
                 // Thrown where it was marked at the wind-up's start, its ring still there.
                 Some((at, mark)) => (at, lob_flight(dist2d(pos, at), a.speed), mark),
                 None => {
-                    let Some(to) = self.foe_pos(foe) else { return };
+                    let Some(to) = self.machinery_shot(id).or_else(|| self.foe_pos(foe)) else { return };
                     let at = self.ground_near(to[0], to[1], to[2]);
                     let fly = dist2d(pos, at) / a.speed.max(1.0);
                     // A splash's ground warned by its spell's own look; a bolt's small ring as drawn.

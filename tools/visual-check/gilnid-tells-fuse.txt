@@ -1,0 +1,25 @@
+# Controlled presentation check: ambient foes removed, debug healing, then boss cleanup.
+# Normal moving boss. Watch held dynamite/ready pose, committed arc, demonstration fall,
+# instant support-to-debris change and the body silhouette before landing dust.
+hero warrior
+cam 0 -30 16
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings=ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks=1; ElwynnSurvival.ClearMarks()
+11 .es unbar all
+11.5 .es clearfoes gilnid
+12 .es goto -205 -592 21 0
+12.5 .es hurt 0 gilnid
+15 .es heal
+16 .es goto -213 -592 21 0
+17 .es spawn dm_gilnid
+17.1 video
+18 shots perch 4 0.4
+20 shots fuse 12 0.2
+23 .es heal
+25 shots drop 24 0.1
+28 shots landed 6 0.3
+30 .es hurt 0 gilnid
+30.2 shots cleanup 4 0.3
+32 end
