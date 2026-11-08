@@ -50,6 +50,7 @@ $Defaults = [ordered]@{
     hunter        = "Vchunter"
     warrior       = "Vcwarrior"
     resolution    = "1280x720"
+    monitor       = ""
     format        = "jpg"
     width         = "1280"
     video         = "screen"
@@ -66,6 +67,9 @@ $SettingsHelp = @(
     "#   only, on a local server; the password is the one the host prints, 'hold' unless you changed it).",
     "# hunter, warrior: the test heroes on that account the scenarios play ('setup' makes them).",
     "# resolution: the client's window. format: jpg (small) or png. width: stills wider are scaled down.",
+    "# monitor: which screen the game window goes on, and the video films. Empty or 0: wherever Windows opens",
+    "#   it. 1 is the main screen (the one with the taskbar by default), 2 the next, and so on, the others in",
+    "#   the order Windows lists them; or a name like DISPLAY2 (Settings > System > Display > Identify).",
     "# video: screen (the game window's rectangle, by Desktop Duplication: the one that sees a Vulkan",
     "#   window's frames), title or desktop (GDI: they see only a few stale frames of benilla's window), or off.",
     "#   ffmpeg: ffmpeg.exe (empty: Documents\visual-check\ffmpeg).",
@@ -379,9 +383,68 @@ public static class VisualCheckWin {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
 }
 "@
 [void][VisualCheckWin]::SetProcessDPIAware()
+Add-Type -AssemblyName System.Windows.Forms  # after DPI-aware, so Screen's bounds are real pixels
+
+# The screens in the order the `monitor` setting counts them: the primary is 1, then the others as
+# Windows lists them.
+function Get-Monitors {
+    $all = @([System.Windows.Forms.Screen]::AllScreens)
+    @($all | Where-Object { $_.Primary }) + @($all | Where-Object { -not $_.Primary })
+}
+
+# The screen the `monitor` setting names (a number, or DISPLAYn), or $null for "wherever Windows
+# opens it" (empty, 0) and, with a word of warning, for one this PC doesn't have.
+function Get-WantedMonitor($setting) {
+    $setting = ([string]$setting).Trim()
+    if (-not $setting -or $setting -eq "0") { return $null }
+    $screens = @(Get-Monitors)
+    if ($setting -match '^\d+$') {
+        $n = [int]$setting
+        if ($n -ge 1 -and $n -le $screens.Count) { return $screens[$n - 1] }
+    } else {
+        $name = $setting.TrimStart([char]92, '.').ToUpper()
+        $hit = @($screens | Where-Object { $_.DeviceName.TrimStart([char]92, '.').ToUpper() -eq $name })
+        if ($hit.Count) { return $hit[0] }
+    }
+    Say "  monitor = $($setting): this PC has $($screens.Count) screen(s) ($(($screens | ForEach-Object { $_.DeviceName.TrimStart([char]92, '.') }) -join ', ')); leaving the window where Windows opens it."
+    return $null
+}
+
+# Moves the window's top-left corner to the top-left of the screen's working area, its size kept.
+function Move-ToMonitor($hwnd, $screen) {
+    $wa = $screen.WorkingArea
+    # SWP_NOSIZE 0x1 | SWP_NOZORDER 0x4 | SWP_NOACTIVATE 0x10
+    [void][VisualCheckWin]::SetWindowPos($hwnd, [IntPtr]::Zero, $wa.X, $wa.Y, 0, 0, 0x15)
+}
+
+# ddagrab's output_idx for a screen: DXGI lists the outputs in an order of its own, so each index is
+# opened once for its size, and the one the size matches is it (equal sizes: Windows' order among
+# them). Cached for the run; $null when no index matches.
+$OutputSizes = $null
+function Get-OutputIdx([string]$ffmpeg, $screen) {
+    $ErrorActionPreference = "Continue"  # ffmpeg's report is on stderr
+    if (-not $script:OutputSizes) {
+        $script:OutputSizes = @()
+        for ($i = 0; $i -lt 8; $i++) {
+            $out = & $ffmpeg -hide_banner -nostdin -loglevel info -f lavfi -i "ddagrab=output_idx=$($i):framerate=5" -frames:v 1 -f null - 2>&1 | Out-String
+            if ($out -match 'Video: wrapped_avframe, d3d11, (\d+)x(\d+)') { $script:OutputSizes += ,@([int]$Matches[1], [int]$Matches[2]) } else { break }
+        }
+    }
+    $same = @([System.Windows.Forms.Screen]::AllScreens | Where-Object { $_.Bounds.Width -eq $screen.Bounds.Width -and $_.Bounds.Height -eq $screen.Bounds.Height })
+    $nth = [Array]::IndexOf(@($same | ForEach-Object { $_.DeviceName }), $screen.DeviceName)
+    $seen = 0
+    for ($i = 0; $i -lt $script:OutputSizes.Count; $i++) {
+        if ($script:OutputSizes[$i][0] -eq $screen.Bounds.Width -and $script:OutputSizes[$i][1] -eq $screen.Bounds.Height) {
+            if ($seen -eq [Math]::Max(0, $nth)) { return $i }
+            $seen++
+        }
+    }
+    return $null
+}
 
 # ffmpeg recording the client's window ("benilla", the title benilla's lib.rs gives it) for
 # $v.Duration seconds into $v.Out. `screen` (the default) takes the window's rectangle by Desktop
@@ -395,13 +458,18 @@ function Start-Video($v, $client, [string]$how) {
         $client.Refresh()
         $r = New-Object VisualCheckWin+RECT
         if (-not [VisualCheckWin]::GetWindowRect($client.MainWindowHandle, [ref]$r)) { return $null }
-        # The primary screen's own coordinates; a window hanging past its edges is cut to them.
-        $sw = [VisualCheckWin]::GetSystemMetrics(0); $sh = [VisualCheckWin]::GetSystemMetrics(1)
-        $l = [Math]::Max(0, $r.Left); $t = [Math]::Max(0, $r.Top)
-        $w = [Math]::Min($sw, $r.Right) - $l; $h = [Math]::Min($sh, $r.Bottom) - $t
+        # The screen the window is on: its rectangle is cut to that screen and measured from that
+        # screen's own top-left, which is what ddagrab's offsets count from.
+        $scr = [System.Windows.Forms.Screen]::FromHandle($client.MainWindowHandle)
+        $b = $scr.Bounds
+        $idx = Get-OutputIdx $v.Ffmpeg $scr
+        if ($null -eq $idx) { return $null }
+        $l = [Math]::Max($b.Left, $r.Left); $t = [Math]::Max($b.Top, $r.Top)
+        $w = [Math]::Min($b.Right, $r.Right) - $l; $h = [Math]::Min($b.Bottom, $r.Bottom) - $t
         $w -= $w % 2; $h -= $h % 2
         if ($w -lt 64 -or $h -lt 64) { return $null }
-        $grab = @("-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=30:draw_mouse=0:offset_x=$($l):offset_y=$($t):video_size=$($w)x$($h)")
+        $l -= $b.Left; $t -= $b.Top
+        $grab = @("-f", "lavfi", "-i", "ddagrab=output_idx=$($idx):framerate=30:draw_mouse=0:offset_x=$($l):offset_y=$($t):video_size=$($w)x$($h)")
         $vf = "hwdownload,format=bgra," + $vf
     } elseif ($how -eq "desktop") {
         $client.Refresh()
@@ -448,11 +516,26 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
     $p = $null
     $rec = $null
     $shotsDir = Join-Path $chome "Screenshots"
+    $screen = Get-WantedMonitor $s.monitor
+    # The outputs ddagrab sees are looked at now, not when the video is due.
+    if ($v -and $s.video -eq "screen" -and $s.ffmpeg) { $null = Get-OutputIdx $s.ffmpeg ([System.Windows.Forms.Screen]::PrimaryScreen) }
     try {
         $p = Start-Process -FilePath $s.client -WorkingDirectory $chome -PassThru `
             -RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err"
         $deadline = (Get-Date).AddSeconds($timeout)
         while (-not $p.HasExited -and (Get-Date) -lt $deadline) {
+            # The window goes to its monitor the moment it exists, and is put back if the client
+            # moves it, until the video starts (its offsets are taken then).
+            if ($screen -and -not $rec) {
+                $p.Refresh()
+                if ($p.MainWindowHandle -ne [IntPtr]::Zero) {
+                    $wr = New-Object VisualCheckWin+RECT
+                    $wa = $screen.WorkingArea
+                    if ([VisualCheckWin]::GetWindowRect($p.MainWindowHandle, [ref]$wr) -and ($wr.Left -ne $wa.X -or $wr.Top -ne $wa.Y)) {
+                        Move-ToMonitor $p.MainWindowHandle $screen
+                    }
+                }
+            }
             if ($v -and -not $rec -and (Test-Path $shotsDir) -and (Get-ChildItem $shotsDir -Filter *.png)) {
                 $rec = Start-Video $v $p $s.video
                 if (-not $rec) { $v.Status = "no video: the game window wasn't found" }
