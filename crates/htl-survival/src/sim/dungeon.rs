@@ -792,6 +792,7 @@ impl Survival {
     /// Every foe that isn't gone for good back at its post, whole.
     fn stir(&mut self) {
         self.reset_machinery();
+        self.reset_duels();
         let fallen = std::mem::take(&mut self.below.as_mut().unwrap().fallen);
         for (def, home, pack) in fallen {
             if pack.is_some_and(|k| self.pack_slain(k)) {

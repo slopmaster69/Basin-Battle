@@ -2392,6 +2392,9 @@ impl Survival {
             if p.critical && !d.crit_effects.is_empty() && self.alive(victim) && after != before {
                 self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
             }
+            if before.zip(after).is_some_and(|(before, after)| after < before) {
+                self.vancleef_hit(victim, p.owner, from);
+            }
             return;
         }
         // A bomb's bolt plants it, and Combustion's spreads what burns on the foe it reaches.
@@ -2645,6 +2648,7 @@ impl Survival {
         let was = self.fx_from.replace(from);
         self.ability_after(owner, mid, ability, share, damage, killed);
         self.fx_from = was;
+        if how != HitKind::Area && damage > 0 { self.vancleef_hit(mid, owner, from); }
         if how == HitKind::Projectile && damage > 0 {
             self.drop_perch(mid);
         }

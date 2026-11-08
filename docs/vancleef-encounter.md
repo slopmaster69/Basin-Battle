@@ -1,25 +1,65 @@
 # Edwin VanCleef: the false opening
 
-This encounter follows the agreed Deadmines design. VanCleef makes 2 committed cuts and
-leaves an honest recovery. His Invitation is a planted, distinct stance: exactly 1 frontal
-hero hit provokes a committed riposte with a full visible windup. Waiting ends the stance
-without an attack. HumanMale clip 57 remains the special-blow animation.
+VanCleef opens with exactly 2 committed cuts and a 1.8 sec recovery. His next close
+exchange is the Invitation: a held guard pose with both swords equipped for 1.8 sec.
+Waiting ends it without an attack and leaves another 1.2 sec opening. A damaging direct
+hit from within the frontal 140-degree sector spends the Invitation once. It still deals
+its normal damage, then starts a 0.9 sec riposte toward that attacker. The facing is fixed
+from its start, and the riposte leaves 2.4 sec of recovery. No instant counter damage.
 
-A posture break keeps its punish window, then sends him a short distance along a checked
-path under brief smoke cover. An arrival cue precedes his visible advancing combination.
-He never teleports and remains vulnerable throughout. At 30% health his finite, noncombat
-Blackguard observers walk away. A final combination keeps its minimum windups and leaves
-an honest recovery. Unbowed uses longer combinations and longer recoveries, without adds.
+Ordinary melee, weapon arts and direct projectiles use the same contact rule. A bursting
+projectile counts only its directly contacted body. Splash, periodic damage, beams and pets
+do not provoke it. Death, posture breaks and disabling effects take precedence. The encounter
+uses no class, ability, hand or party-size requirement. Rear hits remain ordinary damage.
 
-## Implementation boundary
+A posture break preserves the entire existing stagger reward. Afterward he walks a checked
+4 yd route away from a living opponent, under a small native smoke emitter. The emitter goes
+away before a 0.9 sec arrival cue and the advance's full 1.1 sec first windup. The advance
+has 3 committed blows and a 2.5 sec recovery. Blocked, wet, wrong-floor or excessive-detour
+routes are rejected; he gives the arrival cue where he stands. A rooted or stalled route
+ends in place within 2.5 sec. He remains vulnerable throughout.
 
-The encounter lives in a narrow simulation module, with small hooks into mob lifecycle,
-pattern choice, posture breaks and direct hero hits. Its content, deterministic tests and
-filming scenarios belong to this pull request. Rhahk'Zor, the shared boss module, Smite's
-arsenal, Gilnid's workforce, client patches, and add-on versions are outside this change.
+Two friendly, noncombat Blackguard observers stand near his home if both their standing
+points and departure paths are reachable on that floor. They have no pack, aggro, attack,
+loot or reward requirement. At 30% health they walk away along the deck and leave the
+encounter. They never respawn during that fight. At 12%, his 4-blow last stand starts only
+after the current string and recovery; it has 0.65 sec minimum windups and 3 sec recovery.
+It happens once, can be interrupted, and never holds his health above zero.
 
-## Verification
+Unbowed rises through the existing quarters-secret handoff. He has no observers or summons.
+His ordinary and advancing strings have 4 blows, his last stand has 5, and recoveries grow
+to 2.8, 3 and 3.4 sec respectively. Windups never accelerate at low health. Both forms bypass
+random string cuts/extensions, held beats, extra chains and tactical retreats so the visible
+exchange remains honest. The ordinary lunge still closes distance without spending the next
+Invitation. Reset, return, wipe, death and handoff remove encounter poses, smoke and observers.
 
-Before the implementation is published: release server build, full release tests and PR
-rules. The scenario will label forced demonstration beats. Client pose, smoke readability,
-ship-floor paths and solo/duo timing remain under `needs playtest` until filmed.
+## Verification and filming
+
+Deterministic tests cover actual solo/duo/4-hero AI, exact strings and recovery, waiting,
+melee and projectile contact, the second simultaneous hitter, rear/splash/periodic immunity
+to provocation, CC precedence, posture reward, continuous retreat, blocked/rooted fallback,
+finite spectators, pack-clear independence, secret handoff, and encounter cleanup.
+
+- `vancleef-invitation.txt` is a controlled lab demonstration of the honest recovery, safe
+  waiting, a provoked riposte answered by a dodge, and Unbowed's longer string.
+- `vancleef-story.txt` is a controlled encounter with labelled debug health changes, for the
+  retreat, departing Brotherhood, final combination, actual secret handoff and cleanup.
+- Neither scenario is an unassisted kill or a balance playtest. Film a complete solo and duo
+  fight separately, with markers off, before making balance or full-fight showcase claims.
+
+Read-only data queries verified display 2029 and 2357 use HumanMale, native HumanMale attack
+17 and special 57 exist, and the held guard uses Emote43 / ShieldBlock24. Existing client
+patch 0010 holds that guard pose; the HumanMale57 correction from PR285 remains intact.
+Sound kits 5780/5781/5782 and smoke display45 resolve in the local 1.12 data. The smoke is a
+particle emitter with no mesh; its opacity and timing need real-client inspection.
+
+## Not tested in the client
+
+The native held guard is the implemented Invitation silhouette. It cannot promise the exact
+ideal of one blade across his chest and the other drawn back until filmed. Ordinary attack
+recovery returns to the native ready pose; there is no custom shoulder-drop animation.
+
+The smoke emitter, glint, actual stern-floor paths and departure staging, native animation
+blend, controlled-scenario timing, and solo/duo encounter duration remain under `needs playtest`.
+Observers walk away out of the duel and are removed after 8 sec; there is no cinematic or
+entire-ship evacuation route. No client patch or camera takeover is added by this encounter.
