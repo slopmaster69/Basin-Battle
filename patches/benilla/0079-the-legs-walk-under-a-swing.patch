@@ -1,6 +1,6 @@
-From 1f15fb08a9d027cdf4fd72c6cbc00b7c2a5b51ac Mon Sep 17 00:00:00 2001
+From 910a32e550d106daec56ffa18d546ebe5a9902b3 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Sat, 7 Nov 2026 21:36:29 -0700
+Date: Sun, 8 Nov 2026 01:59:17 -0700
 Subject: [PATCH] The legs walk under a swing: a hero or a humanoid foe
  attacking on the move steps instead of sliding
 
@@ -20,7 +20,9 @@ slid for its whole length. Now:
   (`BodyTwist::swing_want`), so the swing faces the aim while the legs keep the strafe's turn.
 - A hit-stop on a layered swing holds the swing alone; the legs walk on.
 - `ActionDash`'s fifth argument `"legs"`: a lunge keeps the legs walking the way the keys go (the
-  wire keeps the dash's), so a strafing or backing hero's legs don't flick forward and back.
+  wire keeps the dash's), so a strafing or backing hero's legs don't flick forward and back, and
+  at their own pace (the keys' speed, or the replaced walk's), so the lunge's burst (5.6 yd/s for
+  the third blow) doesn't flick a walk into a run and back.
 - `PlayUnitAnimation`'s body `"auto"`: an ability's clip that layers; the whole body on
   `animLayer 0`. `HasActionCombat()` is 29.
 - The `animLayer` CVar (default 1; 0 is the twenty-eighth round's look exactly) and the
@@ -36,15 +38,16 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/cvars/mod.rs           |  14 +
  crates/benilla-app/src/cvars/table.rs         |   9 +
  crates/benilla-app/src/debug_panel/inspect.rs |   8 +
- crates/benilla-app/src/player/controller.rs   |  47 +-
- .../src/player/controller/tests.rs            |  80 ++++
- crates/benilla-app/src/player/state.rs        |   7 +
+ crates/benilla-app/src/player/body_pose.rs    |   8 +-
+ crates/benilla-app/src/player/controller.rs   |  83 +++-
+ .../src/player/controller/tests.rs            | 156 +++++++
+ crates/benilla-app/src/player/state.rs        |  12 +
  crates/benilla-assets/src/m2.rs               |   6 +-
  crates/benilla-assets/src/model.rs            | 129 ++++++
  crates/benilla-assets/src/model/pose.rs       |  12 +
  crates/benilla-ui/src/action_combat.rs        |  44 +-
  crates/benilla-world/src/rig_anim/pose.rs     | 200 ++++++++-
- 15 files changed, 1059 insertions(+), 28 deletions(-)
+ 16 files changed, 1182 insertions(+), 30 deletions(-)
 
 diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
 index f152800..fc9f1e4 100644
@@ -848,23 +851,81 @@ index 11b9c68..e9bf6e2 100644
          match overlay {
              Some(o) => format!("anim {base} + overlay {}{rate}", fmt(o)),
              None => format!("anim {base}{rate}"),
+diff --git a/crates/benilla-app/src/player/body_pose.rs b/crates/benilla-app/src/player/body_pose.rs
+index f397f84..144645c 100644
+--- a/crates/benilla-app/src/player/body_pose.rs
++++ b/crates/benilla-app/src/player/body_pose.rs
+@@ -6,7 +6,8 @@ use bevy::prelude::*;
+ use super::{model_pivot_height, wrap_pi, BodyQuery, CameraPivot, Player};
+ 
+ /// Writes this frame onto the driven body and returns its camera-pivot target height;
+-/// `anim_flags` is [`super::gait::drive_body_heading`]'s result.
++/// `anim_flags` is [`super::gait::drive_body_heading`]'s result; `pose_speed`, when set, is the
++/// speed the gait reads in place of the body's (the legs under a swing's lunge).
+ pub(super) fn drive(
+     player: &Player,
+     body: &mut BodyQuery,
+@@ -15,6 +16,7 @@ pub(super) fn drive(
+     swim_pitch: f32,
+     move_flags_now: u32,
+     anim_flags: u32,
++    pose_speed: Option<f32>,
+     landed: bool,
+     stand_now: u8,
+ ) -> Option<f32> {
+@@ -45,10 +47,12 @@ pub(super) fn drive(
+         if let Some(mut motion) = motion {
+             // A swimmer strokes at the flag-scalar speed whatever its pitch; ground gaits take the
+             // achieved horizontal speed, already directional (run-back while backpedaling).
++            // Basin Battle: under a swing's lunge, the legs' own pace (`pose_speed`), not the
++            // lunge's burst.
+             motion.speed = if swimming {
+                 player.swim_stroke_speed
+             } else {
+-                player.horiz_vel.length()
++                pose_speed.unwrap_or_else(|| player.horiz_vel.length())
+             };
+             motion.vertical_speed = player.vel_y;
+             motion.flags = anim_flags;
 diff --git a/crates/benilla-app/src/player/controller.rs b/crates/benilla-app/src/player/controller.rs
-index ec600ee..3ba1b49 100644
+index ec600ee..f67aed3 100644
 --- a/crates/benilla-app/src/player/controller.rs
 +++ b/crates/benilla-app/src/player/controller.rs
-@@ -809,6 +809,11 @@ pub(super) fn control(
+@@ -587,6 +587,8 @@ pub(super) fn control(
+                 ..Default::default()
+             },
+         };
++        // The keys' own speeds, for the legs under a lunge (`legs_pose_speed`).
++        let key_speeds = speeds;
+         // A dash runs at its own speed, forward, back or aside.
+         let speeds = match player.action_dash {
+             Some(d) => benilla_protocol::MoveSpeeds {
+@@ -809,6 +811,16 @@ pub(super) fn control(
              now,
              launch_y,
          );
-+        let pose_flags = pose_with_legs(
-+            pose_flags,
-+            player.action_dash.as_ref(),
-+            crate::creature_anim::anim_layer_on() && !airborne && !swimming && !held,
-+        );
++        let legs_on = crate::creature_anim::anim_layer_on() && !airborne && !swimming && !held;
++        let pose_flags = pose_with_legs(pose_flags, player.action_dash.as_ref(), legs_on);
++        let walk_mode = if player.walking {
++            move_flags::WALK_MODE
++        } else {
++            0
++        };
++        let pose_speed = legs_pose_speed(player.action_dash.as_ref(), legs_on, |dir| {
++            crate::net::current_speed(&key_speeds, dir | walk_mode)
++        });
          let anim_flags = gait::drive_body_heading(
              &mut player,
              pose_flags,
-@@ -974,6 +979,34 @@ fn self_seat(
+@@ -827,6 +839,7 @@ pub(super) fn control(
+             swim_pitch,
+             move_flags_now,
+             anim_flags,
++            pose_speed,
+             landed,
+             stand_now,
+         );
+@@ -974,6 +987,58 @@ fn self_seat(
      })
  }
  
@@ -896,28 +957,55 @@ index ec600ee..3ba1b49 100644
 +    }
 +}
 +
++/// Basin Battle's walk under a swing: how fast the legs walk while a `"legs"` dash runs, for the
++/// gait's pick and rate (`None`: the body's own speed, as before). The keys held walk at the
++/// speed they would move the hero at (`keys_speed`, the server's speeds for those keys: 3 yd/s
++/// while a swing slows the hero, so Walk); none held, at the speed of the walk the dash replaced
++/// (a scripted walk's). The lunge's own burst (a light blow's 3.9 yd/s, the third blow's 5.6, a
++/// roll attack's 8.9) never reaches the gait, so it can't flick a walk into a run and back, or a
++/// run into a walk. `on` as [`pose_with_legs`].
++fn legs_pose_speed(
++    dash: Option<&super::state::ActionDash>,
++    on: bool,
++    keys_speed: impl FnOnce(u32) -> f32,
++) -> Option<f32> {
++    match dash {
++        Some(d) if on && d.keep_legs => Some(if d.legs == (0, 0) {
++            0.0
++        } else if d.legs_from_keys {
++            keys_speed(anim_dir_bits(d.legs))
++        } else {
++            d.under_speed
++        }),
++        _ => None,
++    }
++}
++
  /// How fast the body turns to a locked-on unit, radians a second: about 290° a second, quick
  /// enough to keep a foe in front, slow enough that one rolling past gets behind for a moment.
  const LOCK_TURN_RATE: f32 = 5.0;
-@@ -991,6 +1024,9 @@ fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_tr
+@@ -991,6 +1056,11 @@ fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_tr
              until: 0.0,
              secs: d.secs,
              keys_now: d.keys.is_none(),
 +            keep_legs: d.keep_legs,
 +            legs: (0, 0),
 +            under: (0, 0),
++            legs_from_keys: false,
++            under_speed: 0.0,
          };
          player.pending_dashes.push((now + d.delay, dash));
      }
-@@ -1006,13 +1042,22 @@ fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_tr
+@@ -1006,13 +1076,24 @@ fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_tr
              (d.fwd, d.side) = if f == 0 && s == 0 { (-1, 0) } else { (f, s) };
          }
          d.until = now + d.secs;
 +        // The legs it replaces: a scripted walk's way, for a lunge with no key held.
-+        d.under = player
-+            .action_dash
-+            .filter(|p| now < p.until)
-+            .map_or((0, 0), |p| if p.keep_legs { p.legs } else { (p.fwd, p.side) });
++        let replaced = player.action_dash.filter(|p| now < p.until);
++        d.under = replaced.map_or((0, 0), |p| if p.keep_legs { p.legs } else { (p.fwd, p.side) });
++        // And its pace: a scripted walk's own speed, or the legs' under an earlier lunge.
++        d.under_speed =
++            replaced.map_or(0.0, |p| if p.keep_legs { p.under_speed } else { p.speed });
          player.action_dash = Some(d);
      }
 -    let Some(d) = player.action_dash else { return };
@@ -928,16 +1016,17 @@ index ec600ee..3ba1b49 100644
      }
 +    // The keys held before the dash takes them over: the way the legs walk under a `"legs"` dash.
 +    let held = (axes.fwd.signum(), axes.side.signum());
-+    d.legs = if held != (0, 0) { held } else { d.under };
++    d.legs_from_keys = held != (0, 0);
++    d.legs = if d.legs_from_keys { held } else { d.under };
 +    player.action_dash = Some(d);
      axes.fwd = d.fwd;
      axes.side = d.side;
      axes.translating = d.fwd != 0 || d.side != 0;
 diff --git a/crates/benilla-app/src/player/controller/tests.rs b/crates/benilla-app/src/player/controller/tests.rs
-index 9942886..49825ff 100644
+index 9942886..3a74b89 100644
 --- a/crates/benilla-app/src/player/controller/tests.rs
 +++ b/crates/benilla-app/src/player/controller/tests.rs
-@@ -370,3 +370,83 @@ fn a_login_seats_us_only_on_a_game_object_flagged_as_a_transport() {
+@@ -370,3 +370,159 @@ fn a_login_seats_us_only_on_a_game_object_flagged_as_a_transport() {
      assert_eq!(seat(0x21, 0x20), None, "no transport bit");
      assert_eq!(seat(0x09, 0x8), None, "no game object");
  }
@@ -979,6 +1068,8 @@ index 9942886..49825ff 100644
 +        keep_legs,
 +        legs: (0, 0),
 +        under: (0, 0),
++        legs_from_keys: false,
++        under_speed: 0.0,
 +    };
 +    let mut player = Player::default();
 +    player.pending_dashes.push((1.0, lunge(true)));
@@ -1021,11 +1112,85 @@ index 9942886..49825ff 100644
 +    action_dash(&mut player, &mut axes, 1.0, true);
 +    assert_eq!(player.action_dash.expect("running").legs, (-1, 0));
 +}
++
++/// The legs' pace under a lunge: the keys held walk at the speed the server gives those keys (a
++/// swing's 3 yd/s, so Walk, whatever the lunge's burst); no key held, at the pace of the scripted
++/// walk the lunge replaced; none of either, standing; a dash not asked to keep the legs, or the
++/// layer off, leaves the body's own speed.
++#[test]
++fn a_lunge_never_hands_its_burst_to_the_legs() {
++    let still = || input::MoveAxes {
++        fwd: 0,
++        side: 0,
++        mouselook: false,
++        turning: false,
++        translating: false,
++        strafe_left: false,
++        strafe_right: false,
++        turn_left: false,
++        turn_right: false,
++    };
++    let dash = |keep_legs, speed| super::super::state::ActionDash {
++        fwd: 1,
++        side: 0,
++        speed,
++        until: 0.0,
++        secs: 0.18,
++        keys_now: false,
++        keep_legs,
++        legs: (0, 0),
++        under: (0, 0),
++        legs_from_keys: false,
++        under_speed: 0.0,
++    };
++    let keys = |dir: u32| {
++        assert_eq!(dir, move_flags::FORWARD, "the keys' own way");
++        3.0
++    };
++    // Holding forward while the third blow lunges at 5.6 yd/s: the legs walk at the keys' 3.
++    let mut player = Player::default();
++    player.pending_dashes.push((1.0, dash(true, 1.0 / 0.18)));
++    let mut axes = still();
++    axes.fwd = 1;
++    action_dash(&mut player, &mut axes, 1.0, true);
++    let d = player.action_dash.expect("running");
++    assert_eq!(legs_pose_speed(Some(&d), true, keys), Some(3.0));
++    assert_eq!(legs_pose_speed(Some(&d), false, keys), None, "the layer off");
++    assert_eq!(
++        legs_pose_speed(Some(&dash(false, 5.6)), true, keys),
++        None,
++        "a dash not asked to keep the legs"
++    );
++    // Over a scripted walk at 7 yd/s, no key held: the walk's pace, not the lunge's 3.9.
++    let mut player = Player {
++        action_dash: Some(super::super::state::ActionDash {
++            until: 3.0,
++            ..dash(false, 7.0)
++        }),
++        ..Default::default()
++    };
++    player.pending_dashes.push((1.0, dash(true, 0.7 / 0.18)));
++    let mut axes = still();
++    action_dash(&mut player, &mut axes, 1.0, true);
++    let d = player.action_dash.expect("running");
++    assert_eq!(legs_pose_speed(Some(&d), true, |_| unreachable!()), Some(7.0));
++    // A lunge after a lunge over that walk keeps the walk's pace.
++    player.pending_dashes.push((1.1, dash(true, 1.0 / 0.18)));
++    action_dash(&mut player, &mut still(), 1.1, true);
++    let d = player.action_dash.expect("running");
++    assert_eq!(legs_pose_speed(Some(&d), true, |_| unreachable!()), Some(7.0));
++    // From standing, no key held: the legs stand.
++    let mut player = Player::default();
++    player.pending_dashes.push((1.0, dash(true, 4.0)));
++    action_dash(&mut player, &mut still(), 1.0, true);
++    let d = player.action_dash.expect("running");
++    assert_eq!(legs_pose_speed(Some(&d), true, |_| unreachable!()), Some(0.0));
++}
 diff --git a/crates/benilla-app/src/player/state.rs b/crates/benilla-app/src/player/state.rs
-index de5e48f..283faaf 100644
+index de5e48f..3fe000c 100644
 --- a/crates/benilla-app/src/player/state.rs
 +++ b/crates/benilla-app/src/player/state.rs
-@@ -321,6 +321,13 @@ pub(crate) struct ActionDash {
+@@ -321,6 +321,18 @@ pub(crate) struct ActionDash {
      pub(crate) secs: f32,
      /// The keys still to be read at its start (`None` asked for the ones held).
      pub(crate) keys_now: bool,
@@ -1036,6 +1201,11 @@ index de5e48f..283faaf 100644
 +    pub(crate) legs: (i32, i32),
 +    /// The way the legs walked under the dash it replaced (a scripted walk's), if one ran.
 +    pub(crate) under: (i32, i32),
++    /// Whether `legs` are the movement keys held (else `under`'s).
++    pub(crate) legs_from_keys: bool,
++    /// How fast the legs walked under the dash it replaced (that dash's own speed, or its legs'),
++    /// so a lunge's burst doesn't flick them into a run and back.
++    pub(crate) under_speed: f32,
  }
  
  /// Our avatar: until `active` the camera free-flies, then we drive the body the server placed.
