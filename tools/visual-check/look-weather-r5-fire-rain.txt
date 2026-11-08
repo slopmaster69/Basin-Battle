@@ -1,0 +1,39 @@
+# Lights on the wet ground (client 0082, #271's fifth round): the Camp at Westbrook at 23:30 (no
+# hostile creatures within 45 yd), the hero 16 yd south of the bonfire at WoW (-9640, 688), the
+# camera behind him facing it (yaw 0, pitched 8 down, 8 yd), dry, then a minute of rain, then
+# worldWeather 0 and 1.12's look. Take 280's Goldshire lamps stood 27 to 41 yd off, and a lamp's
+# reflection reached only about 13 yd from it; it now reaches about 20 at half strength, and the
+# bonfire is a light whose place is known. `looklights` answers with the six nearest lights, each
+# now with its place in WoW coordinates (`.es goto` takes them), so the next round can stand
+# beside any lamp.
+# Look for: the fire lying on the wet ground between it and the camera as a warm streak toward
+# the camera, broken by the puddles, sliding with the sidestep; none on the dry ground; please
+# send the "looklights" lines from client.log.
+hero warrior
+cam 0 -8 8
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9640 688
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.5 shots dry 2 0.5
+6.5 lua ConsoleExec("looklights tuned")
+7.0 lua ConsoleExec("lookweather rain 0.9")
+60.0 video
+60.5 shots wet 4 1.0
+64.6 lua ConsoleExec("looklights tuned")
+65.0 lua ActionDash(1.5, 3, "l")
+65.05 shots wet-moving 6 0.25
+68.0 lua SetCVar("worldWeather", "0")
+69.5 shots worldweather-0 2 0.5
+71.0 lua SetCVar("worldWeather", "1")
+71.05 lua SetCVar("worldLook", "0")
+71.1 lua ClearWorldFog()
+72.5 shots classic 2 0.5
+74.0 lua SetCVar("worldLook", "1")
+74.05 lua ClearWorldFog()
+74.1 lua ConsoleExec("lookweather server")
+76 end

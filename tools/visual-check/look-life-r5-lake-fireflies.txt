@@ -1,0 +1,45 @@
+# Fireflies (client 0083, #272's fifth round): the woods by Crystal Lake at 20:45 and 23:00, the
+# camera low facing the south shore (yaw 200, pitched 6 down, 6 yd), as take 280, then looklife 2,
+# worldLife 0, a minute of rain (they should go) and 1.12's look. Take 280 saw 2 to 6 of the 27 to
+# 60 out: born evenly all round the camera, three in four were behind or beside it. Three in four
+# are now born within 50 degrees of where the camera looks, and they are warmer (amber over lime).
+# `looklife` now answers with what the setting asks for at this hour ("Wanted at this hour"), the
+# counts out before the change, and how many fireflies are ahead of the camera; it runs again
+# 4 s after each change, when the pools have filled.
+# Look for: many soft warm glows across the frame at 23:00 (count them against the "ahead of the
+# camera" figure in client.log), more at looklife 2, none at worldLife 0 or in the rain.
+hero warrior
+cam 200 -6 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1245")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+14.0 lua ConsoleExec("looklife grade")
+14.5 shots dusk-2045 3 0.5
+16.5 lua ConsoleExec("worldclock 1380")
+30.0 lua ConsoleExec("looklife grade")
+30.5 video
+31.0 shots night-2300 4 0.5
+33.5 lua ConsoleExec("looklife 2")
+44.0 lua ConsoleExec("looklife 2")
+44.5 shots looklife-2 3 0.5
+46.5 lua ConsoleExec("looklife grade")
+46.55 lua SetCVar("worldLife", "0")
+48.0 shots worldlife-0 2 0.5
+49.5 lua SetCVar("worldLife", "1")
+49.55 lua ConsoleExec("lookweather rain 0.9")
+56.0 lua ConsoleExec("looklife grade")
+56.5 shots rain 2 0.5
+58.0 lua ConsoleExec("lookweather clear")
+58.05 lua SetCVar("worldLook", "0")
+58.1 lua ClearWorldFog()
+59.5 shots classic 2 0.5
+61.0 lua SetCVar("worldLook", "1")
+61.05 lua ClearWorldFog()
+61.1 lua ConsoleExec("lookweather server")
+63 end

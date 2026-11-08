@@ -1,4 +1,4 @@
-From 9a717b0c09c54fc563b411029c8653b6552acf23 Mon Sep 17 00:00:00 2001
+From 2f3fe638b0230efc5f073f9890d75c3b3fb4a7c5 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 16:57:01 -0700
 Subject: [PATCH] Ambient life under the new look: fireflies, falling leaves,
@@ -57,10 +57,30 @@ Revised after the first films in the real client (#272, take 273):
   a model), else of its whole model, where the header box drew it before.
   looklife says how many trees are near and how many crowns drop leaves.
 - Motes were invisible even with 270 out. They are bigger (0.13 yd, was
-  0.07) and brighter (gain 3.0, was 1.7, against 0070's golden rays now
+  0.07) and brighter (gain 3.0, was 1.7, against 0081's golden rays now
   0.6), seen over a wider lobe toward the sun (3, was 6), and the crowns'
   shafts are more open (0.6 shut, was 0.78). looklife says how many the sun
   reaches.
+
+Revised after the fourth films (#272, take 280):
+
+- Only 2 to 6 fireflies showed of 27 to 60 out: born evenly all round the
+  camera, three in four were behind or beside it, and the far quarter
+  fades at the edge. Three in four fireflies and motes are now born
+  within 50 degrees of where the camera looks (those stay put when it
+  turns, so nothing pops), and the fireflies are warmer (2.5, 2.0, 0.45,
+  was 2.1, 2.3, 0.55).
+- Only 2 to 6 leaves fell from 24 crowns, even at looklife 3: a crown
+  dropped 0.012 a second. It drops about six times as many now (0.08,
+  plus 0.12 in the wind and 0.6 in a gust), about 20 falling in a still
+  wood.
+- The motes were still invisible: bigger (0.22 yd, was 0.13) and
+  brighter (gain 5, was 3), and more of them show looking away from the
+  sun (0.25 of the glow toward it, was 0.12).
+- looklife answered with the counts from before the change ("held at 0"
+  said 60 fireflies). It now says what the new setting asks for at this
+  hour, then the counts out before the change, and how many fireflies
+  are ahead of the camera.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
@@ -68,16 +88,16 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/cvars/mod.rs           |   20 +
  crates/benilla-app/src/cvars/table.rs         |   10 +
  crates/benilla-app/src/video.rs               |   13 +-
- crates/benilla-app/src/world_console.rs       |   69 +
+ crates/benilla-app/src/world_console.rs       |   79 +
  crates/benilla-world/src/lighting/mod.rs      |    5 +
- crates/benilla-world/src/look/life.rs         | 2236 +++++++++++++++++
+ crates/benilla-world/src/look/life.rs         | 2329 +++++++++++++++++
  crates/benilla-world/src/look/mod.rs          |   28 +-
  crates/benilla-world/src/look/wind.rs         |   55 +
  crates/benilla-world/src/terrain_stream.rs    |   17 +
  .../benilla-world/src/terrain_stream/merge.rs |    1 +
  .../src/terrain_stream/spawn/mod.rs           |    1 +
  .../benilla-world/src/terrain_stream/weld.rs  |    1 +
- 12 files changed, 2452 insertions(+), 4 deletions(-)
+ 12 files changed, 2555 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/look/life.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
@@ -178,7 +198,7 @@ index 47d787f..7d232e2 100644
              if let Some(mut look_weather) = look_weather {
                  look_weather.on = ev.flag();
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 1a39d50..bf483f6 100644
+index f715ad8..4f223d2 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
 @@ -139,6 +139,8 @@ impl Plugin for WorldConsolePlugin {
@@ -190,7 +210,7 @@ index 1a39d50..bf483f6 100644
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -587,6 +589,46 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
+@@ -592,6 +594,56 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
      lines
  }
  
@@ -205,19 +225,29 @@ index 1a39d50..bf483f6 100644
 +    let Some(density) = LookLife::parse(args) else {
 +        return vec!["Usage: looklife <0-3> | grade".to_string()];
 +    };
-+    let on = {
++    let (on, scale) = {
 +        let mut life = world.get_resource_or_init::<LookLife>();
 +        life.density = density;
-+        life.on
++        (life.on, life.scale())
 +    };
 +    let mut lines = vec![match density {
 +        None => "Life follows the hour.".to_string(),
 +        Some(d) => format!("Life held at {d} times the hour's."),
 +    }];
 +    if let Some(life) = world.get_resource::<Life>() {
++        // What the new density asks for: the pools fill or thin to it over a few seconds, so the
++        // counts out now are still the old setting's (take 280: "held at 0" answered "60
++        // fireflies out").
++        let [flies, leaves, motes, butterflies] = life.wanted(scale);
++        lines.push(format!(
++            "Wanted at this hour: {flies} fireflies, up to {leaves} leaves, {motes} motes, \
++             {butterflies} butterflies (they come or go over a few seconds)."
++        ));
 +        let [flies, leaves, motes, butterflies] = life.counts();
 +        lines.push(format!(
-+            "Out now: {flies} fireflies, {leaves} leaves, {motes} motes, {butterflies} butterflies."
++            "Out before this change: {flies} fireflies ({} ahead of the camera), {leaves} leaves, \
++             {motes} motes, {butterflies} butterflies.",
++            life.flies_ahead()
 +        ));
 +        let (trees, crowns) = life.trees();
 +        lines.push(format!(
@@ -237,7 +267,7 @@ index 1a39d50..bf483f6 100644
  fn look_sky(world: &mut World, args: &str) -> Vec<String> {
      use benilla_world::look::{LookSky, WorldLook};
      let Some(clouds) = LookSky::parse(args) else {
-@@ -1284,6 +1326,33 @@ mod tests {
+@@ -1289,6 +1341,33 @@ mod tests {
          assert_eq!(lines[1], "worldWeather is 0: 1.12's look of the weather.");
      }
  
@@ -289,10 +319,10 @@ index ecfa3d3..e64177e 100644
          let mut offenders = Vec::new();
 diff --git a/crates/benilla-world/src/look/life.rs b/crates/benilla-world/src/look/life.rs
 new file mode 100644
-index 0000000..b9b0c84
+index 0000000..7a24eae
 --- /dev/null
 +++ b/crates/benilla-world/src/look/life.rs
-@@ -0,0 +1,2236 @@
+@@ -0,0 +1,2329 @@
 +//! Ambient life, the new look's own (no reference behaviour): WoW Forever's woods feel lived in.
 +//! A few small things move near the camera, never far from it and never many:
 +//! 1. **fireflies** at dusk and night: warm green motes that drift and blink low over the grass,
@@ -355,6 +385,13 @@ index 0000000..b9b0c84
 +    /// The smallest a glow is drawn on screen (pixels across): farther ones grow to this and dim
 +    /// to match, so a far firefly is a faint point rather than a flickering sub-pixel.
 +    pub const GLOW_MIN_PX: f32 = 3.0;
++    /// Where fireflies and motes are born: this share of them within [`AHEAD_DEG`] of the view's
++    /// heading (either side), the rest anywhere round the camera. Take 280 saw 2 to 6 fireflies a
++    /// frame of the 27 to 60 out: born evenly all round the camera, three in four were behind or
++    /// beside it, and of the rest the far quarter fades at the edge. Those born ahead stay where
++    /// they are when the camera turns, so nothing pops.
++    pub const AHEAD: f32 = 0.75;
++    pub const AHEAD_DEG: f32 = 50.0;
 +
 +    // ---- the weather ----
 +    /// Rain from the first density to the second stops the fireflies, the butterflies and the
@@ -401,14 +438,15 @@ index 0000000..b9b0c84
 +    /// (yards across, the halo; the bright core is the middle fifth). Warmer and stronger, and
 +    /// 0.45 yd (were (1.25, 1.75, 0.5) and 0.32): take 273 found pinpoint specks of 2 or 3 px,
 +    /// pale white-green, with no bloom, hardly standing out from 1.12's own specks by the water.
-+    pub const FIREFLY_RGB: [f32; 3] = [2.1, 2.3, 0.55];
++    /// Warmer again (2.5, 2.0, 0.45, was 2.1, 2.3, 0.55): take 280 found them lime more than warm.
++    pub const FIREFLY_RGB: [f32; 3] = [2.5, 2.0, 0.45];
 +    pub const FIREFLY_SIZE: f32 = 0.45;
 +    /// The nearest few that are flashing light the ground: how many, how far a light reaches
 +    /// (yd), how strong (`look::lights`' intensity), and how close to the camera they must be.
 +    pub const FIREFLY_LIGHTS: usize = 3;
 +    pub const FIREFLY_LIGHT_RADIUS: f32 = 2.5;
 +    pub const FIREFLY_LIGHT: f32 = 0.6;
-+    pub const FIREFLY_LIGHT_COLOR: [f32; 3] = [0.75, 1.0, 0.35];
++    pub const FIREFLY_LIGHT_COLOR: [f32; 3] = [1.0, 0.85, 0.35];
 +    pub const FIREFLY_LIGHT_REACH: f32 = 14.0;
 +
 +    // ---- leaves ----
@@ -425,9 +463,12 @@ index 0000000..b9b0c84
 +    pub const LEAVES: f32 = 40.0;
 +    /// A crown drops this many a second on a still day, plus this many per unit of the wind's
 +    /// strength and of the gust passing it; rain drops more (a share, at full rain).
-+    pub const LEAF_RATE_CALM: f32 = 0.012;
-+    pub const LEAF_RATE_WIND: f32 = 0.02;
-+    pub const LEAF_RATE_GUST: f32 = 0.12;
++    /// About six times what they were (0.012, 0.02, 0.12): take 280 found 24 crowns dropping
++    /// leaves and only 2 to 6 out, even at `looklife 3`, as 24 crowns at 0.012 drop one leaf in
++    /// three seconds. Now a still wood keeps about 20 falling, a breezy one its 40.
++    pub const LEAF_RATE_CALM: f32 = 0.08;
++    pub const LEAF_RATE_WIND: f32 = 0.12;
++    pub const LEAF_RATE_GUST: f32 = 0.6;
 +    pub const LEAF_RAIN: f32 = 1.5;
 +    /// By day only, mostly: they start falling over the first pair of minutes (05:30 to 07:00)
 +    /// and stop over the second (19:30 to 21:00), down to this share at night.
@@ -481,15 +522,18 @@ index 0000000..b9b0c84
 +    /// Seen toward the sun: the glow looking away from the sun as a share of looking into it, and
 +    /// how tight the forward lobe is (a power of the cosine).
 +    /// The lobe 3, was 6: take 273 found no mote at all facing the low sun with 270 out.
-+    pub const MOTE_BACK: f32 = 0.12;
++    /// 0.25, was 0.12: take 280 still found them barely visible.
++    pub const MOTE_BACK: f32 = 0.25;
 +    pub const MOTE_LOBE: f32 = 3.0;
 +    /// Their colour at full sun (the sun's own, warmed; over 1 to sparkle), and size (yd across).
 +    /// 3.0 and 0.13 yd, were 1.7 and 0.07: take 273's motes were invisible even at `looklife 3`
 +    /// (270 out), a 0.07 yd mote dimmed to the 3 px floor too faint to see. The golden hour's god
-+    /// rays, which they take, are 0.6 now (0070, was 0.9).
-+    pub const MOTE_GAIN: f32 = 3.0;
++    /// rays, which they take, are 0.6 now (0081, was 0.9).
++    /// 5.0 and 0.22 yd, were 3.0 and 0.13: take 280 still could not tell the stills from
++    /// `worldLife 0` (12 to 16 of 90 lit, about three streaks in 4 s).
++    pub const MOTE_GAIN: f32 = 5.0;
 +    pub const MOTE_WARM: [f32; 3] = [1.0, 0.92, 0.75];
-+    pub const MOTE_SIZE: f32 = 0.13;
++    pub const MOTE_SIZE: f32 = 0.22;
 +    /// The twinkle: depth and rate (Hz, from and to).
 +    pub const MOTE_TWINKLE: f32 = 0.5;
 +    pub const MOTE_TWINKLE_HZ: (f32, f32) = (0.6, 2.5);
@@ -748,6 +792,9 @@ index 0000000..b9b0c84
 +#[derive(Clone, Copy, Debug)]
 +pub struct LifeEnv {
 +    pub cam: Vec3,
++    /// The camera's heading on the ground (x, z; unit, or zero looking straight down), which
++    /// fireflies and motes are mostly born toward ([`tune::AHEAD`]).
++    pub heading: Vec2,
 +    pub dt: f32,
 +    /// The minute of the game day the light is drawn at (the film's clock under `worldclock`).
 +    pub minute: f32,
@@ -898,6 +945,11 @@ index 0000000..b9b0c84
 +    /// The sun on the motes this frame, colour times strength, and toward it (unit).
 +    mote_rgb: [f32; 3],
 +    mote_sun: Vec3,
++    /// Each kind's count at density 1 this frame (the hour and the weather), for `looklife`'s
++    /// reply ([`Life::wanted`]); and where the camera was and looked ([`Life::flies_ahead`]).
++    want_unit: [f32; 4],
++    last_cam: Vec3,
++    last_heading: Vec2,
 +    clock: f32,
 +    rng: u32,
 +}
@@ -931,6 +983,9 @@ index 0000000..b9b0c84
 +            butterfly_level: 0.0,
 +            mote_rgb: [0.0; 3],
 +            mote_sun: Vec3::Y,
++            want_unit: [0.0; 4],
++            last_cam: Vec3::ZERO,
++            last_heading: Vec2::ZERO,
 +            clock: 0.0,
 +            rng: 0x2545_F491,
 +        }
@@ -950,6 +1005,30 @@ index 0000000..b9b0c84
 +    /// crowns leaves fall from: `looklife` says both.
 +    pub fn trees(&self) -> (usize, usize) {
 +        (self.trees_near, self.crowns.len())
++    }
++
++    /// How many of each `density` asks for at this hour and in this weather: fireflies, leaves
++    /// (at most), motes, butterflies. `looklife` says these, since the pools fill or thin over a
++    /// few seconds after it changes (take 280: "held at 0" answered "60 fireflies out").
++    pub fn wanted(&self, density: f32) -> [usize; 4] {
++        let d = density.clamp(0.0, tune::SCALE_MAX);
++        let caps = self.capacities();
++        std::array::from_fn(|i| ((self.want_unit[i] * d).round() as usize).min(caps[i]))
++    }
++
++    /// How many fireflies are ahead of the camera (within [`tune::AHEAD_DEG`] of its heading, on
++    /// the ground), where a film can see them.
++    pub fn flies_ahead(&self) -> usize {
++        let cos = tune::AHEAD_DEG.to_radians().cos();
++        self.flies
++            .iter()
++            .filter(|f| {
++                let p = f.pos();
++                let to = Vec2::new(p.x - self.last_cam.x, p.z - self.last_cam.z);
++                to.try_normalize()
++                    .is_some_and(|t| t.dot(self.last_heading) >= cos)
++            })
++            .count()
 +    }
 +
 +    /// How many motes the sun reaches now (half lit or more): `looklife` says it.
@@ -1041,6 +1120,19 @@ index 0000000..b9b0c84
 +        (cam.x + r * a.cos(), cam.z + r * a.sin())
 +    }
 +
++    /// [`Self::disc`], but [`tune::AHEAD`] of the time within [`tune::AHEAD_DEG`] of `heading`
++    /// (unit; zero for anywhere), so most of what is born is where the camera looks.
++    fn disc_ahead(&mut self, cam: Vec3, heading: Vec2, inner: f32, radius: f32) -> (f32, f32) {
++        let r = (inner * inner + (radius * radius - inner * inner) * self.rand()).sqrt();
++        let ahead = heading.length_squared() > 0.5 && self.rand() < tune::AHEAD;
++        let a = if ahead {
++            heading.y.atan2(heading.x) + (2.0 * self.rand() - 1.0) * tune::AHEAD_DEG.to_radians()
++        } else {
++            self.rand() * std::f32::consts::TAU
++        };
++        (cam.x + r * a.cos(), cam.z + r * a.sin())
++    }
++
 +    /// Whether (x, z) is under or beside a crown, within `reach` of its edge.
 +    fn near_crown(&self, x: f32, z: f32, reach: f32) -> bool {
 +        self.crowns
@@ -1083,6 +1175,15 @@ index 0000000..b9b0c84
 +        };
 +        self.step_motes(env, world, mote_target, dt);
 +        self.step_butterflies(env, world, density, dt);
++        let unit = density.max(1e-6);
++        self.want_unit = [
++            tune::FIREFLIES * firefly_hour(env.minute) * self.gate,
++            tune::LEAVES * leaf_hour(env.minute).min(1.0).ceil(),
++            mote_target / unit,
++            tune::BUTTERFLIES * self.butterfly_level,
++        ];
++        self.last_cam = env.cam;
++        self.last_heading = env.heading;
 +    }
 +
 +    fn edge_alive(cam: Vec3, p: Vec3, radius: f32) -> bool {
@@ -1110,7 +1211,7 @@ index 0000000..b9b0c84
 +            // A few tries for a spot that keeps one: by the trees, over the water, or in the open
 +            // at a lower chance.
 +            for _ in 0..3 {
-+                let (x, z) = self.disc(cam, tune::NEAR_TO, r);
++                let (x, z) = self.disc_ahead(cam, env.heading, tune::NEAR_TO, r);
 +                let Some(ground) = world.ground(x, z) else {
 +                    continue;
 +                };
@@ -1283,7 +1384,7 @@ index 0000000..b9b0c84
 +            if self.motes.len() as f32 >= target {
 +                break;
 +            }
-+            let (x, z) = self.disc(cam, 0.0, r);
++            let (x, z) = self.disc_ahead(cam, env.heading, 0.0, r);
 +            let Some(ground) = world.ground(x, z) else {
 +                continue;
 +            };
@@ -1787,8 +1888,10 @@ index 0000000..b9b0c84
 +    }
 +    let Ok(cam) = cam.single() else { return };
 +    let w = inputs.weather.as_deref().filter(|w| w.on);
++    let forward = cam.forward();
 +    let env = LifeEnv {
 +        cam: cam.translation(),
++        heading: Vec2::new(forward.x, forward.z).normalize_or_zero(),
 +        dt: inputs.time.delta_secs(),
 +        minute: inputs.clock.minute as f32,
 +        density: inputs.switch.scale(),
@@ -2127,6 +2230,7 @@ index 0000000..b9b0c84
 +    fn env(minute: f32) -> LifeEnv {
 +        LifeEnv {
 +            cam: Vec3::new(0.0, 1.7, 0.0),
++            heading: Vec2::X,
 +            dt: 1.0 / 30.0,
 +            minute,
 +            density: 1.0,
@@ -2139,6 +2243,25 @@ index 0000000..b9b0c84
 +            sun_rgb: [1.0, 0.8, 0.5],
 +            wind: breezy(),
 +        }
++    }
++
++    /// Take 280: 2 to 6 fireflies showed of 27 to 60 out, most born behind the camera. Most are
++    /// now born ahead of it, and `looklife` can say what a density asks for before the pools
++    /// fill.
++    #[test]
++    fn most_fireflies_are_born_where_the_camera_looks() {
++        let mut life = Life::new();
++        let e = env(23.0 * 60.0);
++        run(&mut life, &e, 20.0);
++        let out = life.counts()[0];
++        let ahead = life.flies_ahead();
++        assert!(out >= 20, "{out}");
++        assert!(
++            ahead as f32 >= 0.6 * out as f32,
++            "{ahead} of {out} ahead of the camera"
++        );
++        assert_eq!(life.wanted(0.0)[0], 0, "held at 0 wants none");
++        assert_eq!(life.wanted(2.0)[0], 2 * tune::FIREFLIES as usize);
 +    }
 +
 +    fn crown_at(x: f32, z: f32) -> Crown {
@@ -2530,7 +2653,7 @@ index 0000000..b9b0c84
 +    }
 +}
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index a329f9f..1f55519 100644
+index 1ca8ccc..ccb6430 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -5,9 +5,10 @@
@@ -2555,7 +2678,7 @@ index a329f9f..1f55519 100644
  pub mod lights;
  pub mod mist;
  pub mod pass;
-@@ -31,6 +33,7 @@ pub mod weather;
+@@ -32,6 +34,7 @@ pub mod weather;
  pub mod wind;
  pub use ao::LookAo;
  pub use grade::{GradeKey, PostLook, Tint};
@@ -2563,7 +2686,7 @@ index a329f9f..1f55519 100644
  pub use lights::{LookLight, LookLightTune, LookPulse};
  pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
  pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
-@@ -244,6 +247,7 @@ pub(crate) fn init_resources(app: &mut App) {
+@@ -245,6 +248,7 @@ pub(crate) fn init_resources(app: &mut App) {
      wind::init_resources(app);
      sky::init_resources(app);
      weather::init_resources(app);
@@ -2571,7 +2694,7 @@ index a329f9f..1f55519 100644
  }
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
-@@ -258,6 +262,7 @@ impl Plugin for LookPlugin {
+@@ -259,6 +263,7 @@ impl Plugin for LookPlugin {
                  Startup,
                  (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
              )
@@ -2579,7 +2702,7 @@ index a329f9f..1f55519 100644
              .add_systems(PreUpdate, sync_view_look)
              // The weather: the film's hold drives the wire's override before the weather ticks,
              // and the look is read from this frame's state before the light is resolved, which it
-@@ -291,6 +296,23 @@ impl Plugin for LookPlugin {
+@@ -292,6 +297,23 @@ impl Plugin for LookPlugin {
                      .after(crate::skybox::SkyboxResolve)
                      .after(crate::liquid::SubmersionVerdict),
              )

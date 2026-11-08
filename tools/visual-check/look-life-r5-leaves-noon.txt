@@ -1,0 +1,37 @@
+# Falling leaves (client 0083, #272's fifth round): the Brackwell pumpkin patch at noon, the hero at
+# WoW (-9803, -904), clear of the Defias, facing north-west (yaw 45, level, 7 yd) across the
+# sunlit field with the oaks at its sides, lookwind 1 then 2, looklife 3, worldLife 0. Take 280's
+# woods by Crystal Lake had no sunlit gap to see a leaf against, and its 24 crowns dropped one leaf
+# in three seconds; a crown now drops about six times as many, so a still wood keeps about 20
+# falling and a breezy one its 40. `looklife` runs at the start and 6 s after each change; its
+# "Trees near" line says how many crowns drop leaves here.
+# Look for: leaves drifting down and across the frame downwind, more in the gusts and at
+# lookwind 2 and looklife 3, landing and fading; none at worldLife 0.
+hero warrior
+cam 45 0 7
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+4.35 lua ConsoleExec("lookwind 1")
+16.0 lua ConsoleExec("looklife grade")
+16.5 video
+17.0 shots wind-1 6 0.5
+20.5 lua ConsoleExec("lookwind 2")
+28.0 lua ConsoleExec("looklife grade")
+28.5 shots wind-2 6 0.5
+32.0 lua ConsoleExec("looklife 3")
+40.0 lua ConsoleExec("looklife 3")
+40.5 shots looklife-3 6 0.5
+44.0 lua ConsoleExec("looklife grade")
+44.05 lua SetCVar("worldLife", "0")
+45.5 shots worldlife-0 2 0.5
+47.0 lua SetCVar("worldLife", "1")
+47.05 lua ConsoleExec("lookwind grade")
+47.1 lua ConsoleExec("lookweather server")
+49 end

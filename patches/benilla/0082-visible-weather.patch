@@ -1,4 +1,4 @@
-From a243ab13610092afa649b8e79b4ed00432de4a2e Mon Sep 17 00:00:00 2001
+From 8ca61b9120e3e7c95cd96d40dd75ca0b12790d9c Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 14:39:42 -0700
 Subject: [PATCH] Visible weather under the new look: grey skies, lit rain, wet
@@ -80,15 +80,31 @@ Revised after the third films (#271, take 273):
 - The flash rises over 0.035 s (two or three frames) to 0.7 of what it was,
   where it was one frame's white-out (a frame mean of 140 to 160 of 255).
 
+Revised after the fourth films (#271, take 280):
+
+- The lamps' reflections never reached the road: the nearest lamps stood
+  27 to 41 yd off, and a reflection faded with the ground's distance from
+  its light out to 2.5 times its 10 yd pool, so a streak about halfway
+  to the camera kept an eighth. It reaches 4 times the pool now, half
+  strength at 20 yd. looklights also gives each light's place in WoW
+  coordinates, so a film can stand beside a lamp.
+- A strike's thunder now says so in client.log as it plays ("weather: a
+  strike's thunder plays kit ..."), a storm with no kit says it once, and
+  on a machine whose world sound is off each flash says there is no
+  thunder, so a film without audio can still be checked.
+- The flash jumped in one frame at the rig's 30 fps: it rose over
+  0.035 s. It rises over 0.09 s now, three frames at 30 fps, and its
+  flicker climbs too and comes later (0.24 s, was 0.17).
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
  crates/benilla-app/src/cvars/mod.rs           |   20 +
  crates/benilla-app/src/cvars/table.rs         |   10 +
  crates/benilla-app/src/sound/kit.rs           |   23 +-
- crates/benilla-app/src/sound/weather.rs       |  248 +++-
+ crates/benilla-app/src/sound/weather.rs       |  279 ++++-
  crates/benilla-app/src/video.rs               |   13 +-
- crates/benilla-app/src/world_console.rs       |  141 ++-
+ crates/benilla-app/src/world_console.rs       |  146 ++-
  crates/benilla-assets/src/shaders/liquid.wgsl |   47 +-
  .../benilla-assets/src/shaders/terrain.wgsl   |  106 +-
  crates/benilla-formats/src/sound_entries.rs   |    5 +
@@ -99,13 +115,13 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/look/pass.rs         |    7 +-
  crates/benilla-world/src/look/shadows.rs      |    7 +-
  crates/benilla-world/src/look/water.rs        |   47 +-
- crates/benilla-world/src/look/weather.rs      | 1045 +++++++++++++++++
+ crates/benilla-world/src/look/weather.rs      | 1061 +++++++++++++++++
  crates/benilla-world/src/look/wind.rs         |    8 +-
  .../benilla-world/src/shaders/static_gx.wgsl  |  102 +-
  crates/benilla-world/src/weather/mod.rs       |   27 +-
  .../benilla-world/src/weather/precip/mod.rs   |   50 +-
  .../src/weather/precip/render.rs              |   40 +
- 22 files changed, 1973 insertions(+), 44 deletions(-)
+ 22 files changed, 2025 insertions(+), 44 deletions(-)
  create mode 100644 crates/benilla-world/src/look/weather.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
@@ -219,10 +235,10 @@ index 36475c7..be34a03 100644
      let looping = force_loop || flags & sound_kit_flags::LOOPING != 0;
      if looping {
 diff --git a/crates/benilla-app/src/sound/weather.rs b/crates/benilla-app/src/sound/weather.rs
-index 13978c0..5988210 100644
+index 13978c0..858dcd4 100644
 --- a/crates/benilla-app/src/sound/weather.rs
 +++ b/crates/benilla-app/src/sound/weather.rs
-@@ -5,28 +5,266 @@
+@@ -5,28 +5,297 @@
  //! `0x67e919`) and the area's `AmbienceID` while set, each swap a 5.0 s crossfade (`0x460b00`):
  //! rain is replaced indoors, not ducked. The packet's `grade` drives rendering only (`0x67baf0`).
  //! The channel itself is `super::zone`'s.
@@ -277,7 +293,13 @@ index 13978c0..5988210 100644
 +    heard: Option<(u64, i64)>,
 +    /// The strikes waiting for their delay: when (real seconds), how loud, at what pitch.
 +    due: Vec<(f64, f32, f32)>,
++    /// Whether a strike with no kit to play was logged (once).
++    told_silent: bool,
 +}
++
++/// The strike last logged while the world's sound was off, so each is logged once.
++#[derive(Resource, Default)]
++pub(super) struct SilentStrikes(Option<(u64, i64)>);
 +
 +/// The storm's strike: Blasted Lands' ambient lightning bolt, the one environmental strike in
 +/// 1.12's sound table. Classic has no weather thunder kit: its weather kits are rain, snow and
@@ -368,8 +390,8 @@ index 13978c0..5988210 100644
 +                    pitch,
 +                ));
 +            }
-         }
-     }
++        }
++    }
 +    if st.due.iter().all(|(at, _, _)| *at > now) {
 +        return;
 +    }
@@ -384,8 +406,17 @@ index 13978c0..5988210 100644
 +        .map(|(_, loud, pitch)| (*loud, *pitch))
 +        .collect();
 +    st.due.retain(|(at, _, _)| *at > now);
-+    let Some(id) = kit else { return };
++    let Some(id) = kit else {
++        // Take 280 could not tell whether the storm thundered: say so in client.log.
++        if !due.is_empty() && !st.told_silent {
++            st.told_silent = true;
++            info!("weather: a strike's thunder is silent: no kit to play (see the kit line above)");
++        }
++        return;
++    };
 +    for (loud, pitch) in due {
++        // One line a clap, so the rig can match each flash to its thunder without audio.
++        info!("weather: a strike's thunder plays kit {id} (volume {loud:.2}, pitch {pitch:.2})");
 +        if let Err(e) = play_kit_ext(
 +            &mut kits,
 +            &assets,
@@ -404,7 +435,20 @@ index 13978c0..5988210 100644
 +            },
 +        ) {
 +            warn!("weather: thunder kit {id} — {e:#}");
-+        }
+         }
+     }
+ }
+ 
++/// While the world's sound is off (no output device), the thunder system does not run: each strike
++/// that flashes says so in client.log instead, so a silent film is not taken for a silent storm.
++fn note_silent_thunder(look: Option<Res<WeatherLook>>, mut last: ResMut<SilentStrikes>) {
++    let Some(k) = look.as_ref().filter(|l| l.on).and_then(|l| l.strike) else {
++        return;
++    };
++    let key = (k.seed, k.id);
++    if last.0 != Some(key) {
++        last.0 = Some(key);
++        info!("weather: a strike flashed, but the world's sound is off, so no thunder");
 +    }
 +}
 +
@@ -423,8 +467,8 @@ index 13978c0..5988210 100644
 +    let loud = 1.0 - STRIKE_VOLUME_JITTER * roll();
 +    let pitch = 1.0 + STRIKE_PITCH_JITTER * (2.0 * roll() - 1.0);
 +    (loud, pitch)
- }
- 
++}
++
 +/// How much quieter a strike may play than the kit (a share).
 +const STRIKE_VOLUME_JITTER: f32 = 0.25;
 +/// How far a strike's playback rate may stray from the kit's (a share, either way).
@@ -435,12 +479,15 @@ index 13978c0..5988210 100644
      app.init_resource::<WeatherAmbience>()
 -        .add_systems(Update, track_weather_kit.in_set(WorldStage::Present));
 +        .init_resource::<Thunder>()
++        .init_resource::<SilentStrikes>()
 +        .add_systems(Update, track_weather_kit.in_set(WorldStage::Present))
 +        .add_systems(
 +            Update,
-+            thunder
-+                .in_set(WorldStage::Present)
-+                .run_if(super::world_audio_live),
++            (
++                thunder.run_if(super::world_audio_live),
++                note_silent_thunder.run_if(not(super::world_audio_live)),
++            )
++                .in_set(WorldStage::Present),
 +        );
 +}
 +
@@ -533,7 +580,7 @@ index 4bdb888..47d787f 100644
              if let Some(mut sky) = sky {
                  sky.on = ev.flag();
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 39401b2..1a39d50 100644
+index 39401b2..f715ad8 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
 @@ -132,6 +132,13 @@ impl Plugin for WorldConsolePlugin {
@@ -550,7 +597,7 @@ index 39401b2..1a39d50 100644
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -318,11 +325,43 @@ fn look_lights(world: &mut World, args: &str) -> Vec<String> {
+@@ -318,11 +325,48 @@ fn look_lights(world: &mut World, args: &str) -> Vec<String> {
          return vec!["Usage: looklights <scale 0-10> | tuned".to_string()];
      };
      *world.get_resource_or_init::<LookLightTune>() = tune;
@@ -566,7 +613,8 @@ index 39401b2..1a39d50 100644
 +}
 +
 +/// What the look's light table holds now, for film (benilla's own): how many lights, and the
-+/// nearest few to the camera with their distance, height over it, reach and strength. Every pool
++/// nearest few to the camera with their distance, height over it, reach, strength and place (WoW
++/// coordinates). Every pool
 +/// on the ground and every reflection on wet stone (`look::weather`) comes from these: a lamp
 +/// missing here casts neither.
 +fn look_light_table(world: &mut World) -> Vec<String> {
@@ -586,8 +634,12 @@ index 39401b2..1a39d50 100644
 +    lit.sort_by(|a, b| a.0.distance(cam).total_cmp(&b.0.distance(cam)));
 +    for (pos, radius, rgb, fade) in lit.iter().take(6) {
 +        let peak = rgb[0].max(rgb[1]).max(rgb[2]) * fade;
++        // Its place in WoW coordinates, as `.es goto` takes them, so a film can stand beside it
++        // (take 280 knew only that Goldshire's nearest lamps were 27 to 41 yd off).
++        let [x, y, z] = benilla_assets::coords::bevy_to_wow(*pos);
 +        lines.push(format!(
-+            "  {:.1} yd off, {:+.1} yd up, reach {radius:.1} yd, strength {peak:.2}",
++            "  {:.1} yd off, {:+.1} yd up, reach {radius:.1} yd, strength {peak:.2}, \
++             at {x:.1} {y:.1} {z:.1}",
 +            pos.distance(cam),
 +            pos.y - cam.y
 +        ));
@@ -596,7 +648,7 @@ index 39401b2..1a39d50 100644
  }
  
  /// `lookao <scale> [radius]`, benilla's own (1.12 has no such command): holds the new look's
-@@ -496,6 +535,58 @@ fn look_wind(world: &mut World, args: &str) -> Vec<String> {
+@@ -496,6 +540,58 @@ fn look_wind(world: &mut World, args: &str) -> Vec<String> {
  /// the day and the weather say notwithstanding, for tuning on film (the server sends no weather
  /// yet); `looksky grade`, or no argument, lets go. `worldSky 0` and the classic look (`worldLook
  /// 0`) have 1.12's sky either way.
@@ -655,7 +707,7 @@ index 39401b2..1a39d50 100644
  fn look_sky(world: &mut World, args: &str) -> Vec<String> {
      use benilla_world::look::{LookSky, WorldLook};
      let Some(clouds) = LookSky::parse(args) else {
-@@ -937,6 +1028,16 @@ mod tests {
+@@ -937,6 +1033,16 @@ mod tests {
          );
          assert_eq!(scale(&mut app), 1.5);
          assert_eq!(run(&mut app, "looklights 0"), ["Look lights held at 0."]);
@@ -672,7 +724,7 @@ index 39401b2..1a39d50 100644
          assert_eq!(scale(&mut app), 0.0);
          assert_eq!(
              run(&mut app, "looklights 11"),
-@@ -1147,6 +1248,42 @@ mod tests {
+@@ -1147,6 +1253,42 @@ mod tests {
          assert_eq!(lines[1], "worldWind is 0: the world stands still.");
      }
  
@@ -716,7 +768,7 @@ index 39401b2..1a39d50 100644
      /// of range leaves it as it was with the usage line.
      #[test]
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index 621c15a..747a998 100644
+index 89c2290..e29b1e5 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -80,7 +80,7 @@ struct WowLight {
@@ -728,7 +780,7 @@ index 621c15a..747a998 100644
  //   10-22 the new look's painted sky (`look::sky::pack_rows`, `LookSkyRows`), all zero while off.
  @group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
  @group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
-@@ -605,6 +605,44 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
+@@ -607,6 +607,44 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
      return 1.0 - head.y * (1.0 - lit);
  }
  
@@ -773,7 +825,7 @@ index 621c15a..747a998 100644
  // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
  // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
  // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
-@@ -640,7 +678,12 @@ fn look_water(
+@@ -642,7 +680,12 @@ fn look_water(
      let shore = smoothstep(0.0, water.rows[7].w, depth_v);
  
      // Ripples, calmed into the shore.
@@ -788,7 +840,7 @@ index 621c15a..747a998 100644
      // The sun's share at the surface, for the body, the glint and the mirror.
      let vis = water_shadow(P, eye_z, pix);
 diff --git a/crates/benilla-assets/src/shaders/terrain.wgsl b/crates/benilla-assets/src/shaders/terrain.wgsl
-index 5ef6ecc..7d5285b 100644
+index 5ef6ecc..353473f 100644
 --- a/crates/benilla-assets/src/shaders/terrain.wgsl
 +++ b/crates/benilla-assets/src/shaders/terrain.wgsl
 @@ -44,10 +44,11 @@ struct WowLight {
@@ -823,7 +875,7 @@ index 5ef6ecc..7d5285b 100644
 +const WET_WALL: f32 = 0.45;
 +const WET_SKY: f32 = 0.35;
 +const WET_TORCH: f32 = 1.2;
-+const WET_TORCH_REACH: f32 = 2.5;
++const WET_TORCH_REACH: f32 = 4.0;
 +const WET_LANE_ACROSS: f32 = 0.06;
 +const WET_LANE_ALONG: f32 = 0.45;
 +const WET_PUDDLE: f32 = 0.6;
@@ -1050,7 +1102,7 @@ index 4ed3eb1..69ab9d3 100644
          live: clock.live,
          forced: tune.day.is_some(),
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index 5bd1b3f..a329f9f 100644
+index bb213c6..1ca8ccc 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -3,8 +3,9 @@
@@ -1065,15 +1117,15 @@ index 5bd1b3f..a329f9f 100644
  //! switch, [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look
  //! is then exactly the reference's.
  
-@@ -26,6 +27,7 @@ pub mod shadows;
- pub mod sky;
+@@ -27,6 +28,7 @@ pub mod sky;
+ pub mod switch_watch;
  pub mod water;
  pub mod water_pass;
 +pub mod weather;
  pub mod wind;
  pub use ao::LookAo;
  pub use grade::{GradeKey, PostLook, Tint};
-@@ -35,6 +37,7 @@ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+@@ -36,6 +38,7 @@ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
  pub use shadows::{LookShadows, ShadowFrame};
  pub use sky::{LookSky, SkyFrame};
  pub use water::{LookWater, WaterFrame};
@@ -1081,7 +1133,7 @@ index 5bd1b3f..a329f9f 100644
  pub use wind::{LookWind, WindFrame};
  
  /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
-@@ -146,11 +149,14 @@ pub(crate) struct LookInputs<'w> {
+@@ -147,11 +150,14 @@ pub(crate) struct LookInputs<'w> {
      area: Option<Res<'w, crate::terrain_stream::CurrentArea>>,
      ramp: ResMut<'w, ZoneRamp>,
      grade: ResMut<'w, LookGrade>,
@@ -1098,7 +1150,7 @@ index 5bd1b3f..a329f9f 100644
      pub(crate) fn apply(
          &mut self,
          atmo: Atmosphere,
-@@ -176,7 +182,11 @@ impl LookInputs<'_> {
+@@ -177,7 +183,11 @@ impl LookInputs<'_> {
          if *self.grade != next {
              *self.grade = next;
          }
@@ -1111,7 +1163,7 @@ index 5bd1b3f..a329f9f 100644
      }
  }
  
-@@ -233,6 +243,7 @@ pub(crate) fn init_resources(app: &mut App) {
+@@ -234,6 +244,7 @@ pub(crate) fn init_resources(app: &mut App) {
      water::init_resources(app);
      wind::init_resources(app);
      sky::init_resources(app);
@@ -1119,7 +1171,7 @@ index 5bd1b3f..a329f9f 100644
  }
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
-@@ -248,6 +259,19 @@ impl Plugin for LookPlugin {
+@@ -249,6 +260,19 @@ impl Plugin for LookPlugin {
                  (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
              )
              .add_systems(PreUpdate, sync_view_look)
@@ -1190,10 +1242,10 @@ index 2ab1ca3..832ba1e 100644
          };
          if light.strength <= 0.0 {
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index c4c6e6b..de37d2f 100644
+index aec8189..0961a44 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -176,7 +176,7 @@ pub mod tune {
+@@ -192,7 +192,7 @@ pub mod tune {
  ///   2 `[glint colour (linear), sharpness]` · 3 `[sky zenith (linear), ripple slope]` ·
  ///   4 `[sky horizon (linear), ripple wavelength (yd)]` · 5 `[shallow (sRGB), tint weight]` ·
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
@@ -1202,7 +1254,7 @@ index c4c6e6b..de37d2f 100644
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
  ///   the mirror's sky runs through, so the lakes mirror the clouds.
  pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS;
-@@ -336,6 +336,7 @@ pub fn pack_rows(
+@@ -352,6 +352,7 @@ pub fn pack_rows(
      held: &LookWater,
      light: &WowLighting,
      sky: &super::SkyFrame,
@@ -1210,7 +1262,7 @@ index c4c6e6b..de37d2f 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -391,7 +392,7 @@ pub fn pack_rows(
+@@ -407,7 +408,7 @@ pub fn pack_rows(
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
          tune::OCEAN_CLEAR_YD * clarity,
@@ -1219,7 +1271,7 @@ index c4c6e6b..de37d2f 100644
      ];
      rows
  }
-@@ -402,12 +403,15 @@ pub(crate) fn publish_water(
+@@ -418,12 +419,15 @@ pub(crate) fn publish_water(
      water: Res<LookWater>,
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
@@ -1236,7 +1288,7 @@ index c4c6e6b..de37d2f 100644
      };
      if *frame != next {
          *frame = next;
-@@ -484,7 +488,13 @@ mod tests {
+@@ -500,7 +504,13 @@ mod tests {
  
      #[test]
      fn the_block_is_zero_when_off() {
@@ -1251,7 +1303,7 @@ index c4c6e6b..de37d2f 100644
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
  
-@@ -492,16 +502,31 @@ mod tests {
+@@ -508,16 +518,31 @@ mod tests {
      /// mirror and the clarity, and lets go again.
      #[test]
      fn the_block_carries_the_tuning_and_the_hold() {
@@ -1285,7 +1337,7 @@ index c4c6e6b..de37d2f 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -784,7 +809,13 @@ mod tests {
+@@ -802,7 +827,13 @@ mod tests {
      /// with it off, those rows stay zero and the glint whole.
      #[test]
      fn the_painted_sky_reaches_the_water() {
@@ -1300,7 +1352,7 @@ index c4c6e6b..de37d2f 100644
          assert!(off[10..].iter().all(|r| *r == [0.0; 4]));
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
-@@ -793,7 +824,7 @@ mod tests {
+@@ -811,7 +842,7 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
@@ -1311,10 +1363,10 @@ index c4c6e6b..de37d2f 100644
          assert!(sky.sun_clear < 1.0);
 diff --git a/crates/benilla-world/src/look/weather.rs b/crates/benilla-world/src/look/weather.rs
 new file mode 100644
-index 0000000..1435af4
+index 0000000..5f880d7
 --- /dev/null
 +++ b/crates/benilla-world/src/look/weather.rs
-@@ -0,0 +1,1045 @@
+@@ -0,0 +1,1061 @@
 +//! Visible weather, the new look's own (no reference behaviour): Elwynn in a summer shower. The
 +//! server sends 1.12's own `SMSG_WEATHER` (rain at a grade, [`crate::weather::WeatherState`]); 1.12
 +//! clouds its sky by the grade's first quarter and drops rain past it, and this reads the same
@@ -1429,7 +1481,10 @@ index 0000000..1435af4
 +    /// long in the mirrored ray's angle off the light, out to [`WET_TORCH_REACH`] times the light's
 +    /// radius, brightest in the puddles ([`WET_PUDDLE`]).
 +    pub const WET_TORCH: f32 = 1.2;
-+    pub const WET_TORCH_REACH: f32 = 2.5;
++    /// 4.0, was 2.5: take 280's road lay 27 to 41 yd from the lamps (a 10 yd pool each), and a
++    /// lamp's streak toward the camera, which lies about halfway between, was down to an eighth
++    /// at 20 yd out; it now keeps half there.
++    pub const WET_TORCH_REACH: f32 = 4.0;
 +    pub const WET_LANE_ACROSS: f32 = 0.06;
 +    pub const WET_LANE_ALONG: f32 = 0.45;
 +    /// The share of the ground that holds a puddle (where the soak's noise runs high), which
@@ -1470,10 +1525,13 @@ index 0000000..1435af4
 +    pub const FLASH_FADE_S: f32 = 0.07;
 +    /// The flash rises over this long (two or three frames) to this peak, where it was one frame's
 +    /// white-out at full: take 273 caught a frame mean of 140 to 160 out of 255, the hero all but
-+    /// gone into the fog. Softer, more Wind Waker than camera flash.
-+    pub const FLASH_RISE_S: f32 = 0.035;
++    /// gone into the fog. Softer, more Wind Waker than camera flash. 0.09 s, was 0.035, which is
++    /// one frame at the rig's 30 fps: take 280 saw each flash jump in a single frame (a frame mean
++    /// of 67 to 100) and fade over four or five. Now it climbs over three frames at 30 fps (five
++    /// at 60), and the flicker comes later (0.24 s, was 0.17) so it stays apart from the flare.
++    pub const FLASH_RISE_S: f32 = 0.09;
 +    pub const FLASH_PEAK: f32 = 0.7;
-+    pub const FLICKER_AT_S: f32 = 0.17;
++    pub const FLICKER_AT_S: f32 = 0.24;
 +    pub const FLICKER: f32 = 0.6;
 +    pub const FLASH_LEN_S: f32 = 0.6;
 +    /// What a full flash adds to the ambient (sRGB, cool), to the sky's stops and the fog, and to
@@ -1742,8 +1800,12 @@ index 0000000..1435af4
 +    let rise = smoothstep(0.0, tune::FLASH_RISE_S, t);
 +    let first = rise * (-(t - tune::FLASH_RISE_S).max(0.0) / tune::FLASH_FADE_S).exp();
 +    let dt = t - tune::FLICKER_AT_S;
++    // The flicker climbs too, over half the flare's rise, so it never jumps in one frame.
 +    let flicker = if dt >= 0.0 {
-+        tune::FLICKER * (-dt / tune::FLASH_FADE_S).exp()
++        let climb = 0.5 * tune::FLASH_RISE_S;
++        tune::FLICKER
++            * smoothstep(0.0, climb, dt)
++            * (-(dt - climb).max(0.0) / tune::FLASH_FADE_S).exp()
 +    } else {
 +        0.0
 +    };
@@ -2242,9 +2304,12 @@ index 0000000..1435af4
 +        let (peak, latest) = flash_at(seed, k.at + f64::from(tune::FLASH_RISE_S), 1.0);
 +        assert!(peak > 0.5 * k.power, "{peak}");
 +        assert!(peak <= tune::FLASH_PEAK * k.power + 1e-6, "{peak}");
-+        // It rises over a few frames, never a one-frame white-out.
-+        let (first, _) = flash_at(seed, k.at + 0.008, 1.0);
++        // It rises over a few frames, never a one-frame white-out: at the rig's 30 fps the
++        // first frame in is under half the peak, the second still short of it.
++        let (first, _) = flash_at(seed, k.at + 1.0 / 30.0, 1.0);
 +        assert!(first < 0.5 * peak, "{first} of {peak} a frame in");
++        let (second, _) = flash_at(seed, k.at + 2.0 / 30.0, 1.0);
++        assert!(second > first && second < 0.95 * peak, "{second} of {peak} two frames in");
 +        assert_eq!(latest.map(|s| s.id), Some(k.id));
 +        let before = flash_at(seed, k.at - 0.01, 1.0);
 +        assert!(before.0 < 1e-3 || before.1 != Some(k));
@@ -2267,7 +2332,10 @@ index 0000000..1435af4
 +        assert_ne!(pattern(seed), pattern(cue_seed(20_401, 1.0f32.to_bits())));
 +        assert!((tune::THUNDER_AFTER_MIN_S..=tune::THUNDER_AFTER_MAX_S).contains(&k.thunder_after));
 +        // The flicker: a second rise after the first flare.
-+        assert!(flash_shape(tune::FLICKER_AT_S + 0.005) > flash_shape(tune::FLICKER_AT_S - 0.01));
++        let crest = tune::FLICKER_AT_S + 0.5 * tune::FLASH_RISE_S;
++        assert!(flash_shape(crest) > flash_shape(tune::FLICKER_AT_S - 0.01));
++        // And it climbs: a frame after it starts it is not yet at its crest.
++        assert!(flash_shape(tune::FLICKER_AT_S + 0.01) < flash_shape(crest));
 +    }
 +
 +    #[test]
@@ -2387,7 +2455,7 @@ index 094e810..2ead7ed 100644
      };
  }
 diff --git a/crates/benilla-world/src/shaders/static_gx.wgsl b/crates/benilla-world/src/shaders/static_gx.wgsl
-index 1ffea96..a1fe749 100644
+index 1ffea96..b4260ad 100644
 --- a/crates/benilla-world/src/shaders/static_gx.wgsl
 +++ b/crates/benilla-world/src/shaders/static_gx.wgsl
 @@ -26,8 +26,9 @@ struct WowLight {
@@ -2419,7 +2487,7 @@ index 1ffea96..a1fe749 100644
 +const WET_WALL: f32 = 0.45;
 +const WET_SKY: f32 = 0.35;
 +const WET_TORCH: f32 = 1.2;
-+const WET_TORCH_REACH: f32 = 2.5;
++const WET_TORCH_REACH: f32 = 4.0;
 +const WET_LANE_ACROSS: f32 = 0.06;
 +const WET_LANE_ALONG: f32 = 0.45;
 +const WET_PUDDLE: f32 = 0.6;

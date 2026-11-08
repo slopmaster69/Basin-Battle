@@ -1,0 +1,43 @@
+# The moon's lane (client 0081, #270's fifth round): Crystal Lake at 23:00 and 23:30 facing the
+# moon (yaw 45: the moon's bearing is north-west at every hour, 24 then 41 degrees up), the camera
+# pitched 10 down, 9 yd back. Take 280's camera faced the near bank 14 yd off with the hero
+# swimming: ActionDash runs 2 s at most, so its 3.5 s backing out was 2 s. Here the hero first
+# backs out three times as far (three 2 s dashes), so the lane has the lake to lie on; then he is
+# put about 60 yd south-east across the lake (WoW -9468, -352: its far shore, or open water: say
+# which) and the same shots are taken from there. worldWater 0 and 1.12's look at the end.
+# Look for: the lane as small separate glints lying out across the water toward the moon, dark
+# water either side and by the camera; off the lane no white flecks at all now (take 280: 1.12's
+# flecks dimmed but over the whole lake).
+hero warrior
+cam 45 -10 9
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookweather clear")
+4.5 lua ActionDash(2, 7, "b")
+6.6 lua ActionDash(2, 7, "b")
+8.7 lua ActionDash(2, 7, "b")
+11.5 shots out-2300 3 0.5
+13.1 shots out-ripples-2300 6 0.25
+15.0 lua ConsoleExec("worldclock 1410")
+16.0 shots out-2330 3 0.5
+17.5 .es goto -9468 -352
+21.0 shots across-2330 3 0.5
+22.6 shots across-ripples-2330 6 0.25
+24.5 lua ConsoleExec("worldclock 1380")
+25.5 shots across-2300 2 0.5
+26.6 lua SetCVar("worldWater", "0")
+27.5 shots worldwater-0 2 0.5
+28.6 lua SetCVar("worldWater", "1")
+28.65 lua SetCVar("worldLook", "0")
+28.7 lua ClearWorldFog()
+29.5 shots classic 2 0.5
+30.6 lua SetCVar("worldLook", "1")
+30.65 lua ClearWorldFog()
+30.7 lua ConsoleExec("lookweather server")
+32 end
