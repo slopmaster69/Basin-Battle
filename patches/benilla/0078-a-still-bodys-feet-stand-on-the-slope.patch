@@ -1,0 +1,883 @@
+From 49fd697bf24a39d31aef3d0526fffd087d8a95df Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 22:44:34 -0600
+Subject: [PATCH] A still body's feet stand on the slope under them, switched
+ off until seen (patch 0078)
+
+A body standing on a slope keeps its clips' level feet: the uphill foot sinks into the ground and
+the downhill one hangs in the air. With `actionFeet` on (benilla's own, registered "0" until it has
+been seen in the client) and the action layer live, each leg of a body that has stood still for
+0.15 s bends so its ankle sits as far above the ground under it as the clip put it above the ground
+under the body (at most 0.45 yd either way, scaled): the pelvis drops for the lower foot, and each
+leg takes a two-bone turn of the thigh and the shin, its lengths kept, the knee bending the way it
+bent (forward from a straight leg), the foot kept turned as the clip had it in the model frame. It
+eases in and out over 0.2 s, waits out a roll, and lets go wherever the body isn't standing on the
+terrain itself (a deck, a mine's floor, a building), since the heightfield is all it reads.
+
+The legs are found once per model at bake (`PoseSource::legs`, `pelvis`): a character's knee
+attachment (7 right, 8 left) rides a kneecap helper; the knee is the first bone at or above it with
+a child well below it (the ankle), the hip the first bone a real link above the knee, and the pelvis
+the nearest bone over both hips and SpineLow that isn't a root (the tilts own the roots). A model
+without knee attachments (a boar) has none. Found on HumanMale.m2 (hips 26/25, knees 54/53, ankles
+70/68, pelvis 18) and DwarfMale.m2 (31/30, 58/57, 74/72, pelvis 24); Boar.m2 none.
+
+What it writes goes back to the animation's pose part by part, as a tilt's does. Also: the two
+earlier patches' new code formatted in the workspace's 2021 style (0075's switch test, and an
+upstream assertion 0076 had rewrapped).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/creature_anim.rs       |   4 +-
+ .../benilla-app/src/creature_anim/action.rs   |  21 +
+ .../src/creature_anim/action/feet.rs          | 380 ++++++++++++++++++
+ crates/benilla-app/src/cvars/mod.rs           |  17 +
+ crates/benilla-app/src/cvars/table.rs         |  11 +
+ crates/benilla-assets/src/lib.rs              |   2 +-
+ crates/benilla-assets/src/m2.rs               |   3 +
+ crates/benilla-assets/src/model.rs            | 183 ++++++++-
+ crates/benilla-assets/src/model/pose.rs       |  23 +-
+ crates/benilla-world/src/rig_anim/inertia.rs  |  24 +-
+ 10 files changed, 646 insertions(+), 22 deletions(-)
+ create mode 100644 crates/benilla-app/src/creature_anim/action/feet.rs
+
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index 725be620..f1528001 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -33,7 +33,9 @@ mod lod;
+ /// and the camera's unit collision, all driven by an add-on.
+ mod action;
+ #[cfg(test)]
+-pub(crate) use action::{on_blend_cvar, on_curves_cvar, on_weight_cvar, ImpactWeight};
++pub(crate) use action::{
++    on_blend_cvar, on_curves_cvar, on_feet_cvar, on_weight_cvar, ImpactWeight, PlantedFeet,
++};
+ pub(crate) use action::{lock_point, unit_hit, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 425f9827..91e603be 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -33,6 +33,8 @@ use super::{find_resolved, AnimData, BodyTwist};
+ 
+ mod donor;
+ mod afterimage;
++mod feet;
++pub(crate) use feet::PlantedFeet;
+ mod flurry;
+ mod strike_trail;
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+@@ -1577,6 +1579,20 @@ pub(crate) fn on_weight_cvar(
+     }
+ }
+ 
++/// `actionFeet` (benilla's own): a still body's feet planted on the slope under them, on or off.
++pub(crate) fn on_feet_cvar(ev: On<crate::cvars::CvarChanged>, feet: Option<ResMut<PlantedFeet>>) {
++    if ev.key() != "actionfeet" {
++        return;
++    }
++    if let Some(mut feet) = feet {
++        feet.on = ev.flag();
++        info!(
++            "action: feet planted on the ground under them {}",
++            if feet.on { "on" } else { "off" }
++        );
++    }
++}
++
+ /// The inertial blending runs while an add-on drives the action layer, as everything here does.
+ fn blend_while_layer_live(inertia: Option<ResMut<benilla_world::rig_anim::PoseInertia>>) {
+     let Some(mut inertia) = inertia else { return };
+@@ -1778,6 +1794,7 @@ pub(super) fn plugin(app: &mut App) {
+     app.init_resource::<LockOn>()
+         .init_resource::<ClipOwnsBody>()
+         .init_resource::<ImpactWeight>()
++        .init_resource::<PlantedFeet>()
+         .init_resource::<strike_trail::StrikeTrails>()
+         .init_resource::<donor::Donors>()
+         .add_systems(
+@@ -1810,6 +1827,7 @@ pub(super) fn plugin(app: &mut App) {
+         .add_observer(on_blend_cvar)
+         .add_observer(on_curves_cvar)
+         .add_observer(on_weight_cvar)
++        .add_observer(on_feet_cvar)
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+             (reset_action_on_world_exit, afterimage::clear_afterimages),
+@@ -1824,6 +1842,9 @@ pub(super) fn plugin(app: &mut App) {
+                 apply_action_tilts
+                     .in_set(benilla_world::rig_anim::PosePost)
+                     .after(super::twist::apply_body_twist),
++                feet::plant_feet
++                    .in_set(benilla_world::rig_anim::PosePost)
++                    .after(apply_action_tilts),
+             ),
+         );
+ }
+diff --git a/crates/benilla-app/src/creature_anim/action/feet.rs b/crates/benilla-app/src/creature_anim/action/feet.rs
+new file mode 100644
+index 00000000..e4608bfb
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action/feet.rs
+@@ -0,0 +1,380 @@
++//! Basin Battle: planted feet (not in 1.12.1). A body standing still on a slope keeps its clips'
++//! level feet, so the uphill foot sinks into the ground and the downhill one hangs in the air. While
++//! the action layer is live and `actionFeet` is on, each leg of a still body bends so its ankle sits
++//! as far above the ground under it as the clip put it above the ground under the body: the pelvis
++//! drops for the lower foot and the higher leg bends at the knee (a two-bone turn of the thigh and
++//! the shin, the knee kept bending the way it bent, the foot kept turned as the clip had it). It eases
++//! in and out over a fifth of a second, waits out a roll, and lets go wherever the body isn't on the
++//! terrain itself (a deck, a mine's floor, a building), since the heightfield is all it reads.
++//!
++//! Its parts go back to the animation's pose part by part, as a tilt's do, and it writes no root, so
++//! it never takes a tilt's turn for the animation's.
++
++use bevy::math::Affine3A;
++use bevy::prelude::*;
++
++use benilla_assets::{AdtTile, ModelAnimations};
++use benilla_world::rig_anim::{PoseInertia, RigPose};
++use benilla_world::terrain_stream::{terrain_height_under, TerrainStreamer};
++
++use super::{rebase, restore, ActionTilt, TiltKind};
++
++/// `actionFeet` (benilla's own, registered "0" until it has been seen in the client).
++#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
++pub(crate) struct PlantedFeet {
++    pub(crate) on: bool,
++}
++
++/// Slower than this (yards a second, scaled) for this long is standing still.
++const STILL_SPEED: f32 = 0.25;
++const STILL_FOR: f32 = 0.15;
++/// The weight eases from none to all, or back, over this long.
++const EASE: f32 = 0.2;
++/// The most a foot is raised or lowered (yards, scaled).
++const MAX_STEP: f32 = 0.45;
++/// The body's feet within this of the terrain under it (yards, scaled) stand on the terrain.
++const ON_TERRAIN: f32 = 0.2;
++
++/// A unit's planted feet: the eased weight, the stillness clock and what it wrote, each bone with
++/// the animation's pose under it and what was written (`(bone, base, last)`, as a tilt keeps them).
++#[derive(Component, Default)]
++pub(crate) struct FootPlant {
++    weight: f32,
++    last_pos: Option<Vec3>,
++    still_for: f32,
++    parts: Vec<(usize, Transform, Transform)>,
++}
++
++/// Plant the feet of every still body with legs, in the pose post-pass after the tilts.
++#[allow(clippy::type_complexity)]
++pub(super) fn plant_feet(
++    mut commands: Commands,
++    time: Res<Time>,
++    feet: Option<Res<PlantedFeet>>,
++    inertia: Option<Res<PoseInertia>>,
++    streamer: Option<Res<TerrainStreamer>>,
++    tiles: Option<Res<Assets<AdtTile>>>,
++    mut units: Query<(
++        Entity,
++        &ModelAnimations,
++        &mut RigPose,
++        &Transform,
++        Option<&ActionTilt>,
++        Option<&mut FootPlant>,
++    )>,
++    globals: Query<&GlobalTransform>,
++) {
++    let on = feet.is_some_and(|f| f.on) && inertia.is_some_and(|i| i.live);
++    let dt = time.delta_secs();
++    let ground = |at: Vec3| match (&streamer, &tiles) {
++        (Some(s), Some(t)) => terrain_height_under(s, t, at),
++        _ => None,
++    };
++    for (entity, anims, mut rig, t, tilt, plant) in &mut units {
++        let src = &anims.pose;
++        if src.legs.is_empty() {
++            continue;
++        }
++        let Some(mut plant) = plant else {
++            if on {
++                commands.entity(entity).try_insert(FootPlant::default());
++            }
++            continue;
++        };
++        let rig = &mut *rig;
++        // What was written last frame goes back where nothing rewrote it: the pose below is the
++        // animation's (and the tilts').
++        for (b, base, last) in plant.parts.iter_mut() {
++            if let Some(cur) = rig.locals.get_mut(*b) {
++                rebase(base, cur, last);
++                if restore(cur, base, last) {
++                    rig.pose_dirty = true;
++                }
++            }
++        }
++        plant.parts.clear();
++        let Ok(frame) = globals.get(rig.joints_root) else {
++            continue;
++        };
++        let scale = frame.scale().y.abs().max(0.1);
++        if dt > 0.0 {
++            let moved = plant
++                .last_pos
++                .map_or(0.0, |p| (t.translation - p).length() / dt);
++            plant.still_for = if moved < STILL_SPEED * scale {
++                plant.still_for + dt
++            } else {
++                0.0
++            };
++        }
++        plant.last_pos = Some(t.translation);
++        let feet_at = frame.translation();
++        let under_body = ground(feet_at);
++        let on_terrain = under_body.is_some_and(|g| (g - feet_at.y).abs() < ON_TERRAIN * scale);
++        let rolling = tilt.is_some_and(|t| matches!(t.kind, TiltKind::Roll { .. }));
++        let want = on && plant.still_for >= STILL_FOR && on_terrain && !rolling;
++        let step = if dt > 0.0 { dt / EASE } else { 0.0 };
++        plant.weight = if want {
++            (plant.weight + step).min(1.0)
++        } else {
++            (plant.weight - step).max(0.0)
++        };
++        if plant.weight <= 0.0 {
++            if !on {
++                commands.entity(entity).try_remove::<FootPlant>();
++            }
++            continue;
++        }
++        let Some(body_ground) = under_body else {
++            continue;
++        };
++        let world = frame.affine();
++        let to_model = world.inverse();
++        // Each leg as the animation (and the tilts) posed it, read before anything here moves it:
++        // its three joints in the model frame, the turn of the hip's parent, and the ankle in the
++        // world.
++        let legs: Vec<Leg> = src
++            .legs
++            .iter()
++            .map(|leg| {
++                let (h, k, a) = (leg.hip as usize, leg.knee as usize, leg.ankle as usize);
++                let parent_rot = usize::try_from(rig.parents[h])
++                    .ok()
++                    .map_or(Affine3A::IDENTITY, |q| model_of(rig, q))
++                    .to_scale_rotation_translation()
++                    .1;
++                let (hip, knee, ankle) = (model_of(rig, h), model_of(rig, k), model_of(rig, a));
++                Leg {
++                    bones: (h, k, a),
++                    parent_rot,
++                    ankle_world: world.transform_point3(Vec3::from(ankle.translation)),
++                    hip,
++                    knee,
++                    ankle,
++                }
++            })
++            .collect();
++        // How much higher the ground is under each ankle than under the body, eased in.
++        let lift: Vec<Option<f32>> = legs
++            .iter()
++            .map(|leg| {
++                ground(leg.ankle_world).map(|g| {
++                    let most = MAX_STEP * scale;
++                    (g - body_ground).clamp(-most, most) * plant.weight
++                })
++            })
++            .collect();
++        // The pelvis drops for the lowest foot; without one to drop, a foot is only ever raised.
++        let pelvis = src.pelvis.map(|p| p as usize);
++        let drop = if pelvis.is_some() {
++            lift.iter().flatten().fold(0.0f32, |d, l| d.min(*l))
++        } else {
++            0.0
++        };
++        let down = to_model.transform_vector3(Vec3::Y * drop);
++        if let Some(p) = pelvis.filter(|_| drop < 0.0) {
++            let parent = usize::try_from(rig.parents[p]).ok();
++            let (s, r, _) = parent
++                .map_or(Affine3A::IDENTITY, |q| model_of(rig, q))
++                .to_scale_rotation_translation();
++            let base = rig.locals[p];
++            let mut out = base;
++            out.translation += r.inverse() * down / s.max(Vec3::splat(1.0e-4));
++            write(rig, &mut plant.parts, p, base, out);
++        }
++        let forward = to_model.transform_vector3(t.rotation * Vec3::NEG_Z);
++        for (leg, lift) in legs.iter().zip(&lift) {
++            let Some(lift) = *lift else { continue };
++            let lift = if pelvis.is_some() {
++                lift
++            } else {
++                lift.max(0.0)
++            };
++            let (h, k, a) = leg.bones;
++            let parent_rot = leg.parent_rot;
++            // The joints with the pelvis's drop, and the ankle's mark: its height over the ground
++            // under it, as the animation had it over the ground under the body.
++            let hip = Vec3::from(leg.hip.translation) + down;
++            let knee = Vec3::from(leg.knee.translation) + down;
++            let ankle = Vec3::from(leg.ankle.translation) + down;
++            let target = to_model.transform_point3(leg.ankle_world + Vec3::Y * lift);
++            let Some((thigh, shin)) = solve_leg(hip, knee, ankle, target, forward) else {
++                continue;
++            };
++            let hip_rot = leg.hip.to_scale_rotation_translation().1;
++            let knee_rot = leg.knee.to_scale_rotation_translation().1;
++            let ankle_rot = leg.ankle.to_scale_rotation_translation().1;
++            // The thigh turned in the model frame, read back into its parent's.
++            let hb = rig.locals[h];
++            let mut ho = hb;
++            ho.rotation = (parent_rot.inverse() * thigh * parent_rot * hb.rotation).normalize();
++            write(rig, &mut plant.parts, h, hb, ho);
++            // The shin, under the turned thigh.
++            let thigh_after = thigh * hip_rot;
++            let kb = rig.locals[k];
++            let mut ko = kb;
++            ko.rotation = (thigh_after.inverse() * shin * thigh_after * kb.rotation).normalize();
++            write(rig, &mut plant.parts, k, kb, ko);
++            // The foot keeps the turn the clip gave it in the model frame.
++            let knee_after = shin * thigh * knee_rot;
++            let ab = rig.locals[a];
++            let mut ao = ab;
++            ao.rotation = (knee_after.inverse() * ankle_rot).normalize();
++            write(rig, &mut plant.parts, a, ab, ao);
++        }
++    }
++}
++
++/// One leg as posed before the feet move it.
++struct Leg {
++    bones: (usize, usize, usize),
++    parent_rot: Quat,
++    ankle_world: Vec3,
++    hip: Affine3A,
++    knee: Affine3A,
++    ankle: Affine3A,
++}
++
++/// A bone's local written, kept with the pose under it.
++fn write(
++    rig: &mut RigPose,
++    parts: &mut Vec<(usize, Transform, Transform)>,
++    b: usize,
++    base: Transform,
++    out: Transform,
++) {
++    rig.locals[b] = out;
++    rig.pose_dirty = true;
++    parts.push((b, base, out));
++}
++
++/// A bone's model-frame affine from this frame's locals, its chain folded from the root (the legs
++/// and the pelvis carry no parent arm or billboard, which the compose pass would add).
++fn model_of(rig: &RigPose, b: usize) -> Affine3A {
++    let mut chain = Vec::with_capacity(12);
++    let mut cur = Some(b);
++    while let Some(i) = cur {
++        if i >= rig.locals.len() || chain.len() > rig.locals.len() {
++            break;
++        }
++        chain.push(i);
++        cur = usize::try_from(rig.parents[i]).ok().filter(|&p| p < i);
++    }
++    chain.iter().rev().fold(Affine3A::IDENTITY, |m, &i| {
++        m * rig.locals[i].compute_affine()
++    })
++}
++
++/// A two-bone leg in one frame: the hip, knee and ankle where the pose has them and where the ankle
++/// should go. The turns (in that frame) of the thigh and then of the shin that put the ankle there,
++/// as near as the leg reaches, its two lengths kept and the knee bending to the side it bent (or
++/// toward `forward` from a straight leg). `None` for a leg with no length.
++pub(super) fn solve_leg(
++    hip: Vec3,
++    knee: Vec3,
++    ankle: Vec3,
++    target: Vec3,
++    forward: Vec3,
++) -> Option<(Quat, Quat)> {
++    let (a, b) = (hip.distance(knee), knee.distance(ankle));
++    let to = target - hip;
++    let reach = to.length();
++    if a < 1.0e-4 || b < 1.0e-4 || reach < 1.0e-4 {
++        return None;
++    }
++    let dir = to / reach;
++    let c = reach.clamp((a - b).abs() + 1.0e-3, a + b - 1.0e-3);
++    let thigh_now = knee - hip;
++    let mut side = thigh_now - dir * thigh_now.dot(dir);
++    if side.length_squared() < 1.0e-8 {
++        side = forward - dir * forward.dot(dir);
++    }
++    if side.length_squared() < 1.0e-8 {
++        return None;
++    }
++    let side = side.normalize();
++    let cos = ((a * a + c * c - b * b) / (2.0 * a * c)).clamp(-1.0, 1.0);
++    let sin = (1.0 - cos * cos).max(0.0).sqrt();
++    let knee_new = hip + dir * (a * cos) + side * (a * sin);
++    let thigh = Quat::from_rotation_arc(thigh_now / a, (knee_new - hip) / a);
++    let ankle_moved = hip + thigh * (ankle - hip);
++    let shin = Quat::from_rotation_arc(
++        (ankle_moved - knee_new).normalize(),
++        (hip + dir * c - knee_new).normalize(),
++    );
++    Some((thigh, shin))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// Where the solved leg puts its knee and ankle.
++    fn after(hip: Vec3, knee: Vec3, ankle: Vec3, (thigh, shin): (Quat, Quat)) -> (Vec3, Vec3) {
++        let knee2 = hip + thigh * (knee - hip);
++        let ankle2 = knee2 + shin * (thigh * (ankle - knee));
++        (knee2, ankle2)
++    }
++
++    /// A leg standing slightly bent, its ankle lifted 0.2: the ankle lands there, the thigh and
++    /// shin keep their lengths, the knee comes further forward the way it bent, the hip stays.
++    #[test]
++    fn a_raised_foot_bends_the_knee_and_lands_on_its_mark() {
++        let (hip, knee, ankle) = (
++            Vec3::new(0.0, 1.0, 0.0),
++            Vec3::new(0.0, 0.52, -0.05),
++            Vec3::new(0.0, 0.05, 0.0),
++        );
++        let target = ankle + Vec3::Y * 0.2;
++        let solved = solve_leg(hip, knee, ankle, target, Vec3::NEG_Z).unwrap();
++        let (k2, a2) = after(hip, knee, ankle, solved);
++        assert!(a2.distance(target) < 1.0e-3, "the ankle on its mark: {a2}");
++        assert!(
++            (k2.distance(hip) - knee.distance(hip)).abs() < 1.0e-4,
++            "the thigh's length"
++        );
++        assert!(
++            (a2.distance(k2) - ankle.distance(knee)).abs() < 1.0e-4,
++            "the shin's length"
++        );
++        assert!(
++            k2.z < knee.z,
++            "the knee further forward (-z), as it bent: {k2}"
++        );
++    }
++
++    /// A straight leg bends toward `forward`, never backward or sideways.
++    #[test]
++    fn a_straight_leg_bends_forward() {
++        let (hip, knee, ankle) = (Vec3::Y, Vec3::Y * 0.5, Vec3::ZERO);
++        let target = Vec3::Y * 0.3;
++        let solved = solve_leg(hip, knee, ankle, target, Vec3::NEG_Z).unwrap();
++        let (k2, a2) = after(hip, knee, ankle, solved);
++        assert!(a2.distance(target) < 1.0e-3);
++        assert!(
++            k2.z < -0.1 && k2.x.abs() < 1.0e-4,
++            "forward, in the leg's plane: {k2}"
++        );
++    }
++
++    /// A mark past the leg's reach takes the leg as far as it goes along the line, no further and
++    /// no longer; a leg of no length is left alone.
++    #[test]
++    fn a_mark_out_of_reach_straightens_the_leg_toward_it() {
++        let (hip, knee, ankle) = (Vec3::Y, Vec3::new(0.0, 0.5, -0.1), Vec3::ZERO);
++        let target = Vec3::new(0.0, -1.0, 0.0);
++        let solved = solve_leg(hip, knee, ankle, target, Vec3::NEG_Z).unwrap();
++        let (k2, a2) = after(hip, knee, ankle, solved);
++        let len = knee.distance(hip) + ankle.distance(knee);
++        assert!(
++            (a2.distance(hip) - len).abs() < 2.0e-3,
++            "as long as it gets"
++        );
++        assert!(
++            a2.x.abs() < 1.0e-3 && a2.z.abs() < 2.0e-2,
++            "along the line to the mark: {a2}"
++        );
++        assert!((k2.distance(hip) - knee.distance(hip)).abs() < 1.0e-4);
++        assert!(solve_leg(hip, hip, ankle, target, Vec3::NEG_Z).is_none());
++    }
++}
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index a89710c9..369dbbda 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1718,6 +1718,19 @@ mod tests {
+         assert!(res::<ImpactWeight>(&app).on);
+     }
+ 
++    /// `actionFeet` (benilla's own) plants a still body's feet on the slope under them; registered
++    /// "0", matching `PlantedFeet`'s default, until it has been seen in the client.
++    #[test]
++    fn action_feet_switches_the_planted_feet() {
++        use crate::creature_anim::PlantedFeet;
++        let mut app = cvar_app();
++        assert!(!res::<PlantedFeet>(&app).on, "registered \"0\"");
++        assert_eq!(apply(&mut app, "actionFeet", "1"), SetOutcome::Changed);
++        assert!(res::<PlantedFeet>(&app).on);
++        apply(&mut app, "actionFeet", "0");
++        assert!(!res::<PlantedFeet>(&app).on);
++    }
++
+     /// `worldWind` and `worldSky` (benilla's own) turn the new look's wind and its painted sky off
+     /// and on, each by itself, registered "1" to match `LookWind`'s and `LookSky`'s defaults.
+     #[test]
+@@ -2861,6 +2874,7 @@ mod tests {
+             .init_resource::<benilla_world::rig_anim::PoseInertia>()
+             .init_resource::<benilla_world::rig_anim::PoseCurves>()
+             .init_resource::<crate::creature_anim::ImpactWeight>()
++            .init_resource::<crate::creature_anim::PlantedFeet>()
+             // `worldLook`'s registered "1", as `VideoPlugin` inserts it.
+             .insert_resource(benilla_world::look::WorldLook::NEW)
+             .init_resource::<benilla_world::look::LookAo>()
+@@ -2914,6 +2928,9 @@ mod tests {
+         |app| {
+             app.add_observer(crate::creature_anim::on_weight_cvar);
+         },
++        |app| {
++            app.add_observer(crate::creature_anim::on_feet_cvar);
++        },
+         |app| {
+             app.add_observer(crate::player::camera::on_cvar);
+         },
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index 5a485834..693f8f7c 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -866,6 +866,17 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — 1.12's swings keep the body upright; this tips a striker forward over \
+          its feet as its blow lands, while an add-on drives the action layer",
+     ),
++    // benilla's own: a still body's feet planted on the slope under them (the legs bend, the
++    // pelvis drops) while an add-on drives the action layer; registered "0" until it has been
++    // seen in the client. The knob is `creature_anim::action::PlantedFeet::on`, set by
++    // `creature_anim::action::on_feet_cvar`.
++    ours(
++        "actionFeet",
++        "0",
++        "benilla's own — 1.12 keeps a standing body's feet level whatever the ground; this bends \
++         a still body's legs so each foot stands on the slope under it, while an add-on drives \
++         the action layer",
++    ),
+     // benilla's own: the new look (WoW Forever-style zone light, a longer view, bloom and a
+     // colour grade, god rays and mist), "0" for 1.12's exactly. The knob is
+     // `benilla_world::look::WorldLook`, set by `video::on_cvar`.
+diff --git a/crates/benilla-assets/src/lib.rs b/crates/benilla-assets/src/lib.rs
+index 105cd4cf..3f932d78 100644
+--- a/crates/benilla-assets/src/lib.rs
++++ b/crates/benilla-assets/src/lib.rs
+@@ -30,7 +30,7 @@ mod model;
+ pub use model::{
+     bone_target_id, merged_static_mesh_faded, submesh_to_skinned_mesh, submesh_to_static_mesh,
+     AnimClip, BillboardInfo, ClipEvent, GlobalBone, GlobalSeqChannel, ModelAnimations,
+-    ModelAttachment, ModelJoint, ModelMarker, ModelSkeleton, ModelSubmesh, PoseBone, PoseClip,
++    LegChain, ModelAttachment, ModelJoint, ModelMarker, ModelSkeleton, ModelSubmesh, PoseBone, PoseClip,
+     PoseNode, PoseSource, PoseTrack, Stage1, ATTRIBUTE_WOW_FADE_SPHERE, ATTRIBUTE_WOW_JOINT_INDEX,
+     ATTRIBUTE_WOW_JOINT_WEIGHT, ATTRIBUTE_WOW_MERGED_SLOT,
+ };
+diff --git a/crates/benilla-assets/src/m2.rs b/crates/benilla-assets/src/m2.rs
+index 4557208d..01e94f90 100644
+--- a/crates/benilla-assets/src/m2.rs
++++ b/crates/benilla-assets/src/m2.rs
+@@ -424,9 +424,12 @@ impl AssetLoader for M2ModelLoader {
+             let mut graph = AnimationGraph::new();
+             let root = graph.root;
+             // The pose bake mirrors the graph: update it beside every mask group and `add_clip*`.
++            let legs = crate::model::leg_chains(&skeleton_raw.bones, &attachments);
+             let mut pose = crate::model::PoseSource {
+                 bone_masks: vec![0u64; skeleton_raw.bones.len()],
+                 key_bones: skeleton_raw.bones.iter().map(|b| b.key_bone).collect(),
++                pelvis: crate::model::pelvis_of(&skeleton_raw.bones, &legs),
++                legs,
+                 ..Default::default()
+             };
+             // Groups 0 and 1 hold every joint outside the right and the left arm, so a node masked
+diff --git a/crates/benilla-assets/src/model.rs b/crates/benilla-assets/src/model.rs
+index 89269b42..2c0f7aaa 100644
+--- a/crates/benilla-assets/src/model.rs
++++ b/crates/benilla-assets/src/model.rs
+@@ -18,7 +18,7 @@ use crate::coords::wow_to_bevy;
+ mod anims;
+ mod pose;
+ pub use anims::{AnimClip, ClipEvent, ModelAnimations};
+-pub use pose::{PoseBone, PoseClip, PoseNode, PoseSource, PoseTrack};
++pub use pose::{LegChain, PoseBone, PoseClip, PoseNode, PoseSource, PoseTrack};
+ 
+ /// A billboarded batch's card in Bevy space; its mesh is centred on `pivot` (model-local).
+ #[derive(Clone)]
+@@ -350,6 +350,97 @@ pub(crate) fn in_subtree(skel: &Skeleton, i: usize, root: usize) -> bool {
+     }
+ }
+ 
++/// Basin Battle: a model's legs, each its hip, knee and ankle bones, for the planted feet (the app's
++/// action layer). A character's knee attachment (7 right, 8 left) sits on a kneecap helper bone: the
++/// knee is the first bone at or above it with a child well below it (the shin's end, the ankle), and
++/// the hip the first bone above the knee a real link away. Empty for a model without knee
++/// attachments (a boar), whose legs are left as they are.
++pub(crate) fn leg_chains(
++    bones: &[benilla_formats::SkeletonBone],
++    attachments: &[ModelAttachment],
++) -> Vec<LegChain> {
++    [7u16, 8]
++        .iter()
++        .filter_map(|id| {
++            let start = attachments.iter().find(|a| a.id == *id)?.bone as usize;
++            leg_from(bones, start)
++        })
++        .collect()
++}
++
++/// Basin Battle: the pelvis the planted feet lower the body by: the nearest bone over both hips and
++/// the upper body (key-bone 4, SpineLow, else 6, Head), so the whole body drops with it and the legs
++/// stay on. `None` with fewer than two legs, without that key-bone, or when it would be a root (the
++/// tilts turn the roots, and two writers on one bone would take each other's for the animation's).
++pub(crate) fn pelvis_of(bones: &[benilla_formats::SkeletonBone], legs: &[LegChain]) -> Option<u16> {
++    let [right, left] = legs else { return None };
++    let parent = |i: usize| bones.get(i).and_then(|b| usize::try_from(b.parent).ok());
++    let ancestors = |from: usize| {
++        let mut out = vec![from];
++        let mut cur = from;
++        while let Some(p) = parent(cur) {
++            if out.len() > bones.len() {
++                break;
++            }
++            out.push(p);
++            cur = p;
++        }
++        out
++    };
++    let upper = bones
++        .iter()
++        .position(|b| b.key_bone == 4)
++        .or_else(|| bones.iter().position(|b| b.key_bone == 6))?;
++    let over_right = ancestors(right.hip as usize);
++    let mut common: Vec<usize> = ancestors(left.hip as usize)
++        .into_iter()
++        .filter(|b| over_right.contains(b))
++        .collect();
++    let over_upper = ancestors(upper);
++    common.retain(|b| over_upper.contains(b));
++    let pelvis = *common.first()?;
++    parent(pelvis).map(|_| pelvis as u16)
++}
++
++/// The shortest thigh or shin a leg is taken for (model units, yards).
++const LEG_LINK: f32 = 0.06;
++
++fn leg_from(bones: &[benilla_formats::SkeletonBone], start: usize) -> Option<LegChain> {
++    let pivot = |i: usize| bones.get(i).map(|b| Vec3::from(b.pivot));
++    let parent = |i: usize| bones.get(i).and_then(|b| usize::try_from(b.parent).ok());
++    let mut knee = start;
++    let mut ankle = None;
++    for _ in 0..4 {
++        let z = pivot(knee)?.z;
++        ankle = bones
++            .iter()
++            .enumerate()
++            .filter(|(_, b)| {
++                usize::try_from(b.parent).ok() == Some(knee) && b.pivot[2] < z - LEG_LINK
++            })
++            .min_by(|a, b| a.1.pivot[2].total_cmp(&b.1.pivot[2]))
++            .map(|(i, _)| i);
++        if ankle.is_some() {
++            break;
++        }
++        knee = parent(knee)?;
++    }
++    let ankle = ankle?;
++    let mut hip = parent(knee)?;
++    for _ in 0..4 {
++        if pivot(hip)?.distance(pivot(knee)?) >= LEG_LINK {
++            break;
++        }
++        hip = parent(hip)?;
++    }
++    let (h, k) = (pivot(hip)?, pivot(knee)?);
++    (h.distance(k) >= LEG_LINK && h.z > k.z).then_some(LegChain {
++        hip: hip as u16,
++        knee: knee as u16,
++        ankle: ankle as u16,
++    })
++}
++
+ /// Bake the [`M2Attachment`] table to bone-local offsets, dropping a record with a bad bone.
+ pub(crate) fn build_attachments(
+     attachments: &[M2Attachment],
+@@ -760,6 +851,96 @@ fn merged_static_mesh_impl(
+ mod tests {
+     use super::*;
+ 
++    /// Basin Battle: `HumanMale.m2`'s legs as 1.12.1 ships them (bone, parent, pivot): the knee
++    /// attachments ride kneecap helpers (85, 86) under a zero-length bone (71, 69) under the knee
++    /// (54, 53), whose other child is the ankle (70, 68), with a toe (81, 80) below it.
++    fn human_legs() -> (Vec<benilla_formats::SkeletonBone>, Vec<ModelAttachment>) {
++        let rows: &[(usize, i16, [f32; 3])] = &[
++            (0, -1, [0.0, 0.0, 0.0]),
++            (18, 0, [0.0, 0.0, 1.15]),
++            (20, 18, [-0.002, 0.0, 1.213]),
++            (21, 18, [0.018, 0.0, 1.160]),
++            (25, 21, [0.030, 0.132, 1.077]),
++            (26, 21, [0.030, -0.132, 1.077]),
++            (53, 25, [-0.011, 0.169, 0.580]),
++            (54, 26, [-0.011, -0.169, 0.580]),
++            (68, 53, [-0.093, 0.204, 0.105]),
++            (69, 53, [-0.011, 0.169, 0.580]),
++            (70, 54, [-0.093, -0.204, 0.105]),
++            (71, 54, [-0.011, -0.169, 0.580]),
++            (80, 68, [0.125, 0.209, 0.017]),
++            (81, 70, [0.125, -0.201, 0.017]),
++            (85, 71, [0.126, -0.191, 0.540]),
++            (86, 69, [0.126, 0.190, 0.540]),
++        ];
++        let mut bones = vec![
++            benilla_formats::SkeletonBone {
++                parent: -1,
++                pivot: [0.0; 3],
++                key_bone: -1,
++                billboard: None,
++                parent_arm: None,
++            };
++            87
++        ];
++        for &(i, parent, pivot) in rows {
++            bones[i].parent = parent;
++            bones[i].pivot = pivot;
++        }
++        // SpineLow and Waist, the key-bones the upper-body mask and the pelvis read.
++        bones[20].key_bone = 4;
++        bones[21].key_bone = 5;
++        let attach = |id, bone| ModelAttachment {
++            id,
++            bone,
++            offset: Vec3::ZERO,
++        };
++        (bones, vec![attach(1, 21), attach(7, 85), attach(8, 86)])
++    }
++
++    #[test]
++    fn a_characters_legs_are_found_from_its_knee_attachments() {
++        let (bones, attachments) = human_legs();
++        assert_eq!(
++            leg_chains(&bones, &attachments),
++            vec![
++                LegChain {
++                    hip: 26,
++                    knee: 54,
++                    ankle: 70
++                },
++                LegChain {
++                    hip: 25,
++                    knee: 53,
++                    ankle: 68
++                },
++            ],
++            "right then left: thigh, knee, ankle (not the kneecap, not the toe)"
++        );
++        // A model without knee attachments (a boar) has none.
++        assert!(leg_chains(&bones, &attachments[..1]).is_empty());
++        // A knee attachment on a bone with no shin under it anywhere up its chain finds nothing.
++        let lone = [ModelAttachment {
++            id: 7,
++            bone: 21,
++            offset: Vec3::ZERO,
++        }];
++        assert!(leg_chains(&bones, &lone).is_empty());
++    }
++
++    /// The pelvis is the nearest bone over both hips and SpineLow (not the Waist, which carries
++    /// the legs alone), and never a root.
++    #[test]
++    fn the_pelvis_is_the_nearest_bone_over_the_legs_and_the_spine() {
++        let (mut bones, attachments) = human_legs();
++        let legs = leg_chains(&bones, &attachments);
++        assert_eq!(pelvis_of(&bones, &legs), Some(18));
++        assert_eq!(pelvis_of(&bones, &legs[..1]), None, "one leg: no pelvis");
++        // Were the shared bone a root, the tilts' own, none is offered.
++        bones[18].parent = -1;
++        assert_eq!(pelvis_of(&bones, &legs), None);
++    }
++
+     /// One sequence record with the given bones, the rest neutral.
+     fn sequence(duration: f32, bones: Vec<benilla_formats::BoneKeys>) -> ModelAnimation {
+         ModelAnimation {
+diff --git a/crates/benilla-assets/src/model/pose.rs b/crates/benilla-assets/src/model/pose.rs
+index bc42b1cb..363919b7 100644
+--- a/crates/benilla-assets/src/model/pose.rs
++++ b/crates/benilla-assets/src/model/pose.rs
+@@ -238,6 +238,21 @@ pub struct PoseSource {
+     /// Per bone: its `KeyBoneID` (`-1` none), by which another model's clips find their bones
+     /// here (Basin Battle's borrowed clips).
+     pub key_bones: Vec<i16>,
++    /// Basin Battle: the model's legs found from its knee attachments, right then left (empty
++    /// without them), for the planted feet.
++    pub legs: Vec<LegChain>,
++    /// Basin Battle: the bone the planted feet lower the body by (the nearest over both hips and
++    /// the upper body, never a root), when the model has one.
++    pub pelvis: Option<u16>,
++}
++
++/// Basin Battle: one leg's three joints, by bone index: the hip (the thigh's pivot), the knee and
++/// the ankle.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct LegChain {
++    pub hip: u16,
++    pub knee: u16,
++    pub ankle: u16,
+ }
+ 
+ impl PoseSource {
+@@ -328,11 +343,9 @@ mod tests {
+         }
+ 
+         // Two keys at one time: Bevy's constructor fails, so the channel is absent.
+-        assert!(
+-            PoseTrack::new(&[(0.5, Vec3::X), (0.5, Vec3::Y)])
+-                .sample(0.5)
+-                .is_none()
+-        );
++        assert!(PoseTrack::new(&[(0.5, Vec3::X), (0.5, Vec3::Y)])
++            .sample(0.5)
++            .is_none());
+     }
+ 
+     #[test]
+diff --git a/crates/benilla-world/src/rig_anim/inertia.rs b/crates/benilla-world/src/rig_anim/inertia.rs
+index 780696c9..659656ec 100644
+--- a/crates/benilla-world/src/rig_anim/inertia.rs
++++ b/crates/benilla-world/src/rig_anim/inertia.rs
+@@ -458,19 +458,15 @@ mod tests {
+             !PoseInertia::default().active(),
+             "off until an add-on drives the layer"
+         );
+-        assert!(
+-            PoseInertia {
+-                on: true,
+-                live: true
+-            }
+-            .active()
+-        );
+-        assert!(
+-            !PoseInertia {
+-                on: false,
+-                live: true
+-            }
+-            .active()
+-        );
++        assert!(PoseInertia {
++            on: true,
++            live: true
++        }
++        .active());
++        assert!(!PoseInertia {
++            on: false,
++            live: true
++        }
++        .active());
+     }
+ }
+-- 
+2.56.0.windows.4
+
