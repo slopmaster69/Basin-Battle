@@ -2502,7 +2502,8 @@ name = "Cookie"
 temper = "bruiser"
 subname = "Gorged on the Stew"
 display = 1773
-windup_sound = 417
+# Each string has its own voice so the inhale alert is not masked by an attack grunt.
+windup_sound = 0
 # Native display 1773 is 2x; 1.15 makes the secret form visibly larger than Cookie.
 scale = 1.15
 health = 820
@@ -2532,7 +2533,7 @@ death_text = "...burnt."
   [[mob.pattern]]
   name = "slaps"
   weight = 1.0
-  steps = [ { clip = 16, take = 0, windup = 0.9, damage = 22, recovery = 0.4 }, { clip = 17, take = 0, windup = 0.8, damage = 24, recovery = 1.6 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.9, damage = 22, sound = 417, recovery = 0.4 }, { clip = 17, take = 0, windup = 0.8, damage = 24, recovery = 1.6 } ]
   # A generous inhale locks at the first pose. Move beside him, then punish four seconds of cough.
   [[mob.pattern]]
   name = "belch"

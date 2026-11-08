@@ -10,7 +10,7 @@ Only a fully executed string counts as an exchange. An interrupted wind-up or th
 the pair does not count. After 3 exchanges and the preceding recovery/cooling, Cookie walks to
 his cauldron and scoops for 4 sec. A blocked route gives up after 6 sec without a teleport or heal.
 
-His posture threshold falls from 150 to 60 while scooping, with ordinary party scaling. Plain
+Other crowd control delays the gulp; only a posture break spills it. His posture threshold falls from 150 to 60 while scooping, with ordinary party scaling. Plain
 light attacks can break it. A break spills the taste and leaves 4 sec of cough recovery. Otherwise
 he regains 4% maximum health and begins a separate 1.6 sec warning for a fixed 5 yd, 65-degree
 steam cone. The cone deals 24 damage and leaves the same 4 sec recovery. The pot grants at most
@@ -33,8 +33,9 @@ Native assets checked against local 1.12.1 data:
   mouth belch animation, or physical belly inflation is claimed.
 - Cauldron display 216 exists and measures about 1.8 by 2.0 by 1.5 yd. Steam02 display 431 is a
   particle-only emitter. Unlike Deadmines valve display 353, it has no metal pipe mesh to leave
-  in the stew. Owned props use the existing immediate-display flag, without changing global
-  ground-look thresholds or client patches. Particle radius/opacity still require client review.
+  in the stew. Owned particle cues use the existing immediate-display flag, without changing global
+  ground-look thresholds or client patches. The solid cauldron keeps its collision hull. Particle
+  radius/opacity still require client review.
 - MurlocAlert 1109 precedes Gorged's belch, MurlocWound 418 accompanies recovery, the one-shot
   SteamGeyserVar1 4858 marks a breath release, and medium splash 1096 marks a pour or spill.
   These IDs exist; playback and whether the alert reads as an inhale are not yet verified.

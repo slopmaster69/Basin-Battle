@@ -322,8 +322,8 @@ impl Survival {
             }
             Stage::Scooping { until } => {
                 self.halt(id);
-                if self.disabled(id) || self.mobs[&id].stagger_until > now { self.kitchen_broken(id); }
-                else if now >= until {
+                // Only the posture-break hook spills it. Other crowd control delays the gulp.
+                if now >= until && !self.disabled(id) && self.mobs[&id].stagger_until <= now {
                     let c = self.kitchen.cooks.get_mut(&id).unwrap();
                     // Two tastes of 4% at most in a pull, including tastes at full health.
                     let heal = c.healed < 2;

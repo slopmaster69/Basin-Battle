@@ -319,3 +319,17 @@ fn kitchen_cancelled_warning_and_departed_party_leave_no_late_damage() {
     assert!(s.pending.iter().all(|p| p.attacker != id));
     assert!(matches!(s.mobs[&id].state, MobState::Return));
 }
+
+#[test]
+fn kitchen_short_stagger_delays_the_gulp_but_only_posture_break_spills() {
+    let (mut s, _, id) = fight(COOKIE, 1);
+    scoop(&mut s, id);
+    s.stagger_mob(id, SCOOP + 1.0, false);
+    let ev = run(&mut s, SCOOP + 0.2);
+    assert!(s.kitchen_scooping(id));
+    assert_eq!(s.kitchen.cooks[&id].healed, 0);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "MRGLGLGL!")));
+    run(&mut s, 1.0);
+    assert_eq!(s.kitchen.cooks[&id].healed, 1);
+    assert_eq!(s.kitchen_move(id), Some("steam"));
+}
