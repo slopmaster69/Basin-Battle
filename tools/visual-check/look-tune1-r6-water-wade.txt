@@ -1,0 +1,40 @@
+# Froth round wading legs (client 0081, #270's sixth round): Crystal Lake at 17:30, the camera over
+# open water facing the shore (yaw 20, pitched 20 down, 6 yd) while the hero backs out into the
+# shallows, stands, then backs out deeper and stands again; worldWater 0 and 1.12's look. Take 291
+# found a crisp, dotted, unbroken ring at the neck standing deep, and a dotted arc trailing behind
+# wading deeper. The dots were the froth's per-pixel sampling, which now varies smoothly; the
+# ring is broken into a few drifting patches round the body; and the froth thins as the water
+# deepens (full at the shins, nearly none from about chest deep). 1.12 draws its own thin ring
+# at the waterline (worldwater-0); that one is 1.12's.
+# Look for, crop 1:1 round the body: standing in the shallows, soft patches of froth with gaps,
+# no dots and no unbroken ring; standing deep, at most a few faint patches at the neck; no trail
+# of dots when wading deeper.
+hero warrior
+cam 20 -20 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookweather clear")
+5.0 video
+5.5 shots start 1 0.5
+6.0 lua ActionDash(2.0, 3, "b")
+6.1 shots wade-in 6 0.3
+8.5 shots standing 6 0.4
+11.0 lua ActionDash(1.5, 3, "b")
+11.1 shots deeper 5 0.3
+13.0 shots standing-deep 6 0.4
+15.6 lua SetCVar("worldWater", "0")
+16.4 shots worldwater-0 2 0.4
+17.3 lua SetCVar("worldWater", "1")
+17.35 lua SetCVar("worldLook", "0")
+17.4 lua ClearWorldFog()
+18.2 shots classic 2 0.4
+19.1 lua SetCVar("worldLook", "1")
+19.15 lua ClearWorldFog()
+19.2 lua ConsoleExec("lookweather server")
+21 end

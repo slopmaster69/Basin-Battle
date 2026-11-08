@@ -1,4 +1,4 @@
-From 69dbf80181efd669adac4b4fe90aecd731d97b73 Mon Sep 17 00:00:00 2001
+From a2aeba3760787d7c1c6f191a6c810ab5412b0a9f Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:18:13 -0700
 Subject: [PATCH] Sun shadows with shapes: heroes, creatures, buildings and
@@ -91,6 +91,16 @@ Revised after the fourth films (#269, take 280):
   (its line ends "not yet seen"), and every "[shadows near]" line names
   the mesh's model path and id, material or not.
 
+Revised after the fifth films (#269, take 291):
+
+- Goldshire's water basin cast a blended shadow of its water.blp. A
+  blended batch whose texture names water, lava or slime (by the file's
+  name, not its folder) now casts none, and its line in WOW_SHADOW_STATS
+  says "not casting (water)"; the basin's stone still casts.
+- The pumpkin film still missed the jack-o'-lantern, whose place nobody
+  knew. Each "[shadows near]" line now gives the mesh's place in WoW
+  coordinates beside its distance, so a film can stand beside it.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -98,13 +108,13 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/world_console.rs       |  79 +-
  .../benilla-assets/src/shaders/terrain.wgsl   |  10 +-
  .../benilla-assets/src/shaders/wow_model.wgsl |  10 +-
- crates/benilla-world/src/look/shadow_pass.rs  | 905 +++++++++++++++++-
+ crates/benilla-world/src/look/shadow_pass.rs  | 965 +++++++++++++++++-
  crates/benilla-world/src/look/shadows.rs      | 130 ++-
  crates/benilla-world/src/shaders.rs           |   3 +-
  .../src/shaders/look_shadow_map.wgsl          |  59 ++
  .../benilla-world/src/shaders/static_gx.wgsl  |  10 +-
  .../src/shaders/world_shadow.wgsl             |  14 +-
- 10 files changed, 1172 insertions(+), 62 deletions(-)
+ 10 files changed, 1232 insertions(+), 62 deletions(-)
  create mode 100644 crates/benilla-world/src/shaders/look_shadow_map.wgsl
 
 diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
@@ -303,7 +313,7 @@ index d51b27c..eb948e5 100644
              let o = shadow_disk(i, SHADOW_SEARCH_TAPS, turn) * search;
              let s = textureLoad(shadow_map, clamp(vec2<i32>(t + o), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
 diff --git a/crates/benilla-world/src/look/shadow_pass.rs b/crates/benilla-world/src/look/shadow_pass.rs
-index bdeb415..7672820 100644
+index bdeb415..95510a1 100644
 --- a/crates/benilla-world/src/look/shadow_pass.rs
 +++ b/crates/benilla-world/src/look/shadow_pass.rs
 @@ -10,10 +10,19 @@
@@ -375,7 +385,7 @@ index bdeb415..7672820 100644
  pub fn caster_kind(mat: &WowModelMaterial) -> Option<Option<AssetId<Image>>> {
      let ext = &mat.extension;
      caster_law(
-@@ -121,24 +140,76 @@ fn caster_law(
+@@ -121,24 +140,87 @@ fn caster_law(
      model_flags: Vec4,
      sun_scale: Vec4,
  ) -> Option<Option<AssetId<Image>>> {
@@ -455,10 +465,21 @@ index bdeb415..7672820 100644
 +    })
 +}
 +
++/// Whether a blended batch's texture is a liquid's surface (water, lava, slime), by its file name
++/// alone, not its folder: a `WaterBasin` folder's stone is no water.
++fn liquid_texture(path: &str) -> bool {
++    let name = path
++        .rsplit(['/', '\\'])
++        .next()
++        .unwrap_or(path)
++        .to_ascii_lowercase();
++    ["water", "lava", "slime"].iter().any(|w| name.contains(w))
++}
++
  /// A caster's instance row: its world matrix's linear part as three rows (w 0) and its translation
  /// apart, `w` the rig slot (a float: exact far past 2047, and never a denormal).
  fn inst_rows(gt: &GlobalTransform, rig: u32) -> [[f32; 4]; 4] {
-@@ -164,6 +235,29 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
+@@ -164,6 +246,29 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
      (center, Vec3::from(aabb.half_extents).length() * s)
  }
  
@@ -488,7 +509,7 @@ index bdeb415..7672820 100644
  type ModelCaster = (
      &'static Mesh3d,
      &'static MeshMaterial3d<WowModelMaterial>,
-@@ -172,6 +266,13 @@ type ModelCaster = (
+@@ -172,6 +277,13 @@ type ModelCaster = (
      &'static InheritedVisibility,
      Option<&'static MeshTag>,
      Option<&'static RenderLayers>,
@@ -502,7 +523,7 @@ index bdeb415..7672820 100644
  );
  
  type TerrainCaster = (
-@@ -187,33 +288,98 @@ fn extract_casters(
+@@ -187,33 +299,119 @@ fn extract_casters(
      models: Extract<Query<ModelCaster>>,
      terrain: Extract<Query<TerrainCaster, With<MeshMaterial3d<TerrainMaterial>>>>,
      materials: Extract<Res<Assets<WowModelMaterial>>>,
@@ -533,7 +554,15 @@ index bdeb415..7672820 100644
 +            if d <= tune::STATS_NEAR {
 +                list.push((
 +                    d,
-+                    near_line(d, verdict, part, object, material, asset_server.as_deref()),
++                    near_line(
++                        d,
++                        gt.translation(),
++                        verdict,
++                        part,
++                        object,
++                        material,
++                        asset_server.as_deref(),
++                    ),
 +                ));
 +            }
 +        };
@@ -592,6 +621,19 @@ index bdeb415..7672820 100644
 +        let blended = material.is_some_and(|m| {
 +            matches!(m.base.alpha_mode, AlphaMode::Blend) && m.extension.model_flags.y <= 0.5
 +        });
++        // A blended sheet of water in a model (a basin's or a fountain's `water.blp`, a fall)
++        // is no solid prop: take 291 saw Goldshire's water basin cast a blended shadow of its
++        // water. Its texture's name is the only thing that tells it from a solid prop drawn
++        // blended, so the rule reads it.
++        if blended
++            && cut
++                .and_then(|t| asset_server.as_deref().and_then(|a| a.get_path(t)))
++                .is_some_and(|p| liquid_texture(&p.to_string()))
++        {
++            out.1[3] += 1;
++            note("left out: not casting (water)", material);
++            continue;
++        }
 +        if blended {
 +            out.2 += 1;
 +        }
@@ -607,7 +649,7 @@ index bdeb415..7672820 100644
          out.0.push(Caster {
              mesh: mesh.id(),
              inst: inst_rows(gt, rig),
-@@ -222,6 +388,17 @@ fn extract_casters(
+@@ -222,6 +420,17 @@ fn extract_casters(
              cut,
          });
      }
@@ -625,7 +667,7 @@ index bdeb415..7672820 100644
      // The terrain's cells, whatever the exterior cull hid: a hill off screen still shades.
      for (mesh, gt, aabb) in &terrain {
          let Some(aabb) = aabb else { continue };
-@@ -712,20 +889,81 @@ impl ViewNode for LookShadowNode {
+@@ -712,20 +921,86 @@ impl ViewNode for LookShadowNode {
              span.end(&mut pass);
          }
          if stats {
@@ -652,11 +694,14 @@ index bdeb415..7672820 100644
 +    true
 +}
 +
-+/// One mesh of `WOW_SHADOW_STATS`' near list: its distance, the verdict, what spawned it and its
-+/// 1.12 blend, the material's alpha mode, marker word and flags (WMO, fade twin, interior lane,
-+/// unlit), its shade selector, and its texture's path, which names the model's own folder.
++/// One mesh of `WOW_SHADOW_STATS`' near list: its distance and place (WoW x, y, z, so a film can
++/// stand beside it with `.es goto`: take 291's could not find the jack-o'-lantern), the verdict,
++/// what spawned it and its 1.12 blend, the material's alpha mode, marker word and flags (WMO, fade
++/// twin, interior lane, unlit), its shade selector, and its texture's path, which names the
++/// model's own folder.
 +fn near_line(
 +    d: f32,
++    at: Vec3,
 +    verdict: &str,
 +    part: Option<&crate::model_render::ModelPart>,
 +    object: Option<&crate::interact::WorldObject>,
@@ -669,8 +714,10 @@ index bdeb415..7672820 100644
 +        || "unnamed".to_string(),
 +        |o| format!("{} #{}", o.label, o.id),
 +    );
++    let w = benilla_assets::coords::bevy_to_wow(at);
++    let d = format!("{d:5.1} yd at ({:.1}, {:.1}, {:.1})", w[0], w[1], w[2]);
 +    let Some(m) = material else {
-+        return format!("{d:5.1} yd  {verdict}  [{what}]  {name}");
++        return format!("{d}  {verdict}  [{what}]  {name}");
 +    };
 +    let e = &m.extension;
 +    let mode = match m.base.alpha_mode {
@@ -686,7 +733,7 @@ index bdeb415..7672820 100644
 +        .and_then(|h| assets.and_then(|a| a.get_path(h.id())))
 +        .map_or_else(|| "untextured".to_string(), |p| p.to_string());
 +    format!(
-+        "{d:5.1} yd  {verdict}  [{what}, {mode}, markers {:#x}, flags {:.0}{:.0}{:.0}{:.0}, \
++        "{d}  {verdict}  [{what}, {mode}, markers {:#x}, flags {:.0}{:.0}{:.0}{:.0}, \
 +         shade {:.1}]  {name}  {tex}",
 +        e.clutter_fade.z as u32,
 +        e.model_flags.x,
@@ -711,7 +758,7 @@ index bdeb415..7672820 100644
      static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
      let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
      if last.is_some_and(|t| t.elapsed().as_secs_f32() < 1.0) {
-@@ -742,9 +980,183 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
+@@ -742,9 +1017,183 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
              frame.splits[i], frame.slices[i].texel
          );
      }
@@ -895,7 +942,7 @@ index bdeb415..7672820 100644
  /// The main-world half: the frame's extract; the render half in [`finish`].
  pub(super) fn build(app: &mut App) {
      app.add_plugins(ExtractResourcePlugin::<ShadowFrame>::default());
-@@ -759,12 +1171,12 @@ pub(super) fn finish(app: &mut App) {
+@@ -759,12 +1208,12 @@ pub(super) fn finish(app: &mut App) {
      render_app
          .init_resource::<ShadowCasters>()
          .init_resource::<ShadowGpu>()
@@ -910,7 +957,7 @@ index bdeb415..7672820 100644
                  prepare_shadow_binds.in_set(RenderSystems::PrepareBindGroups),
              ),
          )
-@@ -772,15 +1184,379 @@ pub(super) fn finish(app: &mut App) {
+@@ -772,15 +1221,386 @@ pub(super) fn finish(app: &mut App) {
          .add_render_graph_edges(
              Core3d,
              (Node3d::EndPrepasses, LookShadowLabel, Node3d::StartMainPass),
@@ -950,10 +997,17 @@ index bdeb415..7672820 100644
 +            kind: ModelKind::GameObject,
 +            blend: ModelBlend::AlphaTest,
 +        };
-+        let line = near_line(8.2, "left out: hidden", Some(&part), Some(&object), None, None);
++        // Bevy (x, y, z) is WoW (-z, -x, y): the line gives WoW's, so a film can go there.
++        let at = Vec3::new(904.0, 40.0, 9805.0);
++        let line = near_line(8.2, at, "left out: hidden", Some(&part), Some(&object), None, None);
 +        assert!(line.contains("Chest01.m2 #42"), "{line}");
 +        assert!(line.contains("GameObject"), "{line}");
-+        let unnamed = near_line(8.2, "left out: hidden", Some(&part), None, None, None);
++        let w = benilla_assets::coords::bevy_to_wow(at);
++        assert!(
++            line.contains(&format!("at ({:.1}, {:.1}, {:.1})", w[0], w[1], w[2])),
++            "{line}"
++        );
++        let unnamed = near_line(8.2, at, "left out: hidden", Some(&part), None, None, None);
 +        assert!(unnamed.contains("unnamed"), "{unnamed}");
 +    }
 +
@@ -1292,7 +1346,7 @@ index bdeb415..7672820 100644
      #[test]
      fn which_batches_cast() {
          let tex: AssetId<Image> = AssetId::default();
-@@ -799,10 +1575,39 @@ mod tests {
+@@ -799,10 +1619,39 @@ mod tests {
              law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 0.0, lit),
              Some(Some(tex))
          );
@@ -1305,8 +1359,7 @@ index bdeb415..7672820 100644
 +        );
 +        assert_eq!(
 +            caster_law(AlphaMode::Blend, None, Vec4::ZERO, Vec4::ZERO, lit),
-             None,
--            "translucent"
++            None,
 +            "blended, untextured"
 +        );
 +        // 0080's third films: still `0 blended meshes cast` on every line. A blended batch that
@@ -1328,25 +1381,26 @@ index bdeb415..7672820 100644
 +        let twin = Vec4::new(0.0, 1.0, 0.0, 0.0);
 +        assert_eq!(
 +            law(AlphaMode::Blend, 1, twin, 0.0, lit),
-+            None,
+             None,
+-            "translucent"
 +            "the fade twin of a depth-less batch casts as its source: nothing"
          );
          assert_eq!(
              law(AlphaMode::Add, 4, Vec4::ZERO, 0.0, lit),
-@@ -816,11 +1621,17 @@ mod tests {
+@@ -816,11 +1665,17 @@ mod tests {
                  "marker {m:#x}"
              );
          }
 -        let interior = Vec4::new(1.0, 0.0, 1.0, 0.0);
 +        let interior_group = Vec4::new(1.0, 0.0, 1.0, 0.0);
-         assert_eq!(
--            law(AlphaMode::Opaque, 0, interior, 0.0, lit),
++        assert_eq!(
 +            law(AlphaMode::Opaque, 0, interior_group, 0.0, lit),
 +            Some(None),
 +            "a building's interior group holds its walls: it casts"
 +        );
 +        let interior_prop = Vec4::new(0.0, 0.0, 1.0, 0.0);
-+        assert_eq!(
+         assert_eq!(
+-            law(AlphaMode::Opaque, 0, interior, 0.0, lit),
 +            law(AlphaMode::Opaque, 0, interior_prop, 0.0, lit),
              None,
 -            "interior"
@@ -1354,7 +1408,7 @@ index bdeb415..7672820 100644
          );
          assert_eq!(
              law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 1.0, lit),
-@@ -833,22 +1644,36 @@ mod tests {
+@@ -833,22 +1688,52 @@ mod tests {
              None,
              "glue rig lane"
          );
@@ -1378,6 +1432,22 @@ index bdeb415..7672820 100644
 +            why(AlphaMode::Opaque, 0, interior_prop),
 +            Some("indoors (interior-prop lane)")
 +        );
++    }
++
++    /// Take 291: Goldshire's water basin cast a blended shadow of its `water.blp`. A blended
++    /// batch whose texture is water, lava or slime casts none; its stone, in a folder named for
++    /// the water, still does.
++    #[test]
++    fn water_in_a_model_casts_none() {
++        assert!(liquid_texture(
++            r"World\Generic\Human\Passive Doodads\WaterBasin\Water.blp"
++        ));
++        assert!(liquid_texture("world/generic/passivedoodads/fountain/fountainwater01.blp"));
++        assert!(liquid_texture(r"World\Lava\LavaFall.blp"));
++        assert!(!liquid_texture(
++            r"World\Generic\Human\Passive Doodads\WaterBasin\BasinStone.blp"
++        ));
++        assert!(!liquid_texture(r"World\Generic\Pumpkin\Pumpkin01.blp"));
      }
  
 -    /// The no-cast markers are exactly the bits `model_render` packs for no depth write, no depth
