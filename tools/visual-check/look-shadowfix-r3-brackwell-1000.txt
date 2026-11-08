@@ -1,0 +1,46 @@
+# Sun shadows, second fixes (client 0069, revised in #269's third round): the Brackwell pumpkin patch
+# at 10:00 (the sun about 57 degrees up on its north-west bearing, yaw 45). The camera stands to the
+# side (yaw 315, 6 yd, pitched 35 degrees down), so every shadow runs across the frame to the LEFT of
+# what casts it (toward yaw 225), not toward the camera or under the hero's back as in take 271.
+# First at the goto spot (the hero alone on bare soil), then after a 10 yd dash north into the
+# pumpkins. Each on high with slice 1 of the map in the corner, then worldShadows 0.
+# Crop 1:1 round the hero's feet and the nearest pumpkin (about 300 px square) for the comparison.
+# Look for:
+# - the hero's own shadow to their left, a clear dark figure (legs, body, head) on the soil, its
+#   edges soft but narrow (a few centimetres), much darker than take 271's grey shape;
+# - every pumpkin a dark crescent on its left side (the old pumpkins cast nothing at any hour), and
+#   the strongbox a dark block beside it;
+# - the map (lookshadow map 1, top right): the pumpkins as small round blobs with bright outlines,
+#   which take 271's map should not have had;
+# - nothing of the kind at worldShadows 0 (1.12's blob under the hero instead).
+# With WOW_SHADOW_STATS=1 the client log's "[shadows]" lines now say how many blended meshes cast
+# (the pumpkins are such batches if this fix is the right one) and which meshes were left out.
+hero warrior
+cam 315 -35 6
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua ConsoleExec("worldclock 600")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookshadow grade")
+4.3 lua ConsoleExec("lookshadow map off")
+5.5 shots hero-high 2 0.5
+6.6 lua ConsoleExec("lookshadow map 1")
+7.5 shots hero-high-map1 1 0.5
+8.1 lua ConsoleExec("lookshadow map off")
+8.15 lua SetCVar("worldShadows", "0")
+9.0 shots hero-worldshadows-0 1 0.5
+9.6 lua SetCVar("worldShadows", "2")
+10.0 lua ActionDash(2.0, 5, "f")
+13.0 shots pumpkins-high 2 0.5
+14.1 lua ConsoleExec("lookshadow map 1")
+15.0 shots pumpkins-high-map1 1 0.5
+15.6 lua ConsoleExec("lookshadow map off")
+15.65 lua SetCVar("worldShadows", "1")
+16.5 shots pumpkins-low 1 0.5
+17.1 lua SetCVar("worldShadows", "0")
+18.0 shots pumpkins-worldshadows-0 1 0.5
+18.6 lua SetCVar("worldShadows", "1")
+19 end

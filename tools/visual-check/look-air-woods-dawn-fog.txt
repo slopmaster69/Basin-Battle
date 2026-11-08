@@ -1,0 +1,66 @@
+# The air (client 0073): volumetric fog in the woods by Crystal Lake at dawn (07:00, the sun a few
+# degrees up at yaw 45) on a fog day, the camera facing the sun and pitched a little up, so the low
+# sun comes through the trunks and crowns. First the mist held at 3.5 times the hour's (lookmist
+# 3.5), then a real fog day (lookmist day 20765, 3.35 times), then lookfog 0 and 2 (the volumetric
+# mist's own density), the three quality steps, worldShadows 0 (nothing to cut the shafts with), worldFog 0
+# (the plain analytic mist as before), and worldLook 0. A 2 s sidestep with the fog on checks that
+# the shafts hold still while the camera moves.
+# Look for:
+# - shafts of sun in the mist between the trunks, bright toward the sun and dark lanes behind each
+#   trunk and crown, against the sky as well as against the far wood;
+# - the shade under the trees misty but not lit (grey-blue, not gold), where worldFog 0 lit all of
+#   the mist toward the sun alike;
+# - no shimmer, crawl or dotted noise in the shafts on the still frames, and no smear or ghost of a
+#   trunk's lane trailing it during the sidestep (the history settles in about five frames);
+# - no hard rim of mist round a trunk's silhouette (the fog is at a quarter of the resolution and
+#   upsampled by depth);
+# - quality 1 a little softer or noisier than 2, 3 a little sharper; the sky near the horizon veiled
+#   (a share), the sun still visible through it.
+hero warrior
+cam 45 6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 420")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldFogQuality", "2")
+4.3 lua SetCVar("worldShadows", "2")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookfog grade")
+4.45 lua ConsoleExec("lookmist 3.5")
+4.5 lua ConsoleExec("lookwind 0")
+6.0 video
+6.5 shots fog-3.5 4 0.5
+9.0 lua ActionDash(2, 3, "l")
+9.1 shots fog-moving 12 0.15
+12.0 lua ConsoleExec("lookmist day 20765")
+12.05 lua ClearWorldFog()
+13.0 shots fog-day 2 0.5
+14.5 lua ConsoleExec("lookmist 3.5")
+14.55 lua ConsoleExec("lookfog 0")
+15.5 shots lookfog-0 2 0.5
+17.0 lua ConsoleExec("lookfog 2")
+18.0 shots lookfog-2 2 0.5
+19.5 lua ConsoleExec("lookfog grade")
+19.55 lua ConsoleExec("lookfog quality 1")
+20.5 shots quality-1 2 0.5
+22.0 lua ConsoleExec("lookfog quality 3")
+23.0 shots quality-3 2 0.5
+24.5 lua ConsoleExec("lookfog quality 2")
+24.55 lua SetCVar("worldShadows", "0")
+25.5 shots worldshadows-0 2 0.5
+27.0 lua SetCVar("worldShadows", "2")
+27.05 lua SetCVar("worldFog", "0")
+28.0 shots worldfog-0 2 0.5
+29.5 lua SetCVar("worldFog", "1")
+29.55 lua SetCVar("worldLook", "0")
+29.6 lua ClearWorldFog()
+31.0 shots classic 2 0.5
+32.5 lua SetCVar("worldLook", "1")
+32.55 lua ClearWorldFog()
+32.6 lua ConsoleExec("lookmist grade")
+32.65 lua ConsoleExec("lookwind grade")
+32.7 lua ConsoleExec("lookweather server")
+34 end

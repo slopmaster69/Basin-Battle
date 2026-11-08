@@ -1,0 +1,23 @@
+# The faster game clock for testing ([world] clock_speed, PR 276), on a server built from that
+# branch: the Brackwell pumpkin patch, the camera toward the sun pitched up 35 degrees so the sky
+# shows. One still at the pinned morning, then the re-pin every 10 s and the clock at 1440 times
+# real time (a whole day in a minute, the client's rate 24 minutes a second), and a still every
+# 2.5 s for a minute: one an hour. Then the rules read back, which holds the morning again.
+# Look for: the hour running on between stills in order, dawn to dusk to night and round to the
+# morning, with no jump back or forward at a re-pin (every 10 s the server tells the client where
+# the clock should be); the look's sky, sun and light following each hour; after the reload the
+# morning again.
+hero warrior
+cam 45 35 6
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua UIParent:Hide()
+4.1 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+6.0 shots before 1 0.5
+7.0 .es tune world.clock_every 10
+7.5 .es tune world.clock_speed 1440
+9.0 shots hour 24 2.5
+70.0 .es tune reload
+73.0 shots after 2 0.7
+75 end

@@ -1,0 +1,28 @@
+# The torch lights on a shrunken building: a Watchtower (Elwynn's own at a third, four wall torches)
+# built free 12 yd north of the campfire, filmed from 8 yd south of it at the camp's pinned 23:30.
+# Before client patch 0064 its four torches each cast a full 10 yd pool and the pale tower went
+# white; after, a third-size tower casts third-size pools. The costs are tuned to nothing and read
+# back at the end; the tower is torn down again.
+hero warrior
+cam 0 -10 9
+1 .es debug on
+2 .es home
+4 .es tune station.watchtower.cost.wood 0
+5 .es tune station.watchtower.cost.stone 0
+6 .es tune station.watchtower.cost.bronze 0
+7 .es goto -9612 677.5 36.5 0
+9 .es build watchtower
+11 .es place
+12 shots build 2 1
+22 .es where
+23 .es goto -9617 677.5 36.5 0
+25 lua UIParent:Hide()
+26 shots tower 4 0.8
+29.5 .es goto -9611 677.5 36.5 0
+30.5 shots close 2 0.8
+32.5 lua UIParent:Show()
+33 .es goto -9608 677.5 36.5 0
+34 .es demolish yes
+36 .es tune reload
+37 .es where
+39 end

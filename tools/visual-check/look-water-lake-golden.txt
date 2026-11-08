@@ -1,0 +1,37 @@
+# The new look's water (client 0066): Crystal Lake at 17:30 toward the low sun: the golden path and the trees' shadows on the water.
+# The tuned water, a few seconds of ripples, then lookwater 2 and 0 (the mirror), lookwater 1 2 and
+# 1 0.3 (the clarity), then worldWater 0 and 1.12's look.
+# Look for: the mirror's edges (a band or smear where a reflection leaves the screen, gaps behind
+# posts and trunks, a tree's reflection off its base), the sky in the water against the real sky,
+# a halo or line at the shoreline, foam too white or wide or crawling, glint fireflies on far
+# ripples, the colour by the hour, and a frame of wrong water after a toggle.
+hero warrior
+cam 160 1 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+6.5 shots tuned 6 0.7
+11.0 lua ConsoleExec("lookwater 2")
+12.5 shots mirror-x2 2 0.6
+14.0 lua ConsoleExec("lookwater 0")
+15.5 shots mirror-0 2 0.6
+17.0 lua ConsoleExec("lookwater 1 2")
+18.5 shots clear-x2 2 0.6
+20.0 lua ConsoleExec("lookwater 1 0.3")
+21.5 shots murky 2 0.6
+23.0 lua ConsoleExec("lookwater grade")
+23.05 lua SetCVar("worldWater", "0")
+24.5 shots worldwater-0 2 0.6
+26.0 lua SetCVar("worldWater", "1")
+26.05 lua SetCVar("worldLook", "0")
+26.1 lua ClearWorldFog()
+27.5 shots classic 2 0.6
+29.0 lua SetCVar("worldLook", "1")
+29.05 lua ClearWorldFog()
+30.5 shots tuned-again 2 0.6
+32 end

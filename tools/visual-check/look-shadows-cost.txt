@@ -1,0 +1,25 @@
+# The new look's sun shadows (client 0065): what they cost. Goldshire at golden hour, standing
+# still, the fps journal on (benilla-config/Diagnostics/fps-journal.csv): 8 s at high, 8 s at low,
+# 8 s off, 8 s at high again.
+# Look for: in the CSV, gpu_ms and the "other" column (the slices' passes look_shadow_0..3) at each
+# level against off; the receivers' filtering lands in the opaque and static columns.
+hero warrior
+cam 0 -6 8
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookshadow grade")
+4.3 lua SetCVar("fpsJournal", "1")
+6.0 shots cost-high 1 1.0
+12.5 lua SetCVar("worldShadows", "1")
+14.0 shots cost-low 1 1.0
+20.5 lua SetCVar("worldShadows", "0")
+22.0 shots cost-off 1 1.0
+28.5 lua SetCVar("worldShadows", "2")
+30.0 shots cost-high-again 1 1.0
+36.5 lua SetCVar("fpsJournal", "0")
+37 end

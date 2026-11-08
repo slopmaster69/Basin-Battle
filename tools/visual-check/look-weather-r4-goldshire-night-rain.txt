@@ -1,0 +1,38 @@
+# Night rain (client 0071, #271's fourth round): Goldshire at 23:30, the camera on the road
+# facing the inn's lit windows (yaw 200, pitched 12 down, 10 yd; the inn should fill the left
+# half: if it is not in frame, say which way it lies), dry then a minute of rain, then
+# worldWeather 0 and 1.12's look. `looklights` runs twice and answers with the look's light table:
+# how many lights and the six nearest (distance, height, reach, strength). Send those lines:
+# a lamp missing from them casts no pool and no reflection.
+# Look for: the rain frame no flatter than the dry one (take 273: 90% of pixels in a 20-level grey
+# band, the woods lifted to a veil); the dark woods dark, the near road readable; each lamp and lit
+# window with a light in the table lying on the wet road as a warm streak toward the camera, which
+# slides with the sidestep.
+hero warrior
+cam 200 -12 10
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.5 shots dry 2 0.5
+6.5 lua ConsoleExec("looklights tuned")
+7.0 lua ConsoleExec("lookweather rain 0.9")
+60.0 video
+60.5 shots wet 4 1.0
+64.6 lua ConsoleExec("looklights tuned")
+65.0 lua ActionDash(1.5, 3, "l")
+65.2 shots wet-moving 6 0.25
+68.0 lua SetCVar("worldWeather", "0")
+69.5 shots worldweather-0 2 0.5
+71.0 lua SetCVar("worldWeather", "1")
+71.05 lua SetCVar("worldLook", "0")
+71.1 lua ClearWorldFog()
+72.5 shots classic 2 0.5
+74.0 lua SetCVar("worldLook", "1")
+74.05 lua ClearWorldFog()
+74.1 lua ConsoleExec("lookweather server")
+76 end

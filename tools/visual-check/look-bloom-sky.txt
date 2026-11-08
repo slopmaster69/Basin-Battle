@@ -1,0 +1,21 @@
+# The new look's bloom at golden hour toward the low sun's side of the sky: the grade's own, then
+# held at 1.2 and 2.5 (threshold 0.4), then 1.12's look. Look for a soft glow where the sky meets the leaves.
+hero warrior
+cam 90 6 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+5.0 lua ConsoleExec("lookbloom grade")
+5.5 shots grade 2 0.5
+7.0 lua ConsoleExec("lookbloom 1.2")
+7.5 shots b12 2 0.5
+9.0 lua ConsoleExec("lookbloom 2.5 0.4")
+9.5 shots b25 2 0.5
+11.0 lua ConsoleExec("lookbloom grade")
+11.0 lua SetCVar("worldLook", "0")
+11.05 lua ClearWorldFog()
+11.5 shots old 2 0.5
+13.5 end

@@ -1,0 +1,16 @@
+# Finding the river at Jerod's Landing: the camera at yaw 270 (the stock site faces away from the
+# water). Two stills with the new water, two with worldWater 0.
+hero warrior
+cam 270 -8 9
+include _look_setup
+1.0 .es goto jerods_landing
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+6.0 shots tuned 2 0.6
+7.5 lua SetCVar("worldWater", "0")
+9.0 shots worldwater-0 2 0.6
+10.5 lua SetCVar("worldWater", "1")
+11 end

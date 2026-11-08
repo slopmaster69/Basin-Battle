@@ -1,0 +1,37 @@
+# The moon's lane (client 0070, #270's fourth round): Crystal Lake at 23:00 and 23:30 facing the
+# moon (yaw 45, the moon's north-west bearing, 24 then 41 degrees up), the hero backed out into
+# the lake. Then worldWater 0, 1.12's look, and back to the new look: the zone's grade now comes
+# back at once (it started its 3 s ramp over on the switch, so take 273's tuned-again, a second
+# after, caught it a third of the way in: the water a quarter brighter), shot at 1 s and at 4 s.
+# Look for: the lane as small separate glints, not a milky ribbon, lying out across the lake and
+# brightest away from the camera, dark by the camera (nothing within about 5 yd), dark water
+# either side; 1.12's white ripple flecks dimmed off the lane; tuned-again-1s and -4s the same
+# as lane-2330 (water mean within a few levels).
+hero warrior
+cam 45 -24 10
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookweather clear")
+4.5 lua ActionDash(3.5, 7, "b")
+8.5 shots lane-2300 3 0.5
+10.1 shots ripples-2300 8 0.25
+12.5 lua ConsoleExec("worldclock 1410")
+13.5 shots lane-2330 3 0.5
+15.1 lua SetCVar("worldWater", "0")
+16.0 shots worldwater-0 2 0.5
+17.1 lua SetCVar("worldWater", "1")
+17.15 lua SetCVar("worldLook", "0")
+17.2 lua ClearWorldFog()
+18.0 shots classic 2 0.5
+19.1 lua SetCVar("worldLook", "1")
+19.15 lua ClearWorldFog()
+20.1 shots tuned-again-1s 1 0.5
+23.1 shots tuned-again-4s 2 0.5
+24.5 lua ConsoleExec("lookweather server")
+26 end

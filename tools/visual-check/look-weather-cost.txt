@@ -1,0 +1,31 @@
+# Visible weather (client 0071): what it costs in heavy rain. Goldshire at night (23:00, so the
+# torches' sheen is in the wet ground), held at storm 1 with lookweather, standing still, the fps
+# journal on (benilla-config/Diagnostics/fps-journal.csv): 10 s with the weather's look on, 10 s
+# with worldWeather 0 (1.12's rain under the rest of the new look), 10 s with worldLook 0, 10 s on
+# again. The first 50 s soak the ground.
+# Look for: in the CSV, frame ms and gpu_ms: the wet ground lands in the opaque pass's column, the
+# rings in the transparent (water) one, the lit streaks in the effects; the CPU frame for the
+# streaks' torch light. Please send the CSV with the film, and say the GPU, the window size and
+# weatherDensity if not 3.
+hero warrior
+cam 180 -8 12
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather storm 1")
+55.0 lua SetCVar("fpsJournal", "1")
+56.0 shots cost-on 1 1.0
+66.0 lua SetCVar("worldWeather", "0")
+67.0 shots cost-noweather 1 1.0
+77.0 lua SetCVar("worldWeather", "1")
+77.05 lua SetCVar("worldLook", "0")
+78.0 shots cost-classic 1 1.0
+88.0 lua SetCVar("worldLook", "1")
+89.0 shots cost-on-again 1 1.0
+99.0 lua SetCVar("fpsJournal", "0")
+99.05 lua ConsoleExec("lookweather server")
+100 end

@@ -123,6 +123,9 @@ const HAZARD_FLAME_SECS: f32 = 1.4;
 const VEIL_SPACING: f32 = 2.5;
 /// How near a lamp a hero must be to rest at it or leave by it.
 const LAMP_RANGE: f32 = 6.0;
+/// A rest this soon after the last one is the same rest (Nov 7: Rest pressed thirty times in four
+/// seconds put thirty lines in both heroes' chat and stirred the mine thirty times).
+const REST_AGAIN: f32 = 3.0;
 
 impl Survival {
     /// The Deadmines' world: its lamps, doors, strongboxes and foes.
@@ -717,10 +720,14 @@ impl Survival {
         if self.in_fight(id) {
             return Err("Not while enemies are on you.".into());
         }
+        if p.rested_at.is_some_and(|t| self.clock - t < REST_AGAIN) {
+            return Ok(());
+        }
         let account = p.account.clone();
         if let Some(h) = self.below.as_mut().and_then(|b| b.heroes.get_mut(&account)) {
             h.lamp = lamp.clone();
         }
+        self.players.get_mut(&id).unwrap().rested_at = Some(self.clock);
         self.refresh_hero(id);
         self.stir();
         let name = self.players[&id].name.clone();
