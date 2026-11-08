@@ -884,11 +884,14 @@ slay_sound = 5781
   min_range = 3.5
   max_range = 10.0
   steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.5, lunge = 6.0, damage = 28, recovery = 0.9 } ]
-  # A blade held back, glowing: dodge early and it finds you.
+  # A blade held back, glowing: dodge early and it finds you. His own body's special (a human man's
+  # clip 57, as his Unbowed string ends on): the dwarf woman's opens in a crouched leap, and on his
+  # long legs it folded his knees up under him in the air for half a second (Corey, Nov 8: "his legs
+  # tweak out during one of his special attacks"; the +4 run, 5:28 in).
   [[mob.pattern]]
   name = "riposte stance"
   weight = 1.5
-  steps = [ { from = "DwarfFemale", clip = 57, take = 0, windup = 1.4, damage = 40, arc = 140.0, heavy = true, recovery = 1.1, kit = 379 } ]
+  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 1.4, damage = 40, arc = 140.0, heavy = true, recovery = 1.1, kit = 379 } ]
   [[mob.pattern]]
   name = "blade storm"
   weight = 0.0
