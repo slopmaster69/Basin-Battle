@@ -1,4 +1,4 @@
-# The moon's lane on the water (client 0070, revised in #270's third round): the same shot as take
+# The moon's lane on the water (client 0081, revised in #270's third round): the same shot as take
 # 271's look-tune1-water-moon. Crystal Lake at 23:00 and 23:30 facing the moon (yaw 45: the white
 # moon keeps the sun's north-west bearing, 24 degrees up at 23:00, 41 at 23:30), the hero backed off
 # south-east into the lake so the camera stands over the water looking at the moon.

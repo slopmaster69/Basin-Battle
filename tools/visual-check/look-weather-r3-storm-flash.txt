@@ -1,4 +1,4 @@
-# A storm's lightning on film (client 0071, #271's third round): Goldshire at 23:30 in a full storm,
+# A storm's lightning on film (client 0082, #271's third round): Goldshire at 23:30 in a full storm,
 # the same view as look-weather-r3-goldshire-night-rain, held for 90 s with the video running from
 # the start and a still every second. In a full storm a strike comes about every 30 s, so the video
 # should hold two or three; a flash lasts about half a second (a flare, then a flicker), so stills

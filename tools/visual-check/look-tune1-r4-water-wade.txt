@@ -1,0 +1,35 @@
+# Froth round wading legs (client 0081, #270's fourth round): Crystal Lake at 17:30, the camera
+# over open water facing the shore (yaw 20, pitched 20 down, 6 yd) while the hero backs out into
+# the shallows, then deeper; worldWater 0 and 1.12's look. The wade-in stills may still look
+# through reeds; judge the standing ones.
+# Look for: froth round each shin as soft lumps of varying width with gaps between, fading over
+# a few pixels into the ripples; no continuous pale line or oval round the legs (take 273: a thin
+# crisp line peaking at 151 against water at 45), and nothing across the gap between the legs.
+hero warrior
+cam 20 -20 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookweather clear")
+5.5 shots start 1 0.5
+6.0 lua ActionDash(2.0, 3, "b")
+6.1 shots wade-in 10 0.2
+8.5 shots standing 6 0.4
+11.0 lua ActionDash(1.5, 3, "b")
+11.1 shots deeper 8 0.2
+13.0 shots standing-deep 4 0.4
+14.8 lua SetCVar("worldWater", "0")
+15.6 shots worldwater-0 2 0.4
+16.5 lua SetCVar("worldWater", "1")
+16.55 lua SetCVar("worldLook", "0")
+16.6 lua ClearWorldFog()
+17.4 shots classic 2 0.4
+18.3 lua SetCVar("worldLook", "1")
+18.35 lua ClearWorldFog()
+18.4 lua ConsoleExec("lookweather server")
+20 end

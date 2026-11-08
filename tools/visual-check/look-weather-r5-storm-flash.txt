@@ -1,0 +1,23 @@
+# The storm (client 0082, #271's fifth round): the Camp at Westbrook at 23:30, the hero 16 yd south
+# of the bonfire at WoW (-9640, 688) (take 280's goto camp stood him in it), the camera behind him
+# turned 30 degrees east of the fire (yaw 330, pitched 5 down, 10 yd) so the fire sits at the
+# left edge, a full storm for 90 s with video from the start and a still every second.
+# Look for: each flash climbing over two or three frames at 30 fps (take 280: one frame, a frame
+# mean of 67 to 100, then a fade over four or five), its flicker climbing too; in client.log a
+# line "weather: a strike's thunder plays kit ..." for each strike's thunder (or "weather: a
+# strike flashed, but the world's sound is off, so no thunder" on a machine with no sound out),
+# which the rig can match against the flashes on the video.
+hero warrior
+cam 330 -5 10
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9640 688
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather storm 1")
+5.0 video
+5.5 shots storm 90 1.0
+96.0 lua ConsoleExec("lookweather server")
+97 end

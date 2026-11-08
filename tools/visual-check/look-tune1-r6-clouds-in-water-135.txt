@@ -1,0 +1,40 @@
+# Clouds in the water (0068's sky in 0081's water, #270's sixth round): Stone Cairn Lake from the
+# site's own spot, the camera held facing heading 135 (take 291's survey found open water at
+# turn-135 and turn-180 from the goto's facing; this film and its twin take both as headings),
+# pitched 12 down, 7 yd back, so the near and middle water mirror the sky well up. Take 291 saw
+# the water grey at looksky clouds 0.8 with no cloud shapes. The mirror does sample the painted
+# clouds; but each pixel's rippled ray reached a different patch of them, so they averaged to a
+# greying, and 0.8 is an overcast grey besides. The sky's mirror now takes a calmer surface than
+# the near reflections (half the ripple near the camera, a fifth far off). Cover 0.45 (white
+# clouds on blue: shapes should show), 0.8 (overcast), 0, then worldSky 0; noon and 17:30.
+# Look for: cloud shapes in the open water at clouds-045, white on blue, broken by the ripples;
+# greyer at clouds-08; plain sky at clouds-0; worldsky-0 the flat colour. If this heading faces
+# trunks, say so: the other film's heading may be the open one.
+hero warrior
+cam 135 -12 7
+include _look_setup
+include _look_r5_hide
+1.0 .es goto stone_cairn_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("looksky clouds 0.45")
+5.5 video
+6.0 shots noon-clouds-045 2 0.5
+7.5 lua ConsoleExec("looksky clouds 0.8")
+8.5 shots noon-clouds-08 2 0.5
+10.0 lua ConsoleExec("looksky clouds 0")
+11.0 shots noon-clouds-0 2 0.5
+12.5 lua ConsoleExec("looksky clouds 0.45")
+12.55 lua SetCVar("worldSky", "0")
+13.5 shots noon-worldsky-0 2 0.5
+15.0 lua SetCVar("worldSky", "1")
+15.05 lua ConsoleExec("worldclock 1050")
+16.5 shots golden-clouds-045 2 0.5
+18.0 lua ConsoleExec("looksky grade")
+19.0 shots golden-day 2 0.5
+20.5 lua ConsoleExec("lookweather server")
+22 end

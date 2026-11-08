@@ -1,0 +1,35 @@
+# Goldshire's lamp posts light (client 0082, #271's sixth round): Goldshire at 23:30 in rain from
+# the site's own spot (yaw 200, the inn on the left, pitched 12 down, 10 yd), as take 291, which
+# found a streak under the porch light but none under lamppost.m2 #12341, 19 yd from the camera:
+# no light in the table was nearer than 26.9 yd. A prop casts light only through a point light in
+# its own model file, and Goldshire's lamp posts have none that casts. Under the new look each
+# lamp or lantern prop with no light of its own within 2.5 yd now gets a stock torch's light half
+# a yard under its top; it goes with the prop and with worldLook 0. Each is logged once,
+# "[look lamps] <model> #<id> gets a lamp's light at (x, y, z)". looklights runs at the start and
+# the end. Dry, then rain, then worldLook 0.
+# Look for: a warm pool on the road round the lamp post when dry, and a warm streak on the wet
+# road under it in the rain; none at classic. PLEASE send the "[look lamps]" and "looklights"
+# lines from client.log.
+hero warrior
+cam 200 -12 10
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklights tuned")
+5.5 video
+6.0 shots dry 2 0.5
+7.5 lua ConsoleExec("lookweather rain 0.9")
+55.0 shots wet 3 1.0
+58.5 lua ConsoleExec("looklights tuned")
+59.0 lua SetCVar("worldLook", "0")
+59.05 lua ClearWorldFog()
+60.0 shots classic-wet 2 0.5
+61.1 lua SetCVar("worldLook", "1")
+61.15 lua ClearWorldFog()
+61.2 lua ConsoleExec("lookweather server")
+63 end

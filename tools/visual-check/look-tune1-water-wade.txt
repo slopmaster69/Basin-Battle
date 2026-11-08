@@ -1,4 +1,4 @@
-# The foam round a wading hero (client 0070, `look-tune-1`): Crystal Lake at golden hour (17:30), the
+# The foam round a wading hero (client 0081, `look-tune-1`): Crystal Lake at golden hour (17:30), the
 # same shot as the first films' wade (take 242). The hero runs into the shallows, stands, goes
 # deeper, stands, then worldWater 0 and 1.12's look, then runs back out.
 # Look for: where the legs meet the water, a soft, lumpy, uneven froth that follows the legs'

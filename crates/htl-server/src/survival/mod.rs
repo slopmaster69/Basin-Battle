@@ -278,6 +278,10 @@ pub struct SurvivalGame {
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
     clock_at: Instant,
+    /// The weather (`[weather]`): what went out last, and one held for filming (`.es weather`).
+    pub(crate) weather_send: htl_survival::weather::WeatherSend,
+    pub(crate) weather_hold: Option<htl_survival::weather::Weather>,
+    weather_at: Instant,
     /// A clock running faster than real time (`[world] clock_speed`): when it started and from
     /// what hour, and the pin and speed it started for (a change of either starts it again).
     clock_epoch: Instant,
@@ -381,6 +385,9 @@ impl SurvivalGame {
             dirty: true,
             saved_at: Instant::now(),
             clock_at: Instant::now(),
+            weather_send: Default::default(),
+            weather_hold: None,
+            weather_at: Instant::now(),
             clock_epoch: Instant::now(),
             clock_start: [0, 0],
             clock_seen: (None, 1.0),
@@ -409,6 +416,7 @@ impl SurvivalGame {
                 self.play(events);
                 self.ui_flush();
                 self.hold_clock();
+                self.weather_tick(false);
                 if self.dirty && self.saved_at.elapsed() >= SAVE_EVERY {
                     self.save();
         }
@@ -458,6 +466,35 @@ impl SurvivalGame {
         }
         self.clock_at = Instant::now();
         self.broadcast(&packets::login_set_time_speed_rate(Some(c), self.clock_speed()));
+    }
+
+    /// Whether this world has weather: Elwynn above ground (not below, where a dungeon has its
+    /// own air, nor in Siege's Arathi).
+    fn has_weather(&self) -> bool {
+        !self.realm.below && !self.realm.siege
+    }
+
+    /// The weather now: one held for filming, or the clock's.
+    pub(crate) fn weather_now(&self) -> (htl_survival::weather::Weather, f32) {
+        match self.weather_hold {
+            Some(w) => (w, 1.0),
+            None => self.sim.content.weather.at(unix_now()),
+        }
+    }
+
+    /// Every couple of seconds (or at once, `now`), the weather goes out to everyone if it changed
+    /// enough, or a storm's cue is due.
+    pub(crate) fn weather_tick(&mut self, now: bool) {
+        if !self.has_weather() || (!now && self.weather_at.elapsed().as_secs_f32() < 2.0) {
+            return;
+        }
+        self.weather_at = Instant::now();
+        let (w, ease) = self.weather_now();
+        let wire = htl_survival::weather::wire(w, ease);
+        let def = self.sim.content.weather.clone();
+        if let Some((kind, grade, sound)) = self.weather_send.next(&def, wire, unix_now()) {
+            self.broadcast(&packets::weather(kind, grade, sound, false));
+        }
     }
 
     pub(crate) fn save(&mut self) {
@@ -790,6 +827,11 @@ impl SurvivalGame {
         self.send(conn, packets::tutorial_flags_all_seen());
         self.send(conn, packets::bindpoint(spawn, self.realm.map, self.realm.area));
         self.send(conn, packets::login_set_time_speed_rate(self.clock(), self.clock_speed()));
+        // The weather as it stands, at once; clear below and in Siege (a client carries the last
+        // world's weather over otherwise).
+        let (kind, grade) = if self.has_weather() { self.weather_send.current() } else { (0, 0.0) };
+        let sound = htl_survival::weather::wire_sound(kind, grade);
+        self.send(conn, packets::weather(kind, grade, sound, true));
         self.send(conn, packets::initial_spells(&[packets::DUEL_SPELL]));
         self.send(conn, packets::action_buttons_empty());
         self.send(conn, packets::initialize_factions_empty());

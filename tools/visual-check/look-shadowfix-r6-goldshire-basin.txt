@@ -1,0 +1,26 @@
+# Water casts no shadow (client 0080, #269's sixth round): Goldshire at 15:00 from the site's own
+# spot (yaw 200, the inn on the left, pitched 25 down, 10 yd), shadows high, then worldShadows 0.
+# Take 291 found the water basin's water.blp casting a blended shadow: a blended batch whose
+# texture is water (or lava or slime) now casts none, while the basin's stone still does. Run the
+# client with WOW_SHADOW_STATS=1: the basin's water line should say "left out: not casting
+# (water)", with its place in WoW coordinates.
+# Look for: under the basin, the stone's shadow only, no flat dark sheet where the water is (if
+# the basin is in frame; the log says where it is).
+hero warrior
+cam 200 -25 10
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 900")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookshadow grade")
+5.5 video
+6.0 shots basin-high 2 0.5
+7.5 lua SetCVar("worldShadows", "0")
+8.5 shots basin-worldshadows-0 1 0.5
+9.1 lua SetCVar("worldShadows", "2")
+9.15 lua ConsoleExec("lookweather server")
+11 end

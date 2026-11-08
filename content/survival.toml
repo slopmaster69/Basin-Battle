@@ -14208,3 +14208,32 @@ count = 1
 link = 8.0
 key = "trial_relic_druid_1"
 wake = "relic_druid"
+
+[weather]
+# Elwynn's weather above ground, the same for every hero: a fixed function of the server's clock,
+# sent as 1.12's own weather (any client shows its rain; one with the new look, patch 0082, shows
+# grey skies, lit rain, wet ground and lightning). `.es weather clear|overcast|rain|storm [0-1]`
+# holds one for filming, `.es weather auto` lets go. Not below, nor in Siege.
+on = true
+# The day is cut into spells this long, each rolling its own weather: long enough that a shower
+# is an event, short enough to see a few in an evening's play.
+spell_minutes = 40.0
+# How often each comes (shares of the spells): mostly clear, as Elwynn is; a storm now and then.
+clear = 0.55
+overcast = 0.22
+rain = 0.16
+storm = 0.07
+# A spell's weather holds this share of it, at least to at most (the rest of it is clear), so a
+# shower lasts about 18 to 36 minutes.
+last_min = 0.45
+last_max = 0.9
+# Minutes to ease in and out: the sky clouds over before the first drops, and clears after.
+ease_minutes = 6.0
+# How strong a spell's weather rolls, 0 to 1: never so faint it hardly shows.
+intensity_min = 0.4
+intensity_max = 1.0
+# A grade change this big goes out to everyone (the client eases between them over about 10 s).
+step = 0.02
+# In a storm the weather goes out again this often (seconds), a hair apart, so the clients'
+# lightning starts a fresh run and a hero who came in mid-storm falls into step.
+cue_seconds = 40.0
