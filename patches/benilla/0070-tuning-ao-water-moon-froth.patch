@@ -1,4 +1,4 @@
-From 5cb806115970b218949d54a2b64fa89c26b8fc4a Mon Sep 17 00:00:00 2001
+From 304175f2a297969296c6f7fe7218c1f4d43dfa40 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:26:57 -0700
 Subject: [PATCH] Contact shadows you notice, no band at the water's edge, a
@@ -18,8 +18,17 @@ Tuning from the first films of the contact shadows (#262) and the water
   the screen.
 - The moon's path: the water's moon is the sky's (moon_dir_white, north-
   west, 24 to 55 degrees up from 23:00 to midnight); the first night film
-  faced away from it. Its glint is broader and brighter (sharpness 160 to
-  64, strength 1.2 to 2.0), a pale shimmer of small glints on the ripples.
+  faced away from it. Its glint is now a lane, not a lobe: a ripple glints
+  where its mirrored ray comes within about 2.6 degrees of the moon's
+  bearing, over a long run of elevation toward the horizon and a short one
+  toward the camera, at strength 0.8, with a faint unbroken path under the
+  glints. The calm night ripples break it into glints along a narrow lane,
+  dark water either side. (Revised after the second night film, #270, take
+  271: a broader, brighter lobe, sharpness 64 at 2.0, made a white blaze
+  round the hero, 16% of the frame above 230/255, and a white fleck on
+  every ripple across the lake. A test of that frame's geometry finds 4.8%
+  of the water bright in the lane against 34.6% for the lobe, and nothing
+  bright off the moon's line.)
 - Froth round something standing in the water: a ring of six points on
   the surface finds the step the legs make in the bed behind it, and a
   lumpy froth spreads out from their outline, thinning over the ripples,
@@ -30,16 +39,16 @@ Tuning from the first films of the contact shadows (#262) and the water
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
- crates/benilla-assets/src/shaders/liquid.wgsl | 52 +++++++++++++++--
- crates/benilla-world/src/look/grade.rs        | 26 +++++----
- crates/benilla-world/src/look/water.rs        | 58 ++++++++++++++++++-
- 3 files changed, 119 insertions(+), 17 deletions(-)
+ crates/benilla-assets/src/shaders/liquid.wgsl |  99 ++++++++-
+ crates/benilla-world/src/look/grade.rs        |  26 ++-
+ crates/benilla-world/src/look/water.rs        | 202 +++++++++++++++++-
+ 3 files changed, 300 insertions(+), 27 deletions(-)
 
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index abf81c2..71b51a4 100644
+index db5da61..bd56d15 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
-@@ -223,6 +223,14 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
+@@ -223,6 +223,20 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
  const WATER_SSR_STEPS: u32 = 24u;
  const WATER_SSR_REFINE: u32 = 5u;
  const WATER_SSR_START: f32 = 0.3;
@@ -51,10 +60,16 @@ index abf81c2..71b51a4 100644
 +const WATER_FROTH_YD: f32 = 0.45;
 +const WATER_FROTH_REACH: f32 = 40.0;
 +const WATER_FROTH_TAPS: u32 = 6u;
++// `look::water::tune`'s `MOON_LANE_FAR`, `MOON_LANE_NEAR` and `MOON_SHEEN_LANE` (the same test
++// compares them): the moon's lane runs this far below its elevation (radians) toward the horizon,
++// this far above toward the camera, and its faint unbroken path is this wide.
++const WATER_MOON_FAR: f32 = 0.5;
++const WATER_MOON_NEAR: f32 = 0.12;
++const WATER_MOON_SHEEN_LANE: f32 = 0.07;
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
  // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
  const WATER_SHADOW_TAPS: u32 = 6u;
-@@ -333,7 +341,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+@@ -333,7 +347,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
              }
              let uh = water_uv(view.clip_from_world * vec4<f32>(P + R * hi, 1.0));
              let border = min(min(uh.x, 1.0 - uh.x), min(uh.y, 1.0 - uh.y));
@@ -65,7 +80,36 @@ index abf81c2..71b51a4 100644
              return vec4<f32>(textureSampleLevel(scene_tex, scene_samp, uh, 0.0).rgb, weight);
          }
          t_prev = t;
-@@ -601,6 +611,10 @@ fn look_water(
+@@ -477,6 +493,28 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
+     return water_decode(water_encode(sky) * (1.0 - c.a) + c.rgb);
+ }
+ 
++// The moon's lane (`look::water::tune::MOON_LANE`; its tests mirror this): how near the mirrored
++// ray `R` comes to the moon `L` (both unit), across its bearing (half-width `width`, radians) and
++// along its elevation (far toward the horizon, near toward the camera), as a soft weight 0 to 1.
++fn water_moon_lane(R: vec3<f32>, L: vec3<f32>, width: f32) -> f32 {
++    let flat = vec2<f32>(L.x, L.z);
++    let fl = length(flat);
++    if (fl < 1e-3) {
++        return 0.0;
++    }
++    let toward = flat / fl;
++    let side = vec2<f32>(-toward.y, toward.x);
++    let rf = vec2<f32>(R.x, R.z);
++    let ahead = dot(rf, toward);
++    if (ahead <= 0.0) {
++        return 0.0;
++    }
++    let across = dot(rf, side) / width;
++    let el = atan2(R.y, ahead) - asin(clamp(L.y, -1.0, 1.0));
++    let along = el / select(WATER_MOON_NEAR, WATER_MOON_FAR, el < 0.0);
++    return exp(-(across * across) - along * along);
++}
++
+ // One texel's compare of the sun-shadow map, and a bilinear-weighted compare of the four around
+ // `t` (texel units), as terrain.wgsl's.
+ fn water_shadow_texel(c: vec2<i32>, layer: i32, z: f32, lim: i32) -> f32 {
+@@ -614,28 +652,73 @@ fn look_water(
      if (fres > 0.01) {
          hit = water_reflection(P, R, jitter, water.rows[7].x);
      }
@@ -76,7 +120,31 @@ index abf81c2..71b51a4 100644
      var mirror = mix(water_sky(R), water_decode(hit.rgb), hit.a);
      mirror *= 1.0 - water.rows[9].y * (1.0 - vis);
  
-@@ -617,12 +631,42 @@ fn look_water(
+-    // The glint: the sun's (or the moon's) highlight on the ripples, sharp, with a soft sheen.
++    // The glint: the sun's highlight on the ripples, sharp, with a soft sheen; or by night the
++    // moon's lane (a negative sharpness, its half-width): the ripples whose mirrored rays come
++    // near the moon glint along a narrow lane toward it, over a faint unbroken path off the flat
++    // water (row 8 `.w` its share), dark water either side.
+     let body_dir = water.rows[1].xyz;
+     var glint = vec3<f32>(0.0);
+     if (water.rows[1].w > 0.0 && body_dir.y > -0.05) {
+-        let H = normalize(normalize(body_dir) + V);
+-        let nh = clamp(dot(N, H), 0.0, 1.0);
+         let sharp = water.rows[2].w;
+-        let spec = pow(nh, sharp) + water.rows[8].w * pow(nh, sharp * 0.04);
++        var spec = 0.0;
++        if (sharp > 0.0) {
++            let H = normalize(normalize(body_dir) + V);
++            let nh = clamp(dot(N, H), 0.0, 1.0);
++            spec = pow(nh, sharp) + water.rows[8].w * pow(nh, sharp * 0.04);
++        } else {
++            let L = normalize(body_dir);
++            let R_flat = vec3<f32>(-V.x, max(V.y, 0.01), -V.z);
++            spec = water_moon_lane(R, L, -sharp)
++                + water.rows[8].w * water_moon_lane(normalize(R_flat), L, WATER_MOON_SHEEN_LANE);
++        }
+         glint = water.rows[2].rgb * (water.rows[1].w * spec * vis * shore);
+     }
  
      // The foam: a soft line just off the waterline under the foam depth, broken up and lapping.
      let fd = max(water.rows[7].z, 0.01);
@@ -202,26 +270,40 @@ index ac8e1d4..e8762af 100644
      key(
          21,
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index 51196b7..4738bf8 100644
+index 51196b7..1aef9da 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -72,8 +72,13 @@ pub mod tune {
+@@ -72,8 +72,27 @@ pub mod tune {
      /// Blinn sharpness, and the moon's (broader, a path across the water, pale and faint).
      pub const SUN_GLINT: f32 = 6.0;
      pub const SUN_SHARPNESS: f32 = 900.0;
 -    pub const MOON_GLINT: f32 = 1.2;
 -    pub const MOON_SHARPNESS: f32 = 160.0;
-+    /// 2.0, was 1.2: the first night film found no path at 1.2 (it also faced away from the
-+    /// moon); a broad, pale shimmer wants more of it spread wider.
-+    pub const MOON_GLINT: f32 = 2.0;
-+    /// 64, was 160: a lobe about 8° wide instead of 5°, so the night's calm ripples spread the
-+    /// moon into a path of small glints across the water, still sharp enough not to read as a
-+    /// mirror of the disc.
-+    pub const MOON_SHARPNESS: f32 = 64.0;
++    /// 0.8, was 2.0 (and 1.2 before that): the second night film (23:30, facing the moon) found
++    /// 2.0 on a lobe of sharpness 64 a white blaze round the hero, 16% of the frame above 230/255,
++    /// and a white fleck on every ripple across the lake. The moon's glint is now a lane
++    /// ([`MOON_LANE`]), at most this strong: pale, under white.
++    pub const MOON_GLINT: f32 = 0.8;
++    /// The moon's glint is a lane toward it, not a lobe round its mirror point: a ripple glints
++    /// where its mirrored ray comes within about this many radians of the moon's bearing (the
++    /// lane's half-width, about 2.6°), so the calm night ripples (which tilt a mirrored ray about
++    /// a tenth of a radian) break it into glints along a narrow lane, dark water either side and
++    /// none far off the moon's line. It runs [`MOON_LANE_FAR`] radians of the ray's elevation
++    /// below the moon's own toward the horizon and [`MOON_LANE_NEAR`] above it toward the camera,
++    /// so it reaches out across the lake and never pools round the hero. Packed as the glint's
++    /// sharpness, negative, which marks the lane in `liquid.wgsl` (the sun's is a Blinn lobe).
++    pub const MOON_LANE: f32 = 0.045;
++    pub const MOON_LANE_FAR: f32 = 0.5;
++    pub const MOON_LANE_NEAR: f32 = 0.12;
++    /// Under the glints, a faint unbroken lane off the flat water, this share of them and
++    /// [`MOON_SHEEN_LANE`] radians wide: the pale path the glints sit in (the sun's soft sheen,
++    /// [`SHEEN`], is the moon's no longer).
++    pub const MOON_SHEEN: f32 = 0.12;
++    pub const MOON_SHEEN_LANE: f32 = 0.07;
      pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
      /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
      /// cloud: a full overcast keeps this share of it.
-@@ -86,9 +91,27 @@ pub mod tune {
+@@ -86,9 +105,27 @@ pub mod tune {
      pub const SHADOW_DIM: f32 = 0.3;
      /// The reflection march: how far a mirrored ray is followed (yards).
      pub const SSR_REACH: f32 = 160.0;
@@ -250,7 +332,169 @@ index 51196b7..4738bf8 100644
      /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
      /// hard edge.
      pub const SHORE_SOFT: f32 = 0.15;
-@@ -520,6 +543,35 @@ mod tests {
+@@ -213,7 +250,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
+ 
+ /// The glint's body this frame: the visible sun while it is up, else the white moon, each fading
+ /// in as it rises and dimmed by cloud: `(camera to body, strength, colour (linear), sharpness)`;
+-/// strength 0 while neither is up.
++/// strength 0 while neither is up. The moon's sharpness is its lane's half-width, negative
++/// ([`tune::MOON_LANE`]).
+ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
+     let rise = |dir: Vec3| {
+         smoothstep(
+@@ -239,7 +277,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
+         moon,
+         tune::MOON_GLINT * rise(moon) * cloud,
+         tune::MOON_TINT,
+-        tune::MOON_SHARPNESS,
++        -tune::MOON_LANE,
+     )
+ }
+ 
+@@ -308,7 +346,13 @@ pub fn pack_rows(
+         tune::FOAM_DEPTH,
+         tune::SHORE_SOFT,
+     ];
+-    rows[8] = [middle[0], middle[1], middle[2], tune::SHEEN];
++    // The sheen round the sun's glint, or the moon's faint unbroken lane.
++    let sheen = if sharpness < 0.0 {
++        tune::MOON_SHEEN
++    } else {
++        tune::SHEEN
++    };
++    rows[8] = [middle[0], middle[1], middle[2], sheen];
+     rows[9] = [
+         tune::CLASSIC_RIPPLES,
+         tune::SHADOW_DIM,
+@@ -429,8 +473,116 @@ mod tests {
+         assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
+     }
+ 
+-    /// By day the glint is the sun's, sharp and in the disc's colour; by night the moon's, broad
+-    /// and pale; with neither up, none.
++    /// `liquid.wgsl`'s `water_moon_lane`: how near a mirrored ray `r` comes to the moon `l` (unit),
++    /// across its bearing (half-width `width`) and along its elevation.
++    fn moon_lane(r: Vec3, l: Vec3, width: f32) -> f32 {
++        let flat = Vec2::new(l.x, l.z);
++        if flat.length() < 1e-3 {
++            return 0.0;
++        }
++        let toward = flat.normalize();
++        let side = Vec2::new(-toward.y, toward.x);
++        let rf = Vec2::new(r.x, r.z);
++        let ahead = rf.dot(toward);
++        if ahead <= 0.0 {
++            return 0.0;
++        }
++        let across = rf.dot(side) / width;
++        let el = r.y.atan2(ahead) - l.y.clamp(-1.0, 1.0).asin();
++        let along = el
++            / if el < 0.0 {
++                tune::MOON_LANE_FAR
++            } else {
++                tune::MOON_LANE_NEAR
++            };
++        (-(across * across) - along * along).exp()
++    }
++
++    /// The second night film's lake at 23:30, facing the moon (41° up), the camera 4 yd over calm
++    /// water and pitched 24° down, every pixel's mirrored ray tilted by the night's ripples: the
++    /// moon's glint is a narrow lane toward it, at most pale (under white before the mirror), a
++    /// small share of the water bright, none of it far off the moon's line, and dark water either
++    /// side. With 0070's lobe (strength 2.0, sharpness 64, the sun's sheen) the same frame was
++    /// bright over a wide pool round the mirror point and flecked on the ripples out to the edges.
++    #[test]
++    fn the_moon_lays_a_lane_not_a_pool() {
++        let night = WowLighting {
++            celestial_dir: Vec3::new(0.0, -0.5, 1.0).normalize(),
++            moon_dir_white: {
++                let e = 41f32.to_radians();
++                Vec3::new(e.cos(), e.sin(), 0.0)
++            },
++            ..noon()
++        };
++        let (l, strength, color, sharp) = glint(&night);
++        assert!(sharp < 0.0, "the moon packs a lane");
++        let slope = tune::RIPPLE_CALM;
++        let (w, h) = (160, 90);
++        let pitch = (-24f32).to_radians();
++        let ty = (std::f32::consts::FRAC_PI_4 * 0.5).tan();
++        let tx = ty * 16.0 / 9.0;
++        let (mut water, mut bright, mut far_off, mut peak) = (0, 0, 0, 0.0f32);
++        let (mut old_bright, mut old_far_off) = (0, 0);
++        for j in 0..h {
++            for i in 0..w {
++                let sx = ((i as f32 + 0.5) / w as f32 * 2.0 - 1.0) * tx;
++                let sy = (1.0 - (j as f32 + 0.5) / h as f32 * 2.0) * ty;
++                // Facing +x (the moon's bearing), pitched down.
++                let fwd = Vec3::new(pitch.cos(), pitch.sin(), 0.0);
++                let up = Vec3::new(-pitch.sin(), pitch.cos(), 0.0);
++                let d = (fwd + up * sy + Vec3::Z * sx).normalize();
++                if d.y >= -0.01 {
++                    continue;
++                }
++                water += 1;
++                // The ripples: a deterministic tilt of about the night's slope.
++                let k = (i * 7919 + j * 104_729) as f32;
++                let n =
++                    Vec3::new(slope * (k * 0.37).sin(), 1.0, slope * (k * 0.61).cos()).normalize();
++                let v = -d;
++                let mut r = d - 2.0 * d.dot(n) * n;
++                r.y = r.y.max(0.01);
++                let r = r.normalize();
++                let rf = Vec3::new(d.x, -d.y, d.z);
++                let spec = moon_lane(r, l, -sharp)
++                    + tune::MOON_SHEEN * moon_lane(rf, l, tune::MOON_SHEEN_LANE);
++                let g = strength * spec * color[2];
++                peak = peak.max(g);
++                let bearing = (d.z / Vec2::new(d.x, d.z).length()).asin().abs();
++                if g > 0.25 {
++                    bright += 1;
++                    if bearing > 0.3 {
++                        far_off += 1;
++                    }
++                }
++                // 0070 as filmed: a Blinn lobe of 64 at 2.0, with the sun's sheen.
++                let hv = (l + v).normalize();
++                let nh = n.dot(hv).clamp(0.0, 1.0);
++                let old = 2.0 * (nh.powf(64.0) + tune::SHEEN * nh.powf(64.0 * 0.04));
++                if old > 0.25 {
++                    old_bright += 1;
++                    if bearing > 0.3 {
++                        old_far_off += 1;
++                    }
++                }
++            }
++        }
++        let share = bright as f32 / water as f32;
++        let old_share = old_bright as f32 / water as f32;
++        assert!(peak < 0.95, "the lane stays pale: peak {peak}");
++        assert!(
++            share > 0.002 && share < 0.06,
++            "a narrow lane: {share} of the water"
++        );
++        assert_eq!(far_off, 0, "nothing bright far off the moon's line");
++        assert!(
++            old_share > 4.0 * share && old_far_off > 0,
++            "0070's lobe: {old_share} bright, {old_far_off} far off"
++        );
++    }
++
++    /// By day the glint is the sun's, sharp and in the disc's colour; by night the moon's lane,
++    /// pale; with neither up, none.
+     #[test]
+     fn the_glint_follows_the_sun_then_the_moon() {
+         let day = noon();
+@@ -447,7 +599,7 @@ mod tests {
+         let (dir, s, color, sharp) = glint(&night);
+         assert!((dir - night.moon_dir_white).length() < 1e-6);
+         assert!((s - tune::MOON_GLINT).abs() < 1e-4);
+-        assert_eq!((color, sharp), (tune::MOON_TINT, tune::MOON_SHARPNESS));
++        assert_eq!((color, sharp), (tune::MOON_TINT, -tune::MOON_LANE));
+         let dark = WowLighting {
+             moon_dir_white: Vec3::new(0.0, -0.3, 1.0).normalize(),
+             ..night
+@@ -520,6 +672,38 @@ mod tests {
          assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
      }
  
@@ -276,6 +520,9 @@ index 51196b7..4738bf8 100644
 +        assert_eq!(f("WATER_FROTH"), tune::FROTH);
 +        assert_eq!(f("WATER_FROTH_YD"), tune::FROTH_YD);
 +        assert_eq!(f("WATER_FROTH_REACH"), tune::FROTH_REACH);
++        assert_eq!(f("WATER_MOON_FAR"), tune::MOON_LANE_FAR);
++        assert_eq!(f("WATER_MOON_NEAR"), tune::MOON_LANE_NEAR);
++        assert_eq!(f("WATER_MOON_SHEEN_LANE"), tune::MOON_SHEEN_LANE);
 +        let taps = read("WATER_FROTH_TAPS", "u32");
 +        assert_eq!(
 +            taps.trim_end_matches('u').parse::<u32>().unwrap(),
