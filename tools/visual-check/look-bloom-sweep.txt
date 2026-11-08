@@ -1,0 +1,40 @@
+# The new look's bloom at night, swept: Fireball under the grade's own bloom, then held at 0.6, 1.2
+# and 2.5 (threshold 0.4), then 1.12's look. Look for the glow spreading past the fireball and onto
+# the dark around it. If even 2.5 shows nothing, the bloom isn't reaching the screen at all.
+hero warrior
+cam 0 -4 7
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.4 .es slot q fireball
+5.00 lua ConsoleExec("lookbloom grade")
+5.50 .es in ab 0 0
+5.70 .es in a {facing} 0
+5.75 .es in au {facing} 0
+5.60 shots grade 6 0.12
+8.50 lua ConsoleExec("lookbloom 0.6")
+9.00 .es in ab 0 0
+9.20 .es in a {facing} 0
+9.25 .es in au {facing} 0
+9.10 shots b06 6 0.12
+12.00 lua ConsoleExec("lookbloom 1.2")
+12.50 .es in ab 0 0
+12.70 .es in a {facing} 0
+12.75 .es in au {facing} 0
+12.60 shots b12 6 0.12
+15.50 lua ConsoleExec("lookbloom 2.5 0.4")
+16.00 .es in ab 0 0
+16.20 .es in a {facing} 0
+16.25 .es in au {facing} 0
+16.10 shots b25 6 0.12
+19.0 lua ConsoleExec("lookbloom grade")
+19.0 lua SetCVar("worldLook", "0")
+19.05 lua ClearWorldFog()
+19.50 .es in ab 0 0
+19.70 .es in a {facing} 0
+19.75 .es in au {facing} 0
+19.6 shots old 6 0.12
+22.5 end

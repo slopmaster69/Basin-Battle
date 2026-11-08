@@ -1,0 +1,47 @@
+# The air (client 0073): Goldshire's lit windows seen from afar at night, from about 282 yd to the
+# north-east, on the road toward Northshire (WoW x -9200, y -60, on the ground), the camera facing Goldshire (yaw 157) and pitched a
+# little down. One of three vantage points (look-air-windows-ne, -east, -south); a hill, the woods
+# or the road's bend may hide the town from one of them: say which shows it best.
+# At 23:30 with the far windows as tuned, then lookwindows 0 and 2, then through mist (lookmist 3),
+# then 21:00 (the windows' own night track half up), then worldLook 0.
+# Look for:
+# - Goldshire as a cluster of small warm points of light where the buildings are (the inn, the
+#   smithy, the houses), each a bright core of a pixel or two with a soft halo the bloom picks up;
+# - the glows hidden by any hill or tree in front, not showing through it;
+# - still there in the mist (dimmer, a little), where the buildings themselves are lost;
+# - about half as bright at 21:00, none at worldLook 0 or lookwindows 0 (1.12's own windows only,
+#   a few dim pixels at this distance).
+# The goto line answers with where the hero landed; if it says the spot is under the map or in
+# water, say so.
+hero warrior
+cam 157 -4 4
+include _look_setup
+1.0 .es goto -9200 -60
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("lookweather clear")
+4.25 lua ConsoleExec("lookmist grade")
+4.3 lua ConsoleExec("lookwindows 1")
+6.0 video
+6.5 shots windows 3 0.5
+8.5 lua ConsoleExec("lookwindows 0")
+9.5 shots lookwindows-0 2 0.5
+11.0 lua ConsoleExec("lookwindows 2")
+12.0 shots lookwindows-2 2 0.5
+13.5 lua ConsoleExec("lookwindows 1")
+13.55 lua ConsoleExec("lookmist 3")
+15.0 shots mist-3 2 0.5
+16.5 lua ConsoleExec("lookmist grade")
+16.55 lua ConsoleExec("worldclock 1260")
+16.6 lua ClearWorldFog()
+18.0 shots at-2100 2 0.5
+19.5 lua ConsoleExec("worldclock 1410")
+19.55 lua SetCVar("worldLook", "0")
+19.6 lua ClearWorldFog()
+21.0 shots classic 2 0.5
+22.5 lua SetCVar("worldLook", "1")
+22.55 lua ClearWorldFog()
+22.6 lua ConsoleExec("lookweather server")
+24 end

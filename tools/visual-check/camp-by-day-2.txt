@@ -1,0 +1,18 @@
+# Elwynn by day (content: [world] clock = [10, 0]), at the camp: the campfire from the east under
+# the test server's pinned night (the first shots after the load has settled), then the clock tuned
+# in play to ten in the morning with the re-pin every 10 s, so the server's own clock path sets the
+# hour; then the rules read back. Take 276's first shots caught the loading screen at the lake.
+# Look for: the night camp first (23:30, the mist, the torch pools), then a morning camp: the sun
+# up, the sky blue, the ground lit, the torches small; no frame of a wrong hour.
+hero warrior
+cam 0 -10 9
+include _look_setup
+1.0 .es goto -9617 677.5 36.5 0
+4.0 lua UIParent:Hide()
+4.1 lua SetCVar("worldLook", "1")
+10.0 shots night 3 1.0
+13.5 .es tune world.clock_every 10
+14.0 .es tune world.clock [10, 0]
+30.0 shots day 3 1.0
+33.5 .es tune reload
+34.5 end

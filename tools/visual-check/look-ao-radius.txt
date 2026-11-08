@@ -1,0 +1,24 @@
+# The new look's contact shadows (client 0064): how wide, at Goldshire's inn at golden hour (17:30).
+# The grade's strength at 0.6, 1.2 (the tuned reach) and 2.5 yd, then twice the strength at 0.6 yd.
+# Look for: which reach reads as a soft contact shadow rather than a dark outline (too narrow) or a
+# dirty smudge (too wide); whether a wider reach starts to halo round the hero and the posts.
+hero warrior
+cam 0 -6 8
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldAO", "1")
+4.25 lua ConsoleExec("lookao 1 0.6")
+5.5 shots r0.6 2 0.6
+7.0 lua ConsoleExec("lookao 1 1.2")
+8.0 shots r1.2 2 0.6
+9.5 lua ConsoleExec("lookao 1 2.5")
+10.5 shots r2.5 2 0.6
+12.0 lua ConsoleExec("lookao 2 0.6")
+13.0 shots x2-r0.6 2 0.6
+14.5 lua ConsoleExec("lookao grade")
+15.5 shots grade 2 0.6
+17 end

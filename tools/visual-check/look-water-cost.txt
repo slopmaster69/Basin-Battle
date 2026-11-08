@@ -1,0 +1,23 @@
+# The new look's water (client 0066): what it costs. Crystal Lake filling the frame at 17:30,
+# standing still, the fps journal on (benilla-config/Diagnostics/fps-journal.csv): 8 s with
+# worldWater 1, 8 s with 0, 8 s with 1 again.
+# Look for: in the CSV, gpu_ms and the transparent column (the water's own shader) and "other"
+# (the scene copy) with it on against off.
+hero warrior
+cam 160 1 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua SetCVar("fpsJournal", "1")
+6.0 shots cost-on 1 1.0
+12.5 lua SetCVar("worldWater", "0")
+14.0 shots cost-off 1 1.0
+20.5 lua SetCVar("worldWater", "1")
+22.0 shots cost-on-again 1 1.0
+28.5 lua SetCVar("fpsJournal", "0")
+29 end

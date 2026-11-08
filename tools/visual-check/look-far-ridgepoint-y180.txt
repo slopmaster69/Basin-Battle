@@ -1,0 +1,23 @@
+# #215's longer view at noon (worldclock 720) from ridgepoint, heading 180, a level camera, the
+# server's night fog cleared: the view slider at 1.12's default (farclip 350: 1200 yd under the
+# new look), then at the top (777: 2000 yd), then 1.12's look at 350 (350 yd). Look for how far
+# the land goes before the fog, and no holes or pop-in at the edge.
+hero warrior
+cam 180 -6 2.5
+include _setup
+4.2 .es dummy clear
+4.5 .es goto ridgepoint
+6.0 lua ConsoleExec("worldclock 720")
+6.1 lua ClearWorldFog()
+6.2 lua UIParent:Hide()
+6.3 lua SetCVar("farclip","350")
+8.0 shots far350 2 0.6
+9.5 lua SetCVar("farclip","777")
+9.6 lua ClearWorldFog()
+12.0 shots far777 2 0.6
+13.5 lua SetCVar("worldLook","0")
+13.6 lua SetCVar("farclip","350")
+13.7 lua ClearWorldFog()
+15.0 shots old 2 0.6
+16.5 lua SetCVar("worldLook","1")
+17 end

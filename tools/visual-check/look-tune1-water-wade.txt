@@ -1,0 +1,35 @@
+# The foam round a wading hero (client 0070, `look-tune-1`): Crystal Lake at golden hour (17:30), the
+# same shot as the first films' wade (take 242). The hero runs into the shallows, stands, goes
+# deeper, stands, then worldWater 0 and 1.12's look, then runs back out.
+# Look for: where the legs meet the water, a soft, lumpy, uneven froth that follows the legs'
+# outline and thins out over the ripples around them; no crisp, thin, bright oval ring (a
+# selection circle on the floor). On the right, the shore foam a softer, broken band, patchy
+# with the ripples, not an even bright white line. The legs still seen through the clear water.
+hero warrior
+cam 200 -14 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+5.5 shots start 1 0.5
+6.0 lua ActionDash(2.0, 3, "f")
+6.1 shots wade-in 10 0.2
+8.5 shots standing 4 0.4
+10.5 lua ActionDash(1.5, 3, "f")
+10.6 shots deeper 8 0.2
+12.5 shots standing-deep 4 0.4
+14.0 lua SetCVar("worldWater", "0")
+14.8 shots worldwater-0 2 0.4
+15.7 lua SetCVar("worldWater", "1")
+15.75 lua SetCVar("worldLook", "0")
+15.8 lua ClearWorldFog()
+16.6 shots classic 2 0.4
+17.5 lua SetCVar("worldLook", "1")
+17.55 lua ClearWorldFog()
+18.0 lua ActionDash(2.0, 3, "b")
+18.1 shots wade-out 10 0.2
+21 end

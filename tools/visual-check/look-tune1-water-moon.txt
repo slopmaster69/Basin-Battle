@@ -1,0 +1,38 @@
+# The moon's path on the water (client 0070, `look-tune-1`): Crystal Lake at 23:00 and 23:30 (the
+# server's own night hour), facing the moon. Where the moon is: the sky code (`daynight::
+# moon_direction`) keeps the white moon on the sun's bearing, azimuth 45 degrees in WoW's frame
+# (+x north, +y west), so north-west, map facing (yaw) 45; its elevation table puts it 24 degrees up
+# at 23:00, 41 at 23:30 and 55 at midnight. The first night film looked at yaw 160, with the moon
+# behind the camera. The camera holds yaw 45 while the hero backs off south-east into the lake
+# (the goto lands on its north shore; yaw 200 looks across it), so the camera stands over the
+# water looking back north-west at the moon. Its path lies about 6 to 11 yd ahead on the water.
+# The tuned water, ripples, then worldWater 0 and 1.12's look.
+# Look for: a broad, pale, broken shimmer on the water toward the moon, a path of moonlight made
+# of many small glints on the ripples, not a mirror image of the moon and nothing as bright as
+# day; the night sky's dark blue elsewhere in the water. (If the hero stays on land, try a longer
+# dash or `cam 45 -24 14`; the moon itself is above the frame, the path below it.)
+hero warrior
+cam 45 -24 10
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.5 lua ActionDash(3.5, 7, "b")
+8.5 shots moon-2300 3 0.5
+10.1 shots ripples-2300 8 0.25
+12.5 lua ConsoleExec("worldclock 1410")
+13.5 shots moon-2330 3 0.5
+15.1 lua SetCVar("worldWater", "0")
+16.0 shots worldwater-0 2 0.5
+17.1 lua SetCVar("worldWater", "1")
+17.15 lua SetCVar("worldLook", "0")
+17.2 lua ClearWorldFog()
+18.0 shots classic 2 0.5
+19.1 lua SetCVar("worldLook", "1")
+19.15 lua ClearWorldFog()
+20.0 shots tuned-again 2 0.5
+21 end

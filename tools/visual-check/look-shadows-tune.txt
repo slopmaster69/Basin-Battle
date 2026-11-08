@@ -1,0 +1,28 @@
+# The new look's sun shadows (client 0065): the tuning at Goldshire's inn, golden hour (17:30),
+# high. Strength 0.5, 1, 1.2, then reach 120, 180, 300.
+# Look for: which strength reads painterly rather than a black cut-out or too faint; whether the
+# longer reach costs crispness on the near shadows (the slices spread) and where the far fade sits.
+hero warrior
+cam 0 -6 8
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookshadow 0.5")
+6.5 shots s0.5 2 0.6
+8.0 lua ConsoleExec("lookshadow 1")
+9.5 shots s1 2 0.6
+11.0 lua ConsoleExec("lookshadow 1.2")
+12.5 shots s1.2 2 0.6
+14.0 lua ConsoleExec("lookshadow 1 120")
+15.5 shots d120 2 0.6
+17.0 lua ConsoleExec("lookshadow 1 180")
+18.5 shots d180 2 0.6
+20.0 lua ConsoleExec("lookshadow 1 300")
+21.5 shots d300 2 0.6
+23.0 lua ConsoleExec("lookshadow grade")
+24.5 shots grade 2 0.6
+26 end
