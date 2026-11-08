@@ -249,7 +249,7 @@ impl Survival {
     /// A string done: now and then it gives ground, facing its foe (a beast circling back, a
     /// fighter stepping out of reach to make you come to it).
     pub(crate) fn maybe_give_ground(&mut self, id: Id, hero: Id) {
-        if self.is_kitchen(id) { return; }
+        if self.is_kitchen(id) || self.is_vancleef(id) { return; }
         let ai = self.content.ai.clone();
         // Its temperament's own: a boss too, when it says so.
         let (chance, yards, own) = match self.temper(id) {
@@ -428,7 +428,7 @@ impl Survival {
     /// With `vary`, a boss's string up close may stop one short or run one longer, and may have
     /// one of its blows held a beat.
     pub(crate) fn begin_pattern(&mut self, id: Id, k: usize, vary: bool) {
-        let vary = vary && !self.has_arsenal(id) && !self.is_machine(id) && !self.is_kitchen(id);
+        let vary = vary && !self.has_arsenal(id) && !self.is_machine(id) && !self.is_kitchen(id) && !self.is_vancleef(id);
         let ai = self.content.ai.clone();
         let Some(m) = self.mobs.get(&id) else { return };
         let d = &self.content.mobs[m.def];
@@ -471,7 +471,7 @@ impl Survival {
     /// A boss's string up close done: now and then it goes straight into another (its rest cut
     /// to nothing), not past three close strings in a row.
     pub(crate) fn maybe_chain(&mut self, id: Id) {
-        if self.has_arsenal(id) || self.is_machine(id) || self.is_kitchen(id) { return; }
+        if self.has_arsenal(id) || self.is_machine(id) || self.is_kitchen(id) || self.is_vancleef(id) { return; }
         let chain = self.content.ai.chain;
         let Some(m) = self.mobs.get(&id) else { return };
         let d = &self.content.mobs[m.def];
@@ -490,7 +490,7 @@ impl Survival {
     /// its blows from afar (a charge, a lunge, a throw) can come from, the likelier the more
     /// close strings it has done in a row, and less with a band on it. Whether it did.
     pub(crate) fn maybe_make_space(&mut self, id: Id, hero: Id) -> bool {
-        if self.has_arsenal(id) || self.is_machine(id) || self.is_kitchen(id) { return false; }
+        if self.has_arsenal(id) || self.is_machine(id) || self.is_kitchen(id) || self.is_vancleef(id) { return false; }
         let ai = self.content.ai.clone();
         let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return false };

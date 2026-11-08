@@ -1673,6 +1673,7 @@ impl Survival {
             } else if standing {
                 self.events.push(Event::React { id: mid, anim: WOUND_ANIM, from: pos, lean: lean * 0.7, hold: 0.0, fit: 0.0 });
             }
+            if damage > 0 { self.vancleef_hit(mid, id, pos); }
             // Shield Wall's bash drives a creature back off the shield, still reeling.
             if standing && shoved && strike.wall_bash() {
                 let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: WALL_BASH.push, from_caster: true, ..Default::default() };

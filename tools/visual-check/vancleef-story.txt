@@ -1,0 +1,41 @@
+# Controlled encounter demonstration: debug health changes force posture and story beats.
+# NOT an unassisted kill or balance playtest. Observe native stern geometry and retreat paths.
+# Check: two finite harmless Blackguards, smoke clears BEFORE the arrival cue and advance,
+# at 30% they walk away, no waves, safe minimum windups and a real final recovery.
+# unbar all opens the secret too: killing VanCleef should hand off to exactly one Unbowed.
+hero warrior
+cam 0 -28 15
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es clearfoes
+12 .es unbar all
+13 .es goto -92 -820 39.5 0
+14 .es heal
+15 .es spawn dm_vancleef
+15.1 video
+16 shots approach 12 0.4
+20 .es heal
+22 shots duel 24 0.3
+28 .es heal
+30 .es hurt 0.65 vancleef
+30.1 shots retreat 36 0.25
+35 .es heal
+40 .es heal
+44 .es hurt 0.30 vancleef
+44.1 shots brotherhood 40 0.25
+49 .es heal
+54 .es heal
+58 .es hurt 0.11 vancleef
+58.1 shots final 48 0.25
+63 .es heal
+68 .es heal
+73 .es hurt 0 vancleef
+73.1 shots handoff 24 0.25
+79 .es heal
+80 shots unbowed 36 0.3
+85 .es heal
+91 .es hurt 0 vancleef
+91.1 shots cleanup 12 0.25
+96 end
