@@ -15,6 +15,7 @@ const LAND_STUN: f32 = 2.4;
 const FIRST_OVERFLOW: f32 = 8.0;
 const DESCEND_BY: f32 = 26.0;
 const MOLTEN: u32 = 5213;
+const WORK_VALVE: u32 = 21651; // Opening: the goblin's native UseStandingLoop.
 
 fn falling_point(from: Vec3, to: Vec3, t: f32) -> Vec3 {
     [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t,
@@ -69,6 +70,12 @@ enum Place {
 }
 
 impl Survival {
+    /// Encounter props must be present for the whole warning, without the normal 2 sec fade.
+    /// Reuse the client's existing noncolliding, immediate-prop flag; no floor overlay needed.
+    pub fn is_perch_prop(&self, id: Id) -> bool {
+        self.perches.crews.values().any(|c| c.props.contains(&id) || c.steam.iter().any(|(p, _)| *p == id))
+    }
+
     fn perch_prop(&mut self, at: Vec3, display: u32, scale: f32) -> Id {
         let id = self.alloc();
         self.objs.insert(id, Obj { kind: ObjKind::Prop { display, scale }, pos: at, facing: 0.0 });
@@ -164,6 +171,7 @@ impl Survival {
                     m.home = to;
                     m.thrown_lift = 0.0;
                     m.thrown_until = 0.0;
+                    self.events.push(Event::MobGear { id });
                     self.events.push(Event::MobStop { id, pos: to, facing: m.facing });
                     self.events.push(Event::Visual { id, kit: combat::KIT_FALL_DUST, by: None });
                     self.perches.workers.get_mut(&id).unwrap().state = Place::Ground;
@@ -249,7 +257,7 @@ impl Survival {
     /// A real projectile hit, a struck support, or the demonstration drops it exactly once.
     pub(crate) fn drop_perch(&mut self, id: Id) {
         let Some(w) = self.perches.workers.get(&id).filter(|w| matches!(w.state, Place::Perched)) else { return };
-        let (owner, support, platform, to) = (w.owner, w.support, w.platform, w.landing);
+        let (owner, support, platform, base, to) = (w.owner, w.support, w.platform, w.base, w.landing);
         let Some(from) = self.mobs.get(&id).map(|m| m.pos) else { return };
         self.stagger_mob(id, FALL_SECS, false);
         let m = self.mobs.get_mut(&id).unwrap();
@@ -261,7 +269,11 @@ impl Survival {
             self.objs.remove(&prop);
             self.events.push(Event::ObjGone { id: prop });
         }
-        self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+        // The broken wood stays below the falling body. Dust belongs at the landing, where
+        // it cannot hide the release and the first half of this short fall.
+        let debris = self.perch_prop(base, 1108, 1.0);
+        if let Some(c) = self.perches.crews.get_mut(&owner) { c.props.push(debris); }
+        self.events.push(Event::Sound { id, sound: 3720 }); // Native wooden impact.
         let path = (0..=8).map(|k| falling_point(from, to, k as f32 / 8.0)).collect();
         self.events.push(Event::MobMove { id, path, speed: dist2d(from, to) / FALL_SECS, face: None });
         if let Some(c) = self.perches.crews.get_mut(&owner) {
@@ -294,11 +306,17 @@ impl Survival {
     }
 
     fn perch_overflow(&mut self, owner: Id, at: Vec3, warn: f32, radius: f32, damage: u32) {
-        // Native valve steam warns the exact outlet even with optional floor circles hidden.
-        // Keep it local: ordinary ground spell models have an unscaled, room-sized footprint.
+        // Five native vents cover the actual danger's width, not just its center. Their
+        // anchors stay inside the damage disk, leaving the sides of the channel dry. Do not
+        // enlarge a generic ground spell: its native model need not match its damage radius.
         if !self.perches.crews.contains_key(&owner) { return; }
-        let steam = self.perch_prop(at, 353, 0.8);
-        self.perches.crews.get_mut(&owner).unwrap().steam.push((steam, self.clock + warn));
+        let edge = (radius - 0.7).max(0.0);
+        for [x, y] in [[0.0, 0.0], [-edge, 0.0], [edge, 0.0], [0.0, -edge], [0.0, edge]] {
+            let p = self.ground_near(at[0] + x, at[1] + y, at[2]);
+            if (p[2] - at[2]).abs() > 1.0 || self.land.water_near(p[0], p[1], p[2]) { continue; }
+            let steam = self.perch_prop(p, 353, 1.4);
+            self.perches.crews.get_mut(&owner).unwrap().steam.push((steam, self.clock + warn));
+        }
         let mark = self.mark_ground(at, radius, warn, MOLTEN);
         self.missiles.push(combat::Missile { owner, from: at, at, radius, damage,
             blockable: false, heavy: false, land_at: self.clock + warn, mark, look: MOLTEN });
@@ -325,8 +343,12 @@ impl Survival {
                     self.go(id, valve, self.content.mobs[self.mobs[&id].def].run_speed);
                 } else {
                     self.halt(id);
+                    let m = self.mobs.get_mut(&id).unwrap();
+                    m.facing = facing(m.pos, valve);
+                    self.events.push(Event::MobStop { id, pos: m.pos, facing: m.facing });
                     self.yell(id, "Then we'll melt the lot!");
-                    self.events.push(Event::Cast { caster: id, spell: MOLTEN, ms: 2200 });
+                    self.events.push(Event::Cast { caster: id, spell: WORK_VALVE, ms: 2200 });
+                    self.events.push(Event::Sound { id, sound: 3431 }); // Deadmines steam whistle.
                     self.perches.crews.get_mut(&id).unwrap().stage = Stage::Opening { until: now + 2.2 };
                 }
                 true
