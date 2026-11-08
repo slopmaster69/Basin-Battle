@@ -1,0 +1,4 @@
+# The r5 films hide the interface at 4.1, and with it the marks the Elwynn Survival add-on draws
+# on the world frame, which UIParent:Hide() alone leaves up: the staff's mark round the reticle
+# (take 280's orange "aim reticle" in every film), the skill checks' rings and the ward's bar.
+4.1 lua if ElwynnSurvivalStaff then ElwynnSurvivalStaff:SetParent(UIParent) end if ElwynnSurvivalCheck then ElwynnSurvivalCheck:SetParent(UIParent) end if ElwynnSurvivalBarrier then ElwynnSurvivalBarrier:SetParent(UIParent) end UIParent:Hide()

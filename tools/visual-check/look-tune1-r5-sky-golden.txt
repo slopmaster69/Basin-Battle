@@ -1,0 +1,35 @@
+# The golden-hour glare (client 0081, #270's fifth round): the Brackwell pumpkin patch at 17:30,
+# the hero at WoW (-9803, -904), clear of the Defias, facing the sun (yaw 45, the sun about 30
+# degrees up) with the camera pitched up 35, 6 yd back. Take 280's white disc about 40% of the
+# frame wide with a hard rim was 1.12's own sun glare (a quad about 80 degrees across facing the
+# sun) whitened by the look's grade and bloom; under the new look it is now under half as wide and
+# a third as strong. The day's sky, then SkySunGlare 0 (1.12's console command: the glare off, to
+# show what it adds), worldSky 0, worldLook 0 (1.12's own glare, as before).
+# Look for: a warm sky round the sun with a soft glow and a small bright core, no disc with a rim;
+# the share of the frame over 230 (take 280: 25 to 32%; worldLook 0 gave 27% here); new look with
+# SkySunGlare 0 against the new look's own frame.
+hero warrior
+cam 45 35 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looksky grade")
+6.0 shots golden-day 2 0.5
+7.5 lua ConsoleExec("SkySunGlare 0")
+8.5 shots golden-no-glare 2 0.5
+10.0 lua ConsoleExec("SkySunGlare 1")
+10.05 lua SetCVar("worldSky", "0")
+11.0 shots golden-worldsky-0 2 0.5
+12.5 lua SetCVar("worldSky", "1")
+12.55 lua SetCVar("worldLook", "0")
+12.6 lua ClearWorldFog()
+13.5 shots golden-classic 2 0.5
+15.0 lua SetCVar("worldLook", "1")
+15.05 lua ClearWorldFog()
+15.1 lua ConsoleExec("lookweather server")
+17 end
