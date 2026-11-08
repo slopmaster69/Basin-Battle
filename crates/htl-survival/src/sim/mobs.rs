@@ -615,6 +615,8 @@ impl Survival {
         if damage > 0 { self.perch_hurt(mid, by); }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
+        // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
+        let damage = self.boss_hold(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
         if m.health == 0 {
             return;
@@ -1177,6 +1179,7 @@ impl Survival {
     pub(crate) fn step_mobs(&mut self, dt: f32) {
         self.step_rises();
         self.step_boss_fires();
+        self.step_boss_collapse(dt);
         self.step_perch_crews();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
@@ -1248,6 +1251,10 @@ impl Survival {
             }
             // A boss on its run (`sim::bosses`): its run is its thinking.
             if self.step_boss_run(id) {
+                continue;
+            }
+            // A boss holding the line of its collapse: the route and the front set where it goes.
+            if self.step_boss_holdline(id) {
                 continue;
             }
             // A second wind that was due while it reeled comes once it stands again.
@@ -2044,7 +2051,8 @@ impl Survival {
                     self.set_back(id, home, "found no way to its foe nor home");
                     return;
                 }
-                if !raider && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
+                // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
+                if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
                     let gone = match foe {

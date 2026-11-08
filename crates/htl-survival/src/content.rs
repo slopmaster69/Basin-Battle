@@ -1579,6 +1579,12 @@ pub struct DungeonDef {
     /// The boss (a pack's key) that must be down for the front door to open.
     #[serde(default)]
     pub exit_boss: String,
+    /// Other ways out, open on the same terms (the smugglers' sea tunnel, once the mine has come
+    /// down on the front door), and what the banner says when they open (empty: the front door's).
+    #[serde(default)]
+    pub more_exits: Vec<[f32; 3]>,
+    #[serde(default)]
+    pub way_out: String,
     /// The lamp's quartermaster: what plunder buys (item key to its price).
     #[serde(default)]
     pub trade: BTreeMap<String, u32>,
@@ -2376,6 +2382,45 @@ pub struct EnrageDef {
     /// later (a heavy blow), and a dry way left between them.
     #[serde(default)]
     pub debris: Vec<[f32; 3]>,
+    /// Rocks brought down round it, wherever it stands, this far out (0: none): six falls in a
+    /// ring, dust first.
+    #[serde(default)]
+    pub rocks_round: f32,
+    /// The place coming down behind the heroes (`sim::bosses`'s collapse): a front that runs
+    /// along a route, everything behind it buried.
+    #[serde(default)]
+    pub collapse: Option<CollapseDef>,
+}
+
+/// A collapse (`[mob.phase.collapse]`): a front runs along `route` (the heroes' way out, point to
+/// point) at `speed` yards a second. Behind it rock is falling everywhere and a hero there is
+/// crushed (`crush`, a share of their health each second); for `lead` yards ahead of it dust
+/// trickles and lighter rocks come down, and those heroes are warned. The boss fights on through
+/// it, unhurt, and can't be brought below `hold` of its health until the front reaches the route's
+/// end, where it yells `end_text` and the last of the fight is fought.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CollapseDef {
+    pub route: Vec<[f32; 3]>,
+    pub speed: f32,
+    #[serde(default = "collapse_lead")]
+    pub lead: f32,
+    #[serde(default = "collapse_crush")]
+    pub crush: f32,
+    #[serde(default)]
+    pub hold: f32,
+    #[serde(default)]
+    pub end_text: String,
+    /// Yelled the first time a blow would have brought it below `hold` before the end.
+    #[serde(default)]
+    pub held_text: String,
+}
+
+fn collapse_lead() -> f32 {
+    12.0
+}
+
+fn collapse_crush() -> f32 {
+    0.2
 }
 
 /// Burning ground a boss's heavy blow leaves (`[mob.phase.burn]`): how wide, what it does each

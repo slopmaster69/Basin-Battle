@@ -1485,7 +1485,7 @@ impl Survival {
             self.events.push(Event::Banner {
                 player: None,
                 title: "The Way Out".into(),
-                sub: if d.key == "deadmines" { "The front door is open. Walk out into Moonbrook".into() } else { "The way out is open".into() },
+                sub: if !d.way_out.is_empty() { d.way_out.clone() } else if d.key == "deadmines" { "The front door is open. Walk out into Moonbrook".into() } else { "The way out is open".into() },
             });
         }
         // Every boss down in this run: the dungeon is cleared, and the camp hears of it. A first
@@ -1859,8 +1859,7 @@ impl Survival {
                 .iter()
                 .filter(|(_, p)| {
                     p.health > 0
-                        && dist2d(p.pos, d.exit) <= d.exit_radius
-                        && (p.pos[2] - d.exit[2]).abs() < 6.0
+                        && std::iter::once(&d.exit).chain(d.more_exits.iter()).any(|e| dist2d(p.pos, *e) <= d.exit_radius && (p.pos[2] - e[2]).abs() < 6.0)
                 })
                 .map(|(id, _)| *id)
                 .collect();
