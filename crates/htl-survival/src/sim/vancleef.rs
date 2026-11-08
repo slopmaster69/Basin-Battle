@@ -194,6 +194,11 @@ impl Survival {
                 m.special = false;
                 m.hold = 0.0;
                 m.string_len = 0;
+                m.held_step = None;
+                m.last_pattern = None;
+                m.voiced = false;
+                m.riposte = false;
+                m.ready_at = self.clock + 0.6;
                 m.stagger_until = 0.0;
                 m.posture = 0;
                 m.posture_guard = 0.0;

@@ -131,6 +131,20 @@ fn a_real_weapon_swing_and_a_bursting_projectiles_direct_contact_both_provoke() 
 }
 
 #[test]
+fn an_off_hand_weapon_uses_the_same_invitation_contact_path() {
+    let (mut s, band, id) = fight("dm_vancleef", 1);
+    let hero = band[0];
+    s.players.get_mut(&hero).unwrap().weapon = s.content.item("sword").unwrap();
+    s.players.get_mut(&hero).unwrap().off_weapon = s.content.item("axe");
+    invitation(&mut s, id, hero);
+    s.input(hero, Input::Guard);
+    assert!(matches!(&s.players[&hero].action, Action::Swing { strike, .. } if strike.kind == StrikeKind::Off));
+    let ev = run(&mut s, 0.8);
+    assert_eq!(windups(&ev, id), 1);
+    assert_eq!(s.mobs[&id].pattern.map(|(k, _)| k), s.duel_pattern_named(id, "riposte"));
+}
+
+#[test]
 fn control_and_a_posture_break_take_precedence_over_invitation() {
     let (mut s, band, id) = fight("dm_vancleef", 1);
     invitation(&mut s, id, band[0]);

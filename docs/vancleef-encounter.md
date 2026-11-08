@@ -11,6 +11,8 @@ Ordinary melee, weapon arts and direct projectiles use the same contact rule. A 
 projectile counts only its directly contacted body. Splash, periodic damage, beams and pets
 do not provoke it. Death, posture breaks and disabling effects take precedence. The encounter
 uses no class, ability, hand or party-size requirement. Rear hits remain ordinary damage.
+Control keeps the game's existing boss rules: effects explicitly allowed against bosses
+can interrupt him; an ordinary stun or root is still resisted.
 
 A posture break preserves the entire existing stagger reward. Afterward he walks a checked
 4 yd route away from a living opponent, under a small native smoke emitter. The emitter goes
