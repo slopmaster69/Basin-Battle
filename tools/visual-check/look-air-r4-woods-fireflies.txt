@@ -1,0 +1,28 @@
+# Firefly lights in the fog (client 0073 with 0072, #273's fourth round): the woods by Crystal
+# Lake at 23:00 with the fireflies out (looklife 2) and the fog on (lookmist 3), the camera low
+# among them (yaw 200, pitched 6 down, 5 yd); then worldFog 0.
+# Look for: the fireflies' own small glows, and no big green halo round any of them in the fog
+# (take 275: one about 400 px across); against worldfog-0 the frame should differ by a faint haze,
+# not green blooms.
+hero warrior
+cam 200 -6 5
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldLife", "1")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("looklife 2")
+4.4 lua ConsoleExec("lookmist 3")
+12.0 video
+12.5 shots fog-flies 16 0.25
+16.6 lua SetCVar("worldFog", "0")
+17.5 shots worldfog-0 8 0.25
+19.6 lua SetCVar("worldFog", "1")
+19.65 lua ConsoleExec("looklife grade")
+19.7 lua ConsoleExec("lookmist grade")
+19.75 lua ConsoleExec("lookweather server")
+21 end

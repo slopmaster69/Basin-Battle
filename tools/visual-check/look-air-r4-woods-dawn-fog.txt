@@ -1,0 +1,48 @@
+# Dawn fog (client 0073, #273's fourth round): the woods by Crystal Lake at 07:45 (later than the
+# first take's 07:00: the shadow map holds the sun at 10 degrees until about 07:30, so its shafts
+# and the sun on screen now agree), facing the sun at yaw 45, pitched a little up, lookmist 3.5,
+# then a real fog day, lookfog 2, worldShadows 0 and worldFog 0, and worldLook 0; a sidestep.
+# Look for: the fog at least as golden and hazy as worldfog-0's plain mist on average, with
+# visible shafts between the trunks (bright where the sun reaches, grey-blue lanes behind trunks);
+# no crawl or ghosting in the sidestep.
+hero warrior
+cam 45 6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 465")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldFogQuality", "2")
+4.3 lua SetCVar("worldShadows", "2")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookfog grade")
+4.45 lua ConsoleExec("lookmist 3.5")
+4.5 lua ConsoleExec("lookwind 0")
+6.0 video
+6.5 shots fog-3.5 4 0.5
+9.0 lua ActionDash(2, 3, "l")
+9.1 shots fog-moving 12 0.15
+12.0 lua ConsoleExec("lookmist day 20765")
+12.05 lua ClearWorldFog()
+13.0 shots fog-day 2 0.5
+14.5 lua ConsoleExec("lookmist 3.5")
+14.55 lua ConsoleExec("lookfog 2")
+15.5 shots lookfog-2 2 0.5
+17.0 lua ConsoleExec("lookfog grade")
+17.05 lua SetCVar("worldShadows", "0")
+18.0 shots worldshadows-0 2 0.5
+19.5 lua SetCVar("worldShadows", "2")
+19.55 lua SetCVar("worldFog", "0")
+20.5 shots worldfog-0 2 0.5
+22.0 lua SetCVar("worldFog", "1")
+22.05 lua SetCVar("worldLook", "0")
+22.1 lua ClearWorldFog()
+23.5 shots classic 2 0.5
+25.0 lua SetCVar("worldLook", "1")
+25.05 lua ClearWorldFog()
+25.1 lua ConsoleExec("lookmist grade")
+25.15 lua ConsoleExec("lookwind grade")
+25.2 lua ConsoleExec("lookweather server")
+27 end
