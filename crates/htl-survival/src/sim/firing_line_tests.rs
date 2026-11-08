@@ -67,6 +67,7 @@ fn shouldered_aim_stays_frozen_and_a_sidestep_avoids_the_actual_shot() {
     tick(&mut s, 1.0);
     assert_eq!(s.mobs[&g].facing, face);
     assert_eq!(s.firing_line.aims[&g], at);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Clip { id, clip: 48, .. } if *id == g)));
     tick(&mut s, 1.0);
     assert_eq!(s.players[&h].health, health);
     assert!(s.events.iter().any(|e| matches!(e, Event::Missile { caster, target: Target::Point(p), .. } if *caster == g && *p == at)));
@@ -162,6 +163,24 @@ fn harpoon_pull_waits_for_the_fair_hit_and_respects_a_late_sidestep() {
         tick(&mut s, 0.3);
         assert_eq!(s.events.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == h)), !sidestep);
     }
+}
+
+#[test]
+fn a_raised_guard_blocks_the_harpoon_without_a_pull() {
+    let (mut s, h, boss, crew, _) = fight(false);
+    for g in crew { s.hurt_mob(g, h, u32::MAX); }
+    tick(&mut s, 0.1);
+    s.stagger_mob(boss, 0.01, false);
+    s.mobs.get_mut(&boss).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    let k = s.content.mobs[s.mobs[&boss].def].patterns.iter().position(|p| p.name == "harpoon").unwrap();
+    s.players.get_mut(&h).unwrap().facing = std::f32::consts::PI;
+    s.input(h, Input::Guard);
+    s.begin_pattern(boss, k, false);
+    s.windup(boss, Foe::Hero(h), s.players[&h].pos);
+    s.events.clear();
+    tick(&mut s, 2.4);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Blocked, .. } if *v == h)));
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == h)));
 }
 
 #[test]
