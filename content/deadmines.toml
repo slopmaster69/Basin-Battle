@@ -1280,7 +1280,7 @@ run_speed = 6.0
 walk_speed = 2.0
 aggro = 0.0
 leash = 40.0
-weapon = 1610
+weapon = 18575 # Native red dynamite; the grounded worker takes out his wrench.
 grip = "1h"
 respawn = 0.0
   [mob.attack]
@@ -1299,6 +1299,7 @@ respawn = 0.0
   radius = 2.5
   spell = 4062
   look = 3204
+  sound = 6155 # Native fire-lighting precast; Heavy Dynamite's own ready/throw has no sound.
 
 [[mob]]
 key = "dm_ground_engineer"
