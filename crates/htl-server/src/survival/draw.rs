@@ -714,6 +714,12 @@ impl SurvivalGame {
         } else if let Some(m) = self.sim.mobs.get(&id) {
             mob_def_gear_fields(&self.sim.content.mobs[m.def], f);
         }
+        if let Some(gun) = self.sim.firing_line_gun(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2, gun)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 4, 2 | 3 << 8 | 2 << 16 | 26 << 24)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
+                .set(idx::UNIT_BYTES_2, 2);
+        }
     }
 
     // --- creatures ---------------------------------------------------------------------------------

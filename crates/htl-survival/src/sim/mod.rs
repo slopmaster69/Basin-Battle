@@ -18,6 +18,7 @@ pub(crate) mod machinery;
 pub(crate) mod vancleef;
 pub(crate) mod perches;
 pub(crate) mod arsenal;
+pub(crate) mod firing_line;
 pub(crate) mod kitchen;
 pub mod cc;
 pub mod cues;
@@ -1219,6 +1220,7 @@ pub struct Survival {
     pub(crate) vancleef: vancleef::VanCleef,
     pub(crate) perches: perches::Perches,
     pub(crate) arsenal: arsenal::Arsenal,
+    pub(crate) firing_line: firing_line::FiringLine,
     pub(crate) kitchen: kitchen::Kitchen,
 }
 
@@ -1325,6 +1327,7 @@ impl Survival {
             vancleef: vancleef::VanCleef::default(),
             perches: perches::Perches::default(),
             arsenal: arsenal::Arsenal::default(),
+            firing_line: firing_line::FiringLine::default(),
             kitchen: kitchen::Kitchen::default(),
         }
     }
