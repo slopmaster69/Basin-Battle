@@ -3,6 +3,11 @@
 //!
 //! `cargo run -p htl-server --example bot -- <host[:port]> <name> <class 0-7> [password] [--start]`
 
+// This standalone protocol client does not link the server library's timezone shim.
+#[cfg(all(windows, target_env = "gnu"))]
+#[path = "../src/mingw_tz.rs"]
+mod mingw_tz;
+
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 

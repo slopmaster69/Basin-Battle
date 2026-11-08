@@ -960,11 +960,11 @@ fn every_dungeon_is_a_world_of_its_own_with_its_secrets_kept_back() {
                 }
             }
         }
-        // Every boss turns at least once.
+        // Every boss turns at least once, by health or by an encounter-owned workforce.
         for p in &d.packs {
             let m = &s.content.mobs[s.content.mob(&p.mob).unwrap()];
             if m.boss {
-                assert!(!m.phases.is_empty(), "{key}: {} has no phases", m.key);
+                assert!(!m.phases.is_empty() || m.perch_crew.is_some(), "{key}: {} has no encounter stages", m.key);
             }
         }
     }

@@ -21,8 +21,8 @@ pub(crate) fn first_told(key: String) -> bool {
     TOLD.lock().unwrap().insert(key)
 }
 
-// The binary has its own copy (main.rs); the library's unit tests link benilla's login code too.
-#[cfg(all(test, windows, target_env = "gnu"))]
+// Every consumer of the library (the binary, tests and examples) links the login code.
+#[cfg(all(windows, target_env = "gnu"))]
 mod mingw_tz;
 
 use std::net::{SocketAddr, TcpListener};
