@@ -17,6 +17,7 @@ pub(crate) mod bosses;
 pub(crate) mod machinery;
 pub(crate) mod perches;
 pub(crate) mod arsenal;
+pub(crate) mod firing_line;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -1216,6 +1217,7 @@ pub struct Survival {
     pub(crate) machinery: machinery::Machinery,
     pub(crate) perches: perches::Perches,
     pub(crate) arsenal: arsenal::Arsenal,
+    pub(crate) firing_line: firing_line::FiringLine,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1320,6 +1322,7 @@ impl Survival {
             machinery: machinery::Machinery::default(),
             perches: perches::Perches::default(),
             arsenal: arsenal::Arsenal::default(),
+            firing_line: firing_line::FiringLine::default(),
         }
     }
 

@@ -32,6 +32,8 @@ pub(crate) fn in_strip(pos: Vec3, facing: f32, len: f32, half: f32, p: Vec3) -> 
 #[derive(Debug, Clone)]
 pub(crate) enum Follow {
     None,
+    /// An avoidable harpoon only pulls after the fair hit resolves, never through a guard.
+    Pull { yards: f32 },
     /// A hero's swing: a stagger if it lands on a wind-up, a throw if heavy.
     Swing { stagger: f32, heavy: bool, winding: bool },
     /// An ability's blow: its effects, the drain, Valor, if it lands.
@@ -1926,6 +1928,12 @@ impl Survival {
         let out = self.strike_player(s.attacker, s.victim, s.damage, s.from, s.blockable, s.heavy, s.parryable, s.style);
         // What landed, on a hero striker's meter.
         let after = self.players.get(&s.victim).map_or(0, |p| p.health);
+        if let Follow::Pull { yards } = s.follow {
+            if matches!(out, Outcome::Hit | Outcome::GuardBroken) && after > 0 {
+                let effect = crate::content::AbilityEffect { kind: "pull".into(), amount: yards, from_caster: true, ..Default::default() };
+                self.displace(s.attacker, s.victim, &effect);
+            }
+        }
         if self.players.contains_key(&s.attacker) {
             let label = match s.follow {
                 Follow::Ability { ability, .. } => self.content.abilities[ability].name.clone(),
@@ -2479,6 +2487,7 @@ impl Survival {
         self.missiles = keep;
         for m in due {
             self.unmark(m.mark);
+            let follow = self.firing_follow(m.owner, m.land_at);
             // A grounding totem near where it lands takes it.
             if self.grounded_at(m.at) {
                 continue;
@@ -2499,7 +2508,7 @@ impl Survival {
                 .collect();
             for v in caught {
                 let area = Some(Area::Circle { at: m.at, radius: m.radius });
-                self.strike_fair(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, Follow::None);
+                self.strike_fair(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, follow.clone());
             }
         }
     }

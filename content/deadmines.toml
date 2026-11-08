@@ -181,8 +181,8 @@ count = 1
 
 # On the Juggernaut (off the way: up from the scaffold's south-west platform): Captain Greenskin
 # and his crew on the main deck, and Edwin VanCleef at the stern. Three fights in turn, not one:
-# the two deck hands, then the Evokers, then the captain on his quarterdeck (he calls his own
-# hands at half). Linked, the Evokers between them brought all five at once.
+# the deck hands, then the captain and his finite firing line on the quarterdeck.
+# Linked, the intervening packs used to bring the whole deck at once.
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-62.0, -797.0]
@@ -723,11 +723,10 @@ aggro_sound = 5775
   max_range = 3.0
   steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, kit = 356 } ]
 
-# Captain Greenskin, on the main deck: an elite, gone for good once beaten.
+# Captain Greenskin: the finite firing line controls the opening and the reload windows.
 [[mob]]
 key = "dm_greenskin"
 name = "Captain Greenskin"
-temper = "captain"
 subname = "The Juggernaut's Captain"
 display = 7113
 windup_sound = 1409
@@ -735,62 +734,84 @@ scale = 1.5
 health = 520
 run_speed = 7.0
 walk_speed = 2.0
-# He holds his quarterdeck until you come up to it: at 16 he came down into the deck hands' fight.
 aggro = 12.0
 leash = 30.0
 weapon = 1853
 grip = "1h"
-evade = 0.2
+# His committed cuts and the firing line own his movement, without random backsteps.
+evade = 0.0
 posture = 150
 drops = { plunder = [14, 18] }
 gear = ["pirate_cutlass", "red_bandana", "greenskin_tricorne"]
 respawn = 0.0
+aggro_text = "Hold the quarterdeck!"
+slay_text = "Feed 'em to the fishes."
+death_text = "My ship..."
   [mob.attack]
-  windup = 0.5
+  windup = 0.95
   damage = 18
-  range = 2.8
-  arc = 110.0
-  recovery = 0.7
-  cooldown = 1.0
-  turn_rate = 240.0
-  lock = 0.25
+  range = 3.0
+  arc = 70.0
+  recovery = 1.2
+  cooldown = 0.8
+  turn_rate = 120.0
+  lock = 0.65
   blockable = true
   [[mob.pattern]]
-  name = "three cuts"
+  name = "committed thrust"
   weight = 3.0
-  steps = [ { clip = 57, take = 0, windup = 0.45, damage = 16, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 16, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.72, damage = 24, heavy = true, recovery = 1.0 } ]
+  max_range = 7.0
+  # A narrow committed step leaves his flank open for the recovery.
+  steps = [ { clip = 85, take = 0, windup = 1.05, lunge = 3.0, damage = 22, arc = 55.0, recovery = 1.4 } ]
   [[mob.pattern]]
-  name = "lunge"
+  name = "clearing cut"
   weight = 2.0
-  min_range = 3.5
-  max_range = 9.0
-  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 5.0, damage = 22, recovery = 0.9 } ]
-  # A cleave all round him when he's crowded.
+  max_range = 4.0
+  steps = [ { clip = 57, take = 0, windup = 1.25, range = 4.0, arc = 220.0, damage = 20, recovery = 1.6 } ]
+  # Crew death, never health, unlocks these. Both aim at the position held at the first pose.
   [[mob.pattern]]
-  name = "cleave"
-  weight = 1.5
-  max_range = 3.0
-  steps = [ { clip = 59, take = 0, windup = 0.75, range = 4.0, arc = 360.0, damage = 18, recovery = 1.1, kit = 369 } ]
-  # At half: all hands on deck; then a harpoon thrown at whoever keeps their distance.
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.9
-  pattern = "cleave"
-  text = "\"All hands! Repel boarders!\""
-  summon = ["dm_pirate", "dm_pirate"]
-  [[mob.phase]]
-  at = 0.2
-  speed = 0.8
-  might = 1.15
-  pattern = "harpoon"
-  text = "\"I'll have yer hide for a sail!\""
+  name = "pistol shot"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 28.0
+  # 1.12 has no pistol item model: a short native blunderbuss makes the draw visible.
+  steps = [ { ranged = true, windup = 2.4, damage = 23, range = 28.0, radius = 0.85, speed = 40.0, spell = 8682, sound = 1147, recovery = 1.8 } ]
   [[mob.pattern]]
   name = "harpoon"
-  weight = 2.0
-  below = 0.5
+  weight = 1.5
   min_range = 5.0
   max_range = 26.0
-  steps = [ { ranged = true, windup = 1.0, damage = 24, range = 26.0, radius = 2.0, speed = 24.0, spell = 23065, blockable = true, recovery = 1.0 } ]
+  # Borrow the native rope/net throw used by Reverse Grapple, with a fair hit-gated pull.
+  steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.85, speed = 24.0, spell = 6533, blockable = true, recovery = 2.0 } ]
+
+# Exactly 2 spawn with the captain's pull, on reachable deck, and never get replacements.
+[[mob]]
+key = "dm_deck_gunner"
+name = "Defias Deck Gunner"
+subname = "The Juggernaut's Crew"
+display = 2347
+health = 85
+run_speed = 5.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+bow = 21071
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 2.2
+  damage = 17
+  range = 32.0
+  arc = 20.0
+  recovery = 0.8
+  cooldown = 5.0
+  turn_rate = 0.0
+  lock = 2.2
+  blockable = true
+  radius = 0.85
+  speed = 40.0
+  spell = 8682
+  sound = 1147
 
 # Edwin VanCleef, at the Juggernaut's stern: a fight for when you're ready, early or late.
 [[mob]]

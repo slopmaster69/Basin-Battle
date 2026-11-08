@@ -260,7 +260,7 @@ impl Survival {
         let hunters: Vec<Id> = self
             .mobs
             .iter()
-            .filter(|(_, m)| m.health > 0 && m.state.foe() == Some(mobs::Foe::Hero(id)) && !self.content.mobs[m.def].boss)
+            .filter(|(mid, m)| m.health > 0 && m.state.foe() == Some(mobs::Foe::Hero(id)) && !self.content.mobs[m.def].boss && !self.firing_sees_veil(**mid))
             .map(|(m, _)| *m)
             .collect();
         for m in hunters {
@@ -289,7 +289,7 @@ impl Survival {
 
     /// Hidden from this creature: veiled, and it's no boss (a champion sees through a veil).
     pub(crate) fn unseen_by(&self, mob: Id, hero: Id) -> bool {
-        self.unseen(hero) && !self.mobs.get(&mob).is_some_and(|m| self.content.mobs[m.def].boss)
+        self.unseen(hero) && !self.mobs.get(&mob).is_some_and(|m| self.content.mobs[m.def].boss) && !self.firing_sees_veil(mob)
     }
 
     // --- leaps ----------------------------------------------------------------------------------------

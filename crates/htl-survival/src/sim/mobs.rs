@@ -943,6 +943,7 @@ impl Survival {
         self.boss_gone(mid);
         self.remove_arsenal(mid);
         self.machinery_died(mid);
+        self.firing_died(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1189,6 +1190,7 @@ impl Survival {
         self.clean_machinery();
         self.step_perch_crews();
         self.clean_arsenals();
+        self.clean_firing_lines();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1231,6 +1233,7 @@ impl Survival {
                 }
                 continue;
             }
+            if self.step_firing_gunner(id, dt) { continue; }
             // Far from every hero, a creature at rest sleeps (the land is wide).
             if heroes.iter().all(|p| dist2d(*p, self.mobs[&id].pos) > SLEEP_RANGE) {
                 let m = &self.mobs[&id];
@@ -1258,6 +1261,7 @@ impl Survival {
             }
             if self.step_perch_valve(id) { continue; }
             if self.step_arsenal(id) { continue; }
+            if self.step_firing_captain(id) { continue; }
             if self.disabled(id) {
                 continue;
             }
@@ -1932,7 +1936,7 @@ impl Survival {
         self.events.push(Event::React { id: mid, anim: DODGE_ANIM, from, lean: 0.0, hold: 0.0, fit: WHIFF_SECS });
     }
 
-    fn think(&mut self, id: Id, dt: f32) {
+    pub(crate) fn think(&mut self, id: Id, dt: f32) {
         let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return };
         if m.hidden {
@@ -2415,7 +2419,7 @@ impl Survival {
             _ => d.attack.clone(),
         };
         // The grind locks at its first pose and keeps that line, regardless of its target.
-        if self.machine_grind(id) {
+        if self.machine_grind(id) || (a.ranged && (self.is_firing_captain(id) || d.key == "dm_deck_gunner")) {
             a.turn_rate = 0.0;
             a.lock = a.windup;
         }
@@ -2494,7 +2498,7 @@ impl Survival {
             .iter()
             .enumerate()
             .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32
-                && self.arsenal_pattern_allowed(id, &p.name))
+                && self.arsenal_pattern_allowed(id, &p.name) && self.firing_pattern_allowed(id, &p.name))
             .filter_map(|(k, p)| {
                 let first = p.steps.first()?;
                 let reach = first.range.unwrap_or(d.attack.range) + size - 0.3 + first.lunge;
@@ -2654,11 +2658,13 @@ impl Survival {
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
         self.machinery_windup(id);
+        self.firing_windup(id, to);
     }
 
     /// The blow lands (or the missile flies): every hero in the arc and in reach of the creature's
     /// committed facing, or a station in the way.
     fn release(&mut self, id: Id, foe: Foe) {
+        if self.firing_release(id) { return; }
         // The moving saw hits along its actual swept path, once per hero, in machinery.
         if self.machine_grind(id) { return; }
         let now = self.clock;
