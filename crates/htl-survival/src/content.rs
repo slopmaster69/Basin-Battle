@@ -2216,6 +2216,9 @@ pub struct MobDef {
     /// come with a pattern's `below`. Read in order once loaded (see [`Content::settle`]).
     #[serde(rename = "phase", default)]
     pub phases: Vec<EnrageDef>,
+    /// A finite crew on low work platforms, with breakable supports and a furnace valve.
+    #[serde(default)]
+    pub perch_crew: Option<PerchCrewDef>,
     /// Its posture: this much damage within `posture_secs` breaks its stance (it reels, open to
     /// a riposte). 0: none.
     #[serde(default)]
@@ -2298,6 +2301,17 @@ pub struct MobDef {
     pub windup_sound: u32,
     #[serde(default)]
     pub heavy_sound: u32,
+}
+
+/// Offsets are from the boss's original home, on that floor. The crew is encounter-owned:
+/// it never becomes a respawning pack or leaves a second set behind after a wipe.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PerchCrewDef {
+    pub airborne: String,
+    pub grounded: String,
+    pub spots: Vec<[f32; 2]>,
+    pub valve: [f32; 2],
+    pub channel: Vec<[f32; 2]>,
 }
 
 impl MobDef {
@@ -3358,6 +3372,23 @@ impl Content {
             }
         }
         for m in &self.mobs {
+            if let Some(c) = &m.perch_crew {
+                if !m.boss || !(2..=3).contains(&c.spots.len()) || c.channel.is_empty() || c.channel.len() > 5 {
+                    bail!("mob {}: a perch crew needs a boss, 2-3 platforms and 1-5 channel points", m.key);
+                }
+                for key in [&c.airborne, &c.grounded] {
+                    let Some(k) = self.mob(key) else { bail!("mob {}: no crew mob {key}", m.key) };
+                    if self.mobs[k].perch_crew.is_some() || self.mobs[k].boss || self.mobs[k].inert() {
+                        bail!("mob {}: crew {key} must be an ordinary fighter", m.key);
+                    }
+                }
+                if !self.mobs[self.mob(&c.airborne).unwrap()].attack.ranged || self.mobs[self.mob(&c.grounded).unwrap()].attack.ranged {
+                    bail!("mob {}: its perched crew throws, its grounded crew fights up close", m.key);
+                }
+                if c.spots.iter().chain(c.channel.iter()).chain(std::iter::once(&c.valve)).flatten().any(|n| !n.is_finite() || n.abs() > 30.0) {
+                    bail!("mob {}: crew offsets must be finite and within 30 yd", m.key);
+                }
+            }
             if !m.temper.is_empty() && !self.tempers.iter().any(|t| t.key == m.temper) {
                 bail!("mob {}: temper {} is no [[temper]]", m.key, m.temper);
             }

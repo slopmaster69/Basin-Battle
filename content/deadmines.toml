@@ -1052,39 +1052,8 @@ z = 21.0
 radius = 0.0
 count = 1
 
-# The smelter's molten channels overflow while he fights.
-[[dungeon.hazard]]
-name = "molten iron"
-# Molten Metal: iron spilling over, warned by the ground heating first.
-spell = 5213
-at = [-198.0, -590.0, 21.0]
-radius = 3.0
-damage = 24
-every = 6.0
-phase = 0.0
-boss = "gilnid"
+# Gilnid's finite crew and valve own the foundry hazards (sim/perches.rs).
 
-[[dungeon.hazard]]
-name = "molten iron"
-# Molten Metal: iron spilling over, warned by the ground heating first.
-spell = 5213
-at = [-212.0, -572.0, 21.0]
-radius = 3.0
-damage = 24
-every = 6.0
-phase = 2.0
-boss = "gilnid"
-
-[[dungeon.hazard]]
-name = "molten iron"
-# Molten Metal: iron spilling over, warned by the ground heating first.
-spell = 5213
-at = [-205.0, -600.0, 21.0]
-radius = 3.0
-damage = 24
-every = 6.0
-phase = 4.0
-boss = "gilnid"
 
 # Blackguards on the ramp, engineers on the ring above.
 [[dungeon.pack]]
@@ -1353,6 +1322,65 @@ respawn = 0.0
   weight = 1.5
   steps = [ { clip = 17, take = 1, windup = 1.0, damage = 22, heavy = true, recovery = 1.1 } ]
 
+# This pair belongs to the encounter, never to a pack. The same engineer changes to
+# wrench fighting on landing; ambient engineers elsewhere retain their own behavior.
+[[mob]]
+key = "dm_perched_engineer"
+temper = "skirmisher"
+name = "Furnace Engineer"
+subname = "Gilnid's Crew"
+display = 7047
+health = 80
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 40.0
+weapon = 1610
+grip = "1h"
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.8
+  damage = 18
+  range = 26.0
+  arc = 0.0
+  recovery = 1.5
+  cooldown = 3.0
+  turn_rate = 180.0
+  lock = 0.7
+  blockable = false
+  speed = 10.0
+  # At least LOB_RADIUS (2.5): the landing is warned during the fuse and flight.
+  radius = 2.5
+  spell = 4062
+  look = 3204
+
+[[mob]]
+key = "dm_ground_engineer"
+temper = "brawler"
+name = "Furnace Engineer"
+subname = "Gilnid's Crew"
+display = 7047
+windup_sound = 1409
+health = 80
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 40.0
+weapon = 1610
+grip = "1h"
+respawn = 0.0
+  [mob.attack]
+  windup = 0.75
+  damage = 9
+  range = 2.6
+  arc = 90.0
+  recovery = 1.1
+  cooldown = 1.8
+  turn_rate = 180.0
+  lock = 0.35
+  blockable = true
+
 # Gilnid, the Smelter: a wrench up close, molten iron thrown far, and the channels overflowing.
 [[mob]]
 key = "dm_gilnid"
@@ -1374,7 +1402,15 @@ posture = 260
 drops = { plunder = [26, 32] }
 trophy = { gilnid_wrench = 1 }
 gear = ["gilnid_wrench", "gilnid_pauldrons"]
+aggro_text = "Back to work! All of you!"
+death_text = "Who's... going to pay for this..."
 respawn = 0.0
+  [mob.perch_crew]
+  airborne = "dm_perched_engineer"
+  grounded = "dm_ground_engineer"
+  spots = [[-6.0, 3.0], [6.0, 3.0]]
+  valve = [0.0, -6.0]
+  channel = [[-6.0, -3.0], [0.0, -3.0], [6.0, -3.0]]
   [mob.attack]
   windup = 0.6
   damage = 24
@@ -1385,61 +1421,21 @@ respawn = 0.0
   turn_rate = 210.0
   lock = 0.3
   blockable = true
-  # Turns: at two thirds his crew down from the ring and the iron poured three ladles at a time;
-  # at a third the crucible itself tipped out round him (and slag spat at whoever runs).
-  [[mob.phase]]
-  at = 0.66
-  speed = 0.85
-  pattern = "pour"
-  text = "\"My smelter! You'll be scrap by the time I'm done!\""
-  summon = ["dm_woodcutter", "dm_woodcutter"]
-  [[mob.phase]]
-  at = 0.33
-  speed = 0.75
-  might = 1.15
-  pattern = "crucible"
-  text = "\"Into the slag with you! ALL of you!\""
-  shove = 5.5
-  look = 3204
-  [[mob.pattern]]
-  name = "crucible"
-  weight = 1.5
-  below = 0.33
-  max_range = 30.0
-  steps = [ { clip = 57, take = 0, windup = 1.2, range = 5.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 1.4 } ]
   [[mob.pattern]]
   name = "two knocks"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 0.9 } ]
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 1.4 } ]
   # The spanner raised high and held: it waits out a panicked dodge.
   [[mob.pattern]]
   name = "overhead"
   weight = 2.0
-  steps = [ { clip = 17, take = 1, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.3, kit = 379 } ]
+  steps = [ { clip = 17, take = 1, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.8, kit = 379 } ]
   # Crowded, a kick that clears room.
   [[mob.pattern]]
   name = "kick"
   weight = 1.5
   max_range = 2.6
   steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
-  # A ladle of molten iron to where you stand.
-  [[mob.pattern]]
-  name = "ladle"
-  weight = 2.0
-  min_range = 5.0
-  max_range = 24.0
-  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 24.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.2 } ]
-  [[mob.pattern]]
-  name = "pour"
-  weight = 0.0
-  max_range = 30.0
-  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.5 } ]
-  # Then: three knocks and the overhead, quicker.
-  [[mob.pattern]]
-  name = "hammering"
-  weight = 3.0
-  below = 0.66
-  steps = [ { clip = 16, take = 1, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.8, damage = 36, heavy = true, recovery = 1.5 } ]
 
 # Sneed's Shredder: slow and heavy, its saws unstoppable; Sneed climbs out of the wreck.
 [[mob]]
