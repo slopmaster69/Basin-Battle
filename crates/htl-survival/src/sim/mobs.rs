@@ -1224,6 +1224,11 @@ impl Survival {
         if below && leg_end.is_some_and(|e| e - z > FALL) && was - z > FALL + WALK_SLOPE * walked {
             z = was;
         }
+        // Nor is it lifted at once to a floor far over it (a seam the floors miss, where the only
+        // one is the hillside over the mine: Nov 7 a woodcutter and Sneed went up 250 yards).
+        if below && z - was > FELL_THROUGH.max(FALL + WALK_SLOPE * walked) {
+            z = was;
+        }
         // Stepping round a foe: turned to them, not the way it goes.
         let face = m.sidle.and_then(|h| self.players.get(&h)).map(|p| p.pos);
         let m = self.mobs.get_mut(&id).unwrap();
