@@ -1216,7 +1216,10 @@ carried over to the nearest good spot in it as the save is read.
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set
 again every five minutes so it never runs on to the dusk (not below, not in Siege); until 7 Nov
-it was half past eleven at night under Duskwood's mist, and every game was night and fog. By day
+it was half past eleven at night under Duskwood's mist, and every game was night and fog. To watch
+every hour in one sitting, `.es tune world.clock_speed 120` runs a whole day in twelve minutes from
+the pinned hour (`[world] clock_speed`; everyone is set to the same hour every five minutes, and
+`.es tune reload` holds the morning again). By day
 no mist of ours lies over Elwynn's own air (`[world] fog` is unset). While a raid is called, the
 add-on asks the client for a thicker, redder fog (`raid_fog`, from the bell until the raid is
 over) through client patch 0018's `SetWorldFog`; a client without it keeps Elwynn's own.

@@ -153,6 +153,12 @@ pub fn wow_time_at(clock: Option<[u32; 2]>) -> u32 {
         | (year.saturating_sub(2000) << 24)
 }
 
+/// The time it is now, as a game clock's hour and minute.
+pub fn real_clock() -> [u32; 2] {
+    let t = wow_time_at(None);
+    [(t >> 6) & 0x1f, t & 0x3f]
+}
+
 pub fn login_set_time_speed() -> Packet {
     login_set_time_speed_at(None)
 }
@@ -160,9 +166,28 @@ pub fn login_set_time_speed() -> Packet {
 /// The game clock at `clock` (hour, minute) today, or at the time it is now; it runs on at real
 /// time (a minute a minute) from there.
 pub fn login_set_time_speed_at(clock: Option<[u32; 2]>) -> Packet {
+    login_set_time_speed_rate(clock, 1.0)
+}
+
+/// The same clock running `speed` times as fast as real time (1: a minute a minute).
+pub fn login_set_time_speed_rate(clock: Option<[u32; 2]>, speed: f32) -> Packet {
     let mut b = Body::new();
-    b.u32(wow_time_at(clock)).f32(1.0 / 60.0);
+    b.u32(wow_time_at(clock)).f32(time_rate(speed));
     Packet::new(op::SMSG_LOGIN_SETTIMESPEED, b)
+}
+
+/// The packet's rate for a clock `speed` times real time: the client's game minutes a second,
+/// which it holds from a sixtieth (a minute a minute) through sixty (a day in 24 seconds).
+pub fn time_rate(speed: f32) -> f32 {
+    speed.clamp(1.0, 3600.0) / 60.0
+}
+
+/// Where a clock that started at `start` (hour, minute) has got to after `secs` seconds at
+/// `speed` times real time, round the day.
+pub fn clock_after(start: [u32; 2], secs: f32, speed: f32) -> [u32; 2] {
+    let run = (secs.max(0.0) * speed.max(0.0) / 60.0) as u32;
+    let m = ((start[0] % 24) * 60 + start[1] % 60 + run % 1440) % 1440;
+    [m / 60, m % 60]
 }
 
 pub fn initial_spells(spells: &[u16]) -> Packet {
@@ -1085,5 +1110,23 @@ mod clock_tests {
         // Out of range wraps, never spills into the date.
         let w = wow_time_at(Some([25, 61]));
         assert_eq!((w & 0x3f, (w >> 6) & 0x1f), (1, 1));
+    }
+
+    #[test]
+    fn a_faster_clock_runs_round_the_day_at_the_clients_rate() {
+        // A day in 12 minutes: a minute of real time is two hours.
+        assert_eq!(clock_after([10, 0], 60.0, 120.0), [12, 0]);
+        assert_eq!(clock_after([23, 30], 600.0, 120.0), [19, 30]);
+        // Real time: a minute and a half is one minute on the clock.
+        assert_eq!(clock_after([10, 0], 90.0, 1.0), [10, 1]);
+        // Out of range starts wrap round the day.
+        assert_eq!(clock_after([25, 61], 0.0, 1.0), [1, 1]);
+        // The rate the client is sent: game minutes a second, never slower than real time.
+        assert_eq!(time_rate(1.0), 1.0 / 60.0);
+        assert_eq!(time_rate(120.0), 2.0);
+        assert_eq!(time_rate(0.5), 1.0 / 60.0);
+        assert_eq!(time_rate(9000.0), 60.0);
+        let now = real_clock();
+        assert!(now[0] < 24 && now[1] < 60);
     }
 }

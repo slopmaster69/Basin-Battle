@@ -56,6 +56,11 @@ book_stand_height = 1.05
 # dungeon has its own light) nor in Siege.
 clock = [10, 0]
 clock_every = 300.0
+# How fast the clock runs: 1, a minute a minute, the pin holding the hour. To watch every hour of
+# the look in one sitting, `.es tune world.clock_speed 120` runs a whole day in 12 minutes (96, a
+# quarter of an hour) from the pinned hour, everyone set to the same hour every `clock_every`
+# seconds; `.es tune reload` brings the morning back. Real time below and in Siege.
+clock_speed = 1.0
 # No mist by day: Elwynn's own air. The night's mist, should the night come back, was this: a
 # grey-blue fog closing in at 120 yards, a third of the way from the eye, laid fully over Elwynn's
 # and the light a quarter darker, asked of the client by the add-on (a client without patch 0018
