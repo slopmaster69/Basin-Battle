@@ -37,6 +37,10 @@ Invitation. Reset, return, wipe, death and handoff remove encounter poses, smoke
 
 ## Verification and filming
 
+Canonical-home staging is being checked against the installed native map: a supported
+observer post alone does not prove its departure satisfies the encounter's short-route
+validation. The same check must also prove the posture-break retreat at the stern doorway.
+
 Deterministic tests cover actual solo/duo/4-hero AI, exact strings and recovery, waiting,
 melee and projectile contact, the second simultaneous hitter, rear/splash/periodic immunity
 to provocation, CC precedence, posture reward, continuous retreat, blocked/rooted fallback,
