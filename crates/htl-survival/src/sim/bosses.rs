@@ -140,12 +140,15 @@ impl Survival {
             if dist2d(pos, to) < 1.5 && (pos[2] - to[2]).abs() < 4.0 {
                 let r = self.bosses.runs.get_mut(&id).unwrap();
                 r.leg += 1;
-                if r.leg >= e.run_to.len() {
-                    r.arrived = Some(now);
+                let (leg, of) = (r.leg, e.run_to.len());
+                let name = self.content.mobs[def].name.clone();
+                self.events.push(Event::Log(format!("{name} on its run: point {leg} of {of} at {:.0} {:.0} {:.0}", pos[0], pos[1], pos[2])));
+                if leg >= of {
+                    self.bosses.runs.get_mut(&id).unwrap().arrived = Some(now);
                     self.halt(id);
                     return true;
                 }
-                let next = e.run_to[r.leg];
+                let next = e.run_to[leg];
                 let speed = self.content.mobs[def].run_speed * RUN_HASTE;
                 self.go(id, next, speed);
             } else if self.mobs[&id].lost_at.is_some_and(|t| now - t >= STUCK) {
