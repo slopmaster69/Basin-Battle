@@ -1,4 +1,4 @@
-From f4272947e58cc06dde9731b8e0d4944d6efb18a2 Mon Sep 17 00:00:00 2001
+From 756638936f780a1042997174d29fd90484dd2e48 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:26:57 -0700
 Subject: [PATCH] Contact shadows you notice, no band at the water's edge, a
@@ -93,30 +93,112 @@ Revised after the fourth films (#270, take 280):
   still compiling (a mesh whose pipeline is not ready is skipped that
   frame), then a summary ("[look switch]").
 
+Revised after the fifth films (#270, take 291):
+
+- The golden-hour glare was still a clipped white disc 36% of the frame
+  wide. The 0.45 size and 0.35 strength did take effect (the share of the
+  frame over 230 fell from 25-32% to 17.4%, and the disc was about 80% of
+  the shrunken quad), but 1.12's glare quad is drawn into the frame
+  before the look's grade, whose golden-hour contrast, warmth and bloom
+  lifted the sky round the sun, and any glare on it, past white nearly
+  to the quad's edge. Under the new look the quad is now hidden and the
+  look's pass draws the glare after its grade, from the quad's own
+  envelope (the sun on screen, behind no tree or cloud): a small core and
+  a faint halo in the sun's tint, screened on so it never clips. New
+  console command lookglare <strength 0-4> | classic | grade: classic
+  draws 1.12's quad under the new look again, for the still that
+  compares the two.
+- The wading froth was still a crisp, dotted, unbroken ring at the neck
+  standing deep, with a dotted arc trailing behind wading deeper. The dots
+  were the taps' per-pixel turn; it now wanders smoothly over the surface.
+  Round the step a slow, drifting noise keeps about half the ring as
+  patches, and the froth thins as the water deepens (0.45 to 1.2 yd).
+- The hitch: one frame of 0.5 to 1.4 s each time worldLook came back to 1,
+  in which almost nothing was made again. Each slow frame's "[look
+  switch]" lines now carry its timing spans: the main schedules cut at
+  their boundaries and between Update's world stages, what was left for
+  the render thread and the present, and the render world's last frame
+  by its sets. The next film names the span that holds it.
+- Clouds in the water showed as greying, not shapes. The mirror does
+  sample the painted clouds, but each pixel's rippled ray reached a
+  different patch of them, so they averaged out. The sky's mirror now
+  takes a calmer surface than the near reflections (half the ripple near
+  the camera, a fifth from 40 yd).
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
- crates/benilla-assets/src/shaders/liquid.wgsl | 159 ++++++++-
+ crates/benilla-app/src/world_console.rs       |  29 +
+ crates/benilla-assets/src/shaders/liquid.wgsl | 187 ++++++-
  crates/benilla-world/src/look/grade.rs        |  33 +-
- crates/benilla-world/src/look/mod.rs          |  30 +-
- crates/benilla-world/src/look/sky.rs          |  56 ++-
- crates/benilla-world/src/look/switch_watch.rs | 323 ++++++++++++++++++
- crates/benilla-world/src/look/water.rs        | 290 +++++++++++++++-
- .../benilla-world/src/shaders/world_look.wgsl |   9 +-
- crates/benilla-world/src/sun/follow.rs        |  24 +-
- 8 files changed, 883 insertions(+), 41 deletions(-)
+ crates/benilla-world/src/look/mod.rs          |  32 +-
+ crates/benilla-world/src/look/pass.rs         |  19 +-
+ crates/benilla-world/src/look/sky.rs          | 139 ++++-
+ crates/benilla-world/src/look/switch_watch.rs | 527 ++++++++++++++++++
+ crates/benilla-world/src/look/water.rs        | 316 ++++++++++-
+ .../benilla-world/src/shaders/world_look.wgsl |  44 +-
+ crates/benilla-world/src/sun/follow.rs        |  82 ++-
+ 10 files changed, 1350 insertions(+), 58 deletions(-)
  create mode 100644 crates/benilla-world/src/look/switch_watch.rs
 
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 39401b2..cce4249 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -132,6 +132,13 @@ impl Plugin for WorldConsolePlugin {
+         );
+         // benilla's own: the new look's painted sky held for tuning on film.
+         app.console_command("looksky", GRAPHICS, Some("clouds <0-1> | grade"), look_sky);
++        // benilla's own: the new look's sun glare held for tuning on film, or 1.12's beside it.
++        app.console_command(
++            "lookglare",
++            GRAPHICS,
++            Some("<strength 0-4> | classic | grade"),
++            look_glare,
++        );
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -519,6 +526,28 @@ fn look_sky(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++fn look_glare(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookGlare, WorldLook};
++    let Some((classic, share)) = LookGlare::parse(args) else {
++        return vec!["Usage: lookglare <strength 0-4> | classic | grade".to_string()];
++    };
++    let env = {
++        let mut glare = world.get_resource_or_init::<LookGlare>();
++        glare.classic = classic;
++        glare.share = share;
++        glare.env
++    };
++    let mut lines = vec![if classic {
++        "Sun glare: 1.12's, drawn before the grade.".to_string()
++    } else {
++        format!("Sun glare: drawn after the grade, strength x{share}; now {env:.2} of full.")
++    }];
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has 1.12's sun glare.".to_string());
++    }
++    lines
++}
++
+ /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
+ /// a clear one set with the second, each through `ConsoleWrite` in class 0.
+ fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index db5da61..89c2290 100644
+index db5da61..38ae8bc 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
-@@ -223,6 +223,35 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
+@@ -223,6 +223,42 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
  const WATER_SSR_STEPS: u32 = 24u;
  const WATER_SSR_REFINE: u32 = 5u;
  const WATER_SSR_START: f32 = 0.3;
 +// `look::water::tune`'s `SSR_EDGE` and `SSR_BREAK`, `FROTH`, `FROTH_YD`, `FROTH_WOBBLE`,
-+// `FROTH_CUT_FREQ`, `FROTH_REACH`, `FROTH_TAPS`, `FROTH_FRONT` and `FROTH_SOFT` (keep in sync;
++// `FROTH_CUT_FREQ`, `FROTH_REACH`, `FROTH_TAPS`, `FROTH_FRONT`, `FROTH_SOFT`, `FROTH_DEEP_FROM`,
++// `FROTH_DEEP_TO`, `FROTH_ARCS`, `FROTH_ARC_CUT`, `SKY_CALM_NEAR` and `SKY_CALM_FAR` (keep in sync;
 +// `look::water`'s tests compare them).
 +const WATER_SSR_EDGE: f32 = 0.22;
 +const WATER_SSR_BREAK: f32 = 0.6;
@@ -128,6 +210,12 @@ index db5da61..89c2290 100644
 +const WATER_FROTH_TAPS: u32 = 6u;
 +const WATER_FROTH_FRONT: f32 = 0.05;
 +const WATER_FROTH_SOFT: f32 = 0.6;
++const WATER_SKY_CALM_NEAR: f32 = 0.5;
++const WATER_SKY_CALM_FAR: f32 = 0.8;
++const WATER_FROTH_DEEP_FROM: f32 = 0.45;
++const WATER_FROTH_DEEP_TO: f32 = 1.2;
++const WATER_FROTH_ARCS: f32 = 0.55;
++const WATER_FROTH_ARC_CUT: f32 = 0.5;
 +// `look::water::tune`'s `MOON_LANE_FAR`, `MOON_LANE_NEAR` and `MOON_SHEEN_LANE` (the same test
 +// compares them): the moon's lane runs this far below its elevation (radians) toward the horizon,
 +// this far above toward the camera, and its faint unbroken path is this wide.
@@ -147,7 +235,7 @@ index db5da61..89c2290 100644
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
  // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
  const WATER_SHADOW_TAPS: u32 = 6u;
-@@ -333,7 +362,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+@@ -333,7 +369,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
              }
              let uh = water_uv(view.clip_from_world * vec4<f32>(P + R * hi, 1.0));
              let border = min(min(uh.x, 1.0 - uh.x), min(uh.y, 1.0 - uh.y));
@@ -158,7 +246,7 @@ index db5da61..89c2290 100644
              return vec4<f32>(textureSampleLevel(scene_tex, scene_samp, uh, 0.0).rgb, weight);
          }
          t_prev = t;
-@@ -477,6 +508,43 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
+@@ -477,6 +515,43 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
      return water_decode(water_encode(sky) * (1.0 - c.a) + c.rgb);
  }
  
@@ -202,7 +290,7 @@ index db5da61..89c2290 100644
  // One texel's compare of the sun-shadow map, and a bilinear-weighted compare of the four around
  // `t` (texel units), as terrain.wgsl's.
  fn water_shadow_texel(c: vec2<i32>, layer: i32, z: f32, lim: i32) -> f32 {
-@@ -590,8 +658,15 @@ fn look_water(
+@@ -590,8 +665,15 @@ fn look_water(
          vec3<f32>(1.0),
      );
      var body = water_decode(mix(sh, dp, smoothstep(0.0, water.rows[6].w, depth_v)) * lit_g);
@@ -220,15 +308,23 @@ index db5da61..89c2290 100644
  
      // How much of the bed's light comes through: e^(−path / clarity).
      var clarity = water.rows[0].z;
-@@ -614,28 +689,92 @@ fn look_water(
+@@ -614,28 +696,111 @@ fn look_water(
      if (fres > 0.01) {
          hit = water_reflection(P, R, jitter, water.rows[7].x);
      }
+-    var mirror = mix(water_sky(R), water_decode(hit.rgb), hit.a);
 +    // The ripples' own tilt, -1 to 1 whatever the hour's slope: it breaks up the mirror's
 +    // hand-over to the sky where the mirrored rays leave the screen, and the foam.
 +    let rip = clamp((N.x - N.z) / max(water.rows[3].w, 0.02), -1.0, 1.0);
 +    hit.a = clamp(hit.a + WATER_SSR_BREAK * rip * hit.a * (1.0 - hit.a) * 4.0, 0.0, 1.0);
-     var mirror = mix(water_sky(R), water_decode(hit.rgb), hit.a);
++    // The sky's mirror off a calmer surface than the near reflections': the ripples' tilt
++    // averages out over the many waves a far pixel covers, and full-strength ripples sent each
++    // pixel's ray to a different patch of cloud, so the clouds mirrored as an even greying with
++    // no shapes (take 291). Near the camera half the tilt stays, far off a fifth.
++    let calm = mix(WATER_SKY_CALM_NEAR, WATER_SKY_CALM_FAR, smoothstep(4.0, 40.0, eye_z));
++    var R_sky = reflect(-V, normalize(mix(N, vec3<f32>(0.0, 1.0, 0.0), calm)));
++    R_sky.y = max(R_sky.y, 0.01);
++    var mirror = mix(water_sky(normalize(R_sky)), water_decode(hit.rgb), hit.a);
      mirror *= 1.0 - water.rows[9].y * (1.0 - vis);
  
 -    // The glint: the sun's (or the moon's) highlight on the ripples, sharp, with a soft sheen.
@@ -277,9 +373,12 @@ index db5da61..89c2290 100644
 +    if (eye_z < WATER_FROTH_REACH && water.rows[0].w > 0.0) {
 +        let wob = water_noise(P.xz * WATER_FROTH_WOBBLE + vec2<f32>(0.07, -0.05) * t).x;
 +        let reach = WATER_FROTH_YD * (0.3 + 0.9 * wob);
++        // The taps' turn wanders smoothly over the surface, not pixel by pixel: the per-pixel
++        // dither the mirror uses drew the froth as dots (take 291's dotted ring at the neck).
++        let spin = water_noise(P.xz * 7.0 + vec2<f32>(3.0, -11.0)).x;
 +        var pull = vec2<f32>(0.0);
 +        for (var k = 0u; k < WATER_FROTH_TAPS; k = k + 1u) {
-+            let ang = f32(k) * 2.3999632 + jitter * 6.2831853;
++            let ang = f32(k) * 2.3999632 + spin * 6.2831853;
 +            let r = WATER_FROTH_YD * sqrt((f32(k) + 0.5) / f32(WATER_FROTH_TAPS));
 +            let dir = vec2<f32>(cos(ang), sin(ang));
 +            let Q = P + vec3<f32>(dir.x * r, 0.0, dir.y * r);
@@ -302,6 +401,15 @@ index db5da61..89c2290 100644
 +            on_step = max(on_step, smoothstep(0.5 * fd, 1.5 * fd, dq - depth_v));
 +        }
 +        stand *= smoothstep(0.35, 0.75, length(pull) / max(hits, 1e-3));
++        // Patches, not a ring: round the step (by the way to it, `pull`), a slow noise keeps a
++        // few arcs and drops the rest, drifting; and it thins as the water deepens, so a hero
++        // standing neck-deep has a few soft patches at most (take 291: an unbroken ring at the
++        // neck, a dotted arc trailing wading deeper).
++        let about = pull / max(length(pull), 1e-4);
++        let arc = water_noise(about * WATER_FROTH_ARCS + P.xz * 0.05
++            + vec2<f32>(0.21, 0.13) * t).x;
++        stand *= smoothstep(WATER_FROTH_ARC_CUT, WATER_FROTH_ARC_CUT + 0.25, arc);
++        stand *= 1.0 - smoothstep(WATER_FROTH_DEEP_FROM, WATER_FROTH_DEEP_TO, depth_v);
 +    }
 +    // The shore's band, off the legs and off the froth's ground beside them.
 +    let band = smoothstep(0.0, 0.06, depth_v) * (1.0 - smoothstep(0.1 * fd, fd, depth_v))
@@ -408,7 +516,7 @@ index ac8e1d4..da2fa86 100644
      key(
          21,
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index aa9be1c..bb213c6 100644
+index aa9be1c..7fe8111 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -24,6 +24,7 @@ pub mod rays;
@@ -419,6 +527,15 @@ index aa9be1c..bb213c6 100644
  pub mod water;
  pub mod water_pass;
  pub mod wind;
+@@ -33,7 +34,7 @@ pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
+ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+ pub use shadows::{LookShadows, ShadowFrame};
+-pub use sky::{LookSky, SkyFrame};
++pub use sky::{LookGlare, LookSky, SkyFrame};
+ pub use water::{LookWater, WaterFrame};
+ pub use wind::{LookWind, WindFrame};
+ 
 @@ -191,11 +192,15 @@ pub fn graded(
      dt: f32,
      suppressed: bool,
@@ -480,8 +597,58 @@ index aa9be1c..bb213c6 100644
      }
  
      #[test]
+diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
+index 0835ddd..cd780d5 100644
+--- a/crates/benilla-world/src/look/pass.rs
++++ b/crates/benilla-world/src/look/pass.rs
+@@ -314,6 +314,21 @@ impl LookUniform {
+     }
+ }
+ 
++impl LookUniform {
++    /// The sun's glare, drawn after the grade (`look::LookGlare`), in the rows' spare lanes:
++    /// `grade.w` its strength, `camera.w` and `sun_dir.w` its core's and halo's sigma, `mist.w`
++    /// the halo's share. None with the sun behind the camera (its point would be meaningless) or
++    /// off the screen's edge, as the rays fade.
++    pub fn set_glare(&mut self, glare: Option<&super::LookGlare>) {
++        use super::sky::tune;
++        let on_screen = (self.sun[2] * 3.0).min(1.0);
++        self.grade[3] = glare.map_or(0.0, |g| g.strength()) * on_screen;
++        self.camera[3] = tune::GLARE_CORE;
++        self.sun_dir[3] = tune::GLARE_HALO;
++        self.mist[3] = tune::GLARE_HALO_SHARE;
++    }
++}
++
+ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
+ 
+ #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+@@ -503,13 +518,14 @@ impl ViewNode for LookNode {
+         let clip_from_world = view.clip_from_world.unwrap_or_else(|| {
+             view.clip_from_view * Mat4::from(world_from_view.affine().inverse())
+         });
+-        let uniform = LookUniform::new(
++        let mut uniform = LookUniform::new(
+             &frame,
+             clip_from_world,
+             world_from_view.translation(),
+             world_from_view.forward().into(),
+             ao_view.is_some(),
+         );
++        uniform.set_glare(world.get_resource::<super::LookGlare>());
+         world
+             .resource::<RenderQueue>()
+             .write_buffer(&gpu.uniform, 0, bytemuck::bytes_of(&uniform));
+@@ -571,6 +587,7 @@ pub(super) fn build(app: &mut App) {
+                 .after(super::sky::SkyPublish)
+                 .in_set(crate::lighting::LightingConsumeSet),
+         );
++    app.add_plugins(ExtractResourcePlugin::<super::LookGlare>::default());
+ }
+ 
+ pub(super) fn finish(app: &mut App) {
 diff --git a/crates/benilla-world/src/look/sky.rs b/crates/benilla-world/src/look/sky.rs
-index 4060641..dc464c3 100644
+index 4060641..72728ed 100644
 --- a/crates/benilla-world/src/look/sky.rs
 +++ b/crates/benilla-world/src/look/sky.rs
 @@ -65,6 +65,11 @@ pub mod tune {
@@ -496,23 +663,34 @@ index 4060641..dc464c3 100644
      pub const SOFTNESS: f32 = 0.13;
      pub const OPACITY: f32 = 0.9;
      pub const OPACITY_OVERCAST: f32 = 0.97;
-@@ -124,6 +129,15 @@ pub mod tune {
+@@ -124,6 +129,26 @@ pub mod tune {
      /// The wide halo is hollowed inside about 6° of the sun (`1 − cos^power`), where 1.12's glare
      /// shines, so it rings that glare (`look_sky.wgsl`'s `LOOK_SKY_HOLLOW_POWER`).
      pub const SUN_HOLLOW_POWER: f32 = 120.0;
-+    /// 1.12's own sun glare under the new look: its size and its strength, shares of 1.12's.
-+    /// Take 280 found the golden-hour glare a white disc about 40% of the frame wide with a hard
-+    /// rim (25 to 32% of the frame above 230), the same with the painted sky off. It is 1.12's
-+    /// glare quad (`sun::follow`), 20 units at 12 out, about 80 degrees across facing the sun,
-+    /// added in gamma: the look's grade and bloom then lifted its faint outer texels to white,
-+    /// and where they clip is the rim. Under the new look it is under half as wide and 0.35 as
-+    /// strong, a core the bloom and the halo here soften; `worldLook 0` keeps 1.12's.
-+    pub const GLARE_SIZE: f32 = 0.45;
-+    pub const GLARE_ALPHA: f32 = 0.35;
++    /// The sun's glare under the new look, drawn by the look's pass after its grade (`look::pass`,
++    /// `world_look.wgsl`'s `sun_glare`), in gamma like 1.12's: a core and a halo, gaussian, as
++    /// shares of the screen's height, the halo's share of the core, and its strength at the core.
++    /// 1.12's glare quad (`sun::follow`) is hidden under the new look; its envelope (the sun on
++    /// screen, behind no tree or cloud, by the view's angle to it) scales this one.
++    ///
++    /// Take 280 found the golden-hour glare a clipped white disc about 40% of the frame wide; 0081
++    /// then drew 1.12's quad at 0.45 its size and 0.35 its strength, and take 291 still found a
++    /// clipped disc 36% wide (17.4% of the frame over 230, was 25 to 32%). Both shares did take
++    /// effect (the over-230 share fell, and the disc is about 80% of the shrunken quad's width),
++    /// but the quad is drawn into the frame before the look's grade: the golden-hour contrast,
++    /// warmth and bloom lifted the sky round the sun, already bright, and any glare on it, past
++    /// 230 nearly to the quad's edge, so its rim still read as a hard disc whatever its size.
++    /// Drawn after the grade the glare is only what it adds: a hand-sized core, as 1.12's
++    /// reads under `worldLook 0`, and a faint halo. `lookglare` holds its strength or shows
++    /// 1.12's quad under the new look instead, for the still that compares them.
++    pub const GLARE_CORE: f32 = 0.035;
++    pub const GLARE_HALO: f32 = 0.11;
++    pub const GLARE_HALO_SHARE: f32 = 0.22;
++    pub const GLARE_STRENGTH: f32 = 0.5;
      pub const HALO_WARM: [f32; 3] = [1.0, 0.72, 0.42];
      /// The moon's halo, pale and small, at night only.
      pub const MOON_INNER_POWER: f32 = 900.0;
-@@ -391,6 +405,20 @@ pub fn cover(input: &SkyInputs, light: &WowLighting) -> f32 {
+@@ -391,6 +416,20 @@ pub fn cover(input: &SkyInputs, light: &WowLighting) -> f32 {
      base + (tune::OVERCAST_COVER - base).max(0.0) * storm
  }
  
@@ -533,7 +711,7 @@ index 4060641..dc464c3 100644
  /// The layer's rows for this frame ([`SKY_ROWS`]); all zero, no layer, when `on` is false.
  pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4]; SKY_ROWS] {
      let mut rows = [[0.0; 4]; SKY_ROWS];
-@@ -429,7 +457,7 @@ pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4];
+@@ -429,7 +468,7 @@ pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4];
      });
      rows[0] = [
          1.0,
@@ -542,7 +720,65 @@ index 4060641..dc464c3 100644
          tune::SOFTNESS,
          tune::OPACITY + (tune::OPACITY_OVERCAST - tune::OPACITY) * overcast,
      ];
-@@ -894,7 +922,31 @@ mod tests {
+@@ -680,8 +719,56 @@ pub(crate) fn follow_look_sky(
+     *gt = GlobalTransform::from(*tf);
+ }
+ 
++/// The sun's glare under the new look (benilla's own): drawn after the grade by the look's pass,
++/// in place of 1.12's quad ([`tune::GLARE_STRENGTH`]). `classic` draws 1.12's quad instead, as
++/// 1.12 does, for the still that compares them (`lookglare classic`); `share` scales the strength
++/// (`lookglare <share>`). `env` is this frame's envelope, written by `sun::follow`: 1.12's own for
++/// its glare (the view's angle to the sun, the sun behind no tree or cloud, the weather), 0 with
++/// the glare off (`SkySunGlare 0`) or hidden.
++#[derive(Resource, Clone, Copy, Debug, PartialEq, bevy::render::extract_resource::ExtractResource)]
++pub struct LookGlare {
++    pub classic: bool,
++    pub share: f32,
++    pub env: f32,
++}
++
++impl Default for LookGlare {
++    fn default() -> Self {
++        Self {
++            classic: false,
++            share: 1.0,
++            env: 0.0,
++        }
++    }
++}
++
++impl LookGlare {
++    /// `lookglare`'s arguments: a share 0-4 of the tuned strength, `classic` for 1.12's quad,
++    /// `grade` (or nothing) for the tuned glare; `None` for anything else.
++    pub fn parse(args: &str) -> Option<(bool, f32)> {
++        let mut words = args.split_whitespace();
++        let out = match words.next() {
++            None | Some("grade") => (false, 1.0),
++            Some("classic") => (true, 1.0),
++            Some(w) => (false, w.parse::<f32>().ok().filter(|v| v.is_finite())?.clamp(0.0, 4.0)),
++        };
++        words.next().is_none().then_some(out)
++    }
++
++    /// The glare's strength at its core this frame, 0 when 1.12's quad draws instead.
++    pub fn strength(&self) -> f32 {
++        if self.classic {
++            0.0
++        } else {
++            tune::GLARE_STRENGTH * self.share * self.env
++        }
++    }
++}
++
+ pub(crate) fn init_resources(app: &mut App) {
+-    app.init_resource::<LookSky>().init_resource::<SkyFrame>();
++    app.init_resource::<LookSky>()
++        .init_resource::<SkyFrame>()
++        .init_resource::<LookGlare>();
+ }
+ 
+ #[cfg(test)]
+@@ -894,7 +981,53 @@ mod tests {
          assert!((cover(&input(720.0, None), &storm) - tune::OVERCAST_COVER).abs() < 1e-5);
          assert_eq!(cover(&input(720.0, Some(0.8)), &storm), 0.8);
          let rows = pack_rows(true, &input(720.0, Some(0.0)), &noon());
@@ -572,15 +808,37 @@ index 4060641..dc464c3 100644
 +            let dir = Vec3::new(a.cos(), up, a.sin()).normalize();
 +            assert_eq!(cover_toward(dir, &rows), 0.0, "a cloud toward {dir}");
 +        }
++    }
++
++    /// `lookglare`: a share, `classic`, `grade`; the strength is the tune's by the share and the
++    /// envelope, and none while 1.12's quad draws.
++    #[test]
++    fn lookglare_parses_and_scales() {
++        assert_eq!(LookGlare::parse(""), Some((false, 1.0)));
++        assert_eq!(LookGlare::parse("grade"), Some((false, 1.0)));
++        assert_eq!(LookGlare::parse("classic"), Some((true, 1.0)));
++        assert_eq!(LookGlare::parse("0.5"), Some((false, 0.5)));
++        assert_eq!(LookGlare::parse("9"), Some((false, 4.0)));
++        assert_eq!(LookGlare::parse("x"), None);
++        assert_eq!(LookGlare::parse("1 2"), None);
++        let g = LookGlare {
++            classic: false,
++            share: 0.5,
++            env: 0.8,
++        };
++        assert!((g.strength() - tune::GLARE_STRENGTH * 0.4).abs() < 1e-6);
++        assert_eq!(LookGlare { classic: true, ..g }.strength(), 0.0);
++        // Hand-sized: the core well under a tenth of the screen's height, the halo faint.
++        const { assert!(tune::GLARE_CORE < 0.06 && tune::GLARE_HALO_SHARE < 0.5) };
      }
  
      /// The sun's halo is up by day and gone by night; the moon's the other way.
 diff --git a/crates/benilla-world/src/look/switch_watch.rs b/crates/benilla-world/src/look/switch_watch.rs
 new file mode 100644
-index 0000000..0baa4e4
+index 0000000..2697c6c
 --- /dev/null
 +++ b/crates/benilla-world/src/look/switch_watch.rs
-@@ -0,0 +1,323 @@
+@@ -0,0 +1,527 @@
 +//! What switching the look costs, in the log (benilla's own). Take 280 found a 0.6 to 2 s hitch
 +//! each time `worldLook` came back on, and one frame with the hero see-through (the oak behind him
 +//! showing through his body) right after a settings change; neither shows without the real
@@ -590,7 +848,20 @@ index 0000000..0baa4e4
 +//! again, and skips its draws until it has), and, from the render world, the pipelines still
 +//! compiling (a mesh whose pipeline is not ready is not drawn that frame, which would leave a
 +//! hero see-through while the static world draws). The window closes with a summary line.
++//!
++//! Take 291 found one frame of 0.5 to 1.4 s each time `worldLook` came back to 1, with almost
++//! nothing made again in it (the 4,000 meshes and 115 images came in the frames after): a
++//! synchronous job no tally counted. Each slow frame's line now carries its timing spans
++//! ([`Spans`]): the main schedules, cut at their boundaries and between `Update`'s
++//! [`crate::schedule::WorldStage`]s (the stream, the net, the input), what is left for the render
++//! sub-app and the present, and the render world's last finished frame by its sets (extract and
++//! asset prepare, queue, sort, prepare, the graph). Stamps only: they order nothing new.
 +
++use std::sync::Mutex;
++use std::time::Instant;
++
++use bevy::app::MainScheduleOrder;
++use bevy::ecs::schedule::ScheduleLabel;
 +use bevy::prelude::*;
 +use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
 +use bevy::render::render_resource::PipelineCache;
@@ -654,6 +925,94 @@ index 0000000..0baa4e4
 +    }
 +}
 +
++/// The marker schedules spliced between the main ones ([`MAIN_MARKS`]).
++#[derive(ScheduleLabel, Clone, Copy, Debug, PartialEq, Eq, Hash)]
++struct SpanMark(u8);
++
++/// Each marker schedule and the span it closes; mark 0, before `First`, opens the frame.
++const MAIN_MARKS: [(u8, &str); 6] = [
++    (0, ""),
++    (1, "First"),
++    (2, "PreUpdate"),
++    (3, "Update/rest"),
++    (4, "PostUpdate"),
++    (5, "Last"),
++];
++
++/// The frame's timing spans: stamps at the main schedules' boundaries and after each of
++/// `Update`'s world stages, closed at the next frame's start, so the render sub-app's wait and
++/// the present fall in the last span. `last` is the previous frame's, as (name, ms).
++#[derive(Resource, Default)]
++struct Spans {
++    marks: Vec<(&'static str, Instant)>,
++    last: Vec<(&'static str, f32)>,
++}
++
++impl Spans {
++    /// Close the frame: its spans in the order they closed, the rest as `render+present`.
++    fn close(&mut self, now: Instant) {
++        self.last.clear();
++        for w in self.marks.windows(2) {
++            self.last
++                .push((w[1].0, (w[1].1 - w[0].1).as_secs_f32() * 1000.0));
++        }
++        if let Some((_, end)) = self.marks.last() {
++            self.last
++                .push(("render+present", (now - *end).as_secs_f32() * 1000.0));
++        }
++        self.marks.clear();
++    }
++
++    fn stamp(&mut self, name: &'static str) {
++        self.marks.push((name, Instant::now()));
++    }
++}
++
++/// Spans as a line: each over 0.5 ms, largest first, ("Update/Stream 912.0, Last 3.1").
++fn span_line(spans: &[(&'static str, f32)]) -> String {
++    let mut big: Vec<_> = spans.iter().filter(|(_, ms)| *ms >= 0.5).collect();
++    big.sort_by(|a, b| b.1.total_cmp(&a.1));
++    if big.is_empty() {
++        return "none over 0.5 ms".to_string();
++    }
++    big.iter()
++        .map(|(n, ms)| format!("{n} {ms:.1}"))
++        .collect::<Vec<_>>()
++        .join(", ")
++}
++
++/// The render world's stamps this frame and its last finished frame's spans (it runs on its own
++/// thread, a frame behind the main world).
++static RENDER_SPANS: Mutex<SpanTape> = Mutex::new((Vec::new(), Vec::new()));
++
++/// This frame's stamps and the last finished frame's spans (name, ms).
++type SpanTape = (Vec<(&'static str, Instant)>, Vec<(&'static str, f32)>);
++
++/// A render-world stamp; the first of a frame (`""`) closes the frame before.
++fn render_stamp(name: &'static str) -> impl FnMut() {
++    move || {
++        let mut r = RENDER_SPANS.lock().unwrap_or_else(|e| e.into_inner());
++        let now = Instant::now();
++        if name.is_empty() && !r.0.is_empty() {
++            let spans: Vec<_> = r
++                .0
++                .windows(2)
++                .map(|w| (w[1].0, (w[1].1 - w[0].1).as_secs_f32() * 1000.0))
++                .collect();
++            r.1 = spans;
++            r.0.clear();
++        }
++        r.0.push((name, now));
++    }
++}
++
++/// The render world's last finished frame, as a line.
++fn render_line() -> String {
++    let r = RENDER_SPANS.lock().unwrap_or_else(|e| e.into_inner());
++    let total: f32 = r.1.iter().map(|s| s.1).sum();
++    format!("{total:.1} ms: {}", span_line(&r.1))
++}
++
 +/// What a frame made again: model materials, liquids, images and meshes added or changed.
 +#[derive(Clone, Copy, Default, PartialEq, Debug)]
 +struct Remade {
@@ -685,6 +1044,7 @@ index 0000000..0baa4e4
 +    slow: u32,
 +    worst_ms: f32,
 +    worst_frame: u32,
++    worst_spans: String,
 +    remade: Remade,
 +    last: Remade,
 +}
@@ -754,6 +1114,7 @@ index 0000000..0baa4e4
 +    switches: SwitchInputs,
 +    mut events: RemadeInputs,
 +    mut watch: ResMut<LookSwitchWatch>,
++    spans: Option<Res<Spans>>,
 +    mut last: Local<Option<Switches>>,
 +    mut tally: Local<Tally>,
 +) {
@@ -779,6 +1140,10 @@ index 0000000..0baa4e4
 +    let ms = time.delta_secs() * 1000.0;
 +    if watch.frame > 0 && ms >= SLOW_MS {
 +        tally.slow += 1;
++        let main = spans
++            .as_deref()
++            .map_or_else(|| "not stamped".to_string(), |s| span_line(&s.last));
++        let render = render_line();
 +        info!(
 +            "[look switch] {}, frame {}: the frame before took {ms:.0} ms; made again then: {}; \
 +             now: {}",
@@ -787,9 +1152,15 @@ index 0000000..0baa4e4
 +            tally.last.line(),
 +            this.line()
 +        );
++        info!(
++            "[look switch] {}, frame {}: its spans (ms): {main}; the render world's last frame \
++             {render}",
++            watch.what, watch.frame
++        );
 +        if ms > tally.worst_ms {
 +            tally.worst_ms = ms;
 +            tally.worst_frame = watch.frame;
++            tally.worst_spans = main;
 +        }
 +    }
 +    tally.remade.add(&this);
@@ -799,12 +1170,17 @@ index 0000000..0baa4e4
 +    if watch.left <= 0.0 {
 +        info!(
 +            "[look switch] {} done: {} frames, {} slower than {SLOW_MS:.0} ms (the slowest {:.0} \
-+             ms at frame {}); made again: {}",
++             ms at frame {}, spans {}); made again: {}",
 +            watch.what,
 +            watch.frame,
 +            tally.slow,
 +            tally.worst_ms,
 +            tally.worst_frame,
++            if tally.worst_spans.is_empty() {
++                "-"
++            } else {
++                tally.worst_spans.as_str()
++            },
 +            tally.remade.line()
 +        );
 +        watch.left = 0.0;
@@ -843,8 +1219,69 @@ index 0000000..0baa4e4
 +    app.init_resource::<LookSwitchWatch>()
 +        .add_plugins(ExtractResourcePlugin::<LookSwitchWatch>::default())
 +        .add_systems(Last, watch_switches);
++    build_spans(app);
 +    if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
 +        render_app.add_systems(Render, watch_pipelines.in_set(RenderSystems::Cleanup));
++    }
++}
++
++/// The timing stamps ([`Spans`]): marker schedules between the main ones, plain systems after
++/// each of `Update`'s world stages (a resource only they touch, so they order nothing new), and
++/// the render world's at its set boundaries. A stamp is one `Instant` pushed.
++fn build_spans(app: &mut App) {
++    use crate::schedule::WorldStage;
++    let Some(mut order) = app.world_mut().get_resource_mut::<MainScheduleOrder>() else {
++        return;
++    };
++    order.insert_before(First, SpanMark(0));
++    order.insert_after(First, SpanMark(1));
++    order.insert_after(PreUpdate, SpanMark(2));
++    order.insert_after(Update, SpanMark(3));
++    order.insert_after(PostUpdate, SpanMark(4));
++    order.insert_after(Last, SpanMark(5));
++    app.init_resource::<Spans>();
++    for (i, name) in MAIN_MARKS {
++        app.add_systems(SpanMark(i), move |mut s: ResMut<Spans>| {
++            if i == 0 {
++                s.close(Instant::now());
++            }
++            s.stamp(name);
++        });
++    }
++    let stage = |name: &'static str| move |mut s: ResMut<Spans>| s.stamp(name);
++    app.add_systems(
++        Update,
++        (
++            stage("Update/to-Net").before(WorldStage::Net),
++            stage("Update/Net")
++                .after(WorldStage::Net)
++                .before(WorldStage::Input),
++            stage("Update/Input")
++                .after(WorldStage::Input)
++                .before(WorldStage::Stream),
++            stage("Update/Stream")
++                .after(WorldStage::Stream)
++                .before(WorldStage::Present),
++            stage("Update/Present").after(WorldStage::Present),
++        ),
++    );
++    if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
++        use RenderSystems as R;
++        render_app.add_systems(
++            Render,
++            (
++                render_stamp("").in_set(R::ExtractCommands),
++                render_stamp("extract+assets")
++                    .after(R::PrepareMeshes)
++                    .before(R::ManageViews),
++                render_stamp("views+queue")
++                    .after(R::Queue)
++                    .before(R::PhaseSort),
++                render_stamp("sort").after(R::PhaseSort).before(R::Prepare),
++                render_stamp("prepare").after(R::Prepare).before(R::Render),
++                render_stamp("graph").after(R::Render).before(R::Cleanup),
++            ),
++        );
 +    }
 +}
 +
@@ -861,6 +1298,31 @@ index 0000000..0baa4e4
 +            wind: true,
 +            sky: true,
 +        }
++    }
++
++    /// A frame's spans close at the next frame's start, in the order they closed, the rest
++    /// named `render+present`; the line lists the big ones, largest first.
++    #[test]
++    fn the_spans_name_where_a_frame_went() {
++        let t0 = Instant::now();
++        let ms = |n: u64| t0 + std::time::Duration::from_millis(n);
++        let mut s = Spans {
++            marks: vec![
++                ("", ms(0)),
++                ("First", ms(1)),
++                ("Update/Stream", ms(901)),
++                ("Last", ms(903)),
++            ],
++            ..Default::default()
++        };
++        s.close(ms(913));
++        let names: Vec<_> = s.last.iter().map(|x| x.0).collect();
++        assert_eq!(names, ["First", "Update/Stream", "Last", "render+present"]);
++        assert!(s.marks.is_empty());
++        let line = span_line(&s.last);
++        assert!(line.starts_with("Update/Stream 900."), "{line}");
++        assert!(line.contains("render+present 10."), "{line}");
++        assert_eq!(span_line(&[("First", 0.1)]), "none over 0.5 ms");
 +    }
 +
 +    #[test]
@@ -905,7 +1367,7 @@ index 0000000..0baa4e4
 +    }
 +}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index 51196b7..aec8189 100644
+index 51196b7..e172c10 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
 @@ -72,8 +72,54 @@ pub mod tune {
@@ -965,7 +1427,7 @@ index 51196b7..aec8189 100644
      pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
      /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
      /// cloud: a full overcast keeps this share of it.
-@@ -86,9 +132,50 @@ pub mod tune {
+@@ -86,9 +132,70 @@ pub mod tune {
      pub const SHADOW_DIM: f32 = 0.3;
      /// The reflection march: how far a mirrored ray is followed (yards).
      pub const SSR_REACH: f32 = 160.0;
@@ -1012,12 +1474,32 @@ index 51196b7..aec8189 100644
 +    /// The froth's lumps fade in over this much of the cut noise (was 0.38: 0.42 to 0.8), so
 +    /// their edges are soft, never a line.
 +    pub const FROTH_SOFT: f32 = 0.6;
++    /// Revised after take 291, which still found a crisp, dotted, unbroken ring round the neck
++    /// standing deep and a dotted arc trailing behind wading deeper. The dots were the taps'
++    /// per-pixel turn (the mirror's dither); it now wanders smoothly over the surface. The ring
++    /// is broken into patches: round the step a slow noise ([`FROTH_ARCS`] cells round, drifting)
++    /// keeps the arcs over [`FROTH_ARC_CUT`] and drops the rest, about half; and the froth fades
++    /// out as the water at the pixel deepens from [`FROTH_DEEP_FROM`] to [`FROTH_DEEP_TO`] yd, so
++    /// wading at the shins froths and neck-deep water barely does.
++    /// How much calmer than the ripples the surface is for the sky's mirror (the share of the
++    /// way to flat), near the camera and from 40 yd out. Take 291's `looksky clouds 0.8` over
++    /// open water mirrored as an even greying with no cloud shapes: the mirror does sample the
++    /// painted clouds (`water_sky`), but each pixel's rippled ray reached a different patch of
++    /// them, and 0.8 is an overcast grey besides (`look::sky::tune::OVERCAST_FROM`). The ripples'
++    /// tilt averages out over the many waves a far pixel covers, so the sky's mirror takes a
++    /// calmer surface; the shore's reflections keep the whole ripple.
++    pub const SKY_CALM_NEAR: f32 = 0.5;
++    pub const SKY_CALM_FAR: f32 = 0.8;
++    pub const FROTH_DEEP_FROM: f32 = 0.45;
++    pub const FROTH_DEEP_TO: f32 = 1.2;
++    pub const FROTH_ARCS: f32 = 0.55;
++    pub const FROTH_ARC_CUT: f32 = 0.5;
 +    /// The froth's reach (planar eye depth, yards): past it a hero's legs are a few pixels wide.
 +    pub const FROTH_REACH: f32 = 40.0;
      /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
      /// hard edge.
      pub const SHORE_SOFT: f32 = 0.15;
-@@ -213,7 +300,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
+@@ -213,7 +320,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
  
  /// The glint's body this frame: the visible sun while it is up, else the white moon, each fading
  /// in as it rises and dimmed by cloud: `(camera to body, strength, colour (linear), sharpness)`;
@@ -1027,7 +1509,7 @@ index 51196b7..aec8189 100644
  pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
      let rise = |dir: Vec3| {
          smoothstep(
-@@ -239,7 +327,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
+@@ -239,7 +347,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
          moon,
          tune::MOON_GLINT * rise(moon) * cloud,
          tune::MOON_TINT,
@@ -1036,7 +1518,7 @@ index 51196b7..aec8189 100644
      )
  }
  
-@@ -308,7 +396,13 @@ pub fn pack_rows(
+@@ -308,7 +416,13 @@ pub fn pack_rows(
          tune::FOAM_DEPTH,
          tune::SHORE_SOFT,
      ];
@@ -1051,7 +1533,7 @@ index 51196b7..aec8189 100644
      rows[9] = [
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
-@@ -429,8 +523,142 @@ mod tests {
+@@ -429,8 +543,142 @@ mod tests {
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
      }
  
@@ -1196,7 +1678,7 @@ index 51196b7..aec8189 100644
      #[test]
      fn the_glint_follows_the_sun_then_the_moon() {
          let day = noon();
-@@ -447,7 +675,7 @@ mod tests {
+@@ -447,7 +695,7 @@ mod tests {
          let (dir, s, color, sharp) = glint(&night);
          assert!((dir - night.moon_dir_white).length() < 1e-6);
          assert!((s - tune::MOON_GLINT).abs() < 1e-4);
@@ -1205,7 +1687,7 @@ index 51196b7..aec8189 100644
          let dark = WowLighting {
              moon_dir_white: Vec3::new(0.0, -0.3, 1.0).normalize(),
              ..night
-@@ -520,6 +748,50 @@ mod tests {
+@@ -520,6 +768,56 @@ mod tests {
          assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
      }
  
@@ -1235,6 +1717,12 @@ index 51196b7..aec8189 100644
 +        assert_eq!(f("WATER_FROTH_REACH"), tune::FROTH_REACH);
 +        assert_eq!(f("WATER_FROTH_FRONT"), tune::FROTH_FRONT);
 +        assert_eq!(f("WATER_FROTH_SOFT"), tune::FROTH_SOFT);
++        assert_eq!(f("WATER_SKY_CALM_NEAR"), tune::SKY_CALM_NEAR);
++        assert_eq!(f("WATER_SKY_CALM_FAR"), tune::SKY_CALM_FAR);
++        assert_eq!(f("WATER_FROTH_DEEP_FROM"), tune::FROTH_DEEP_FROM);
++        assert_eq!(f("WATER_FROTH_DEEP_TO"), tune::FROTH_DEEP_TO);
++        assert_eq!(f("WATER_FROTH_ARCS"), tune::FROTH_ARCS);
++        assert_eq!(f("WATER_FROTH_ARC_CUT"), tune::FROTH_ARC_CUT);
 +        assert_eq!(f("WATER_MOON_FAR"), tune::MOON_LANE_FAR);
 +        assert_eq!(f("WATER_MOON_NEAR"), tune::MOON_LANE_NEAR);
 +        assert_eq!(f("WATER_MOON_SHEEN_LANE"), tune::MOON_SHEEN_LANE);
@@ -1257,10 +1745,35 @@ index 51196b7..aec8189 100644
      #[test]
      fn the_block_is_twenty_three_rows() {
 diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
-index de5620e..cac5165 100644
+index de5620e..8aad35f 100644
 --- a/crates/benilla-world/src/shaders/world_look.wgsl
 +++ b/crates/benilla-world/src/shaders/world_look.wgsl
-@@ -59,6 +59,12 @@ const RAY_DECAY: f32 = 0.96;
+@@ -16,7 +16,7 @@
+ 
+ @group(0) @binding(0) var scene_tex: texture_2d<f32>;
+ struct Look {
+-    // x = saturation, y = contrast, z = warmth, w unused.
++    // x = saturation, y = contrast, z = warmth, w = the sun glare's strength (`sun_glare`).
+     grade: vec4<f32>,
+     // xy = the sun's screen UV, z = its rays' visibility, w = the ray strength.
+     sun: vec4<f32>,
+@@ -24,11 +24,12 @@ struct Look {
+     sun_color: vec4<f32>,
+     // rgb = the fog colour (linear), w = the mist's base height.
+     fog_color: vec4<f32>,
+-    // x = the mist's falloff in yards, y = its cap, z = in-scattering toward the sun, w unused.
++    // x = the mist's falloff in yards, y = its cap, z = in-scattering toward the sun, w = the sun
++    // glare halo's share.
+     mist: vec4<f32>,
+-    // xyz = the camera, w unused.
++    // xyz = the camera, w = the sun glare core's sigma (screen heights).
+     camera: vec4<f32>,
+-    // xyz = camera to sun, unit, w unused.
++    // xyz = camera to sun, unit, w = the sun glare halo's sigma (screen heights).
+     sun_dir: vec4<f32>,
+     // x = 1 to apply the occlusion, y = its coolness, z = 1.12's fog start, w = its end (yd).
+     ao: vec4<f32>,
+@@ -59,6 +60,12 @@ const RAY_DECAY: f32 = 0.96;
  // The shafts' brightness, and how far from the sun (in screen heights) they reach before fading.
  const RAY_EXPOSURE: f32 = 0.6;
  const RAY_RADIUS: f32 = 0.8;
@@ -1273,7 +1786,7 @@ index de5620e..cac5165 100644
  // The density exponent's clamp (`look::rays::MIST_EXP_LIMIT`).
  const MIST_EXP_LIMIT: f32 = 30.0;
  
-@@ -207,7 +213,8 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+@@ -207,10 +214,35 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
          let aspect = vec2<f32>(dims.x / dims.y, 1.0);
          let near = 1.0 - smoothstep(0.0, RAY_RADIUS, length((look.sun.xy - uv) * aspect));
          if near > 0.0 {
@@ -1283,67 +1796,179 @@ index de5620e..cac5165 100644
          }
      }
  
+     let graded = grade(lin, look.grade.x, look.grade.y, look.grade.z);
+-    return vec4<f32>(linear_to_srgb(clamp(graded, vec3<f32>(0.0), vec3<f32>(1.0))), scene.a);
++    let encoded = linear_to_srgb(clamp(graded, vec3<f32>(0.0), vec3<f32>(1.0)));
++    return vec4<f32>(sun_glare(encoded, uv, dims), scene.a);
++}
++
++// The sun's glare after the grade (`look::sky::tune::GLARE_*`, `look::LookGlare`), in gamma like
++// 1.12's own glare quad, which the new look hides: drawn before the grade, the grade and the bloom
++// lifted the quad to a clipped white disc (take 291). A gaussian core and a faint halo round the
++// sun's point on screen, in the sun's tint, screened on so it never clips past white. `grade.w`
++// is its strength at the core (0 none), `camera.w` and `sun_dir.w` the core's and the halo's
++// sigma in screen heights, `mist.w` the halo's share.
++fn sun_glare(c: vec3<f32>, uv: vec2<f32>, dims: vec2<f32>) -> vec3<f32> {
++    let k = look.grade.w;
++    if k <= 0.0 {
++        return c;
++    }
++    let d = (uv - look.sun.xy) * vec2<f32>(dims.x / dims.y, 1.0);
++    let r2 = dot(d, d);
++    let core = max(look.camera.w, 1e-4);
++    let halo = max(look.sun_dir.w, 1e-4);
++    let shape = exp(-r2 / (2.0 * core * core)) + look.mist.w * exp(-r2 / (2.0 * halo * halo));
++    let s = look.sun_color.rgb;
++    let tint = linear_to_srgb(clamp(s / max(max(s.r, s.g), max(s.b, 1e-3)), vec3<f32>(0.0),
++        vec3<f32>(1.0)));
++    let add = clamp(tint * (k * shape), vec3<f32>(0.0), vec3<f32>(1.0));
++    return c + add * (vec3<f32>(1.0) - c);
+ }
 diff --git a/crates/benilla-world/src/sun/follow.rs b/crates/benilla-world/src/sun/follow.rs
-index 76507a9..38163aa 100644
+index 76507a9..ef41c81 100644
 --- a/crates/benilla-world/src/sun/follow.rs
 +++ b/crates/benilla-world/src/sun/follow.rs
-@@ -184,6 +184,9 @@ pub(super) struct FlareGate<'w, 's> {
+@@ -184,6 +184,10 @@ pub(super) struct FlareGate<'w, 's> {
      /// The new look's painted sky (`look::sky`), whose clouds stand in for 1.12's while it draws:
      /// the sun's glare then dims with the painted cloud over it.
      look_sky: Option<Res<'w, crate::look::SkyFrame>>,
-+    /// The new look, under which the sun's glare is smaller and fainter
-+    /// (`look::sky::tune::GLARE_SIZE`, `GLARE_ALPHA`).
++    /// The new look, under which the look's pass draws the sun's glare after its grade in place
++    /// of this quad (`look::LookGlare`), unless `lookglare classic` asks for 1.12's.
 +    look: Option<Res<'w, crate::look::WorldLook>>,
++    look_glare: Option<ResMut<'w, crate::look::LookGlare>>,
      /// Both glares' enabled word; the start-up 1 where none is registered.
      glare: Option<Res<'w, super::SunGlare>>,
      env: Local<'s, f32>,
-@@ -212,6 +215,19 @@ impl FlareGate<'_, '_> {
+@@ -212,6 +216,22 @@ impl FlareGate<'_, '_> {
          self.glare.as_deref().copied().unwrap_or_default().enabled
      }
  
-+    /// The sun glare's size and strength as shares of 1.12's: smaller and fainter under the new
-+    /// look, whose grade and bloom would whiten it (`look::sky::tune`); 1.12's otherwise.
-+    fn sun_glare_shares(&self) -> (f32, f32) {
-+        if self.look.as_deref().is_some_and(|l| l.on) {
-+            (
-+                crate::look::sky::tune::GLARE_SIZE,
-+                crate::look::sky::tune::GLARE_ALPHA,
-+            )
-+        } else {
-+            (1.0, 1.0)
++    /// Whether 1.12's sun glare quad draws: always under the classic look, and under the new one
++    /// only for `lookglare classic`; else the look's pass draws the glare after its grade.
++    fn classic_sun_glare(&self) -> bool {
++        !self.look.as_deref().is_some_and(|l| l.on)
++            || self.look_glare.as_deref().is_some_and(|g| g.classic)
++    }
++
++    /// Hand this frame's sun-glare envelope to the look's pass (`look::LookGlare::env`).
++    fn publish_sun_glare(&mut self, env: f32) {
++        if let Some(g) = self.look_glare.as_deref_mut() {
++            if g.env != env {
++                g.env = env;
++            }
 +        }
 +    }
 +
      /// The envelope along `dir`, `half` the quad's angular half-size. The submersion fade is inside
      /// the slew, so surfacing ramps the glare back in: the target `[glare+0x34]` (reset at
      /// `0x6cf499`) takes it at `0x6cf501`/`0x6cf504`, before the limiter reads it at `0x6cf59b`.
-@@ -307,6 +323,7 @@ pub(super) fn follow_sun(
+@@ -276,6 +296,7 @@ pub(super) fn follow_sun(
+     // The visible sun, which rises and sets, not the near-fixed lighting sun.
+     let to_light = light.celestial_dir.normalize_or_zero();
+     if to_light == Vec3::ZERO {
++        gate.publish_sun_glare(0.0);
+         return;
+     }
+     let far = match proj {
+@@ -307,6 +328,7 @@ pub(super) fn follow_sun(
          SUN_FLARE_RISE,
      );
      let enabled = gate.enabled();
-+    let (glare_size, glare_alpha) = gate.sun_glare_shares();
++    let classic_glare = gate.classic_sun_glare();
      for (mut tf, mut gt, sprite, mat) in &mut sprites {
          tf.rotation = rot;
          match sprite.part {
-@@ -340,13 +357,16 @@ pub(super) fn follow_sun(
-             SunPart::Glare => {
-                 tf.translation = cam_pos + to_light * GLARE_DIST;
-                 // `lerp(3, 20, f)` world units (`[0xce9838]`/`[0xce983c]`).
--                let units = 3.0 + 17.0 * f;
-+                let units = (3.0 + 17.0 * f) * glare_size;
-                 tf.scale = Vec3::splat(if hidden { 0.0 } else { units });
-                 // Alpha is `lerp(0.5, 1, f)` (`[glare+0x9c]`) × the envelope × the weather seed,
+@@ -346,10 +368,17 @@ pub(super) fn follow_sun(
                  // `0x6cf490`'s `[+0x1b] = floor(255·lerp·[+0x30])` on the seed byte; a disabled
                  // glare is not drawn (`0x7e57fe`).
                  let env = if enabled {
 -                    benilla_assets::quantize((0.5 + 0.5 * f) * env30 * seed.unwrap_or(1.0), 255.0)
 +                    benilla_assets::quantize(
-+                        (0.5 + 0.5 * f) * env30 * seed.unwrap_or(1.0) * glare_alpha,
++                        (0.5 + 0.5 * f) * env30 * seed.unwrap_or(1.0),
 +                        255.0,
 +                    )
                  } else {
                      0.0
                  };
++                // Under the new look the look's pass draws it after its grade, from this
++                // envelope; the quad then adds nothing (`look::sky::tune::GLARE_STRENGTH`).
++                gate.publish_sun_glare(if classic_glare || hidden { 0.0 } else { env });
++                let env = if classic_glare { env } else { 0.0 };
+                 let color = Color::srgba(tint[0], tint[1], tint[2], env);
+                 benilla_assets::write_gated(
+                     &mut mats,
+@@ -664,9 +693,41 @@ mod tests {
+     /// envelope rises from where it fell.
+     #[test]
+     fn a_disabled_glare_draws_nothing() {
++        let glare_alpha = |enabled: bool| glare_under(enabled, None).0;
++        assert!(
++            glare_alpha(true) > 0.0,
++            "the control: an enabled glare shows"
++        );
++        assert_eq!(glare_alpha(false), 0.0);
++    }
++
++    /// Under the new look 1.12's quad adds nothing and its envelope goes to the look's pass,
++    /// which draws the glare after its grade (take 291: drawn before the grade, even a smaller,
++    /// fainter quad clipped to a white disc); `lookglare classic` draws the quad again, and a
++    /// disabled glare hands the pass nothing.
++    #[test]
++    fn the_new_look_draws_the_glare_after_its_grade() {
++        let (quad, env) = glare_under(true, Some(false));
++        assert_eq!(quad, 0.0, "the quad adds nothing under the new look");
++        assert!(env > 0.0, "the pass gets the envelope");
++        let (quad, env) = glare_under(true, Some(true));
++        assert!(quad > 0.0 && env == 0.0, "lookglare classic: 1.12's quad");
++        assert_eq!(glare_under(false, Some(false)), (0.0, 0.0));
++    }
++
++    /// The glare quad's alpha after a few frames facing the sun, and the envelope handed to the
++    /// look's pass; `look` is the new look with `lookglare classic` or not, `None` the classic.
++    fn glare_under(enabled: bool, look: Option<bool>) -> (f32, f32) {
+         let dir = Vec3::new(0.0, 0.5, -1.0).normalize();
+-        let glare_alpha = |enabled: bool| {
++        {
+             let mut app = App::new();
++            if let Some(classic) = look {
++                app.insert_resource(crate::look::WorldLook::NEW);
++                app.insert_resource(crate::look::LookGlare {
++                    classic,
++                    ..default()
++                });
++            }
+             app.add_plugins((MinimalPlugins, bevy::transform::TransformPlugin));
+             // A tenth of a second a frame, so the envelope's slew shows within a few frames.
+             app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+@@ -710,19 +771,20 @@ mod tests {
+             for _ in 0..4 {
+                 app.update();
+             }
+-            app.world()
++            let quad = app
++                .world()
+                 .resource::<Assets<CelestialMaterial>>()
+                 .get(&mat)
+                 .unwrap()
+                 .base
+                 .base_color
+-                .alpha()
+-        };
+-        assert!(
+-            glare_alpha(true) > 0.0,
+-            "the control: an enabled glare shows"
+-        );
+-        assert_eq!(glare_alpha(false), 0.0);
++                .alpha();
++            let env = app
++                .world()
++                .get_resource::<crate::look::LookGlare>()
++                .map_or(0.0, |g| g.env);
++            (quad, env)
++        }
+     }
+ 
+     /// Height oracle: a flat plain at WoW z = 0, with a 30-unit ridge crest everywhere more than
 -- 
 2.43.0
 

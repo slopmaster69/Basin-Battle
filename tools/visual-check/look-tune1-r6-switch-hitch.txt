@@ -1,0 +1,45 @@
+# The switch hitch (client 0081, #270's sixth round): the Brackwell pumpkin patch at 17:30, the
+# hero at WoW (-9803, -904) with the oaks behind him (yaw 45, pitched 10 up, 6 yd), worldLook and
+# worldSky each switched off and on three times, video throughout and dense stills after each
+# switch. Take 291 found one frame of 0.5 to 1.4 s each time worldLook came back to 1, with
+# almost nothing made again in it: a job the tally didn't count. Each slow frame's "[look
+# switch]" lines now carry its timing spans in ms, largest first: the main schedules (First,
+# PreUpdate, Update/Net, Update/Input, Update/Stream, Update/Present, Update/rest, PostUpdate,
+# Last), "render+present" (what was left for the render thread and the present), and the render
+# world's last frame by its sets (extract+assets, views+queue, sort, prepare, graph). The window's
+# closing line names the slowest frame's spans.
+# PLEASE send client.log's "[look switch]" lines with the film.
+# Look for: in the log, which span holds the 0.5 to 1.4 s on each worldLook 1.
+hero warrior
+cam 45 10 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.0 video
+6.0 lua SetCVar("worldLook", "0")
+6.05 shots look-0-a 8 0.06
+8.0 lua SetCVar("worldLook", "1")
+8.05 shots look-1-a 10 0.06
+11.0 lua SetCVar("worldSky", "0")
+11.05 shots sky-0-a 8 0.06
+13.0 lua SetCVar("worldSky", "1")
+13.05 shots sky-1-a 8 0.06
+15.0 lua SetCVar("worldLook", "0")
+15.05 shots look-0-b 8 0.06
+17.0 lua SetCVar("worldLook", "1")
+17.05 shots look-1-b 10 0.06
+20.0 lua SetCVar("worldSky", "0")
+20.05 shots sky-0-b 8 0.06
+22.0 lua SetCVar("worldSky", "1")
+22.05 shots sky-1-b 8 0.06
+24.0 lua SetCVar("worldLook", "0")
+24.05 shots look-0-c 8 0.06
+26.0 lua SetCVar("worldLook", "1")
+26.05 shots look-1-c 10 0.06
+29.0 lua ConsoleExec("lookweather server")
+31 end
