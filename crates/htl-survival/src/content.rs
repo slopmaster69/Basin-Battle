@@ -2245,6 +2245,15 @@ pub struct MobDef {
     /// Said over a hero it has just felled.
     #[serde(default)]
     pub slay_sound: u32,
+    /// What it yells (a monster yell from where it stands, with a speech bubble) as it turns on a
+    /// foe, over a hero it has just felled, and as it falls. Empty: nothing. A phase's `text` and a
+    /// second form's `then_text` are yelled the same way.
+    #[serde(default)]
+    pub aggro_text: String,
+    #[serde(default)]
+    pub slay_text: String,
+    #[serde(default)]
+    pub death_text: String,
     /// Its voice as it begins a string up close (the first blow's wind-up), from where it stands,
     /// so a blow from behind is heard coming: a grunt, a shout. `heavy_sound` for a heavy first
     /// blow (else `windup_sound`). 0: none.

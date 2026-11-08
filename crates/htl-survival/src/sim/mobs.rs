@@ -516,11 +516,18 @@ impl Survival {
                 }
                 mob.state = MobState::Chase { foe };
                 mob.think = 0.0;
-                // Its voice as it turns on them (once until it's home again).
+                // Its voice and its words as it turns on them (once until it's home again).
                 let sound = self.content.mobs[mob.def].aggro_sound;
-                if m == mid && sound != 0 && !mob.voiced {
+                let line = &self.content.mobs[mob.def].aggro_text;
+                if m == mid && (sound != 0 || !line.is_empty()) && !mob.voiced {
                     mob.voiced = true;
-                    self.events.push(Event::Sound { id: m, sound });
+                    if sound != 0 {
+                        self.events.push(Event::Sound { id: m, sound });
+                    }
+                    if !line.is_empty() {
+                        self.events.push(Event::Log(format!("{}: {line}", self.content.mobs[mob.def].name)));
+                        self.events.push(Event::Yell { id: m, text: line.clone() });
+                    }
                 }
             }
             let (pos, link) = (mob.pos, mob.pack.map_or(0.0, |k| self.content.packs[k].link));
@@ -773,10 +780,7 @@ impl Survival {
             let damage = (self.content.mobs[def].attack.damage as f32 * 0.5).round() as u32;
             self.missiles.push(combat::Missile { owner: mid, from: at, at, radius: e.shove, damage, blockable: false, heavy: true, land_at: now + PHASE_SHOVE_WARN, mark, look: 0 });
         }
-        if !e.text.is_empty() {
-            let name = self.content.mobs[def].name.clone();
-            self.announce(format!("{name}: {}", e.text));
-        }
+        self.yell(mid, e.text.clone());
         // Help called from the dark, on its foe at once.
         let at = self.mobs[&mid].pos;
         for (n, k) in e.summon.iter().enumerate() {
@@ -842,10 +846,7 @@ impl Survival {
         if of.then_look != 0 {
             self.events.push(Event::Missile { caster: s, spell: of.then_look, target: Target::Point(at) });
         }
-        if !of.then_text.is_empty() {
-            let name = self.content.mobs[nd].name.clone();
-            self.announce(format!("{name}: {}", of.then_text));
-        }
+        self.yell(s, of.then_text.clone());
         if of.then_after > 0.0 {
             self.events.push(Event::Emote { id: s, emote: ROAR_EMOTE });
             let sound = self.content.mobs[nd].aggro_sound;
@@ -924,6 +925,7 @@ impl Survival {
         if sound != 0 {
             self.events.push(Event::Sound { id: mid, sound });
         }
+        self.yell(mid, self.content.mobs[def].death_text.clone());
         if !self.content.mobs[def].inert() {
             self.gain_valor(killer, self.content.valor.kill);
         }
