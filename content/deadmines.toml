@@ -915,7 +915,6 @@ respawn = 0.0
   arc = 0.0
   recovery = 1.0
   cooldown = 1.0
-  # Every counter commits to the attacker it chose, leaving a sidestep answer.
   turn_rate = 0.0
   lock = 1.0
   blockable = true

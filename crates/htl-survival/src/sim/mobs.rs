@@ -2426,7 +2426,7 @@ impl Survival {
             (None, Some(s), true) => s.over(&d.attack),
             _ => d.attack.clone(),
         };
-        // The grind locks at its first pose and keeps that line, regardless of its target.
+        // The grind and the firing line lock at their first pose, regardless of target motion.
         if self.machine_grind(id) || (a.ranged && (self.is_firing_captain(id) || d.key == "dm_deck_gunner")) {
             a.turn_rate = 0.0;
             a.lock = a.windup;
