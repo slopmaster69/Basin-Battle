@@ -562,7 +562,7 @@ then_after = 3.5
 then_needs = "secret_ingredient"
 then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot and grows."
 then_kit = 356
-then_look = 10987
+# Geyser 10987 is an ice-hand effect, not stew; growth and the next breath carry the reveal.
 aggro_text = "Mrrgl! Cookie's kitchen!"
 slay_text = "More meat for the pot!"
 death_text = "...burnt."

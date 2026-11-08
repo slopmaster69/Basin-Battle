@@ -34,7 +34,8 @@ Native assets checked against local 1.12.1 data:
 - Throw Dark Iron Ale 14814 has a native mug missile at 30 yd/sec. `Event::Missile` sends it to
   the fixed spill point; the heat and splash sound wait for its flight. The mug is a released
   projectile, not an attached vessel. Geyser 10987 uses ice hand/chest effects and is not used for
-  the pour. Its pre-existing secret-form rise effect is unchanged.
+  the pour. That misleading legacy ice effect is also removed from the secret-form rise; the
+  larger body and its own steam preparation carry the reveal.
 - Cauldron display 216 exists and measures about 1.8 by 2.0 by 1.5 yd. Steam02 display 431 is a
   particle-only emitter. Unlike Deadmines valve display 353, it has no metal pipe mesh to leave
   in the stew. Owned particle cues use the existing immediate-display flag, without changing global
