@@ -68,8 +68,31 @@ impl Land for Deck {
     }
 }
 
+/// Flat ground at 0, but a seam (4.1 < x < 4.4) where the only floor is the hillside far above, as
+/// the edges of the Deadmines' walkway up to the Shredder were (Nov 7).
+struct Seam;
+
+impl Land for Seam {
+    fn height(&self, x: f32, _y: f32) -> f32 {
+        if x > 4.1 && x < 4.4 { 300.0 } else { 0.0 }
+    }
+    fn height_near(&self, x: f32, y: f32, _z: f32) -> f32 {
+        self.height(x, y)
+    }
+    fn plans(&self) -> bool {
+        true
+    }
+    fn walk_clear(&self, _from: Vec3, _to: Vec3) -> bool {
+        true
+    }
+}
+
 /// A dungeon on the deck: one lamp at its west end, and nobody down there but who a test brings.
 fn below_deck() -> Survival {
+    below_on(Box::new(Deck))
+}
+
+fn below_on(land: Box<dyn Land>) -> Survival {
     let mut c = Content::dev();
     c.pvp = Default::default();
     let d = c.dungeon.as_mut().unwrap();
@@ -78,7 +101,7 @@ fn below_deck() -> Survival {
     d.doors.clear();
     d.hazards.clear();
     d.boxes.clear();
-    let mut s = Survival::new_dungeon(c, Box::new(Deck), 3, 1_000_000.0);
+    let mut s = Survival::new_dungeon(c, land, 3, 1_000_000.0);
     s.mobs.clear();
     s.rng = rand::SeedableRng::seed_from_u64(1);
     s
@@ -134,6 +157,23 @@ fn a_creature_running_across_a_deck_never_drops_through_a_slit_its_way_was_looke
     s.halt_mob(g);
     s.step(DT);
     assert_eq!(s.mobs[&g].pos[2], DECK);
+}
+
+#[test]
+fn below_a_creature_is_never_lifted_to_a_floor_far_over_it_in_one_step() {
+    let mut s = below_on(Box::new(Seam));
+    hero(&mut s, "Ayla", [-19.0, -19.0, 0.0]);
+    let g = sneed(&mut s, [0.0, 0.0, 0.0]);
+    s.flee_to(g, [8.0, 0.0, 0.0], 7.5);
+    let mut highest: f32 = 0.0;
+    let mut ev = Vec::new();
+    for _ in 0..24 {
+        ev.extend(s.step(DT));
+        highest = highest.max(s.mobs[&g].pos[2]);
+    }
+    assert!(s.mobs[&g].pos[0] > 4.4, "across the seam: {:?}", s.mobs[&g].pos);
+    assert!(highest < 1.0, "Nov 7: lifted to the hillside, then 'fell through the floor': {highest}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("fell through"))), "{ev:?}");
 }
 
 #[test]

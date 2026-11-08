@@ -1,0 +1,27 @@
+# The same seam from the ship's deck (-30, -812, 39.4) heading south (-x, cam 180): a slow walk
+# off the ship (run_speed 2.5), then a run, then a hop and a run; plain ActionDash, no spell lab.
+# `.es where` after each.
+hero warrior
+cam 180 -12 8
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -30 -812 39.4
+17 .es where
+18 shots deck 1 1
+19 .es tune player.run_speed 2.5
+20 lua ActionDash(3, 2.5, "f")
+20.2 shots slow 14 0.4
+27 .es where
+28 .es tune player.run_speed 7
+29 .es goto -30 -812 39.4
+31 lua ActionDash(1.2, 7, "f")
+31.2 shots run 8 0.3
+36 .es where
+37 .es goto -30 -812 39.4
+39 .es hop
+39.3 lua ActionDash(1.2, 7, "f")
+39.4 shots hop 8 0.3
+44 .es where
+47 end
