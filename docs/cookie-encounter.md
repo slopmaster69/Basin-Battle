@@ -55,10 +55,10 @@ this encounter's authored beats. Other boss behavior is unchanged. Separate comm
 Smite's 3 loadouts explain existing tuning in response to the PR #298 review; their numbers do
 not change.
 
-The release server build passed. The full release test sweep passed every test except an obsolete
-bestiary-camera fixture for Cookie's removed pot attack. That fixture now uses the Shadow Hunter's
-ranged hex, preserving the far-camera assertion; all 36 server-library tests passed on rerun.
-Together, the sweep and affected-suite rerun cover 1,109 passing tests and 19 ignored tests.
+After integrating Gilnid's collision-safe cue restoration (#304), the release server build and
+the full release test sweep passed: 1,114 tests passed, 19 ignored, no failures. This includes all
+37 server-library tests and the structural-platform exclusions. The renderer combines trap,
+perch-visual and kitchen ownership; the solid cauldron, cargo and planks keep their collision.
 The scenario parser and repository PR checks also passed.
 
 All 12 kitchen tests passed. They exercise actual AI/exchange counting, interruption with plain
