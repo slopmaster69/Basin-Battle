@@ -1,0 +1,34 @@
+# Noon highlights (client 0084, #273's sixth round): Goldshire at noon, the camera close over the
+# cobbles (yaw 0, pitched 25 down, 4 yd), as take 291, which still found the stone pale cream:
+# 10.9% of the frame over 230 against 2.6% under 1.12's. The noon grade's contrast is now 1.0
+# (was 1.06, which lifted a stone texel at 0.8 to 0.88 before the shoulder) and its bloom 0.08
+# (was 0.15). The default, looksharpen 0 and 1, then 1.12's look, then the sidestep at the default.
+# Look for: the share of the frame over 230 in the default still against the classic one (near
+# it); the stones keeping their colour, not cream; edge energy at 0, 0.4 and 1 as before.
+hero warrior
+cam 0 -25 4
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSharpen", "0.4")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looksharpen grade")
+5.5 video
+6.0 shots cobbles-default 2 0.5
+7.5 lua ConsoleExec("looksharpen 0")
+8.5 shots cobbles-sharpen-0 2 0.5
+10.0 lua ConsoleExec("looksharpen 1")
+11.0 shots cobbles-sharpen-1 2 0.5
+12.5 lua ConsoleExec("looksharpen grade")
+12.55 lua SetCVar("worldLook", "0")
+12.6 lua ClearWorldFog()
+14.0 shots cobbles-classic 2 0.5
+15.5 lua SetCVar("worldLook", "1")
+15.55 lua ClearWorldFog()
+17.0 lua ActionDash(2, 1.5, "l")
+17.0 shots sidestep-default 10 0.2
+20.0 lua ConsoleExec("lookweather server")
+22 end
