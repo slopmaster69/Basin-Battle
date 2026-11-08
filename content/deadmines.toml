@@ -2048,10 +2048,10 @@ death_text = "...VanCleef... never pay..."
   # The gauntlet (Corey, Nov 8: "a continuous slow gauntlet back through the whole dungeon... a
   # boulder chase scene from Indiana Jones until we're back at the ship"). At 70% he brings the
   # mouth down, and the mine comes down behind the heroes all the way back: a front that runs the
-  # heroes' own way out (the galleries, the Mast Room, the workshop, the Foundry, the Cannon
-  # Gallery, the dry dock) to Smite's island before the Juggernaut: about 900 yd at 4 yd/s, three and
-  # three quarter minutes. Behind it rock falls
-  # everywhere and a hero there is crushed (a fifth of their health a second); ahead of it dust
+  # heroes' own way out (the galleries, the Mast Room, the workshop, the Foundry's ramp and pit, the
+  # Cannon Gallery, the ledge along the dry dock) to Smite's island before the Juggernaut, its points
+  # from the land's own walking paths so none is over water or in rock: about 900 yd at 4 yd/s,
+  # nearly four minutes. Behind it rock falls everywhere and a hero there is crushed (a fifth of their health a second); ahead of it dust
   # and warning falls. He fights them the whole way, unhurt by it, and can't be brought below 26%
   # until it reaches the ship: the last of the fight is fought there.
   [[mob.phase]]
@@ -2059,7 +2059,7 @@ death_text = "...VanCleef... never pay..."
   speed = 0.95
   text = "Rhahk'Zor bring whole mine down on you!"
   debris = [[-30.0, -388.0, 56.0], [-25.0, -381.0, 57.5], [-34.0, -379.0, 56.0]]
-  collapse = { route = [[-40.0, -385.0, 55.8], [-70.0, -380.0, 54.2], [-112.5, -405.0, 59.9], [-140.0, -400.0, 58.2], [-190.0, -442.5, 53.6], [-190.0, -480.0, 54.0], [-244.0, -482.0, 48.9], [-288.0, -505.0, 50.0], [-290.3, -537.0, 49.4], [-300.0, -580.0, 47.2], [-250.0, -578.0, 51.1], [-240.0, -579.0, 51.2], [-178.0, -580.0, 45.6], [-186.0, -599.0, 37.4], [-205.0, -592.0, 21.0], [-176.5, -580.0, 19.3], [-135.0, -596.0, 16.7], [-128.0, -622.0, 12.9], [-110.0, -650.0, 7.2], [-100.0, -680.0, 2.3], [-98.0, -715.0, -0.8], [-95.0, -750.0, 3.2], [-2.0, -768.0, 9.6]], speed = 4.0, lead = 14.0, crush = 0.2, hold = 0.26, held_text = "Rhahk'Zor not die in a hole!", end_text = "No more mine. Only Rhahk'Zor!" }
+  collapse = { route = [[-40.0, -385.0, 55.8], [-70.0, -380.0, 54.2], [-112.5, -405.0, 59.9], [-140.0, -400.0, 58.2], [-190.0, -442.5, 53.6], [-190.0, -480.0, 54.0], [-244.0, -482.0, 48.9], [-288.0, -505.0, 50.0], [-290.3, -537.0, 49.4], [-300.0, -580.0, 47.2], [-250.0, -578.0, 51.1], [-240.0, -579.0, 51.2], [-216.0, -561.0, 51.2], [-192.0, -563.0, 51.2], [-184.0, -575.0, 47.9], [-185.0, -587.0, 41.9], [-195.0, -598.0, 34.4], [-207.0, -600.0, 28.2], [-219.0, -595.0, 21.8], [-205.0, -592.0, 21.0], [-181.0, -583.0, 19.3], [-145.0, -583.0, 18.8], [-133.0, -591.0, 18.7], [-126.0, -615.0, 13.7], [-119.0, -639.0, 11.4], [-110.0, -650.0, 7.2], [-109.0, -691.0, 4.6], [-100.0, -692.0, 8.2], [-93.0, -716.0, 8.6], [-81.0, -726.0, 8.9], [-57.0, -728.0, 8.9], [-33.0, -731.0, 8.6], [-21.0, -742.0, 9.1], [-9.0, -754.0, 9.1], [-2.0, -768.0, 9.6]], speed = 4.0, lead = 14.0, crush = 0.2, hold = 0.26, held_text = "Rhahk'Zor not die in a hole!", end_text = "No more mine. Only Rhahk'Zor!" }
   # On the way, wherever he is: the beams over him come down in a ring.
   [[mob.phase]]
   at = 0.45

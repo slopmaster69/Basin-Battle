@@ -335,7 +335,12 @@ impl Survival {
             return false;
         }
         let def = m.def;
-        let to = route_point(&route, &along, (front + lead * 0.5).min(total));
+        // The next of the route's own points past the middle of the band (each one ground a body
+        // stands on; a point between two may be over water or in the rock).
+        let want = (front + lead * 0.5).min(total);
+        let k = along.iter().position(|a| *a >= want).unwrap_or(route.len() - 1);
+        // (A long straight leg: its point on the line, as walkable as the leg.)
+        let to = if along[k] - want <= lead { route[k] } else { route_point(&route, &along, want) };
         if lost {
             // No way to its hero: set back on the route at the front, not given up.
             self.set_back(id, to, "the collapse: no way to its hero, back at the front");
