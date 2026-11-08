@@ -14205,7 +14205,7 @@ wake = "relic_druid"
 
 [weather]
 # Elwynn's weather above ground, the same for every hero: a fixed function of the server's clock,
-# sent as 1.12's own weather (any client shows its rain; one with the new look, patch 0071, shows
+# sent as 1.12's own weather (any client shows its rain; one with the new look, patch 0082, shows
 # grey skies, lit rain, wet ground and lightning). `.es weather clear|overcast|rain|storm [0-1]`
 # holds one for filming, `.es weather auto` lets go. Not below, nor in Siege.
 on = true

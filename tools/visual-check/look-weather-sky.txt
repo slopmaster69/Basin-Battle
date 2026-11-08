@@ -1,4 +1,4 @@
-# Visible weather (client 0071) and the revised sky (0068): the sky over Crystal Lake at noon and at
+# Visible weather (client 0082) and the revised sky (0068): the sky over Crystal Lake at noon and at
 # golden hour, the camera pitched up, clear, overcast, heavy rain and a storm (lookweather).
 # Look for: overcast and heavier: the revised sky's grey, darker cover (darker under the thick
 # parts, a few thinner places), never a flat white sheet; at golden hour the gold capped and dimmed

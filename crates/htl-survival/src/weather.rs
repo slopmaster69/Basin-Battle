@@ -4,7 +4,7 @@
 //! minutes. The server sends it as 1.12's own `SMSG_WEATHER` (rain at a grade, [`wire`]), which any
 //! 1.12 client shows: 1.12 clouds the sky over the grade's first quarter and rains past it, so a
 //! spell easing in clouds over before the first drops fall. A client with the new look (patch
-//! 0071) dresses it: grey skies, rain lit by the hour, wet ground, lightning in a storm.
+//! 0082) dresses it: grey skies, rain lit by the hour, wet ground, lightning in a storm.
 //!
 //! The kinds' grade bands are the client's (`benilla_world::look::weather::tune`); keep in sync.
 
