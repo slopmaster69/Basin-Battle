@@ -135,6 +135,60 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
 const AWAY: Vec3 = [-19.0, -19.0, DECK];
 
 #[test]
+fn airborne_starts_recover_to_verified_footing_and_repeated_failures_end_the_fight() {
+    let mut s = below_deck();
+    let p = hero(&mut s, "Ayla", [12.0, 6.0, DECK]);
+    let g = sneed(&mut s, [0.0, 0.0, DECK]);
+    s.engage(g, Foe::Hero(p));
+    let mut logs = Vec::new();
+    for _ in 0..2 {
+        let m = s.mobs.get_mut(&g).unwrap();
+        m.pos = [25.0, 0.0, DECK]; // Already airborne: this must never become the fallback.
+        m.path = vec![[25.2, 0.0, 0.0]];
+        m.speed = 7.5;
+        logs.extend(s.step(DT));
+        assert!(s.land().footing(s.mobs[&g].pos).is_some());
+        assert!(s.mobs[&g].pos[0].abs() < 1.0);
+    }
+    assert!(logs.iter().any(|e| matches!(e, Event::Log(t) if t.contains("repeated floor failure: fight reset"))));
+    assert!(s.mobs[&g].state.foe().is_none(), "bounded recovery gives up the broken fight");
+    assert_eq!(logs.iter().filter(|e| matches!(e, Event::Log(t) if t.contains("put back"))).count(), 2);
+}
+
+#[test]
+fn a_reset_and_an_authored_route_cannot_choose_another_floor() {
+    let mut s = below_deck();
+    let g = sneed(&mut s, [0.0, 0.0, DECK]);
+    s.set_back(g, [25.0, 0.0, DECK], "invalid airborne reset");
+    assert_eq!(s.mobs[&g].pos, [0.0, 0.0, DECK]);
+    assert!(crate::land::walking_route(s.land(), &[[0.0, 0.0, DECK], [25.0, 0.0, DECK]]).is_none());
+    assert!(crate::land::walking_route(&Seam, &[[0.0, 0.0, 0.0], [4.2, 0.0, 0.0]]).is_none());
+}
+
+#[test]
+fn an_airborne_creature_with_no_path_recovers_before_another_search() {
+    let mut s = below_deck();
+    hero(&mut s, "Ayla", AWAY);
+    let g = sneed(&mut s, [0.0, 0.0, DECK]);
+    s.mobs.get_mut(&g).unwrap().pos = [25.0, 0.0, DECK];
+    let ev = s.step(DT);
+    assert_eq!(s.mobs[&g].pos, [0.0, 0.0, DECK]);
+    assert_eq!(ev.iter().filter(|e| matches!(e, Event::Log(t) if t.contains("put back"))).count(), 1);
+}
+
+#[test]
+fn an_invalid_path_endpoint_cannot_snap_a_creature_up_to_the_roof() {
+    let mut s = below_on(Box::new(Seam));
+    hero(&mut s, "Ayla", [-19.0, -19.0, 0.0]);
+    let g = sneed(&mut s, [4.0, 0.0, 0.0]);
+    let m = s.mobs.get_mut(&g).unwrap();
+    m.path = vec![[4.2, 0.0, 300.0]];
+    m.speed = 7.5;
+    s.step(DT);
+    assert_eq!(s.mobs[&g].pos, [4.0, 0.0, 0.0], "verified floor before the bad endpoint");
+}
+
+#[test]
 fn a_creature_running_across_a_deck_never_drops_through_a_slit_its_way_was_looked_past() {
     let mut s = below_deck();
     hero(&mut s, "Ayla", AWAY);

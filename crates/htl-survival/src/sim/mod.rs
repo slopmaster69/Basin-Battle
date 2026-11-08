@@ -961,6 +961,11 @@ pub struct Mob {
     /// Where the way it's on was searched to (its last leg's end, on a long walk), so a goal that
     /// has hardly moved keeps that way instead of searching again.
     pub plan_to: Option<Vec3>,
+    /// Last dry, open floor actually stood on; an airborne step never replaces it.
+    pub(crate) footing: Option<Vec3>,
+    /// Repeated floor failures without two yards of verified progress end the fight.
+    pub(crate) floor_failures: u8,
+    pub(crate) floor_recovery: Option<Vec3>,
     /// A second form (`then`): the creature it stepped out of, back in its place at a rest.
     pub form_of: Option<usize>,
     /// A panic's last stride.
