@@ -490,7 +490,9 @@ pub(crate) const VERSION: u32 = 2;
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
 /// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
 /// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
-pub(crate) const ADDON_NEWEST: u32 = 59;
+/// 60: the add-on says `ac29`: the legs walk under a swing (a lunge keeps the legs' walk, the leap
+/// and the kick stay on the whole body).
+pub(crate) const ADDON_NEWEST: u32 = 60;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -514,7 +516,9 @@ pub(crate) const ADDON_NEWEST: u32 = 59;
 /// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
 /// (0061 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
 /// round of its own: nothing new for the add-on to call.)
-pub(crate) const CLIENT_NEWEST: u8 = 28;
+/// 29: the legs walk under a swing (0079): a swing or an ability's cast (the body word `auto`)
+/// plays on the torso while the hero walks, and a lunge's `ActionDash` keeps the legs' walk.
+pub(crate) const CLIENT_NEWEST: u8 = 29;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.

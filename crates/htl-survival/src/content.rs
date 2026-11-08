@@ -3752,6 +3752,9 @@ impl Content {
             if !SLOTS.contains(&a.slot.as_str()) {
                 bail!("{what}: slot {:?} (one of {SLOTS:?})", a.slot);
             }
+            if !BODIES.contains(&a.body.as_str()) {
+                bail!("{what}: body {:?} (\"\" for the torso while the legs walk, or \"full\")", a.body);
+            }
             if a.school != "core" && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
                 bail!("{what}: school {:?} (core, {BETA} or one of {SCHOOLS:?})", a.school);
             }

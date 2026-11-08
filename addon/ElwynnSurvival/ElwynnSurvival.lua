@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 59
+local VERSION = 60
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -600,16 +600,31 @@ local function MineBusy()
   return m and GetTime() - m.start < m.move.impact + m.move.recovery
 end
 
+-- The blows whose legs are the move (ac29: every other swing plays on the torso while the legs
+-- walk): the leap and the kick stay on the whole body. In ES, not a local: the main chunk is near
+-- Lua 5.0's 200 locals.
+ES.FULL_BODY_KIND = { leap = true, kick = true }
+
+-- The body a swing of this kind plays on: "full" for the leap and the kick on a client that walks
+-- the legs under a swing (ac29), else nil (the whole body standing, the torso while moving).
+function ES.SwingBody(kind)
+  if ES.FULL_BODY_KIND[kind] and (HasActionCombat and tonumber(HasActionCombat()) or 0) >= 29 then
+    return "full"
+  end
+  return nil
+end
+
 -- Play a blow of ours: the clip (its impact and recovery the server's), the trail, the lunge, the
 -- whoosh.
 local function PlayMine(kind, step, move)
   local heavy = kind == "heavy" or kind == "bash" or kind == "kick" or kind == "leap"
   local trail = heavy and HEAVY_TRAIL or LIGHT_TRAIL
-  PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery, nil, move.from)
+  PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery, ES.SwingBody(kind), move.from)
   local mv = ES.moves
   if move.lunge > 0 and ActionDash and mv then
     local secs = mv.lungeSecs
-    ActionDash(secs, move.lunge / secs, "f", math.max(0, move.impact - secs))
+    -- "legs" (ac29): the legs keep walking the way the keys go through the lunge's step.
+    ActionDash(secs, move.lunge / secs, "f", math.max(0, move.impact - secs), "legs")
   end
   if kind ~= "bash" and kind ~= "kick" then
     local weight = (mv and mv.twoHanded) and "large" or "medium"
@@ -762,7 +777,8 @@ function ES.SwingLine(f)
   if not clip or not PlayUnitAnimation then return end
   -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track),
   -- another model's take when the ability names one (the same on every race), over the body the
-  -- line names ("full", "upper", or "lower" from ac23: the legs alone, the arms keeping their draw).
+  -- line names ("full", "upper", or "lower" from ac23: the legs alone, the arms keeping their draw;
+  -- "auto" from ac29: the whole body standing, the torso while the legs walk).
   if kind == "cast" then
     -- Ours is held until it ends or the server lets it go (`ST`): Skyfall's hang, a throw's aim.
     if mine then guid = "player"; ES.castHeld = true end
@@ -783,7 +799,7 @@ function ES.SwingLine(f)
     end
     guid = "player"
   end
-  PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, nil, from)
+  PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, ES.SwingBody(kind), from)
 end
 
 -- FU: a storm of cuts starts on a unit (Bladestorm), on a client with patch 0025; the unit's ST
@@ -7091,7 +7107,10 @@ events:SetScript("OnEvent", function()
     -- ac26: the point the reticle is on (GetReticlePoint), and whether cover is in the way.
     -- ac27: the shoulders turned to the aim (SetAimTurn) while the bow is drawn.
     -- ac28: a heal on a friend floats green over their head (the server sends the heal log).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 28 then
+    -- ac29: the legs walk under a swing (a cast's body "auto", ActionDash's "legs").
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 29 then
+      Say(".es hello " .. VERSION .. " ac29")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 28 then
       Say(".es hello " .. VERSION .. " ac28")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
       Say(".es hello " .. VERSION .. " ac27")

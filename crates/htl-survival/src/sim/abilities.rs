@@ -191,6 +191,17 @@ const AIM_POINT_NEAR: f32 = 1.5;
 const AIM_POINT_SLACK: f32 = 0.2;
 /// After letting an ability go, a beat before the next thing.
 pub(crate) const CAST_RECOVERY: f32 = 0.35;
+
+/// How much of the body an ability's cast clip drives (its `body`): the whole body standing and
+/// the torso while the legs walk on, unless the blow needs the legs too ("full": Uppercut's rise,
+/// Shockwave's slam).
+pub(crate) fn cast_body(d: &AbilityDef) -> ClipBody {
+    if d.body == "full" {
+        ClipBody::Full
+    } else {
+        ClipBody::Auto
+    }
+}
 /// The throw's clip (AttackThrown) and the pose a thrown charge holds till it goes (HoldThrown):
 /// the axe drawn back, so everyone can see a throw coming, as a bow's draw shows.
 const THROW_CLIP: u16 = 107;
@@ -1373,7 +1384,7 @@ impl Survival {
                 let from = it.next().map(|m| m.trim().to_string()).filter(|m| !m.is_empty());
                 (clip, take, from)
             };
-            self.events.push(Event::Clip { id, clip, take, from, secs, at, body: ClipBody::Full });
+            self.events.push(Event::Clip { id, clip, take, from, secs, at, body: cast_body(&d) });
         }
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };

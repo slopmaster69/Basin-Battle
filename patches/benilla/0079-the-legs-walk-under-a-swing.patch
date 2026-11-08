@@ -1,0 +1,1648 @@
+From 1f15fb08a9d027cdf4fd72c6cbc00b7c2a5b51ac Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 21:36:29 -0700
+Subject: [PATCH] The legs walk under a swing: a hero or a humanoid foe
+ attacking on the move steps instead of sliding
+
+A swing went onto the upper body only after the unit had been measured moving for 0.22 s,
+counted again from nothing for every clip, so a light swing's whole wind-up and blow played the
+clip's planted stance while the hero glided at 3 yd/s, and an ability's clip (always "full")
+slid for its whole length. Now:
+
+- The legs' motion is the unit's (`LegsMotion` on the `AnimDriver`, from the movement flags the
+  animation plays and the unit's speed), so a unit already walking takes a swing on the torso from
+  its first frame and keeps it there to the end (stopping, the torso finishes the swing while the
+  legs settle into stand). Models without a SpineLow split (beasts) and the kick (95) stay whole.
+- The swing's turn is shared up the spine (`RigPose::ramped`, folded last in the evaluator: half
+  at SpineLow, all of it at the chest, rotation only; with nothing ramped the pose is Bevy's bit
+  for bit).
+- The spine eases round to take the whole strafe gap while a swing is layered
+  (`BodyTwist::swing_want`), so the swing faces the aim while the legs keep the strafe's turn.
+- A hit-stop on a layered swing holds the swing alone; the legs walk on.
+- `ActionDash`'s fifth argument `"legs"`: a lunge keeps the legs walking the way the keys go (the
+  wire keeps the dash's), so a strafing or backing hero's legs don't flick forward and back.
+- `PlayUnitAnimation`'s body `"auto"`: an ability's clip that layers; the whole body on
+  `animLayer 0`. `HasActionCombat()` is 29.
+- The `animLayer` CVar (default 1; 0 is the twenty-eighth round's look exactly) and the
+  `animlayer <share>|tuned` console command to tune the spine's share on film.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/creature_anim.rs       |  13 +-
+ .../benilla-app/src/creature_anim/action.rs   | 422 +++++++++++++++++-
+ .../benilla-app/src/creature_anim/driver.rs   |   3 +
+ crates/benilla-app/src/creature_anim/twist.rs |  93 +++-
+ crates/benilla-app/src/cvars/mod.rs           |  14 +
+ crates/benilla-app/src/cvars/table.rs         |   9 +
+ crates/benilla-app/src/debug_panel/inspect.rs |   8 +
+ crates/benilla-app/src/player/controller.rs   |  47 +-
+ .../src/player/controller/tests.rs            |  80 ++++
+ crates/benilla-app/src/player/state.rs        |   7 +
+ crates/benilla-assets/src/m2.rs               |   6 +-
+ crates/benilla-assets/src/model.rs            | 129 ++++++
+ crates/benilla-assets/src/model/pose.rs       |  12 +
+ crates/benilla-ui/src/action_combat.rs        |  44 +-
+ crates/benilla-world/src/rig_anim/pose.rs     | 200 ++++++++-
+ 15 files changed, 1059 insertions(+), 28 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index f152800..fc9f1e4 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -36,7 +36,9 @@ mod action;
+ pub(crate) use action::{
+     on_blend_cvar, on_curves_cvar, on_feet_cvar, on_weight_cvar, ImpactWeight, PlantedFeet,
+ };
+-pub(crate) use action::{lock_point, unit_hit, WeaponGlow};
++#[cfg(test)]
++pub(crate) use action::on_cvar as anim_layer_on_cvar;
++pub(crate) use action::{anim_layer_on, lock_point, unit_hit, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+ /// paperdoll shows); behaviour reads `armed_main`/`armed_off`, which apply the disarm ladder.
+@@ -971,9 +973,17 @@ pub(crate) struct AnimDriver {
+     /// short kick, its mechanism open: the reference's blend source keeps running, so it stays
+     /// scoped to the airborne cut.
+     frozen: Option<bevy::animation::graph::AnimationNodeIndex>,
++    /// Basin Battle: the unit's legs, for the walk under a swing (the action layer reads it).
++    legs: action::LegsMotion,
+ }
+ 
+ impl AnimDriver {
++    /// Basin Battle: how long the legs have been walking (positive) or still (negative), for the
++    /// inspector.
++    pub(crate) fn legs_moving_for(&self) -> f32 {
++        self.legs.moving_for
++    }
++
+     /// The requested `(base, masked overlay)` ids, for the inspector.
+     pub(crate) fn playing(&self) -> (Option<u16>, Option<u16>) {
+         let base = match self.mode {
+@@ -1048,6 +1058,7 @@ impl Default for AnimDriver {
+             mount_display: 0,
+             last_special: None,
+             frozen: None,
++            legs: action::LegsMotion::default(),
+         }
+     }
+ }
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 91e603b..d886346 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -19,6 +19,11 @@
+ //! - The fourth round: the units near us for the script's own blow test, spell kits and voices
+ //!   played here and now, the clips' impact keyframes told back to the script, the lock-on's unit
+ //!   selected (its circle under it), and the feet stepping round as the lock-on turns us in place.
++//! - The legs walk under a swing (the twenty-ninth round, patch 0079; `animLayer`): a unit already
++//!   moving (by its movement flags, [`LegsMotion`], kept for the unit rather than measured again
++//!   for each clip) takes a swing on the upper body from its first frame, to its end; the swing's
++//!   turn is shared up the spine (`RigPose::ramped`), the spine turns it onto the aim while the
++//!   legs keep a strafe's turn (`BodyTwist::swing_want`), and a hit-stop holds the swing alone.
+ 
+ use std::f32::consts::TAU;
+ use std::sync::Mutex;
+@@ -74,6 +79,141 @@ const STILL_BELOW: f32 = 0.6;
+ /// Moving this long hands the legs to the gait (a lunge's step is shorter, so a blow stepping in
+ /// keeps its own stance, sliding the little way rather than flicking the legs to a run and back).
+ const LEGS_AFTER: f32 = 0.22;
++/// Clips whose legs are the move, never cut at the waist whoever sends them: the kick (95).
++const LEGS_ARE_THE_MOVE: &[u16] = &[95];
++/// The swing's share of SpineLow's turn under walking legs, rising to all of it at the chest
++/// (`animlayer` holds another for tuning on film).
++const SPINE_FLOOR: f32 = 0.5;
++
++/// `animLayer` (benilla's own CVar, registered "1"): the legs walk under a swing. Off, every
++/// action clip plays as the twenty-eighth round played it. An atomic, read by the action layer,
++/// the twist and the controller, which have no room for another system parameter.
++static ANIM_LAYER: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
++/// The spine's floor share held by `animlayer` (f32 bits; NaN: [`SPINE_FLOOR`]).
++static ANIM_LAYER_FLOOR: std::sync::atomic::AtomicU32 =
++    std::sync::atomic::AtomicU32::new(u32::MAX);
++
++/// Whether the legs walk under a swing (`animLayer`).
++pub(crate) fn anim_layer_on() -> bool {
++    ANIM_LAYER.load(std::sync::atomic::Ordering::Relaxed)
++}
++
++/// The swing's share of SpineLow's turn under walking legs now.
++fn spine_floor() -> f32 {
++    let held = f32::from_bits(ANIM_LAYER_FLOOR.load(std::sync::atomic::Ordering::Relaxed));
++    if held.is_finite() {
++        held
++    } else {
++        SPINE_FLOOR
++    }
++}
++
++/// The `animLayer` change callback: a flag, int-parsed and `!= 0`.
++pub(crate) fn on_cvar(ev: On<crate::cvars::CvarChanged>) {
++    if ev.is("animLayer") {
++        ANIM_LAYER.store(ev.flag(), std::sync::atomic::Ordering::Relaxed);
++    }
++}
++
++/// `animlayer <share>`, benilla's own (1.12 has no such command): holds the swing's share of
++/// SpineLow's turn under walking legs, 0 to 1 (1 cuts the swing at the waist as 1.12 does), for
++/// tuning on film; `animlayer tuned`, or no argument, puts back the tuned share. `animLayer 0`
++/// plays every swing on the whole body either way.
++fn anim_layer_console(_world: &mut World, args: &str) -> Vec<String> {
++    let arg = args.trim();
++    let held = if arg.is_empty() || arg.eq_ignore_ascii_case("tuned") {
++        None
++    } else {
++        match arg.parse::<f32>() {
++            Ok(v) if (0.0..=1.0).contains(&v) => Some(v),
++            _ => return vec!["Usage: animlayer <spine share 0-1> | tuned".to_string()],
++        }
++    };
++    ANIM_LAYER_FLOOR.store(
++        held.map_or(u32::MAX, f32::to_bits),
++        std::sync::atomic::Ordering::Relaxed,
++    );
++    let mut lines = vec![match held {
++        None => format!("Swing on the spine at its tuned share ({SPINE_FLOOR})."),
++        Some(v) => format!("Swing on the spine held at {v} at SpineLow."),
++    }];
++    if !anim_layer_on() {
++        lines.push("animLayer is 0: every swing plays on the whole body.".to_string());
++    }
++    lines
++}
++
++/// A unit's legs, for the walk under a swing: how long they have been moving (positive, seconds)
++/// or still (negative), by the unit's movement flags and speed (our own hero's animation flags,
++/// another's relayed ones, a creature's path), and whether it rides. Kept on the unit's
++/// [`super::AnimDriver`], so a new clip doesn't count again from nothing; a knockback or a pull,
++/// with no direction flag, never counts as walking.
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub(crate) struct LegsMotion {
++    pub(crate) moving_for: f32,
++    pub(crate) mounted: bool,
++}
++
++impl LegsMotion {
++    /// One frame of the legs: `flags` the animation's movement flags, `speed` the unit's (yd/s).
++    pub(super) fn step(&mut self, flags: u32, speed: f32, mounted: bool, dt: f32) {
++        use super::select::move_flags;
++        self.mounted = mounted;
++        if dt <= 0.0 {
++            return;
++        }
++        let walking = flags & (move_flags::ANY_MOVE | move_flags::SWIMMING) != 0;
++        if walking && speed > MOVING_ABOVE {
++            self.moving_for = self.moving_for.max(0.0) + dt;
++        } else if !walking || speed < STILL_BELOW {
++            self.moving_for = self.moving_for.min(0.0) - dt;
++        }
++    }
++}
++
++/// What decides which body an action clip plays on this frame.
++#[derive(Clone, Copy, Debug)]
++struct BodyAsk {
++    body: ActionBody,
++    id: u16,
++    /// The model has an upper-body node, and splits at SpineLow (not the Head alone).
++    has_upper: bool,
++    spine_split: bool,
++    /// Last frame's choice, and whether the legs had been handed to the walk ([`ActionClip`]'s
++    /// latch).
++    on_upper: bool,
++    layered: bool,
++    /// The clip's own measure of the body's motion (the twenty-eighth round's), and the unit's legs.
++    clip_moving_for: f32,
++    legs: LegsMotion,
++}
++
++/// Whether the clip plays on the upper body this frame. With the layer on, a clip on the whole body
++/// standing (`Auto`, `"auto"`) goes on the torso whenever the legs are walking or riding, from its
++/// first frame, and stays there to its end (stopping, the torso finishes the swing over the legs'
++/// stand), on a model that splits at SpineLow, unless its legs are the move. With it off, the
++/// twenty-eighth round's rule exactly, `"auto"` playing on the whole body.
++fn on_upper_now(ask: BodyAsk, layer_on: bool) -> bool {
++    match (ask.body, layer_on) {
++        (ActionBody::Full | ActionBody::Lower, _) | (ActionBody::Layer, false) => false,
++        (ActionBody::Upper, _) => ask.has_upper,
++        (ActionBody::Auto, false) => {
++            ask.has_upper
++                && if ask.on_upper {
++                    ask.clip_moving_for > -0.15
++                } else {
++                    // Longer than a lunge's step: a blow stepping in keeps its own legs.
++                    ask.clip_moving_for > LEGS_AFTER
++                }
++        }
++        (ActionBody::Auto | ActionBody::Layer, true) => {
++            ask.has_upper
++                && ask.spine_split
++                && !LEGS_ARE_THE_MOVE.contains(&ask.id)
++                && (ask.layered || ask.legs.mounted || ask.legs.moving_for > LEGS_AFTER)
++        }
++    }
++}
+ /// How far the body must have moved before a roll knows which way it tumbles, and how long it
+ /// waits for that before giving up on the tumble (a dodge into a wall).
+ const ROLL_DIRECTION_AFTER: f32 = 0.12;
+@@ -157,6 +297,11 @@ pub(crate) struct ActionClip {
+     /// `(node, when the fade began, its weight then)`, ramped to nothing over [`CROSS_FADE`] and
+     /// stopped. A fade not yet begun (gathered before the player was seen) has a negative time.
+     fading: Vec<(AnimationNodeIndex, f32, f32)>,
++    /// The legs went to the walk under it (the layer on): it stays on the upper body to its end.
++    layered: bool,
++    /// Upper-body nodes of the clips it replaced that were layered, still fading out under it: their
++    /// turn is shared up the spine as its own is.
++    ramp_out: Vec<AnimationNodeIndex>,
+ }
+ 
+ impl ActionClip {
+@@ -381,6 +526,8 @@ impl ActionClip {
+             reaction: false,
+             coil: false,
+             fading: Vec::new(),
++            layered: false,
++            ramp_out: Vec::new(),
+         }
+     }
+ 
+@@ -586,9 +733,16 @@ fn replace_clip(old: &mut ActionClip, clip: ActionClip) {
+     };
+     let mut fading = std::mem::take(&mut old.fading);
+     fading.retain(|(n, ..)| !clip.nodes().any(|k| k == *n));
++    // A layered clip's torso fades into the next one's with its turn still shared up the spine.
++    let mut ramp_out = std::mem::take(&mut old.ramp_out);
++    if old.layered {
++        ramp_out.extend(old.upper);
++    }
++    ramp_out.retain(|n| !clip.nodes().any(|k| k == *n));
+     let mut next = ActionClip {
+         lambda,
+         fading,
++        ramp_out,
+         ..clip
+     };
+     for n in old.nodes() {
+@@ -1054,12 +1208,18 @@ pub(super) fn apply_action_clips(
+         Option<&crate::net::Guid>,
+         Has<SelfPlayer>,
+         Has<ActionTilt>,
++        Option<&super::AnimDriver>,
++        Option<&mut BodyTwist>,
++        Option<&mut RigPose>,
+     )>,
+ ) {
+     let dt = time.delta_secs();
+     let now = time.elapsed_secs();
+     let weighty = weight.is_some_and(|w| w.on);
+-    for (entity, mut clip, mut player, anims, t, stop, guid, mine, tilted) in &mut units {
++    let layer_on = anim_layer_on();
++    for (entity, mut clip, mut player, anims, t, stop, guid, mine, tilted, driver, twist, rig) in
++        &mut units
++    {
+         let clip = &mut *clip;
+         let frozen = stop.is_some_and(|s| now < s.until);
+         if !frozen && dt > 0.0 {
+@@ -1131,19 +1291,27 @@ pub(super) fn apply_action_clips(
+             }
+         }
+         clip.last_pos = Some(t.translation);
+-        clip.on_upper = match clip.body {
+-            ActionBody::Full | ActionBody::Lower => false,
+-            ActionBody::Upper => clip.upper.is_some(),
+-            ActionBody::Auto => {
+-                clip.upper.is_some()
+-                    && if clip.on_upper {
+-                        clip.moving_for > -0.15
+-                    } else {
+-                        // Longer than a lunge's step: a blow stepping in keeps its own legs.
+-                        clip.moving_for > LEGS_AFTER
+-                    }
+-            }
++        let ask = BodyAsk {
++            body: clip.body,
++            id: clip.id,
++            has_upper: clip.upper.is_some(),
++            spine_split: anims.pose.spine_split(),
++            on_upper: clip.on_upper,
++            layered: clip.layered,
++            clip_moving_for: clip.moving_for,
++            // A unit without a driver measures its legs as the clip does.
++            legs: driver.map_or(
++                LegsMotion {
++                    moving_for: clip.moving_for,
++                    mounted: false,
++                },
++                |d| d.legs,
++            ),
+         };
++        clip.on_upper = on_upper_now(ask, layer_on);
++        clip.layered = layer_on
++            && clip.on_upper
++            && matches!(clip.body, ActionBody::Auto | ActionBody::Layer);
+         let on = clip.on_node();
+         // The node the body switch leaves fades out under the one it goes to.
+         let offs: Vec<AnimationNodeIndex> = clip.nodes().filter(|n| *n != on).collect();
+@@ -1178,6 +1346,24 @@ pub(super) fn apply_action_clips(
+             }
+         }
+         clip.fading = fading;
++        // The walk under a swing: its torso's turn (and a replaced swing's, fading under it) shared
++        // up the spine, and the spine turning it onto the aim (both taken each frame, so they end
++        // with the clip, however it ends).
++        if clip.layered {
++            let fading = &clip.fading;
++            clip.ramp_out.retain(|n| fading.iter().any(|(f, ..)| f == n));
++            if let Some(mut rig) = rig {
++                rig.ramped.clear();
++                rig.ramped.push(on.index());
++                rig.ramped.extend(clip.ramp_out.iter().map(|n| n.index()));
++                rig.ramp_floor = spine_floor();
++            }
++            if let Some(mut twist) = twist {
++                twist.swing_want = true;
++            }
++        } else {
++            clip.ramp_out.clear();
++        }
+         // Its weight against everything else playing (the gait, the driver's one-shots), the
+         // hands' grip overlays and its own outgoing nodes apart, so the share it takes is
+         // `lambda`.
+@@ -1212,13 +1398,24 @@ pub(super) fn apply_action_clips(
+ pub(super) fn apply_hit_stops(
+     mut commands: Commands,
+     time: Res<Time>,
+-    mut units: Query<(Entity, &mut AnimationPlayer, &mut HitStopped)>,
++    mut units: Query<(
++        Entity,
++        &mut AnimationPlayer,
++        &mut HitStopped,
++        Option<&ActionClip>,
++    )>,
+ ) {
+     let now = time.elapsed_secs();
+-    for (entity, mut player, mut stop) in &mut units {
++    let layer_on = anim_layer_on();
++    for (entity, mut player, mut stop, clip) in &mut units {
+         let stop = &mut *stop;
++        // A swing over walking legs holds itself alone: the legs walk on through the blow.
++        let only = clip.filter(|c| layer_on && c.layered).map(held_alone);
+         if now < stop.until {
+             for (node, anim) in player.playing_animations_mut() {
++                if only.as_ref().is_some_and(|keep| !keep.contains(node)) {
++                    continue;
++                }
+                 let speed = anim.speed();
+                 if speed != 0.0 {
+                     match stop.held.iter_mut().find(|(n, _)| n == node) {
+@@ -1242,6 +1439,11 @@ pub(super) fn apply_hit_stops(
+     }
+ }
+ 
++/// The nodes a hit-stop holds on a swing over walking legs: the swing's own and its fading ones.
++fn held_alone(clip: &ActionClip) -> Vec<AnimationNodeIndex> {
++    clip.nodes().chain(clip.fading.iter().map(|f| f.0)).collect()
++}
++
+ /// The upper body follows the aiming camera's pitch (our own hero, while aiming), and turns as the
+ /// add-on asks (`SetAimTurn`).
+ pub(super) fn aim_pitch(
+@@ -1791,6 +1993,15 @@ pub(super) fn shuffle_on_lock_turn(
+ }
+ 
+ pub(super) fn plugin(app: &mut App) {
++    use crate::console::ConsoleCommandApp;
++    // benilla's own: the walk under a swing's spine share held for tuning on film.
++    app.console_command(
++        "animlayer",
++        crate::console::GRAPHICS,
++        Some("<spine share 0-1> | tuned"),
++        anim_layer_console,
++    );
++    app.add_observer(on_cvar);
+     app.init_resource::<LockOn>()
+         .init_resource::<ClipOwnsBody>()
+         .init_resource::<ImpactWeight>()
+@@ -1996,6 +2207,8 @@ mod tests {
+             reaction: false,
+             coil: false,
+             fading: Vec::new(),
++            layered: false,
++            ramp_out: Vec::new(),
+         }
+     }
+ 
+@@ -2208,4 +2421,183 @@ mod tests {
+         }
+         assert!(c.stopping.is_some(), "let go after its hold");
+     }
++
++    /// The legs, by the unit's flags: a second's run counts past a lunge's step, a lunge's 0.18
++    /// sec from standing doesn't; flags with no speed (rooted) or speed with no flags (a knockback)
++    /// never count; stopping counts down at once; and it's the unit's, kept across clips.
++    #[test]
++    fn the_legs_count_walking_by_the_units_flags_not_a_clips_measure() {
++        use super::super::select::move_flags::{FORWARD, STRAFE_LEFT};
++        let dt = 1.0 / 60.0;
++        let mut legs = LegsMotion::default();
++        for _ in 0..60 {
++            legs.step(FORWARD, 7.0, false, dt);
++        }
++        assert!(legs.moving_for > LEGS_AFTER, "a second's run: {}", legs.moving_for);
++        let mut lunge = LegsMotion::default();
++        for _ in 0..11 {
++            lunge.step(FORWARD, 6.0, false, dt);
++        }
++        assert!(lunge.moving_for < LEGS_AFTER, "a lunge's step stays planted");
++        let mut rooted = LegsMotion::default();
++        rooted.step(STRAFE_LEFT, 0.0, false, dt);
++        assert!(rooted.moving_for < 0.0, "keys held, not moving");
++        let mut thrown = LegsMotion::default();
++        thrown.step(0, 9.0, false, dt);
++        assert!(thrown.moving_for < 0.0, "a knockback isn't walking");
++        legs.step(0, 0.0, true, dt);
++        assert!(legs.moving_for < 0.0, "stopped: counting stillness at once");
++        assert!(legs.mounted);
++    }
++
++    fn ask(body: ActionBody, moving_for: f32) -> BodyAsk {
++        BodyAsk {
++            body,
++            id: 17,
++            has_upper: true,
++            spine_split: true,
++            on_upper: false,
++            layered: false,
++            clip_moving_for: 0.0,
++            legs: LegsMotion {
++                moving_for,
++                mounted: false,
++            },
++        }
++    }
++
++    /// The layer on: which body a clip plays on.
++    #[test]
++    fn with_the_layer_on_a_swing_takes_the_torso_while_the_legs_walk() {
++        use ActionBody::{Auto, Full, Layer, Lower, Upper};
++        let on = |a: BodyAsk| on_upper_now(a, true);
++        assert!(!on(ask(Auto, -1.0)), "standing: the whole body");
++        assert!(on(ask(Auto, 1.0)), "walking a second: the torso from the first frame");
++        assert!(on(ask(Layer, 1.0)), "an ability's \"auto\" too");
++        assert!(!on(ask(Auto, 0.1)), "just set off: the legs still the clip's");
++        assert!(
++            on(BodyAsk {
++                legs: LegsMotion {
++                    moving_for: -1.0,
++                    mounted: true
++                },
++                ..ask(Auto, -1.0)
++            }),
++            "riding: the torso"
++        );
++        assert!(!on(ask(Full, 1.0)) && !on(ask(Lower, 1.0)));
++        assert!(on(ask(Upper, -1.0)), "asked onto the upper body: there");
++        assert!(!on(BodyAsk { id: 95, ..ask(Auto, 1.0) }), "the kick's legs are the move");
++        assert!(
++            !on(BodyAsk {
++                spine_split: false,
++                ..ask(Auto, 1.0)
++            }),
++            "a beast's Head-only split: the whole body"
++        );
++        assert!(
++            on(BodyAsk {
++                layered: true,
++                on_upper: true,
++                ..ask(Auto, -1.0)
++            }),
++            "stopped mid-swing: the torso finishes it"
++        );
++    }
++
++    /// The layer off: the twenty-eighth round's rule, exactly, for every input; `"auto"` on the
++    /// whole body.
++    #[test]
++    fn with_the_layer_off_a_clip_plays_as_it_did_before() {
++        use ActionBody::{Auto, Full, Layer, Lower, Upper};
++        // The twenty-eighth round's decision, as it was written.
++        let before = |body: ActionBody, has_upper: bool, on_upper: bool, moving_for: f32| match body {
++            Full | Lower => false,
++            Upper => has_upper,
++            Auto => {
++                has_upper
++                    && if on_upper {
++                        moving_for > -0.15
++                    } else {
++                        moving_for > LEGS_AFTER
++                    }
++            }
++            Layer => unreachable!(),
++        };
++        for body in [Auto, Full, Upper, Lower] {
++            for has_upper in [false, true] {
++                for on_upper in [false, true] {
++                    for layered in [false, true] {
++                        for i in -10..=10 {
++                            let m = i as f32 * 0.05;
++                            for legs in [-1.0, 1.0] {
++                                let a = BodyAsk {
++                                    body,
++                                    has_upper,
++                                    on_upper,
++                                    layered,
++                                    clip_moving_for: m,
++                                    ..ask(body, legs)
++                                };
++                                assert_eq!(
++                                    on_upper_now(a, false),
++                                    before(body, has_upper, on_upper, m),
++                                    "{a:?}"
++                                );
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        assert!(!on_upper_now(ask(Layer, 5.0), false), "\"auto\" is the whole body");
++    }
++
++    /// A chain while walking: the next swing starts on the torso, the last one's torso fading out
++    /// under it with its turn still shared up the spine; a hit-stop holds only the swing's nodes.
++    #[test]
++    fn a_chain_while_walking_stays_on_the_torso_from_swing_to_swing() {
++        let mut c = clip(0.3, 0.3, 0.3);
++        c.upper = Some(AnimationNodeIndex::new(2));
++        c.lambda = 1.0;
++        c.on_upper = true;
++        c.layered = true;
++        let mut next = clip(0.3, 0.3, 0.3);
++        next.full = AnimationNodeIndex::new(7);
++        next.upper = Some(AnimationNodeIndex::new(8));
++        replace_clip(&mut c, next);
++        assert_eq!(c.ramp_out, [AnimationNodeIndex::new(2)], "the last torso fades, ramped");
++        assert!(c.fading.iter().any(|f| f.0 == AnimationNodeIndex::new(2)));
++        let a = BodyAsk {
++            on_upper: c.on_upper,
++            layered: c.layered,
++            ..ask(c.body, 2.0)
++        };
++        c.on_upper = on_upper_now(a, true);
++        assert_eq!(c.on_node(), AnimationNodeIndex::new(8), "its first frame on the torso");
++        c.layered = true;
++        let mut held: Vec<usize> = held_alone(&c).iter().map(|n| n.index()).collect();
++        held.sort();
++        assert_eq!(held, [1, 2, 7, 8], "the swing's nodes and its fading ones, not the gait");
++    }
++
++    /// `animlayer`: a share holds the spine's floor, `tuned` or nothing puts it back, anything else
++    /// leaves it with the usage line.
++    #[test]
++    fn the_spine_share_holds_and_lets_go() {
++        let mut world = World::new();
++        // (Its first line: a second says when `animLayer` is 0, which another test may set.)
++        assert_eq!(
++            anim_layer_console(&mut world, "0.25")[0],
++            "Swing on the spine held at 0.25 at SpineLow."
++        );
++        assert_eq!(spine_floor(), 0.25);
++        assert_eq!(
++            anim_layer_console(&mut world, "2"),
++            ["Usage: animlayer <spine share 0-1> | tuned"]
++        );
++        assert_eq!(spine_floor(), 0.25, "a bad share changes nothing");
++        anim_layer_console(&mut world, "tuned");
++        assert_eq!(spine_floor(), SPINE_FLOOR);
++    }
+ }
+diff --git a/crates/benilla-app/src/creature_anim/driver.rs b/crates/benilla-app/src/creature_anim/driver.rs
+index 6d575dd..75315b8 100644
+--- a/crates/benilla-app/src/creature_anim/driver.rs
++++ b/crates/benilla-app/src/creature_anim/driver.rs
+@@ -560,6 +560,9 @@ pub(super) fn drive_animations(
+         // The creep vis flag off the unit's own descriptor (`[[unit+0x110]+0x213] & 2`), never
+         // predicted: the crouch lands with the server's aura.
+         mv.stealthed = store.is_some_and(|s| s.0.unit_is_stealthed());
++        // Basin Battle: the legs' motion for the walk under a swing, by the flags the animation
++        // plays (the action layer reads it after the clocks advance).
++        drv.legs.step(mv.flags, mv.speed, mounted, time.delta_secs());
+         let moving = mv.flags & move_flags::ANY_MOVE != 0;
+         // An arc's launch vertical speed splits a jump (the JumpStart/Jump bracket; jump
+         // `0x60e480`, land `0x602c60`) from a step-off fall, which has no bracket and keeps the
+diff --git a/crates/benilla-app/src/creature_anim/twist.rs b/crates/benilla-app/src/creature_anim/twist.rs
+index b94b647..826c62d 100644
+--- a/crates/benilla-app/src/creature_anim/twist.rs
++++ b/crates/benilla-app/src/creature_anim/twist.rs
+@@ -26,6 +26,13 @@ pub(crate) struct BodyTwist {
+     /// bow's line onto the reticle, on top of [`Self::turn`] and [`Self::pitch`].
+     pub(crate) turn_fix: f32,
+     pub(crate) lean_fix: f32,
++    /// Basin Battle: a swing plays on the upper body over walking legs this frame (the action
++    /// layer's walk under a swing, written every frame and taken here): the spine eases round to
++    /// take the whole gap, as aimed, so the swing goes where the hero faces while the legs keep
++    /// a strafe's turn.
++    pub(crate) swing_want: bool,
++    /// How far round that is, eased 0 to 1 ([`ease_swing_lock`]).
++    swing_lock: f32,
+     spine: Option<Channel>,
+     head: Option<Channel>,
+ }
+@@ -39,6 +46,8 @@ impl BodyTwist {
+             aim_lock: false,
+             turn_fix: 0.0,
+             lean_fix: 0.0,
++            swing_want: false,
++            swing_lock: 0.0,
+             spine: spine.map(Channel::new),
+             head: head.map(Channel::new),
+         }
+@@ -104,6 +113,37 @@ fn aim_locked_shares(gap: f32) -> (f32, f32) {
+     (gap.clamp(-AIM_SPINE_MOST, AIM_SPINE_MOST), 0.0)
+ }
+ 
++/// How fast the spine eases round to a swing's aim (per second, the aim pitch's rate): about
++/// 0.1 sec to most of the way, so the shoulders swing round rather than jump.
++const SWING_LOCK_RATE: f32 = 14.0;
++
++/// The swing lock eased one frame toward `want`, snapped to 0 when nearly there, so with no swing
++/// the twist is exactly the stock one.
++fn ease_swing_lock(cur: f32, want: bool, dt: f32) -> f32 {
++    let target = if want { 1.0 } else { 0.0 };
++    let next = cur + (target - cur) * (1.0 - (-SWING_LOCK_RATE * dt.max(0.0)).exp());
++    if !want && next < 1.0e-3 {
++        0.0
++    } else {
++        next.min(1.0)
++    }
++}
++
++/// The `(spine, head)` twist with an ability aimed or a swing over walking legs (`k`, 0 to 1, the
++/// greater of the two) blended from the stock shares toward the aimed ones; a rider's saddle keeps
++/// the stock ones (its spine disarmed).
++fn locked_shares(gap: f32, mounted: bool, k: f32) -> (f32, f32) {
++    if mounted || k <= 0.0 {
++        return armed_shares(gap, mounted);
++    }
++    let locked = aim_locked_shares(gap);
++    if k >= 1.0 {
++        return locked;
++    }
++    let (s, h) = armed_shares(gap, false);
++    (s + (locked.0 - s) * k, h + (locked.1 - h) * k)
++}
++
+ /// Compose the twist onto the bone locals in [`benilla_world::rig_anim::PosePost`]: each channel
+ /// yaws its subtree about world up through the bone's pivot, `local' = local · Quat(g⁻¹·Y, θ)`
+ /// with `g` the bone's rotation up to the unit. The head runs after the spine, so it turns relative
+@@ -116,7 +156,9 @@ pub(super) fn apply_body_twist(
+     parents: Query<&ChildOf>,
+     locals: Query<&Transform>,
+     stores: Query<&crate::net::ObjectStore>,
++    time: Res<Time>,
+ ) {
++    let dt = time.delta_secs();
+     // `WOW_NO_TWIST=1` stands the pass down and logs the gap it would have closed.
+     if twist_off() {
+         for (_, t) in &units {
+@@ -133,11 +175,11 @@ pub(super) fn apply_body_twist(
+         let mounted = stores
+             .get(unit)
+             .is_ok_and(|s| s.0.unit_mount_display_id() != 0);
+-        let (spine, head) = if twist.aim_lock && !mounted {
+-            aim_locked_shares(twist.yaw_gap)
+-        } else {
+-            armed_shares(twist.yaw_gap, mounted)
+-        };
++        // The walk under a swing's lock, taken (the action layer names it again each frame).
++        let want = std::mem::take(&mut twist.swing_want) && !mounted;
++        twist.swing_lock = ease_swing_lock(twist.swing_lock, want, dt);
++        let k = if twist.aim_lock { 1.0 } else { twist.swing_lock };
++        let (spine, head) = locked_shares(twist.yaw_gap, mounted, k);
+         let pitch = if mounted {
+             0.0
+         } else {
+@@ -257,7 +299,10 @@ fn twist_off() -> bool {
+ 
+ #[cfg(test)]
+ mod tests {
+-    use super::{aim_locked_shares, armed_shares, twist_shares, twisted_local};
++    use super::{
++        aim_locked_shares, armed_shares, ease_swing_lock, locked_shares, twist_shares,
++        twisted_local,
++    };
+     use bevy::prelude::{Quat, Vec3};
+     use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+ 
+@@ -329,6 +374,42 @@ mod tests {
+         assert_eq!(aim_locked_shares(PI), (1.75, 0.0));
+     }
+ 
++    /// A swing over walking legs eases the spine round to the aimed shares: none of it is the stock
++    /// twist exactly, all of it the aimed one, and between them the spine turns steadily further; a
++    /// rider keeps the stock shares whatever the lock.
++    #[test]
++    fn a_swing_lock_blends_the_stock_twist_into_the_aimed_one() {
++        let gap = -FRAC_PI_2;
++        assert_eq!(locked_shares(gap, false, 0.0), armed_shares(gap, false));
++        assert_eq!(locked_shares(gap, false, 1.0), aim_locked_shares(gap));
++        let mut last = locked_shares(gap, false, 0.0).0;
++        for i in 1..=10 {
++            let (spine, head) = locked_shares(gap, false, i as f32 / 10.0);
++            assert!(spine <= last, "the spine turns further toward the aim");
++            assert!((spine + head - gap).abs() < 1e-5, "the head still lands on the aim");
++            last = spine;
++        }
++        assert_eq!(locked_shares(gap, true, 1.0), armed_shares(gap, true));
++    }
++
++    /// The lock eases in over about a fifth of a second, and back out to exactly nothing.
++    #[test]
++    fn the_swing_lock_eases_in_quickly_and_out_to_nothing() {
++        let mut k = 0.0;
++        for _ in 0..12 {
++            k = ease_swing_lock(k, true, 1.0 / 60.0);
++        }
++        assert!(k > 0.9, "most of the way in 0.2 sec: {k}");
++        for _ in 0..6 {
++            k = ease_swing_lock(k, true, 1.0 / 60.0);
++        }
++        assert!(k > 0.95, "nearly all of it by 0.3 sec: {k}");
++        for _ in 0..60 {
++            k = ease_swing_lock(k, false, 1.0 / 60.0);
++        }
++        assert_eq!(k, 0.0, "let go, exactly the stock twist again");
++    }
++
+     #[test]
+     fn zero_gap_is_zero_twist() {
+         assert_eq!(twist_shares(0.0), (0.0, 0.0));
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 369dbbd..f46331a 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1638,6 +1638,17 @@ mod tests {
+         assert!(res::<LookAo>(&app).on);
+     }
+ 
++    /// `animLayer` (benilla's own) switches the legs walking under a swing, registered "1".
++    #[test]
++    fn anim_layer_switches_the_walk_under_a_swing() {
++        let mut app = cvar_app();
++        assert!(crate::creature_anim::anim_layer_on(), "registered \"1\"");
++        assert_eq!(apply(&mut app, "animLayer", "0"), SetOutcome::Changed);
++        assert!(!crate::creature_anim::anim_layer_on());
++        apply(&mut app, "animlayer", "1");
++        assert!(crate::creature_anim::anim_layer_on());
++    }
++
+     /// `worldShadows` (benilla's own) sets the new look's sun shadows by level, registered "1"
+     /// (low) to match `LookShadows`' default, leaving the rest of the look.
+     #[test]
+@@ -2910,6 +2921,9 @@ mod tests {
+         |app| {
+             app.add_observer(crate::player::approach_on_cvar);
+         },
++        |app| {
++            app.add_observer(crate::creature_anim::anim_layer_on_cvar);
++        },
+         |app| {
+             app.add_observer(crate::sound::on_cvar);
+         },
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index 693f8f7..05fac31 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -638,6 +638,15 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — the reference draws its doll inside the main pass and has no \
+          second view to rate-limit",
+     ),
++    // benilla's own: Basin Battle's swings play on the upper body while the legs walk (the action
++    // layer's walk under a swing, patch 0079); "0" for the whole-body swing that slides. The knob
++    // is `crate::creature_anim::anim_layer_on`.
++    ours(
++        "animLayer",
++        "1",
++        "benilla's own — 1.12 plays its own melee on the upper body over a run, but Basin \
++         Battle's action clips are not 1.12's; this lets their legs walk under a swing",
++    ),
+     // `gxMultisample` (`0x63a950`, flags 3). The reference formats its default from field 21 of the
+     // `VideoHardware.dbc` row `DetectHardware` (`0x641260`) matches, which is 1, no multisampling,
+     // on every fallback row a modern GPU reaches. The knob is [`benilla_world::view::MsaaSetting`],
+diff --git a/crates/benilla-app/src/debug_panel/inspect.rs b/crates/benilla-app/src/debug_panel/inspect.rs
+index 11b9c68..e9bf6e2 100644
+--- a/crates/benilla-app/src/debug_panel/inspect.rs
++++ b/crates/benilla-app/src/debug_panel/inspect.rs
+@@ -584,6 +584,14 @@ pub(super) fn inspect_ui(
+         } else {
+             String::new()
+         };
++        // Basin Battle: how long the legs have walked, which hands them a swing's legs (the walk
++        // under a swing, `animLayer`); hidden standing.
++        let legs = d.legs_moving_for();
++        let rate = if legs > 0.0 {
++            format!("{rate} · legs walking {legs:.2}s")
++        } else {
++            rate
++        };
+         match overlay {
+             Some(o) => format!("anim {base} + overlay {}{rate}", fmt(o)),
+             None => format!("anim {base}{rate}"),
+diff --git a/crates/benilla-app/src/player/controller.rs b/crates/benilla-app/src/player/controller.rs
+index ec600ee..3ba1b49 100644
+--- a/crates/benilla-app/src/player/controller.rs
++++ b/crates/benilla-app/src/player/controller.rs
+@@ -809,6 +809,11 @@ pub(super) fn control(
+             now,
+             launch_y,
+         );
++        let pose_flags = pose_with_legs(
++            pose_flags,
++            player.action_dash.as_ref(),
++            crate::creature_anim::anim_layer_on() && !airborne && !swimming && !held,
++        );
+         let anim_flags = gait::drive_body_heading(
+             &mut player,
+             pose_flags,
+@@ -974,6 +979,34 @@ fn self_seat(
+     })
+ }
+ 
++/// Basin Battle: the animation's direction bits for the legs' way `(forward, right)`, as the keys'
++/// own would set them.
++fn anim_dir_bits((fwd, side): (i32, i32)) -> u32 {
++    let mut bits = 0;
++    match fwd.signum() {
++        1 => bits |= move_flags::FORWARD,
++        -1 => bits |= move_flags::BACKWARD,
++        _ => {}
++    }
++    match side.signum() {
++        -1 => bits |= move_flags::STRAFE_LEFT,
++        1 => bits |= move_flags::STRAFE_RIGHT,
++        _ => {}
++    }
++    bits
++}
++
++/// Basin Battle's walk under a swing: while a `"legs"` dash runs (a swing's lunge), the pose's
++/// direction bits are the legs' (the movement keys'), not the dash's, so a strafing or backing
++/// hero's legs don't flick to a forward run and back; none held, none (a lunge from standing keeps
++/// its planted stance). The wire keeps the dash's. `on`: the layer is on and the body on the ground.
++fn pose_with_legs(pose: u32, dash: Option<&super::state::ActionDash>, on: bool) -> u32 {
++    match dash {
++        Some(d) if on && d.keep_legs => (pose & !move_flags::ANY_MOVE) | anim_dir_bits(d.legs),
++        _ => pose,
++    }
++}
++
+ /// How fast the body turns to a locked-on unit, radians a second: about 290° a second, quick
+ /// enough to keep a foe in front, slow enough that one rolling past gets behind for a moment.
+ const LOCK_TURN_RATE: f32 = 5.0;
+@@ -991,6 +1024,9 @@ fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_tr
+             until: 0.0,
+             secs: d.secs,
+             keys_now: d.keys.is_none(),
++            keep_legs: d.keep_legs,
++            legs: (0, 0),
++            under: (0, 0),
+         };
+         player.pending_dashes.push((now + d.delay, dash));
+     }
+@@ -1006,13 +1042,22 @@ fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_tr
+             (d.fwd, d.side) = if f == 0 && s == 0 { (-1, 0) } else { (f, s) };
+         }
+         d.until = now + d.secs;
++        // The legs it replaces: a scripted walk's way, for a lunge with no key held.
++        d.under = player
++            .action_dash
++            .filter(|p| now < p.until)
++            .map_or((0, 0), |p| if p.keep_legs { p.legs } else { (p.fwd, p.side) });
+         player.action_dash = Some(d);
+     }
+-    let Some(d) = player.action_dash else { return };
++    let Some(mut d) = player.action_dash else { return };
+     if now >= d.until || !may_translate || player.swimming {
+         player.action_dash = None;
+         return;
+     }
++    // The keys held before the dash takes them over: the way the legs walk under a `"legs"` dash.
++    let held = (axes.fwd.signum(), axes.side.signum());
++    d.legs = if held != (0, 0) { held } else { d.under };
++    player.action_dash = Some(d);
+     axes.fwd = d.fwd;
+     axes.side = d.side;
+     axes.translating = d.fwd != 0 || d.side != 0;
+diff --git a/crates/benilla-app/src/player/controller/tests.rs b/crates/benilla-app/src/player/controller/tests.rs
+index 9942886..49825ff 100644
+--- a/crates/benilla-app/src/player/controller/tests.rs
++++ b/crates/benilla-app/src/player/controller/tests.rs
+@@ -370,3 +370,83 @@ fn a_login_seats_us_only_on_a_game_object_flagged_as_a_transport() {
+     assert_eq!(seat(0x21, 0x20), None, "no transport bit");
+     assert_eq!(seat(0x09, 0x8), None, "no game object");
+ }
++
++/// The legs' way as the keys' own direction bits: none held, none.
++#[test]
++fn the_legs_way_sets_the_keys_direction_bits() {
++    assert_eq!(anim_dir_bits((0, -1)), move_flags::STRAFE_LEFT);
++    assert_eq!(
++        anim_dir_bits((-1, 1)),
++        move_flags::BACKWARD | move_flags::STRAFE_RIGHT
++    );
++    assert_eq!(anim_dir_bits((0, 0)), 0);
++}
++
++/// A swing's lunge (a `"legs"` dash) run while strafing left: the body runs the dash's way
++/// (forward, on the wire), the pose keeps the strafe; with no key held the pose has no way at all
++/// (a planted lunge); a dash without `"legs"`, or the layer off, poses as the dash goes.
++#[test]
++fn a_lunge_keeps_the_legs_walking_the_way_the_keys_go() {
++    let still = || input::MoveAxes {
++        fwd: 0,
++        side: 0,
++        mouselook: false,
++        turning: false,
++        translating: false,
++        strafe_left: false,
++        strafe_right: false,
++        turn_left: false,
++        turn_right: false,
++    };
++    let lunge = |keep_legs| super::super::state::ActionDash {
++        fwd: 1,
++        side: 0,
++        speed: 6.0,
++        until: 0.0,
++        secs: 0.18,
++        keys_now: false,
++        keep_legs,
++        legs: (0, 0),
++        under: (0, 0),
++    };
++    let mut player = Player::default();
++    player.pending_dashes.push((1.0, lunge(true)));
++    let mut axes = still();
++    axes.side = -1;
++    axes.strafe_left = true;
++    action_dash(&mut player, &mut axes, 1.0, true);
++    assert_eq!((axes.fwd, axes.side), (1, 0), "the body runs the dash's way");
++    let dash = player.action_dash.expect("running");
++    assert_eq!(dash.legs, (0, -1), "the legs keep the strafe");
++    let wire = move_flags::FORWARD;
++    assert_eq!(
++        pose_with_legs(wire, Some(&dash), true),
++        move_flags::STRAFE_LEFT
++    );
++    assert_eq!(pose_with_legs(wire, Some(&dash), false), wire, "the layer off");
++    assert_eq!(
++        pose_with_legs(wire, Some(&lunge(false)), true),
++        wire,
++        "a dash not asked to keep the legs"
++    );
++    // No key held: planted.
++    let mut player = Player::default();
++    player.pending_dashes.push((1.0, lunge(true)));
++    let mut axes = still();
++    action_dash(&mut player, &mut axes, 1.0, true);
++    let dash = player.action_dash.expect("running");
++    assert_eq!(pose_with_legs(wire, Some(&dash), true), 0);
++    // Over a scripted walk backwards (a dash of its own, no key held): the walk's way.
++    let mut player = Player {
++        action_dash: Some(super::super::state::ActionDash {
++            fwd: -1,
++            until: 3.0,
++            ..lunge(false)
++        }),
++        ..Default::default()
++    };
++    player.pending_dashes.push((1.0, lunge(true)));
++    let mut axes = still();
++    action_dash(&mut player, &mut axes, 1.0, true);
++    assert_eq!(player.action_dash.expect("running").legs, (-1, 0));
++}
+diff --git a/crates/benilla-app/src/player/state.rs b/crates/benilla-app/src/player/state.rs
+index de5e48f..283faaf 100644
+--- a/crates/benilla-app/src/player/state.rs
++++ b/crates/benilla-app/src/player/state.rs
+@@ -321,6 +321,13 @@ pub(crate) struct ActionDash {
+     pub(crate) secs: f32,
+     /// The keys still to be read at its start (`None` asked for the ones held).
+     pub(crate) keys_now: bool,
++    /// Basin Battle (`"legs"`): the legs keep walking the way the movement keys go while it runs
++    /// (a lunge into a strafe's swing), the body still running the dash's way.
++    pub(crate) keep_legs: bool,
++    /// The way the legs walk now (`(forward, right)`): the movement keys held, else `under`.
++    pub(crate) legs: (i32, i32),
++    /// The way the legs walked under the dash it replaced (a scripted walk's), if one ran.
++    pub(crate) under: (i32, i32),
+ }
+ 
+ /// Our avatar: until `active` the camera free-flies, then we drive the body the server placed.
+diff --git a/crates/benilla-assets/src/m2.rs b/crates/benilla-assets/src/m2.rs
+index 01e94f9..8d4bf3a 100644
+--- a/crates/benilla-assets/src/m2.rs
++++ b/crates/benilla-assets/src/m2.rs
+@@ -22,7 +22,7 @@ use crate::bone_target_id;
+ use crate::coords::wow_to_bevy;
+ use crate::model::{
+     arm_subtree_roots, billboard_info, build_animation_clip, build_attachments, build_global_bones,
+-    build_grip_clip, build_skeleton, finger_subtree_roots, in_subtree, skeleton_pivots,
++    build_grip_clip, build_skeleton, finger_subtree_roots, in_subtree, skeleton_pivots, spine_rank,
+     upper_subtree_root, AnimClip, ModelAnimations, ModelAttachment, ModelSkeleton, ModelSubmesh,
+     Stage1,
+ };
+@@ -452,6 +452,10 @@ impl AssetLoader for M2ModelLoader {
+             // (Basin Battle) is its complement, every joint inside the upper body, so a node masked
+             // with it animates only the legs and the pelvis.
+             let upper_root = upper_subtree_root(&skeleton_raw);
++            // Basin Battle: how a swing over walking legs is shared up the spine.
++            pose.spine_rank = upper_root
++                .map(|r| spine_rank(&skeleton_raw, r))
++                .unwrap_or_default();
+             if let Some(upper_root) = upper_root {
+                 for i in 0..skeleton_raw.bones.len() {
+                     if !in_subtree(&skeleton_raw, i, upper_root) {
+diff --git a/crates/benilla-assets/src/model.rs b/crates/benilla-assets/src/model.rs
+index 2c0f7aa..292e799 100644
+--- a/crates/benilla-assets/src/model.rs
++++ b/crates/benilla-assets/src/model.rs
+@@ -317,6 +317,68 @@ pub(crate) fn upper_subtree_root(skel: &Skeleton) -> Option<usize> {
+     bone_with(4).or_else(|| bone_with(6))
+ }
+ 
++/// Basin Battle: how far up the spine each bone sits, for a swing played on the upper body over
++/// walking legs (the action layer's walk-while-swinging). The chain runs from `root`, the
++/// upper-body split, up to the shoulders' (key bones 2 and 3) lowest common ancestor, the chest;
++/// its bones read 0 at the split rising evenly to 1 at the chest, and every other bone inside the
++/// split reads 1 (the shoulders, the arms, the neck and the head take the swing whole). Bones
++/// outside the split (the pelvis, the legs) read 0, though their mask keeps the swing off them
++/// anyway. Empty unless the split is SpineLow (key bone 4): a Head-only split (most beasts) has
++/// no torso to share a swing with, and plays it on the whole body.
++pub(crate) fn spine_rank(skel: &Skeleton, root: usize) -> Vec<f32> {
++    if skel.bones.get(root).map(|b| b.key_bone) != Some(4) {
++        return Vec::new();
++    }
++    let n = skel.bones.len();
++    let parent = |b: usize| {
++        skel.bones
++            .get(b)
++            .and_then(|x| usize::try_from(x.parent).ok())
++            .filter(|&p| p < n)
++    };
++    // A bone and every bone above it, capped against a malformed parent loop.
++    let up = |from: usize| {
++        let mut chain = vec![from];
++        let mut cur = from;
++        while let Some(p) = parent(cur) {
++            if chain.len() > n {
++                break;
++            }
++            chain.push(p);
++            cur = p;
++        }
++        chain
++    };
++    let shoulder = |k: i16| skel.bones.iter().position(|b| b.key_bone == k);
++    let chest = match (shoulder(2), shoulder(3)) {
++        (Some(l), Some(r)) => {
++            let above_l = up(l);
++            up(r).into_iter().find(|b| above_l.contains(b))
++        }
++        _ => None,
++    };
++    // From the split up to the chest; none when the chest isn't above the split.
++    let chain: Vec<usize> = chest
++        .map(up)
++        .and_then(|above| {
++            let at = above.iter().position(|&b| b == root)?;
++            let mut chain = above[..=at].to_vec();
++            chain.reverse();
++            Some(chain)
++        })
++        .unwrap_or_default();
++    let mut rank: Vec<f32> = (0..n)
++        .map(|i| if in_subtree(skel, i, root) { 1.0 } else { 0.0 })
++        .collect();
++    if chain.len() > 1 {
++        let last = (chain.len() - 1) as f32;
++        for (i, &b) in chain.iter().enumerate() {
++            rank[b] = i as f32 / last;
++        }
++    }
++    rank
++}
++
+ /// The finger key-bones per hand `(right, left)`, 8-12 and 13-17: the reference's `CloseHand`
+ /// targets, posed with `HandsClosed` (AnimationData 15) while that hand holds a weapon
+ /// (`0x479660`/`0x60b590`). Empty for a model without them.
+@@ -1127,4 +1189,71 @@ mod tests {
+             "the swinging spine bones are ordinary"
+         );
+     }
++
++    /// A skeleton from `(parent, key bone)` pairs, pivots at the origin.
++    fn skeleton(bones: &[(i16, i16)]) -> Skeleton {
++        Skeleton {
++            bones: bones
++                .iter()
++                .map(|&(parent, key_bone)| benilla_formats::SkeletonBone {
++                    parent,
++                    pivot: [0.0; 3],
++                    key_bone,
++                    billboard: None,
++                    parent_arm: None,
++                })
++                .collect(),
++        }
++    }
++
++    /// The walk-while-swinging ramp: SpineLow half, the bone above it three quarters, the chest
++    /// (the shoulders' common parent) and everything above it whole; the hips and the legs none.
++    #[test]
++    fn the_spine_takes_a_swing_by_how_far_up_it_sits() {
++        // 0 root, 1 hips (Waist 5), 2 SpineLow (4), 3 spine, 4 chest, 5 shoulder L (2),
++        // 6 shoulder R (3), 7 neck, 8 head (6), 9 thigh, 10 shin, 11 arm L under the shoulder.
++        let skel = skeleton(&[
++            (-1, -1),
++            (0, 5),
++            (1, 4),
++            (2, -1),
++            (3, -1),
++            (4, 2),
++            (4, 3),
++            (4, -1),
++            (7, 6),
++            (1, -1),
++            (9, -1),
++            (5, 0),
++        ]);
++        let root = upper_subtree_root(&skel).unwrap();
++        assert_eq!(root, 2);
++        let rank = spine_rank(&skel, root);
++        assert_eq!(rank[2], 0.0, "SpineLow is the chain's foot");
++        assert_eq!(rank[3], 0.5);
++        assert_eq!(rank[4], 1.0, "the chest takes it whole");
++        for b in [5, 6, 7, 8, 11] {
++            assert_eq!(rank[b], 1.0, "bone {b} above the chest takes it whole");
++        }
++        for b in [0, 1, 9, 10] {
++            assert_eq!(rank[b], 0.0, "bone {b} is the legs' and the hips'");
++        }
++    }
++
++    /// A short spine whose SpineLow is itself the chest has no ramp (1.12's hard split); a model
++    /// without shoulders has none either; a Head-only split has no rank at all (no layering).
++    #[test]
++    fn a_short_spine_a_shoulderless_one_and_a_head_split_have_no_ramp() {
++        // SpineLow carries both shoulders.
++        let short = skeleton(&[(-1, 5), (0, 4), (1, 2), (1, 3), (1, 6), (0, -1)]);
++        let rank = spine_rank(&short, 1);
++        assert_eq!(rank, vec![0.0, 1.0, 1.0, 1.0, 1.0, 0.0]);
++        // No shoulders: every upper bone whole.
++        let bare = skeleton(&[(-1, 5), (0, 4), (1, -1), (2, 6), (0, -1)]);
++        assert_eq!(spine_rank(&bare, 1), vec![0.0, 1.0, 1.0, 1.0, 0.0]);
++        // A beast's Head-only split.
++        let beast = skeleton(&[(-1, -1), (0, -1), (1, 6), (0, -1)]);
++        let root = upper_subtree_root(&beast).unwrap();
++        assert!(spine_rank(&beast, root).is_empty(), "no SpineLow: no layer");
++    }
+ }
+diff --git a/crates/benilla-assets/src/model/pose.rs b/crates/benilla-assets/src/model/pose.rs
+index 363919b..3c652a8 100644
+--- a/crates/benilla-assets/src/model/pose.rs
++++ b/crates/benilla-assets/src/model/pose.rs
+@@ -244,6 +244,11 @@ pub struct PoseSource {
+     /// Basin Battle: the bone the planted feet lower the body by (the nearest over both hips and
+     /// the upper body, never a root), when the model has one.
+     pub pelvis: Option<u16>,
++    /// Basin Battle: per bone, how far up the spine it sits (0 at SpineLow rising to 1 at the
++    /// chest, 1 for the rest of the upper body, 0 for the legs), by which a swing on the upper body
++    /// over walking legs is shared out along the spine. Empty when the model has no SpineLow
++    /// split, whose swings stay whole-body.
++    pub spine_rank: Vec<f32>,
+ }
+ 
+ /// Basin Battle: one leg's three joints, by bone index: the hip (the thigh's pivot), the knee and
+@@ -256,6 +261,13 @@ pub struct LegChain {
+ }
+ 
+ impl PoseSource {
++    /// Basin Battle: the model splits at SpineLow, so an action clip can play on the torso while
++    /// the legs walk.
++    #[inline]
++    pub fn spine_split(&self) -> bool {
++        !self.spine_rank.is_empty()
++    }
++
+     /// Record `node` as playing `clip` under `mask`; call it beside each `graph.add_clip*`.
+     pub fn set_node(&mut self, node: AnimationNodeIndex, clip: u32, mask: u64) {
+         let i = node.index();
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index d0f97be..3a5af3c 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -40,6 +40,7 @@
+ //! - `ActionDash(seconds, speed[, keys[, delay]])`: our own body runs `speed` yards a second for
+ //!   `seconds` along the ground, at once, the way `keys` say (`"f"`, `"b"`, `"l"`, `"r"`, `"fl"`...;
+ //!   the movement keys held now when absent, else a step back), starting `delay` seconds from now.
++//!   (A fifth, `"legs"`, from the twenty-ninth round.)
+ //! - `SetLockOn(unit)`: the camera and the body keep facing that unit (`nil` lets go).
+ //! - `CameraKick(share, seconds)`: the camera punches in by that share of its distance and eases
+ //!   back.
+@@ -294,6 +295,21 @@
+ //! The twenty-eighth (`HasActionCombat() >= 28`): a heal you or your pet cast on someone else
+ //! floats its number in green over them (`SMSG_SPELLHEALLOG`; 1.12 floats no heal). Nothing new
+ //! to call: the server sends the heal log only to a client this new.
++//!
++//! The twenty-ninth (`HasActionCombat() >= 29`), the legs walk under a swing (patch 0079):
++//!
++//! - A clip on the whole body standing and the upper body moving (`body` nil) goes on the upper
++//!   body from its first frame when the unit is already moving (by its movement flags, kept for the
++//!   unit, not measured again for each clip), and stays there to its end; the legs keep walking.
++//!   The swing's turn is shared up the spine (half at SpineLow, all of it at the chest), the spine
++//!   turns the swing onto the aim while the legs keep a strafe's turn, and a hit-stop holds only the
++//!   swing, not the legs. A model with no SpineLow (a beast) plays it on the whole body; so does
++//!   the kick (anim 95), whose legs are the move. `animLayer 0` is the twenty-eighth round's look.
++//! - `PlayUnitAnimation`'s `body` may be `"auto"`: the same for an ability's clip, which an older
++//!   client plays on the whole body (`"full"`).
++//! - `ActionDash`'s fifth argument `"legs"`: while the dash runs, the legs keep walking the way the
++//!   movement keys go (a lunge into a strafe's swing doesn't flick the legs forward and back); the
++//!   body still runs the dash's way.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -321,6 +337,9 @@ static VIEW_ELEVATION: AtomicU32 = AtomicU32::new(0);
+ pub enum ActionBody {
+     /// The whole body standing still, the upper body while the legs move.
+     Auto,
++    /// `"auto"` (the twenty-ninth round): [`Self::Auto`] while the legs walk under a swing
++    /// (`animLayer 1`), the whole body with it off, as an ability's clip played before.
++    Layer,
+     Full,
+     Upper,
+     /// The legs and the pelvis alone; the upper body keeps whatever it's doing.
+@@ -528,6 +547,8 @@ pub struct Dash {
+     pub speed: f32,
+     pub keys: Option<(i32, i32)>,
+     pub delay: f32,
++    /// `"legs"` (the twenty-ninth round): the legs keep the movement keys' walk while it runs.
++    pub keep_legs: bool,
+ }
+ 
+ static DASHES: std::sync::Mutex<Vec<Dash>> = std::sync::Mutex::new(Vec::new());
+@@ -1256,7 +1277,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(28))?,
++        lua.create_function(|_, _: MultiValue| Ok(29))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1283,6 +1304,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 Some("full") => ActionBody::Full,
+                 Some("upper") => ActionBody::Upper,
+                 Some("lower") => ActionBody::Lower,
++                Some("auto") => ActionBody::Layer,
+                 _ => ActionBody::Auto,
+             };
+             let from = text(v.get(8)).filter(|f| !f.is_empty());
+@@ -1453,6 +1475,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             {
+                 let keys = dash_keys(v.get(2));
+                 let delay = number(v.get(3), 0.0, 3.0).unwrap_or(0.0);
++                let keep_legs = text(v.get(4)).is_some_and(|t| t.eq_ignore_ascii_case("legs"));
+                 if let Ok(mut d) = DASHES.lock() {
+                     if d.len() < 16 {
+                         d.push(Dash {
+@@ -1460,6 +1483,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                             speed,
+                             keys,
+                             delay,
++                            keep_legs,
+                         });
+                     }
+                 }
+@@ -2080,6 +2104,7 @@ mod tests {
+             r#"PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "lower")
+                PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "upper")
+                PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "full")
++               PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "auto")
+                PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "sideways")
+                PlayUnitAnimation("player", 38)"#,
+         )
+@@ -2098,12 +2123,29 @@ mod tests {
+                 ActionBody::Lower,
+                 ActionBody::Upper,
+                 ActionBody::Full,
++                ActionBody::Layer,
+                 ActionBody::Auto,
+                 ActionBody::Auto
+             ]
+         );
+     }
+ 
++    /// `ActionDash`'s fifth argument `"legs"` keeps the legs' walk; without it, as before.
++    #[test]
++    fn a_dash_keeps_the_legs_only_when_asked() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        take_dashes();
++        lua.load(
++            r#"ActionDash(0.18, 4, "f", 0.2, "legs")
++               ActionDash(0.18, 4, "f", 0.2)"#,
++        )
++        .exec()
++        .unwrap();
++        let legs: Vec<bool> = take_dashes().iter().map(|d| d.keep_legs).collect();
++        assert_eq!(legs, [true, false]);
++    }
++
+     #[test]
+     fn the_probe_finds_the_nearest_unit_in_front_and_not_behind_or_too_far() {
+         // Facing -Z (yaw 0): a unit 2 yards ahead, one behind, one ahead but far, a player.
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index 2782932..b165c53 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -45,6 +45,16 @@ pub struct RigPose {
+     pub(crate) borrowed: Vec<u8>,
+     /// Basin Battle: the inertial blending's state ([`super::inertia`]), while it runs.
+     pub(crate) inertia: Option<Box<super::inertia::InertiaState>>,
++    /// Basin Battle's walk-while-swinging: the graph nodes (by `AnimationNodeIndex::index()`)
++    /// playing a swing on the upper body over walking legs this frame. They fold after every
++    /// other node, and their turn of each spine bone is shared out by how far up it sits
++    /// ([`benilla_assets::PoseSource::spine_rank`]): `ramp_floor` at SpineLow, rising to all of it
++    /// at the chest. The evaluator takes the list each frame, so its writer (the action layer)
++    /// names them again every frame, and a node it stops naming is never ramped by a stale entry
++    /// (the upper-body node is shared with 1.12's own overlay of the same clip). Empty: the pose
++    /// is exactly Bevy's.
++    pub ramped: Vec<usize>,
++    pub ramp_floor: f32,
+ }
+ 
+ /// [`RigPose::borrowed`]'s bits: translation, rotation, scale.
+@@ -81,6 +91,8 @@ impl RigPose {
+             pose_dirty: true,
+             borrowed: Vec::new(),
+             inertia: None,
++            ramped: Vec::new(),
++            ramp_floor: 1.0,
+         };
+         rig.compose();
+         rig
+@@ -207,6 +219,9 @@ struct Active {
+     node: usize,
+     /// In [`ExtraClips`], not the model's own.
+     extra: bool,
++    /// Basin Battle: a swing on the upper body over walking legs ([`RigPose::ramped`]), folded
++    /// last with its turn shared out up the spine.
++    ramped: bool,
+     clip: usize,
+     mask: u64,
+     weight: f32,
+@@ -242,6 +257,15 @@ fn evaluate_rig_poses(
+             let mine = extra.filter(|e| e.model == std::sync::Arc::as_ptr(src) as usize);
+             let extra_guard = mine.and_then(|e| e.clips.read().ok());
+             let extra = extra_guard.as_deref();
++            // This frame's ramped nodes, taken (see `RigPose::ramped`); none on a model with no
++            // SpineLow split.
++            let ramped = if rig.ramped.is_empty() {
++                Vec::new()
++            } else {
++                std::mem::take(&mut rig.ramped)
++            };
++            let ramped: &[usize] = if src.spine_split() { &ramped } else { &[] };
++            let ramp_floor = rig.ramp_floor.clamp(0.0, 1.0);
+             // The contributing animations in node order, in one scratch per worker thread.
+             thread_local! {
+                 static ACTIVE: std::cell::RefCell<Vec<Active>> =
+@@ -268,6 +292,7 @@ fn evaluate_rig_poses(
+                     active.push(Active {
+                         node: node.index(),
+                         extra: from_extra,
++                        ramped: ramped.contains(&node.index()),
+                         clip: pn.clip as usize,
+                         mask: pn.mask,
+                         weight: anim.weight(),
+@@ -275,7 +300,8 @@ fn evaluate_rig_poses(
+                         cursor: 0,
+                     });
+                 }
+-                active.sort_unstable_by_key(|a| a.node);
++                // A ramped node folds over the rest (with none, exactly Bevy's order).
++                active.sort_unstable_by_key(|a| (a.ramped, a.node));
+                 // Which properties a clip writes this frame (`written`), and of those, which another
+                 // model's clip had a hand in (`ext`), for the borrowed bones' return to rest.
+                 thread_local! {
+@@ -334,7 +360,7 @@ fn evaluate_rig_poses(
+                     }
+                     many => {
+                         rig.pose_dirty = true;
+-                        blend_rig(src, extra, many, &mut rig, track.then_some((&mut *written, &mut *ext)), smooth);
++                        blend_rig(src, extra, many, &mut rig, track.then_some((&mut *written, &mut *ext)), smooth, ramp_floor);
+                     }
+                 }
+                 if track_borrowed {
+@@ -409,6 +435,7 @@ fn blend_rig(
+     rig: &mut RigPose,
+     mut marks: Option<(&mut Vec<u8>, &mut Vec<u8>)>,
+     smooth: bool,
++    ramp_floor: f32,
+ ) {
+     // Every clip here was found when gathered; one gone since poses nothing rather than panicking.
+     let clip = |a: &Active| clip_in(src, extra, a.extra, a.clip).unwrap_or(&NO_CLIP);
+@@ -436,7 +463,14 @@ fn blend_rig(
+                 from_extra |= if t.is_some() { BORROWED_T } else { 0 } | if r.is_some() { BORROWED_R } else { 0 } | if sc.is_some() { BORROWED_S } else { 0 };
+             }
+             fold(&mut translation, t, a.weight);
+-            fold(&mut rotation, r, a.weight);
++            if a.ramped {
++                // Its turn shared out up the spine; where it moves or sizes a bone, whole (a
++                // spine's offsets ramped would shorten it).
++                let rank = src.spine_rank.get(bone as usize).copied().unwrap_or(1.0);
++                fold_ramped(&mut rotation, r, a.weight, ramp_floor + (1.0 - ramp_floor) * rank);
++            } else {
++                fold(&mut rotation, r, a.weight);
++            }
+             fold(&mut scale, sc, a.weight);
+         }
+         if translation.is_none() && rotation.is_none() && scale.is_none() {
+@@ -513,6 +547,21 @@ fn fold<T: Animatable>(register: &mut Option<(T, f32)>, sample: Option<T>, weigh
+     });
+ }
+ 
++/// Basin Battle: [`fold`] for a ramped rotation, which takes only `share` of the step toward its
++/// sample (all of it at 1, exactly [`fold`]); a first contribution still lands whole, as nothing is
++/// under it to share with.
++#[inline]
++fn fold_ramped(register: &mut Option<(Quat, f32)>, sample: Option<Quat>, weight: f32, share: f32) {
++    let Some(v) = sample else { return };
++    *register = Some(match register.take() {
++        None => (v, weight),
++        Some((acc, total)) => {
++            let total = total + weight;
++            (Quat::interpolate(&acc, &v, share * weight / total), total)
++        }
++    });
++}
++
+ /// The pose evaluator's own set, so a writer of the players' clocks and weights (an add-on's action
+ /// layer) can run after the advance and before the poses are taken.
+ #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+@@ -1030,6 +1079,151 @@ mod tests {
+         assert_twins_equal(&mut app, &oj, ours);
+     }
+ 
++    /// A clip holding each listed bone's turn (and bone 1's place) still.
++    fn still(bones: &[(u16, Quat)], at: Vec3) -> ClipSpec {
++        ClipSpec {
++            bones: bones
++                .iter()
++                .map(|&(b, q)| {
++                    (
++                        b,
++                        BoneSpec {
++                            t: if b == 1 { vec![(0.0, at), (1.0, at)] } else { vec![] },
++                            r: vec![(0.0, q), (1.0, q)],
++                            s: vec![],
++                        },
++                    )
++                })
++                .collect(),
++            mask: 0,
++        }
++    }
++
++    fn set_ramp(app: &mut App, rig: Entity, nodes: &[AnimationNodeIndex], floor: f32) {
++        let mut e = app.world_mut().entity_mut(rig);
++        let mut pose = e.get_mut::<RigPose>().unwrap();
++        pose.ramped = nodes.iter().map(|n| n.index()).collect();
++        pose.ramp_floor = floor;
++    }
++
++    fn rot(app: &App, rig: Entity, bone: usize) -> Quat {
++        app.world().entity(rig).get::<RigPose>().unwrap().locals[bone].rotation
++    }
++
++    /// Two turns the same, either sign (component-wise: `angle_between`'s `acos` is too coarse in
++    /// f32 for turns this close).
++    fn same_turn(q: Quat, want: Quat) -> bool {
++        let d = if q.dot(want) < 0.0 { q + want } else { q - want };
++        d.length() < 1e-4
++    }
++
++    /// Basin Battle's walk-while-swinging: a swing on the upper body over the walk's gait. Bone 0
++    /// (the legs, outside the upper body) keeps the gait; SpineLow (bone 1) takes the floor's
++    /// share of the swing's turn and the chest (bone 2) all of it, at the swing's blend; bone 1's
++    /// place takes the plain blend, not the ramp. The list is taken each frame.
++    #[test]
++    fn a_ramped_swing_shares_its_turn_up_the_spine_over_the_gait() {
++        let mut app = app();
++        let (a, b) = (Quat::from_rotation_y(0.2), Quat::from_rotation_x(1.1));
++        let (ta, tb) = (Vec3::X, Vec3::Y);
++        let gait = still(&[(0, a), (1, a), (2, a)], ta);
++        let mut swing = still(&[(0, b), (1, b), (2, b)], tb);
++        swing.mask = 1 << 2;
++        let (graph, nodes, mut pose) = build(&mut app, &[gait, swing], vec![1 << 2, 1 << 5, 1 << 5]);
++        pose.spine_rank = vec![0.0, 0.0, 1.0];
++        let (_, _, ours) = twin_rigs(&mut app, 3, &graph, &pose);
++        app.update(); // warm-up: see single_clip_matches_animate_targets
++        drive(&mut app, &[ours], |p, _| {
++            p.play(nodes[0]).repeat();
++            p.play(nodes[1]).repeat().set_weight(999.0);
++        });
++        set_ramp(&mut app, ours, &[nodes[1]], 0.5);
++        step(&mut app, 0.02);
++        let w = 999.0 / 1000.0;
++        assert!(same_turn(rot(&app, ours, 0), a), "the legs keep the gait");
++        let spine_low = Quat::interpolate(&a, &b, 0.5 * w);
++        assert!(same_turn(rot(&app, ours, 1), spine_low), "SpineLow takes half");
++        let chest = Quat::interpolate(&a, &b, w);
++        assert!(same_turn(rot(&app, ours, 2), chest), "the chest takes it whole");
++        let t1 = app.world().entity(ours).get::<RigPose>().unwrap().locals[1].translation;
++        assert!(t1.distance(ta.lerp(tb, w)) < 1e-4, "a place takes the plain blend: {t1}");
++        assert!(
++            app.world().entity(ours).get::<RigPose>().unwrap().ramped.is_empty(),
++            "taken each frame"
++        );
++        // Not named again: the plain blend, the chest and SpineLow alike.
++        step(&mut app, 0.02);
++        assert!(same_turn(rot(&app, ours, 1), chest), "no stale ramp");
++    }
++
++    /// A ramped node folds over the gait even when its node index comes first, and a model with
++    /// no SpineLow split ignores the list (exactly Bevy's blend).
++    #[test]
++    fn a_ramped_node_folds_last_and_a_model_with_no_spine_split_ignores_it() {
++        let mut app = app();
++        let (a, b) = (Quat::from_rotation_z(-0.4), Quat::from_rotation_x(0.9));
++        let mut swing = still(&[(1, b), (2, b)], Vec3::Y);
++        swing.mask = 1 << 2;
++        let gait = still(&[(1, a), (2, a)], Vec3::X);
++        let (graph, nodes, mut pose) = build(&mut app, &[swing, gait], vec![1 << 2, 1 << 5, 1 << 5]);
++        let plain = pose.clone();
++        pose.spine_rank = vec![0.0, 0.0, 1.0];
++        let (oracle, oj, ours) = twin_rigs(&mut app, 3, &graph, &pose);
++        let (_, _, beast) = twin_rigs(&mut app, 3, &graph, &plain);
++        app.update(); // warm-up: see single_clip_matches_animate_targets
++        drive(&mut app, &[oracle, ours, beast], |p, _| {
++            p.play(nodes[1]).repeat();
++            p.play(nodes[0]).repeat().set_weight(999.0);
++        });
++        set_ramp(&mut app, ours, &[nodes[0]], 0.5);
++        set_ramp(&mut app, beast, &[nodes[0]], 0.5);
++        step(&mut app, 0.02);
++        let w = 999.0 / 1000.0;
++        assert!(same_turn(rot(&app, ours, 1), Quat::interpolate(&a, &b, 0.5 * w)));
++        assert!(same_turn(rot(&app, ours, 2), Quat::interpolate(&a, &b, w)));
++        assert_twins_equal(&mut app, &oj, beast);
++    }
++
++    /// A model with the SpineLow split and nothing ramped poses exactly as Bevy does.
++    #[test]
++    fn a_spine_split_with_nothing_ramped_matches_animate_targets() {
++        let mut app = app();
++        let gait = ClipSpec {
++            bones: vec![(
++                1,
++                BoneSpec {
++                    t: vec![(0.0, Vec3::ZERO), (0.5, Vec3::Z)],
++                    r: vec![(0.0, Quat::IDENTITY), (0.5, Quat::from_rotation_z(0.7))],
++                    s: vec![],
++                },
++            )],
++            mask: 0,
++        };
++        let swing = ClipSpec {
++            bones: vec![(
++                1,
++                BoneSpec {
++                    t: vec![],
++                    r: vec![(0.0, Quat::from_rotation_x(1.2)), (0.4, Quat::from_rotation_x(0.2))],
++                    s: vec![],
++                },
++            )],
++            mask: 1 << 2,
++        };
++        let (graph, nodes, mut pose) = build(&mut app, &[gait, swing], vec![1 << 2, 1 << 5]);
++        pose.spine_rank = vec![0.0, 0.0];
++        let (oracle, oj, ours) = twin_rigs(&mut app, 2, &graph, &pose);
++        app.update(); // warm-up: see single_clip_matches_animate_targets
++        drive(&mut app, &[oracle, ours], |p, _| {
++            p.play(nodes[0]).repeat();
++            p.play(nodes[1]).repeat().set_weight(5.0);
++        });
++        for _ in 0..4 {
++            step(&mut app, 0.06);
++            assert_twins_equal(&mut app, &oj, ours);
++        }
++    }
++
+     /// Basin Battle: a bone another model's clip turned, that the unit's own clips leave unkeyed,
+     /// goes back to rest once that clip is done; one the own clips write keeps their value.
+     #[test]
+-- 
+2.43.0
+

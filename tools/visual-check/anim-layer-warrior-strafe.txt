@@ -1,0 +1,82 @@
+# The legs walk under a swing (client 0079, `animLayer`): the human warrior strafing left at a
+# swing's pace (3 yd/s, what the server slows a swinging hero to, so the legs Walk) through a light
+# chain of three, seen from the side: the layer on, then off (`animLayer 0`, today's slide), then on
+# again strafing right, then one swing standing still. Brackwell's pumpkin patch at 10:00, the
+# interface hidden. Movement is ActionDash (a script can't press the movement keys); each swing's
+# lunge is a dash of its own that replaces ours for 0.18 s, so the dash is given again half a second
+# after each press. Look for, layer on: the legs keep their sidestep turn (hips toward the slide)
+# and keep stepping, while the shoulders, the arms and the swing stay square to the way the hero
+# faces, the spine taking the whole turn; no frame where both feet stand planted while the body
+# glides; the stride unbroken from one swing to the next (no stop, no restart at the first frame of
+# a swing); the arms and torso playing the whole swing; no kink or pop at the waist (the swing's
+# turn spread up the spine); the lunge's short step forward not flicking the legs into a forward run
+# and back. Layer off: today's look, the legs frozen in the swing's stance for most of each swing
+# while the body slides. Standing still: the whole-body swing, as today, in both.
+# (From the side camera the legs are seen front-on while the hips turn to the slide; `cam 0 -6 8` in
+# the watcher's scenarios folder shows the stride across the frame if it's hard to read.)
+hero warrior
+cam 90 -6 8
+include _look_setup
+1.0 .es goto brackwell
+3.95 lua ConsoleExec("worldclock 600")
+4.0 lua ClearWorldFog()
+4.05 lua UIParent:Hide()
+4.1 lua SetCVar("animLayer", "1")
+4.5 video
+# Layer on, strafing left.
+5.00 lua ActionDash(2.0, 3, "l")
+5.50 shots on-strafe 30 0.08
+5.60 .es in a
+5.65 .es in au
+6.10 lua ActionDash(2.0, 3, "l")
+6.50 .es in a
+6.55 .es in au
+7.00 lua ActionDash(2.0, 3, "l")
+7.40 .es in a
+7.45 .es in au
+7.90 lua ActionDash(1.0, 3, "l")
+# Back to the start, the layer off: today's look.
+9.5 .es goto brackwell
+11.4 .es heal
+11.5 lua SetCVar("animLayer", "0")
+# Layer off, strafing left.
+12.00 lua ActionDash(2.0, 3, "l")
+12.50 shots off-strafe 30 0.08
+12.60 .es in a
+12.65 .es in au
+13.10 lua ActionDash(2.0, 3, "l")
+13.50 .es in a
+13.55 .es in au
+14.00 lua ActionDash(2.0, 3, "l")
+14.40 .es in a
+14.45 .es in au
+14.90 lua ActionDash(1.0, 3, "l")
+# Back to the start, the layer on again.
+16.5 .es goto brackwell
+18.4 .es heal
+18.5 lua SetCVar("animLayer", "1")
+# Layer on, strafing right.
+19.00 lua ActionDash(2.0, 3, "r")
+19.50 shots on-strafe-2 30 0.08
+19.60 .es in a
+19.65 .es in au
+20.10 lua ActionDash(2.0, 3, "r")
+20.50 .es in a
+20.55 .es in au
+21.00 lua ActionDash(2.0, 3, "r")
+21.40 .es in a
+21.45 .es in au
+21.90 lua ActionDash(1.0, 3, "r")
+# Standing still, the layer on: the whole-body swing as today.
+23.5 .es goto brackwell
+25.4 .es heal
+25.6 shots on-standing 12 0.08
+25.7 .es in a
+25.75 .es in au
+# Standing still, the layer off: the same.
+27.0 lua SetCVar("animLayer", "0")
+27.5 shots off-standing 12 0.08
+27.6 .es in a
+27.65 .es in au
+29.0 lua SetCVar("animLayer", "1")
+30 end
