@@ -1,0 +1,45 @@
+# The sharpen on bark (client 0084, #273's fifth round): the woods on Crystal Lake's north bank at
+# noon. Take 280's nearest trunk was about 15 yd off: here the hero first walks 12 yd toward the
+# north bank's oaks (yaw 45; two 2 s walks, stopping at a trunk if he meets one), and the camera,
+# 3 yd behind him and pitched 12 up, looks over his head at the bark a few yards on. looksharpen
+# 0, the default (worldSharpen 0.4) and 1, then 1.12's look; then the sidestep (2 s to the left at
+# 1.5 yd a second) filmed in stills every 0.2 s from its start, at looksharpen 0 and the default.
+# Crop 1:1 the nearest trunk's bark and a patch of the crowns. The goto and the walk end where the
+# hero stands; say how far the nearest trunk is.
+# Look for: the bark's ridges and the leaves' edges crisper, no halos round a trunk against the
+# bright sky, the crowns no more sparkly or crawling while moving than at 0.
+hero warrior
+cam 45 12 3
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSharpen", "0.4")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookwind 0")
+4.5 lua ActionDash(2, 3, "f")
+6.6 lua ActionDash(2, 3, "f")
+9.5 lua ConsoleExec("looksharpen 0")
+10.5 shots bark-sharpen-0 2 0.5
+12.0 lua ConsoleExec("looksharpen grade")
+13.0 shots bark-default 2 0.5
+14.5 lua ConsoleExec("looksharpen 1")
+15.5 shots bark-sharpen-1 2 0.5
+17.0 lua ConsoleExec("looksharpen grade")
+17.05 lua SetCVar("worldLook", "0")
+17.1 lua ClearWorldFog()
+18.5 shots bark-classic 2 0.5
+20.0 lua SetCVar("worldLook", "1")
+20.05 lua ClearWorldFog()
+20.1 lua ConsoleExec("looksharpen 0")
+21.0 video
+21.5 lua ActionDash(2, 1.5, "l")
+21.5 shots sidestep-sharpen-0 10 0.2
+24.5 lua ConsoleExec("looksharpen grade")
+25.0 lua ActionDash(2, 1.5, "r")
+25.0 shots sidestep-default 10 0.2
+28.0 lua ConsoleExec("lookwind grade")
+28.05 lua ConsoleExec("lookweather server")
+30 end

@@ -1,0 +1,36 @@
+# Lamps in the mist (client 0084, #273's fifth round): Goldshire at 23:30, the camera on the road
+# 10 yd behind the hero facing the lamps (yaw 150, pitched 12 down), as take 280: lookmist 3 with
+# worldFog 1, then worldFog 0, lookfog 2, worldLook 0. Take 280's cart lantern glowed in the mist
+# and the street lamp did not: a light's glow went by its strength between 0.3 and 1.5, and a
+# whitish lamp (about 0.6) took a fifth of it while the lantern (about 2.9) took all. The band is
+# 0.15 to 0.8 now. `looklights` lists the nearest lights with their places.
+# Look for: every lamp in frame with a soft warm glow over a few yards in mist-3, none a white
+# wash; the hero solid against it; the frame brighter than worldfog-0 round the lamps.
+hero warrior
+cam 150 -12 10
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookfog grade")
+4.35 lua ConsoleExec("lookmist 3")
+4.4 lua ConsoleExec("looklights tuned")
+6.0 shots mist-3 3 0.5
+8.0 lua SetCVar("worldFog", "0")
+9.0 shots worldfog-0 2 0.5
+10.5 lua SetCVar("worldFog", "1")
+10.55 lua ConsoleExec("lookfog 2")
+11.5 shots lookfog-2 2 0.5
+13.0 lua ConsoleExec("lookfog grade")
+13.05 lua SetCVar("worldLook", "0")
+13.1 lua ClearWorldFog()
+14.5 shots classic 2 0.5
+16.0 lua SetCVar("worldLook", "1")
+16.05 lua ClearWorldFog()
+16.1 lua ConsoleExec("lookmist grade")
+16.15 lua ConsoleExec("lookweather server")
+18 end

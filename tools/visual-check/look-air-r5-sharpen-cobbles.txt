@@ -1,0 +1,41 @@
+# The sharpen on cobbles, and the noon highlights (client 0084, #273's fifth round): Goldshire at
+# noon, the camera close over the cobbles (yaw 0, pitched 25 down, 4 yd), as take 280:
+# looksharpen 0, the default and 1, then 1.12's look; then the sidestep (2 s at 1.5 yd a second)
+# in stills every 0.2 s from its start, at 0 and the default. Take 280 found the noon cobbles
+# blown out under the new look (11.7% of the frame over 230 against 3.0% under 1.12's): the noon
+# grade's contrast, the bloom and the sharpen each lift a bright stone texel past white, where it
+# clipped flat. The look pass now ends on a soft shoulder over its highlights.
+# Look for: the share of the frame over 230 in the default still against the classic one (it
+# should be near it), the bright stones keeping their texture; edge energy at 0, 0.4 and 1 as
+# take 280 measured it; no halos; the sidestep stills no crawl on the cobbles' edges.
+hero warrior
+cam 0 -25 4
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSharpen", "0.4")
+4.25 lua ConsoleExec("lookweather clear")
+5.5 lua ConsoleExec("looksharpen 0")
+6.5 shots cobbles-sharpen-0 2 0.5
+8.0 lua ConsoleExec("looksharpen grade")
+9.0 shots cobbles-default 2 0.5
+10.5 lua ConsoleExec("looksharpen 1")
+11.5 shots cobbles-sharpen-1 2 0.5
+13.0 lua ConsoleExec("looksharpen grade")
+13.05 lua SetCVar("worldLook", "0")
+13.1 lua ClearWorldFog()
+14.5 shots cobbles-classic 2 0.5
+16.0 lua SetCVar("worldLook", "1")
+16.05 lua ClearWorldFog()
+16.1 lua ConsoleExec("looksharpen 0")
+17.0 video
+17.5 lua ActionDash(2, 1.5, "l")
+17.5 shots sidestep-sharpen-0 10 0.2
+20.5 lua ConsoleExec("looksharpen grade")
+21.0 lua ActionDash(2, 1.5, "r")
+21.0 shots sidestep-default 10 0.2
+24.0 lua ConsoleExec("lookweather server")
+26 end

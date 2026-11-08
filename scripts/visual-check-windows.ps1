@@ -586,6 +586,12 @@ function Invoke-Scenario($s, $name, $out) {
     $log = Join-Path $out "client.log"
     $vars = @{ WOW_CHAR = $hero; WOW_PROBE_LUA = $lua; WOW_PROBE_LUA_AT = "1" }
     if ($cam -ne "off") { $vars.WOW_PROBE_CAM = $cam }
+    # A cost run (a step that turns fpsJournal on) has the client write its frame-time journal
+    # straight into the run's folder: take 280 found it in the client's own folder, out of reach.
+    # It then covers the whole run; the stills' times tell the steps apart.
+    if (@($sc.Steps | Where-Object { $_.Kind -eq "lua" -and $_.Text -match 'fpsJournal' }).Count -gt 0) {
+        $vars.WOW_FPS_JOURNAL = Join-Path $out "fps-journal.csv"
+    }
     $quit = Invoke-Client $s $vars $timeout $chome $log $v
     $shots = Save-Shots $s (Join-Path $chome "Screenshots") $out $log ($null -ne $v)
     $runLog = @()
@@ -595,10 +601,10 @@ function Invoke-Scenario($s, $name, $out) {
     if ($v) { $videoNote = $v.Status }
     $runLog += $videoNote
     Set-Content (Join-Path $out "run.txt") $runLog
-    # The client's frame-time journal (SetCVar("fpsJournal", "1") in a scenario) is written into the
-    # run's own client home, which goes next: keep it beside the stills for a cost measurement.
+    # A journal written into the run's own client home instead (an older client, with no
+    # WOW_FPS_JOURNAL), which goes next: keep it beside the stills, unless one is already there.
     foreach ($journal in @((Join-Path $chome "Diagnostics\fps-journal.csv"), (Join-Path $chome "benilla-config\Diagnostics\fps-journal.csv"))) {
-        if (Test-Path $journal) { Copy-Item $journal (Join-Path $out "fps-journal.csv") -ErrorAction SilentlyContinue }
+        if ((Test-Path $journal) -and -not (Test-Path (Join-Path $out "fps-journal.csv"))) { Copy-Item $journal (Join-Path $out "fps-journal.csv") -ErrorAction SilentlyContinue }
     }
     Remove-Item -Recurse -Force $chome -ErrorAction SilentlyContinue
     $done = (Test-Path $log) -and (Select-String -Path $log -Pattern 'visual-check: done' -Quiet)
