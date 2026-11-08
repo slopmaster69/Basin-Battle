@@ -1,0 +1,35 @@
+# Sun shadows (client 0080, #269's fifth round): the Brackwell pumpkin patch at 10:00, the hero
+# at WoW (-9803, -904), 5 yd clear of every Defias pack's reach (take 280's west spot, -9810 -888,
+# stood 6 yd inside a thug pack's), facing west (yaw 100) toward the big jack-o'-lantern at about
+# (-9805, -892), 12 yd ahead, the camera 6 yd behind him pitched 30 down. The sun stands north-west
+# about 57 degrees up, so the shadows fall short toward the south-east. High, lookshadow map 1,
+# low, worldShadows 0. The pumpkin nodes are placed at random each world; any in frame count too.
+# PLEASE run the client with WOW_SHADOW_STATS=1 and send client.log: each "[shadows near]" line
+# now names the mesh's model path and id even when its material is not loaded yet, and a mesh
+# the camera has not looked at yet casts (its verdict ends "not yet seen").
+# Look for: the jack-o'-lantern's own shadow on the soil beside it on high, against
+# worldShadows 0 (crop 1:1 round it and round the hero's feet); the hero's crisp shadow as before;
+# no Defias coming at him. The goto line answers with where the hero stands.
+hero warrior
+cam 100 -30 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 600")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookshadow grade")
+4.35 lua ConsoleExec("lookshadow map off")
+6.0 shots lantern-high 2 0.5
+7.2 lua ConsoleExec("lookshadow map 1")
+8.0 shots lantern-map1 1 0.5
+8.6 lua ConsoleExec("lookshadow map off")
+8.65 lua SetCVar("worldShadows", "1")
+9.5 shots lantern-low 1 0.5
+10.1 lua SetCVar("worldShadows", "0")
+11.0 shots lantern-worldshadows-0 1 0.5
+11.6 lua SetCVar("worldShadows", "2")
+11.65 lua ConsoleExec("lookweather server")
+13 end
