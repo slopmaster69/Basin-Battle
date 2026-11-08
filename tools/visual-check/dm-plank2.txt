@@ -1,0 +1,24 @@
+# The plank bridge to Smite's island starts BELOW the hull edge: a hero walking north-west off
+# (-30, -812, 39.4) landed on it at (-32.2, -804.2, 31.6) (take 159). The deck it leaves is the
+# 31-32 level west of it. Here: set down on that deck at (-38, -799, 31.9) heading 320 degrees
+# (toward the plank's top at about (-32, -804)), a slow walk onto the plank with the movement
+# trace on, `.es where` after; then from just short of the top at (-34, -802.5, 31.6).
+hero warrior
+cam 320 -30 10
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -38 -799 31.9
+17 .es where
+18 shots deck 1 1
+19 lua ActionDash(2, 4, "f")
+19.2 shots walk 10 0.4
+24 .es where
+25 .es goto -34 -802.5 31.6
+27 .es where
+28 shots top 1 1
+29 lua ActionDash(2, 2.5, "f")
+29.2 shots walk2 10 0.4
+34 .es where
+37 end
