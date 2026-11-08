@@ -1,7 +1,7 @@
 # Gilnid: trouble above the furnace
 
-Status: mechanics merged in PR #295 and checked in controlled real-client footage. PR #299
-follows up the visible tells; an unassisted fight and solo-versus-duo validation remain open.
+Status: implemented in PR #295; automated verification passed on November 8, 2026. Real-client
+capture and unassisted fight validation are still required.
 
 Codex owns this encounter, following the independent Codex and Claude design comparison.
 Claude's monster yells and Rhahk'Zor engine are already on main.
@@ -45,21 +45,10 @@ valve regardless of his health. His 2.2 sec opening can be delayed by a stagger;
 then travels through three separated floor points, leaving dry space to either side. The valve
 sequence runs once. Boss death or reset removes workers, props, warning steam and pending throws.
 
-Five native valve-steam props now cover each overflow's width, even with optional floor circles
-disabled. `DeadMineValveSteam02` (display 353) at scale 1.4 uses anchors inside the existing damage
-disk and expires at impact. The encounter's props reuse client patch 0017's immediate,
-noncolliding-object flag: ordinary 2 sec fades had hidden most of the 1.4 sec warning. Damage,
-the three 2.2 yd discharge radii, and the global minimum ground-spell radius are unchanged.
-
-Perched engineers hold native red dynamite (item display 18575), with Heavy Dynamite's ready
-pose, fuse effect and arc (spell 4062), plus the native fire-lighting sound 6155. On landing,
-`MobGear` from PR #298 switches the same body to wrench 1610. Takeoff dust is removed; landing
-dust remains. The support disappears immediately into low native Deadmines lumber (1108),
-with a wooden impact sound. This is a broken-state swap, not a simulated tipping support.
-
-Gilnid faces the valve before using the goblin's native standing interaction (Opening 21651,
-animation 123), with the Deadmines steam whistle (3431). The opening remains 2.2 sec and can be
-staggered; it grants no invulnerability. There is no wheel animation or guaranteed hand contact.
+Small native valve-steam props warn overflow points even with optional floor circles disabled.
+These use `DeadMineValveSteam02` (display 353) at scale 0.8 and expire at impact. The exact steam
+footprint and readability still require client footage; the native Molten Metal impact, support
+silhouette, dynamite arc/fuse and continuous falling motion have the same visual acceptance.
 
 The Windows GNU timezone compatibility shim now lives once in the server library so examples,
 the executable and integration tests link it consistently. The standalone protocol bot, which
@@ -83,37 +72,6 @@ The `gilnid-perches` and `gilnid-perch-shot` recording scenarios parse successfu
 optional floor markers and explicitly describe controlled demonstration footage. They use debug
 healing and selected debug kills; neither is evidence of an unassisted full-fight clear.
 
-Controlled recordings on `8dc26de` with client `skyB` showed real projectile contact dropping a
-worker while Gilnid stayed at full health, both automatic descents, grounded melee, the valve
-trigger and cleanup. They also exposed tiny warning steam, weak dynamite preparation and dust
-obscuring the fall. These recordings are video-only and cannot prove sound audibility.
-
-PR #299 adds checks for bounded steam placement and the safe dry side, low debris and dust only
-at landing, the gear handoff, and valve facing/gesture cancellation. `gilnid-tells-fuse` and
-`gilnid-tells-valve` are short controlled presentation scenarios; ambient foes are cleared and
-worker kills are scripted for the valve check. Both explicitly hide optional floor markers.
-
-On the final combined source, all 14 focused Gilnid tests passed. The workspace release suite
-passed 1,084 tests with 19 ignored (915 survival tests passed). One initial full run missed the
-timing-sensitive client parry check; its isolated rerun passed, and the subsequent complete
-workspace rerun passed without failures. Merging main `b32e942` changed only Smite's documentation;
-the tested encounter source was unchanged. Native floor queries also confirmed the dry exit
-from (-205, -595) to (-205, -591.4) at floor 21; unsafe outer steam anchors are omitted.
-
-Still unverified: the revised tells in the client, an unassisted clear, and solo-versus-duo
-balance. Supports do not rock or tip, and valve hand contact is not established. Keep
-`needs playtest` until the remaining acceptance is recorded.
-
-## Presentation follow-up claim
-
-Codex is following up the recorded PR #295 encounter in `codex/gilnid-tells`. The direct-hit
-fall and finite-workforce mechanics are already verified. This branch improves the bounded
-native discharge warning with a visible dry route, dynamite preparation, unobscured descent,
-and valve-facing/action feedback. It preserves damage, projectile scheduling, safe-floor
-projection and all other encounters. Native support sway and precise hand-to-valve contact may
-remain limited by the existing client; any remaining limitations will be stated explicitly.
-
-The current controlled footage confirms that the small steam outlets do not explain the
-hazard footprint, the fuse is weak, and takeoff dust masks the body. The claim was published as
-draft PR #299 before source changes began. Targeted real-client checks will name the exact
-commit and retain the older evidence; silent recordings will not be presented as audio proof.
+Not tested yet: the authored Foundry geometry and visuals in the real client, a full unassisted
+fight with markers disabled, or solo-versus-duo balance. Cargo supports are static rather than
+animated to sway. Keep `needs playtest` until these acceptance checks are recorded.
