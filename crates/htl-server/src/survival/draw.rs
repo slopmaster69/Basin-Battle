@@ -292,7 +292,7 @@ impl SurvivalGame {
         // the flag is also its "never fade" (Corey's review: the trap should appear instantly).
         match v.kind {
             ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
-            ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) || self.sim.is_perch_prop(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             _ => (kind, flags),
         }
     }
