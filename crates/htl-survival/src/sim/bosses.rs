@@ -140,6 +140,12 @@ impl Survival {
             self.bosses.runs.remove(&id);
             return false;
         };
+        // Its fight lost on the way (every hero down or gone): the run ends, and it heads home
+        // to be whole again where its fight began.
+        if matches!(m.state, MobState::Return | MobState::Idle { .. }) {
+            self.bosses.runs.remove(&id);
+            return false;
+        }
         let now = self.clock;
         let def = m.def;
         let Some(e) = self.content.mobs[def].phases.get(run.phase).cloned() else {

@@ -2093,3 +2093,31 @@ fn a_bosss_debris_comes_down_over_its_points_after_the_dust() {
     let rocks: Vec<_> = s.missiles.iter().filter(|m| m.owner == boss && m.heavy && m.radius >= 3.0).collect();
     assert_eq!(rocks.len(), 2, "and the rocks to come");
 }
+
+/// A boss whose heroes all fall while it's on its run gives the run up and goes home whole.
+#[test]
+fn a_bosss_run_ends_when_its_fight_is_lost_on_the_way_and_it_goes_home_whole() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].phases = vec![EnrageDef { at: 0.6, speed: 1.0, might: 1.0, run_to: vec![[160.0, 0.0, 0.0], [160.0, 60.0, 0.0]], ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 2);
+    run(&mut s, 2.0);
+    assert!(s.boss_running(boss));
+    let hp = s.players[&id].health;
+    s.hurt_player_by(id, hp + 10_000, boss, "a blow");
+    run(&mut s, 40.0);
+    assert!(!s.boss_running(boss), "the run given up");
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, start) < 4.0, "home again: {:?}", m.pos);
+    assert_eq!(m.health, m.max_health, "whole");
+}
