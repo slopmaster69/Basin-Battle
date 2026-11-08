@@ -308,6 +308,11 @@ impl Survival {
         most
     }
 
+    /// Whether a boss's collapse is still coming down: it chases its heroes however far they run.
+    pub(crate) fn boss_unleashed(&self, id: Id) -> bool {
+        self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id && !c.done)
+    }
+
     /// The collapse's front, as far along its route as it has come (for tests and the log).
     pub(crate) fn collapse_front(&self) -> Option<(f32, bool)> {
         self.bosses.collapse.as_ref().map(|c| (c.front, c.done))

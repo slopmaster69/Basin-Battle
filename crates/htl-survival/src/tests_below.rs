@@ -2235,3 +2235,29 @@ fn another_way_out_ends_the_run_once_the_exit_boss_is_down() {
     let ev = run(&mut s, 0.5);
     assert!(ev.iter().any(|e| matches!(e, Event::Travel { player, to: None } if *player == id)), "out by the other way");
 }
+
+/// A boss whose collapse is coming down chases a hero who has run far ahead, past its leash, and
+/// keeps the fight (the collapse with it).
+#[test]
+fn a_boss_with_its_collapse_coming_down_chases_a_hero_far_ahead_and_keeps_the_fight() {
+    use crate::content::{CollapseDef, EnrageDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 2.0, lead: 10.0, crush: 0.2, hold: 0.25, end_text: String::new(), held_text: String::new() }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [105.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    // The hero runs far down the route, well past the boss's leash.
+    s.move_player(id, [200.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 6.0);
+    assert!(s.collapse_front().is_some_and(|f| !f.1), "the collapse still coming down");
+    assert!(matches!(s.mobs[&boss].state.foe(), Some(mobs::Foe::Hero(h)) if h == id), "still after the hero");
+    assert!(s.mobs[&boss].pos[0] > 120.0, "and coming on down the route: {:?}", s.mobs[&boss].pos);
+}

@@ -2033,7 +2033,8 @@ impl Survival {
                     self.set_back(id, home, "found no way to its foe nor home");
                     return;
                 }
-                if !raider && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
+                // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
+                if !raider && (lost || (!self.boss_unleashed(id) && self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def)))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
                     let gone = match foe {
