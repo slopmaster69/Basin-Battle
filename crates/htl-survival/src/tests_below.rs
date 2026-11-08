@@ -510,6 +510,9 @@ fn a_machine_that_falls_lets_its_driver_out_and_comes_back_whole_if_he_wins() {
     assert!(find(&s, "dm_sneed").is_none());
     let back = find(&s, "dm_shredder").expect("the shredder is back");
     assert_eq!(s.mobs[&back].health, s.mobs[&back].max_health);
+    // Return from the lamp for the next pull; an abandoned driver's fight resets immediately.
+    let at = s.mobs[&back].pos;
+    s.move_player(id, [at[0] + 2.5, at[1], at[2]], std::f32::consts::PI, Moving::default());
     // Beaten both ways: gone for good.
     s.engage(back, mobs::Foe::Hero(id));
     s.hurt_mob(back, id, 1_000_000);
@@ -960,11 +963,11 @@ fn every_dungeon_is_a_world_of_its_own_with_its_secrets_kept_back() {
                 }
             }
         }
-        // Every boss turns at least once, by health or by an encounter-owned workforce.
+        // Every boss turns at least once, by health, workforce or a second form.
         for p in &d.packs {
             let m = &s.content.mobs[s.content.mob(&p.mob).unwrap()];
             if m.boss {
-                assert!(!m.phases.is_empty() || m.perch_crew.is_some(), "{key}: {} has no encounter stages", m.key);
+                assert!(!m.phases.is_empty() || m.perch_crew.is_some() || !m.then.is_empty(), "{key}: {} has no encounter stages", m.key);
             }
         }
     }
