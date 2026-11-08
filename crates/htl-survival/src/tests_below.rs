@@ -720,6 +720,49 @@ fn a_boss_turns_at_each_of_its_phases_harder_and_quicker_each_time() {
     assert!(seen[2].1.damage > seen[1].1.damage, "harder each turn");
 }
 
+/// A boss's words are yelled from where it stands, never told as a server line: as it turns on a
+/// hero, at a phase, over a hero it fells, and as it falls.
+#[test]
+fn a_bosss_words_are_yelled_by_the_boss_as_it_turns_at_each_phase_over_its_kill_and_as_it_falls() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].aggro_text = "Who goes there?".into();
+    c.mobs[w].slay_text = "One less.".into();
+    c.mobs[w].death_text = "Impossible...".into();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.5, speed: 1.0, pattern: String::new(), text: "Enough!".into(), summon: Vec::new(), might: 1.0, kit: 0, look: 0, sound: 0, shove: 0.0 }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let a = s.join("ayla", "Ayla", None);
+    let b = s.join("bram", "Bram", None);
+    s.move_player(a, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    s.move_player(b, [96.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let yelled = |s: &Survival, line: &str| s.events.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == line));
+    let told = |s: &Survival, line: &str| s.events.iter().any(|e| matches!(e, Event::Announce { text } if text.contains(line)));
+    s.events.clear();
+    s.engage(boss, mobs::Foe::Hero(a));
+    assert!(yelled(&s, "Who goes there?"), "its words as it turns on them");
+    s.events.clear();
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, a, max / 2 + 1);
+    assert!(yelled(&s, "Enough!") && !told(&s, "Enough!"), "a phase's words, yelled, not a server line");
+    s.events.clear();
+    // The boss's blow is the one that fells Bram (what a creature's strike records as it lands).
+    let now = s.clock;
+    let p = s.players.get_mut(&b).unwrap();
+    p.last_hit_by = Some(boss);
+    p.combat_at = now;
+    let hp = p.health;
+    s.hurt_player_by(b, hp + 10_000, boss, "a blow");
+    assert!(yelled(&s, "One less."), "over the hero it felled: {:?}", s.events);
+    s.events.clear();
+    let left = s.mobs[&boss].health;
+    s.hurt_mob(boss, a, left);
+    assert!(yelled(&s, "Impossible..."), "as it falls");
+}
+
 #[test]
 fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_falls() {
     use crate::content::EnrageDef;
@@ -807,7 +850,7 @@ fn a_secret_form_rises_from_a_fallen_boss_only_once_its_secret_is_found() {
     let ev = run(&mut s, 3.0);
     assert!(!s.mobs[&sneed].hidden && s.mobs[&sneed].rise_at.is_none());
     assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == sneed)));
-    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("Not yet!"))));
+    assert!(ev.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == sneed && text == "Not yet!")), "yelled by the form that rose");
     assert!(!matches!(s.mobs[&sneed].state, MobState::Idle { .. }), "straight at its killer");
     s.hurt_mob(sneed, id, 1_000_000);
     s.step(DT);
