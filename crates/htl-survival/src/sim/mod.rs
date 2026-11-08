@@ -14,6 +14,7 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub(crate) mod bosses;
+pub(crate) mod machinery;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -1208,6 +1209,7 @@ pub struct Survival {
     pub(crate) warlord: warlord::Warlord,
     /// Basin Battle's boss beats under way: a boss on its run, burning blows, burning ground.
     pub(crate) bosses: bosses::Bosses,
+    pub(crate) machinery: machinery::Machinery,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1309,6 +1311,7 @@ impl Survival {
             beta: beta::Beta::default(),
             warlord: warlord::Warlord::default(),
             bosses: bosses::Bosses::default(),
+            machinery: machinery::Machinery::default(),
         }
     }
 

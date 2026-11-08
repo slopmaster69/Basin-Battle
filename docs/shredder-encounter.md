@@ -1,19 +1,51 @@
 # Sneed's Shredder: the machine and the coward
 
-Claim before implementation for the agreed Deadmines encounter design.
+The machine uses one complete saw sweep, then a stamp and rake, then a straight grind. Only
+executed strings build pressure. Smoke puffs come twice as often at the second pressure step.
+The grind locks its direction at the first pose, winds up for 1.4 sec, travels 6 yd in 0.9 sec,
+and stalls for 3.5 sec. Its 3 yd lane checks the actual swept path and can hit each hero once.
+Walls stop the grind. A sidestep works without a dodge, parry, interrupt or ranged loadout.
+There are no health-triggered phases or damage multipliers in either form.
 
-The machine cycles through a saw sweep, a stamp and rake, and a committed straight grind.
-Completed strings build steam pressure. The grind spends that pressure and ends in a generous
-stall recovery. No health threshold adds frenzy or a damage multiplier.
+The machine still has 950 base health. Its driver has 340 base health, down from 700. Sneed
+throws the native wrench missile, scrambles back 4 yd where the ground allows, and flurries up
+close. After at least 5 sec on foot, at a safe attack boundary, he returns to the wreck. He has
+6 sec to get there; no path means he abandons the attempt. At the wreck he visibly works for
+4 sec, using the existing Mining cast and repeated sparks. Any positive damage or a stagger
+stops that attempt permanently. No particular class ability is required.
 
-Breaking the machine releases a fragile, mobile Sneed. He throws a wrench, retreats and flurries
-when cornered. Once per encounter he may reach the wreck and visibly repair it for 4 sec.
-Heroes can interrupt or delay that work with ordinary attacks. A completed repair returns the
-machine at a third of its health. Reset, wipe and death clear the wreck and transition exactly once.
+A successful repair consumes the corpse and removes the driver, replacing them with one machine
+at one third of its original maximum health. The driver's remaining health is saved; when the
+machine breaks again, he emerges with that health and no repair left. Only the final driver's
+death awards plunder and gear and clears the pack. A wipe restores one whole machine at its
+original post. A lamp rest and a driver death remove any retained wreck.
 
-Implementation scope: a separate machinery simulation module, minimal shared hooks, the exact
-Shredder and Sneed content sections, focused lifecycle/combat tests and a real-client recording
-scenario. Rhahk'Zor, Gilnid, client patches and other boss content remain their current owners'.
+The implementation is in `sim/machinery.rs`, with small attack and lifecycle hooks. Other boss
+content, shared boss-run behavior, the client patches and the native creature models stay with
+their existing owners. The native Throw Wrench spell 13398 was verified against the rig's client
+data: `Spells\Missile_Wrench.mdx`, speed 20. Smoke and work use existing spell visuals 1856 and
+2575. Native Shredder clips 16 and 130 are retained. Silhouette, exact steam appearance, sound
+separation and work animation still need the real-client visual pass.
 
-Validation pending: release server build, release workspace tests, repository checks and real-client
-showcase footage. Dev-command isolated demonstrations will be labelled as such.
+## Capture checklist
+
+`tools/visual-check/shredder-pressure-repair.txt` is a **dev-command demonstration**, with forced
+health transitions and repeated healing. It does not prove an unassisted full fight. Start with
+an unbeaten Sneed pack. Record the source commit and client build in the capture notes.
+
+- Approach from the Mast Room entry and frame both safe sides of the machine.
+- Show each normal move's preparation, danger and recovery. Sidestep the locked grind and strike
+  during the stall. Keep the full first pressure cycle in one shot.
+- Show driver emergence, a wrench covering his retreat, and a close flurry.
+- Let one repair complete. Show its full 4 sec and the one-third health bar. Break the machine
+  again and verify that the driver retains his damage and never repairs again.
+- On a fresh pull, interrupt the work with a normal light swing, with an empty ability loadout.
+  Show the wreck disappearing and Sneed remaining on foot.
+- On separate fresh pulls, wipe during work and during the grind. Return to the post, then rest
+  at a lamp: one full-health machine, no duplicate Sneed, lingering attack or ghost wreck.
+- Record solo and duo fights, with melee and ranged loadouts, including earned finishes. Record
+  at least one full fight with floor markers turned off in Controls. Record that separately
+  from the scripted demonstration, and report boss length and any unclear native animation.
+
+The script can be parsed without launching a client using
+`scripts/visual-check-windows.ps1 -Check shredder-pressure-repair`.

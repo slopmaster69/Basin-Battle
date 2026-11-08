@@ -964,7 +964,7 @@ fn every_dungeon_is_a_world_of_its_own_with_its_secrets_kept_back() {
         for p in &d.packs {
             let m = &s.content.mobs[s.content.mob(&p.mob).unwrap()];
             if m.boss {
-                assert!(!m.phases.is_empty(), "{key}: {} has no phases", m.key);
+                assert!(!m.phases.is_empty() || !m.then.is_empty(), "{key}: {} has no encounter stages", m.key);
             }
         }
     }
