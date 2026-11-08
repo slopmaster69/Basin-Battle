@@ -695,7 +695,7 @@ fn a_boss_turns_at_each_of_its_phases_harder_and_quicker_each_time() {
     use crate::content::EnrageDef;
     let mut c = content();
     let w = c.mob("warlord").unwrap();
-    let phase = |at: f32, speed: f32, might: f32| EnrageDef { at, speed, pattern: String::new(), text: format!("at {at}"), summon: Vec::new(), might, kit: 0, look: 0, sound: 0, shove: 0.0 };
+    let phase = |at: f32, speed: f32, might: f32| EnrageDef { at, speed, pattern: String::new(), text: format!("at {at}"), summon: Vec::new(), might, kit: 0, look: 0, sound: 0, shove: 0.0, ..Default::default() };
     c.mobs[w].enrage = None;
     c.mobs[w].posture = 0;
     c.mobs[w].phases = vec![phase(0.75, 0.9, 1.1), phase(0.5, 0.8, 1.2), phase(0.25, 0.7, 1.4)];
@@ -720,6 +720,49 @@ fn a_boss_turns_at_each_of_its_phases_harder_and_quicker_each_time() {
     assert!(seen[2].1.damage > seen[1].1.damage, "harder each turn");
 }
 
+/// A boss's words are yelled from where it stands, never told as a server line: as it turns on a
+/// hero, at a phase, over a hero it fells, and as it falls.
+#[test]
+fn a_bosss_words_are_yelled_by_the_boss_as_it_turns_at_each_phase_over_its_kill_and_as_it_falls() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].aggro_text = "Who goes there?".into();
+    c.mobs[w].slay_text = "One less.".into();
+    c.mobs[w].death_text = "Impossible...".into();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.5, speed: 1.0, pattern: String::new(), text: "Enough!".into(), summon: Vec::new(), might: 1.0, kit: 0, look: 0, sound: 0, shove: 0.0, ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let a = s.join("ayla", "Ayla", None);
+    let b = s.join("bram", "Bram", None);
+    s.move_player(a, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    s.move_player(b, [96.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let yelled = |s: &Survival, line: &str| s.events.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == line));
+    let told = |s: &Survival, line: &str| s.events.iter().any(|e| matches!(e, Event::Announce { text } if text.contains(line)));
+    s.events.clear();
+    s.engage(boss, mobs::Foe::Hero(a));
+    assert!(yelled(&s, "Who goes there?"), "its words as it turns on them");
+    s.events.clear();
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, a, max / 2 + 1);
+    assert!(yelled(&s, "Enough!") && !told(&s, "Enough!"), "a phase's words, yelled, not a server line");
+    s.events.clear();
+    // The boss's blow is the one that fells Bram (what a creature's strike records as it lands).
+    let now = s.clock;
+    let p = s.players.get_mut(&b).unwrap();
+    p.last_hit_by = Some(boss);
+    p.combat_at = now;
+    let hp = p.health;
+    s.hurt_player_by(b, hp + 10_000, boss, "a blow");
+    assert!(yelled(&s, "One less."), "over the hero it felled: {:?}", s.events);
+    s.events.clear();
+    let left = s.mobs[&boss].health;
+    s.hurt_mob(boss, a, left);
+    assert!(yelled(&s, "Impossible..."), "as it falls");
+}
+
 #[test]
 fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_falls() {
     use crate::content::EnrageDef;
@@ -728,7 +771,7 @@ fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_fa
     c.mobs[w].enrage = None;
     c.mobs[w].posture = 0;
     let summon = vec!["grunt".to_string(), "grunt".to_string()];
-    c.mobs[w].phases = vec![EnrageDef { at: 0.75, speed: 1.0, pattern: String::new(), text: String::new(), summon, might: 1.0, kit: 0, look: 0, sound: 0, shove: 0.0 }];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.75, speed: 1.0, pattern: String::new(), text: String::new(), summon, might: 1.0, kit: 0, look: 0, sound: 0, shove: 0.0, ..Default::default() }];
     // The boss at its first turn, its two adds called up on the hero.
     let fight = |c: Content| {
         let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
@@ -807,7 +850,7 @@ fn a_secret_form_rises_from_a_fallen_boss_only_once_its_secret_is_found() {
     let ev = run(&mut s, 3.0);
     assert!(!s.mobs[&sneed].hidden && s.mobs[&sneed].rise_at.is_none());
     assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == sneed)));
-    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("Not yet!"))));
+    assert!(ev.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == sneed && text == "Not yet!")), "yelled by the form that rose");
     assert!(!matches!(s.mobs[&sneed].state, MobState::Idle { .. }), "straight at its killer");
     s.hurt_mob(sneed, id, 1_000_000);
     s.step(DT);
@@ -1934,4 +1977,147 @@ fn the_books_record_of_a_dungeon_lists_its_bosses_their_gear_and_the_camps_kills
     // A trophy is the camp's the first time; after, it's in the chest.
     let line = |who: &str| text.lines().find(|l| l.starts_with(&format!("- {who}:"))).unwrap_or("").to_string();
     assert!(line("Mr. Smite").contains("in storage") && line("Cookie").contains("sent to storage the first time"), "{text}");
+}
+
+/// A boss whose phase has a route (`run_to`) breaks off and runs it, heeding nobody and taking up
+/// no other phase on the way; at its end it waits for a hero to come near, yells, and fights there
+/// (its home from then); a fight it then loses puts it back where its fight began, whole.
+#[test]
+fn a_boss_runs_its_route_waits_at_its_end_for_a_hero_and_goes_back_where_it_began_if_its_fight_is_lost() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].phases = vec![
+        EnrageDef { at: 0.6, speed: 1.0, might: 1.0, run_to: vec![[130.0, 0.0, 0.0], [130.0, 30.0, 0.0]], wait_for: 10.0, arrive_text: "Mine now.".into(), ..Default::default() },
+        EnrageDef { at: 0.3, speed: 1.0, might: 1.0, text: "Later.".into(), ..Default::default() },
+    ];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    // Where its fight begins: its home (a pack member stands a little off its pack's spot).
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 2);
+    assert!(s.boss_running(boss), "off on its route at its phase");
+    // Struck past its next phase on the run: that waits.
+    s.hurt_mob(boss, id, max / 4);
+    assert_eq!(s.mobs[&boss].phase, 1, "no second phase while it runs");
+    run(&mut s, 20.0);
+    let at = s.mobs[&boss].pos;
+    assert!(dist2d(at, [130.0, 30.0, 0.0]) < 2.0, "at its route's end: {at:?}");
+    assert!(s.boss_running(boss), "waiting there for a hero, not fighting from afar");
+    // A hero comes: it yells, and fights there.
+    s.move_player(id, [128.0, 26.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 0.3);
+    assert!(!s.boss_running(boss));
+    assert!(ev.iter().any(|e| matches!(e, Event::Yell { id: b, text } if *b == boss && text == "Mine now.")));
+    assert!(dist2d(s.mobs[&boss].home, [130.0, 30.0, 0.0]) < 0.5, "its home from then");
+    // The fight lost: its hero falls. Home, whole, and back where its fight began.
+    let hp = s.players[&id].health;
+    s.hurt_player_by(id, hp + 10_000, boss, "a blow");
+    run(&mut s, 40.0);
+    let m = &s.mobs[&boss];
+    // (Resting at home, it wanders a step or two round it.)
+    assert!(dist2d(m.pos, start) < 4.0 && dist2d(m.home, start) < 0.5, "put back where it began: at {:?}, home {:?}, began {start:?}", m.pos, m.home);
+    assert_eq!((m.phase, m.health), (0, m.max_health), "whole again");
+    assert!(!s.boss_running(boss));
+}
+
+/// A heated boss's heavy blow leaves burning ground that bites a hero standing in it, then burns
+/// out; a blow that lodges holds the boss where it is, open.
+#[test]
+fn a_heated_bosss_heavy_blow_leaves_burning_ground_and_a_lodged_blow_holds_it() {
+    use crate::content::{BurnDef, EnrageDef, PatternDef, SpecialDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].attack.damage = 0;
+    c.mobs[w].special = None;
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, burn: Some(BurnDef { radius: 3.0, damage: 6, secs: 3.0, look: 0 }), ..Default::default() }];
+    let lodged: SpecialDef = toml::from_str("lodge = 2.0").unwrap();
+    c.mobs[w].patterns = vec![PatternDef { name: "slam".into(), weight: 0.0, min_range: 0.0, max_range: 40.0, below: 1.0, steps: vec![lodged] }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [60.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    let pos = s.mobs[&boss].pos;
+    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, true);
+    let fire = s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Fire { .. }) && dist2d(o.pos, [pos[0] + 2.1, pos[1], 0.0]) < 0.5).map(|(f, _)| *f);
+    assert!(fire.is_some(), "burning where the blow landed");
+    // A light blow leaves nothing.
+    let fires = s.objs.values().filter(|o| matches!(o.kind, ObjKind::Fire { .. })).count();
+    s.boss_blow_lands(boss, pos, 1.5, 3.0, 90.0, false);
+    assert_eq!(s.objs.values().filter(|o| matches!(o.kind, ObjKind::Fire { .. })).count(), fires);
+    // A hero standing in it is bitten each second.
+    s.move_player(id, [pos[0] + 2.1, pos[1], 0.0], 0.0, Moving::default());
+    let hp = s.players[&id].health;
+    run(&mut s, 1.1);
+    assert!(s.players[&id].health < hp, "bitten by the burning iron");
+    run(&mut s, 3.0);
+    assert!(!s.objs.contains_key(&fire.unwrap()), "burned out");
+    // The lodged blow: it hauls at its weapon, open.
+    let now = s.clock;
+    s.mobs.get_mut(&boss).unwrap().pattern = Some((0, 0));
+    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, false);
+    assert!(s.mobs[&boss].stagger_until >= now + 1.9, "held, open, as long as the blow says");
+}
+
+/// Debris: dust over each point first, then the rocks, a heavy blow there.
+#[test]
+fn a_bosss_debris_comes_down_over_its_points_after_the_dust() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, debris: vec![[105.0, 5.0, 0.0], [105.0, -5.0, 0.0]], ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [105.0, 5.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    s.engage(boss, mobs::Foe::Hero(id));
+    s.events.clear();
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    let dust = s.events.iter().filter(|e| matches!(e, Event::Missile { spell: 7272, .. })).count();
+    assert_eq!(dust, 2, "dust over each point first");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == id)), "the hero under it is warned");
+    let rocks: Vec<_> = s.missiles.iter().filter(|m| m.owner == boss && m.heavy && m.radius >= 3.0).collect();
+    assert_eq!(rocks.len(), 2, "and the rocks to come");
+}
+
+/// A boss whose heroes all fall while it's on its run gives the run up and goes home whole.
+#[test]
+fn a_bosss_run_ends_when_its_fight_is_lost_on_the_way_and_it_goes_home_whole() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    c.mobs[w].phases = vec![EnrageDef { at: 0.6, speed: 1.0, might: 1.0, run_to: vec![[160.0, 0.0, 0.0], [160.0, 60.0, 0.0]], ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 2);
+    run(&mut s, 2.0);
+    assert!(s.boss_running(boss));
+    let hp = s.players[&id].health;
+    s.hurt_player_by(id, hp + 10_000, boss, "a blow");
+    run(&mut s, 40.0);
+    assert!(!s.boss_running(boss), "the run given up");
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, start) < 4.0, "home again: {:?}", m.pos);
+    assert_eq!(m.health, m.max_health, "whole");
 }

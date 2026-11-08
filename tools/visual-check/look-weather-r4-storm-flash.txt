@@ -1,4 +1,4 @@
-# The storm (client 0071, #271's fourth round): the heroes' camp at 23:30 (no hostile creatures
+# The storm (client 0082, #271's fourth round): the heroes' camp at 23:30 (no hostile creatures
 # spawn there; take 273's storm at Goldshire was broken up by an attacker), a full storm for 90 s
 # with video from the start and a still every second.
 # Look for: each flash rising over two or three frames to a gentler peak (take 273: one frame at

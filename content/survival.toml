@@ -306,6 +306,43 @@ space = 0.3
 space_streak = 0.2
 space_most = 0.8
 space_band = 0.5
+# Each creature its own (Corey, Nov 8: two brawlers and a caster shouldn't be "the exact same fight"
+# every time): as it appears, its pace between strings and its readiness to give ground are each
+# its kind's give or take `quirk`, and one of its strings is its favourite, `favourite` times as
+# likely as its kind's own weight says (one pirate leans on its overhead, the next on its combo).
+quirk = 0.18
+favourite = 2.0
+
+# How a fight of two or more goes: one plan is picked as the fight begins, from those that fit who's
+# in it (not a boss's fight). The fairness rules hold under every plan: one string at a time, a breath
+# after it, no blade with a bolt in the air, nothing at a reeling hero.
+# All in: every fighter up close presses (its pace between strings 0.85 of its own).
+[[plan]]
+key = "all_in"
+weight = 1.0
+min_melee = 1
+# Pincer: one holds the hero's front while another works round to their back and strikes from there.
+[[plan]]
+key = "pincer"
+weight = 1.0
+min_melee = 2
+# Screen: a fighter stands between the hero and the fight's caster or shooter while it waits.
+[[plan]]
+key = "screen"
+weight = 1.0
+min_melee = 1
+ranged = true
+# Bait: one holds back out of reach until its fellow is hurt past half or falls, the hero opens up
+# near it, or 12 seconds pass.
+[[plan]]
+key = "bait"
+weight = 1.0
+min_melee = 2
+# Waves: half the fighters up close hold back the same way (three or more).
+[[plan]]
+key = "waves"
+weight = 0.7
+min_melee = 3
 
 # Each grip's blows. `clip` is the game's own animation (AnimationData id) and `take` which of the
 # model's versions of it; `windup` and `recovery` are shares of the weapon's own times, `damage`
@@ -14168,7 +14205,7 @@ wake = "relic_druid"
 
 [weather]
 # Elwynn's weather above ground, the same for every hero: a fixed function of the server's clock,
-# sent as 1.12's own weather (any client shows its rain; one with the new look, patch 0071, shows
+# sent as 1.12's own weather (any client shows its rain; one with the new look, patch 0082, shows
 # grey skies, lit rain, wet ground and lightning). `.es weather clear|overcast|rain|storm [0-1]`
 # holds one for filming, `.es weather auto` lets go. Not below, nor in Siege.
 on = true

@@ -1,4 +1,4 @@
-# Night rain (client 0071, #271's fourth round): Goldshire at 23:30, the camera on the road
+# Night rain (client 0082, #271's fourth round): Goldshire at 23:30, the camera on the road
 # facing the inn's lit windows (yaw 200, pitched 12 down, 10 yd; the inn should fill the left
 # half: if it is not in frame, say which way it lies), dry then a minute of rain, then
 # worldWeather 0 and 1.12's look. `looklights` runs twice and answers with the look's light table:

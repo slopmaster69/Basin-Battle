@@ -1,0 +1,261 @@
+From b923f21115d6ae3e10fea15f40802abe483805c6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 22:27:19 -0600
+Subject: [PATCH] A striker's weight goes into its blow: tipped forward a
+ moment as the blow lands (patch 0077)
+
+A struck body already leans back along the blow; the striker stood bolt upright through its own
+swing. When an action clip reaches its impact keyframe (where the script is told the blow landed),
+the striker now tips forward over its feet, out fast and settling over 0.35 s, as a struck lean
+does: 0.06 rad for a quick blow, up to 0.1 for a wind-up of 0.6 s or more. It is the existing lean
+tilt, about the same pivot over the feet, along the unit's facing; it doesn't start over a roll or
+a struck lean already turning the body, on a reaction, or on an upper body swinging over running
+legs. `actionWeight` (benilla's own, registered "1") turns it off.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/creature_anim.rs       |  2 +-
+ .../benilla-app/src/creature_anim/action.rs   | 90 ++++++++++++++++++-
+ crates/benilla-app/src/cvars/mod.rs           | 17 ++++
+ crates/benilla-app/src/cvars/table.rs         |  9 ++
+ 4 files changed, 116 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index 968b8606..725be620 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -33,7 +33,7 @@ mod lod;
+ /// and the camera's unit collision, all driven by an add-on.
+ mod action;
+ #[cfg(test)]
+-pub(crate) use action::{on_blend_cvar, on_curves_cvar};
++pub(crate) use action::{on_blend_cvar, on_curves_cvar, on_weight_cvar, ImpactWeight};
+ pub(crate) use action::{lock_point, unit_hit, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 2cdcf06c..425f9827 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -81,6 +81,14 @@ const ROLL_ECHO: f32 = 0.25;
+ /// A struck body's lean: out fast, back slow, over this long; pivoting this high.
+ const LEAN_SECS: f32 = 0.45;
+ const LEAN_PIVOT: f32 = 0.2;
++/// A blow landing in the striker's own clip tips the striker forward over its feet, its weight
++/// going into the blow: this far (radians) for a quick one, up to the heavy share for a wind-up of
++/// [`HEAVY_WINDUP`] seconds or more, settling over [`IMPACT_LEAN_SECS`] as a struck lean does.
++const IMPACT_LEAN: f32 = 0.06;
++const IMPACT_LEAN_HEAVY: f32 = 0.1;
++const QUICK_WINDUP: f32 = 0.2;
++const HEAVY_WINDUP: f32 = 0.6;
++const IMPACT_LEAN_SECS: f32 = 0.35;
+ /// The upper body follows the aim this much, up to this far.
+ const AIM_PITCH_SHARE: f32 = 0.8;
+ const AIM_PITCH_MAX: f32 = 0.7;
+@@ -588,6 +596,24 @@ fn replace_clip(old: &mut ActionClip, clip: ActionClip) {
+     *old = next;
+ }
+ 
++/// How far a striker tips into a blow whose wind-up took `windup` seconds: more the heavier.
++fn impact_lean(windup: f32) -> f32 {
++    let heavy = ((windup - QUICK_WINDUP) / (HEAVY_WINDUP - QUICK_WINDUP)).clamp(0.0, 1.0);
++    IMPACT_LEAN * (1.0 - heavy) + IMPACT_LEAN_HEAVY * heavy
++}
++
++/// `actionWeight` (benilla's own): the striker's weight going into a blow, on or off.
++#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
++pub(crate) struct ImpactWeight {
++    pub(crate) on: bool,
++}
++
++impl Default for ImpactWeight {
++    fn default() -> Self {
++        Self { on: true }
++    }
++}
++
+ /// A fading node's weight `secs` after its fade began from `w0`; `None` once it's done.
+ fn fade_weight(w0: f32, secs: f32) -> Option<f32> {
+     let u = secs / CROSS_FADE;
+@@ -1015,6 +1041,7 @@ pub(super) fn drain_action_calls(
+ pub(super) fn apply_action_clips(
+     mut commands: Commands,
+     time: Res<Time>,
++    weight: Option<Res<ImpactWeight>>,
+     mut units: Query<(
+         Entity,
+         &mut ActionClip,
+@@ -1024,11 +1051,13 @@ pub(super) fn apply_action_clips(
+         Option<&HitStopped>,
+         Option<&crate::net::Guid>,
+         Has<SelfPlayer>,
++        Has<ActionTilt>,
+     )>,
+ ) {
+     let dt = time.delta_secs();
+     let now = time.elapsed_secs();
+-    for (entity, mut clip, mut player, anims, t, stop, guid, mine) in &mut units {
++    let weighty = weight.is_some_and(|w| w.on);
++    for (entity, mut clip, mut player, anims, t, stop, guid, mine, tilted) in &mut units {
+         let clip = &mut *clip;
+         let frozen = stop.is_some_and(|s| now < s.until);
+         if !frozen && dt > 0.0 {
+@@ -1037,6 +1066,34 @@ pub(super) fn apply_action_clips(
+         // The blow lands in the clip: tell the script, which plays its weight.
+         if !clip.told && clip.key > 0.0 && clip.t >= clip.key && !clip.shuffle {
+             clip.told = true;
++            // The striker's own weight goes into it: tipped forward over its feet a moment, on a
++            // whole body (not an upper body swinging over running legs), and not over a roll or a
++            // struck lean already turning it.
++            let forward = t.rotation * Vec3::NEG_Z;
++            let flat = Vec3::new(forward.x, 0.0, forward.z);
++            if weighty
++                && !clip.reaction
++                && !clip.on_upper
++                && !tilted
++                && flat.length_squared() > 1.0e-6
++            {
++                let windup = if clip.windup > 0.0 {
++                    clip.windup
++                } else {
++                    clip.key
++                };
++                commands.entity(entity).try_insert(ActionTilt {
++                    kind: TiltKind::Lean {
++                        amount: impact_lean(windup),
++                    },
++                    asked: now,
++                    start: Some(now),
++                    secs: IMPACT_LEAN_SECS,
++                    from: t.translation,
++                    axis: Some(Vec3::Y.cross(flat.normalize())),
++                    bones: Vec::new(),
++                });
++            }
+             let who = if mine {
+                 "player".to_string()
+             } else {
+@@ -1503,6 +1560,23 @@ pub(crate) fn on_curves_cvar(
+     }
+ }
+ 
++/// `actionWeight` (benilla's own): a striker tipping into its blow, on or off.
++pub(crate) fn on_weight_cvar(
++    ev: On<crate::cvars::CvarChanged>,
++    weight: Option<ResMut<ImpactWeight>>,
++) {
++    if ev.key() != "actionweight" {
++        return;
++    }
++    if let Some(mut weight) = weight {
++        weight.on = ev.flag();
++        info!(
++            "action: a striker's weight into its blow {}",
++            if weight.on { "on" } else { "off" }
++        );
++    }
++}
++
+ /// The inertial blending runs while an add-on drives the action layer, as everything here does.
+ fn blend_while_layer_live(inertia: Option<ResMut<benilla_world::rig_anim::PoseInertia>>) {
+     let Some(mut inertia) = inertia else { return };
+@@ -1703,6 +1777,7 @@ pub(super) fn shuffle_on_lock_turn(
+ pub(super) fn plugin(app: &mut App) {
+     app.init_resource::<LockOn>()
+         .init_resource::<ClipOwnsBody>()
++        .init_resource::<ImpactWeight>()
+         .init_resource::<strike_trail::StrikeTrails>()
+         .init_resource::<donor::Donors>()
+         .add_systems(
+@@ -1734,6 +1809,7 @@ pub(super) fn plugin(app: &mut App) {
+         )
+         .add_observer(on_blend_cvar)
+         .add_observer(on_curves_cvar)
++        .add_observer(on_weight_cvar)
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+             (reset_action_on_world_exit, afterimage::clear_afterimages),
+@@ -1913,6 +1989,18 @@ mod tests {
+         }
+     }
+ 
++    /// A quick jab tips the striker a little, a slow heavy blow more, and never past the heavy
++    /// share however long the wind-up.
++    #[test]
++    fn a_heavier_blow_tips_the_striker_further_into_it() {
++        assert_eq!(impact_lean(0.1), IMPACT_LEAN);
++        assert_eq!(impact_lean(QUICK_WINDUP), IMPACT_LEAN);
++        let mid = impact_lean(0.4);
++        assert!(mid > IMPACT_LEAN && mid < IMPACT_LEAN_HEAVY, "{mid}");
++        assert_eq!(impact_lean(HEAVY_WINDUP), IMPACT_LEAN_HEAVY);
++        assert_eq!(impact_lean(3.0), IMPACT_LEAN_HEAVY);
++    }
++
+     #[test]
+     fn a_creatures_strike_takes_a_readable_share_of_its_wind_up() {
+         // A one-handed clip's impact 0.3 s in, wound up over 0.55 s (a pirate's slash): the
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index cfa8f74e..a89710c9 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1705,6 +1705,19 @@ mod tests {
+         assert!(res::<PoseCurves>(&app).on);
+     }
+ 
++    /// `actionWeight` (benilla's own) turns a striker's tip into its blow off and on, registered
++    /// "1" to match `ImpactWeight`'s default.
++    #[test]
++    fn action_weight_switches_the_tip_into_a_blow() {
++        use crate::creature_anim::ImpactWeight;
++        let mut app = cvar_app();
++        assert!(res::<ImpactWeight>(&app).on, "registered \"1\"");
++        assert_eq!(apply(&mut app, "actionWeight", "0"), SetOutcome::Changed);
++        assert!(!res::<ImpactWeight>(&app).on);
++        apply(&mut app, "actionWeight", "1");
++        assert!(res::<ImpactWeight>(&app).on);
++    }
++
+     /// `worldWind` and `worldSky` (benilla's own) turn the new look's wind and its painted sky off
+     /// and on, each by itself, registered "1" to match `LookWind`'s and `LookSky`'s defaults.
+     #[test]
+@@ -2847,6 +2860,7 @@ mod tests {
+             .init_resource::<benilla_world::ffx_glow::FfxSwitches>()
+             .init_resource::<benilla_world::rig_anim::PoseInertia>()
+             .init_resource::<benilla_world::rig_anim::PoseCurves>()
++            .init_resource::<crate::creature_anim::ImpactWeight>()
+             // `worldLook`'s registered "1", as `VideoPlugin` inserts it.
+             .insert_resource(benilla_world::look::WorldLook::NEW)
+             .init_resource::<benilla_world::look::LookAo>()
+@@ -2897,6 +2911,9 @@ mod tests {
+         |app| {
+             app.add_observer(crate::creature_anim::on_curves_cvar);
+         },
++        |app| {
++            app.add_observer(crate::creature_anim::on_weight_cvar);
++        },
+         |app| {
+             app.add_observer(crate::player::camera::on_cvar);
+         },
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index b4ad53e5..5a485834 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -857,6 +857,15 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — 1.12 plays an animation's keys with straight lines between them; this \
+          draws a smooth curve through them while an add-on drives the action layer",
+     ),
++    // benilla's own: a striker tipping forward into its blow as the blow lands in its own clip (an
++    // add-on's action layer only), "0" for none. The knob is
++    // `creature_anim::action::ImpactWeight::on`, set by `creature_anim::action::on_weight_cvar`.
++    ours(
++        "actionWeight",
++        "1",
++        "benilla's own — 1.12's swings keep the body upright; this tips a striker forward over \
++         its feet as its blow lands, while an add-on drives the action layer",
++    ),
+     // benilla's own: the new look (WoW Forever-style zone light, a longer view, bloom and a
+     // colour grade, god rays and mist), "0" for 1.12's exactly. The knob is
+     // `benilla_world::look::WorldLook`, set by `video::on_cvar`.
+-- 
+2.56.0.windows.4
+

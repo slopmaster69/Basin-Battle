@@ -1,4 +1,4 @@
-From 5271981ab444bfa9acc0748affcae3f7892b732d Mon Sep 17 00:00:00 2001
+From a243ab13610092afa649b8e79b4ed00432de4a2e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 14:39:42 -0700
 Subject: [PATCH] Visible weather under the new look: grey skies, lit rain, wet
@@ -109,10 +109,10 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  create mode 100644 crates/benilla-world/src/look/weather.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index bf8a264..239f408 100644
+index 369dbbd..d12b46d 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -1701,6 +1701,25 @@ mod tests {
+@@ -1756,6 +1756,25 @@ mod tests {
          assert!(res::<LookWind>(&app).on && res::<LookSky>(&app).on);
      }
  
@@ -138,7 +138,7 @@ index bf8a264..239f408 100644
      /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
      #[test]
      fn the_ffx_switches_reach_the_pass() {
-@@ -2823,6 +2842,7 @@ mod tests {
+@@ -2882,6 +2901,7 @@ mod tests {
              .init_resource::<benilla_world::look::LookWater>()
              .init_resource::<benilla_world::look::LookWind>()
              .init_resource::<benilla_world::look::LookSky>()
@@ -147,10 +147,10 @@ index bf8a264..239f408 100644
              .insert_resource(RenderScale(1.0))
              // Literal: `Realmlist::default()` reads `$WOW_HOST`.
 diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
-index 51803fb..9362de6 100644
+index 693f8f7..d8f730a 100644
 --- a/crates/benilla-app/src/cvars/table.rs
 +++ b/crates/benilla-app/src/cvars/table.rs
-@@ -892,6 +892,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+@@ -933,6 +933,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
          "benilla's own — 1.12's sky is a gradient with its own clouds; this turns the new look's \
           painted sky (drifting clouds, the sun's and the moon's halos) off on its own",
      ),

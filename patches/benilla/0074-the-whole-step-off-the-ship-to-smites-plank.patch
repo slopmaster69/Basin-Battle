@@ -1,0 +1,49 @@
+From 9614a3ea6b655242ee6c806ba09aeb126a179162 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 21:21:30 -0600
+Subject: [PATCH] The step off the Juggernaut onto the plank down to Mr. Smite
+ is solid at both ends
+
+Corey (8 Nov): stepping off the ship onto the plank was "only slightly fixed". Patch 0063's slab
+joined only the middle 4 yd of the gun deck's edge and the plank's top; each edge runs about 6 yd,
+so a hero stepping off at the north end (toward the plank's west side) or the south end (toward
+its tip) still dropped into the trough at z 27.7. The added floor is now a strip of six triangles
+between points measured on each edge (the server's map, htl-map `dmprobe`, half-yard grid),
+joining the whole of both. The server's `DEADMINES_BRIDGES` holds the same list.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-world/src/terrain_stream.rs | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
+index 4215eb62..e7a5b715 100644
+--- a/crates/benilla-world/src/terrain_stream.rs
++++ b/crates/benilla-world/src/terrain_stream.rs
+@@ -1213,11 +1213,18 @@ pub(crate) struct MapBridge;
+ /// The Deadmines' added pieces, triangles in WoW coordinates; the server's htl-map
+ /// (`deadmines.rs`, `DEADMINES_BRIDGES`) holds the same list: change both together.
+ /// 1. The gangway off the Juggernaut's gun deck onto the plank down to Mr. Smite's dock: the
+-///    data leaves a 5 yd hole between the deck's sloping edge (z 30) and the plank's top
+-///    (z 31.5), over a trough at z 27.7, which players had to jump.
+-const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 2] = [
+-    [[-33.0, -799.3, 30.2], [-36.5, -802.0, 31.4], [-34.6, -807.0, 30.5]],
+-    [[-33.0, -799.3, 30.2], [-34.6, -807.0, 30.5], [-31.0, -804.3, 31.5]],
++///    data leaves a 5 yd hole between the deck's edge (z 30-31, along (-32.6, -798.3)–(-37,
++///    -802.6)) and the plank's top (z 30.5-31.6, along (-30.3, -803.2)–(-34.9, -807.4)), over a
++///    trough at z 27.7, which players had to jump. The first slab joined only the middle 4 yd of
++///    the two edges, and stepping off at either end still fell in: this strip joins the whole of
++///    both.
++const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 6] = [
++    [[-32.6, -798.3, 30.4], [-33.6, -800.1, 30.1], [-31.6, -804.2, 31.6]],
++    [[-32.6, -798.3, 30.4], [-31.6, -804.2, 31.6], [-30.3, -803.2, 31.4]],
++    [[-33.6, -800.1, 30.1], [-35.0, -802.3, 30.2], [-33.3, -805.6, 31.3]],
++    [[-33.6, -800.1, 30.1], [-33.3, -805.6, 31.3], [-31.6, -804.2, 31.6]],
++    [[-35.0, -802.3, 30.2], [-37.0, -802.6, 31.2], [-34.9, -807.4, 30.5]],
++    [[-35.0, -802.3, 30.2], [-34.9, -807.4, 30.5], [-33.3, -805.6, 31.3]],
+ ];
+ 
+ /// The pieces added to the map in directory `dir`.
+-- 
+2.46.2.windows.1
+
