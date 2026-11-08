@@ -218,7 +218,7 @@ impl Survival {
         }
         self.events.push(Event::Perfect { player: id, ability });
         if d.clip != 0 {
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: super::abilities::CAST_RECOVERY + 0.2, at: 0.0, body: ClipBody::Full });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: super::abilities::CAST_RECOVERY + 0.2, at: 0.0, body: super::abilities::cast_body(&d) });
         }
         // The dark star on them, and the black lightning of the cord snapping into them.
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(target) });

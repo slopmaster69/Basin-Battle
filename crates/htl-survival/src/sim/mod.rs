@@ -420,13 +420,16 @@ pub enum Event {
 /// How much of a unit a clip drives ([`Event::Clip`]): all of it (the usual), its arms and
 /// torso only (a draw, a cast, the legs free to run), or its pelvis and legs only (Skyfall's
 /// hang: the legs drawn up while the arms keep drawing the bow). The lower half takes client
-/// patch 0037 (`ac23`); an older client plays it as a whole-body clip.
+/// patch 0037 (`ac23`); an older client plays it as a whole-body clip. `Auto`, an ability's
+/// cast by default: the whole body standing, the torso while the legs walk (client patch 0079,
+/// `ac29`; an older client is sent `Full`, as it played every cast before).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ClipBody {
     #[default]
     Full,
     Upper,
     Lower,
+    Auto,
 }
 
 impl ClipBody {
@@ -436,6 +439,7 @@ impl ClipBody {
             ClipBody::Full => "full",
             ClipBody::Upper => "upper",
             ClipBody::Lower => "lower",
+            ClipBody::Auto => "auto",
         }
     }
 }
