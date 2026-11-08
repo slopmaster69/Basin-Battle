@@ -481,6 +481,11 @@ pub const DUAL_FINISH_AT: u8 = 4;
 pub const DUAL_FINISH_DAMAGE: f32 = 2.2;
 pub const DUAL_FINISH_STAGGER: f32 = 0.8;
 pub const DUAL_WINDOW: f32 = 0.8;
+/// How far a client's own measure of a charge's hold may differ from the server's (the press and
+/// its release each a trip over the network): within it, the hand's timing is what's judged. A
+/// small message can wait up to 0.2 s on the way (Corey's Fireballs on his own server through the
+/// router, Nov 7: the ring felt laggy and every Pyroblast fizzled).
+pub const RELEASE_LAG: f32 = 0.3;
 /// The finisher's clip (`Attack1H`: both blades round together, on the hero's own model), and the
 /// off hand's chain (a `[[moveset]]` key).
 pub const DUAL_FINISH_CLIP: u16 = 17;
@@ -806,6 +811,9 @@ pub struct Player {
     pub cd_off: bool,
     /// A charge let go before its least: it goes as soon as it's reached.
     pub release_at_least: bool,
+    /// How long the hero's own client says the charge was held, sent with its release: the check
+    /// is judged by the hand, not by when the release arrived (`RELEASE_LAG`).
+    pub release_held: Option<f32>,
     /// The last ability cast and when.
     pub last_cast: Option<(usize, f32)>,
     /// The weapons put away (R).
@@ -954,6 +962,8 @@ pub struct Mob {
     pub fighters: u32,
     /// Its wind-up was knocked aside lately: not again until then.
     pub wary_until: f32,
+    /// It has run from its hero once already (its temperament's `flee_below`).
+    pub fled: bool,
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
@@ -1522,6 +1532,7 @@ impl Survival {
             cooldowns: BTreeMap::new(),
             cd_off: false,
             release_at_least: false,
+            release_held: None,
             last_cast: None,
             sheathed: false,
             rooted: false,
@@ -1999,6 +2010,17 @@ impl Survival {
             _ => c.run_speed,
         };
         base * self.speed_share(id)
+    }
+
+    /// A release of the attack with its client's measure of the hold (`.es in au ... h<secs>`).
+    pub fn release_held(&mut self, id: Id, held: f32) {
+        if let Some(p) = self.players.get_mut(&id) {
+            p.release_held = held.is_finite().then_some(held);
+        }
+        self.input(id, Input::AttackUp);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.release_held = None;
+        }
     }
 
     /// Where a hero's reticle looks as they shoot (their client's word): the facing and the
