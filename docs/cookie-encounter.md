@@ -1,8 +1,8 @@
 # Cookie: dinner interrupted
 
 Cookie alternates a cleaver pair, a broad ladle, and Serve It Hot. The pour locks its direction
-at the first pose and lands 3 yd ahead in one 2 yd patch. It warns for 1.8 sec, deals 20 damage
-on the first tick and 4 on each of two later ticks, then leaves 1.5 sec of harmless thinning
+at the first pose and lands 3 yd ahead in one 2 yd patch. It warns for 1.8 sec, throws a native flying mug to the committed floor point, and starts heat
+after its short flight (at least 0.15 sec). It deals 20 damage on the first tick and 4 on each of two later ticks, then leaves 1.5 sec of harmless thinning
 steam. Five steam anchors reduce to one when the heat ends. No second pour or scoop can begin
 until the old patch disappears. Invalid, wet, blocked, or wrong-floor patch points are rejected.
 
@@ -31,6 +31,10 @@ Native assets checked against local 1.12.1 data:
   CombatWound 9. It does not have clip 54 or dedicated eating, working, coughing or inhale clips.
   The scoop uses LoadThrown and the recovery uses CombatWound as stand-ins. No attached vessel,
   mouth belch animation, or physical belly inflation is claimed.
+- Throw Dark Iron Ale 14814 has a native mug missile at 30 yd/sec. `Event::Missile` sends it to
+  the fixed spill point; the heat and splash sound wait for its flight. The mug is a released
+  projectile, not an attached vessel. Geyser 10987 uses ice hand/chest effects and is not used for
+  the pour. Its pre-existing secret-form rise effect is unchanged.
 - Cauldron display 216 exists and measures about 1.8 by 2.0 by 1.5 yd. Steam02 display 431 is a
   particle-only emitter. Unlike Deadmines valve display 353, it has no metal pipe mesh to leave
   in the stew. Owned particle cues use the existing immediate-display flag, without changing global

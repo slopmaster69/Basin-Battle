@@ -20,6 +20,9 @@ const RADIUS: f32 = 2.0;
 // Local 1.12.1 Steam02 is particles only, without the metal valve mesh of display 353.
 // Its particle coverage still needs a real-client check; five anchors cover the small patch.
 const STEAM: u32 = 431;
+// Throw Dark Iron Ale is a native flying mug, not the ice-hand effect named Geyser.
+const MUG: u32 = 14814;
+const MUG_SPEED: f32 = 30.0;
 
 #[derive(Default)]
 pub(crate) struct Kitchen {
@@ -188,11 +191,15 @@ impl Survival {
             self.events.push(Event::Sound { id, sound: 4858 }); // One-shot SteamGeyserVar1, no orphaned loop.
         }
         if self.kitchen_move(id) != Some("serve it hot") { return false; }
-        self.events.push(Event::Sound { id, sound: 1096 }); // Native medium water splash.
+        let from = self.mobs[&id].pos;
         if let Some(p) = self.kitchen.cooks.get_mut(&id).and_then(|c| c.patch.as_mut()) {
             if p.hot_at.is_none() {
-                p.hot_at = Some(self.clock);
-                p.next_tick = self.clock;
+                // Usually 3 yd at 30 yd/sec. A 0.15 sec floor also covers the hand-to-floor
+                // height and tick rounding; damage never precedes the short native flight.
+                let lands = self.clock + (dist2d(from, p.at) / MUG_SPEED).max(0.15);
+                self.events.push(Event::Missile { caster: id, spell: MUG, target: Target::Point(p.at) });
+                p.hot_at = Some(lands);
+                p.next_tick = lands;
             }
         }
         true
@@ -254,7 +261,9 @@ impl Survival {
             // Last thin wisp is harmless cooling. No new patch until it disappears too.
             if patch.props.len() > 1 { for p in patch.props.drain(1..) { self.kitchen_drop_prop(p); } }
         } else if now >= patch.next_tick {
-            let damage = if patch.next_tick == start { patch.damage } else { (patch.damage / 5).max(1) };
+            let first = patch.next_tick == start;
+            let damage = if first { patch.damage } else { (patch.damage / 5).max(1) };
+            if first { self.events.push(Event::Sound { id, sound: 1096 }); }
             patch.next_tick = now + 1.0;
             let heroes: Vec<_> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, patch.at) <= RADIUS
                 && (p.pos[2] - patch.at[2]).abs() < 2.0 && clear_line(self.land.as_ref(), patch.at, p.pos)).map(|(h, _)| *h).collect();

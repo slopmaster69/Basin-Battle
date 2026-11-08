@@ -82,7 +82,16 @@ fn kitchen_pour_locks_one_patch_and_the_dry_side_is_safe_with_marks_hidden() {
     run(&mut s, 1.0);
     assert_eq!(s.mobs[&id].facing, dir, "the pour cannot chase a sidestep");
     assert_eq!(s.players[&band[1]].health, hp[1], "warning steam is harmless");
-    let ev = run(&mut s, 3.9);
+    let mut launched = Vec::new();
+    for _ in 0..30 {
+        launched.extend(s.step(DT));
+        if s.kitchen.cooks[&id].patch.as_ref().unwrap().hot_at.is_some() { break; }
+    }
+    assert_eq!(launched.iter().filter(|e| matches!(e, Event::Missile { caster, spell: MUG, target: Target::Point(p) } if *caster == id && *p == at)).count(), 1, "one native mug flies to the committed floor point");
+    assert!(s.kitchen.cooks[&id].patch.as_ref().unwrap().hot_at.unwrap() >= s.clock + 0.14);
+    let flight = run(&mut s, 0.1);
+    assert!(!flight.iter().any(|e| matches!(e, Event::Swing { attacker, damage, .. } if *attacker == id && *damage > 0)), "the mug travels before the spill can burn");
+    let ev = run(&mut s, HOT + 0.3);
     assert!(!ev.iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(h), damage, .. } if *attacker == id && *h == band[0] && *damage > 0)), "dry side requires only movement");
     assert!(s.players[&band[1]].health < hp[1]);
     let patch = s.kitchen.cooks[&id].patch.as_ref().unwrap();
