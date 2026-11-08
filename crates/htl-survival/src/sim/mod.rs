@@ -13,6 +13,7 @@ use crate::land::Land;
 pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
+pub(crate) mod bosses;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -1205,6 +1206,8 @@ pub struct Survival {
     pub(crate) beta: beta::Beta,
     /// The Warlord's (the Warrior's second choices): Tackles under way.
     pub(crate) warlord: warlord::Warlord,
+    /// Basin Battle's boss beats under way: a boss on its run, burning blows, burning ground.
+    pub(crate) bosses: bosses::Bosses,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1305,6 +1308,7 @@ impl Survival {
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
             warlord: warlord::Warlord::default(),
+            bosses: bosses::Bosses::default(),
         }
     }
 

@@ -1900,6 +1900,17 @@ impl SurvivalGame {
                 })
             }
             "spawn" => Err("Turn debug on first (.es debug).".into()),
+            // (debug) The way below opened without its bosses beaten, for filming a fight that
+            // crosses rooms: every gate and shortcut, or one by its key.
+            "unbar" if self.sim.debug => self.sim.unbar(&arg).map(|said| self.say_to(conn, &said)),
+            "unbar" => Err("Turn debug on first (.es debug).".into()),
+            // (debug) The nearest foe brought down to a share of its health, as a blow would:
+            // `.es hurt 0.6`. For filming a boss's turns.
+            "hurt" if self.sim.debug => match arg.parse::<f32>() {
+                Ok(share) => self.sim.dev_hurt(me, share, arg2).map(|said| self.say_to(conn, &said)),
+                Err(_) => Err("Try .es hurt 0.6 [name] (the share of its health to leave it).".into()),
+            },
+            "hurt" => Err("Turn debug on first (.es debug).".into()),
             // Testing the progression from a blank slate: this hero back to their first day, or
             // (debug) the camp's whole world, its save copied aside first.
             "reset" => match arg.as_str() {

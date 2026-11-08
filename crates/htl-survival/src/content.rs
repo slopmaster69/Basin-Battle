@@ -2110,6 +2110,10 @@ pub struct SpecialDef {
     /// Its own sound as it winds up (see [`AttackDef::sound`]).
     #[serde(default)]
     pub sound: Option<u32>,
+    /// Basin Battle: its weapon sticks where this blow lands, and it hauls at it this long
+    /// (seconds; 0: no), open to every blow: the best opening of a fight.
+    #[serde(default)]
+    pub lodge: f32,
 }
 
 fn one_u32() -> u32 {
@@ -2304,7 +2308,7 @@ impl MobDef {
 }
 
 /// A creature's second wind (`[mob.enrage]`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct EnrageDef {
     /// At or below this share of its health.
     pub at: f32,
@@ -2334,6 +2338,41 @@ pub struct EnrageDef {
     /// It throws down every hero this near as it turns (0: none).
     #[serde(default)]
     pub shove: f32,
+    /// Basin Battle's boss beats (`sim::bosses`). The boss breaks off and runs along these points
+    /// (by the land's ways between them), heeding nobody, and fights again where the last one is
+    /// once a hero has come within `wait_for` yards of it (its home from then: a lost fight
+    /// puts it back where it began). Empty: it stays.
+    #[serde(default)]
+    pub run_to: Vec<[f32; 3]>,
+    /// On the run, rocks shaken loose behind it this often (seconds; 0: none): dust first, then
+    /// the fall, a light blow.
+    #[serde(default)]
+    pub run_falls: f32,
+    #[serde(default)]
+    pub wait_for: f32,
+    /// Yelled, and its flash on it, as it takes up the fight again at the run's end.
+    #[serde(default)]
+    pub arrive_text: String,
+    #[serde(default)]
+    pub arrive_kit: u32,
+    /// From this phase on its heavy blows leave burning ground where they land.
+    #[serde(default)]
+    pub burn: Option<BurnDef>,
+    /// Rocks brought down as it turns: dust over each of these points, then the fall a moment
+    /// later (a heavy blow), and a dry way left between them.
+    #[serde(default)]
+    pub debris: Vec<[f32; 3]>,
+}
+
+/// Burning ground a boss's heavy blow leaves (`[mob.phase.burn]`): how wide, what it does each
+/// second to a hero standing in it, how long it burns, and its look (a ground spell).
+#[derive(Debug, Clone, Deserialize)]
+pub struct BurnDef {
+    pub radius: f32,
+    pub damage: u32,
+    pub secs: f32,
+    #[serde(default)]
+    pub look: u32,
 }
 
 /// One of the journal's goals: done when the camp has `kind` (`bank`, `build`, `craft`, `kill`,
