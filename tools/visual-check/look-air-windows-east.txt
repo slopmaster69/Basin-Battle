@@ -1,4 +1,4 @@
-# The air (client 0073): Goldshire's lit windows seen from afar at night, from about 311 yd to the
+# The air (client 0084): Goldshire's lit windows seen from afar at night, from about 311 yd to the
 # east, toward Crystal Lake (WoW x -9440, y -260, on the ground), the camera facing Goldshire (yaw 94) and pitched a
 # little down. One of three vantage points (look-air-windows-ne, -east, -south); a hill, the woods
 # or the road's bend may hide the town from one of them: say which shows it best.

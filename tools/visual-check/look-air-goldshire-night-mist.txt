@@ -1,4 +1,4 @@
-# The air (client 0073): Goldshire at night (23:30) in mist, the camera on the road facing the inn's
+# The air (client 0084): Goldshire at night (23:30) in mist, the camera on the road facing the inn's
 # lit windows and the lamp posts (as look-weather-r3-goldshire-night-rain), 10 yd off and pitched
 # 12 degrees down. The mist held at 3 times the hour's (lookmist 3), then the night's own mist, then
 # lookfog 2, worldFog 0 (the plain mist) and worldLook 0.

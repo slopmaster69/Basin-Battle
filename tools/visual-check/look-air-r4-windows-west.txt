@@ -1,4 +1,4 @@
-# Far lit windows (client 0073, #273's fourth round): Goldshire's windows at night from about 285 yd west, on the road toward the camp and Westfall
+# Far lit windows (client 0084, #273's fourth round): Goldshire's windows at night from about 285 yd west, on the road toward the camp and Westfall
 # (WoW x -9530, y 330, on the ground), facing Goldshire (yaw 279), the camera 6 yd back and nearly
 # level. The NE spot of take 275 was hidden by trees; this round tries open ground (the west road,
 # the south fields and the east lake side): say which shows the town best, and if trees or a hill

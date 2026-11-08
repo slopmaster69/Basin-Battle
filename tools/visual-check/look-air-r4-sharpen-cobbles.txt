@@ -1,4 +1,4 @@
-# The air (client 0073, #273's fourth round; the first take never ran: the window closed after login): the sharpen up close on Goldshire's cobbles, the inn's timbers and its
+# The air (client 0084, #273's fourth round; the first take never ran: the window closed after login): the sharpen up close on Goldshire's cobbles, the inn's timbers and its
 # stone at noon (12:00), the camera 4 yd off and pitched 25 degrees down: looksharpen 0 (none), the
 # default (worldSharpen 0.4) and looksharpen 1, then worldLook 0. Then a 2 s sidestep at the default
 # with the trees behind the inn in frame, to watch for crawling on the leaves.

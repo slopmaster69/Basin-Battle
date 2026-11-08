@@ -1,4 +1,4 @@
-# Firefly lights in the fog (client 0073 with 0072, #273's fourth round): the woods by Crystal
+# Firefly lights in the fog (client 0084 with 0072, #273's fourth round): the woods by Crystal
 # Lake at 23:00 with the fireflies out (looklife 2) and the fog on (lookmist 3), the camera low
 # among them (yaw 200, pitched 6 down, 5 yd); then worldFog 0.
 # Look for: the fireflies' own small glows, and no big green halo round any of them in the fog

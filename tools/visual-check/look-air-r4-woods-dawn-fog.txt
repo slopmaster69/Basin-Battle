@@ -1,4 +1,4 @@
-# Dawn fog (client 0073, #273's fourth round): the woods by Crystal Lake at 07:45 (later than the
+# Dawn fog (client 0084, #273's fourth round): the woods by Crystal Lake at 07:45 (later than the
 # first take's 07:00: the shadow map holds the sun at 10 degrees until about 07:30, so its shafts
 # and the sun on screen now agree), facing the sun at yaw 45, pitched a little up, lookmist 3.5,
 # then a real fog day, lookfog 2, worldShadows 0 and worldFog 0, and worldLook 0; a sidestep.

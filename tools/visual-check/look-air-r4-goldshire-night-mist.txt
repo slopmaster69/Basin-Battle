@@ -1,4 +1,4 @@
-# The hero in the fog (client 0073, #273's fourth round): Goldshire at 23:30 in mist, the camera
+# The hero in the fog (client 0084, #273's fourth round): Goldshire at 23:30 in mist, the camera
 # on the road 10 yd behind the hero facing the lamps (yaw 150, pitched 12 down), lookmist 3 with
 # worldFog 1, then worldFog 0, then the night's own mist, lookfog 2, worldLook 0.
 # Look for: the hero solid in mist-3, as solid as in worldfog-0 (take 275: a translucent ghost

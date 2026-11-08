@@ -1,4 +1,4 @@
-# The air (client 0073, #273's fourth round; the first take never ran: the window closed after login): what it costs. The woods by Crystal Lake at 07:45 in thick mist
+# The air (client 0084, #273's fourth round; the first take never ran: the window closed after login): what it costs. The woods by Crystal Lake at 07:45 in thick mist
 # (lookmist 3.5), facing the sun, standing still, the fps journal on
 # (benilla-config/Diagnostics/fps-journal.csv): 10 s at each fog quality step (1, 2, 3), 10 s with
 # worldFog 0, 10 s with worldSharpen 0, 10 s with worldLook 0. (The far windows' cost is in the

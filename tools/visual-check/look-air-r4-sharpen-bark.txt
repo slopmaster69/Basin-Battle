@@ -1,4 +1,4 @@
-# The air (client 0073, #273's fourth round; the first take never ran: the window closed after login): the sharpen on bark and leaves in the woods by Crystal Lake at noon
+# The air (client 0084, #273's fourth round; the first take never ran: the window closed after login): the sharpen on bark and leaves in the woods by Crystal Lake at noon
 # (12:00), the camera facing the north shore's oaks (yaw 45), 3 yd off and level: looksharpen 0,
 # the default (worldSharpen 0.4) and looksharpen 1, then worldLook 0, then a sidestep at each of 0
 # and the default to watch the leaves.
