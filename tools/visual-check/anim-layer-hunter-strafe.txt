@@ -1,28 +1,35 @@
 # The legs walk under a swing (client 0079, `animLayer`): the dwarf hunter strafing left at a
 # swing's pace (3 yd/s, what the server slows a swinging hero to, so the legs Walk) through a light
-# chain of three, seen from the side: the layer on, then off (`animLayer 0`, today's slide), then on
-# again strafing right, then one swing standing still. the Proving Ring at 10:00, the
-# interface hidden. Movement is ActionDash (a script can't press the movement keys); each swing's
-# lunge is a dash of its own that replaces ours for 0.18 s, so the dash is given again half a second
-# after each press. Look for, layer on: the legs keep their sidestep turn (hips toward the slide)
-# and keep stepping, while the shoulders, the arms and the swing stay square to the way the hero
-# faces, the spine taking the whole turn; no frame where both feet stand planted while the body
-# glides; the stride unbroken from one swing to the next (no stop, no restart at the first frame of
-# a swing); the arms and torso playing the whole swing; no kink or pop at the waist (the swing's
-# turn spread up the spine); the lunge's short step forward not flicking the legs into a forward run
-# and back. Layer off: today's look, the legs frozen in the swing's stance for most of each swing
-# while the body slides. Standing still: the whole-body swing, as today, in both.
-# (From the side camera the legs are seen front-on while the hips turn to the slide; `cam 0 -6 8` in
-# the watcher's scenarios folder shows the stride across the frame if it's hard to read.)
-# Last, stopping mid-swing, the layer on then off: the move ends 0.2 s into a swing. Look for the
-# torso finishing the swing while the legs settle into a stand (on), against the slide stopping (off).
-# The Proving Ring, not Brackwell: Brackwell's Defias joined in during take 281.
+# chain of three, seen from the side: a warm-up pass with the layer on and no shots, then the layer
+# on, then off (`animLayer 0`, today's slide), then on again strafing right, then one swing
+# standing still. The Proving Ring at 10:00, the interface hidden. Movement is ActionDash (a script
+# can't press the movement keys); each swing's lunge is a dash of its own that replaces ours for
+# 0.18 s, so the dash is given again half a second after each press. Look for, layer on: the legs
+# keep their sidestep turn (hips toward the slide) and keep stepping, while the shoulders, the arms
+# and the swing stay square to the way the hero faces, the spine taking the whole turn; no frame
+# where both feet stand planted while the body glides; the stride unbroken from one swing to the
+# next (no stop, no restart at the first frame of a swing); the legs keeping their gait through the
+# lunge (no flick from a walk into a run and back, or from a run into a walk); the arms and torso
+# playing the whole swing; no kink or pop at the waist (the swing's turn spread up the spine); the
+# lunge's short step forward not flicking the legs into a forward run and back. Layer off: today's
+# look, the legs frozen in the swing's stance for most of each swing while the body slides.
+# Standing still: the whole-body swing, as today, in both.
+# The chain's first blow (ScourgeMale's Attack1H, take 1) winds up with the chest turned about 90
+# degrees from the way the hero goes, then squares up for the blow; seen side-on it's a strong
+# twist, seen from behind it reads as a turn and back. Blows 2 and 3 (take 2) are overheads.
+# (From the side camera the legs are seen front-on while the hips turn to the slide; `cam 0 -6 8`
+# in the watcher's scenarios folder shows the stride across the frame if it's hard to read.)
+# Last, stopping mid-swing, the layer on then off: the move ends 0.2 s into a swing (about 0.4 s
+# with the lunge). Look for the torso finishing the swing while the legs settle into a stand (on),
+# against the slide stopping (off).
+# The Proving Ring, not Brackwell: Brackwell's Defias joined in during take 281. The first pass
+# after the first goto was filmed from behind in takes 281 and 289, and every pass after a later
+# goto side-on, so the first pass is a warm-up with no shots.
 hero hunter
 cam 90 -6 8
 include _look_setup
-1.0 .es goto proving_ring
-# A second goto before the first pass: in take 281 the first pass was filmed from behind and
-# every pass after a later goto from the side.
+1.00 .es goto proving_ring
+# A second goto before the warm-up (the camera settles after it).
 4.50 .es goto proving_ring
 6.40 .es heal
 6.95 lua ConsoleExec("worldclock 600")
@@ -30,9 +37,8 @@ include _look_setup
 7.05 lua UIParent:Hide()
 7.10 lua SetCVar("animLayer", "1")
 7.50 video
-# Layer on, strafing left.
+# Warm-up, the layer on, strafing left: the same moves and swings, no shots (filmed from behind).
 8.00 lua ActionDash(2.0, 3, "l")
-8.50 shots on-strafe 30 0.08
 8.60 .es in a
 8.65 .es in au
 9.10 lua ActionDash(2.0, 3, "l")
@@ -42,13 +48,13 @@ include _look_setup
 10.40 .es in a
 10.45 .es in au
 10.90 lua ActionDash(1.0, 3, "l")
-# Back to the start, the layer off: today's look.
+# Back to the start, the layer still on.
 12.50 .es goto proving_ring
 14.40 .es heal
-14.50 lua SetCVar("animLayer", "0")
-# Layer off, strafing left.
+14.50 lua SetCVar("animLayer", "1")
+# Layer on, strafing left.
 15.00 lua ActionDash(2.0, 3, "l")
-15.50 shots off-strafe 30 0.08
+15.50 shots on-strafe 30 0.08
 15.60 .es in a
 15.65 .es in au
 16.10 lua ActionDash(2.0, 3, "l")
@@ -58,49 +64,64 @@ include _look_setup
 17.40 .es in a
 17.45 .es in au
 17.90 lua ActionDash(1.0, 3, "l")
-# Back to the start, the layer on again.
+# Back to the start, the layer off: today's look.
 19.50 .es goto proving_ring
 21.40 .es heal
-21.50 lua SetCVar("animLayer", "1")
-# Layer on, strafing right.
-22.00 lua ActionDash(2.0, 3, "r")
-22.50 shots on-strafe-2 30 0.08
+21.50 lua SetCVar("animLayer", "0")
+# Layer off, strafing left.
+22.00 lua ActionDash(2.0, 3, "l")
+22.50 shots off-strafe 30 0.08
 22.60 .es in a
 22.65 .es in au
-23.10 lua ActionDash(2.0, 3, "r")
+23.10 lua ActionDash(2.0, 3, "l")
 23.50 .es in a
 23.55 .es in au
-24.00 lua ActionDash(2.0, 3, "r")
+24.00 lua ActionDash(2.0, 3, "l")
 24.40 .es in a
 24.45 .es in au
-24.90 lua ActionDash(1.0, 3, "r")
-# Standing still, the layer on: the whole-body swing as today.
+24.90 lua ActionDash(1.0, 3, "l")
+# Back to the start, the layer on again.
 26.50 .es goto proving_ring
 28.40 .es heal
-28.60 shots on-standing 12 0.08
-28.70 .es in a
-28.75 .es in au
+28.50 lua SetCVar("animLayer", "1")
+# Layer on, strafing right.
+29.00 lua ActionDash(2.0, 3, "r")
+29.50 shots on-strafe-2 30 0.08
+29.60 .es in a
+29.65 .es in au
+30.10 lua ActionDash(2.0, 3, "r")
+30.50 .es in a
+30.55 .es in au
+31.00 lua ActionDash(2.0, 3, "r")
+31.40 .es in a
+31.45 .es in au
+31.90 lua ActionDash(1.0, 3, "r")
+# Standing still, the layer on: the whole-body swing as today.
+33.50 .es goto proving_ring
+35.40 .es heal
+35.60 shots on-standing 12 0.08
+35.70 .es in a
+35.75 .es in au
 # Standing still, the layer off: the same.
-30.00 lua SetCVar("animLayer", "0")
-30.50 shots off-standing 12 0.08
-30.60 .es in a
-30.65 .es in au
-32.00 lua SetCVar("animLayer", "1")
+37.00 lua SetCVar("animLayer", "0")
+37.50 shots off-standing 12 0.08
+37.60 .es in a
+37.65 .es in au
+39.00 lua SetCVar("animLayer", "1")
 # Stopping mid-swing, the layer on: the move ends 0.2 s after the press.
-33.0 lua SetCVar("animLayer", "1")
-33.5 .es goto proving_ring
-35.4 .es heal
-36.00 lua ActionDash(1.2, 3, "l")
-36.90 shots on-stop 24 0.06
-37.00 .es in a
-37.05 .es in au
+40.50 .es goto proving_ring
+42.40 .es heal
+43.00 lua ActionDash(1.2, 3, "l")
+43.90 shots on-stop 24 0.06
+44.00 .es in a
+44.05 .es in au
 # Stopping mid-swing, the layer off.
-39.0 lua SetCVar("animLayer", "0")
-39.5 .es goto proving_ring
-41.4 .es heal
-42.00 lua ActionDash(1.2, 3, "l")
-42.90 shots off-stop 24 0.06
-43.00 .es in a
-43.05 .es in au
-45.0 lua SetCVar("animLayer", "1")
-46 end
+46.00 lua SetCVar("animLayer", "0")
+46.50 .es goto proving_ring
+48.40 .es heal
+49.00 lua ActionDash(1.2, 3, "l")
+49.90 shots off-stop 24 0.06
+50.00 .es in a
+50.05 .es in au
+52.00 lua SetCVar("animLayer", "1")
+53 end
