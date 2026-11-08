@@ -159,7 +159,11 @@ impl Survival {
             if let Some(def) = self.content.mob(WATCHER) {
                 for side in [-1.0, 1.0] {
                     let Some(at) = self.duel_floor(home, [home[0] + side * 4.0, home[1] + 1.5, home[2]]) else { continue };
-                    let Some(exit) = self.duel_floor(at, [home[0] + side * 4.0, home[1] + 13.0, home[2]]) else { continue };
+                    // The cabin blocks the old northbound exits. Leave along its visible
+                    // southern lip toward starboard instead: both short walks finish before
+                    // cleanup, without moving the duel home toward Greenskin's deck.
+                    let offset = if side < 0.0 { [6.0, 4.0] } else { [12.0, 0.0] };
+                    let Some(exit) = self.duel_floor(at, [home[0] + offset[0], home[1] + offset[1], home[2]]) else { continue };
                     let watcher = self.spawn_mob(def, at, None, false);
                     let m = self.mobs.get_mut(&watcher).unwrap();
                     m.state = MobState::Idle { wander_at: f32::MAX };

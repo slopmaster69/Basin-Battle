@@ -258,10 +258,26 @@ fn spectators_are_finite_noncombat_and_leave_once_without_stopping_an_attack() {
     let first = s.mobs[&watchers[0].0].pos;
     run(&mut s, 1.0);
     assert!(dist2d(first, s.mobs[&watchers[0].0].pos) > 1.8);
-    run(&mut s, 9.0);
+    run(&mut s, 6.0);
+    assert!(watchers.iter().all(|(w, exit)| dist2d(s.mobs[w].pos, *exit) < 0.1), "both walks finish before cleanup");
+    run(&mut s, 3.0);
     assert!(watchers.iter().all(|(w, _)| !s.mobs.contains_key(w)));
     assert!(s.vancleef.duels[&id].departed);
     assert!(s.vancleef.observers.is_empty());
+}
+
+#[test]
+fn unsupported_observer_departures_stay_absent_on_custom_land() {
+    let (mut s, _, id) = fight("dm_vancleef", 1);
+    s.remove_duel(id);
+    s.land = Box::new(NoPath);
+    s.clean_duels();
+    assert!(s.vancleef.duels[&id].watchers.is_empty());
+    assert!(s.vancleef.observers.is_empty());
+    s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health * 3 / 10;
+    s.step_vancleef(id);
+    run(&mut s, 9.0);
+    assert!(!s.mobs.keys().any(|w| s.duel_observer(*w)), "no replacement combat or stranded actors");
 }
 
 #[test]
