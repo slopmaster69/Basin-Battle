@@ -1,4 +1,4 @@
-From 3c198dcdd4433f08c25ee4c5c9c66d42a30d38be Mon Sep 17 00:00:00 2001
+From 924fa50b9e2ba16d0293cd3f1bc15c4fdc618141 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 8 Nov 2026 08:32:17 -0700
 Subject: [PATCH] Water that answers what moves through it: wakes, rings and
@@ -13,14 +13,23 @@ a faint pale edge, and the shallows show their sand plainly.
 The wakes. A ripple field of 256 x 256 texels over 64 yd round the
 camera (a little ahead of it, where the view falls), snapped to whole
 texels, is stepped on the GPU each frame (look_wakes.wgsl, one compute
-pass, look_wakes in the fps journal's gpu_look column) as a linear
-shallow-water wave at fixed 1/120 s steps, in pairs. Every unit with its
-feet in the water pushes on it by its speed (a still one only breathes
-gentle rings), one coming in splashes, a fishing bobber nods, and rain
-drops dimple it. A swimmer outruns his own rings, so they pile up into a
-V. Foam is born where a body churns the water and on the rising crests,
-carried by the water's drift, and fades over about a second and a half;
-the water draws it white, smeared along the crests into curling streaks.
+pass, look_wakes in the fps journal's gpu_look column and named on its
+GPU_PASSES line) as a linear shallow-water wave at fixed 1/120 s steps,
+in pairs. Every unit with its feet in the water pushes on it by its
+speed, smoothed over 0.12 s (a still one only breathes gentle rings),
+one coming in splashes, a fishing bobber nods, and raindrops dimple it.
+
+The V. Behind a moving body two arms trail from its sides at 19.5
+degrees either side of its track, as a Kelvin wake's do at any speed,
+reaching back as far as it goes in 1.2 s. They push on the water and lay
+foam along them, and their foam is carried outward as fast as the arms
+move, so it stays on them as a crisp V of white streaks that fades over
+about a second and a half. Foam is born only there, at the body's sides
+and as a splash's few droplets on a ring round it: a still body, a ring
+or a raindrop never foams, a texel takes at most 12 a second, and new
+foam is held back as the share of the field under it nears 4% (read
+back from the GPU). The water draws it white, crisp where it is thick
+and a soft veil where it is thin, so it fades rather than blinks out.
 The field's slopes add to the water's own ripples, so the mirror, the
 glint and the bed move with it.
 
@@ -30,10 +39,11 @@ standing hero's neck that four films found is 1.12's, and it no longer
 draws while the wakes run. `lookwater wakes 0` brings both back.
 
 The bed through moving water: the bed seen under the water is drawn back
-from the surface's tilt, more the deeper it lies, so it wavers under the
-ripples and the wakes; faint moving light lies on the shallow bed in the
-sun. Where the bend is under a pixel the frame's blend keeps the bed it
-already holds, so a calm surface still shows what is drawn behind it.
+from the surface's tilt, 3.5 yd per unit of slope per yard of depth to
+1.5 yd deep, so it wavers under the ripples and the wakes; faint moving
+light lies on the shallow bed in the sun. Where the bend is under a
+pixel the frame's blend keeps the bed it already holds, so a calm
+surface still shows what is drawn behind it.
 
 The shore and the shallows, retuned toward the reference: no foam line,
 fully clear at the waterline with a faint pale haze over its first
@@ -42,30 +52,31 @@ colour that holds to 1.2 yd and turns to the deep by 3.5.
 
 Switches: worldWater 0 and worldLook 0 run 1.12's water and wade foam
 untouched. `lookwater wakes [0|1]` (with no value it reports the bodies
-pushing, the field's size and the share of it under foam, read back from
-the GPU; the same line is logged every 10 s while something moves the
-water), `lookwater refract <0-2>` and `lookwater caustics <0-2>` hold the
-bend and the light, `grade` lets go.
+pushing, the field's size, the share of it under foam read back from the
+GPU, and the fastest body's speed and depth; the same line is logged
+every 10 s while something moves the water), `lookwater refract <0-2>`
+and `lookwater caustics <0-2>` hold the bend and the light, `grade` lets
+go.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
- crates/benilla-app/src/entities.rs            |  24 +-
- crates/benilla-app/src/perf/journal.rs        |   5 +-
- crates/benilla-app/src/shaders.rs             |  14 +
- crates/benilla-app/src/world_console.rs       | 132 ++-
- crates/benilla-assets/src/materials.rs        |  46 +
- crates/benilla-assets/src/shaders/liquid.wgsl | 152 ++-
- crates/benilla-world/src/liquid/surface.rs    |   3 +-
- crates/benilla-world/src/look/mod.rs          |  11 +-
- crates/benilla-world/src/look/wakes.rs        | 990 ++++++++++++++++++
- crates/benilla-world/src/look/wakes_pass.rs   | 212 ++++
- crates/benilla-world/src/look/water.rs        | 163 ++-
- crates/benilla-world/src/shaders.rs           |   5 +-
- .../benilla-world/src/shaders/look_wakes.wgsl | 167 +++
- crates/benilla-world/src/water_fx/mod.rs      |  14 +-
- crates/benilla-world/src/world_unit.rs        |   5 +
- 15 files changed, 1896 insertions(+), 47 deletions(-)
+ crates/benilla-app/src/entities.rs            |   24 +-
+ crates/benilla-app/src/perf/journal.rs        |   14 +-
+ crates/benilla-app/src/shaders.rs             |   14 +
+ crates/benilla-app/src/world_console.rs       |  132 +-
+ crates/benilla-assets/src/materials.rs        |   46 +
+ crates/benilla-assets/src/shaders/liquid.wgsl |  158 ++-
+ crates/benilla-world/src/liquid/surface.rs    |    3 +-
+ crates/benilla-world/src/look/mod.rs          |   11 +-
+ crates/benilla-world/src/look/wakes.rs        | 1241 +++++++++++++++++
+ crates/benilla-world/src/look/wakes_pass.rs   |  212 +++
+ crates/benilla-world/src/look/water.rs        |  169 ++-
+ crates/benilla-world/src/shaders.rs           |    5 +-
+ .../benilla-world/src/shaders/look_wakes.wgsl |  214 +++
+ crates/benilla-world/src/water_fx/mod.rs      |   14 +-
+ crates/benilla-world/src/world_unit.rs        |    5 +
+ 15 files changed, 2211 insertions(+), 51 deletions(-)
  create mode 100644 crates/benilla-world/src/look/wakes.rs
  create mode 100644 crates/benilla-world/src/look/wakes_pass.rs
  create mode 100644 crates/benilla-world/src/shaders/look_wakes.wgsl
@@ -113,7 +124,7 @@ index aeed5d9..a9efbaa 100644
                  .before(benilla_world::schedule::WorldStage::Input),
          )
 diff --git a/crates/benilla-app/src/perf/journal.rs b/crates/benilla-app/src/perf/journal.rs
-index 5ccfcb5..3de4f43 100644
+index 5ccfcb5..a0744e4 100644
 --- a/crates/benilla-app/src/perf/journal.rs
 +++ b/crates/benilla-app/src/perf/journal.rs
 @@ -102,8 +102,8 @@ enum GpuBucket {
@@ -127,7 +138,37 @@ index 5ccfcb5..3de4f43 100644
      Look,
  }
  
-@@ -443,6 +443,7 @@ mod tests {
+@@ -142,8 +142,9 @@ struct GpuAccum {
+     /// The newest measurement time consumed; all measurements of one sync share one `Instant`,
+     /// which is what makes a frame countable.
+     seen: Option<Instant>,
+-    /// `WOW_GPU_PASSES=1`: the same sums per pass, printed beside each row as a `GPU_PASSES`
+-    /// line; empty unless armed.
++    /// The same sums per pass, printed beside each row as a `GPU_PASSES` line: every pass with
++    /// `WOW_GPU_PASSES=1`, else the new look's own (`gpu_look`'s: `look_wakes`, the shadows, the
++    /// fog...), so a cost run names them without the variable.
+     passes: std::collections::BTreeMap<String, f64>,
+ }
+ 
+@@ -163,7 +164,7 @@ impl GpuAccum {
+             let Some(bucket) = gpu_bucket(path) else {
+                 continue;
+             };
+-            let pass = passes_armed()
++            let pass = (passes_armed() || bucket == GpuBucket::Look)
+                 .then(|| path.strip_prefix("render/")?.strip_suffix("/elapsed_gpu"))
+                 .flatten();
+             for m in diagnostic
+@@ -199,7 +200,7 @@ impl GpuAccum {
+             for bucket in self.sum {
+                 s.push_str(&format!(",{:.2}", bucket / n));
+             }
+-            if passes_armed() {
++            if !self.passes.is_empty() {
+                 // Costliest first, ms per read frame.
+                 let mut rows: Vec<(&String, &f64)> = self.passes.iter().collect();
+                 rows.sort_by(|a, b| b.1.total_cmp(a.1));
+@@ -443,6 +444,7 @@ mod tests {
              "look_shadow_0",
              "look_shadow_3",
              "look_water_copy",
@@ -404,7 +445,7 @@ index ea94dab..2509f07 100644
  
  impl MaterialExtension for LiquidExt {
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index dfbd806..239e657 100644
+index dfbd806..d3e2122 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -25,8 +25,9 @@
@@ -449,21 +490,23 @@ index dfbd806..239e657 100644
  
  struct LiquidVsOut {
      @builtin(position) clip_position: vec4<f32>,
-@@ -260,6 +266,13 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
+@@ -260,6 +266,15 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
  const WATER_NIGHT_FLECKS: f32 = 0.0;
  const WATER_NIGHT_FLECK_LANE: f32 = 0.12;
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
-+// `look::wakes::tune`'s `FOAM_FROM` and `FOAM_EDGE` (`look::water`'s test compares them): where the
-+// wakes' foam shows against its streaks, and how crisp its edge is.
++// `look::wakes::tune`'s `FOAM_FROM`, `FOAM_EDGE` and `FOAM_VEIL` (`look::water`'s test compares
++// them): where the wakes' foam shows against its streaks, how crisp its edge is, and the most the
++// soft veil of thin foam hides.
 +const WAKE_FOAM_FROM: f32 = 0.5;
 +const WAKE_FOAM_EDGE: f32 = 0.12;
++const WAKE_FOAM_VEIL: f32 = 0.45;
 +// `look::water::tune`'s `REFRACT_DEPTH` (the same test compares it): the deepest the bed's bend
 +// grows with.
-+const WATER_REFRACT_DEPTH: f32 = 2.0;
++const WATER_REFRACT_DEPTH: f32 = 1.5;
  // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
  const WATER_SHADOW_TAPS: u32 = 6u;
  const WATER_SHADOW_TEXELS: f32 = 1.5;
-@@ -652,6 +665,62 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
+@@ -652,6 +667,62 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
      return slope * (0.9 * amount * fade);
  }
  
@@ -526,7 +569,7 @@ index dfbd806..239e657 100644
  // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
  // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
  // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
-@@ -688,9 +757,14 @@ fn look_water(
+@@ -688,9 +759,14 @@ fn look_water(
  
      // Ripples, calmed into the shore.
      var N = water_normal(P.xz, t, water.rows[3].w * (0.3 + 0.7 * shore), water.rows[4].w, fp);
@@ -543,7 +586,7 @@ index dfbd806..239e657 100644
          N = normalize(N + vec3<f32>(ring.x, 0.0, ring.y));
      }
  
-@@ -707,7 +781,7 @@ fn look_water(
+@@ -707,7 +783,7 @@ fn look_water(
          vec3<f32>(0.0),
          vec3<f32>(1.0),
      );
@@ -552,7 +595,7 @@ index dfbd806..239e657 100644
      // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term). By night (the
      // glint is the moon's lane, a negative sharpness) its white flecks keep a share off the lane.
      var flecks = water.rows[9].x;
-@@ -791,7 +865,8 @@ fn look_water(
+@@ -791,7 +867,8 @@ fn look_water(
      var stand = 0.0;
      var on_step = 0.0;
      var hits = 0.0;
@@ -562,7 +605,7 @@ index dfbd806..239e657 100644
          let wob = water_noise(P.xz * WATER_FROTH_WOBBLE + vec2<f32>(0.07, -0.05) * t).x;
          let reach = WATER_FROTH_YD * (0.3 + 0.9 * wob);
          // The taps' turn wanders smoothly over the surface, not pixel by pixel: the per-pixel
-@@ -847,15 +922,66 @@ fn look_water(
+@@ -847,15 +924,70 @@ fn look_water(
          * (1.0 - smoothstep(60.0, 120.0, eye_z));
      let foam_rgb = water_decode(lit_g) * 0.8;
  
@@ -606,12 +649,16 @@ index dfbd806..239e657 100644
 +        * (1.0 - smoothstep(0.1, max(water.rows[25].y, 0.11), depth_v)) * (0.7 + 0.6 * na);
 +    let haze_rgb = mix(water_decode(lit_g), water.rows[3].rgb, 0.3) * 0.85;
 +
-+    // The wakes' foam: crisp white streaks along the crests where the field holds foam.
++    // The wakes' foam: crisp white streaks along the crests where the field holds a lot of it,
++    // and a soft veil where it holds a little (a droplet, a streak fading out), so it fades out
++    // rather than blinking off and a splash is never an opaque disc.
 +    var wfoam = 0.0;
 +    if (wake.z > 0.02) {
 +        let streak = wake_streaks(P.xz, vec2<f32>(wake.x, wake.y), t, fp);
-+        wfoam = smoothstep(WAKE_FOAM_FROM, WAKE_FOAM_FROM + WAKE_FOAM_EDGE, wake.z * (0.35 + streak))
-+            * water.rows[24].y * (1.0 - smoothstep(60.0, 120.0, eye_z));
++        let crisp = smoothstep(WAKE_FOAM_FROM, WAKE_FOAM_FROM + WAKE_FOAM_EDGE, wake.z * (0.35 + streak))
++            * smoothstep(0.1, 0.5, wake.z);
++        let veil = WAKE_FOAM_VEIL * smoothstep(0.04, 0.45, wake.z) * (0.5 + 0.5 * streak);
++        wfoam = max(crisp, veil) * water.rows[24].y * (1.0 - smoothstep(60.0, 120.0, eye_z));
 +    }
 +    let wfoam_rgb = water_decode(lit_g) * 0.95;
 +
@@ -717,10 +764,10 @@ index 1a0af64..68319c5 100644
  
 diff --git a/crates/benilla-world/src/look/wakes.rs b/crates/benilla-world/src/look/wakes.rs
 new file mode 100644
-index 0000000..b81b9e1
+index 0000000..9c49b20
 --- /dev/null
 +++ b/crates/benilla-world/src/look/wakes.rs
-@@ -0,0 +1,990 @@
+@@ -0,0 +1,1241 @@
 +//! Wakes, the new look's own (no reference behaviour): water that answers what moves through it,
 +//! as WoW Forever's lakes do. A swimmer leaves a crisp white wake fanning out behind him in a V,
 +//! a hero wading in sends rings out and splashes where he steps in, a bobber sits in a small
@@ -735,9 +782,14 @@ index 0000000..b81b9e1
 +//!    swimming, by its speed; a still one only breathes gentle rings), a splash where one comes in,
 +//!    a fishing bobber ([`crate::world_unit::Bobber`]), and raindrops while it rains
 +//!    (`look::weather`); the nearest [`tune::MAX_SOURCES`] to the field.
-+//! 3. **Foam**: born where a body churns the water and on the rising crests it sends out, carried
-+//!    by the water's drift, fading over [`tune::FOAM_LIFE_S`]: the trailing V with its streaks.
-+//!    `liquid.wgsl` draws it white, drawn out along the crests into curling streaks.
++//! 3. **The V and its foam**: behind a moving body two arms trail from its sides at
++//!    [`tune::ARM_DEG`] either side of its track (a Kelvin wake, as a boat's or a duck's), pushing
++//!    on the water and laying foam along them; the arms' foam is carried outward as fast as the
++//!    arms move, so it stays on them as streaks, and fades over [`tune::FOAM_LIFE_S`]. Foam is
++//!    born only there, at the body's sides and as a splash's few droplets: a still body, a ring
++//!    or a raindrop never foams, and the share of the field under foam is held under
++//!    [`tune::FOAM_COVER_MOST`]. `liquid.wgsl` draws it white, crisp where thick, a soft veil
++//!    where thin.
 +//! 4. The field's slopes add to the water's own ripples, so the mirror, the glint and the
 +//!    refracted bed (`liquid.wgsl`) all move with it.
 +//!
@@ -773,9 +825,12 @@ index 0000000..b81b9e1
 +    /// How fast a ring travels (yd/s). A swimmer at 4.7 yd/s outruns it, so his rings pile up
 +    /// into a V about 25° either side of his track, as a boat's does.
 +    pub const WAVE_SPEED: f32 = 2.0;
-+    /// A ring fades to a third over this long, and the foam does.
++    /// A ring fades to a third over this long, and the foam does. 0.65, was 0.55: the first
++    /// filming's streaks (what little there was) were gone in half a second; the reference's
++    /// wake fades over about a second and a half, which the water's soft fade-out of thin foam
++    /// (`liquid.wgsl`) stretches this to.
 +    pub const WAVE_LIFE_S: f32 = 1.4;
-+    pub const FOAM_LIFE_S: f32 = 0.55;
++    pub const FOAM_LIFE_S: f32 = 0.65;
 +    /// The pressure a body pushes with for each yd/s it moves at (up to [`PUSH_SPEED_MOST`]),
 +    /// and the gentle breathing push of one standing still, at [`IDLE_HZ`].
 +    pub const PUSH: f32 = 0.15;
@@ -784,24 +839,55 @@ index 0000000..b81b9e1
 +    pub const IDLE_HZ: f32 = 1.3;
 +    /// A body's radius at the waterline at model scale 1.
 +    pub const RADIUS: f32 = 0.35;
-+    /// The foam a body churns at its sides (per second, at 4 yd/s, at most 1.5 times it), the
-+    /// foam a rising crest makes per yd/s it rises faster than [`CREST_FROM`], and the most foam
-+    /// a texel holds.
-+    pub const BODY_FOAM: f32 = 8.0;
-+    pub const CREST_FOAM: f32 = 80.0;
-+    /// Above a still body's breathing (its crests rise at most about 0.06 yd/s), so a hero
-+    /// standing in the water makes rings and no foam.
++    /// A body's speed is smoothed over this long, so a position that lands in lumps (a server's
++    /// steps, a frame that skips) still reads as the steady speed it swims at.
++    pub const SPEED_SMOOTH_S: f32 = 0.12;
++    /// The foam a body churns at its sides (per second, at 4 yd/s, at most 1.5 times it). 2, was
++    /// 8: the V's arms ([`ARM_FOAM`]) carry the wake's white now, this is the churn round him.
++    pub const BODY_FOAM: f32 = 2.0;
++    /// The foam a crest makes per yd/s it rises faster than [`CREST_FROM`], on the arms only
++    /// (was everywhere, at 80: the first filming's rain whitened 91% of the lake with it).
++    pub const CREST_FOAM: f32 = 10.0;
++    /// Above a still body's breathing (its crests rise at most about 0.06 yd/s).
 +    pub const CREST_FROM: f32 = 0.07;
-+    pub const FOAM_MOST: f32 = 2.0;
-+    /// How much faster than the water's own drift the foam is carried: the drift of a small
-+    /// ripple is a few inches a second, the foam on a wake spreads at about half a yard.
-+    pub const DRIFT: f32 = 6.0;
-+    /// A body coming into the water: the splash's push (yd²/s, at once) and the foam it throws, a
-+    /// share of the splash.
-+    pub const SPLASH: f32 = 0.3;
-+    pub const SPLASH_FOAM: f32 = 4.0;
++    /// The most foam a texel holds (was 2).
++    pub const FOAM_MOST: f32 = 1.5;
++    /// The most foam a texel takes a second, whatever pushes it.
++    pub const FOAM_IN_MOST: f32 = 12.0;
++    /// The most of the field under foam: new foam is held back from half of it and stops at it,
++    /// read back from the GPU ([`WakeStats`]), so nothing can whiten the lake.
++    pub const FOAM_COVER_MOST: f32 = 0.04;
++    /// How much faster than the water's own drift the foam is carried (was 6: it smeared the
++    /// streaks).
++    pub const DRIFT: f32 = 1.5;
++    /// The Kelvin wake (Corey's reference: a swimmer's crisp white V): behind a moving body two
++    /// arms trail from its sides at [`ARM_DEG`] either side of its track, as a boat's or a duck's
++    /// do at any speed. Each pushes on the water (a share [`ARM_PUSH`] of the body's push) and lays
++    /// foam ([`ARM_FOAM`] a second, falling off over [`ARM_FOAM_FALL`] yards back), and its foam
++    /// is carried outward as fast as the arm moves, so it stays on the arm as a streak.
++    pub const ARM_DEG: f32 = 19.5;
++    /// The arms reach back as far as the body goes in this long, at most [`ARM_MOST`] yards.
++    pub const ARM_SECS: f32 = 1.2;
++    pub const ARM_MOST: f32 = 7.0;
++    /// An arm's half-width (yd) at the body, and how much it widens a yard back.
++    pub const ARM_WIDTH: f32 = 0.16;
++    pub const ARM_SPREAD: f32 = 0.03;
++    pub const ARM_PUSH: f32 = 0.6;
++    pub const ARM_FOAM: f32 = 20.0;
++    pub const ARM_FOAM_FALL: f32 = 3.0;
++    /// The wake grows in from [`WAKE_FROM`] yd/s to full at [`WAKE_FULL`] (a swimmer goes 4.7): a
++    /// body drifting or turning on the spot leaves rings, not a V.
++    pub const WAKE_FROM: f32 = 0.8;
++    pub const WAKE_FULL: f32 = 3.0;
++    /// A body coming into the water: the splash's push (yd²/s, at once; 0.12, was 0.3) sends a
++    /// ring out, and it throws droplets on a ring round it, on [`SPLASH_DROPS`] of its texels,
++    /// each [`DROP_FOAM`] foam per unit of splash. The first filming's splash was an opaque white
++    /// disc as big as the hero: its foam lay over the whole of it, and its crests foamed.
++    pub const SPLASH: f32 = 0.12;
++    pub const SPLASH_DROPS: f32 = 0.45;
++    pub const DROP_FOAM: f32 = 2.5;
 +    /// Raindrops while it rains (a drop on this many texels a second at full rain, about two a
-+    /// square yard), each this hard.
++    /// square yard), each this hard: rings only, never foam.
 +    pub const RAIN_RATE: f32 = 0.125;
 +    pub const RAIN_DROP: f32 = 0.03;
 +    /// A fishing bobber: a small body nodding at this push and rate.
@@ -822,11 +908,13 @@ index 0000000..b81b9e1
 +    pub const JUMP_YD: f32 = 6.0;
 +    /// In `liquid.wgsl`: how much the field's slopes tilt the water's normal, the most a foam
 +    /// streak hides of the water, and where the foam shows (its value against the streak noise, a
-+    /// crisp edge over [`FOAM_EDGE`]).
++    /// crisp edge over [`FOAM_EDGE`]). Thin foam (a droplet, a streak fading out) shows as a soft
++    /// veil instead, at most [`FOAM_VEIL`], so it fades rather than blinks out.
 +    pub const NORMAL_GAIN: f32 = 1.0;
 +    pub const FOAM_SHOW: f32 = 0.9;
 +    pub const FOAM_FROM: f32 = 0.5;
 +    pub const FOAM_EDGE: f32 = 0.12;
++    pub const FOAM_VEIL: f32 = 0.45;
 +    /// Log the counts this often while something moves the water.
 +    pub const LOG_EVERY_S: f32 = 10.0;
 +}
@@ -902,7 +990,8 @@ index 0000000..b81b9e1
 +}
 +
 +/// One body pushing on the field this frame: its path since the field last stepped (Bevy XZ), its
-+/// radius, its steady push and foam, a splash if it came in, and its idle breathing.
++/// radius, its steady push and foam, a splash if it came in, its idle breathing, and its wake: how
++/// strong (0 to 1), its smoothed velocity (Bevy XZ, yd/s) and how far back its arms reach.
 +#[derive(Clone, Copy, Debug, PartialEq, Default)]
 +pub struct WakeSource {
 +    pub from: Vec2,
@@ -914,6 +1003,9 @@ index 0000000..b81b9e1
 +    pub idle: f32,
 +    pub idle_hz: f32,
 +    pub phase: f32,
++    pub wake: f32,
++    pub vel: Vec2,
++    pub arm: f32,
 +}
 +
 +/// This frame's wakes, from [`publish_wakes`] to the render world (`look::wakes_pass`) and the
@@ -935,6 +1027,9 @@ index 0000000..b81b9e1
 +    pub first_step: u32,
 +    /// The rain, 0 to 1.
 +    pub rain: f32,
++    /// How much of the foam born this frame is kept: 1, less as the field nears
++    /// [`tune::FOAM_COVER_MOST`] under foam.
++    pub foam_gain: f32,
 +    pub sources: Vec<WakeSource>,
 +}
 +
@@ -950,16 +1045,20 @@ index 0000000..b81b9e1
 +            clock: 0.0,
 +            first_step: 0,
 +            rain: 0.0,
++            foam_gain: 1.0,
 +            sources: Vec::new(),
 +        }
 +    }
 +}
 +
-+/// The counts `lookwater wakes` and the log report: the bodies pushing, and from the GPU the foam
-+/// and moving texels on the last frame it read back.
++/// The counts `lookwater wakes` and the log report: the bodies pushing, the fastest of them (its
++/// smoothed speed and how deep its feet are), and from the GPU the foam and moving texels on the
++/// last frame it read back.
 +#[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
 +pub struct WakeStats {
 +    pub sources: usize,
++    pub fastest: f32,
++    pub fastest_depth: f32,
 +    pub foam_texels: u32,
 +    pub moving_texels: u32,
 +    pub read: bool,
@@ -971,10 +1070,24 @@ index 0000000..b81b9e1
 +        self.foam_texels as f32 / (tune::GRID * tune::GRID) as f32
 +    }
 +
++    /// How much of the foam born now is kept: all of it under half of
++    /// [`tune::FOAM_COVER_MOST`], none at it.
++    pub fn foam_gain(&self) -> f32 {
++        if !self.read {
++            return 1.0;
++        }
++        1.0 - smoothstep(
++            0.5 * tune::FOAM_COVER_MOST,
++            tune::FOAM_COVER_MOST,
++            self.foam_share(),
++        )
++    }
++
 +    /// The counts in one line, for the console and the log.
 +    pub fn line(&self) -> String {
 +        format!(
-+            "{} pushing, field {}x{} over {} yd, foam on {:.2}% ({} texels), moving {} texels{}",
++            "{} pushing, field {}x{} over {} yd, foam on {:.2}% ({} texels), moving {} texels{}, \
++             fastest {:.1} yd/s with its feet {:.1} yd deep",
 +            self.sources,
 +            tune::GRID,
 +            tune::GRID,
@@ -987,15 +1100,19 @@ index 0000000..b81b9e1
 +            } else {
 +                " (not read back yet)"
 +            },
++            self.fastest,
++            self.fastest_depth,
 +        )
 +    }
 +}
 +
-+/// A body's place the field last stepped to, and whether it was in the water.
++/// A body's place the field last stepped to, its smoothed velocity, and whether it was in the
++/// water.
 +#[derive(Clone, Copy, Debug)]
 +struct Body {
 +    stepped: Vec2,
 +    last: Vec3,
++    vel: Vec2,
 +    wet: bool,
 +    seen: bool,
 +}
@@ -1039,28 +1156,32 @@ index 0000000..b81b9e1
 +    t * t * (3.0 - 2.0 * t)
 +}
 +
-+/// A body's push for this frame: `depth` its feet under the surface (yd), `speed` its planar
-+/// speed (yd/s), `scale` its model's; `None` out of the water or too deep to reach the surface
-+/// (`gate`).
-+pub fn body_source(depth: f32, gate: f32, speed: f32, scale: f32) -> Option<WakeSource> {
++/// A body's push for this frame: `depth` its feet under the surface (yd), `vel` its smoothed
++/// planar velocity (Bevy XZ, yd/s), `scale` its model's; `None` out of the water or too deep to
++/// reach the surface (`gate`).
++pub fn body_source(depth: f32, gate: f32, vel: Vec2, scale: f32) -> Option<WakeSource> {
 +    if depth < tune::WET_FROM || depth > gate {
 +        return None;
 +    }
 +    let wet = smoothstep(tune::WET_FROM, tune::FULL_DEPTH, depth);
-+    let speed = speed.clamp(0.0, tune::PUSH_SPEED_MOST);
++    let speed = vel.length().clamp(0.0, tune::PUSH_SPEED_MOST);
 +    Some(WakeSource {
 +        radius: tune::RADIUS * scale.clamp(0.5, 3.0),
 +        push: tune::PUSH * speed * wet,
 +        foam: tune::BODY_FOAM * (speed / 4.0).min(1.5) * wet,
 +        idle: tune::IDLE_PUSH * wet,
 +        idle_hz: tune::IDLE_HZ,
++        wake: smoothstep(tune::WAKE_FROM, tune::WAKE_FULL, speed) * wet,
++        vel,
++        arm: (tune::ARM_SECS * speed).min(tune::ARM_MOST),
 +        ..default()
 +    })
 +}
 +
-+/// The compute pass's uniform (`look_wakes.wgsl`'s `WakeParams`): seven rows and three a source,
++/// The compute pass's uniform (`look_wakes.wgsl`'s `WakeParams`): nine rows and four a source,
 +/// [`tune::MAX_SOURCES`] of them.
-+pub const PARAM_ROWS: usize = 7 + 3 * tune::MAX_SOURCES;
++pub const PARAM_HEAD_ROWS: usize = 9;
++pub const PARAM_ROWS: usize = PARAM_HEAD_ROWS + 4 * tune::MAX_SOURCES;
 +
 +/// [`PARAM_ROWS`] for this frame.
 +pub fn pack_params(frame: &WakeFrame) -> Vec<[f32; 4]> {
@@ -1076,7 +1197,7 @@ index 0000000..b81b9e1
 +    // The bodies' foam comes in their own rows ([`body_source`]); 1 here takes it as it is.
 +    rows[2] = [1.0, tune::CREST_FOAM, tune::CREST_FROM, tune::FOAM_MOST];
 +    let rain = tune::RAIN_RATE * frame.rain.clamp(0.0, 1.0) * tune::STEP_S;
-+    rows[3] = [rain, tune::RAIN_DROP, tune::SPLASH_FOAM, tune::EDGE_TEXELS];
++    rows[3] = [rain, tune::RAIN_DROP, tune::DROP_FOAM, tune::EDGE_TEXELS];
 +    rows[4] = [
 +        frame.clock,
 +        frame.first_step as f32,
@@ -1090,11 +1211,26 @@ index 0000000..b81b9e1
 +        frame.cell.y as f32,
 +    ];
 +    let n = frame.sources.len().min(tune::MAX_SOURCES);
-+    rows[6] = [if frame.reset { 1.0 } else { 0.0 }, n as f32, 0.0, 0.0];
++    rows[6] = [
++        if frame.reset { 1.0 } else { 0.0 },
++        n as f32,
++        frame.foam_gain.clamp(0.0, 1.0),
++        tune::FOAM_IN_MOST,
++    ];
++    let arm = tune::ARM_DEG.to_radians();
++    rows[7] = [arm.tan(), arm.cos(), tune::ARM_WIDTH, tune::ARM_SPREAD];
++    rows[8] = [
++        tune::ARM_PUSH,
++        tune::ARM_FOAM,
++        tune::ARM_FOAM_FALL,
++        tune::SPLASH_DROPS,
++    ];
 +    for (i, s) in frame.sources.iter().take(n).enumerate() {
-+        rows[7 + 3 * i] = [s.from.x, s.from.y, s.to.x, s.to.y];
-+        rows[8 + 3 * i] = [s.radius, s.push, s.foam, s.splash];
-+        rows[9 + 3 * i] = [s.idle, s.idle_hz, s.phase, 0.0];
++        let r = PARAM_HEAD_ROWS + 4 * i;
++        rows[r] = [s.from.x, s.from.y, s.to.x, s.to.y];
++        rows[r + 1] = [s.radius, s.push, s.foam, s.splash];
++        rows[r + 2] = [s.idle, s.idle_hz, s.phase, s.wake];
++        rows[r + 3] = [s.vel.x, s.vel.y, s.arm, 0.0];
 +    }
 +    rows
 +}
@@ -1176,6 +1312,7 @@ index 0000000..b81b9e1
 +        clock: track.clock,
 +        first_step: track.steps,
 +        rain: weather.map_or(0.0, |w| w.rings()),
++        foam_gain: stats.foam_gain(),
 +        sources: Vec::new(),
 +    };
 +    if pairs > 0 {
@@ -1211,6 +1348,8 @@ index 0000000..b81b9e1
 +    let reach = 0.5 * tune::SPAN_YD + 2.0;
 +    let mut sources: Vec<(f32, WakeSource)> = Vec::new();
 +    let dt = dt.max(1.0e-4);
++    let smooth_k = 1.0 - (-dt / tune::SPEED_SMOOTH_S).exp();
++    let (mut fastest, mut fastest_depth) = (0.0f32, 0.0f32);
 +    for (e, pos, height, scale, bobber) in found {
 +        let flat = Vec2::new(pos.x, pos.z);
 +        if (flat - centre).abs().max_element() > reach {
@@ -1219,6 +1358,7 @@ index 0000000..b81b9e1
 +        let body = track.bodies.entry(e).or_insert(Body {
 +            stepped: flat,
 +            last: pos,
++            vel: Vec2::ZERO,
 +            wet: false,
 +            seen: true,
 +        });
@@ -1227,8 +1367,12 @@ index 0000000..b81b9e1
 +        body.last = pos;
 +        if moved.length() > tune::JUMP_YD || reset {
 +            body.stepped = flat;
++            body.vel = Vec2::ZERO;
++        } else {
++            let raw = Vec2::new(moved.x, moved.z) / dt;
++            body.vel += (raw - body.vel) * smooth_k;
 +        }
-+        let speed = Vec2::new(moved.x, moved.z).length() / dt;
++        let vel = body.vel;
 +        let wow = bevy_to_wow(pos);
 +        let Some(surface) = surface_at(&index, &water, wow) else {
 +            body.wet = false;
@@ -1245,7 +1389,7 @@ index 0000000..b81b9e1
 +            })
 +        } else {
 +            let gate = (2.0 * height).max(1.0);
-+            body_source(depth, gate, speed, scale)
++            body_source(depth, gate, vel, scale)
 +        };
 +        let Some(mut s) = source else {
 +            body.wet = false;
@@ -1259,6 +1403,10 @@ index 0000000..b81b9e1
 +        s.from = body.stepped;
 +        s.to = flat;
 +        s.phase = phase_of(e);
++        if !bobber && vel.length() >= fastest {
++            fastest = vel.length();
++            fastest_depth = depth;
++        }
 +        if pairs > 0 {
 +            body.stepped = flat;
 +        } else {
@@ -1275,6 +1423,8 @@ index 0000000..b81b9e1
 +        .map(|(_, s)| s)
 +        .collect();
 +    stats.sources = next.sources.len();
++    stats.fastest = fastest;
++    stats.fastest_depth = fastest_depth;
 +
 +    track.since_log += dt;
 +    if track.since_log >= tune::LOG_EVERY_S && (stats.sources > 0 || stats.foam_texels > 0) {
@@ -1417,8 +1567,19 @@ index 0000000..b81b9e1
 +    }
 +}
 +
++/// `look_wakes.wgsl`'s `wake_hash`: 0 to 1 for a world texel and a step's number.
++pub fn wake_hash(cell: IVec2, n: u32) -> f32 {
++    let mut h = (cell.x as u32)
++        .wrapping_mul(374_761_393)
++        .wrapping_add((cell.y as u32).wrapping_mul(668_265_263))
++        .wrapping_add(n.wrapping_mul(2_246_822_519));
++    h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
++    h ^= h >> 16;
++    h as f32 * (1.0 / 4_294_967_296.0)
++}
++
 +/// One step `k` of `steps` of the field on the CPU, as `look_wakes.wgsl`'s `step_field`: the
-+/// params are [`pack_params`]'s (the grid's size is the field's own here). No rain, no shift.
++/// params are [`pack_params`]'s (the grid's size is the field's own here). No shift.
 +pub fn cpu_step(field: &CpuField, params: &[[f32; 4]], k: u32) -> CpuField {
 +    let n = field.n as i32;
 +    let [_, dx, dt, steps] = params[0];
@@ -1428,8 +1589,12 @@ index 0000000..b81b9e1
 +    let more = params[3];
 +    let clock = params[4];
 +    let place = params[5];
-+    let count = params[6][1] as usize;
++    let misc = params[6];
++    let arm_p = params[7];
++    let arm2 = params[8];
++    let count = misc[1] as usize;
 +    let kf = k as f32;
++    let smooth = |e0: f32, e1: f32, x: f32| smoothstep(e0, e1, x);
 +    let mut out = CpuField::new(field.n);
 +    for z in 0..n {
 +        for x in 0..n {
@@ -1438,49 +1603,91 @@ index 0000000..b81b9e1
 +            let xr = field.at(x + 1, z);
 +            let zl = field.at(x, z - 1);
 +            let zr = field.at(x, z + 1);
++            let cell = IVec2::new(x + place[2] as i32, z + place[3] as i32);
 +            let pos = Vec2::new(place[0], place[1]) + (Vec2::new(x as f32, z as f32) + 0.5) * dx;
 +            let t = clock[0] + kf * dt;
-+            let (mut press, mut churn, mut splash) = (0.0, 0.0, 0.0);
++            let (mut press, mut churn, mut arms) = (0.0f32, 0.0f32, 0.0f32);
++            let (mut splash, mut drops) = (0.0f32, 0.0f32);
++            let mut carry = Vec2::ZERO;
 +            for i in 0..count {
-+                let s0 = params[7 + 3 * i];
-+                let s1 = params[8 + 3 * i];
-+                let s2 = params[9 + 3 * i];
++                let r = PARAM_HEAD_ROWS + 4 * i;
++                let (s0, s1, s2, s3) = (params[r], params[r + 1], params[r + 2], params[r + 3]);
 +                let r2 = (s1[0] * s1[0]).max(1e-4);
 +                let from = Vec2::new(s0[0], s0[1]);
 +                let to = Vec2::new(s0[2], s0[3]);
 +                let a = from.lerp(to, kf / steps);
 +                let b = from.lerp(to, (kf + 1.0) / steps);
-+                let v = b - a;
-+                let l2 = v.length_squared().max(1e-8);
-+                let sv = ((pos - a).dot(v) / l2).clamp(0.0, 1.0);
-+                let d2 = (pos - a - sv * v).length_squared();
++
++                let v = Vec2::new(s3[0], s3[1]);
++                let sp = v.length();
++                if s2[3] > 0.0 && sp > 0.3 {
++                    let d = v / sp;
++                    let across = Vec2::new(-d.y, d.x);
++                    let rel = pos - b;
++                    let along = -rel.dot(d);
++                    let side = rel.dot(across);
++                    let reach = s3[2];
++                    let line = s1[0] + along.max(0.0) * arm_p[0];
++                    if along > -1.0 && along < reach + 1.5 && side.abs() < line + 1.2 {
++                        let off = (side.abs() - line).abs() * arm_p[1];
++                        let wid = arm_p[2] + arm_p[3] * along.max(0.0);
++                        let on_len =
++                            smooth(-s1[0], 0.3, along) * (1.0 - smooth(0.7 * reach, reach, along));
++                        let g_arm = (-off * off / (wid * wid)).exp() * on_len * s2[3];
++                        press += s1[1] * arm2[0] * g_arm;
++                        churn += arm2[1] * g_arm * (-along.max(0.0) / arm2[2]).exp();
++                        arms += g_arm;
++                        let m = smooth(-1.0, 0.0, along)
++                            * (1.0 - smooth(reach, reach + 1.5, along))
++                            * (1.0 - smooth(line + 0.4, line + 1.2, side.abs()))
++                            * s2[3];
++                        let sign = if side > 0.0 {
++                            1.0
++                        } else if side < 0.0 {
++                            -1.0
++                        } else {
++                            0.0
++                        };
++                        carry += across * (m * sp * arm_p[0] * sign);
++                    }
++                }
++
++                let seg = b - a;
++                let l2 = seg.length_squared().max(1e-8);
++                let sv = ((pos - a).dot(seg) / l2).clamp(0.0, 1.0);
++                let d2 = (pos - a - sv * seg).length_squared();
 +                if d2 > 9.0 * r2 {
 +                    continue;
 +                }
 +                let g = (-d2 / r2).exp();
 +                press += (s1[1] + s2[0] * (std::f32::consts::TAU * s2[1] * t + s2[2]).sin()) * g;
 +                churn += s1[2] * (-d2 / (1.69 * r2)).exp() * (d2 / r2).clamp(0.0, 1.0);
-+                if k == 0 {
++                if k == 0 && s1[3] > 0.0 {
 +                    splash += s1[3] * (-d2 / (2.25 * r2)).exp();
++                    let ring = d2.sqrt() - 2.2 * s1[0];
++                    if wake_hash(cell, (clock[1] as u32).wrapping_add(7919)) < arm2[3] {
++                        drops += s1[3] * (-ring * ring / (0.36 * r2)).exp();
++                    }
 +                }
 +            }
 +            let lap = (xl[1] + xr[1] + zl[1] + zr[1] - 4.0 * s[1]) / (dx * dx);
 +            let mut h = s[0] - dt * lap;
 +            let mut phi = s[1] - dt * (wave[0] * h + press) - splash;
++            if more[0] > 0.0 && wake_hash(cell, (clock[1] as u32).wrapping_add(k)) < more[0] {
++                phi -= more[1];
++            }
 +            let edge = x.min(n - 1 - x).min(z.min(n - 1 - z)) as f32;
 +            let e = (edge / more[3].max(1.0)).clamp(0.0, 1.0);
 +            let keep = wave[1] * (1.0 - 0.2 * (1.0 - e) * (1.0 - e));
 +            h *= keep;
 +            phi *= keep;
 +            let drift = Vec2::new(xr[1] - xl[1], zr[1] - zl[1]) / (2.0 * dx);
-+            let back = Vec2::new(x as f32, z as f32) + 0.5 - drift * (wave[3] * dt / dx);
++            let back = Vec2::new(x as f32, z as f32) + 0.5 - (drift * wave[3] + carry) * (dt / dx);
 +            let rise = (h - s[0]) / dt;
-+            let crest = (rise - foam_p[2]).max(0.0) * if h > 0.0 { 1.0 } else { 0.0 };
-+            let foam = ((field.foam_at(back)
-+                + (churn * foam_p[0] + crest * foam_p[1]) * dt
-+                + splash * more[2])
-+                * wave[2])
-+                .min(foam_p[3]);
++            let crest =
++                (rise - foam_p[2]).max(0.0) * if h > 0.0 { 1.0 } else { 0.0 } * arms.min(1.0);
++            let born = ((churn * foam_p[0] + crest * foam_p[1]) * dt).min(misc[3] * dt) * misc[2];
++            let foam = ((field.foam_at(back) + born + drops * more[2]) * wave[2]).min(foam_p[3]);
 +            out.texels[(z * n + x) as usize] = [h, phi, foam, 0.0];
 +        }
 +    }
@@ -1492,26 +1699,31 @@ index 0000000..b81b9e1
 +    use super::*;
 +
 +    /// A body crossing a CPU field at `speed` yd/s along +X for `secs`, then (optionally) stopping
-+    /// for `rest` more: the field, its corner, and the body's end.
-+    fn run(speed: f32, secs: f32, rest: f32, depth: f32) -> (CpuField, Vec2, Vec2) {
++    /// for `rest` more, in `rain` (0 to 1): the field, its corner, and the body's end. Its speed is
++    /// smoothed as [`publish_wakes`] smooths it.
++    fn run(speed: f32, secs: f32, rest: f32, depth: f32, rain: f32) -> (CpuField, Vec2, Vec2) {
 +        let n = 96;
 +        let origin = Vec2::ZERO;
 +        let mut field = CpuField::new(n);
 +        let mut pos = Vec2::new(4.0, 12.0);
++        let mut vel = Vec2::ZERO;
 +        let mut frame = WakeFrame {
 +            on: true,
 +            reset: false,
 +            pairs: 1,
++            rain,
 +            ..default()
 +        };
 +        let pair_s = 2.0 * tune::STEP_S;
++        let smooth_k = 1.0 - (-pair_s / tune::SPEED_SMOOTH_S).exp();
 +        let moving = (secs / pair_s) as u32;
 +        let total = moving + (rest / pair_s) as u32;
 +        let mut wet = false;
 +        for i in 0..total {
-+            let v = if i < moving { speed } else { 0.0 };
-+            let next = pos + Vec2::new(v * pair_s, 0.0);
-+            let mut s = body_source(depth, 4.0, v, 1.0).expect("in the water");
++            let target = if i < moving { speed } else { 0.0 };
++            vel += (Vec2::new(target, 0.0) - vel) * smooth_k;
++            let next = pos + vel * pair_s;
++            let mut s = body_source(depth, 4.0, vel, 1.0).expect("in the water");
 +            if !wet {
 +                s.splash = tune::SPLASH;
 +                wet = true;
@@ -1520,6 +1732,7 @@ index 0000000..b81b9e1
 +            s.to = next;
 +            frame.sources = vec![s];
 +            frame.clock = i as f32 * pair_s;
++            frame.first_step = 2 * i;
 +            let mut params = pack_params(&frame);
 +            params[0][0] = n as f32;
 +            params[5] = [origin.x, origin.y, 0.0, 0.0];
@@ -1534,72 +1747,152 @@ index 0000000..b81b9e1
 +        f.texel_of(o, p).map_or(0.0, |t| t[2])
 +    }
 +
-+    /// The reference's swimmer: at the swim speed (4.72 yd/s) the foam lies behind him in a V,
-+    /// on both sides of his track and opening out the further back it lies; none ahead of him.
++    fn most_foam(f: &CpuField) -> f32 {
++        f.texels.iter().map(|t| t[2]).fold(0.0f32, f32::max)
++    }
++
++    /// The reference's swimmer: at the swim speed (4.72 yd/s) the foam lies behind him in a V of
++    /// two arms, each trailing from his side at about 19.5° from his track, white along the arm
++    /// and clear between them; none ahead of him.
 +    #[test]
-+    fn a_swimmer_leaves_a_v_of_foam_behind_him() {
-+        let (f, o, end) = run(4.72, 2.0, 0.0, 1.0);
-+        // Ahead of him: calm, no foam.
-+        assert_eq!(foam(&f, o, end + Vec2::new(2.0, 0.0)), 0.0);
-+        // The V's half-width at 1.5 and 3 yd behind him: the widest foam either side.
-+        let half_width = |back: f32| {
-+            let mut w = [0.0f32; 2];
-+            for (side, sign) in [(0, 1.0f32), (1, -1.0)] {
-+                for j in 0..40 {
++    fn a_swimmer_leaves_a_v_of_two_foam_arms() {
++        let (f, o, end) = run(4.72, 2.5, 0.0, 1.0, 0.0);
++        assert!(
++            foam(&f, o, end + Vec2::new(1.5, 0.0)) < 0.05,
++            "calm ahead of him"
++        );
++        let tan = tune::ARM_DEG.to_radians().tan();
++        for back in [1.5f32, 2.5, 3.5, 4.5] {
++            // Each side's whitest texel across the track, and where it lies.
++            for sign in [1.0f32, -1.0] {
++                let (mut best, mut at) = (0.0f32, 0.0f32);
++                for j in 0..16 {
 +                    let off = j as f32 * TEXEL_YD;
-+                    if foam(&f, o, end + Vec2::new(-back, sign * off)) > 0.3 {
-+                        w[side] = off;
++                    let v = foam(&f, o, end + Vec2::new(-back, sign * off));
++                    if v > best {
++                        (best, at) = (v, off);
 +                    }
 +                }
++                let arm = tune::RADIUS + back * tan;
++                assert!(
++                    best > 0.6,
++                    "{back} yd back, side {sign}: white on the arm ({best})"
++                );
++                assert!(
++                    (at - arm).abs() <= 0.6,
++                    "{back} yd back, side {sign}: the arm at {at} yd out, the V's at {arm}"
++                );
 +            }
-+            w
++            // Clear between the arms.
++            let mid = foam(&f, o, end + Vec2::new(-back, 0.0));
++            assert!(mid < 0.3, "{back} yd back: clear between the arms ({mid})");
++        }
++        // It opens out: the arms lie further apart further back.
++        let foamy = |back: f32| -> f32 {
++            (0..16)
++                .map(|j| j as f32 * TEXEL_YD)
++                .filter(|&off| foam(&f, o, end + Vec2::new(-back, off)) > 0.5)
++                .fold(0.0f32, f32::max)
 +        };
-+        let near = half_width(1.5);
-+        let far = half_width(3.0);
 +        assert!(
-+            near[0] > 0.0 && near[1] > 0.0,
-+            "foam both sides near: {near:?}"
++            foamy(4.0) > foamy(1.5) + 0.5,
++            "{} then {}",
++            foamy(1.5),
++            foamy(4.0)
 +        );
-+        assert!(
-+            far[0] > near[0] && far[1] > near[1],
-+            "it opens out: {near:?} then {far:?}"
-+        );
-+        assert!(far[0] < 3.0, "a V, not a flood: {far:?}");
++        // A V, not a flood.
++        let white = f.texels.iter().filter(|t| t[2] > 0.3).count();
++        assert!((100..900).contains(&white), "{white} foamy texels");
 +    }
 +
 +    /// A hero standing still in the shallows breathes gentle rings and no foam.
 +    #[test]
 +    fn a_still_hero_makes_rings_not_foam() {
-+        let (f, o, end) = run(0.0, 0.0, 3.0, 0.8);
-+        let mut most_foam = 0.0f32;
++        let (f, o, end) = run(0.0, 0.0, 3.0, 0.8, 0.0);
 +        let mut ring = 0.0f32;
 +        for z in 0..f.n {
 +            for x in 0..f.n {
 +                let t = f.texels[z * f.n + x];
 +                let p = o + (Vec2::new(x as f32, z as f32) + 0.5) * TEXEL_YD;
-+                let r = (p - end).length();
-+                most_foam = most_foam.max(t[2]);
-+                if (1.5..3.0).contains(&r) {
++                if (1.5..3.0).contains(&(p - end).length()) {
 +                    ring = ring.max(t[0].abs());
 +                }
 +            }
 +        }
-+        assert!(most_foam < 0.3, "no foam, not even round him: {most_foam}");
-+        assert!(ring > 0.001 && ring < 0.05, "gentle rings: {ring} yd");
++        assert!(
++            most_foam(&f) < 0.05,
++            "no foam, not even round him: {}",
++            most_foam(&f)
++        );
++        assert!(ring > 0.0005 && ring < 0.05, "gentle rings: {ring} yd");
 +    }
 +
-+    /// The wake fades: a second and a half after the swimmer stops, little foam is left, and the
-+    /// field never grows.
++    /// Rain dimples the water with rings and never foams it (the first filming's rain whitened
++    /// 91% of the lake), with a hero standing in it.
++    #[test]
++    fn rain_makes_rings_not_foam() {
++        let (f, _, _) = run(0.0, 0.0, 3.0, 0.8, 1.0);
++        let moving = f.texels.iter().filter(|t| t[0].abs() > 0.005).count();
++        assert!(moving > 500, "the drops' rings: {moving} moving texels");
++        assert!(most_foam(&f) < 0.05, "no foam: {}", most_foam(&f));
++    }
++
++    /// The wake fades: half a second after the swimmer stops the arms are still there, a second
++    /// and a half after little foam is left; and the field never grows.
 +    #[test]
 +    fn the_wake_fades_and_the_field_stays_calm() {
-+        let (f, _, _) = run(4.72, 1.5, 2.0, 1.0);
-+        let foam: usize = f.texels.iter().filter(|t| t[2] > 0.3).count();
-+        let (moving, _, _) = run(4.72, 1.5, 0.0, 1.0);
-+        let had: usize = moving.texels.iter().filter(|t| t[2] > 0.3).count();
-+        assert!(had > 50, "{had} foamy texels while he swims");
-+        let most = f.texels.iter().map(|t| t[0].abs()).fold(0.0f32, f32::max);
-+        assert!(foam < 6, "{foam} foamy texels left");
++        let count = |f: &CpuField| f.texels.iter().filter(|t| t[2] > 0.3).count();
++        let (moving, _, _) = run(4.72, 2.0, 0.0, 1.0, 0.0);
++        let (half, _, _) = run(4.72, 2.0, 0.5, 1.0, 0.0);
++        let (gone, _, _) = run(4.72, 2.0, 1.5, 1.0, 0.0);
++        let (had, mid, left) = (count(&moving), count(&half), count(&gone));
++        assert!(had > 100, "{had} foamy texels while he swims");
++        assert!(mid > had / 4 && mid < had, "fading: {had} then {mid}");
++        assert!(left < had / 20, "{left} foamy texels left of {had}");
++        let most = gone
++            .texels
++            .iter()
++            .map(|t| t[0].abs())
++            .fold(0.0f32, f32::max);
 +        assert!(most < 0.2, "the field stays small: {most} yd");
++    }
++
++    /// A body coming in throws a few droplets on a ring round it, soft and thin: no disc of foam
++    /// over it.
++    #[test]
++    fn a_splash_throws_droplets_not_a_disc() {
++        let (f, o, end) = run(0.0, 0.0, 2.0 * tune::STEP_S, 0.8, 0.0);
++        let (mut inside, mut drops, mut most) = (0.0f32, 0, 0.0f32);
++        for z in 0..f.n {
++            for x in 0..f.n {
++                let t = f.texels[z * f.n + x];
++                let r = (o + (Vec2::new(x as f32, z as f32) + 0.5) * TEXEL_YD - end).length();
++                if r < tune::RADIUS {
++                    inside = inside.max(t[2]);
++                }
++                if t[2] > 0.05 {
++                    drops += 1;
++                }
++                most = most.max(t[2]);
++            }
++        }
++        assert!(inside < 0.05, "none over him: {inside}");
++        assert!((2..40).contains(&drops), "a few droplets: {drops}");
++        assert!(most < 0.6, "thin, so the water draws them soft: {most}");
++    }
++
++    /// The foam is held back as the field fills, so nothing can whiten the lake.
++    #[test]
++    fn foam_is_held_back_as_the_field_fills() {
++        let at = |share: f32| WakeStats {
++            foam_texels: (share * (tune::GRID * tune::GRID) as f32) as u32,
++            read: true,
++            ..default()
++        };
++        assert_eq!(at(0.005).foam_gain(), 1.0, "a swimmer's V");
++        assert!(at(0.03).foam_gain() < 0.6);
++        assert!(at(tune::FOAM_COVER_MOST).foam_gain() < 1e-3, "none at the most");
++        assert_eq!(WakeStats::default().foam_gain(), 1.0, "nothing read yet");
 +    }
 +
 +    #[test]
@@ -1633,16 +1926,20 @@ index 0000000..b81b9e1
 +
 +    #[test]
 +    fn a_body_pushes_only_in_the_water_and_harder_as_it_goes() {
-+        assert!(body_source(0.0, 4.0, 4.0, 1.0).is_none(), "dry");
++        let swim = Vec2::new(4.0, 0.0);
++        assert!(body_source(0.0, 4.0, swim, 1.0).is_none(), "dry");
 +        assert!(
-+            body_source(5.0, 4.0, 4.0, 1.0).is_none(),
++            body_source(5.0, 4.0, swim, 1.0).is_none(),
 +            "too deep to reach the top"
 +        );
-+        let shin = body_source(0.2, 4.0, 4.0, 1.0).unwrap();
-+        let waist = body_source(1.0, 4.0, 4.0, 1.0).unwrap();
-+        assert!(shin.push < waist.push && shin.foam < waist.foam);
-+        let still = body_source(1.0, 4.0, 0.0, 1.0).unwrap();
-+        assert_eq!((still.push, still.foam), (0.0, 0.0));
++        let shin = body_source(0.2, 4.0, swim, 1.0).unwrap();
++        let waist = body_source(1.0, 4.0, swim, 1.0).unwrap();
++        assert!(shin.push < waist.push && shin.foam < waist.foam && shin.wake < waist.wake);
++        assert_eq!(waist.wake, 1.0, "a swimmer's full V");
++        assert_eq!(waist.vel, swim);
++        assert!((waist.arm - tune::ARM_SECS * 4.0).abs() < 1e-5);
++        let still = body_source(1.0, 4.0, Vec2::ZERO, 1.0).unwrap();
++        assert_eq!((still.push, still.foam, still.wake), (0.0, 0.0, 0.0));
 +        assert!(still.idle > 0.0, "a still body breathes rings");
 +    }
 +
@@ -1665,9 +1962,10 @@ index 0000000..b81b9e1
 +        assert_eq!(p.len(), PARAM_ROWS);
 +        assert_eq!(p[0][3], 4.0, "two pairs, four steps");
 +        assert_eq!(p[4][2..], [3.0, -1.0]);
-+        assert_eq!(p[6][..2], [1.0, 1.0]);
-+        assert_eq!(p[7], [1.0, 2.0, 3.0, 4.0]);
-+        assert_eq!(p[8][0], 0.4);
++        assert_eq!(p[6][..3], [1.0, 1.0, 1.0]);
++        assert!((p[7][0] - 0.354).abs() < 1e-3, "the arms' tan at 19.5°");
++        assert_eq!(p[PARAM_HEAD_ROWS], [1.0, 2.0, 3.0, 4.0]);
++        assert_eq!(p[PARAM_HEAD_ROWS + 1][0], 0.4);
 +        assert_eq!(water_row(&WakeFrame::default()), [0.0; 4]);
 +    }
 +
@@ -1675,7 +1973,7 @@ index 0000000..b81b9e1
 +    #[test]
 +    fn the_shader_takes_the_packed_rows() {
 +        let src = include_str!("../shaders/look_wakes.wgsl");
-+        assert!(src.contains(&format!("src: array<vec4<f32>, {}>", 3 * tune::MAX_SOURCES)));
++        assert!(src.contains(&format!("src: array<vec4<f32>, {}>", 4 * tune::MAX_SOURCES)));
 +        let rows_before_src = src
 +            .split("struct WakeParams {")
 +            .nth(1)
@@ -1685,7 +1983,7 @@ index 0000000..b81b9e1
 +            .unwrap()
 +            .matches("vec4<f32>,")
 +            .count();
-+        assert_eq!(rows_before_src, 7);
++        assert_eq!(rows_before_src, PARAM_HEAD_ROWS);
 +    }
 +
 +    #[test]
@@ -1713,7 +2011,7 @@ index 0000000..b81b9e1
 +}
 diff --git a/crates/benilla-world/src/look/wakes_pass.rs b/crates/benilla-world/src/look/wakes_pass.rs
 new file mode 100644
-index 0000000..d980557
+index 0000000..2190cc8
 --- /dev/null
 +++ b/crates/benilla-world/src/look/wakes_pass.rs
 @@ -0,0 +1,212 @@
@@ -1723,7 +2021,7 @@ index 0000000..d980557
 +//!
 +//! A step reads one field image and writes the other; steps run in pairs, so the frame's field
 +//! always ends in [`WAKE_FIELD`], which the liquid material binds. The compute pass is one span,
-+//! `look_wakes`, in the fps journal's `gpu_look` column.
++//! `look_wakes`, in the fps journal's `gpu_look` column and named on its `GPU_PASSES` line.
 +
 +use bevy::prelude::*;
 +use bevy::render::diagnostic::RecordDiagnostics;
@@ -1930,10 +2228,10 @@ index 0000000..d980557
 +    graph.add_node_edge(LookWakesLabel, bevy::render::graph::CameraDriverLabel);
 +}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index ec1dc9f..eec0e64 100644
+index ec1dc9f..0f14ec5 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -46,16 +46,34 @@ pub mod tune {
+@@ -46,16 +46,38 @@ pub mod tune {
      pub const MIRROR: f32 = 1.0;
      /// The yards of water that let through about a third (1/e) of the bed's light at
      /// `lookwater _ 1`: Elwynn's lakes are clear, the bed shows to about two yards deep.
@@ -1963,16 +2261,20 @@ index ec1dc9f..eec0e64 100644
 +    pub const HAZE_YD: f32 = 0.7;
 +    /// The bed seen through moving water: it is drawn back from the tilt of the surface by this
 +    /// many yards per unit of slope per yard of depth (to [`REFRACT_DEPTH`] deep), so it wavers
-+    /// under the ripples and the wakes. `lookwater refract` holds a multiple of it.
-+    pub const REFRACT: f32 = 1.0;
-+    pub const REFRACT_DEPTH: f32 = 2.0;
++    /// under the ripples and the wakes. `lookwater refract` holds a multiple of it. 3.5, was 1:
++    /// the first filming's bed barely wavered (a day's ripple tilts the surface about 0.08, so
++    /// half a yard down the bed moved under 0.05 yd, a pixel or two from 16 yd); now about
++    /// 0.15 yd there, a few pixels, and more under a wake. The deep bed is mostly hidden by the
++    /// water's body, so its bend stops growing at 1.5 yd (was 2).
++    pub const REFRACT: f32 = 3.5;
++    pub const REFRACT_DEPTH: f32 = 1.5;
 +    /// Faint moving light on the shallow bed in the sun, a share of the bed's light at most.
 +    /// `lookwater caustics` holds a multiple of it.
 +    pub const CAUSTICS: f32 = 0.35;
      /// Ripples: the normal's slope at the big octave's peak, and that octave's wavelength in yards
      /// (the small one is a third of it). Calm (dawn, dusk, night: glassy) to breeze (day), and how
      /// much rougher a full storm makes it.
-@@ -142,8 +160,10 @@ pub mod tune {
+@@ -142,8 +164,10 @@ pub mod tune {
      /// Shore foam: under this many yards deep, strongest just off the waterline, at this most.
      pub const FOAM_DEPTH: f32 = 0.5;
      /// 0.6, was 0.75: the shore's band read a fairly bright, even white on the first films; the
@@ -1985,7 +2287,7 @@ index ec1dc9f..eec0e64 100644
      /// Froth round something standing in the water (a wading hero's legs, a post), where the
      /// shore's band drew a crisp, thin, bright oval at the waterline: [`FROTH_TAPS`] points on the
      /// surface within [`FROTH_YD`] of a pixel find the step in the bed the legs make, and the froth
-@@ -214,8 +234,13 @@ pub mod tune {
+@@ -214,8 +238,13 @@ pub mod tune {
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
  ///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), rain rings]` ·
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
@@ -2001,7 +2303,7 @@ index ec1dc9f..eec0e64 100644
  
  /// `worldWater` and the film's hold: `on` (on by default, inert under the classic look); `reflect`
  /// holds the mirror at a multiple of the tuned one, `clarity` the clarity (`lookwater`).
-@@ -373,6 +398,7 @@ pub fn pack_rows(
+@@ -373,6 +402,7 @@ pub fn pack_rows(
      light: &WowLighting,
      sky: &super::SkyFrame,
      rings: f32,
@@ -2009,7 +2311,7 @@ index ec1dc9f..eec0e64 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -388,7 +414,7 @@ pub fn pack_rows(
+@@ -388,7 +418,7 @@ pub fn pack_rows(
          } else {
              sky.moon_clear
          };
@@ -2018,7 +2320,7 @@ index ec1dc9f..eec0e64 100644
      }
      // The sky's reflection: the hour's dome, toward the fog under cloud.
      let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
-@@ -430,6 +456,20 @@ pub fn pack_rows(
+@@ -430,6 +460,20 @@ pub fn pack_rows(
          tune::OCEAN_CLEAR_YD * clarity,
          rings,
      ];
@@ -2039,7 +2341,7 @@ index ec1dc9f..eec0e64 100644
      rows
  }
  
-@@ -440,14 +480,19 @@ pub(crate) fn publish_water(
+@@ -440,14 +484,19 @@ pub(crate) fn publish_water(
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
      weather: Option<Res<super::WeatherLook>>,
@@ -2060,7 +2362,7 @@ index ec1dc9f..eec0e64 100644
      };
      if *frame != next {
          *frame = next;
-@@ -520,7 +565,27 @@ mod tests {
+@@ -520,7 +569,28 @@ mod tests {
          }
      }
  
@@ -2078,6 +2380,7 @@ index ec1dc9f..eec0e64 100644
 +            clock: 0.0,
 +            first_step: 0,
 +            rain: 0.0,
++            foam_gain: 1.0,
 +            sources: Vec::new(),
 +        },
 +        &LookWakes {
@@ -2089,7 +2392,7 @@ index ec1dc9f..eec0e64 100644
  
      #[test]
      fn the_block_is_zero_when_off() {
-@@ -530,6 +595,7 @@ mod tests {
+@@ -530,6 +600,7 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -2097,7 +2400,7 @@ index ec1dc9f..eec0e64 100644
          );
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
-@@ -544,6 +610,7 @@ mod tests {
+@@ -544,6 +615,7 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -2105,7 +2408,7 @@ index ec1dc9f..eec0e64 100644
          );
          assert_eq!(rows[0], [1.0, tune::MIRROR, tune::CLEAR_YD, tune::FOAM]);
          assert_eq!(rows[7][0], tune::SSR_REACH);
-@@ -555,6 +622,7 @@ mod tests {
+@@ -555,6 +627,7 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.7,
@@ -2113,7 +2416,7 @@ index ec1dc9f..eec0e64 100644
          );
          assert_eq!(rain[9][3], 0.7, "the rain's rings");
          let held = LookWater {
-@@ -562,7 +630,7 @@ mod tests {
+@@ -562,7 +635,7 @@ mod tests {
              clarity: Some(0.5),
              ..default()
          };
@@ -2122,17 +2425,18 @@ index ec1dc9f..eec0e64 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -836,6 +904,9 @@ mod tests {
+@@ -836,6 +909,10 @@ mod tests {
          assert_eq!(f("WATER_MOON_GLINT_MEAN"), tune::MOON_GLINT_MEAN);
          assert_eq!(f("WATER_NIGHT_FLECKS"), tune::NIGHT_FLECKS);
          assert_eq!(f("WATER_NIGHT_FLECK_LANE"), tune::NIGHT_FLECK_LANE);
 +        assert_eq!(f("WATER_REFRACT_DEPTH"), tune::REFRACT_DEPTH);
 +        assert_eq!(f("WAKE_FOAM_FROM"), crate::look::wakes::tune::FOAM_FROM);
 +        assert_eq!(f("WAKE_FOAM_EDGE"), crate::look::wakes::tune::FOAM_EDGE);
++        assert_eq!(f("WAKE_FOAM_VEIL"), crate::look::wakes::tune::FOAM_VEIL);
          let taps = read("WATER_FROTH_TAPS", "u32");
          assert_eq!(
              taps.trim_end_matches('u').parse::<u32>().unwrap(),
-@@ -843,10 +914,65 @@ mod tests {
+@@ -843,10 +920,65 @@ mod tests {
          );
      }
  
@@ -2201,7 +2505,7 @@ index ec1dc9f..eec0e64 100644
      }
  
      /// Under the painted sky the mirror takes its rows, and the cloud over the sun dims the glint;
-@@ -859,8 +985,9 @@ mod tests {
+@@ -859,8 +991,9 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -2212,7 +2516,7 @@ index ec1dc9f..eec0e64 100644
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
              minute: 720.0,
-@@ -868,8 +995,8 @@ mod tests {
+@@ -868,8 +1001,8 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
@@ -2252,10 +2556,10 @@ index 9f53ed0..6ec8351 100644
  }
 diff --git a/crates/benilla-world/src/shaders/look_wakes.wgsl b/crates/benilla-world/src/shaders/look_wakes.wgsl
 new file mode 100644
-index 0000000..7e3bd32
+index 0000000..2ce2636
 --- /dev/null
 +++ b/crates/benilla-world/src/shaders/look_wakes.wgsl
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,214 @@
 +// The new look's wakes (`look::wakes`, benilla's own, no reference behaviour): one step of the
 +// ripple field round the camera. Each texel holds the surface's height (yd), its velocity
 +// potential (yd²/s, the water's drift is its gradient) and its foam:
@@ -2263,9 +2567,12 @@ index 0000000..7e3bd32
 +// A linear shallow-water wave, stepped symplectically so it stays stable at any frame rate:
 +//   h' = h − dt·∇²φ        φ' = (φ − dt·(c²·h' + p))
 +// both kept by the wave's life each step, where p is the pressure the bodies in the water push
-+// with. Foam is carried by the drift ∇φ, born where a body moves through the water and on the
-+// rising crests it sends out (the trailing V), and fades over its life. `look::wakes::cpu_step` is
-+// this step in Rust for the tests (keep in sync).
++// with. A moving body also pushes along the two arms of a Kelvin wake (about 19.5° either side of
++// its track, trailing from its sides) and lays foam along them and at its sides; the foam on the
++// arms is carried outward with them, so it stays a crisp white V of streaks, and fades over its
++// life. Only the arms and the bodies make foam: a still body's breathing, a raindrop and a
++// splash's rings never do (a splash throws a few droplets). `look::wakes::cpu_step` is this step
++// in Rust for the tests (keep in sync).
 +
 +struct WakeParams {
 +    // [grid texels, texel (yd), step (s), steps this frame]
@@ -2274,17 +2581,22 @@ index 0000000..7e3bd32
 +    wave: vec4<f32>,
 +    // [body foam scale, crest foam, crest from (yd/s), foam most]
 +    foam: vec4<f32>,
-+    // [rain drops a texel a step, rain drop (yd²/s), splash foam per splash, edge texels]
++    // [rain drops a texel a step, rain drop (yd²/s), droplet foam, edge texels]
 +    more: vec4<f32>,
 +    // [clock at the first step (s), first step's number, shift x, shift z (texels)]
 +    clock: vec4<f32>,
 +    // [origin x, origin z (yd), origin cell x, origin cell z]
 +    place: vec4<f32>,
-+    // [reset, sources, 0, 0]
++    // [reset, sources, foam gain, foam a texel takes a second at most]
 +    misc: vec4<f32>,
-+    // Three rows a source: [from x, from z, to x, to z] (yd, over the whole frame) ·
-+    // [radius (yd), push, foam, splash] · [idle push, idle Hz, phase, 0].
-+    src: array<vec4<f32>, 96>,
++    // The Kelvin arms: [tan of their angle, its cos, width (yd), widening a yard back]
++    arm: vec4<f32>,
++    // [arm push (a share of the body's), arm foam a second, arm foam falls over (yd), droplets]
++    arm2: vec4<f32>,
++    // Four rows a source: [from x, from z, to x, to z] (yd, over the whole frame) ·
++    // [radius (yd), push, foam, splash] · [idle push, idle Hz, phase, wake 0-1] ·
++    // [velocity x, z (yd/s), arm length (yd), 0].
++    src: array<vec4<f32>, 128>,
 +};
 +
 +@group(0) @binding(0) var field_in: texture_2d<f32>;
@@ -2359,22 +2671,55 @@ index 0000000..7e3bd32
 +    let xr = wake_load(c + vec2<i32>(1, 0));
 +    let zl = wake_load(c - vec2<i32>(0, 1));
 +    let zr = wake_load(c + vec2<i32>(0, 1));
++    // World-anchored, so raindrops and droplets do not slide with the field.
++    let cell = c + vec2<i32>(i32(p.place.z), i32(p.place.w));
 +
-+    // The bodies: the pressure each pushes with along its path through this step, the foam it
-+    // churns at its sides, and the splash of one that came in this frame.
++    // The bodies: the pressure each pushes with along its path through this step and along its
++    // wake's arms, the foam it lays at its sides and on the arms, the arms' outward carry, and the
++    // splash of one that came in this frame with its droplets.
 +    let x = p.place.xy + (vec2<f32>(c) + vec2<f32>(0.5)) * dx;
 +    let t = p.clock.x + k * dt;
 +    var press = 0.0;
 +    var churn = 0.0;
++    var arms = 0.0;
++    var carry = vec2<f32>(0.0);
 +    var splash = 0.0;
++    var drops = 0.0;
 +    let count = u32(p.misc.y);
 +    for (var i = 0u; i < count; i = i + 1u) {
-+        let s0 = p.src[3u * i];
-+        let s1 = p.src[3u * i + 1u];
-+        let s2 = p.src[3u * i + 2u];
++        let s0 = p.src[4u * i];
++        let s1 = p.src[4u * i + 1u];
++        let s2 = p.src[4u * i + 2u];
++        let s3 = p.src[4u * i + 3u];
 +        let r2 = max(s1.x * s1.x, 1e-4);
 +        let a = mix(s0.xy, s0.zw, k / steps);
 +        let b = mix(s0.xy, s0.zw, (k + 1.0) / steps);
++
++        // The Kelvin arms, behind a moving body: `along` yards back from it, `side` across.
++        let sp = length(s3.xy);
++        if (s2.w > 0.0 && sp > 0.3) {
++            let d = s3.xy / sp;
++            let across = vec2<f32>(-d.y, d.x);
++            let rel = x - b;
++            let along = -dot(rel, d);
++            let side = dot(rel, across);
++            let reach = s3.z;
++            let line = s1.x + max(along, 0.0) * p.arm.x;
++            if (along > -1.0 && along < reach + 1.5 && abs(side) < line + 1.2) {
++                let off = abs(abs(side) - line) * p.arm.y;
++                let wid = p.arm.z + p.arm.w * max(along, 0.0);
++                let on_len = smoothstep(-s1.x, 0.3, along) * (1.0 - smoothstep(0.7 * reach, reach, along));
++                let g_arm = exp(-off * off / (wid * wid)) * on_len * s2.w;
++                press += s1.y * p.arm2.x * g_arm;
++                churn += p.arm2.y * g_arm * exp(-max(along, 0.0) / p.arm2.z);
++                arms += g_arm;
++                // Outward from the track as fast as the arm moves, so its foam rides on it.
++                let m = smoothstep(-1.0, 0.0, along) * (1.0 - smoothstep(reach, reach + 1.5, along))
++                    * (1.0 - smoothstep(line + 0.4, line + 1.2, abs(side))) * s2.w;
++                carry += across * (m * sp * p.arm.x * sign(side));
++            }
++        }
++
 +        let d2 = wake_seg_d2(x, a, b);
 +        if (d2 > 9.0 * r2) {
 +            continue;
@@ -2382,8 +2727,13 @@ index 0000000..7e3bd32
 +        let g = exp(-d2 / r2);
 +        press += (s1.y + s2.x * sin(6.2831853 * s2.y * t + s2.z)) * g;
 +        churn += s1.z * exp(-d2 / (1.69 * r2)) * clamp(d2 / r2, 0.0, 1.0);
-+        if (step.x == 0u) {
++        if (step.x == 0u && s1.w > 0.0) {
 +            splash += s1.w * exp(-d2 / (2.25 * r2));
++            // A few droplets on a ring round it, not a disc.
++            let ring = sqrt(d2) - 2.2 * s1.x;
++            if (wake_hash(cell, u32(p.clock.y) + 7919u) < p.arm2.w) {
++                drops += s1.w * exp(-ring * ring / (0.36 * r2));
++            }
 +        }
 +    }
 +
@@ -2391,8 +2741,7 @@ index 0000000..7e3bd32
 +    let lap = (xl.y + xr.y + zl.y + zr.y - 4.0 * s.y) / (dx * dx);
 +    var h = s.x - dt * lap;
 +    var phi = s.y - dt * (p.wave.x * h + press) - splash;
-+    // Raindrops, world-anchored so they do not slide with the field.
-+    let cell = c + vec2<i32>(i32(p.place.z), i32(p.place.w));
++    // Raindrops: rings only.
 +    if (p.more.x > 0.0 && wake_hash(cell, u32(p.clock.y) + step.x) < p.more.x) {
 +        phi -= p.more.y;
 +    }
@@ -2403,13 +2752,15 @@ index 0000000..7e3bd32
 +    h *= keep;
 +    phi *= keep;
 +
-+    // The foam, carried back along the drift, born on the rising crests and at the bodies.
++    // The foam, carried back along the drift and out with the arms; born at the bodies' sides,
++    // on the arms and on the crests rising along them, never more than a texel takes a second,
++    // and less while the field is already foamy (`misc.z`).
 +    let drift = vec2<f32>(xr.y - xl.y, zr.y - zl.y) / (2.0 * dx);
-+    let back = vec2<f32>(c) + vec2<f32>(0.5) - drift * (p.wave.w * dt / dx);
++    let back = vec2<f32>(c) + vec2<f32>(0.5) - (drift * p.wave.w + carry) * (dt / dx);
 +    let rise = (h - s.x) / dt;
-+    let crest = max(rise - p.foam.z, 0.0) * select(0.0, 1.0, h > 0.0);
-+    var foam = wake_foam_at(back) + (churn * p.foam.x + crest * p.foam.y) * dt
-+        + splash * p.more.z;
++    let crest = max(rise - p.foam.z, 0.0) * select(0.0, 1.0, h > 0.0) * min(arms, 1.0);
++    let born = min((churn * p.foam.x + crest * p.foam.y) * dt, p.misc.w * dt) * p.misc.z;
++    var foam = wake_foam_at(back) + born + drops * p.more.z;
 +    foam = min(foam * p.wave.z, p.foam.w);
 +
 +    textureStore(field_out, c, vec4<f32>(h, phi, foam, 0.0));
