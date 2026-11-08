@@ -1,0 +1,15 @@
+# #215's god rays toward the visible sun (heading 45, where the client's sun stands), from ridgepoint,
+# golden (worldclock 1050), the view tilted up 30. Then 1.12's look the same way.
+hero warrior
+cam 45 30 7
+include _setup
+4.2 .es dummy clear
+4.5 .es goto ridgepoint
+6.0 lua ConsoleExec("worldclock 1050")
+6.1 lua ClearWorldFog()
+6.2 lua UIParent:Hide()
+7.5 shots new 3 0.6
+10.0 lua SetCVar("worldLook","0")
+10.1 lua ClearWorldFog()
+11.5 shots old 2 0.6
+13.5 end

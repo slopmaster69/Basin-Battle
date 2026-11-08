@@ -1,4 +1,4 @@
-From 304175f2a297969296c6f7fe7218c1f4d43dfa40 Mon Sep 17 00:00:00 2001
+From 15a18f5809331817f3248cc478e3a4f3415ae8ee Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:26:57 -0700
 Subject: [PATCH] Contact shadows you notice, no band at the water's edge, a
@@ -36,40 +36,87 @@ Tuning from the first films of the contact shadows (#262) and the water
   ring round every reed base in the shallows). The shore's
   band is a little dimmer (0.75 to 0.6) and patchy with the ripples.
 
+Revised after the third films (#270, take 273, and the laptop's take 275 on
+#268):
+
+- The moon's lane was one unbroken milky ribbon that widened and brightened
+  toward the camera (its brightest, 254, at the bottom of the frame), and
+  1.12's white ripple flecks covered the rest of the lake. The lane is now
+  broken into glints (a sparkle on the surface whose tops alone shine, its
+  mean far off so nothing crawls), dimmer at the moon's mirror point and
+  brightest a little beyond it, cut short toward the camera (0.05 rad, was
+  0.12) and faded out within 10 yd of it; its unbroken path is fainter
+  (0.05, was 0.12). By night 1.12's flecks keep a fifth of their light off
+  the lane.
+- The water read a quarter brighter after worldLook 0 and back: the zone's
+  grade started its 3 s ramp over on the switch, and the stills a second
+  later caught the night grade a third of the way in. The ramp now follows
+  the zone under the classic look too, so the grade comes back at once.
+- The wading froth still drew a thin, crisp, pale oval round the shins and
+  a line across the gap between the legs. It is strongest at a leg and
+  fades out over a reach that wanders along the outline with a noise (0.3
+  to 1.2 times 0.45 yd), cut into lumps by a finer noise, with none where
+  legs lie on both sides of a pixel, and no shore band beside them; at most
+  0.45, was 0.55.
+- Golden hour facing the sun: the look's own god rays and bloom whitened
+  the sky from the sun upward (the same with the painted sky off). The
+  17:30 key's bloom is 0.30 (was 0.50) and rays 0.6 (was 0.9), and a sky
+  pixel takes a third of the rays (RAY_SKY_SHARE 0.35): over open sky every
+  march finds sky, so they were a glow, not shafts.
+- looksky clouds 0 left one bright cloud. No cover now sets the field's
+  threshold over its peak (it eases to the old line at a clear day's 0.1),
+  so 0 is an empty sky.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
- crates/benilla-assets/src/shaders/liquid.wgsl |  99 ++++++++-
- crates/benilla-world/src/look/grade.rs        |  26 ++-
- crates/benilla-world/src/look/water.rs        | 202 +++++++++++++++++-
- 3 files changed, 300 insertions(+), 27 deletions(-)
+ crates/benilla-assets/src/shaders/liquid.wgsl | 155 +++++++++-
+ crates/benilla-world/src/look/grade.rs        |  33 ++-
+ crates/benilla-world/src/look/mod.rs          |  28 +-
+ crates/benilla-world/src/look/sky.rs          |  47 ++-
+ crates/benilla-world/src/look/water.rs        | 272 +++++++++++++++++-
+ .../benilla-world/src/shaders/world_look.wgsl |   9 +-
+ 6 files changed, 505 insertions(+), 39 deletions(-)
 
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index db5da61..bd56d15 100644
+index db5da61..621c15a 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
-@@ -223,6 +223,20 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
+@@ -223,6 +223,33 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
  const WATER_SSR_STEPS: u32 = 24u;
  const WATER_SSR_REFINE: u32 = 5u;
  const WATER_SSR_START: f32 = 0.3;
-+// `look::water::tune`'s `SSR_EDGE` and `SSR_BREAK`, `FROTH`, `FROTH_YD`, `FROTH_REACH` and
-+// `FROTH_TAPS` (keep in sync; `look::water`'s tests compare them).
++// `look::water::tune`'s `SSR_EDGE` and `SSR_BREAK`, `FROTH`, `FROTH_YD`, `FROTH_WOBBLE`,
++// `FROTH_CUT_FREQ`, `FROTH_REACH` and `FROTH_TAPS` (keep in sync; `look::water`'s tests compare
++// them).
 +const WATER_SSR_EDGE: f32 = 0.22;
 +const WATER_SSR_BREAK: f32 = 0.6;
-+const WATER_FROTH: f32 = 0.55;
++const WATER_FROTH: f32 = 0.45;
 +const WATER_FROTH_YD: f32 = 0.45;
++const WATER_FROTH_WOBBLE: f32 = 3.3;
++const WATER_FROTH_CUT_FREQ: f32 = 4.7;
 +const WATER_FROTH_REACH: f32 = 40.0;
 +const WATER_FROTH_TAPS: u32 = 6u;
 +// `look::water::tune`'s `MOON_LANE_FAR`, `MOON_LANE_NEAR` and `MOON_SHEEN_LANE` (the same test
 +// compares them): the moon's lane runs this far below its elevation (radians) toward the horizon,
 +// this far above toward the camera, and its faint unbroken path is this wide.
 +const WATER_MOON_FAR: f32 = 0.5;
-+const WATER_MOON_NEAR: f32 = 0.12;
++const WATER_MOON_NEAR: f32 = 0.05;
 +const WATER_MOON_SHEEN_LANE: f32 = 0.07;
++// `MOON_CORE`, `MOON_NEAR_YD`, the glints' `MOON_GLINT_*` and the night's `NIGHT_FLECKS` and
++// `NIGHT_FLECK_LANE` (the same test compares them).
++const WATER_MOON_CORE: f32 = 0.35;
++const WATER_MOON_NEAR_YD: f32 = 10.0;
++const WATER_MOON_GLINT_FREQ: f32 = 2.2;
++const WATER_MOON_GLINT_CUT: f32 = 0.58;
++const WATER_MOON_GLINT_GAIN: f32 = 1.3;
++const WATER_MOON_GLINT_MEAN: f32 = 0.25;
++const WATER_NIGHT_FLECKS: f32 = 0.2;
++const WATER_NIGHT_FLECK_LANE: f32 = 0.12;
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
  // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
  const WATER_SHADOW_TAPS: u32 = 6u;
-@@ -333,7 +347,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+@@ -333,7 +360,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
              }
              let uh = water_uv(view.clip_from_world * vec4<f32>(P + R * hi, 1.0));
              let border = min(min(uh.x, 1.0 - uh.x), min(uh.y, 1.0 - uh.y));
@@ -80,7 +127,7 @@ index db5da61..bd56d15 100644
              return vec4<f32>(textureSampleLevel(scene_tex, scene_samp, uh, 0.0).rgb, weight);
          }
          t_prev = t;
-@@ -477,6 +493,28 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
+@@ -477,6 +506,43 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
      return water_decode(water_encode(sky) * (1.0 - c.a) + c.rgb);
  }
  
@@ -103,13 +150,46 @@ index db5da61..bd56d15 100644
 +    let across = dot(rf, side) / width;
 +    let el = atan2(R.y, ahead) - asin(clamp(L.y, -1.0, 1.0));
 +    let along = el / select(WATER_MOON_NEAR, WATER_MOON_FAR, el < 0.0);
-+    return exp(-(across * across) - along * along);
++    // Dimmer at the mirror point itself, brightest a little beyond it toward the horizon, so the
++    // lane lies out across the water rather than pooling in front of the camera.
++    let out = WATER_MOON_CORE + (1.0 - WATER_MOON_CORE) * smoothstep(0.0, 0.4 * WATER_MOON_FAR, -el);
++    return exp(-(across * across) - along * along) * out;
++}
++
++// The moon lane's glints at `p` (the surface's XZ) at `t`: a sparkle whose tops alone shine, so
++// the lane is small glints, never one ribbon; where a sparkle cell is under a pixel (`fp`, yards a
++// pixel) it is its mean, so far water does not crawl.
++fn water_moon_glints(p: vec2<f32>, t: f32, fp: f32) -> f32 {
++    let k = WATER_MOON_GLINT_FREQ;
++    let a = water_noise(p * k + vec2<f32>(0.31, -0.23) * t).x;
++    let b = water_noise(p * (2.3 * k) + vec2<f32>(17.0, 3.0) - vec2<f32>(0.19, 0.27) * t).x;
++    let sparkle = smoothstep(WATER_MOON_GLINT_CUT, 1.0, 0.6 * a + 0.4 * b) * WATER_MOON_GLINT_GAIN;
++    let fine = 1.0 - smoothstep(0.25 / k, 1.0 / k, fp);
++    return mix(WATER_MOON_GLINT_MEAN, sparkle, fine);
 +}
 +
  // One texel's compare of the sun-shadow map, and a bilinear-weighted compare of the four around
  // `t` (texel units), as terrain.wgsl's.
  fn water_shadow_texel(c: vec2<i32>, layer: i32, z: f32, lim: i32) -> f32 {
-@@ -614,28 +652,73 @@ fn look_water(
+@@ -590,8 +656,15 @@ fn look_water(
+         vec3<f32>(1.0),
+     );
+     var body = water_decode(mix(sh, dp, smoothstep(0.0, water.rows[6].w, depth_v)) * lit_g);
+-    // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term).
+-    body += water_decode((in.secondary_vtx + vec3<f32>(0.25)) * detail.a) * water.rows[9].x * shore;
++    // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term). By night (the
++    // glint is the moon's lane, a negative sharpness) its white flecks keep a share off the lane.
++    var flecks = water.rows[9].x;
++    if (water.rows[2].w < 0.0) {
++        let R_flat = normalize(vec3<f32>(-V.x, max(V.y, 0.01), -V.z));
++        let on_lane = water_moon_lane(R_flat, normalize(water.rows[1].xyz), WATER_NIGHT_FLECK_LANE);
++        flecks *= mix(WATER_NIGHT_FLECKS, 1.0, clamp(on_lane, 0.0, 1.0));
++    }
++    body += water_decode((in.secondary_vtx + vec3<f32>(0.25)) * detail.a) * flecks * shore;
+ 
+     // How much of the bed's light comes through: e^(−path / clarity).
+     var clarity = water.rows[0].z;
+@@ -614,28 +687,90 @@ fn look_water(
      if (fres > 0.01) {
          hit = water_reflection(P, R, jitter, water.rows[7].x);
      }
@@ -140,8 +220,11 @@ index db5da61..bd56d15 100644
 +        } else {
 +            let L = normalize(body_dir);
 +            let R_flat = vec3<f32>(-V.x, max(V.y, 0.01), -V.z);
-+            spec = water_moon_lane(R, L, -sharp)
-+                + water.rows[8].w * water_moon_lane(normalize(R_flat), L, WATER_MOON_SHEEN_LANE);
++            // Nearer the camera than `WATER_MOON_NEAR_YD` on the surface the lane fades out.
++            let reach = smoothstep(0.5 * WATER_MOON_NEAR_YD, WATER_MOON_NEAR_YD, length(to_cam.xz));
++            spec = (water_moon_lane(R, L, -sharp) * water_moon_glints(P.xz, t, fp)
++                + water.rows[8].w * water_moon_lane(normalize(R_flat), L, WATER_MOON_SHEEN_LANE))
++                * reach;
 +        }
          glint = water.rows[2].rgb * (water.rows[1].w * spec * vis * shore);
      }
@@ -151,16 +234,24 @@ index db5da61..bd56d15 100644
 -    let band = smoothstep(0.0, 0.04, depth_v) * (1.0 - smoothstep(0.15 * fd, fd, depth_v));
 +    // Something standing in the water (a wading hero's legs, a post) is a step in the bed behind
 +    // the surface, where the shore is a slope: a ring of points round P on the surface each read
-+    // the bed under them. `stand` is the share whose bed is a step shallower than P's (P is
-+    // beside the legs: froth), `on_step` whether P is itself on a step's shallow side (in front of
-+    // the legs, where the shore's band would draw a crisp ring hugging their outline).
++    // the bed under them. `stand` is how near a step shallower than P's lies (P is beside the
++    // legs: froth), out to a reach that wanders along the outline with the noise, so the froth is
++    // lumps of varying width that fade into the ripples, never an even line; `on_step` whether P
++    // is itself on a step's shallow side (on the legs under the surface, where the shore's band
++    // would draw a crisp ring hugging their outline). Steps on both sides of P (the gap between
++    // two legs) make no froth, so nothing joins the legs.
 +    var stand = 0.0;
 +    var on_step = 0.0;
++    var hits = 0.0;
 +    if (eye_z < WATER_FROTH_REACH && water.rows[0].w > 0.0) {
++        let wob = water_noise(P.xz * WATER_FROTH_WOBBLE + vec2<f32>(0.07, -0.05) * t).x;
++        let reach = WATER_FROTH_YD * (0.3 + 0.9 * wob);
++        var pull = vec2<f32>(0.0);
 +        for (var k = 0u; k < WATER_FROTH_TAPS; k = k + 1u) {
 +            let ang = f32(k) * 2.3999632 + jitter * 6.2831853;
 +            let r = WATER_FROTH_YD * sqrt((f32(k) + 0.5) / f32(WATER_FROTH_TAPS));
-+            let Q = P + vec3<f32>(cos(ang) * r, 0.0, sin(ang) * r);
++            let dir = vec2<f32>(cos(ang), sin(ang));
++            let Q = P + vec3<f32>(dir.x * r, 0.0, dir.y * r);
 +            let cq = view.clip_from_world * vec4<f32>(Q, 1.0);
 +            if (cq.w <= 0.05) {
 +                continue;
@@ -170,28 +261,34 @@ index db5da61..bd56d15 100644
 +                continue;
 +            }
 +            let dq = max(cam.y - Q.y, 0.0) * max(zq - cq.w, 0.0) / cq.w;
-+            stand += (1.0 - smoothstep(0.1 * fd, fd, dq))
++            let ledge = (1.0 - smoothstep(0.1 * fd, fd, dq))
 +                * smoothstep(0.5 * fd, 1.5 * fd, depth_v - dq);
++            stand = max(stand, ledge * (1.0 - smoothstep(0.3 * reach, reach, r)));
++            pull += dir * ledge;
++            hits += ledge;
 +            on_step = max(on_step, smoothstep(0.5 * fd, 1.5 * fd, dq - depth_v));
 +        }
-+        stand = stand / f32(WATER_FROTH_TAPS);
++        stand *= smoothstep(0.35, 0.75, length(pull) / max(hits, 1e-3));
 +    }
++    // The shore's band, off the legs and off the froth's ground beside them.
 +    let band = smoothstep(0.0, 0.06, depth_v) * (1.0 - smoothstep(0.1 * fd, fd, depth_v))
-+        * (1.0 - on_step);
++        * (1.0 - on_step) * (1.0 - smoothstep(0.0, 2.0, hits));
      let na = water_noise(P.xz * 0.9 + vec2<f32>(0.05, -0.03) * t).x;
      let nb = water_noise(P.xz * 2.7 + vec2<f32>(31.0, 7.0) - vec2<f32>(0.11, 0.07) * t).x;
      let lap = 0.5 + 0.5 * sin(depth_v / fd * 9.0 - t * 1.4 + na * 4.0);
 -    let foam = water.rows[0].w * band
 -        * smoothstep(0.42, 0.78, 0.45 * na + 0.25 * nb + 0.35 * lap)
-+    // The shore's band, patchy with the noise and the ripples; the froth lumpier and finer.
++    // The shore's band, patchy with the noise and the ripples; the froth cut by a finer noise into
++    // lumps with gaps between, thinning over the ripples.
 +    let shore_mask = smoothstep(0.38, 0.86, 0.4 * na + 0.25 * nb + 0.3 * lap + 0.15 * rip);
-+    let froth_mask = smoothstep(0.25, 0.75, 0.55 * nb + 0.3 * na + 0.25 * rip);
++    let nc = water_noise(P.xz * WATER_FROTH_CUT_FREQ + vec2<f32>(-7.0, 13.0) + vec2<f32>(0.13, -0.09) * t).x;
++    let froth_mask = smoothstep(0.42, 0.8, 0.6 * nc + 0.25 * nb + 0.2 * rip);
 +    let foam = min(water.rows[0].w * band * shore_mask + WATER_FROTH * stand * froth_mask, 1.0)
          * (1.0 - smoothstep(60.0, 120.0, eye_z));
      let foam_rgb = water_decode(lit_g) * 0.8;
  
 diff --git a/crates/benilla-world/src/look/grade.rs b/crates/benilla-world/src/look/grade.rs
-index ac8e1d4..e8762af 100644
+index ac8e1d4..da2fa86 100644
 --- a/crates/benilla-world/src/look/grade.rs
 +++ b/crates/benilla-world/src/look/grade.rs
 @@ -57,8 +57,9 @@ pub struct PostLook {
@@ -248,9 +345,17 @@ index ac8e1d4..e8762af 100644
      ),
      // Golden hour.
      key(
-@@ -286,7 +289,9 @@ pub const ELWYNN: [GradeKey; 7] = [
+@@ -284,9 +287,16 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.95, 0.75, 0.50, 0.40),
+         Tint::new(0.98, 0.78, 0.55, 0.25),
          2.0,
-         [1.12, 1.12, 0.18, 0.50, 0.15, 0.9],
+-        [1.12, 1.12, 0.18, 0.50, 0.15, 0.9],
++        // Bloom 0.30, was 0.50, and rays 0.6, was 0.9: facing the sun at 17:30 the look's own
++        // bloom and god rays whitened the sky from the sun upward into one sheet, the same with
++        // the painted sky off (the laptop's take 275 on #268), where 1.12's look shows a blue sky
++        // and a hand-sized glare. The rays over open sky also take only a share now
++        // (`world_look.wgsl`'s `RAY_SKY_SHARE`); shafts through the trees keep the gold.
++        [1.12, 1.12, 0.18, 0.30, 0.15, 0.6],
          // Low sun, long shade: the contact shadows at their strongest, cool against the gold.
 -        [1.0, 0.6],
 +        // 2.0: x2 of the first pass: at 1x the first films (#262) could not find it; at 2x it read as a soft yard-wide shade along the step, under the
@@ -259,7 +364,7 @@ index ac8e1d4..e8762af 100644
      ),
      // Dusk: rose and violet.
      key(
-@@ -298,7 +303,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+@@ -298,7 +308,8 @@ pub const ELWYNN: [GradeKey; 7] = [
          Tint::new(0.75, 0.45, 0.70, 0.35),
          1.5,
          [1.05, 1.08, 0.05, 0.45, 0.35, 0.5],
@@ -269,11 +374,147 @@ index ac8e1d4..e8762af 100644
      ),
      key(
          21,
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index aa9be1c..5bd1b3f 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -191,11 +191,15 @@ pub fn graded(
+     dt: f32,
+     suppressed: bool,
+ ) -> (Atmosphere, PostLook, f32) {
++    // The ramp follows the zone under the classic look too, so `worldLook 1` brings the zone's
++    // grade back at once where the player already stands in it. It started over on the switch,
++    // and the third night film's stills a second after `worldLook 1` (take 273's `tuned-again`)
++    // caught the grade a third of the way in: the night's water a quarter brighter than before
++    // the switch, its moon lane narrower.
++    ramp.advance(zone, dt);
+     if !look.on {
+-        *ramp = ZoneRamp::default();
+         return (atmo, PostLook::NEUTRAL, 0.0);
+     }
+-    ramp.advance(zone, dt);
+     let table = ramp.zone.and_then(zone_grade);
+     match table {
+         Some(keys) if !suppressed && ramp.weight > 0.0 => {
+@@ -342,7 +346,8 @@ mod tests {
+         assert!((ramp.weight - 0.5).abs() < 1e-6);
+     }
+ 
+-    /// `worldLook 0`: the sample comes back untouched, with no post values, at full zone weight.
++    /// `worldLook 0`: the sample comes back untouched, with no post values; the zone's ramp keeps
++    /// its weight, so `worldLook 1` grades at once.
+     #[test]
+     fn the_classic_look_returns_the_sample_untouched() {
+         let atmo = Atmosphere::DEFAULT;
+@@ -367,10 +372,21 @@ mod tests {
+         assert!(post.is_neutral());
+         assert_eq!(strength, 0.0);
+         assert_eq!(
+-            ramp,
+-            ZoneRamp::default(),
+-            "the ramp starts over on switching back"
++            ramp.weight, 1.0,
++            "the ramp keeps following the zone under the classic look"
++        );
++        // Switching back in the zone: the grade at once, not over the zone's ramp.
++        let (_, post, strength) = graded(
++            WorldLook::NEW,
++            &mut ramp,
++            Some(ELWYNN_ZONE),
++            atmo,
++            1050.0,
++            0.016,
++            false,
+         );
++        assert_eq!(strength, 1.0);
++        assert!(!post.is_neutral());
+     }
+ 
+     #[test]
+diff --git a/crates/benilla-world/src/look/sky.rs b/crates/benilla-world/src/look/sky.rs
+index 4060641..52b0707 100644
+--- a/crates/benilla-world/src/look/sky.rs
++++ b/crates/benilla-world/src/look/sky.rs
+@@ -65,6 +65,11 @@ pub mod tune {
+     /// cover keeps a few more breaks (its threshold 0.36, was 0.33), a full one still covers
+     /// most of the sky.
+     pub const THRESHOLD_FULL: f32 = 0.26;
++    /// The threshold at no cover at all, over the field's peak (it never passes 1), so `looksky
++    /// clouds 0` is an empty sky: the laptop's take 275 on #268 found one bright cloud left at 0.
++    /// It eases down to the straight line's value at a clear day's cover ([`CLEAR_COVER`]), so a
++    /// clear day keeps its few clouds.
++    pub const THRESHOLD_NONE: f32 = 1.0;
+     pub const SOFTNESS: f32 = 0.13;
+     pub const OPACITY: f32 = 0.9;
+     pub const OPACITY_OVERCAST: f32 = 0.97;
+@@ -391,6 +396,20 @@ pub fn cover(input: &SkyInputs, light: &WowLighting) -> f32 {
+     base + (tune::OVERCAST_COVER - base).max(0.0) * storm
+ }
+ 
++/// The cloud field's threshold at `cover` (0 none to 1 overcast): from [`tune::THRESHOLD_CLEAR`]
++/// to [`tune::THRESHOLD_FULL`] along the cover, and under a clear day's cover up toward
++/// [`tune::THRESHOLD_NONE`], over the field's peak, so no cover is no cloud.
++pub fn threshold(cover: f32) -> f32 {
++    let line = |c: f32| tune::THRESHOLD_CLEAR + (tune::THRESHOLD_FULL - tune::THRESHOLD_CLEAR) * c;
++    let c = cover.clamp(0.0, 1.0);
++    if c >= tune::CLEAR_COVER {
++        line(c)
++    } else {
++        let t = c / tune::CLEAR_COVER;
++        tune::THRESHOLD_NONE + (line(tune::CLEAR_COVER) - tune::THRESHOLD_NONE) * t
++    }
++}
++
+ /// The layer's rows for this frame ([`SKY_ROWS`]); all zero, no layer, when `on` is false.
+ pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4]; SKY_ROWS] {
+     let mut rows = [[0.0; 4]; SKY_ROWS];
+@@ -429,7 +448,7 @@ pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4];
+     });
+     rows[0] = [
+         1.0,
+-        tune::THRESHOLD_CLEAR + (tune::THRESHOLD_FULL - tune::THRESHOLD_CLEAR) * cover,
++        threshold(cover),
+         tune::SOFTNESS,
+         tune::OPACITY + (tune::OPACITY_OVERCAST - tune::OPACITY) * overcast,
+     ];
+@@ -894,7 +913,31 @@ mod tests {
+         assert!((cover(&input(720.0, None), &storm) - tune::OVERCAST_COVER).abs() < 1e-5);
+         assert_eq!(cover(&input(720.0, Some(0.8)), &storm), 0.8);
+         let rows = pack_rows(true, &input(720.0, Some(0.0)), &noon());
+-        assert!((rows[0][1] - tune::THRESHOLD_CLEAR).abs() < 1e-6);
++        assert!((rows[0][1] - tune::THRESHOLD_NONE).abs() < 1e-6);
++    }
++
++    /// `looksky clouds 0` is an empty sky (take 275 found one bright cloud left): its threshold
++    /// sits over the field's peak, and no direction sees a cloud. A clear day's cover keeps the
++    /// straight line's threshold, and the threshold falls as the cover grows.
++    #[test]
++    fn no_cover_is_no_cloud() {
++        assert!(threshold(0.0) >= 1.0);
++        let line = tune::THRESHOLD_CLEAR
++            + (tune::THRESHOLD_FULL - tune::THRESHOLD_CLEAR) * tune::CLEAR_COVER;
++        assert!((threshold(tune::CLEAR_COVER) - line).abs() < 1e-6);
++        let mut last = f32::MAX;
++        for i in 0..=20 {
++            let t = threshold(i as f32 / 20.0);
++            assert!(t < last, "falls with the cover at {i}");
++            last = t;
++        }
++        let rows = pack_rows(true, &input(720.0, Some(0.0)), &noon());
++        for i in 0..400 {
++            let a = i as f32 * 0.37;
++            let up = 0.15 + 0.8 * ((i * 7) % 100) as f32 / 100.0;
++            let dir = Vec3::new(a.cos(), up, a.sin()).normalize();
++            assert_eq!(cover_toward(dir, &rows), 0.0, "a cloud toward {dir}");
++        }
+     }
+ 
+     /// The sun's halo is up by day and gone by night; the moon's the other way.
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index 51196b7..1aef9da 100644
+index 51196b7..c4c6e6b 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -72,8 +72,27 @@ pub mod tune {
+@@ -72,8 +72,53 @@ pub mod tune {
      /// Blinn sharpness, and the moon's (broader, a path across the water, pale and faint).
      pub const SUN_GLINT: f32 = 6.0;
      pub const SUN_SHARPNESS: f32 = 900.0;
@@ -294,16 +535,42 @@ index 51196b7..1aef9da 100644
 +    /// sharpness, negative, which marks the lane in `liquid.wgsl` (the sun's is a Blinn lobe).
 +    pub const MOON_LANE: f32 = 0.045;
 +    pub const MOON_LANE_FAR: f32 = 0.5;
-+    pub const MOON_LANE_NEAR: f32 = 0.12;
++    /// 0.05, was 0.12: on the third night film (take 273, 23:30, the moon 41° up) the lane widened
++    /// and brightened toward the camera, 25 px wide at mid-frame and 160 at the bottom edge, its
++    /// brightest (254) at the bottom. The mirror point of a high moon lies a few yards in front of
++    /// a camera 4 yd up, so the near side of the lane is cut short ([`MOON_CORE`],
++    /// [`MOON_NEAR_YD`] as well) and the lane lies out across the water.
++    pub const MOON_LANE_NEAR: f32 = 0.05;
++    /// The lane at the moon's mirror point, a share of its brightest: it is brightest a little
++    /// beyond it, toward the horizon (over the first two fifths of [`MOON_LANE_FAR`]).
++    pub const MOON_CORE: f32 = 0.35;
++    /// The lane fades out nearer the camera than this (yards on the surface, from half of it), so
++    /// it never pools at the bottom of the frame.
++    pub const MOON_NEAR_YD: f32 = 10.0;
++    /// The lane's glints: a sparkle across the surface (this many cells a yard, scrolling with the
++    /// ripples) cut so only its tops shine, from [`MOON_GLINT_CUT`] up, at most
++    /// [`MOON_GLINT_GAIN`]; far off, where a cell is under a pixel, it is its mean
++    /// [`MOON_GLINT_MEAN`]. Take 273 found the lane one unbroken milky ribbon: the brightest pixel
++    /// of each of its 490 rows never under 90, the median 194.
++    pub const MOON_GLINT_FREQ: f32 = 2.2;
++    pub const MOON_GLINT_CUT: f32 = 0.58;
++    pub const MOON_GLINT_GAIN: f32 = 1.3;
++    pub const MOON_GLINT_MEAN: f32 = 0.25;
 +    /// Under the glints, a faint unbroken lane off the flat water, this share of them and
 +    /// [`MOON_SHEEN_LANE`] radians wide: the pale path the glints sit in (the sun's soft sheen,
-+    /// [`SHEEN`], is the moon's no longer).
-+    pub const MOON_SHEEN: f32 = 0.12;
++    /// [`SHEEN`], is the moon's no longer). 0.05, was 0.12: with the glints on top it read as the
++    /// milky ribbon.
++    pub const MOON_SHEEN: f32 = 0.05;
 +    pub const MOON_SHEEN_LANE: f32 = 0.07;
++    /// By night 1.12's own white ripple flecks ([`CLASSIC_RIPPLES`]) keep this share off the
++    /// moon's lane, all of it within about [`NIGHT_FLECK_LANE`] radians of its bearing: take 273
++    /// found them white confetti over the whole dark lake.
++    pub const NIGHT_FLECKS: f32 = 0.2;
++    pub const NIGHT_FLECK_LANE: f32 = 0.12;
      pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
      /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
      /// cloud: a full overcast keeps this share of it.
-@@ -86,9 +105,27 @@ pub mod tune {
+@@ -86,9 +131,35 @@ pub mod tune {
      pub const SHADOW_DIM: f32 = 0.3;
      /// The reflection march: how far a mirrored ray is followed (yards).
      pub const SSR_REACH: f32 = 160.0;
@@ -324,15 +591,23 @@ index 51196b7..1aef9da 100644
 +    /// shore's band drew a crisp, thin, bright oval at the waterline: [`FROTH_TAPS`] points on the
 +    /// surface within [`FROTH_YD`] of a pixel find the step in the bed the legs make, and the froth
 +    /// spreads that far out from their outline, lumpy and thinning, at most this strong.
-+    pub const FROTH: f32 = 0.55;
++    /// Revised after take 273, which still found a thin, crisp, pale oval round the shins (151
++    /// against water at 45, about 5 px wide) and a fainter line across the gap between the legs:
++    /// the froth is now strongest at a step and fades out over a reach that wanders along the
++    /// outline with a noise of [`FROTH_WOBBLE`] cells a yard (0.3 to 1.2 times [`FROTH_YD`]), cut
++    /// into lumps by a finer one ([`FROTH_CUT_FREQ`]), none where steps lie on both sides (between
++    /// the legs), and no shore band beside a step; 0.45, was 0.55, at most.
++    pub const FROTH: f32 = 0.45;
 +    pub const FROTH_YD: f32 = 0.45;
++    pub const FROTH_WOBBLE: f32 = 3.3;
++    pub const FROTH_CUT_FREQ: f32 = 4.7;
 +    pub const FROTH_TAPS: u32 = 6;
 +    /// The froth's reach (planar eye depth, yards): past it a hero's legs are a few pixels wide.
 +    pub const FROTH_REACH: f32 = 40.0;
      /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
      /// hard edge.
      pub const SHORE_SOFT: f32 = 0.15;
-@@ -213,7 +250,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
+@@ -213,7 +284,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
  
  /// The glint's body this frame: the visible sun while it is up, else the white moon, each fading
  /// in as it rises and dimmed by cloud: `(camera to body, strength, colour (linear), sharpness)`;
@@ -342,7 +617,7 @@ index 51196b7..1aef9da 100644
  pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
      let rise = |dir: Vec3| {
          smoothstep(
-@@ -239,7 +277,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
+@@ -239,7 +311,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
          moon,
          tune::MOON_GLINT * rise(moon) * cloud,
          tune::MOON_TINT,
@@ -351,7 +626,7 @@ index 51196b7..1aef9da 100644
      )
  }
  
-@@ -308,7 +346,13 @@ pub fn pack_rows(
+@@ -308,7 +380,13 @@ pub fn pack_rows(
          tune::FOAM_DEPTH,
          tune::SHORE_SOFT,
      ];
@@ -366,7 +641,7 @@ index 51196b7..1aef9da 100644
      rows[9] = [
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
-@@ -429,8 +473,116 @@ mod tests {
+@@ -429,8 +507,142 @@ mod tests {
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
      }
  
@@ -394,7 +669,9 @@ index 51196b7..1aef9da 100644
 +            } else {
 +                tune::MOON_LANE_NEAR
 +            };
-+        (-(across * across) - along * along).exp()
++        let out = tune::MOON_CORE
++            + (1.0 - tune::MOON_CORE) * smoothstep(0.0, 0.4 * tune::MOON_LANE_FAR, -el);
++        (-(across * across) - along * along).exp() * out
 +    }
 +
 +    /// The second night film's lake at 23:30, facing the moon (41° up), the camera 4 yd over calm
@@ -422,6 +699,9 @@ index 51196b7..1aef9da 100644
 +        let tx = ty * 16.0 / 9.0;
 +        let (mut water, mut bright, mut far_off, mut peak) = (0, 0, 0, 0.0f32);
 +        let (mut old_bright, mut old_far_off) = (0, 0);
++        // The lane's light near the camera (under 8 yd out on the surface) and out over the lake
++        // (12 to 40 yd), each pixel's light summed, and their pixels.
++        let (mut near_sum, mut near_n, mut out_sum, mut out_n) = (0.0f32, 0, 0.0f32, 0);
 +        for j in 0..h {
 +            for i in 0..w {
 +                let sx = ((i as f32 + 0.5) / w as f32 * 2.0 - 1.0) * tx;
@@ -443,10 +723,21 @@ index 51196b7..1aef9da 100644
 +                r.y = r.y.max(0.01);
 +                let r = r.normalize();
 +                let rf = Vec3::new(d.x, -d.y, d.z);
-+                let spec = moon_lane(r, l, -sharp)
-+                    + tune::MOON_SHEEN * moon_lane(rf, l, tune::MOON_SHEEN_LANE);
++                // Yards out on the surface from under a camera 4 yd up.
++                let yd = 4.0 * Vec2::new(d.x, d.z).length() / -d.y;
++                let reach = smoothstep(0.5 * tune::MOON_NEAR_YD, tune::MOON_NEAR_YD, yd);
++                let spec = (moon_lane(r, l, -sharp)
++                    + tune::MOON_SHEEN * moon_lane(rf, l, tune::MOON_SHEEN_LANE))
++                    * reach;
 +                let g = strength * spec * color[2];
 +                peak = peak.max(g);
++                if yd < 8.0 {
++                    near_sum += g;
++                    near_n += 1;
++                } else if (12.0..40.0).contains(&yd) {
++                    out_sum += g;
++                    out_n += 1;
++                }
 +                let bearing = (d.z / Vec2::new(d.x, d.z).length()).asin().abs();
 +                if g > 0.25 {
 +                    bright += 1;
@@ -474,6 +765,16 @@ index 51196b7..1aef9da 100644
 +            "a narrow lane: {share} of the water"
 +        );
 +        assert_eq!(far_off, 0, "nothing bright far off the moon's line");
++        // Take 273: the lane brightened toward the camera, its brightest at the bottom of the
++        // frame. It lies out across the lake now, dark by the camera.
++        let (near, out) = (
++            near_sum / near_n.max(1) as f32,
++            out_sum / out_n.max(1) as f32,
++        );
++        assert!(
++            near_n > 0 && out_n > 0 && near < 0.5 * out,
++            "near the camera {near}, out over the lake {out}"
++        );
 +        assert!(
 +            old_share > 4.0 * share && old_far_off > 0,
 +            "0070's lobe: {old_share} bright, {old_far_off} far off"
@@ -485,7 +786,7 @@ index 51196b7..1aef9da 100644
      #[test]
      fn the_glint_follows_the_sun_then_the_moon() {
          let day = noon();
-@@ -447,7 +599,7 @@ mod tests {
+@@ -447,7 +659,7 @@ mod tests {
          let (dir, s, color, sharp) = glint(&night);
          assert!((dir - night.moon_dir_white).length() < 1e-6);
          assert!((s - tune::MOON_GLINT).abs() < 1e-4);
@@ -494,7 +795,7 @@ index 51196b7..1aef9da 100644
          let dark = WowLighting {
              moon_dir_white: Vec3::new(0.0, -0.3, 1.0).normalize(),
              ..night
-@@ -520,6 +672,38 @@ mod tests {
+@@ -520,6 +732,48 @@ mod tests {
          assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
      }
  
@@ -519,10 +820,20 @@ index 51196b7..1aef9da 100644
 +        assert_eq!(f("WATER_SSR_BREAK"), tune::SSR_BREAK);
 +        assert_eq!(f("WATER_FROTH"), tune::FROTH);
 +        assert_eq!(f("WATER_FROTH_YD"), tune::FROTH_YD);
++        assert_eq!(f("WATER_FROTH_WOBBLE"), tune::FROTH_WOBBLE);
++        assert_eq!(f("WATER_FROTH_CUT_FREQ"), tune::FROTH_CUT_FREQ);
 +        assert_eq!(f("WATER_FROTH_REACH"), tune::FROTH_REACH);
 +        assert_eq!(f("WATER_MOON_FAR"), tune::MOON_LANE_FAR);
 +        assert_eq!(f("WATER_MOON_NEAR"), tune::MOON_LANE_NEAR);
 +        assert_eq!(f("WATER_MOON_SHEEN_LANE"), tune::MOON_SHEEN_LANE);
++        assert_eq!(f("WATER_MOON_CORE"), tune::MOON_CORE);
++        assert_eq!(f("WATER_MOON_NEAR_YD"), tune::MOON_NEAR_YD);
++        assert_eq!(f("WATER_MOON_GLINT_FREQ"), tune::MOON_GLINT_FREQ);
++        assert_eq!(f("WATER_MOON_GLINT_CUT"), tune::MOON_GLINT_CUT);
++        assert_eq!(f("WATER_MOON_GLINT_GAIN"), tune::MOON_GLINT_GAIN);
++        assert_eq!(f("WATER_MOON_GLINT_MEAN"), tune::MOON_GLINT_MEAN);
++        assert_eq!(f("WATER_NIGHT_FLECKS"), tune::NIGHT_FLECKS);
++        assert_eq!(f("WATER_NIGHT_FLECK_LANE"), tune::NIGHT_FLECK_LANE);
 +        let taps = read("WATER_FROTH_TAPS", "u32");
 +        assert_eq!(
 +            taps.trim_end_matches('u').parse::<u32>().unwrap(),
@@ -533,6 +844,33 @@ index 51196b7..1aef9da 100644
      /// The block's size is its rows': its own ten and the painted sky's thirteen.
      #[test]
      fn the_block_is_twenty_three_rows() {
+diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
+index de5620e..cac5165 100644
+--- a/crates/benilla-world/src/shaders/world_look.wgsl
++++ b/crates/benilla-world/src/shaders/world_look.wgsl
+@@ -59,6 +59,12 @@ const RAY_DECAY: f32 = 0.96;
+ // The shafts' brightness, and how far from the sun (in screen heights) they reach before fading.
+ const RAY_EXPOSURE: f32 = 0.6;
+ const RAY_RADIUS: f32 = 0.8;
++// The share of the rays a sky pixel takes. Over open sky every march finds sky, so the rays are a
++// glow, not shafts: facing the sun at golden hour (17:30, rays 0.9) they and the bloom whitened
++// the sky from the sun upward into one sheet (the laptop's take 275 on #268, the same with the
++// painted sky off), where 1.12's own glare is the size of a hand. Shafts between the trees and
++// the buildings keep their whole strength.
++const RAY_SKY_SHARE: f32 = 0.35;
+ // The density exponent's clamp (`look::rays::MIST_EXP_LIMIT`).
+ const MIST_EXP_LIMIT: f32 = 30.0;
+ 
+@@ -207,7 +213,8 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+         let aspect = vec2<f32>(dims.x / dims.y, 1.0);
+         let near = 1.0 - smoothstep(0.0, RAY_RADIUS, length((look.sun.xy - uv) * aspect));
+         if near > 0.0 {
+-            lin += look.sun_color.rgb * (strength * near * RAY_EXPOSURE * shafts(uv, dims));
++            let share = select(1.0, RAY_SKY_SHARE, depth <= 0.0);
++            lin += look.sun_color.rgb * (strength * near * share * RAY_EXPOSURE * shafts(uv, dims));
+         }
+     }
+ 
 -- 
 2.43.0
 

@@ -1,0 +1,36 @@
+# The painted sky at golden hour over open sky (client 0068, revised): the Brackwell pumpkin patch at
+# 17:30, the camera facing the sun (yaw 45) and pitched up 35 degrees, where the ground stops it; the
+# probe (take 274) showed the sky filling most of the frame there, the oaks low at the sides. Over
+# Crystal Lake the same camera sank under the water (takes 273, 274). The day's own cover, then 0.3,
+# 0.6 and 0.8, then worldSky 0 and 1.12's look.
+# Look for: the clouds by the sun gold-lit, their undersides warmer and darker (amber to brown),
+# never a white or white-yellow bloom; no second glow on 1.12's sun glare, the sky's warm halo a
+# ring round it; at 0.8 a grey-gold sky darker under the clouds, with breaks, not a bright sheet;
+# 1.12's glare dimmed where a cloud covers the sun.
+hero warrior
+cam 45 35 6
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("looksky grade")
+6.0 shots day 3 1.0
+9.5 lua ConsoleExec("looksky clouds 0.3")
+10.5 shots clouds-03 2 0.7
+12.0 lua ConsoleExec("looksky clouds 0.6")
+13.0 shots clouds-06 3 1.0
+16.0 lua ConsoleExec("looksky clouds 0.8")
+17.0 shots clouds-08 3 1.0
+20.0 lua ConsoleExec("looksky grade")
+20.05 lua SetCVar("worldSky", "0")
+21.0 shots worldsky-0 2 0.7
+22.5 lua SetCVar("worldSky", "1")
+22.55 lua SetCVar("worldLook", "0")
+22.6 lua ClearWorldFog()
+23.5 shots classic 2 0.7
+25.0 lua SetCVar("worldLook", "1")
+25.05 lua ClearWorldFog()
+26 end

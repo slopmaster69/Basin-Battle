@@ -814,6 +814,8 @@ pub struct Player {
     /// How long the hero's own client says the charge was held, sent with its release: the check
     /// is judged by the hand, not by when the release arrived (`RELEASE_LAG`).
     pub release_held: Option<f32>,
+    /// When the hero last rested at a lamp: Rest pressed again on its way does nothing.
+    pub rested_at: Option<f32>,
     /// The last ability cast and when.
     pub last_cast: Option<(usize, f32)>,
     /// The weapons put away (R).
@@ -1533,6 +1535,7 @@ impl Survival {
             cd_off: false,
             release_at_least: false,
             release_held: None,
+            rested_at: None,
             last_cast: None,
             sheathed: false,
             rooted: false,

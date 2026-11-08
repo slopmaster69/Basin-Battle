@@ -1,0 +1,29 @@
+# The new look's sun shadows (client 0065) on open ground (brackwell), where nothing overhead shades
+# the whole yard: golden hour (17:30) high, the hour's own then lookshadow 2 then none; then noon
+# the same. The camera looks north, the sun is west at 17:30, so a shadow falls to the right.
+# Look for: the hero's and the props' shadows as shapes on the ground, fixed to their feet, soft
+# edged, no acne, the blob gone under them; at noon short and pooled.
+hero warrior
+cam 0 -18 7
+include _look_setup
+1.0 .es goto brackwell
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookshadow grade")
+6.5 shots golden 2 0.6
+8.0 lua ConsoleExec("lookshadow 2")
+9.5 shots golden-x2 2 0.6
+11.0 lua ConsoleExec("lookshadow 0")
+12.5 shots golden-none 2 0.6
+14.0 lua ConsoleExec("lookshadow grade")
+14.05 lua ConsoleExec("worldclock 720")
+16.0 shots noon 2 0.6
+17.5 lua ConsoleExec("lookshadow 0")
+19.0 shots noon-none 2 0.6
+20.5 lua ConsoleExec("lookshadow grade")
+20.55 lua ConsoleExec("worldclock 420")
+22.5 shots 0700 2 0.6
+24 end

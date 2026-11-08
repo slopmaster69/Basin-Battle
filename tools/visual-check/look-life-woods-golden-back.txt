@@ -1,0 +1,21 @@
+# Ambient life (client 0072): the same woods by Crystal Lake at golden hour (17:30) as
+# look-life-woods-golden, with the sun behind the camera (yaw 225), to compare.
+# Look for: the motes nearly gone (dim specks at most) with the sun at your back, against the
+# sparkle facing it; the leaves the same either way.
+hero warrior
+cam 225 -2 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+10.0 shots sun-behind 8 0.5
+14.5 lua ConsoleExec("looklife 3")
+18.0 shots sun-behind-x3 8 0.5
+22.5 lua ConsoleExec("looklife grade")
+22.55 lua ConsoleExec("lookweather server")
+24 end

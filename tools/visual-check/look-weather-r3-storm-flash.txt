@@ -1,0 +1,23 @@
+# A storm's lightning on film (client 0071, #271's third round): Goldshire at 23:30 in a full storm,
+# the same view as look-weather-r3-goldshire-night-rain, held for 90 s with the video running from
+# the start and a still every second. In a full storm a strike comes about every 30 s, so the video
+# should hold two or three; a flash lasts about half a second (a flare, then a flicker), so stills
+# a second apart catch one only by luck: check the mp4 and name the times of the flashes.
+# Look for: a brief cool-white flash lighting the whole street and the sky, picked up by the bloom,
+# fading in a flicker, never a long white hold; thunder one to six seconds after each (the client
+# log says which kit: "weather: thunder plays kit <id> (<name>)", which should be an ambient or
+# weather sound, or "no ambient thunder kit found; lightning is silent", and then no thunder).
+hero warrior
+cam 150 -12 10
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather storm 1")
+5.0 video
+5.5 shots storm 90 1.0
+96.0 lua ConsoleExec("lookweather server")
+97 end

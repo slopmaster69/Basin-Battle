@@ -1,0 +1,18 @@
+# #215's new look for Elwynn at noon (worldclock 720), from Goldshire's start spot up the road, the
+# HUD hidden. The new look (worldLook 1), then 1.12's (worldLook 0) from the same spot, then the
+# new one again. The game's own night fog (the server's night, SetWorldFog) is cleared first, so
+# 1.12's side shows its own light for the hour.
+hero warrior
+cam 0 -10 6
+include _setup
+4.2 .es dummy clear
+5.0 lua ConsoleExec("worldclock 720")
+5.1 lua ClearWorldFog()
+5.2 lua UIParent:Hide()
+8.6 lua ClearWorldFog()
+6.5 shots new 3 0.5
+8.5 lua SetCVar("worldLook","0")
+9.0 shots old 3 0.5
+11.0 lua SetCVar("worldLook","1")
+11.5 shots back 2 0.5
+13 end
