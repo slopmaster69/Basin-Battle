@@ -1,4 +1,4 @@
-# Sun shadows, second fixes (client 0069, revised in #269's third round): the Brackwell pumpkin patch
+# Sun shadows, second fixes (client 0080, revised in #269's third round): the Brackwell pumpkin patch
 # at 10:00 (the sun about 57 degrees up on its north-west bearing, yaw 45). The camera stands to the
 # side (yaw 315, 6 yd, pitched 35 degrees down), so every shadow runs across the frame to the LEFT of
 # what casts it (toward yaw 225), not toward the camera or under the hero's back as in take 271.

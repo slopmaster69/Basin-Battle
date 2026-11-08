@@ -1,4 +1,4 @@
-# Visible weather (client 0071): Crystal Lake in rain at noon (held here with lookweather, no
+# Visible weather (client 0082): Crystal Lake in rain at noon (held here with lookweather, no
 # server needed), the camera low over the water toward the shore and the trees.
 # Look for: rings spreading on the water everywhere near the camera, small and quick, fading with
 # distance (no shimmer far off); the reflections broken up by them; the shore's stones and grass

@@ -1,0 +1,23 @@
+# Where Goldshire's lamps are (client 0082, #271's fifth round): Goldshire at 23:30 in rain from
+# the site's own spot (yaw 200, the inn on the left, pitched 12 down, 10 yd), as take 280, with
+# `looklights` run at the start and at the end. Its lines now give each light's place in WoW
+# coordinates as well as its distance, height, reach and strength, so the next round can put the
+# camera beside a lamp with `.es goto x y`. A lamp's reflection on wet ground now reaches about
+# 20 yd from it at half strength (was about 13).
+# Look for: any warm streak on the wet road toward the camera from the nearest lamps; please send
+# the "looklights" lines from client.log.
+hero warrior
+cam 200 -12 10
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("looklights tuned")
+4.3 lua ConsoleExec("lookweather rain 0.9")
+55.0 shots wet 3 1.0
+58.5 lua ConsoleExec("looklights tuned")
+59.0 lua ConsoleExec("lookweather server")
+61 end

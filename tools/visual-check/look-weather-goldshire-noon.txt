@@ -1,4 +1,4 @@
-# Visible weather (client 0071), the server's path: Goldshire at noon, the camera on the inn and the
+# Visible weather (client 0082), the server's path: Goldshire at noon, the camera on the inn and the
 # road, the sky in the top of the frame. The server holds the weather (.es weather, everyone sees
 # it): clear, overcast, rain, a storm, then back to the clock (clear) and the ground drying. Then
 # the storm again against worldWeather 0 and worldLook 0.

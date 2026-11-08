@@ -1,0 +1,99 @@
+# A look round Stone Cairn Lake (#270's fifth round, for placing next round's clouds-in-water
+# film): noon with looksky clouds 0.8, the camera not held: from the goto it turns a full circle in
+# eight 45-degree steps (FlipCameraYaw), a still at each, the yaw in the label as turned from the
+# start. Take 280's yaw-45 view there was a trunk.
+# Look for: which stills show open water with a low far shore (say the label), and anything in
+# the way of the camera.
+hero warrior
+cam off
+include _look_setup
+include _look_r5_hide
+1.0 .es goto stone_cairn_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("lookweather clear")
+4.25 lua ConsoleExec("looksky clouds 0.8")
+6.0 shots turn-000 1 0.5
+6.6 lua FlipCameraYaw(5)
+6.7 lua FlipCameraYaw(5)
+6.8 lua FlipCameraYaw(5)
+6.9 lua FlipCameraYaw(5)
+7.0 lua FlipCameraYaw(5)
+7.1 lua FlipCameraYaw(5)
+7.2 lua FlipCameraYaw(5)
+7.3 lua FlipCameraYaw(5)
+7.4 lua FlipCameraYaw(5)
+8.0 shots turn-045 1 0.5
+8.6 lua FlipCameraYaw(5)
+8.7 lua FlipCameraYaw(5)
+8.8 lua FlipCameraYaw(5)
+8.9 lua FlipCameraYaw(5)
+9.0 lua FlipCameraYaw(5)
+9.1 lua FlipCameraYaw(5)
+9.2 lua FlipCameraYaw(5)
+9.3 lua FlipCameraYaw(5)
+9.4 lua FlipCameraYaw(5)
+10.0 shots turn-090 1 0.5
+10.6 lua FlipCameraYaw(5)
+10.7 lua FlipCameraYaw(5)
+10.8 lua FlipCameraYaw(5)
+10.9 lua FlipCameraYaw(5)
+11.0 lua FlipCameraYaw(5)
+11.1 lua FlipCameraYaw(5)
+11.2 lua FlipCameraYaw(5)
+11.3 lua FlipCameraYaw(5)
+11.4 lua FlipCameraYaw(5)
+12.0 shots turn-135 1 0.5
+12.6 lua FlipCameraYaw(5)
+12.7 lua FlipCameraYaw(5)
+12.8 lua FlipCameraYaw(5)
+12.9 lua FlipCameraYaw(5)
+13.0 lua FlipCameraYaw(5)
+13.1 lua FlipCameraYaw(5)
+13.2 lua FlipCameraYaw(5)
+13.3 lua FlipCameraYaw(5)
+13.4 lua FlipCameraYaw(5)
+14.0 shots turn-180 1 0.5
+14.6 lua FlipCameraYaw(5)
+14.7 lua FlipCameraYaw(5)
+14.8 lua FlipCameraYaw(5)
+14.9 lua FlipCameraYaw(5)
+15.0 lua FlipCameraYaw(5)
+15.1 lua FlipCameraYaw(5)
+15.2 lua FlipCameraYaw(5)
+15.3 lua FlipCameraYaw(5)
+15.4 lua FlipCameraYaw(5)
+16.0 shots turn-225 1 0.5
+16.6 lua FlipCameraYaw(5)
+16.7 lua FlipCameraYaw(5)
+16.8 lua FlipCameraYaw(5)
+16.9 lua FlipCameraYaw(5)
+17.0 lua FlipCameraYaw(5)
+17.1 lua FlipCameraYaw(5)
+17.2 lua FlipCameraYaw(5)
+17.3 lua FlipCameraYaw(5)
+17.4 lua FlipCameraYaw(5)
+18.0 shots turn-270 1 0.5
+18.6 lua FlipCameraYaw(5)
+18.7 lua FlipCameraYaw(5)
+18.8 lua FlipCameraYaw(5)
+18.9 lua FlipCameraYaw(5)
+19.0 lua FlipCameraYaw(5)
+19.1 lua FlipCameraYaw(5)
+19.2 lua FlipCameraYaw(5)
+19.3 lua FlipCameraYaw(5)
+19.4 lua FlipCameraYaw(5)
+20.0 shots turn-315 1 0.5
+20.6 lua FlipCameraYaw(5)
+20.7 lua FlipCameraYaw(5)
+20.8 lua FlipCameraYaw(5)
+20.9 lua FlipCameraYaw(5)
+21.0 lua FlipCameraYaw(5)
+21.1 lua FlipCameraYaw(5)
+21.2 lua FlipCameraYaw(5)
+21.3 lua FlipCameraYaw(5)
+21.4 lua FlipCameraYaw(5)
+22.0 lua ConsoleExec("looksky grade")
+22.05 lua ConsoleExec("lookweather server")
+24 end
