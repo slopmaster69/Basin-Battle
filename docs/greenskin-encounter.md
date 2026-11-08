@@ -62,12 +62,14 @@ successful sidestep, both crew-death gates, no health escalation or replacements
 Vanish, wipe/reset/death cleanup, RTT-fair harpoon pull, normal knockback motion, floor rejection,
 ordinary sword solo/duo clears, charged projectile inputs, and captain-first elite rewards.
 The sword runs use inflated hero HP as controlled pressure fixtures, not balance evidence.
+The ranged fixture repositions between charged casts to keep a clear shot around the moving
+captain. It verifies ordinary projectile damage on the crew, not a ranged solo-clear time.
 
 `tools/visual-check/greenskin-firing-line.txt` is an isolated normal-spawn demonstration with
 ambient foes cleared and markers off. Debug healing and crew/captain damage are explicitly
 labelled assistance. Hero `[-70,-815,41.5]` faces +x before the spawn command, placing the
-captain 8 yd ahead at the authored home. Preserve yaw0: the camera controls actual hero facing.
-Start with pitch-35/distance22 and a short framing probe. If the ship scenery collides with the
+captain 8 yd ahead at the authored home. Preserve yaw 0: the camera controls actual hero facing.
+Start with pitch -35 / distance 22 and a short framing probe. If the ship scenery collides with the
 camera, the capture worker can override pitch/distance locally while preserving yaw0.
 
 The sequence shows the opening, sidesteps, captain reload window, one then two gunner deaths,
