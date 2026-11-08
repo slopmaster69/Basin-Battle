@@ -18,6 +18,7 @@ pub(crate) mod machinery;
 pub(crate) mod vancleef;
 pub(crate) mod perches;
 pub(crate) mod arsenal;
+pub(crate) mod kitchen;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -1218,6 +1219,7 @@ pub struct Survival {
     pub(crate) vancleef: vancleef::VanCleef,
     pub(crate) perches: perches::Perches,
     pub(crate) arsenal: arsenal::Arsenal,
+    pub(crate) kitchen: kitchen::Kitchen,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1323,6 +1325,7 @@ impl Survival {
             vancleef: vancleef::VanCleef::default(),
             perches: perches::Perches::default(),
             arsenal: arsenal::Arsenal::default(),
+            kitchen: kitchen::Kitchen::default(),
         }
     }
 

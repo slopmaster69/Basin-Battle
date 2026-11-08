@@ -703,7 +703,8 @@ impl Survival {
     /// in its fight as its health takes (0: it has none).
     pub fn posture_limit(&self, mid: Id) -> u32 {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
-        let limit = self.content.mobs[m.def].posture;
+        // Greed leaves Cookie's hands occupied. Ordinary light blows can spoil the scoop too.
+        let limit = if self.kitchen_scooping(mid) { 60 } else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }
@@ -739,6 +740,7 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
+        self.kitchen_broken(mid);
         self.vancleef_broken(mid);
         // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
         // on the screen of the hero who broke it.
@@ -944,6 +946,7 @@ impl Survival {
         self.boss_gone(mid);
         self.remove_arsenal(mid);
         self.machinery_died(mid);
+        self.remove_kitchen(mid);
         self.remove_duel(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
@@ -1192,6 +1195,7 @@ impl Survival {
         self.clean_duels();
         self.step_perch_crews();
         self.clean_arsenals();
+        self.clean_kitchens();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1261,6 +1265,7 @@ impl Survival {
             }
             if self.step_perch_valve(id) { continue; }
             if self.step_arsenal(id) { continue; }
+            if self.step_kitchen(id) { continue; }
             if self.step_vancleef(id) { continue; }
             if self.disabled(id) {
                 continue;
@@ -2361,6 +2366,7 @@ impl Survival {
                     }
                     if self.mobs[&id].pattern.is_none() {
                         self.machinery_string_landed(id, completed, a.damage);
+                        self.kitchen_string_landed(id, completed);
                         self.vancleef_string_landed(id, completed);
                     }
                 } else {
@@ -2423,7 +2429,7 @@ impl Survival {
             _ => d.attack.clone(),
         };
         // The grind locks at its first pose and keeps that line, regardless of its target.
-        if self.machine_grind(id) {
+        if self.machine_grind(id) || self.kitchen_committed(id) {
             a.turn_rate = 0.0;
             a.lock = a.windup;
         }
@@ -2486,6 +2492,7 @@ impl Survival {
     /// One of a creature's patterns that suits a foe `dist` off (`size` its body), weighted.
     pub(crate) fn pick_pattern(&mut self, id: Id, dist: f32, size: f32) -> Option<usize> {
         if self.is_machine(id) { return self.machine_pattern(id, dist, size); }
+        if self.is_kitchen(id) { return self.kitchen_pattern(id, dist, size); }
         if self.is_vancleef(id) { return self.vancleef_pattern(id, dist, size); }
         let m = self.mobs.get(&id)?;
         let d = &self.content.mobs[m.def];
@@ -2574,7 +2581,7 @@ impl Survival {
         };
         let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
         let tele = if self.machine_grind(id) { Telegraph { reach: 7.5, width: 3.0, at: Some((pos, face)), ..tele } } else { tele };
-        let mark = if a.ranged {
+        let mark = if let Some(mark) = self.kitchen_pour_mark(id, tele) { Some(mark) } else if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked
             // through the whole wind-up and flight, so the ring is there to read and step out of,
@@ -2664,6 +2671,7 @@ impl Survival {
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
         self.machinery_windup(id);
+        self.kitchen_windup(id);
     }
 
     /// The blow lands (or the missile flies): every hero in the arc and in reach of the creature's
@@ -2671,6 +2679,7 @@ impl Survival {
     fn release(&mut self, id: Id, foe: Foe) {
         // The moving saw hits along its actual swept path, once per hero, in machinery.
         if self.machine_grind(id) { return; }
+        if self.kitchen_release(id) { return; }
         let now = self.clock;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];

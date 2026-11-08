@@ -1,0 +1,27 @@
+# Controlled secret-form demonstration. Fresh summon, periodic heals and debug finish.
+# Not the secret-ingredient discovery/handoff or an unassisted clear. Markers stay disabled.
+# Inspect the enlarged orange murloc, long alert/cast inhale stand-in, committed steam direction,
+# four-second wounded cough stand-in, and no murloc reinforcements at low health.
+hero warrior
+cam 0 -24 14
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es unbar all
+12 .es clearfoes cookie_probe_empty
+13 .es goto -71 -900 15 0
+15 .es spawn dm_cookie_gorged
+15.1 video
+16 shots inhale-belch-cough 50 0.35
+20 .es heal
+25 .es heal
+30 .es heal
+35 .es hurt 0.2 dm_cookie_gorged
+35.1 shots low-health-same-rhythm 50 0.35
+40 .es heal
+45 .es heal
+50 .es heal
+55 .es hurt 0 dm_cookie_gorged
+55.1 shots cleanup 10 0.3
+60 end

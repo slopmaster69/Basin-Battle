@@ -1081,8 +1081,8 @@ mod tests {
         let scene = |name: &str| super::bestiary_scene(pirate.patterns.iter().find(|p| p.name == name).unwrap());
         assert_eq!(scene("two slashes"), "close");
         assert_eq!(scene("lunge"), "one");
-        let cookie = content.mobs.iter().find(|d| d.key == "dm_cookie").unwrap();
-        assert_eq!(super::bestiary_scene(cookie.patterns.iter().find(|p| p.name == "pot").unwrap()), "far");
+        let hunter = content.mobs.iter().find(|d| d.key == "shadowhunter").unwrap();
+        assert_eq!(super::bestiary_scene(hunter.patterns.iter().find(|p| p.name == "hex").unwrap()), "far");
     }
 
     #[test]
