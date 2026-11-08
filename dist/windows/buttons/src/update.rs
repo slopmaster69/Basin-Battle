@@ -33,11 +33,11 @@ pub fn check(paths: &Paths, project: &Project) -> Result<Option<Release>, String
 }
 
 /// Why an update can't happen right now, or nothing.
-pub fn not_now() -> Option<&'static str> {
-    if crate::proc::server_running() {
+pub fn not_now(root: &Path) -> Option<&'static str> {
+    if crate::proc::server_running_in(root) {
         return Some("Your server is running from this folder, so the update waits. Close its window and open Play again.");
     }
-    if crate::proc::game_running() {
+    if crate::proc::game_running_in(root) {
         return Some("The game is open, so the update waits. Close it and open Play again.");
     }
     None

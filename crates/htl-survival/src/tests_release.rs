@@ -379,3 +379,75 @@ fn meteor_leaves_what_it_knocks_back_inside_its_crater() {
     // A foe a yard from the middle, thrown back, still stands in the smallest crater.
     assert!(1.0 + knock < mt.radius[0], "knocked {knock} yd out of a {} yd crater", mt.radius[0]);
 }
+
+/// Charge `slot` (its EX version with `ex`) and run the server's clock to the flare plus `late`:
+/// the release is on its way, arriving that late.
+fn charge_past_flare(s: &mut Survival, p: Id, slot: &str, ex: bool, late: f32) -> f32 {
+    s.input(p, Input::Ability(key_of(slot), ex));
+    s.input(p, Input::Attack);
+    s.step(0.0);
+    let flare = s.players[&p].check_flare;
+    run(s, flare + late);
+    flare
+}
+
+#[test]
+fn a_release_that_reaches_the_server_late_is_judged_by_the_hands_own_hold() {
+    // Corey's Fireballs on his own server through the router, Nov 7: a release let go on the
+    // flare reached the server a fifth of a second later, and the ring felt laggy.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    let late = 0.2;
+    assert!(late > s.content.checks.window && late < RELEASE_LAG);
+    // As the server sees it alone (an older add-on): late.
+    charge_past_flare(&mut s, p, "ranged", false, late);
+    s.input(p, Input::AttackUp);
+    let ev = s.step(0.0);
+    assert_eq!(grade_in(&ev, p), Some("late"));
+    assert!(!perfect_in(&ev, p));
+    run(&mut s, 4.0);
+    // With the hold the client measured: on the flare, a perfect.
+    let flare = charge_past_flare(&mut s, p, "ranged", false, late);
+    s.release_held(p, flare);
+    let ev = s.step(0.0);
+    assert!(perfect_in(&ev, p), "judged by the hand: {:?}", grade_in(&ev, p));
+}
+
+#[test]
+fn a_clients_word_on_its_hold_goes_only_so_far_from_the_servers() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    // Let go far past the flare, while claiming the flare: past the lag allowed, it's late.
+    let flare = charge_past_flare(&mut s, p, "ranged", false, 0.6);
+    s.release_held(p, flare);
+    let ev = s.step(0.0);
+    assert_eq!(grade_in(&ev, p), Some("late"));
+    assert!(s.players[&p].release_held.is_none(), "the word goes with its one release");
+}
+
+#[test]
+fn pyroblast_waits_for_a_release_on_its_way_before_it_fizzles() {
+    // Every Pyroblast fizzled on Corey's laggy route: the server's clock passed the window while
+    // the release let go inside it was still coming.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
+    let w = s.content.checks.window;
+    let flare = charge_past_flare(&mut s, p, "ranged", true, w + 0.15);
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "still held, as far as the server knows");
+    s.release_held(p, flare + 0.02);
+    let ev = s.step(0.0);
+    assert!(perfect_in(&ev, p), "a perfect Pyroblast: {:?}", grade_in(&ev, p));
+    // Truly held too long, it still fizzles.
+    run(&mut s, 3.0);
+    s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    charge_past_flare(&mut s, p, "ranged", true, w + 0.05 + RELEASE_LAG + 0.1);
+    assert!(!matches!(s.players[&p].action, Action::Charge { .. }), "fizzled");
+}

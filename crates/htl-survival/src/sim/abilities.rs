@@ -1014,7 +1014,10 @@ impl Survival {
         let now = self.clock;
         let Some(Action::Charge { ability, since }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
         let (lo, hi) = self.charge_of(id, ability);
-        let held = now - since;
+        // The hold as the hero's hand made it, where their client sent it and it's near the
+        // server's own; else as the server saw it.
+        let seen = now - since;
+        let held = self.players[&id].release_held.map_or(seen, |h| h.clamp(seen - RELEASE_LAG, seen + RELEASE_LAG));
         let d = self.content.abilities[ability].clone();
         let all = d.perfect && d.stakes == "all";
         if held + 1.0e-4 < lo {
@@ -4133,7 +4136,8 @@ impl Survival {
                     }
                     self.keep_charge_aim(id, since);
                     self.fire(id, ability, if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 });
-                } else if all && held > self.players[&id].check_flare + self.content.checks.window + 0.05 {
+                // (Not before a release on its way could have arrived: it's judged by the hand.)
+                } else if all && held > self.players[&id].check_flare + self.content.checks.window + 0.05 + RELEASE_LAG {
                     self.fizzle(id, ability);
                 } else if hold > 0.0 && held >= hi + hold {
                     if checked {
