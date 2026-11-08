@@ -576,7 +576,7 @@ function Start-Video($v, $client, [string]$how) {
 function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null) {
     Stop-Strays $s
     $common = @{
-        WOW_DATA = $s.data; WOW_HOST = $s.host; WOW_REALM = $s.realm
+        WOW_DATA = $s.data; WOW_HOST = $(if ($s.port -and [string]$s.port -ne "3724") { "$($s.host):$($s.port)" } else { $s.host }); WOW_REALM = $s.realm
         WOW_USER = $s.account; WOW_PASS = $s.password
         BENILLA_HOME = $chome
         # Nobody at the keyboard: a refused login ends the run instead of waiting on a dialog;
