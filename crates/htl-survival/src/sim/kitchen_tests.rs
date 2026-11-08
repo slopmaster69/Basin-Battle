@@ -38,6 +38,163 @@ fn scoop(s: &mut Survival, id: Id) {
     until(s, id, 45.0, |s, id| s.kitchen_scooping(id));
 }
 
+fn production_fight(key: &str, rtt: f32) -> (Survival, Id, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::bare(c, Box::new(FlatLand::default()), 19, 1_000_000.0);
+    let h = s.join("accounting", "Accounting", None);
+    s.players.get_mut(&h).unwrap().loadout.clear();
+    s.move_player(h, [2.5, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+    s.set_rtt(h, rtt);
+    let id = s.spawn_mob(s.content.mob(key).unwrap(), [0.0, 0.0, 0.0], None, false);
+    // Let ordinary aggro and pattern selection start the encounter.
+    s.step(DT);
+    (s, h, id)
+}
+
+fn move_beside_locked_blow(s: &mut Survival, band: &[Id], id: Id) {
+    until(s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { t, .. }
+        if t >= s.attack_now(id).windup - s.attack_now(id).lock));
+    let (at, dir) = (s.mobs[&id].pos, s.mobs[&id].facing + std::f32::consts::FRAC_PI_2);
+    for h in band {
+        let pos = [at[0] + dir.cos() * 2.5, at[1] + dir.sin() * 2.5, at[2]];
+        s.move_player(*h, pos, facing(pos, at), Moving::default());
+    }
+}
+
+#[test]
+fn kitchen_interrupted_first_second_and_between_step_windups_retry_the_pair() {
+    for key in [COOKIE, GORGED] {
+        for rtt in [0.0, 0.1] {
+            for interrupt in ["first", "between", "second"] {
+                let (mut s, h, id) = production_fight(key, rtt);
+                until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+                let pair = s.kitchen_move(id).unwrap().to_owned();
+                let hp = s.players[&h].health;
+                if interrupt != "first" {
+                    move_beside_locked_blow(&mut s, &[h], id);
+                    until(&mut s, id, 2.0, |s, id| s.mobs[&id].pattern.is_some_and(|(_, n)| n == 1));
+                    assert!(matches!(s.mobs[&id].state, MobState::Recover { .. }));
+                    if interrupt == "second" {
+                        until(&mut s, id, 2.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+                        assert_eq!(s.mobs[&id].pattern.unwrap().1, 1, "second windup really reached");
+                    }
+                }
+                // Explicit crowd-control probe, after ordinary AI reached the requested beat.
+                s.stagger_mob(id, 0.8, false);
+                assert!(s.mobs[&id].pattern.is_none());
+                run(&mut s, 0.85);
+                assert_eq!(s.kitchen.cooks[&id].completed, 0, "{key}, {interrupt}, RTT {rtt}");
+                assert_eq!(s.players[&h].health, hp, "the avoided/interrupted blows never land");
+                until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+                assert_eq!(s.kitchen_move(id), Some(pair.as_str()));
+                assert_eq!(s.mobs[&id].pattern.unwrap().1, 0);
+            }
+        }
+    }
+}
+
+#[test]
+fn kitchen_released_pairs_count_once_when_the_final_blow_hits_or_misses() {
+    for key in [COOKIE, GORGED] {
+        for rtt in [0.0, 0.1] {
+            for hit in [false, true] {
+                let (mut s, h, id) = production_fight(key, rtt);
+                let hp = s.players[&h].health;
+                move_beside_locked_blow(&mut s, &[h], id);
+                until(&mut s, id, 3.0, |s, id| s.mobs[&id].pattern.is_some_and(|(_, n)| n == 1)
+                    && matches!(s.mobs[&id].state, MobState::Windup { .. }));
+                assert_eq!(s.kitchen.cooks[&id].completed, 0);
+                if hit {
+                    let (at, dir) = (s.mobs[&id].pos, s.mobs[&id].facing);
+                    let pos = [at[0] + dir.cos() * 2.5, at[1] + dir.sin() * 2.5, at[2]];
+                    s.move_player(h, pos, facing(pos, at), Moving::default());
+                } else {
+                    move_beside_locked_blow(&mut s, &[h], id);
+                }
+                until(&mut s, id, 2.0, |s, id| s.kitchen.cooks[&id].completed == 1);
+                run(&mut s, 0.25);
+                assert_eq!(s.kitchen.cooks[&id].completed, 1, "the released pair counts once, {key}, RTT {rtt}");
+                assert_eq!(s.players[&h].health < hp, hit);
+                if key == GORGED && hit {
+                    assert!(matches!(s.players[&h].action, Action::Stagger { .. }), "last-slap mercy must still count the fully released pair");
+                }
+                until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+                assert_eq!(s.kitchen_move(id), Some(if key == COOKIE { "ladle" } else { "belch" }));
+            }
+        }
+    }
+}
+
+#[test]
+fn gorged_interrupted_belch_retries_then_a_full_belch_coughs_and_returns_to_slaps() {
+    for rtt in [0.0, 0.1] {
+        let (mut s, h, id) = production_fight(GORGED, rtt);
+        move_beside_locked_blow(&mut s, &[h], id);
+        until(&mut s, id, 3.0, |s, id| s.mobs[&id].pattern.is_some_and(|(_, n)| n == 1)
+            && matches!(s.mobs[&id].state, MobState::Windup { .. }));
+        move_beside_locked_blow(&mut s, &[h], id);
+        until(&mut s, id, 8.0, |s, id| s.kitchen_move(id) == Some("belch"));
+        s.stagger_mob(id, 0.8, false);
+        run(&mut s, 0.85);
+        assert_eq!(s.kitchen.cooks[&id].completed, 1);
+        assert!(s.kitchen.cooks[&id].stage.is_none());
+        until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+        assert_eq!(s.kitchen_move(id), Some("belch"));
+        move_beside_locked_blow(&mut s, &[h], id);
+        until(&mut s, id, 3.0, |s, id| matches!(s.kitchen.cooks[&id].stage, Some(Stage::Coughing { .. })));
+        let released = s.clock;
+        assert_eq!(s.kitchen.cooks[&id].completed, 0);
+        let ev = run(&mut s, COUGH - 0.1);
+        assert!(!ev.iter().any(|e| matches!(e, Event::MobWindup { id: who, .. } if *who == id)));
+        until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+        assert!(s.clock >= released + COUGH);
+        assert_eq!(s.kitchen_move(id), Some("slaps"));
+        assert_eq!(s.players[&h].health, s.players[&h].max_health);
+    }
+}
+
+#[test]
+fn gorged_mercy_cutoff_repeats_the_unfinished_pair_with_or_without_network_grace() {
+    for rtt in [0.1, 0.35, 0.0] {
+        let (mut s, h, id) = production_fight(GORGED, rtt);
+        let hp = s.players[&h].health;
+        until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+        assert_eq!(s.kitchen_move(id), Some("slaps"));
+        until(&mut s, id, 3.0, |s, _| s.players[&h].health < hp);
+        assert!(matches!(s.players[&h].action, Action::Stagger { .. }), "the first heavy slap actually staggered the hero, RTT {rtt}");
+        assert!(s.mobs[&id].pattern.is_none(), "mercy still cancels the second slap");
+        assert_eq!(s.kitchen.cooks[&id].completed, 0, "a mercy-cut first slap is not a full exchange, RTT {rtt}");
+        let after_first = s.players[&h].health;
+        until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+        assert_eq!(s.kitchen_move(id), Some("slaps"));
+        assert_eq!(s.mobs[&id].pattern.unwrap().1, 0, "the next attack retries the pair");
+        assert_eq!(s.players[&h].health, after_first, "the interrupted follow-up never hits");
+        println!("RTT {rtt}: first slap staggered the hero; mercy cancelled the follow-up; next windup retries slaps");
+    }
+}
+
+#[test]
+fn kitchen_first_blow_breaking_a_tired_guard_does_not_complete_the_pair() {
+    for key in [COOKIE, GORGED] {
+        for rtt in [0.0, 0.1] {
+            let (mut s, h, id) = production_fight(key, rtt);
+            until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+            let pair = s.kitchen_move(id).unwrap().to_owned();
+            s.input(h, Input::Guard);
+            s.players.get_mut(&h).unwrap().stamina = 1.0;
+            let ev = run(&mut s, 1.15);
+            assert!(ev.iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(v), outcome: Outcome::GuardBroken, .. }
+                if *attacker == id && *v == h)), "the first blow really broke a tired guard, {key}, RTT {rtt}");
+            assert!(s.mobs[&id].pattern.is_none());
+            assert_eq!(s.kitchen.cooks[&id].completed, 0);
+            until(&mut s, id, 8.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+            assert_eq!(s.kitchen_move(id), Some(pair.as_str()));
+            assert_eq!(s.mobs[&id].pattern.unwrap().1, 0);
+        }
+    }
+}
+
 #[test]
 fn kitchen_counts_only_completed_strings_then_waits_for_the_single_patch_to_cool() {
     for (heroes, low) in [(1, false), (2, true), (4, false)] {
@@ -217,6 +374,8 @@ fn gorged_inhales_then_commits_belch_and_coughs_without_health_line_adds() {
     for low in [false, true] {
         let (mut s, band, id) = fight(GORGED, 2);
         if low { s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health / 5; }
+        // Every nearby hero avoids the first slap so mercy does not truncate the pair.
+        move_beside_locked_blow(&mut s, &band, id);
         until(&mut s, id, 15.0, |s, id| s.kitchen_move(id) == Some("belch"));
         let (at, dir) = (s.mobs[&id].pos, s.mobs[&id].facing);
         s.move_player(band[0], [at[0] - dir.sin() * 3.0, at[1] + dir.cos() * 3.0, at[2]], 0.0, Moving::default());
