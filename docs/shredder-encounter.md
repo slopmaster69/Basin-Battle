@@ -53,3 +53,18 @@ an unbeaten Sneed pack. Record the source commit and client build in the capture
 
 The script can be parsed without launching a client using
 `scripts/visual-check-windows.ps1 -Check shredder-pressure-repair`.
+
+## Actor diagnostics and their limits
+
+The existing ignored `tests_fair_hero::fair_hero_one` report was run with `FAIR_HERO_FOES`
+set to each form and `FAIR_HERO_SEED` set to 1, 7 and 19. Its careful sword actor moves,
+attacks and answers tells, but has 1,000,000 health and fights on flat open-world ground.
+The machine's first life lasted 78.62, 74.26 and 76.58 sec; the actor took 56, 28 and 0
+damage. Sneed spawned alone lasted 25.78, 31.98 and 41.92 sec, with no damage taken.
+Neither form produced a hit the report classed as too quick to answer.
+
+These are isolated-form diagnostics. The harness tracks only the original creature IDs, so
+its machine report stops at driver emergence; its standalone Sneed has no wreck or repair.
+It has no duo mode. These timings must not be added together or called full encounter balance
+evidence. Whole-encounter solo and duo pacing, normal-health survival and earned finishes
+remain to be measured in play or a separately extended actor report.
