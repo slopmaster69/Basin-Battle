@@ -43,6 +43,10 @@ enum Beat {
 }
 
 impl Survival {
+    pub(crate) fn duel_observer(&self, id: Id) -> bool {
+        self.mobs.get(&id).is_some_and(|m| self.content.mobs[m.def].key == WATCHER)
+    }
+
     pub(crate) fn is_vancleef(&self, id: Id) -> bool {
         self.mobs.get(&id).is_some_and(|m| matches!(self.content.mobs[m.def].key.as_str(), "dm_vancleef" | "dm_vancleef_unbowed"))
     }

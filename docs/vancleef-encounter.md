@@ -54,6 +54,9 @@ Read-only data queries verified display 2029 and 2357 use HumanMale, native Huma
 patch 0010 holds that guard pose; the HumanMale57 correction from PR285 remains intact.
 Sound kits 5780/5781/5782 and smoke display45 resolve in the local 1.12 data. The smoke is a
 particle emitter with no mesh; its opacity and timing need real-client inspection.
+The native floor probe found both observer standing points and exits on the stern's floor
+(39.1-39.8 yd high), with walking paths from VanCleef's home. It also found the drop south
+of the stern at (-84, -824): the same-floor retreat check rejects that candidate.
 
 ## Not tested in the client
 

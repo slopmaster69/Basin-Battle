@@ -232,6 +232,7 @@ fn spectators_are_finite_noncombat_and_leave_once_without_stopping_an_attack() {
         s.engage(*w, Foe::Hero(band[0]));
         assert_eq!(s.mobs[w].health, 1);
         assert!(s.mobs[w].state.foe().is_none());
+        assert!(!s.takes_help(band[0], *w), "no heal interception or ally-target slot");
     }
     let k = s.duel_pattern_named(id, "string").unwrap();
     s.begin_pattern(id, k, false);

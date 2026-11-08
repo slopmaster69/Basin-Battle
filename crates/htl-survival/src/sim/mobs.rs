@@ -1798,7 +1798,7 @@ impl Survival {
 
     /// Whether another standing creature is within `r` of `at`.
     fn crowded(&self, id: Id, at: Vec3, r: f32) -> bool {
-        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && dist2d(m.pos, at) < r)
+        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && !self.duel_observer(*o) && dist2d(m.pos, at) < r)
     }
 
     /// Where to stand `r` from a foe at `foe`, coming from `from`: on its own side of them, or

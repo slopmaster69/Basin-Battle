@@ -3277,6 +3277,8 @@ impl Survival {
     /// heroes' side (a `friendly` creature, or set down by `by` or a friend of theirs) that isn't
     /// a totem, or a totem its rules make `healable` (a Priest's orb). A totem never otherwise.
     pub(crate) fn takes_help(&self, by: Id, mid: Id) -> bool {
+        // Story spectators must not intercept a heal or consume an ally-target slot.
+        if self.duel_observer(mid) { return false; }
         let Some(m) = self.mobs.get(&mid) else { return false };
         if m.health == 0 || m.hidden {
             return false;
