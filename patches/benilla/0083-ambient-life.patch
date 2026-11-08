@@ -1,4 +1,4 @@
-From e87655a068069e43825bb9c267d03510b2f98b9a Mon Sep 17 00:00:00 2001
+From 9a717b0c09c54fc563b411029c8653b6552acf23 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 16:57:01 -0700
 Subject: [PATCH] Ambient life under the new look: fireflies, falling leaves,
@@ -73,18 +73,18 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/look/life.rs         | 2236 +++++++++++++++++
  crates/benilla-world/src/look/mod.rs          |   28 +-
  crates/benilla-world/src/look/wind.rs         |   55 +
- crates/benilla-world/src/terrain_stream.rs    |   29 +-
+ crates/benilla-world/src/terrain_stream.rs    |   17 +
  .../benilla-world/src/terrain_stream/merge.rs |    1 +
  .../src/terrain_stream/spawn/mod.rs           |    1 +
  .../benilla-world/src/terrain_stream/weld.rs  |    1 +
- 12 files changed, 2462 insertions(+), 6 deletions(-)
+ 12 files changed, 2452 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/look/life.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index 239f408..5b98c10 100644
+index d12b46d..f79e4b8 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -1720,6 +1720,25 @@ mod tests {
+@@ -1775,6 +1775,25 @@ mod tests {
          assert!(res::<LookWeather>(&app).on);
      }
  
@@ -110,7 +110,7 @@ index 239f408..5b98c10 100644
      /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
      #[test]
      fn the_ffx_switches_reach_the_pass() {
-@@ -2843,6 +2862,7 @@ mod tests {
+@@ -2902,6 +2921,7 @@ mod tests {
              .init_resource::<benilla_world::look::LookWind>()
              .init_resource::<benilla_world::look::LookSky>()
              .init_resource::<benilla_world::look::LookWeather>()
@@ -119,10 +119,10 @@ index 239f408..5b98c10 100644
              .insert_resource(RenderScale(1.0))
              // Literal: `Realmlist::default()` reads `$WOW_HOST`.
 diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
-index 9362de6..3b82ee0 100644
+index d8f730a..6ac0dea 100644
 --- a/crates/benilla-app/src/cvars/table.rs
 +++ b/crates/benilla-app/src/cvars/table.rs
-@@ -902,6 +902,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+@@ -943,6 +943,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
          "benilla's own — 1.12's rain is grey streaks; this turns the new look's weather (lit \
           rain, wet ground, rings on the water, lightning) off on its own",
      ),
@@ -2677,7 +2677,7 @@ index 2ead7ed..b1036db 100644
      fn the_front_origin_snaps_to_its_grid() {
          let o = front_origin(Vec3::new(9_100.0, 50.0, -300.0));
 diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
-index 4215eb6..ea23ecb 100644
+index e7a5b71..09f8482 100644
 --- a/crates/benilla-world/src/terrain_stream.rs
 +++ b/crates/benilla-world/src/terrain_stream.rs
 @@ -203,6 +203,18 @@ impl Placements {
@@ -2716,26 +2716,7 @@ index 4215eb6..ea23ecb 100644
          },
      );
      placements.pending_spawns += 1;
-@@ -1216,8 +1231,16 @@ pub(crate) struct MapBridge;
- ///    data leaves a 5 yd hole between the deck's sloping edge (z 30) and the plank's top
- ///    (z 31.5), over a trough at z 27.7, which players had to jump.
- const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 2] = [
--    [[-33.0, -799.3, 30.2], [-36.5, -802.0, 31.4], [-34.6, -807.0, 30.5]],
--    [[-33.0, -799.3, 30.2], [-34.6, -807.0, 30.5], [-31.0, -804.3, 31.5]],
-+    [
-+        [-33.0, -799.3, 30.2],
-+        [-36.5, -802.0, 31.4],
-+        [-34.6, -807.0, 30.5],
-+    ],
-+    [
-+        [-33.0, -799.3, 30.2],
-+        [-34.6, -807.0, 30.5],
-+        [-31.0, -804.3, 31.5],
-+    ],
- ];
- 
- /// The pieces added to the map in directory `dir`.
-@@ -1253,6 +1276,7 @@ fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &Wmo
+@@ -1260,6 +1275,7 @@ fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &Wmo
              portal_instance: None,
              refs: 1,
              owner: (0, 0), // unread for WMOs: their prop hulls weld per placement
@@ -2743,7 +2724,7 @@ index 4215eb6..ea23ecb 100644
          },
      );
      placements.pending_spawns += 1;
-@@ -1643,6 +1667,7 @@ mod straddler_tests {
+@@ -1650,6 +1666,7 @@ mod straddler_tests {
              portal_instance: None,
              refs: 1,
              owner,

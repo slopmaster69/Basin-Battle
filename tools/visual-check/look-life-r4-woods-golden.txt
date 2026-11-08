@@ -1,4 +1,4 @@
-# Motes in the sun (client 0072, #272's fourth round): the woods by Crystal Lake at 17:30 facing
+# Motes in the sun (client 0083, #272's fourth round): the woods by Crystal Lake at 17:30 facing
 # the low sun (yaw 45, pitched 4 up), the grade's density then looklife 3; `looklife` answers with
 # how many motes are out and how many the sun reaches (send those lines).
 # Look for: specks of warm light drifting in the sunlit gaps and against the trunks, brightest

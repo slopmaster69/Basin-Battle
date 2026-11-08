@@ -1,4 +1,4 @@
-# Fireflies (client 0072, #272's fourth round): the woods by Crystal Lake at 20:45 and 23:00, the
+# Fireflies (client 0083, #272's fourth round): the woods by Crystal Lake at 20:45 and 23:00, the
 # grade's density, looklife 2, looklife 0, worldLife 0 and worldLook 0. Each `looklife` answers
 # with what is out, the trees near and the crowns dropping leaves, and the motes in the sun.
 # Look for: warm green-gold glows about as big as a fist, many lit at once (each now glows most
