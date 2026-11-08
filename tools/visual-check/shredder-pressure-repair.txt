@@ -4,7 +4,8 @@
 # Requires a fresh dungeon where Sneed has not been slain. Coordinates are the authored post;
 # camera framing and all timings require the capture operator's visual pass.
 # Inspect: distinct saw/stamp/rev poses, straight grind, steam, 3.5 sec exposed stall,
-# native wrench missile, corpse kept as wreck, 4 sec work with sparks, one-third-health restart.
+# native wrench missile, retained wreck, Sneed working beside its edge (whole body clear),
+# facing the wreck for 4 sec with sparks, restart at the original wreck center at one-third health.
 hero warrior
 cam 180 -14 11
 0.5 .es debug quiet

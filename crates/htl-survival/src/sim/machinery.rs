@@ -12,6 +12,9 @@ const HALF_WIDTH: f32 = 1.5;
 const STALL: f32 = 3.5;
 const REPAIR: f32 = 4.0;
 const SEEK_LIMIT: f32 = 6.0;
+const SEEK_SPEED: f32 = 5.0;
+const WORK_ARRIVAL: f32 = 0.2;
+const WORK_DRIFT: f32 = 0.35;
 // Existing smoke puff (Vanish), used only as a visual. No concealment or damage.
 const SMOKE: u32 = 1856;
 // Mining's working animation, already used by gatherers.
@@ -223,13 +226,36 @@ mod tests {
         let away = [8.0, 0.0, 0.0];
         s.mobs.get_mut(&driver).unwrap().pos = away;
         s.mobs.get_mut(&driver).unwrap().path.clear();
-        s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Seeking { until: s.clock + SEEK_LIMIT, repath_at: s.clock };
+        s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Seeking { at: [4.6, 0.0, 0.0], until: s.clock + SEEK_LIMIT, repath_at: s.clock };
         s.land = Box::new(NoRoute);
         run(&mut s, SEEK_LIMIT + 0.1);
         assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
         assert!(dist2d(s.mobs[&driver].pos, away) < 0.1);
         assert!(!s.mobs.contains_key(&machine));
         assert!(live(&s, MACHINE).is_none());
+    }
+
+    #[test]
+    fn shredder_uses_another_edge_when_the_nearest_is_blocked_and_never_falls_back_to_center() {
+        let (mut s, band, machine) = fight(1, 8);
+        s.hurt_mob(machine, band[0], u32::MAX);
+        let driver = live(&s, DRIVER).unwrap();
+        let foe = Foe::Hero(band[0]);
+        let first = s.repair_work_point(driver, machine, foe).unwrap();
+        s.land = Box::new(FlatLand { walls: vec![([first[0], first[1]], 0.8)], ..Default::default() });
+        let other = s.repair_work_point(driver, machine, foe).expect("another reachable edge");
+        assert!(dist2d(first, other) > 4.0);
+        assert!(s.land.footing(other).is_some());
+        assert!(dist2d(other, s.mobs[&machine].pos) > 4.0);
+        s.land = Box::new(NoRoute);
+        assert!(s.repair_work_point(driver, machine, foe).is_none());
+        s.mobs.get_mut(&driver).unwrap().state = MobState::Chase { foe };
+        s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Fighting { after: s.clock };
+        let before = s.mobs[&driver].pos;
+        assert!(s.step_machinery(driver));
+        assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
+        assert_eq!(s.mobs[&driver].pos, before);
+        assert!(!s.mobs.contains_key(&machine));
     }
 
     #[test]
@@ -311,8 +337,8 @@ struct Driver {
 #[derive(Clone, Copy)]
 enum RepairStage {
     Fighting { after: f32 },
-    Seeking { until: f32, repath_at: f32 },
-    Working { until: f32, spark_at: f32 },
+    Seeking { at: Vec3, until: f32, repath_at: f32 },
+    Working { at: Vec3, until: f32, spark_at: f32 },
     Spent,
 }
 
@@ -538,41 +564,79 @@ impl Survival {
             RepairStage::Fighting { after } => {
                 let boundary = matches!(m.state, MobState::Chase { .. }) || matches!(m.state, MobState::Recover { until, .. } if now >= until && m.pattern.is_none());
                 if now < after || !boundary || !free { return false; }
-                self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { until: now + SEEK_LIMIT, repath_at: now + 0.5 };
+                let Some(at) = self.repair_work_point(id, d.wreck.unwrap(), foe.unwrap()) else {
+                    self.abandon_repair(id);
+                    return true;
+                };
+                self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { at, until: now + SEEK_LIMIT, repath_at: now + 0.5 };
                 let m = self.mobs.get_mut(&id).unwrap();
                 m.pattern = None;
                 m.state = MobState::Chase { foe: foe.unwrap() };
-                self.go(id, wreck, 5.0);
+                self.go(id, at, SEEK_SPEED);
                 true
             }
-            RepairStage::Seeking { until, repath_at } => {
+            RepairStage::Seeking { at, until, repath_at } => {
                 if now >= until {
                     self.abandon_repair(id);
-                } else if free && dist2d(pos, wreck) <= 1.6 && (pos[2] - wreck[2]).abs() < 2.0 {
+                } else if free && dist2d(pos, at) <= WORK_ARRIVAL && (pos[2] - at[2]).abs() < 0.5 && self.land.footing(pos).is_some() {
                     self.halt(id);
-                    self.mobs.get_mut(&id).unwrap().facing = facing(pos, wreck);
-                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { until: now + REPAIR, spark_at: now };
+                    let face = facing(pos, wreck);
+                    self.mobs.get_mut(&id).unwrap().facing = face;
+                    self.events.push(Event::MobStop { id, pos, facing: face });
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until: now + REPAIR, spark_at: now };
                     self.yell(id, "Just... one... bolt...");
                     self.events.push(Event::Cast { caster: id, spell: WORK, ms: (REPAIR * 1000.0) as u32 });
                 } else if free && !self.held_still(id) && self.mobs[&id].path.is_empty() && now >= repath_at {
-                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { until, repath_at: now + 0.5 };
-                    self.go(id, wreck, 5.0);
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { at, until, repath_at: now + 0.5 };
+                    self.go(id, at, SEEK_SPEED);
                 }
                 true
             }
-            RepairStage::Working { until, spark_at } => {
-                if !free || dist2d(pos, wreck) > 1.8 || (pos[2] - wreck[2]).abs() >= 2.0 {
+            RepairStage::Working { at, until, spark_at } => {
+                if !free || dist2d(pos, at) > WORK_DRIFT || (pos[2] - at[2]).abs() >= 0.5 || self.land.footing(pos).is_none() {
                     self.abandon_repair(id);
                 } else if now >= until {
                     self.finish_repair(id, d, wreck, foe.unwrap());
                 } else if now >= spark_at {
                     self.events.push(Event::Visual { id, kit: combat::KIT_PARRY, by: None });
-                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { until, spark_at: now + 0.75 };
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until, spark_at: now + 0.75 };
                 }
                 true
             }
             RepairStage::Spent => false,
         }
+    }
+
+    /// Work beside the retained Death pose, not at the machine's origin inside it. The
+    /// native GoblinShredder envelope is X [-4.29, 3.26], Y [-4.01, 4.80] before scale.
+    /// Leave room for the driver's body even at arrival/drift tolerance. Try the hero's
+    /// nearest accessible edge first; a blocked edge never becomes a center fallback.
+    fn repair_work_point(&self, driver: Id, wreck: Id, foe: Foe) -> Option<Vec3> {
+        let m = &self.mobs[&wreck];
+        let (origin, face, scale) = (m.pos, m.facing, self.content.mobs[m.def].scale);
+        let from = self.mobs[&driver].pos;
+        let hero = self.foe_pos(foe)?;
+        let clearance = 0.5 * self.content.mobs[self.mobs[&driver].def].scale + 0.5;
+        let mut candidates = [
+            [3.26 * scale + clearance, 0.0], [-4.29 * scale - clearance, 0.0],
+            [0.0, 4.80 * scale + clearance], [0.0, -4.01 * scale - clearance],
+        ].map(|p| [origin[0] + face.cos() * p[0] - face.sin() * p[1],
+            origin[1] + face.sin() * p[0] + face.cos() * p[1], origin[2]]);
+        candidates.sort_by(|a, b| dist2d(*a, hero).total_cmp(&dist2d(*b, hero)));
+        candidates.into_iter().find_map(|at| {
+            let at = self.land.footing(at)?;
+            // The driver and an approaching hero must stay on the wreck's own floor.
+            if (at[2] - origin[2]).abs() > 1.5 { return None; }
+            // A dry work point pressed against a wall is still unreadable to melee.
+            // Keep one ordinary swing's standing room outside this same edge.
+            let outward = facing(origin, at);
+            let approach = self.land.footing([at[0] + outward.cos() * 1.2,
+                at[1] + outward.sin() * 1.2, at[2]])?;
+            if (approach[2] - at[2]).abs() > 0.5 || !self.land.walk_clear(approach, at) { return None; }
+            let route = crate::land::walking_route(self.land.as_ref(), &[from, at])?;
+            let length: f32 = route.windows(2).map(|p| dist2d(p[0], p[1])).sum();
+            (length <= SEEK_LIMIT * SEEK_SPEED).then_some(at)
+        })
     }
 
     fn finish_repair(&mut self, driver: Id, d: Driver, at: Vec3, foe: Foe) {

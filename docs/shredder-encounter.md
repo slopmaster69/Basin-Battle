@@ -10,12 +10,13 @@ There are no health-triggered phases or damage multipliers in either form.
 The machine still has 950 base health. Its driver has 340 base health, down from 700. Sneed
 aims the native wrench missile during its tell, then scrambles back 4 yd where the ground allows, and flurries up
 close. After at least 5 sec on foot, at a safe attack boundary, he returns to the wreck. He has
-6 sec to get there; no path means he abandons the attempt. At the wreck he visibly works for
-4 sec, using the existing Mining cast and repeated sparks. Any positive damage or a stagger
-stops that attempt permanently. No particular class ability is required.
+6 sec to get there; no path means he abandons the attempt. He chooses a dry reachable edge
+nearest his opponent, outside the retained native Death pose, and faces the machine. He works
+for 4 sec there, using the existing Mining cast and repeated sparks. Any positive damage or a
+stagger stops that attempt permanently. No particular class ability is required.
 
 A successful repair consumes the corpse and removes the driver, replacing them with one machine
-at one third of its original maximum health. The driver's remaining health is saved; when the
+at the original wreck position with one third of its original maximum health. The driver's remaining health is saved; when the
 machine breaks again, he emerges with that health and no repair left. Only the final driver's
 death awards plunder and gear and clears the pack. A wipe restores one whole machine at its
 original post. A lamp rest and a driver death remove any retained wreck.
@@ -68,3 +69,19 @@ its machine report stops at driver emergence; its standalone Sneed has no wreck 
 It has no duo mode. These timings must not be added together or called full encounter balance
 evidence. Whole-encounter solo and duo pacing, normal-health survival and earned finishes
 remain to be measured in play or a separately extended actor report.
+
+## Repair edge regression
+
+The old center-seeking stop was 1.5 yd from the retained wreck in both native capture setups.
+GoblinShredder's Death pose extends several yards farther at the final encounter scale
+(including `combat.boss_scale`), hiding the goblin and close sword contact. The repair now checks four edge points against native footing
+and walking paths plus dry melee standing room, selects the nearest reachable edge to the opponent, and never falls back
+to the center. The 0.2 yd arrival and 0.35 yd work drift limits retain clearance for Sneed's
+body. A failed route still abandons the single attempt without teleporting.
+
+`shredder_native` (ignored without `WOW_DATA`) exercises the authored post and the north/east
+capture setups. It checks actual Mining-start clearance, continuous dry movement, facing,
+ordinary empty-loadout melee interruption, the full four-second work interval, rebuild at the
+original center, preserved driver health and no second repair. Run it with
+`cargo test --release -p htl-server --test shredder_native -- --ignored --nocapture`.
+The real client's hand animation, sparks and sword contact still require the visual pass.
