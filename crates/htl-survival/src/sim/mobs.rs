@@ -612,6 +612,7 @@ impl Survival {
         if self.own_totem(mid, by) {
             return;
         }
+        if damage > 0 { self.perch_hurt(mid, by); }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
@@ -934,6 +935,8 @@ impl Survival {
 
     fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
+        self.drop_perch(mid);
+        self.remove_perch_crew(mid);
         self.death_mark_reset(mid);
         self.boss_gone(mid);
         self.machinery_died(mid);
@@ -1181,6 +1184,7 @@ impl Survival {
         self.step_boss_fires();
         self.step_boss_collapse(dt);
         self.clean_machinery();
+        self.step_perch_crews();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1215,6 +1219,14 @@ impl Survival {
             if self.mobs[&id].state.foe().is_some() {
                 self.join_fight(id);
             }
+            // Perched engineers only finish scheduled throws. Falls follow their own spline,
+            // without a walker's floor projection snapping them down or back onto the ring.
+            if self.perch_controlled(id) {
+                if !self.disabled(id) && matches!(self.mobs[&id].state, MobState::Windup { .. }) {
+                    self.think(id, dt);
+                }
+                continue;
+            }
             // Far from every hero, a creature at rest sleeps (the land is wide).
             if heroes.iter().all(|p| dist2d(*p, self.mobs[&id].pos) > SLEEP_RANGE) {
                 let m = &self.mobs[&id];
@@ -1240,6 +1252,7 @@ impl Survival {
             if self.step_machinery(id) {
                 continue;
             }
+            if self.step_perch_valve(id) { continue; }
             if self.disabled(id) {
                 continue;
             }
@@ -1706,6 +1719,7 @@ impl Survival {
     /// while to `face` (whoever threw it), so a knockback drives it back rather than turning it to
     /// run.
     pub(crate) fn throw_mob(&mut self, id: Id, to: Vec3, air: f32, face: Option<Id>, lift: f32) {
+        if self.perch_controlled(id) { return; }
         let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
         // (Thrown again while up: from the ground under it.)
