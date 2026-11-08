@@ -38,7 +38,7 @@ dirs = "7"
 rfd = { version = "0.17", default-features = false, features = ["gtk3"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Console"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Console", "Win32_System_Threading"] }
 
 # Not a member of the repository's workspace: built on its own,
 #   cargo build --release --manifest-path dist/windows/buttons/Cargo.toml

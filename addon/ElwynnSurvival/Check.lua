@@ -517,6 +517,9 @@ ES.Attack = function(state)
   if state == "down" then
     check.pressAt = GetTime()
   elseif c and c.kind == "release" and ES.attackHeld then
+    -- The hold as the ring showed it goes with the release: the server judges that, not when the
+    -- release reached it (a small message can wait a fifth of a second on the way).
+    ES.releaseHeld = GetTime() - c.start
     Finish(JudgeRelease(c, GetTime()))
   end
   return Attack(state)

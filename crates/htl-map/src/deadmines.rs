@@ -37,6 +37,17 @@ pub const AREA_ID: u32 = 1581;
 const CELL: f32 = 1.0;
 /// Ground this far round the dungeon's models is kept.
 const MARGIN: f32 = 20.0;
+/// Pieces Elwynn Survival adds to the Deadmines' collision, triangles in WoW coordinates. The
+/// client spawns the same list (benilla patch, `terrain_stream.rs`, `DEADMINES_BRIDGES`): change
+/// both together, so the server's floors and the player's feet agree.
+/// 1. The gangway off the Juggernaut's gun deck onto the plank down to Mr. Smite's dock. The data
+///    leaves a 5 yd hole between the deck's sloping edge (z 30, along (-33, -800)–(-36.5, -802))
+///    and the plank's top (z 31.5, along (-31, -804)–(-34.6, -807)), over a trough at z 27.7;
+///    players had to jump it (Corey, 7 Nov 2026).
+pub const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 2] = [
+    [[-33.0, -799.3, 30.2], [-36.5, -802.0, 31.4], [-34.6, -807.0, 30.5]],
+    [[-33.0, -799.3, 30.2], [-34.6, -807.0, 30.5], [-31.0, -804.3, 31.5]],
+];
 
 pub struct LoadedDeadmines {
     pub ground: Layers,
@@ -260,6 +271,10 @@ pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Opt
                 solid.extend(hull.indices.chunks_exact(3).map(|c| [pts[c[0] as usize], pts[c[1] as usize], pts[c[2] as usize]]));
             }
         }
+    }
+    // Our own pieces, where the data leaves a gap (`DEADMINES_BRIDGES`).
+    if map_dir == MAP_DIR {
+        solid.extend(DEADMINES_BRIDGES);
     }
     let (min, max) = window.unwrap_or(([lo[0] - MARGIN, lo[1] - MARGIN], [hi[0] + MARGIN, hi[1] + MARGIN]));
     for c in &chunks {

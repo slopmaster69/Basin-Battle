@@ -490,7 +490,7 @@ pub(crate) const VERSION: u32 = 2;
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
 /// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
 /// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
-pub(crate) const ADDON_NEWEST: u32 = 58;
+pub(crate) const ADDON_NEWEST: u32 = 59;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1434,6 +1434,10 @@ impl SurvivalGame {
                 Ok(())
             }
             "in" => {
+                // A release carries the hold as its client measured it (`h<secs>`, add-on 59), last
+                // or alone: taken out before the reticle's words are read.
+                let (held, arg2, tail) = held_words(arg2, words.collect());
+                let mut words = tail.into_iter();
                 // An ability key: `ab <slot 0-5> <ex 0|1>`, or its role's own letter.
                 let mut rest = arg2.to_string();
                 let input = match arg.as_str() {
@@ -1482,8 +1486,10 @@ impl SurvivalGame {
                         self.sim.set_aim_point(me, at);
                     }
                 }
-                if let Some(i) = input {
-                    self.sim.input(me, i);
+                match (input, held) {
+                    (Some(Input::AttackUp), Some(h)) => self.sim.release_held(me, h),
+                    (Some(i), _) => self.sim.input(me, i),
+                    _ => {}
                 }
                 Ok(())
             }
@@ -2470,6 +2476,15 @@ mod facts_tests {
 
 /// The aim point after a line's facing and elevation (`... <facing> <elevation> <x> <y> <z>`, the
 /// world point the client's reticle is on): all three, or none.
+/// A release's hold as its client measured it (`h<secs>`), out of an input's words (its first
+/// and the rest): the hold, and the words without it.
+fn held_words<'a>(first: &'a str, rest: Vec<&'a str>) -> (Option<f32>, &'a str, Vec<&'a str>) {
+    let told = |w: &str| w.strip_prefix('h').and_then(|s| s.parse::<f32>().ok());
+    let held = told(first).or_else(|| rest.iter().find_map(|w| told(w)));
+    let first = if told(first).is_some() { "" } else { first };
+    (held, first, rest.into_iter().filter(|w| told(w).is_none()).collect())
+}
+
 fn aim_point_words<'a>(words: &mut impl Iterator<Item = &'a str>) -> Option<[f32; 3]> {
     let x = words.next()?.parse::<f32>().ok()?;
     let y = words.next()?.parse::<f32>().ok()?;
@@ -2488,5 +2503,19 @@ mod aim_point_tests {
         assert_eq!(aim_point_words(&mut "".split_whitespace()), None, "an older client sends none");
         assert_eq!(aim_point_words(&mut "1 2".split_whitespace()), None);
         assert_eq!(aim_point_words(&mut "1 x 3".split_whitespace()), None);
+    }
+
+    #[test]
+    fn a_releases_hold_comes_out_of_its_words_wherever_it_is() {
+        use super::held_words;
+        let (h, first, rest) = held_words("1.5", vec!["0.2", "3", "4", "5", "h1.234"]);
+        assert_eq!((h, first, rest), (Some(1.234), "1.5", vec!["0.2", "3", "4", "5"]));
+        // No reticle point: it doesn't stand in for one.
+        let (h, first, rest) = held_words("1.5", vec!["0.2", "h0.9"]);
+        assert_eq!((h, first, rest), (Some(0.9), "1.5", vec!["0.2"]));
+        // Alone, with no reticle line at all.
+        assert_eq!(held_words("h0.5", vec![]), (Some(0.5), "", vec![]));
+        // An older add-on: none.
+        assert_eq!(held_words("1.5", vec!["0.2"]), (None, "1.5", vec!["0.2"]));
     }
 }

@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 58
+local VERSION = 59
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1543,7 +1543,9 @@ function ES.Attack(state)
   else
     if not ES.attackHeld then return end
     ES.attackHeld = false
-    Say(".es in au" .. ES.AimLine())
+    local held = ES.releaseHeld and string.format(" h%.3f", ES.releaseHeld) or ""
+    ES.releaseHeld = nil
+    Say(".es in au" .. ES.AimLine() .. held)
   end
 end
 

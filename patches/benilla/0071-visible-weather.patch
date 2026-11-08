@@ -1,4 +1,4 @@
-From 25ea50a173c76416e71fa22f628ef6aae59acc7e Mon Sep 17 00:00:00 2001
+From 1d6e036bd29b7ba78823490e5785c8d517f698f2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 14:39:42 -0700
 Subject: [PATCH] Visible weather under the new look: grey skies, lit rain, wet
@@ -31,29 +31,49 @@ overcast|rain|storm> [0-1] holds a weather here for film through 1.12's
 own path, and lookweather server lets go (back to the last weather the
 server sent). worldLook 0 is 1.12's weather exactly.
 
+Revised after the first weather films (#271, take 272):
+
+- Night rain at Goldshire filmed near-black and murky, darker and flatter
+  than the dry frame. By night an overcast takes 0.15 of the moon's light
+  (by day 0.5 of the sun's), soaked ground darkens by 0.1 (by day 0.3), and
+  the weather lifts the mist to 0.4 of its daytime lift.
+- The wet ground mirrors the lights: every new-look light (a lamp, a torch,
+  a building's window light) lies on wet stone as a streak from under it
+  toward the camera, out to two and a half times its radius, brightest in
+  the puddles, where the old sheen was a small highlight inside the light's
+  own pool.
+- The streaks catch the lamps: 2.0 of a lamp's light, was 0.8, out to 1.6
+  times its range.
+- The thunder played kit 8432 (ThunderaanAttack, a boss's attack). It is
+  chosen now only from kits whose every file sits under the world's ambience
+  or weather sounds, never a creature's, a spell's, a character's or an
+  item's, nor a name of an attack, wound, death, aggro, cast or impact; the
+  pick is logged, and with none the storm is silent.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
  crates/benilla-app/src/cvars/mod.rs           |  20 +
  crates/benilla-app/src/cvars/table.rs         |  10 +
- crates/benilla-app/src/sound/weather.rs       | 155 +++-
+ crates/benilla-app/src/sound/weather.rs       | 221 ++++-
  crates/benilla-app/src/video.rs               |  13 +-
  crates/benilla-app/src/world_console.rs       |  95 ++
  crates/benilla-assets/src/shaders/liquid.wgsl |  47 +-
- .../benilla-assets/src/shaders/terrain.wgsl   |  88 +-
+ .../benilla-assets/src/shaders/terrain.wgsl   | 106 +-
  crates/benilla-formats/src/sound_entries.rs   |   5 +
  .../src/lighting/global_light.rs              |  18 +-
+ crates/benilla-world/src/look/mist.rs         |   8 +-
  crates/benilla-world/src/look/mod.rs          |  34 +-
  crates/benilla-world/src/look/pass.rs         |   7 +-
  crates/benilla-world/src/look/shadows.rs      |   7 +-
  crates/benilla-world/src/look/water.rs        |  47 +-
- crates/benilla-world/src/look/weather.rs      | 849 ++++++++++++++++++
+ crates/benilla-world/src/look/weather.rs      | 925 ++++++++++++++++++
  crates/benilla-world/src/look/wind.rs         |   8 +-
- .../benilla-world/src/shaders/static_gx.wgsl  |  84 +-
+ .../benilla-world/src/shaders/static_gx.wgsl  | 102 +-
  crates/benilla-world/src/weather/mod.rs       |  27 +-
  .../benilla-world/src/weather/precip/mod.rs   |  50 +-
  .../src/weather/precip/render.rs              |  40 +
- 19 files changed, 1564 insertions(+), 40 deletions(-)
+ 20 files changed, 1749 insertions(+), 41 deletions(-)
  create mode 100644 crates/benilla-world/src/look/weather.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
@@ -116,10 +136,10 @@ index 51803fb..9362de6 100644
      // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
      // [`crate::perf::FpsJournalSetting`].
 diff --git a/crates/benilla-app/src/sound/weather.rs b/crates/benilla-app/src/sound/weather.rs
-index 13978c0..32ef618 100644
+index 13978c0..5d3e987 100644
 --- a/crates/benilla-app/src/sound/weather.rs
 +++ b/crates/benilla-app/src/sound/weather.rs
-@@ -5,22 +5,149 @@
+@@ -5,22 +5,183 @@
  //! `0x67e919`) and the area's `AmbienceID` while set, each swap a 5.0 s crossfade (`0x460b00`):
  //! rain is replaced indoors, not ducked. The packet's `grade` drives rendering only (`0x67baf0`).
  //! The channel itself is `super::zone`'s.
@@ -175,39 +195,73 @@ index 13978c0..32ef618 100644
 +    due: Vec<(f64, f32)>,
 +}
 +
-+/// A thunder kit: the first whose files name thunder, leaving out Thunder Bluff, Thunder Clap,
-+/// Thunderfury and music; one under the weather or the ambience first. Untested against a real
-+/// install: 1.12 may ship none, and the storm is then silent.
++/// A thunder kit, looked up once: [`pick_thunder`] over the sound table, the pick logged, and
++/// nothing (a silent storm) if no kit fits.
 +fn find_thunder(catalog: &benilla_formats::SoundKitCatalog) -> Option<u32> {
-+    let thunderish = |f: &str| {
-+        let f = f.to_ascii_lowercase();
-+        f.contains("thunder")
-+            && !["bluff", "clap", "fury", "music", "lizard"]
-+                .iter()
-+                .any(|x| f.contains(x))
-+    };
-+    let mut found: Vec<(bool, u32, &str)> = catalog
++    let kits: Vec<(u32, &str, Vec<&str>)> = catalog
 +        .iter()
-+        .filter(|k| k.files.iter().any(|(f, _)| thunderish(f)))
 +        .map(|k| {
-+            let weather = k.files.iter().any(|(f, _)| {
-+                let f = f.to_ascii_lowercase();
-+                f.contains("weather") || f.contains("ambience")
-+            });
-+            (!weather, k.id, k.name.as_str())
++            (
++                k.id,
++                k.name.as_str(),
++                k.files.iter().map(|(f, _)| f.as_str()).collect(),
++            )
 +        })
 +        .collect();
-+    found.sort();
-+    match found.first() {
-+        Some((_, id, name)) => {
++    let found = pick_thunder(
++        kits.iter()
++            .map(|(id, name, files)| (*id, *name, files.as_slice())),
++    );
++    match found {
++        Some((id, name)) => {
 +            info!("weather: thunder plays kit {id} ({name})");
-+            Some(*id)
++            Some(id)
 +        }
 +        None => {
-+            info!("weather: no thunder kit found; lightning is silent");
++            info!("weather: no ambient thunder kit found; lightning is silent");
 +            None
 +        }
 +    }
++}
++
++/// The thunder among `(id, name, files)` kits: a kit whose files or name say thunder and whose
++/// every file sits under the world's ambience or weather sounds (`Sound\Ambience\`, a path
++/// naming weather), never a creature's, a spell's, a character's or an item's. The first take
++/// played kit 8432 (`ThunderaanAttack`, a boss's attack, under `Sound\Creature\`). Names of
++/// creature and spell kits (`*Attack`, `*Wound`, `*Death`, `*Aggro`, a cast or an impact) are left
++/// out too, and Thunder Bluff, Thunder Clap, Thunderfury and music. The lowest id wins; `None`
++/// if nothing fits, and the storm is then silent.
++fn pick_thunder<'a>(
++    kits: impl Iterator<Item = (u32, &'a str, &'a [&'a str])>,
++) -> Option<(u32, String)> {
++    const NOT_WEATHER: [&str; 13] = [
++        "attack", "wound", "death", "aggro", "cast", "impact", "spell", "bluff", "clap", "fury",
++        "music", "lizard", "creature",
++    ];
++    let ambient_path = |f: &str| {
++        let f = f.to_ascii_lowercase().replace('/', "\\");
++        (f.contains("sound\\ambience\\") || f.contains("weather"))
++            && !["\\creature\\", "\\spells\\", "\\character\\", "\\item\\"]
++                .iter()
++                .any(|x| f.contains(x))
++    };
++    kits.filter(|(_, name, files)| {
++        let lname = name.to_ascii_lowercase();
++        let says_thunder = lname.contains("thunder")
++            || files
++                .iter()
++                .any(|f| f.to_ascii_lowercase().contains("thunder"));
++        let clean = |s: &str| {
++            let s = s.to_ascii_lowercase();
++            !NOT_WEATHER.iter().any(|x| s.contains(x))
++        };
++        says_thunder
++            && !files.is_empty()
++            && files.iter().all(|f| ambient_path(f) && clean(f))
++            && clean(&lname)
++    })
++    .map(|(id, name, _)| (id, name.to_string()))
++    .min_by_key(|(id, _)| *id)
 +}
 +
 +/// Queues each new strike's thunder after its delay and plays what is due, 2D on the ambience.
@@ -273,7 +327,7 @@ index 13978c0..32ef618 100644
          }
      }
  }
-@@ -28,5 +155,23 @@ fn track_weather_kit(mut kit: ResMut<WeatherAmbience>, mut msgs: MessageReader<W
+@@ -28,5 +189,55 @@ fn track_weather_kit(mut kit: ResMut<WeatherAmbience>, mut msgs: MessageReader<W
  /// Registration hook for [`super::SoundPlugin`].
  pub(super) fn plugin(app: &mut App) {
      app.init_resource::<WeatherAmbience>()
@@ -296,6 +350,38 @@ index 13978c0..32ef618 100644
 +    fn thunder_is_found_by_its_file_and_not_the_bluff() {
 +        use benilla_formats::SoundKitCatalog;
 +        assert_eq!(find_thunder(&SoundKitCatalog::empty_for_tests()), None);
++    }
++
++    /// The storm's thunder is ambient or weather sound only: never a boss's attack (the first
++    /// take's `ThunderaanAttack`), a spell, a creature or Thunder Bluff; silent when none fits.
++    #[test]
++    fn thunder_keeps_to_the_weather() {
++        let boss: &[&str] = &["Sound\\Creature\\Thunderaan\\ThunderaanAttack.wav"];
++        let clap: &[&str] = &["Sound\\Spells\\ThunderClap.wav"];
++        let bluff: &[&str] = &["Sound\\Ambience\\ZoneAmbience\\ThunderBluffDay.wav"];
++        let named: &[&str] = &["Sound\\Ambience\\Weather\\Rumble01.wav"];
++        let storm: &[&str] = &[
++            "Sound\\Ambience\\Weather\\Thunder01.wav",
++            "Sound\\Ambience\\Weather\\Thunder02.wav",
++        ];
++        let without = [
++            (8432, "ThunderaanAttack", boss),
++            (3, "ThunderClap", clap),
++            (4, "ThunderBluffDay", bluff),
++        ];
++        assert_eq!(pick_thunder(without.iter().copied()), None, "silent");
++        let mut with = without.to_vec();
++        with.push((9001, "WeatherThunder", storm));
++        with.push((9100, "DistantThunder", named));
++        assert_eq!(
++            pick_thunder(with.iter().copied()),
++            Some((9001, "WeatherThunder".to_string()))
++        );
++        assert_eq!(
++            pick_thunder([(5, "ThunderaanAggro", named)].into_iter()),
++            None,
++            "a creature's name, even on an ambience path"
++        );
 +    }
  }
 diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
@@ -457,7 +543,7 @@ index 39401b2..295f8a9 100644
      /// of range leaves it as it was with the usage line.
      #[test]
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index 1c8fbb7..f9dbcfc 100644
+index bd56d15..92054c8 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -80,7 +80,7 @@ struct WowLight {
@@ -469,7 +555,7 @@ index 1c8fbb7..f9dbcfc 100644
  //   10-22 the new look's painted sky (`look::sky::pack_rows`, `LookSkyRows`), all zero while off.
  @group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
  @group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
-@@ -549,6 +549,44 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
+@@ -577,6 +577,44 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
      return 1.0 - head.y * (1.0 - lit);
  }
  
@@ -514,7 +600,7 @@ index 1c8fbb7..f9dbcfc 100644
  // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
  // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
  // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
-@@ -584,7 +622,12 @@ fn look_water(
+@@ -612,7 +650,12 @@ fn look_water(
      let shore = smoothstep(0.0, water.rows[7].w, depth_v);
  
      // Ripples, calmed into the shore.
@@ -529,7 +615,7 @@ index 1c8fbb7..f9dbcfc 100644
      // The sun's share at the surface, for the body, the glint and the mirror.
      let vis = water_shadow(P, eye_z, pix);
 diff --git a/crates/benilla-assets/src/shaders/terrain.wgsl b/crates/benilla-assets/src/shaders/terrain.wgsl
-index e25b82f..22d6392 100644
+index 5ef6ecc..7d5285b 100644
 --- a/crates/benilla-assets/src/shaders/terrain.wgsl
 +++ b/crates/benilla-assets/src/shaders/terrain.wgsl
 @@ -44,10 +44,11 @@ struct WowLight {
@@ -546,7 +632,7 @@ index e25b82f..22d6392 100644
      point_count: vec4<f32>,
      points: array<vec4<f32>, 512>,
      // The new look's lights from torches and spells (`look::lights`, MAX_LOOK_LIGHTS = 24), two
-@@ -302,6 +303,76 @@ fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
+@@ -302,6 +303,94 @@ fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
      return sum;
  }
  
@@ -558,11 +644,16 @@ index e25b82f..22d6392 100644
 +// Ground, stone and roofs facing up take all of it, walls a share, undersides (eaves, a cart's
 +// belly) none, in soft patches like puddles and drier ground. The sheen is the sun's (or the
 +// moon's) highlight where it is not shadowed (`sun_vis`), the sky's at a grazing angle, and every
-+// new-look torch's, which pools on wet stone at night. The shape constants are `look::weather::
-+// tune`'s `WET_*`, mirrored here.
++// new-look light's reflection (a lamp's, a torch's, a building's window light): a streak on the
++// wet stone from under it toward the camera, brightest in the puddles. The shape constants are
++// `look::weather::tune`'s `WET_*`, mirrored here.
 +const WET_WALL: f32 = 0.45;
 +const WET_SKY: f32 = 0.35;
-+const WET_TORCH: f32 = 0.8;
++const WET_TORCH: f32 = 1.2;
++const WET_TORCH_REACH: f32 = 2.5;
++const WET_LANE_ACROSS: f32 = 0.06;
++const WET_LANE_ALONG: f32 = 0.45;
++const WET_PUDDLE: f32 = 0.6;
 +const WET_PATCH: f32 = 0.35;
 +
 +fn look_wet_hash(c: vec2<f32>) -> f32 {
@@ -599,21 +690,34 @@ index e25b82f..22d6392 100644
 +    // The sky, at a grazing angle.
 +    let fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 5.0);
 +    spec += wow_light.fog_color.rgb * (fres * WET_SKY);
-+    // The torches and the spells.
++    // The lamps, torches and spells, mirrored: where the ray mirrored off the wet surface passes
++    // near a light, narrow across its bearing and long along its elevation, so each light lies on
++    // the ground as a streak from under it toward the camera, out past its own pool.
++    let R = reflect(-V, N);
++    let r_flat = vec2<f32>(R.x, R.z);
++    let r_len = max(length(r_flat), 1e-4);
++    let r_el = atan2(R.y, r_len);
++    let puddle = smoothstep(0.45, 0.7, look_wet_noise(P.xz * 0.9 + vec2<f32>(17.0, 5.0)));
++    let mirror = (1.0 - WET_PUDDLE) + WET_PUDDLE * puddle;
 +    let count = u32(wow_light.point_count.y);
 +    for (var i = 0u; i < count; i = i + 1u) {
 +        let pos_radius = wow_light.look_lights[2u * i];
 +        let to_light = pos_radius.xyz - P;
 +        let d2 = dot(to_light, to_light);
-+        let r2 = pos_radius.w * pos_radius.w;
++        let reach = pos_radius.w * WET_TORCH_REACH;
++        let r2 = reach * reach;
 +        if (d2 >= r2) {
 +            continue;
 +        }
 +        let x2 = d2 / r2;
 +        let window = (1.0 - x2) * (1.0 - x2);
-+        let h = normalize(to_light * inverseSqrt(max(d2, 1e-6)) + V);
++        let l_flat = vec2<f32>(to_light.x, to_light.z);
++        let l_len = max(length(l_flat), 1e-4);
++        let across = (r_flat.x * l_flat.y - r_flat.y * l_flat.x) / (r_len * l_len * WET_LANE_ACROSS);
++        let along = (r_el - atan2(to_light.y, l_len)) / WET_LANE_ALONG;
++        let ahead = select(0.0, 1.0, dot(r_flat, l_flat) > 0.0);
 +        spec += wow_light.look_lights[2u * i + 1u].rgb
-+            * (window * WET_TORCH * pow(max(dot(N, h), 0.0), sharp));
++            * (window * WET_TORCH * mirror * ahead * exp(-(across * across) - along * along));
 +    }
 +    let res = rgb * (1.0 - wet.x * soak) + spec * (wet.y * soak);
 +    return clamp(res, vec3<f32>(0.0), vec3<f32>(1.0));
@@ -623,7 +727,7 @@ index e25b82f..22d6392 100644
  // The MCNK chunk cell centre under a world point: the reference's light anchor, the chunk's world
  // AABB centre `CMapChunk+0x5c..0x64` (written by `0x6b0e50`). The grid is fixed world-wide (chunk
  // 533.33333/16 yd, half-extent 32 tiles) and symmetric, and WoW x/y are Bevy −z/−x, so snapping
-@@ -398,6 +469,8 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
+@@ -398,6 +487,8 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
      specmask = mix(specmask, s3.a, a.b);
  
      var primary = in.primary;
@@ -632,7 +736,7 @@ index e25b82f..22d6392 100644
      // The new look's sun shadow takes the sun's N·L share out of the Gouraud sum, and the baked
      // MCSH below gives way to it as it comes in (the same trees, baked for 1.12's fixed sun).
      let eye_z = -(view.view_from_world * vec4<f32>(in.world_position.xyz, 1.0)).z;
-@@ -407,6 +480,7 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
+@@ -407,6 +498,7 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
      if (wow_light.shadow[0].x > 0.5 && any(in.primary > in.primary_no_sun + vec3<f32>(1.0 / 512.0))) {
          let vis = sun_shadow(in.world_position.xyz, normalize(in.world_normal), eye_z, in.clip_position.xy);
          primary = shade_sun(in.primary, in.primary_no_sun, vis);
@@ -640,7 +744,7 @@ index e25b82f..22d6392 100644
          mcsh_weight = 1.0 - wow_light.shadow[0].y;
      }
  
-@@ -432,6 +506,16 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
+@@ -432,6 +524,16 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
      if (wow_light.point_count.y > 0.5) {
          lit_sum += max(color, vec3<f32>(LOOK_FLOOR)) * look_light_sum(in.world_position.xyz, normalize(in.world_normal));
      }
@@ -724,6 +828,32 @@ index 842bd8c..1a75eab 100644
      // `WOW_POINTS_DUMP=1` prints the nearest 8 packed lights once a second; `=frame` every frame,
      // which a pool that changes frame to frame needs.
      static POINTS_DUMP: std::sync::OnceLock<Option<std::ffi::OsString>> =
+diff --git a/crates/benilla-world/src/look/mist.rs b/crates/benilla-world/src/look/mist.rs
+index 4ed3eb1..69ab9d3 100644
+--- a/crates/benilla-world/src/look/mist.rs
++++ b/crates/benilla-world/src/look/mist.rs
+@@ -334,6 +334,7 @@ pub(super) fn resolve_mist(
+     time: Res<Time<Real>>,
+     clock: Option<Res<WorldTime>>,
+     weather: Option<Res<WeatherState>>,
++    game_clock: Option<Res<crate::lighting::GameClock>>,
+     tune: Res<LookMistTune>,
+     mut event: ResMut<WorldMist>,
+     mut mist: ResMut<LookMist>,
+@@ -341,7 +342,12 @@ pub(super) fn resolve_mist(
+     let clock = clock.map(|c| *c).unwrap_or_default();
+     let input = MistInputs {
+         day: tune.day.unwrap_or_else(|| server_day(&clock)),
+-        weather: weather.map_or(0.0, |w| weather_scale(&w)),
++        // By night the weather lifts it less (`look::weather::tune::NIGHT_MIST`): the night's
++        // mist is its dark fog, and a full lift of it buries the night in a murk.
++        weather: weather.map_or(0.0, |w| {
++            let night = game_clock.map_or(0.0, |c| super::weather::night_share(c.minute as f32));
++            super::weather::mist_lift(weather_scale(&w), night)
++        }),
+         held: tune.scale,
+         live: clock.live,
+         forced: tune.day.is_some(),
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
 index aa9be1c..aef83ef 100644
 --- a/crates/benilla-world/src/look/mod.rs
@@ -840,10 +970,10 @@ index 0835ddd..0e3a32e 100644
              PostLook::NEUTRAL
          },
 diff --git a/crates/benilla-world/src/look/shadows.rs b/crates/benilla-world/src/look/shadows.rs
-index 316e2c9..fd0be4f 100644
+index da0dd48..f94cae3 100644
 --- a/crates/benilla-world/src/look/shadows.rs
 +++ b/crates/benilla-world/src/look/shadows.rs
-@@ -548,6 +548,8 @@ pub(crate) struct ShadowInputs<'w, 's> {
+@@ -556,6 +556,8 @@ pub(crate) struct ShadowInputs<'w, 's> {
      shadows: Res<'w, LookShadows>,
      frame: ResMut<'w, ShadowFrame>,
      proj: Query<'w, 's, &'static Projection, With<crate::view::WorldCamera>>,
@@ -852,7 +982,7 @@ index 316e2c9..fd0be4f 100644
  }
  
  impl ShadowInputs<'_, '_> {
-@@ -579,7 +581,10 @@ impl ShadowInputs<'_, '_> {
+@@ -587,7 +589,10 @@ impl ShadowInputs<'_, '_> {
              return ShadowFrame::default();
          };
          let light = ShadowLight {
@@ -865,10 +995,10 @@ index 316e2c9..fd0be4f 100644
          };
          if light.strength <= 0.0 {
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index 4738bf8..85ab0ac 100644
+index 1aef9da..0b04187 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -128,7 +128,7 @@ pub mod tune {
+@@ -142,7 +142,7 @@ pub mod tune {
  ///   2 `[glint colour (linear), sharpness]` · 3 `[sky zenith (linear), ripple slope]` ·
  ///   4 `[sky horizon (linear), ripple wavelength (yd)]` · 5 `[shallow (sRGB), tint weight]` ·
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
@@ -877,7 +1007,7 @@ index 4738bf8..85ab0ac 100644
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
  ///   the mirror's sky runs through, so the lakes mirror the clouds.
  pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS;
-@@ -287,6 +287,7 @@ pub fn pack_rows(
+@@ -302,6 +302,7 @@ pub fn pack_rows(
      held: &LookWater,
      light: &WowLighting,
      sky: &super::SkyFrame,
@@ -885,7 +1015,7 @@ index 4738bf8..85ab0ac 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -336,7 +337,7 @@ pub fn pack_rows(
+@@ -357,7 +358,7 @@ pub fn pack_rows(
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
          tune::OCEAN_CLEAR_YD * clarity,
@@ -894,7 +1024,7 @@ index 4738bf8..85ab0ac 100644
      ];
      rows
  }
-@@ -347,12 +348,15 @@ pub(crate) fn publish_water(
+@@ -368,12 +369,15 @@ pub(crate) fn publish_water(
      water: Res<LookWater>,
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
@@ -911,7 +1041,7 @@ index 4738bf8..85ab0ac 100644
      };
      if *frame != next {
          *frame = next;
-@@ -429,7 +433,13 @@ mod tests {
+@@ -450,7 +454,13 @@ mod tests {
  
      #[test]
      fn the_block_is_zero_when_off() {
@@ -926,7 +1056,7 @@ index 4738bf8..85ab0ac 100644
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
  
-@@ -437,16 +447,31 @@ mod tests {
+@@ -458,16 +468,31 @@ mod tests {
      /// mirror and the clarity, and lets go again.
      #[test]
      fn the_block_carries_the_tuning_and_the_hold() {
@@ -960,7 +1090,7 @@ index 4738bf8..85ab0ac 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -582,7 +607,13 @@ mod tests {
+@@ -714,7 +739,13 @@ mod tests {
      /// with it off, those rows stay zero and the glint whole.
      #[test]
      fn the_painted_sky_reaches_the_water() {
@@ -975,7 +1105,7 @@ index 4738bf8..85ab0ac 100644
          assert!(off[10..].iter().all(|r| *r == [0.0; 4]));
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
-@@ -591,7 +622,7 @@ mod tests {
+@@ -723,7 +754,7 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
@@ -986,10 +1116,10 @@ index 4738bf8..85ab0ac 100644
          assert!(sky.sun_clear < 1.0);
 diff --git a/crates/benilla-world/src/look/weather.rs b/crates/benilla-world/src/look/weather.rs
 new file mode 100644
-index 0000000..872910c
+index 0000000..ec1816c
 --- /dev/null
 +++ b/crates/benilla-world/src/look/weather.rs
-@@ -0,0 +1,849 @@
+@@ -0,0 +1,925 @@
 +//! Visible weather, the new look's own (no reference behaviour): Elwynn in a summer shower. The
 +//! server sends 1.12's own `SMSG_WEATHER` (rain at a grade, [`crate::weather::WeatherState`]); 1.12
 +//! clouds its sky by the grade's first quarter and drops rain past it, and this reads the same
@@ -1050,6 +1180,14 @@ index 0000000..872910c
 +    // ---- overcast ----
 +    /// The share of the sun's light a full overcast takes, and the cool it leaves on the rest.
 +    pub const SUN_DIM: f32 = 0.5;
++    /// By night ([`super::night_share`]) the overcast takes this share of the moon's light
++    /// instead: Goldshire in rain at 23:30 filmed near-black and murky at [`SUN_DIM`], darker and
++    /// flatter than the dry frame from the same spot, where the night is already dark.
++    pub const NIGHT_SUN_DIM: f32 = 0.15;
++    /// The share of the weather's lift of the mist (`look::mist::weather_scale`) kept by night:
++    /// the night's mist is the night's dark fog colour, and three to four times of it flattened
++    /// the night-rain film into a murk.
++    pub const NIGHT_MIST: f32 = 0.4;
 +    pub const SUN_COOL: [f32; 3] = [0.84, 0.9, 1.0];
 +    /// The ambient (the sky's light in the shade) under a full overcast: a touch cooler.
 +    pub const AMBIENT_COOL: [f32; 3] = [0.94, 0.98, 1.04];
@@ -1068,22 +1206,40 @@ index 0000000..872910c
 +    pub const DRY_S: f32 = 300.0;
 +    /// Soaked ground: how much darker (a share of its light), how strong its sheen, and how sharp.
 +    pub const WET_DARKEN: f32 = 0.3;
++    /// How much darker soaked ground is by night: the night's ground is dark already, and the
++    /// night-rain film's cobbles went near-black at [`WET_DARKEN`].
++    pub const NIGHT_WET_DARKEN: f32 = 0.1;
 +    pub const WET_SHEEN: f32 = 0.5;
 +    pub const WET_SHININESS: f32 = 40.0;
 +    /// The wet block's shape (`look_wet` in `terrain.wgsl` and `static_gx.wgsl`, mirrored there as
 +    /// WGSL constants; the tests compare them): how wet a wall gets beside the ground, the sky's
-+    /// sheen at a grazing angle, a torch's sheen, and how patchy the soak is.
++    /// sheen at a grazing angle, a torch's reflection, and how patchy the soak is.
 +    pub const WET_WALL: f32 = 0.45;
 +    pub const WET_SKY: f32 = 0.35;
-+    pub const WET_TORCH: f32 = 0.8;
++    /// 1.2, was 0.8 on a Blinn lobe inside the torch's own radius: the night-rain film's cobbles
++    /// showed no sheen and the lamp pools barely reached the ground. A lamp (or a window's light,
++    /// a building's MOLT light) now lies on the wet ground as its reflection: a streak running
++    /// from under it toward the camera, [`WET_LANE_ACROSS`] radians wide and [`WET_LANE_ALONG`]
++    /// long in the mirrored ray's angle off the light, out to [`WET_TORCH_REACH`] times the light's
++    /// radius, brightest in the puddles ([`WET_PUDDLE`]).
++    pub const WET_TORCH: f32 = 1.2;
++    pub const WET_TORCH_REACH: f32 = 2.5;
++    pub const WET_LANE_ACROSS: f32 = 0.06;
++    pub const WET_LANE_ALONG: f32 = 0.45;
++    /// The share of the ground that holds a puddle (where the soak's noise runs high), which
++    /// mirrors a light fully; the rest of the wet ground this share less.
++    pub const WET_PUDDLE: f32 = 0.6;
 +    pub const WET_PATCH: f32 = 0.35;
 +    /// The streaks: how much of the hour's light (ambient plus half the sun) and of a torch's they
 +    /// catch, how opaque at their head (the tail fades out), how far a torch's light reaches them
 +    /// (yd, at most its own range), and how many of the torches nearest the camera.
++    /// 2.0, was 0.8, and the reach 1.6 times a torch's own range (was its range, at most 12 yd):
++    /// on the night-rain film the streaks hardly caught the lamps.
 +    pub const STREAK_LIGHT: f32 = 0.4;
-+    pub const STREAK_TORCH: f32 = 0.8;
++    pub const STREAK_TORCH: f32 = 2.0;
 +    pub const STREAK_ALPHA: f32 = 0.55;
-+    pub const TORCH_REACH: f32 = 12.0;
++    pub const STREAK_TORCH_RANGE: f32 = 1.6;
++    pub const TORCH_REACH: f32 = 16.0;
 +    pub const MAX_TORCHES: usize = 8;
 +    /// The streaks lean downwind: yards of lean on a 2 yd streak per unit of the wind's strength.
 +    pub const STREAK_LEAN: f32 = 0.3;
@@ -1252,6 +1408,9 @@ index 0000000..872910c
 +    pub storm: f32,
 +    /// How wet the ground is, 0 dry to 1 soaked ([`wet_step`]).
 +    pub wet: f32,
++    /// How much it is night, 0 by day to 1 ([`night_share`]): an overcast dims the night less, wet
++    /// ground darkens less and the weather's mist lifts less.
++    pub night: f32,
 +    /// The lightning's flash this frame, 0 to about 1.
 +    pub flash: f32,
 +    /// The latest strike that has flashed, for its thunder.
@@ -1269,8 +1428,9 @@ index 0000000..872910c
 +        if !self.on || self.wet <= 0.0 {
 +            return [0.0; 3];
 +        }
++        let darken = tune::WET_DARKEN + (tune::NIGHT_WET_DARKEN - tune::WET_DARKEN) * self.night;
 +        [
-+            tune::WET_DARKEN * self.wet,
++            darken * self.wet,
 +            tune::WET_SHEEN * self.wet,
 +            tune::WET_SHININESS,
 +        ]
@@ -1284,6 +1444,19 @@ index 0000000..872910c
 +            0.0
 +        }
 +    }
++}
++
++/// How much it is night at `minute` of the game day, 0 by day to 1: the torches' own night
++/// (`look::lights::night_weight`) without its day floor.
++pub fn night_share(minute: f32) -> f32 {
++    let floor = super::lights::tune::DAY_FLOOR;
++    ((super::lights::night_weight(minute) - floor) / (1.0 - floor)).clamp(0.0, 1.0)
++}
++
++/// The weather's lift of the mist (`look::mist::weather_scale`) at `night` ([`night_share`]):
++/// [`tune::NIGHT_MIST`] of it by night.
++pub fn mist_lift(lift: f32, night: f32) -> f32 {
++    lift * (1.0 + (tune::NIGHT_MIST - 1.0) * night.clamp(0.0, 1.0))
 +}
 +
 +fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
@@ -1394,16 +1567,17 @@ index 0000000..872910c
 +    std::array::from_fn(|i| (a[i] + b[i] * k).clamp(0.0, 1.0))
 +}
 +
-+/// The weather over the graded light: an overcast dims and cools the sun and cools the shade a
-+/// touch; a flash lights the ambient, the sky and the fog. `suppressed` (under water, a ghost)
-+/// and off pass `atmo` through.
++/// The weather over the graded light: an overcast dims and cools the sun (the moon's light by
++/// night, less) and cools the shade a touch; a flash lights the ambient, the sky and the fog.
++/// `suppressed` (under water, a ghost) and off pass `atmo` through.
 +pub fn apply_atmosphere(atmo: Atmosphere, w: &WeatherLook, suppressed: bool) -> Atmosphere {
 +    if !w.on || suppressed {
 +        return atmo;
 +    }
 +    let o = w.overcast.clamp(0.0, 1.0);
 +    let mut out = atmo;
-+    let sun_k = lerp3([1.0; 3], tune::SUN_COOL, o).map(|c| c * (1.0 - tune::SUN_DIM * o));
++    let dim = tune::SUN_DIM + (tune::NIGHT_SUN_DIM - tune::SUN_DIM) * w.night.clamp(0.0, 1.0);
++    let sun_k = lerp3([1.0; 3], tune::SUN_COOL, o).map(|c| c * (1.0 - dim * o));
 +    out.sun_diffuse = mul3(atmo.sun_diffuse, sun_k);
 +    out.ambient = mul3(atmo.ambient, lerp3([1.0; 3], tune::AMBIENT_COOL, o)).map(|c| c.min(1.0));
 +    if w.flash > 0.0 {
@@ -1465,7 +1639,7 @@ index 0000000..872910c
 +        });
 +        let mut torches: Vec<(f32, Vec3, f32, [f32; 3])> = lights
 +            .filter_map(|(p, range, rgb)| {
-+                let reach = range.min(tune::TORCH_REACH);
++                let reach = (range * tune::STREAK_TORCH_RANGE).min(tune::TORCH_REACH);
 +                let d2 = p.distance_squared(cam);
 +                let near = tune::TORCH_REACH + 70.0;
 +                (reach > 0.0 && d2 < near * near).then_some((d2, p, reach, rgb))
@@ -1534,6 +1708,7 @@ index 0000000..872910c
 +    tune: Res<LookWeather>,
 +    state: Option<Res<WeatherState>>,
 +    world_time: Res<WorldTime>,
++    clock: Option<Res<crate::lighting::GameClock>>,
 +    time: Res<Time<Real>>,
 +    mut frame: ResMut<WeatherLook>,
 +) {
@@ -1571,6 +1746,7 @@ index 0000000..872910c
 +        rain,
 +        storm,
 +        wet: wet_step(frame.wet, rain, time.delta_secs()),
++        night: clock.map_or(0.0, |c| night_share(c.minute as f32)),
 +        flash,
 +        strike,
 +        since_cue,
@@ -1614,11 +1790,41 @@ index 0000000..872910c
 +            ("WET_WALL", tune::WET_WALL),
 +            ("WET_SKY", tune::WET_SKY),
 +            ("WET_TORCH", tune::WET_TORCH),
++            ("WET_TORCH_REACH", tune::WET_TORCH_REACH),
++            ("WET_LANE_ACROSS", tune::WET_LANE_ACROSS),
++            ("WET_LANE_ALONG", tune::WET_LANE_ALONG),
++            ("WET_PUDDLE", tune::WET_PUDDLE),
 +            ("WET_PATCH", tune::WET_PATCH),
 +        ] {
 +            let line = format!("const {name}: f32 = {v:?};");
 +            assert!(terrain.contains(&line), "{line}");
 +        }
++    }
++
++    /// The night-rain film (Goldshire, 23:30) went near-black and murky: by night an overcast
++    /// dims the moon's light less than a day's sun, soaked ground darkens less, and the weather's
++    /// mist lifts less; by day all three are as before.
++    #[test]
++    fn a_rainy_night_is_not_buried() {
++        assert_eq!(night_share(12.0 * 60.0), 0.0);
++        assert_eq!(night_share(23.5 * 60.0), 1.0);
++        let atmo = Atmosphere {
++            sun_diffuse: [0.4, 0.45, 0.6],
++            ..Atmosphere::DEFAULT
++        };
++        let day = WeatherLook {
++            night: 0.0,
++            ..look(1.0, 0.0)
++        };
++        let night = WeatherLook { night: 1.0, ..day };
++        let lit = |w: &WeatherLook| apply_atmosphere(atmo, w, false).sun_diffuse[2];
++        assert!((lit(&day) - 0.6 * (1.0 - tune::SUN_DIM)).abs() < 1e-5);
++        assert!((lit(&night) - 0.6 * (1.0 - tune::NIGHT_SUN_DIM)).abs() < 1e-5);
++        let soaked = |w: WeatherLook| WeatherLook { wet: 1.0, ..w }.lanes()[0];
++        assert!((soaked(day) - tune::WET_DARKEN).abs() < 1e-6);
++        assert!((soaked(night) - tune::NIGHT_WET_DARKEN).abs() < 1e-6);
++        assert_eq!(mist_lift(4.0, 0.0), 4.0);
++        assert!((mist_lift(4.0, 1.0) - 4.0 * tune::NIGHT_MIST).abs() < 1e-5);
 +    }
 +
 +    /// Heavy rain covers the revised sky to its grey overcast: the rain's sky density is the
@@ -1866,7 +2072,7 @@ index 094e810..2ead7ed 100644
      };
  }
 diff --git a/crates/benilla-world/src/shaders/static_gx.wgsl b/crates/benilla-world/src/shaders/static_gx.wgsl
-index 5ccee63..6d11da5 100644
+index 1ffea96..a1fe749 100644
 --- a/crates/benilla-world/src/shaders/static_gx.wgsl
 +++ b/crates/benilla-world/src/shaders/static_gx.wgsl
 @@ -26,8 +26,9 @@ struct WowLight {
@@ -1880,7 +2086,7 @@ index 5ccee63..6d11da5 100644
      point_count: vec4<f32>,
      points: array<vec4<f32>, 512>,
      // The new look's lights from torches and spells (`look::lights`, 24 lights of two rows).
-@@ -378,6 +379,76 @@ fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
+@@ -378,6 +379,94 @@ fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
      return sum;
  }
  
@@ -1892,11 +2098,16 @@ index 5ccee63..6d11da5 100644
 +// Ground, stone and roofs facing up take all of it, walls a share, undersides (eaves, a cart's
 +// belly) none, in soft patches like puddles and drier ground. The sheen is the sun's (or the
 +// moon's) highlight where it is not shadowed (`sun_vis`), the sky's at a grazing angle, and every
-+// new-look torch's, which pools on wet stone at night. The shape constants are `look::weather::
-+// tune`'s `WET_*`, mirrored here.
++// new-look light's reflection (a lamp's, a torch's, a building's window light): a streak on the
++// wet stone from under it toward the camera, brightest in the puddles. The shape constants are
++// `look::weather::tune`'s `WET_*`, mirrored here.
 +const WET_WALL: f32 = 0.45;
 +const WET_SKY: f32 = 0.35;
-+const WET_TORCH: f32 = 0.8;
++const WET_TORCH: f32 = 1.2;
++const WET_TORCH_REACH: f32 = 2.5;
++const WET_LANE_ACROSS: f32 = 0.06;
++const WET_LANE_ALONG: f32 = 0.45;
++const WET_PUDDLE: f32 = 0.6;
 +const WET_PATCH: f32 = 0.35;
 +
 +fn look_wet_hash(c: vec2<f32>) -> f32 {
@@ -1933,21 +2144,34 @@ index 5ccee63..6d11da5 100644
 +    // The sky, at a grazing angle.
 +    let fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 5.0);
 +    spec += wow_light.fog_color.rgb * (fres * WET_SKY);
-+    // The torches and the spells.
++    // The lamps, torches and spells, mirrored: where the ray mirrored off the wet surface passes
++    // near a light, narrow across its bearing and long along its elevation, so each light lies on
++    // the ground as a streak from under it toward the camera, out past its own pool.
++    let R = reflect(-V, N);
++    let r_flat = vec2<f32>(R.x, R.z);
++    let r_len = max(length(r_flat), 1e-4);
++    let r_el = atan2(R.y, r_len);
++    let puddle = smoothstep(0.45, 0.7, look_wet_noise(P.xz * 0.9 + vec2<f32>(17.0, 5.0)));
++    let mirror = (1.0 - WET_PUDDLE) + WET_PUDDLE * puddle;
 +    let count = u32(wow_light.point_count.y);
 +    for (var i = 0u; i < count; i = i + 1u) {
 +        let pos_radius = wow_light.look_lights[2u * i];
 +        let to_light = pos_radius.xyz - P;
 +        let d2 = dot(to_light, to_light);
-+        let r2 = pos_radius.w * pos_radius.w;
++        let reach = pos_radius.w * WET_TORCH_REACH;
++        let r2 = reach * reach;
 +        if (d2 >= r2) {
 +            continue;
 +        }
 +        let x2 = d2 / r2;
 +        let window = (1.0 - x2) * (1.0 - x2);
-+        let h = normalize(to_light * inverseSqrt(max(d2, 1e-6)) + V);
++        let l_flat = vec2<f32>(to_light.x, to_light.z);
++        let l_len = max(length(l_flat), 1e-4);
++        let across = (r_flat.x * l_flat.y - r_flat.y * l_flat.x) / (r_len * l_len * WET_LANE_ACROSS);
++        let along = (r_el - atan2(to_light.y, l_len)) / WET_LANE_ALONG;
++        let ahead = select(0.0, 1.0, dot(r_flat, l_flat) > 0.0);
 +        spec += wow_light.look_lights[2u * i + 1u].rgb
-+            * (window * WET_TORCH * pow(max(dot(N, h), 0.0), sharp));
++            * (window * WET_TORCH * mirror * ahead * exp(-(across * across) - along * along));
 +    }
 +    let res = rgb * (1.0 - wet.x * soak) + spec * (wet.y * soak);
 +    return clamp(res, vec3<f32>(0.0), vec3<f32>(1.0));
@@ -1957,7 +2181,7 @@ index 5ccee63..6d11da5 100644
  // ---- the pass ----
  
  struct GxVertex {
-@@ -661,6 +732,17 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+@@ -661,6 +750,17 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
              vec3<f32>(1.0),
          );
      }
