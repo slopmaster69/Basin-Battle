@@ -1,4 +1,4 @@
-From 54f360a1e465d3cba9e6db15b1383515063e39a2 Mon Sep 17 00:00:00 2001
+From 69dbf80181efd669adac4b4fe90aecd731d97b73 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:18:13 -0700
 Subject: [PATCH] Sun shadows with shapes: heroes, creatures, buildings and
@@ -80,6 +80,17 @@ Revised after the third films (#269, take 273):
 - The hero's shadow (take 273: crisp, the ground under it at 0.62 of its
   light) is unchanged.
 
+Revised after the fourth films (#269, take 280):
+
+- Some game objects about 8 yd off were listed "not casting (no material
+  yet)" with nothing to say what they were. A material waits outside the
+  store until a mesh bound to it has been on screen
+  (model_render::lazy), so a mesh the camera had not yet looked at
+  (behind it, round a corner, in a barn) cast nothing. The extract now
+  reads such a mesh's parked material and it casts as it would once seen
+  (its line ends "not yet seen"), and every "[shadows near]" line names
+  the mesh's model path and id, material or not.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -87,13 +98,13 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/world_console.rs       |  79 +-
  .../benilla-assets/src/shaders/terrain.wgsl   |  10 +-
  .../benilla-assets/src/shaders/wow_model.wgsl |  10 +-
- crates/benilla-world/src/look/shadow_pass.rs  | 859 +++++++++++++++++-
+ crates/benilla-world/src/look/shadow_pass.rs  | 905 +++++++++++++++++-
  crates/benilla-world/src/look/shadows.rs      | 130 ++-
  crates/benilla-world/src/shaders.rs           |   3 +-
  .../src/shaders/look_shadow_map.wgsl          |  59 ++
  .../benilla-world/src/shaders/static_gx.wgsl  |  10 +-
  .../src/shaders/world_shadow.wgsl             |  14 +-
- 10 files changed, 1126 insertions(+), 62 deletions(-)
+ 10 files changed, 1172 insertions(+), 62 deletions(-)
  create mode 100644 crates/benilla-world/src/shaders/look_shadow_map.wgsl
 
 diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
@@ -292,10 +303,10 @@ index d51b27c..eb948e5 100644
              let o = shadow_disk(i, SHADOW_SEARCH_TAPS, turn) * search;
              let s = textureLoad(shadow_map, clamp(vec2<i32>(t + o), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
 diff --git a/crates/benilla-world/src/look/shadow_pass.rs b/crates/benilla-world/src/look/shadow_pass.rs
-index bdeb415..dc48997 100644
+index bdeb415..7672820 100644
 --- a/crates/benilla-world/src/look/shadow_pass.rs
 +++ b/crates/benilla-world/src/look/shadow_pass.rs
-@@ -10,10 +10,18 @@
+@@ -10,10 +10,19 @@
  //! the far slices ([`tune::SMALL_CASTER_RADIUS`]). An entity caster is gated on Bevy's
  //! `InheritedVisibility`, so a body the exterior-scene election hides (off screen) casts none; the
  //! static world and the terrain are culled here alone, so a tree behind the camera still shades
@@ -305,19 +316,20 @@ index bdeb415..dc48997 100644
 +//! a building, nor ground clutter; a building's interior groups do, as they hold its walls, and an
 +//! alpha-blended batch casts cut by its texture (a solid prop drawn blended), whether it writes
 +//! depth or not. A skinned body is bounded on its rig's origin (the palette, not its transform,
-+//! places it).
++//! places it). A mesh the camera has not yet looked at casts from its material's parked value
++//! (`model_render::lazy`), so a prop behind the camera still shades the ground in front of it.
  //!
 -//! `WOW_SHADOW_STATS=1` prints each slice's draw counts once a second.
 +//! `WOW_SHADOW_STATS=1` prints each slice's draw counts once a second, with the model meshes the
 +//! extract left out and why, and every model mesh within [`tune::STATS_NEAR`] of the camera with
-+//! its texture, kind, blend, markers and verdict (`[shadows near]`); `lookshadow map
++//! its model's path, texture, kind, blend, markers and verdict (`[shadows near]`); `lookshadow map
 +//! <slice>` draws that slice's map in a corner of the screen ([`LookShadowMapNode`]): the world
 +//! seen from the light, the terrain in grey bands every 8 yd of depth, a caster's outline bright
 +//! where the depth jumps, nothing (no caster) dark blue, the camera a red dot.
  
  use bevy::camera::primitives::Aabb;
  use bevy::camera::visibility::RenderLayers;
-@@ -32,7 +40,7 @@ use bevy::render::render_graph::{
+@@ -32,7 +41,7 @@ use bevy::render::render_graph::{
      NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
  };
  use bevy::render::render_resource::binding_types::{
@@ -326,7 +338,7 @@ index bdeb415..dc48997 100644
  };
  use bevy::render::render_resource::*;
  use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
-@@ -89,19 +97,29 @@ struct Caster {
+@@ -89,19 +98,29 @@ struct Caster {
      cut: Option<AssetId<Image>>,
  }
  
@@ -363,7 +375,7 @@ index bdeb415..dc48997 100644
  pub fn caster_kind(mat: &WowModelMaterial) -> Option<Option<AssetId<Image>>> {
      let ext = &mat.extension;
      caster_law(
-@@ -121,24 +139,76 @@ fn caster_law(
+@@ -121,24 +140,76 @@ fn caster_law(
      model_flags: Vec4,
      sun_scale: Vec4,
  ) -> Option<Option<AssetId<Image>>> {
@@ -387,7 +399,7 @@ index bdeb415..dc48997 100644
 +        // once the markers above have taken the additive, multiply and test-less ones). Many of
 +        // 1.12's solid props draw this way, their texture's alpha whole where the object is. It
 +        // casts cut by its texture at 1.12's alpha-test reference (224/255), so glass, smoke or a
-+        // soft card, well under it, still casts nothing; untextured, nothing. (0069's second
++        // soft card, well under it, still casts nothing; untextured, nothing. (0080's second
 +        // round cast only a blended batch that writes depth, and on the third films not one did:
 +        // every line said `0 blended meshes cast`.)
 +        AlphaMode::Blend => texture.map(Some),
@@ -446,7 +458,7 @@ index bdeb415..dc48997 100644
  /// A caster's instance row: its world matrix's linear part as three rows (w 0) and its translation
  /// apart, `w` the rig slot (a float: exact far past 2047, and never a denormal).
  fn inst_rows(gt: &GlobalTransform, rig: u32) -> [[f32; 4]; 4] {
-@@ -164,6 +234,29 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
+@@ -164,6 +235,29 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
      (center, Vec3::from(aabb.half_extents).length() * s)
  }
  
@@ -476,7 +488,7 @@ index bdeb415..dc48997 100644
  type ModelCaster = (
      &'static Mesh3d,
      &'static MeshMaterial3d<WowModelMaterial>,
-@@ -172,6 +265,11 @@ type ModelCaster = (
+@@ -172,6 +266,13 @@ type ModelCaster = (
      &'static InheritedVisibility,
      Option<&'static MeshTag>,
      Option<&'static RenderLayers>,
@@ -485,10 +497,12 @@ index bdeb415..dc48997 100644
 +    // What spawned it (a doodad, a building, a creature, a game object) and its batch's 1.12
 +    // blend, for `WOW_SHADOW_STATS`' list of the meshes near the camera.
 +    Option<&'static crate::model_render::ModelPart>,
++    // Its model's path (or a unit's name), so the list names what it is even with no material.
++    Option<&'static crate::interact::WorldObject>,
  );
  
  type TerrainCaster = (
-@@ -187,33 +285,84 @@ fn extract_casters(
+@@ -187,33 +288,98 @@ fn extract_casters(
      models: Extract<Query<ModelCaster>>,
      terrain: Extract<Query<TerrainCaster, With<MeshMaterial3d<TerrainMaterial>>>>,
      materials: Extract<Res<Assets<WowModelMaterial>>>,
@@ -511,22 +525,21 @@ index bdeb415..dc48997 100644
      };
      let world_layer = RenderLayers::default();
 -    for (mesh, mat, gt, aabb, vis, tag, layers) in &models {
-+    for (mesh, mat, gt, aabb, vis, tag, layers, skinned, part) in &models {
-+        let material = materials.get(&mat.0);
++    for (mesh, mat, gt, aabb, vis, tag, layers, skinned, part, object) in &models {
 +        // The list's line for this mesh, if it is near the camera.
-+        let mut note = |verdict: &str| {
++        let mut note = |verdict: &str, material: Option<&WowModelMaterial>| {
 +            let Some(list) = near.as_mut() else { return };
 +            let d = gt.translation().distance(frame.cam);
 +            if d <= tune::STATS_NEAR {
 +                list.push((
 +                    d,
-+                    near_line(d, verdict, part, material, asset_server.as_deref()),
++                    near_line(d, verdict, part, object, material, asset_server.as_deref()),
 +                ));
 +            }
 +        };
          if !vis.get() || layers.is_some_and(|l| !l.intersects(&world_layer)) {
 +            out.1[0] += 1;
-+            note("left out: hidden");
++            note("left out: hidden", materials.get(&mat.0));
              continue;
          }
 -        let Some(aabb) = aabb else { continue };
@@ -540,15 +553,26 @@ index bdeb415..dc48997 100644
 +            .flatten();
 +        let Some((center, radius)) = caster_bound(gt, aabb, origin) else {
 +            out.1[1] += 1;
-+            note("left out: unbounded");
++            note("left out: unbounded", materials.get(&mat.0));
 +            continue;
 +        };
          if !admits(center, radius) {
 +            out.1[2] += 1;
-+            note("left out: outside every slice");
++            note("left out: outside every slice", materials.get(&mat.0));
              continue;
          }
 -        let Some(cut) = materials.get(&mat.0).and_then(caster_kind) else {
++        // A material waits outside the store (`model_render::lazy`, parked) until a mesh bound to
++        // it has been on screen, so a mesh the camera has not looked at yet (behind it, round a
++        // corner, in a barn) had no material here and cast nothing: take #280 listed game objects
++        // 8 yd off as "no material yet". Its parked value says how it casts; the batch's mesh and
++        // texture are loaded whether it has been seen or not.
++        let parked = if materials.contains(mat.0.id()) {
++            None
++        } else {
++            crate::model_render::lazy::with_material(&materials, mat.0.id(), Clone::clone)
++        };
++        let material = materials.get(&mat.0).or(parked.as_ref());
 +        let Some(cut) = material.and_then(caster_kind) else {
 +            out.1[3] += 1;
 +            let why = material.map_or("no material yet", |m| {
@@ -562,7 +586,7 @@ index bdeb415..dc48997 100644
 +                )
 +                .unwrap_or("?")
 +            });
-+            note(&format!("left out: not casting ({why})"));
++            note(&format!("left out: not casting ({why})"), material);
              continue;
          };
 +        let blended = material.is_some_and(|m| {
@@ -571,15 +595,19 @@ index bdeb415..dc48997 100644
 +        if blended {
 +            out.2 += 1;
 +        }
-+        note(&format!(
-+            "casts {}{}, r {radius:.2}",
-+            if blended { "blended, " } else { "" },
-+            if cut.is_some() { "cut" } else { "solid" }
-+        ));
++        note(
++            &format!(
++                "casts {}{}{}, r {radius:.2}",
++                if blended { "blended, " } else { "" },
++                if cut.is_some() { "cut" } else { "solid" },
++                if parked.is_some() { ", not yet seen" } else { "" }
++            ),
++            material,
++        );
          out.0.push(Caster {
              mesh: mesh.id(),
              inst: inst_rows(gt, rig),
-@@ -222,6 +371,17 @@ fn extract_casters(
+@@ -222,6 +388,17 @@ fn extract_casters(
              cut,
          });
      }
@@ -597,7 +625,7 @@ index bdeb415..dc48997 100644
      // The terrain's cells, whatever the exterior cull hid: a hill off screen still shades.
      for (mesh, gt, aabb) in &terrain {
          let Some(aabb) = aabb else { continue };
-@@ -712,20 +872,75 @@ impl ViewNode for LookShadowNode {
+@@ -712,20 +889,81 @@ impl ViewNode for LookShadowNode {
              span.end(&mut pass);
          }
          if stats {
@@ -631,12 +659,18 @@ index bdeb415..dc48997 100644
 +    d: f32,
 +    verdict: &str,
 +    part: Option<&crate::model_render::ModelPart>,
++    object: Option<&crate::interact::WorldObject>,
 +    material: Option<&WowModelMaterial>,
 +    assets: Option<&AssetServer>,
 +) -> String {
 +    let what = part.map_or("?".to_string(), |p| format!("{:?} {:?}", p.kind, p.blend));
++    // What it is: a model's path or a unit's name, and its id (placement, guid or display).
++    let name = object.map_or_else(
++        || "unnamed".to_string(),
++        |o| format!("{} #{}", o.label, o.id),
++    );
 +    let Some(m) = material else {
-+        return format!("{d:5.1} yd  {verdict}  [{what}]");
++        return format!("{d:5.1} yd  {verdict}  [{what}]  {name}");
 +    };
 +    let e = &m.extension;
 +    let mode = match m.base.alpha_mode {
@@ -653,7 +687,7 @@ index bdeb415..dc48997 100644
 +        .map_or_else(|| "untextured".to_string(), |p| p.to_string());
 +    format!(
 +        "{d:5.1} yd  {verdict}  [{what}, {mode}, markers {:#x}, flags {:.0}{:.0}{:.0}{:.0}, \
-+         shade {:.1}]  {tex}",
++         shade {:.1}]  {name}  {tex}",
 +        e.clutter_fade.z as u32,
 +        e.model_flags.x,
 +        e.model_flags.y,
@@ -677,7 +711,7 @@ index bdeb415..dc48997 100644
      static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
      let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
      if last.is_some_and(|t| t.elapsed().as_secs_f32() < 1.0) {
-@@ -742,9 +957,183 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
+@@ -742,9 +980,183 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
              frame.splits[i], frame.slices[i].texel
          );
      }
@@ -861,7 +895,7 @@ index bdeb415..dc48997 100644
  /// The main-world half: the frame's extract; the render half in [`finish`].
  pub(super) fn build(app: &mut App) {
      app.add_plugins(ExtractResourcePlugin::<ShadowFrame>::default());
-@@ -759,12 +1148,12 @@ pub(super) fn finish(app: &mut App) {
+@@ -759,12 +1171,12 @@ pub(super) fn finish(app: &mut App) {
      render_app
          .init_resource::<ShadowCasters>()
          .init_resource::<ShadowGpu>()
@@ -876,7 +910,7 @@ index bdeb415..dc48997 100644
                  prepare_shadow_binds.in_set(RenderSystems::PrepareBindGroups),
              ),
          )
-@@ -772,15 +1161,356 @@ pub(super) fn finish(app: &mut App) {
+@@ -772,15 +1184,379 @@ pub(super) fn finish(app: &mut App) {
          .add_render_graph_edges(
              Core3d,
              (Node3d::EndPrepasses, LookShadowLabel, Node3d::StartMainPass),
@@ -900,6 +934,29 @@ index bdeb415..dc48997 100644
  
 -    /// Solid and alpha-tested batches cast (the latter cut), translucent, additive, depth-less,
 -    /// interior, clutter, rig-lane and sky ones never; a fading doodad's twin casts as its source.
++    /// Take #280: game objects 8 yd off were listed as "not casting (no material yet)" with
++    /// nothing to say what they were. Every near line now names the model, material or not.
++    #[test]
++    fn the_near_list_names_each_mesh() {
++        use benilla_formats::ModelBlend;
++        use crate::model_render::{ModelKind, ModelPart};
++        let object = crate::interact::WorldObject {
++            kind: ModelKind::GameObject,
++            label: "World\\Generic\\Human\\Passive Doodads\\Chests\\Chest01.m2".to_string(),
++            id: 42,
++            detail: String::new(),
++        };
++        let part = ModelPart {
++            kind: ModelKind::GameObject,
++            blend: ModelBlend::AlphaTest,
++        };
++        let line = near_line(8.2, "left out: hidden", Some(&part), Some(&object), None, None);
++        assert!(line.contains("Chest01.m2 #42"), "{line}");
++        assert!(line.contains("GameObject"), "{line}");
++        let unnamed = near_line(8.2, "left out: hidden", Some(&part), None, None, None);
++        assert!(unnamed.contains("unnamed"), "{unnamed}");
++    }
++
 +    /// `world_shadow.wgsl`'s `slice_clip` and the viewport, read from the pass's own uniform
 +    /// ([`slice_rows`]) as the vertex stage reads it: a caster point's texel and stored depth in
 +    /// slice `c`.
@@ -1040,7 +1097,7 @@ index bdeb415..dc48997 100644
 +                    let what = format!("slice {c} of {cascades}, sun {deg}°");
 +                    let under = receive(&rows, c, ground, Vec3::Y, &map, true);
 +                    assert!(
-+                        under >= 0.0 && under < 0.05,
++                        (0.0..0.05).contains(&under),
 +                        "{what}: the shadow reads {under}"
 +                    );
 +                    if cascades > 2 && c == 0 {
@@ -1235,11 +1292,11 @@ index bdeb415..dc48997 100644
      #[test]
      fn which_batches_cast() {
          let tex: AssetId<Image> = AssetId::default();
-@@ -799,10 +1529,39 @@ mod tests {
+@@ -799,10 +1575,39 @@ mod tests {
              law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 0.0, lit),
              Some(Some(tex))
          );
-+        // 0069's first films: the pumpkins (an alpha-blended batch that writes depth) cast
++        // 0080's first films: the pumpkins (an alpha-blended batch that writes depth) cast
 +        // nothing. They cast now, cut by their texture; untextured, a blended batch casts none.
          assert_eq!(
              law(AlphaMode::Blend, 0, Vec4::ZERO, 0.0, lit),
@@ -1248,10 +1305,11 @@ index bdeb415..dc48997 100644
 +        );
 +        assert_eq!(
 +            caster_law(AlphaMode::Blend, None, Vec4::ZERO, Vec4::ZERO, lit),
-+            None,
+             None,
+-            "translucent"
 +            "blended, untextured"
 +        );
-+        // 0069's third films: still `0 blended meshes cast` on every line. A blended batch that
++        // 0080's third films: still `0 blended meshes cast` on every line. A blended batch that
 +        // skips only the depth write (M2 render flag 0x10, as 1.12 draws many solid props
 +        // blended) casts cut by its texture too; one that skips the depth test, an additive or
 +        // a multiply one never.
@@ -1270,13 +1328,12 @@ index bdeb415..dc48997 100644
 +        let twin = Vec4::new(0.0, 1.0, 0.0, 0.0);
 +        assert_eq!(
 +            law(AlphaMode::Blend, 1, twin, 0.0, lit),
-             None,
--            "translucent"
++            None,
 +            "the fade twin of a depth-less batch casts as its source: nothing"
          );
          assert_eq!(
              law(AlphaMode::Add, 4, Vec4::ZERO, 0.0, lit),
-@@ -816,11 +1575,17 @@ mod tests {
+@@ -816,11 +1621,17 @@ mod tests {
                  "marker {m:#x}"
              );
          }
@@ -1297,7 +1354,7 @@ index bdeb415..dc48997 100644
          );
          assert_eq!(
              law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 1.0, lit),
-@@ -833,22 +1598,36 @@ mod tests {
+@@ -833,22 +1644,36 @@ mod tests {
              None,
              "glue rig lane"
          );

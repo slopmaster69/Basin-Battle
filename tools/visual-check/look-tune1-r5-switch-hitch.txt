@@ -1,0 +1,45 @@
+# The switches (client 0081, #270's fifth round): the Brackwell pumpkin patch at 17:30, the hero
+# at WoW (-9803, -904) with the oaks behind him (yaw 45, pitched 10 up, 6 yd), worldLook and
+# worldSky each switched off and on three times, video throughout and dense stills for half a
+# second after each switch. Take 280 found a 0.6 to 2 s hitch every time worldLook came back on,
+# and one frame with the hero see-through (the oak's crown through his body) right after a
+# settings change. What causes either can't be seen without the real client, so the client now
+# logs it: for 3 s after each switch, client.log has "[look switch]" lines naming every frame over
+# 50 ms with the materials, liquids, images and meshes it made again, and each change in how many
+# render pipelines are still compiling (a mesh whose pipeline is not ready is skipped that frame).
+# PLEASE send client.log's "[look switch]" lines with the film.
+# Look for: which switch hitches and for how long; whether the see-through frame comes, and on
+# which switch, against the log's pipelines compiling at that moment.
+hero warrior
+cam 45 10 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.0 video
+6.0 lua SetCVar("worldLook", "0")
+6.05 shots look-0-a 8 0.06
+8.0 lua SetCVar("worldLook", "1")
+8.05 shots look-1-a 10 0.06
+11.0 lua SetCVar("worldSky", "0")
+11.05 shots sky-0-a 8 0.06
+13.0 lua SetCVar("worldSky", "1")
+13.05 shots sky-1-a 8 0.06
+15.0 lua SetCVar("worldLook", "0")
+15.05 shots look-0-b 8 0.06
+17.0 lua SetCVar("worldLook", "1")
+17.05 shots look-1-b 10 0.06
+20.0 lua SetCVar("worldSky", "0")
+20.05 shots sky-0-b 8 0.06
+22.0 lua SetCVar("worldSky", "1")
+22.05 shots sky-1-b 8 0.06
+24.0 lua SetCVar("worldLook", "0")
+24.05 shots look-0-c 8 0.06
+26.0 lua SetCVar("worldLook", "1")
+26.05 shots look-1-c 10 0.06
+29.0 lua ConsoleExec("lookweather server")
+31 end

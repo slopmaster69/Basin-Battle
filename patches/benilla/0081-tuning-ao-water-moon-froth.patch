@@ -1,4 +1,4 @@
-From 1683a639b32159be64c111fb364d86036afaf860 Mon Sep 17 00:00:00 2001
+From f4272947e58cc06dde9731b8e0d4944d6efb18a2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:26:57 -0700
 Subject: [PATCH] Contact shadows you notice, no band at the water's edge, a
@@ -67,36 +67,67 @@ Revised after the third films (#270, take 273, and the laptop's take 275 on
   threshold over its peak (it eases to the old line at a clear day's 0.1),
   so 0 is an empty sky.
 
+Revised after the fourth films (#270, take 280):
+
+- The wading froth was a crisp, unbroken oval round both knees that
+  crossed between the legs, and a wide white ellipse at chest height
+  wading deeper. A tap whose point on the surface lay behind the hero
+  read his body above the water, nearer than the surface, as a step 0 yd
+  under it, so the froth traced his whole outline against the water. A
+  tap now counts only where the scene behind it is under the surface;
+  the froth is softer-edged and at most 0.35 (was 0.45).
+- The golden-hour glare was a white disc about 40% of the frame wide
+  with a hard rim. It is 1.12's own sun glare, a quad about 80 degrees
+  across facing the sun added in gamma, whose faint outer texels the
+  look's grade and bloom lifted to white. Under the new look it is under
+  half as wide (0.45) and a third as strong (0.35); worldLook 0 keeps
+  1.12's.
+- 1.12's moon flecks still covered the whole lake, dimmer. Off the moon's
+  lane they are gone now (NIGHT_FLECKS 0, was 0.2).
+- The one-frame see-through hero after a settings change and the 0.6 to
+  2 s hitch each time worldLook came back on cannot be told apart
+  without the real client, so the client now says what they are: for 3 s
+  after worldLook or one of the look's switches changes, client.log
+  names each frame over 50 ms with the materials, liquids, images and
+  meshes made again, and each change in how many render pipelines are
+  still compiling (a mesh whose pipeline is not ready is skipped that
+  frame), then a summary ("[look switch]").
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
- crates/benilla-assets/src/shaders/liquid.wgsl | 155 +++++++++-
- crates/benilla-world/src/look/grade.rs        |  33 ++-
- crates/benilla-world/src/look/mod.rs          |  28 +-
- crates/benilla-world/src/look/sky.rs          |  47 ++-
- crates/benilla-world/src/look/water.rs        | 272 +++++++++++++++++-
+ crates/benilla-assets/src/shaders/liquid.wgsl | 159 ++++++++-
+ crates/benilla-world/src/look/grade.rs        |  33 +-
+ crates/benilla-world/src/look/mod.rs          |  30 +-
+ crates/benilla-world/src/look/sky.rs          |  56 ++-
+ crates/benilla-world/src/look/switch_watch.rs | 323 ++++++++++++++++++
+ crates/benilla-world/src/look/water.rs        | 290 +++++++++++++++-
  .../benilla-world/src/shaders/world_look.wgsl |   9 +-
- 6 files changed, 505 insertions(+), 39 deletions(-)
+ crates/benilla-world/src/sun/follow.rs        |  24 +-
+ 8 files changed, 883 insertions(+), 41 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/switch_watch.rs
 
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index db5da61..621c15a 100644
+index db5da61..89c2290 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
-@@ -223,6 +223,33 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
+@@ -223,6 +223,35 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
  const WATER_SSR_STEPS: u32 = 24u;
  const WATER_SSR_REFINE: u32 = 5u;
  const WATER_SSR_START: f32 = 0.3;
 +// `look::water::tune`'s `SSR_EDGE` and `SSR_BREAK`, `FROTH`, `FROTH_YD`, `FROTH_WOBBLE`,
-+// `FROTH_CUT_FREQ`, `FROTH_REACH` and `FROTH_TAPS` (keep in sync; `look::water`'s tests compare
-+// them).
++// `FROTH_CUT_FREQ`, `FROTH_REACH`, `FROTH_TAPS`, `FROTH_FRONT` and `FROTH_SOFT` (keep in sync;
++// `look::water`'s tests compare them).
 +const WATER_SSR_EDGE: f32 = 0.22;
 +const WATER_SSR_BREAK: f32 = 0.6;
-+const WATER_FROTH: f32 = 0.45;
++const WATER_FROTH: f32 = 0.35;
 +const WATER_FROTH_YD: f32 = 0.45;
 +const WATER_FROTH_WOBBLE: f32 = 3.3;
 +const WATER_FROTH_CUT_FREQ: f32 = 4.7;
 +const WATER_FROTH_REACH: f32 = 40.0;
 +const WATER_FROTH_TAPS: u32 = 6u;
++const WATER_FROTH_FRONT: f32 = 0.05;
++const WATER_FROTH_SOFT: f32 = 0.6;
 +// `look::water::tune`'s `MOON_LANE_FAR`, `MOON_LANE_NEAR` and `MOON_SHEEN_LANE` (the same test
 +// compares them): the moon's lane runs this far below its elevation (radians) toward the horizon,
 +// this far above toward the camera, and its faint unbroken path is this wide.
@@ -111,12 +142,12 @@ index db5da61..621c15a 100644
 +const WATER_MOON_GLINT_CUT: f32 = 0.58;
 +const WATER_MOON_GLINT_GAIN: f32 = 1.3;
 +const WATER_MOON_GLINT_MEAN: f32 = 0.25;
-+const WATER_NIGHT_FLECKS: f32 = 0.2;
++const WATER_NIGHT_FLECKS: f32 = 0.0;
 +const WATER_NIGHT_FLECK_LANE: f32 = 0.12;
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
  // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
  const WATER_SHADOW_TAPS: u32 = 6u;
-@@ -333,7 +360,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+@@ -333,7 +362,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
              }
              let uh = water_uv(view.clip_from_world * vec4<f32>(P + R * hi, 1.0));
              let border = min(min(uh.x, 1.0 - uh.x), min(uh.y, 1.0 - uh.y));
@@ -127,7 +158,7 @@ index db5da61..621c15a 100644
              return vec4<f32>(textureSampleLevel(scene_tex, scene_samp, uh, 0.0).rgb, weight);
          }
          t_prev = t;
-@@ -477,6 +506,43 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
+@@ -477,6 +508,43 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
      return water_decode(water_encode(sky) * (1.0 - c.a) + c.rgb);
  }
  
@@ -171,7 +202,7 @@ index db5da61..621c15a 100644
  // One texel's compare of the sun-shadow map, and a bilinear-weighted compare of the four around
  // `t` (texel units), as terrain.wgsl's.
  fn water_shadow_texel(c: vec2<i32>, layer: i32, z: f32, lim: i32) -> f32 {
-@@ -590,8 +656,15 @@ fn look_water(
+@@ -590,8 +658,15 @@ fn look_water(
          vec3<f32>(1.0),
      );
      var body = water_decode(mix(sh, dp, smoothstep(0.0, water.rows[6].w, depth_v)) * lit_g);
@@ -189,7 +220,7 @@ index db5da61..621c15a 100644
  
      // How much of the bed's light comes through: e^(−path / clarity).
      var clarity = water.rows[0].z;
-@@ -614,28 +687,90 @@ fn look_water(
+@@ -614,28 +689,92 @@ fn look_water(
      if (fres > 0.01) {
          hit = water_reflection(P, R, jitter, water.rows[7].x);
      }
@@ -257,7 +288,9 @@ index db5da61..621c15a 100644
 +                continue;
 +            }
 +            let zq = water_scene_z(water_uv(cq));
-+            if (zq <= 0.0) {
++            // The scene nearer than the surface point stands in front of it (the hero's body
++            // above the water, seen past this pixel): no step under the water there.
++            if (zq <= 0.0 || zq < cq.w - WATER_FROTH_FRONT) {
 +                continue;
 +            }
 +            let dq = max(cam.y - Q.y, 0.0) * max(zq - cq.w, 0.0) / cq.w;
@@ -282,7 +315,7 @@ index db5da61..621c15a 100644
 +    // lumps with gaps between, thinning over the ripples.
 +    let shore_mask = smoothstep(0.38, 0.86, 0.4 * na + 0.25 * nb + 0.3 * lap + 0.15 * rip);
 +    let nc = water_noise(P.xz * WATER_FROTH_CUT_FREQ + vec2<f32>(-7.0, 13.0) + vec2<f32>(0.13, -0.09) * t).x;
-+    let froth_mask = smoothstep(0.42, 0.8, 0.6 * nc + 0.25 * nb + 0.2 * rip);
++    let froth_mask = smoothstep(0.3, 0.3 + WATER_FROTH_SOFT, 0.6 * nc + 0.25 * nb + 0.2 * rip);
 +    let foam = min(water.rows[0].w * band * shore_mask + WATER_FROTH * stand * froth_mask, 1.0)
          * (1.0 - smoothstep(60.0, 120.0, eye_z));
      let foam_rgb = water_decode(lit_g) * 0.8;
@@ -375,10 +408,18 @@ index ac8e1d4..da2fa86 100644
      key(
          21,
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index aa9be1c..5bd1b3f 100644
+index aa9be1c..bb213c6 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
-@@ -191,11 +191,15 @@ pub fn graded(
+@@ -24,6 +24,7 @@ pub mod rays;
+ pub mod shadow_pass;
+ pub mod shadows;
+ pub mod sky;
++pub mod switch_watch;
+ pub mod water;
+ pub mod water_pass;
+ pub mod wind;
+@@ -191,11 +192,15 @@ pub fn graded(
      dt: f32,
      suppressed: bool,
  ) -> (Atmosphere, PostLook, f32) {
@@ -396,7 +437,15 @@ index aa9be1c..5bd1b3f 100644
      let table = ramp.zone.and_then(zone_grade);
      match table {
          Some(keys) if !suppressed && ramp.weight > 0.0 => {
-@@ -342,7 +346,8 @@ mod tests {
+@@ -272,6 +277,7 @@ impl Plugin for LookPlugin {
+         pass::build(app);
+         shadow_pass::build(app);
+         water_pass::build(app);
++        switch_watch::build(app);
+     }
+ 
+     fn finish(&self, app: &mut App) {
+@@ -342,7 +348,8 @@ mod tests {
          assert!((ramp.weight - 0.5).abs() < 1e-6);
      }
  
@@ -406,7 +455,7 @@ index aa9be1c..5bd1b3f 100644
      #[test]
      fn the_classic_look_returns_the_sample_untouched() {
          let atmo = Atmosphere::DEFAULT;
-@@ -367,10 +372,21 @@ mod tests {
+@@ -367,10 +374,21 @@ mod tests {
          assert!(post.is_neutral());
          assert_eq!(strength, 0.0);
          assert_eq!(
@@ -432,7 +481,7 @@ index aa9be1c..5bd1b3f 100644
  
      #[test]
 diff --git a/crates/benilla-world/src/look/sky.rs b/crates/benilla-world/src/look/sky.rs
-index 4060641..52b0707 100644
+index 4060641..dc464c3 100644
 --- a/crates/benilla-world/src/look/sky.rs
 +++ b/crates/benilla-world/src/look/sky.rs
 @@ -65,6 +65,11 @@ pub mod tune {
@@ -447,7 +496,23 @@ index 4060641..52b0707 100644
      pub const SOFTNESS: f32 = 0.13;
      pub const OPACITY: f32 = 0.9;
      pub const OPACITY_OVERCAST: f32 = 0.97;
-@@ -391,6 +396,20 @@ pub fn cover(input: &SkyInputs, light: &WowLighting) -> f32 {
+@@ -124,6 +129,15 @@ pub mod tune {
+     /// The wide halo is hollowed inside about 6° of the sun (`1 − cos^power`), where 1.12's glare
+     /// shines, so it rings that glare (`look_sky.wgsl`'s `LOOK_SKY_HOLLOW_POWER`).
+     pub const SUN_HOLLOW_POWER: f32 = 120.0;
++    /// 1.12's own sun glare under the new look: its size and its strength, shares of 1.12's.
++    /// Take 280 found the golden-hour glare a white disc about 40% of the frame wide with a hard
++    /// rim (25 to 32% of the frame above 230), the same with the painted sky off. It is 1.12's
++    /// glare quad (`sun::follow`), 20 units at 12 out, about 80 degrees across facing the sun,
++    /// added in gamma: the look's grade and bloom then lifted its faint outer texels to white,
++    /// and where they clip is the rim. Under the new look it is under half as wide and 0.35 as
++    /// strong, a core the bloom and the halo here soften; `worldLook 0` keeps 1.12's.
++    pub const GLARE_SIZE: f32 = 0.45;
++    pub const GLARE_ALPHA: f32 = 0.35;
+     pub const HALO_WARM: [f32; 3] = [1.0, 0.72, 0.42];
+     /// The moon's halo, pale and small, at night only.
+     pub const MOON_INNER_POWER: f32 = 900.0;
+@@ -391,6 +405,20 @@ pub fn cover(input: &SkyInputs, light: &WowLighting) -> f32 {
      base + (tune::OVERCAST_COVER - base).max(0.0) * storm
  }
  
@@ -468,7 +533,7 @@ index 4060641..52b0707 100644
  /// The layer's rows for this frame ([`SKY_ROWS`]); all zero, no layer, when `on` is false.
  pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4]; SKY_ROWS] {
      let mut rows = [[0.0; 4]; SKY_ROWS];
-@@ -429,7 +448,7 @@ pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4];
+@@ -429,7 +457,7 @@ pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4];
      });
      rows[0] = [
          1.0,
@@ -477,7 +542,7 @@ index 4060641..52b0707 100644
          tune::SOFTNESS,
          tune::OPACITY + (tune::OPACITY_OVERCAST - tune::OPACITY) * overcast,
      ];
-@@ -894,7 +913,31 @@ mod tests {
+@@ -894,7 +922,31 @@ mod tests {
          assert!((cover(&input(720.0, None), &storm) - tune::OVERCAST_COVER).abs() < 1e-5);
          assert_eq!(cover(&input(720.0, Some(0.8)), &storm), 0.8);
          let rows = pack_rows(true, &input(720.0, Some(0.0)), &noon());
@@ -510,11 +575,340 @@ index 4060641..52b0707 100644
      }
  
      /// The sun's halo is up by day and gone by night; the moon's the other way.
+diff --git a/crates/benilla-world/src/look/switch_watch.rs b/crates/benilla-world/src/look/switch_watch.rs
+new file mode 100644
+index 0000000..0baa4e4
+--- /dev/null
++++ b/crates/benilla-world/src/look/switch_watch.rs
+@@ -0,0 +1,323 @@
++//! What switching the look costs, in the log (benilla's own). Take 280 found a 0.6 to 2 s hitch
++//! each time `worldLook` came back on, and one frame with the hero see-through (the oak behind him
++//! showing through his body) right after a settings change; neither shows without the real
++//! client. For [`WATCH_SECS`] after `worldLook` or one of the look's own switches changes, each
++//! frame slower than [`SLOW_MS`] is logged (`[look switch]`) with what the frames around it made
++//! again: the model materials, liquids, images and meshes added or changed (Bevy prepares each
++//! again, and skips its draws until it has), and, from the render world, the pipelines still
++//! compiling (a mesh whose pipeline is not ready is not drawn that frame, which would leave a
++//! hero see-through while the static world draws). The window closes with a summary line.
++
++use bevy::prelude::*;
++use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
++use bevy::render::render_resource::PipelineCache;
++use bevy::render::{Render, RenderApp, RenderSystems};
++
++use benilla_assets::materials::{LiquidMaterial, WowModelMaterial};
++
++use super::{LookAo, LookShadows, LookSky, LookWater, LookWind, WorldLook};
++
++/// How long after a switch the frames are watched (real seconds).
++pub const WATCH_SECS: f32 = 3.0;
++/// A frame this long (ms) or longer is logged while the window is open.
++pub const SLOW_MS: f32 = 50.0;
++
++/// The window, shared with the render world, whose pipeline count it opens and shuts.
++#[derive(Resource, Clone, Default, ExtractResource)]
++pub struct LookSwitchWatch {
++    /// Real seconds left in the window; 0 while it is shut.
++    pub left: f32,
++    /// What switched, for the log ("worldLook 1").
++    pub what: String,
++    /// Frames since the switch, the switch's own frame 0.
++    pub frame: u32,
++}
++
++/// The switches as last seen; a change of any opens the window.
++#[derive(Clone, Copy, PartialEq, Debug)]
++struct Switches {
++    look: bool,
++    ao: bool,
++    shadows: u8,
++    water: bool,
++    wind: bool,
++    sky: bool,
++}
++
++impl Switches {
++    /// What changed from `old` to `self`, as the CVars are written ("worldLook 1, worldSky 0").
++    fn describe(&self, old: &Switches) -> String {
++        let flag = |b: bool| if b { 1 } else { 0 };
++        let mut out = Vec::new();
++        if self.look != old.look {
++            out.push(format!("worldLook {}", flag(self.look)));
++        }
++        if self.ao != old.ao {
++            out.push(format!("worldAO {}", flag(self.ao)));
++        }
++        if self.shadows != old.shadows {
++            out.push(format!("worldShadows {}", self.shadows));
++        }
++        if self.water != old.water {
++            out.push(format!("worldWater {}", flag(self.water)));
++        }
++        if self.wind != old.wind {
++            out.push(format!("worldWind {}", flag(self.wind)));
++        }
++        if self.sky != old.sky {
++            out.push(format!("worldSky {}", flag(self.sky)));
++        }
++        out.join(", ")
++    }
++}
++
++/// What a frame made again: model materials, liquids, images and meshes added or changed.
++#[derive(Clone, Copy, Default, PartialEq, Debug)]
++struct Remade {
++    materials: u32,
++    liquids: u32,
++    images: u32,
++    meshes: u32,
++}
++
++impl Remade {
++    fn add(&mut self, o: &Remade) {
++        self.materials += o.materials;
++        self.liquids += o.liquids;
++        self.images += o.images;
++        self.meshes += o.meshes;
++    }
++
++    fn line(&self) -> String {
++        format!(
++            "{} model materials, {} liquids, {} images, {} meshes",
++            self.materials, self.liquids, self.images, self.meshes
++        )
++    }
++}
++
++/// The open window's running tally, for its summary.
++#[derive(Default)]
++struct Tally {
++    slow: u32,
++    worst_ms: f32,
++    worst_frame: u32,
++    remade: Remade,
++    last: Remade,
++}
++
++/// How many of a store's events this frame made an asset again (added or changed).
++fn remade<A: Asset>(events: &mut MessageReader<AssetEvent<A>>) -> u32 {
++    events
++        .read()
++        .filter(|e| matches!(e, AssetEvent::Added { .. } | AssetEvent::Modified { .. }))
++        .count() as u32
++}
++
++/// The look's switches this frame (an app without one of them reads it as on).
++#[derive(bevy::ecs::system::SystemParam)]
++struct SwitchInputs<'w> {
++    look: Res<'w, WorldLook>,
++    ao: Option<Res<'w, LookAo>>,
++    shadows: Option<Res<'w, LookShadows>>,
++    water: Option<Res<'w, LookWater>>,
++    wind: Option<Res<'w, LookWind>>,
++    sky: Option<Res<'w, LookSky>>,
++}
++
++impl SwitchInputs<'_> {
++    fn now(&self) -> Switches {
++        Switches {
++            look: self.look.on,
++            ao: self.ao.as_deref().is_none_or(|a| a.on),
++            shadows: self.shadows.as_deref().map_or(1, |s| s.level),
++            water: self.water.as_deref().is_none_or(|w| w.on),
++            wind: self.wind.as_deref().is_none_or(|w| w.on),
++            sky: self.sky.as_deref().is_none_or(|s| s.on),
++        }
++    }
++}
++
++/// The asset stores' events, read every frame so the window counts only its own.
++#[derive(bevy::ecs::system::SystemParam)]
++struct RemadeInputs<'w, 's> {
++    materials: MessageReader<'w, 's, AssetEvent<WowModelMaterial>>,
++    liquids: MessageReader<'w, 's, AssetEvent<LiquidMaterial>>,
++    images: MessageReader<'w, 's, AssetEvent<Image>>,
++    meshes: MessageReader<'w, 's, AssetEvent<Mesh>>,
++}
++
++impl RemadeInputs<'_, '_> {
++    fn take(&mut self) -> Remade {
++        Remade {
++            materials: remade(&mut self.materials),
++            liquids: remade(&mut self.liquids),
++            images: remade(&mut self.images),
++            meshes: remade(&mut self.meshes),
++        }
++    }
++
++    fn skip(&mut self) {
++        self.materials.clear();
++        self.liquids.clear();
++        self.images.clear();
++        self.meshes.clear();
++    }
++}
++
++/// Opens the window on a switch, logs its slow frames, and closes it with a summary.
++fn watch_switches(
++    time: Res<Time<Real>>,
++    switches: SwitchInputs,
++    mut events: RemadeInputs,
++    mut watch: ResMut<LookSwitchWatch>,
++    mut last: Local<Option<Switches>>,
++    mut tally: Local<Tally>,
++) {
++    let now = switches.now();
++    if let Some(old) = last.filter(|old| *old != now) {
++        let what = now.describe(&old);
++        info!("[look switch] {what}: watching the next {WATCH_SECS:.0} s");
++        *watch = LookSwitchWatch {
++            left: WATCH_SECS,
++            what,
++            frame: 0,
++        };
++        *tally = Tally::default();
++    }
++    *last = Some(now);
++    if watch.left <= 0.0 {
++        events.skip();
++        return;
++    }
++    let this = events.take();
++    // The frame time measured now is the frame before this one: the switch's own frame shows
++    // in frame 1.
++    let ms = time.delta_secs() * 1000.0;
++    if watch.frame > 0 && ms >= SLOW_MS {
++        tally.slow += 1;
++        info!(
++            "[look switch] {}, frame {}: the frame before took {ms:.0} ms; made again then: {}; \
++             now: {}",
++            watch.what,
++            watch.frame,
++            tally.last.line(),
++            this.line()
++        );
++        if ms > tally.worst_ms {
++            tally.worst_ms = ms;
++            tally.worst_frame = watch.frame;
++        }
++    }
++    tally.remade.add(&this);
++    tally.last = this;
++    watch.frame += 1;
++    watch.left -= time.delta_secs();
++    if watch.left <= 0.0 {
++        info!(
++            "[look switch] {} done: {} frames, {} slower than {SLOW_MS:.0} ms (the slowest {:.0} \
++             ms at frame {}); made again: {}",
++            watch.what,
++            watch.frame,
++            tally.slow,
++            tally.worst_ms,
++            tally.worst_frame,
++            tally.remade.line()
++        );
++        watch.left = 0.0;
++    }
++}
++
++/// The render world's side: while the window is open, each change in how many pipelines are
++/// still compiling, and how many were made since the switch.
++fn watch_pipelines(
++    watch: Option<Res<LookSwitchWatch>>,
++    cache: Res<PipelineCache>,
++    mut base: Local<Option<usize>>,
++    mut waiting_was: Local<usize>,
++) {
++    let Some(watch) = watch.filter(|w| w.left > 0.0) else {
++        *base = None;
++        *waiting_was = 0;
++        return;
++    };
++    let total = cache.pipelines().count();
++    let base = *base.get_or_insert(total);
++    let waiting = cache.waiting_pipelines().count();
++    if waiting != *waiting_was {
++        info!(
++            "[look switch] {}, frame {}: {waiting} pipelines compiling (a mesh whose pipeline is \
++             not ready is not drawn this frame), {} new since the switch",
++            watch.what,
++            watch.frame,
++            total.saturating_sub(base)
++        );
++        *waiting_was = waiting;
++    }
++}
++
++pub(crate) fn build(app: &mut App) {
++    app.init_resource::<LookSwitchWatch>()
++        .add_plugins(ExtractResourcePlugin::<LookSwitchWatch>::default())
++        .add_systems(Last, watch_switches);
++    if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
++        render_app.add_systems(Render, watch_pipelines.in_set(RenderSystems::Cleanup));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn all_on() -> Switches {
++        Switches {
++            look: true,
++            ao: true,
++            shadows: 1,
++            water: true,
++            wind: true,
++            sky: true,
++        }
++    }
++
++    #[test]
++    fn a_switch_is_named_as_its_cvar() {
++        let on = all_on();
++        let off = Switches { look: false, ..on };
++        assert_eq!(on.describe(&off), "worldLook 1");
++        assert_eq!(off.describe(&on), "worldLook 0");
++        let two = Switches {
++            sky: false,
++            shadows: 2,
++            ..on
++        };
++        assert_eq!(two.describe(&on), "worldShadows 2, worldSky 0");
++    }
++
++    /// The window opens on a switch, logs only while open, and shuts after its seconds.
++    #[test]
++    fn the_window_opens_on_a_switch_and_shuts() {
++        let mut app = App::new();
++        app.add_plugins(MinimalPlugins)
++            .add_plugins(bevy::asset::AssetPlugin::default())
++            .init_asset::<Image>()
++            .init_asset::<Mesh>()
++            .init_asset::<WowModelMaterial>()
++            .init_asset::<LiquidMaterial>()
++            .init_resource::<WorldLook>()
++            .init_resource::<LookSwitchWatch>()
++            .add_systems(Last, watch_switches);
++        app.update();
++        assert_eq!(app.world().resource::<LookSwitchWatch>().left, 0.0);
++        app.world_mut().resource_mut::<WorldLook>().on = true;
++        app.update();
++        let watch = app.world().resource::<LookSwitchWatch>();
++        assert!(watch.left > 0.0 && watch.left <= WATCH_SECS);
++        assert_eq!(watch.what, "worldLook 1");
++        // Ages out on real time; force it shut as a long frame would.
++        app.world_mut().resource_mut::<LookSwitchWatch>().left = 1e-6;
++        app.update();
++        app.update();
++        assert_eq!(app.world().resource::<LookSwitchWatch>().left, 0.0);
++    }
++}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index 51196b7..c4c6e6b 100644
+index 51196b7..aec8189 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -72,8 +72,53 @@ pub mod tune {
+@@ -72,8 +72,54 @@ pub mod tune {
      /// Blinn sharpness, and the moon's (broader, a path across the water, pale and faint).
      pub const SUN_GLINT: f32 = 6.0;
      pub const SUN_SHARPNESS: f32 = 900.0;
@@ -564,13 +958,14 @@ index 51196b7..c4c6e6b 100644
 +    pub const MOON_SHEEN_LANE: f32 = 0.07;
 +    /// By night 1.12's own white ripple flecks ([`CLASSIC_RIPPLES`]) keep this share off the
 +    /// moon's lane, all of it within about [`NIGHT_FLECK_LANE`] radians of its bearing: take 273
-+    /// found them white confetti over the whole dark lake.
-+    pub const NIGHT_FLECKS: f32 = 0.2;
++    /// found them white confetti over the whole dark lake. 0, was 0.2: take 280 still found them
++    /// over the whole lake, dimmer (p99 60 to 70); off the lane they are gone now.
++    pub const NIGHT_FLECKS: f32 = 0.0;
 +    pub const NIGHT_FLECK_LANE: f32 = 0.12;
      pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
      /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
      /// cloud: a full overcast keeps this share of it.
-@@ -86,9 +131,35 @@ pub mod tune {
+@@ -86,9 +132,50 @@ pub mod tune {
      pub const SHADOW_DIM: f32 = 0.3;
      /// The reflection march: how far a mirrored ray is followed (yards).
      pub const SSR_REACH: f32 = 160.0;
@@ -597,17 +992,32 @@ index 51196b7..c4c6e6b 100644
 +    /// outline with a noise of [`FROTH_WOBBLE`] cells a yard (0.3 to 1.2 times [`FROTH_YD`]), cut
 +    /// into lumps by a finer one ([`FROTH_CUT_FREQ`]), none where steps lie on both sides (between
 +    /// the legs), and no shore band beside a step; 0.45, was 0.55, at most.
-+    pub const FROTH: f32 = 0.45;
++    /// Revised after take 280, which found a crisp, pale, unbroken oval round both knees crossing
++    /// between the legs (200 against water at 53), and a wide white ellipse at chest height wading
++    /// deeper. Its cause: a tap whose point on the surface lies behind the hero from the camera
++    /// reads the hero's own body above the water in the depth buffer, nearer than the surface, and
++    /// took that for a step 0 yd under it, so the froth traced the body's whole outline against
++    /// the water (the gap between the legs, the torso when deep). A tap now counts only where the
++    /// scene behind it lies under the surface; the froth is 0.35, was 0.45, at most, and its lumps'
++    /// edges are softer ([`FROTH_SOFT`]).
++    pub const FROTH: f32 = 0.35;
 +    pub const FROTH_YD: f32 = 0.45;
 +    pub const FROTH_WOBBLE: f32 = 3.3;
 +    pub const FROTH_CUT_FREQ: f32 = 4.7;
 +    pub const FROTH_TAPS: u32 = 6;
++    /// How far nearer than a tap's point on the surface the scene behind it may be and still be
++    /// under the water (yd of eye depth): anything nearer stands in front of the surface (a body
++    /// above the water), not under it, and makes no froth.
++    pub const FROTH_FRONT: f32 = 0.05;
++    /// The froth's lumps fade in over this much of the cut noise (was 0.38: 0.42 to 0.8), so
++    /// their edges are soft, never a line.
++    pub const FROTH_SOFT: f32 = 0.6;
 +    /// The froth's reach (planar eye depth, yards): past it a hero's legs are a few pixels wide.
 +    pub const FROTH_REACH: f32 = 40.0;
      /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
      /// hard edge.
      pub const SHORE_SOFT: f32 = 0.15;
-@@ -213,7 +284,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
+@@ -213,7 +300,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
  
  /// The glint's body this frame: the visible sun while it is up, else the white moon, each fading
  /// in as it rises and dimmed by cloud: `(camera to body, strength, colour (linear), sharpness)`;
@@ -617,7 +1027,7 @@ index 51196b7..c4c6e6b 100644
  pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
      let rise = |dir: Vec3| {
          smoothstep(
-@@ -239,7 +311,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
+@@ -239,7 +327,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
          moon,
          tune::MOON_GLINT * rise(moon) * cloud,
          tune::MOON_TINT,
@@ -626,7 +1036,7 @@ index 51196b7..c4c6e6b 100644
      )
  }
  
-@@ -308,7 +380,13 @@ pub fn pack_rows(
+@@ -308,7 +396,13 @@ pub fn pack_rows(
          tune::FOAM_DEPTH,
          tune::SHORE_SOFT,
      ];
@@ -641,7 +1051,7 @@ index 51196b7..c4c6e6b 100644
      rows[9] = [
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
-@@ -429,8 +507,142 @@ mod tests {
+@@ -429,8 +523,142 @@ mod tests {
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
      }
  
@@ -678,7 +1088,7 @@ index 51196b7..c4c6e6b 100644
 +    /// water and pitched 24° down, every pixel's mirrored ray tilted by the night's ripples: the
 +    /// moon's glint is a narrow lane toward it, at most pale (under white before the mirror), a
 +    /// small share of the water bright, none of it far off the moon's line, and dark water either
-+    /// side. With 0070's lobe (strength 2.0, sharpness 64, the sun's sheen) the same frame was
++    /// side. With 0081's lobe (strength 2.0, sharpness 64, the sun's sheen) the same frame was
 +    /// bright over a wide pool round the mirror point and flecked on the ripples out to the edges.
 +    #[test]
 +    fn the_moon_lays_a_lane_not_a_pool() {
@@ -745,7 +1155,7 @@ index 51196b7..c4c6e6b 100644
 +                        far_off += 1;
 +                    }
 +                }
-+                // 0070 as filmed: a Blinn lobe of 64 at 2.0, with the sun's sheen.
++                // 0081 as first filmed: a Blinn lobe of 64 at 2.0, with the sun's sheen.
 +                let hv = (l + v).normalize();
 +                let nh = n.dot(hv).clamp(0.0, 1.0);
 +                let old = 2.0 * (nh.powf(64.0) + tune::SHEEN * nh.powf(64.0 * 0.04));
@@ -777,7 +1187,7 @@ index 51196b7..c4c6e6b 100644
 +        );
 +        assert!(
 +            old_share > 4.0 * share && old_far_off > 0,
-+            "0070's lobe: {old_share} bright, {old_far_off} far off"
++            "0081's lobe: {old_share} bright, {old_far_off} far off"
 +        );
 +    }
 +
@@ -786,7 +1196,7 @@ index 51196b7..c4c6e6b 100644
      #[test]
      fn the_glint_follows_the_sun_then_the_moon() {
          let day = noon();
-@@ -447,7 +659,7 @@ mod tests {
+@@ -447,7 +675,7 @@ mod tests {
          let (dir, s, color, sharp) = glint(&night);
          assert!((dir - night.moon_dir_white).length() < 1e-6);
          assert!((s - tune::MOON_GLINT).abs() < 1e-4);
@@ -795,7 +1205,7 @@ index 51196b7..c4c6e6b 100644
          let dark = WowLighting {
              moon_dir_white: Vec3::new(0.0, -0.3, 1.0).normalize(),
              ..night
-@@ -520,6 +732,48 @@ mod tests {
+@@ -520,6 +748,50 @@ mod tests {
          assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
      }
  
@@ -823,6 +1233,8 @@ index 51196b7..c4c6e6b 100644
 +        assert_eq!(f("WATER_FROTH_WOBBLE"), tune::FROTH_WOBBLE);
 +        assert_eq!(f("WATER_FROTH_CUT_FREQ"), tune::FROTH_CUT_FREQ);
 +        assert_eq!(f("WATER_FROTH_REACH"), tune::FROTH_REACH);
++        assert_eq!(f("WATER_FROTH_FRONT"), tune::FROTH_FRONT);
++        assert_eq!(f("WATER_FROTH_SOFT"), tune::FROTH_SOFT);
 +        assert_eq!(f("WATER_MOON_FAR"), tune::MOON_LANE_FAR);
 +        assert_eq!(f("WATER_MOON_NEAR"), tune::MOON_LANE_NEAR);
 +        assert_eq!(f("WATER_MOON_SHEEN_LANE"), tune::MOON_SHEEN_LANE);
@@ -871,6 +1283,67 @@ index de5620e..cac5165 100644
          }
      }
  
+diff --git a/crates/benilla-world/src/sun/follow.rs b/crates/benilla-world/src/sun/follow.rs
+index 76507a9..38163aa 100644
+--- a/crates/benilla-world/src/sun/follow.rs
++++ b/crates/benilla-world/src/sun/follow.rs
+@@ -184,6 +184,9 @@ pub(super) struct FlareGate<'w, 's> {
+     /// The new look's painted sky (`look::sky`), whose clouds stand in for 1.12's while it draws:
+     /// the sun's glare then dims with the painted cloud over it.
+     look_sky: Option<Res<'w, crate::look::SkyFrame>>,
++    /// The new look, under which the sun's glare is smaller and fainter
++    /// (`look::sky::tune::GLARE_SIZE`, `GLARE_ALPHA`).
++    look: Option<Res<'w, crate::look::WorldLook>>,
+     /// Both glares' enabled word; the start-up 1 where none is registered.
+     glare: Option<Res<'w, super::SunGlare>>,
+     env: Local<'s, f32>,
+@@ -212,6 +215,19 @@ impl FlareGate<'_, '_> {
+         self.glare.as_deref().copied().unwrap_or_default().enabled
+     }
+ 
++    /// The sun glare's size and strength as shares of 1.12's: smaller and fainter under the new
++    /// look, whose grade and bloom would whiten it (`look::sky::tune`); 1.12's otherwise.
++    fn sun_glare_shares(&self) -> (f32, f32) {
++        if self.look.as_deref().is_some_and(|l| l.on) {
++            (
++                crate::look::sky::tune::GLARE_SIZE,
++                crate::look::sky::tune::GLARE_ALPHA,
++            )
++        } else {
++            (1.0, 1.0)
++        }
++    }
++
+     /// The envelope along `dir`, `half` the quad's angular half-size. The submersion fade is inside
+     /// the slew, so surfacing ramps the glare back in: the target `[glare+0x34]` (reset at
+     /// `0x6cf499`) takes it at `0x6cf501`/`0x6cf504`, before the limiter reads it at `0x6cf59b`.
+@@ -307,6 +323,7 @@ pub(super) fn follow_sun(
+         SUN_FLARE_RISE,
+     );
+     let enabled = gate.enabled();
++    let (glare_size, glare_alpha) = gate.sun_glare_shares();
+     for (mut tf, mut gt, sprite, mat) in &mut sprites {
+         tf.rotation = rot;
+         match sprite.part {
+@@ -340,13 +357,16 @@ pub(super) fn follow_sun(
+             SunPart::Glare => {
+                 tf.translation = cam_pos + to_light * GLARE_DIST;
+                 // `lerp(3, 20, f)` world units (`[0xce9838]`/`[0xce983c]`).
+-                let units = 3.0 + 17.0 * f;
++                let units = (3.0 + 17.0 * f) * glare_size;
+                 tf.scale = Vec3::splat(if hidden { 0.0 } else { units });
+                 // Alpha is `lerp(0.5, 1, f)` (`[glare+0x9c]`) × the envelope × the weather seed,
+                 // `0x6cf490`'s `[+0x1b] = floor(255·lerp·[+0x30])` on the seed byte; a disabled
+                 // glare is not drawn (`0x7e57fe`).
+                 let env = if enabled {
+-                    benilla_assets::quantize((0.5 + 0.5 * f) * env30 * seed.unwrap_or(1.0), 255.0)
++                    benilla_assets::quantize(
++                        (0.5 + 0.5 * f) * env30 * seed.unwrap_or(1.0) * glare_alpha,
++                        255.0,
++                    )
+                 } else {
+                     0.0
+                 };
 -- 
 2.43.0
 
