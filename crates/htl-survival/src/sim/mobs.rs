@@ -739,6 +739,7 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
+        self.vancleef_broken(mid);
         // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
         // on the screen of the hero who broke it.
         self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
@@ -943,6 +944,7 @@ impl Survival {
         self.boss_gone(mid);
         self.remove_arsenal(mid);
         self.machinery_died(mid);
+        self.remove_duel(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1187,6 +1189,7 @@ impl Survival {
         self.step_boss_fires();
         self.step_boss_collapse(dt);
         self.clean_machinery();
+        self.clean_duels();
         self.step_perch_crews();
         self.clean_arsenals();
         let now = self.clock;
@@ -1258,6 +1261,7 @@ impl Survival {
             }
             if self.step_perch_valve(id) { continue; }
             if self.step_arsenal(id) { continue; }
+            if self.step_vancleef(id) { continue; }
             if self.disabled(id) {
                 continue;
             }
@@ -1282,6 +1286,9 @@ impl Survival {
 
     /// Move along the current path.
     fn walk(&mut self, id: Id, dt: f32) {
+        // A committed duel lunge retains its exact heading even at a path endpoint
+        // where floating-point rounding can make facing(next, next) turn to zero.
+        let committed = self.is_vancleef(id) && self.mobs.get(&id).is_some_and(|m| matches!(m.state, MobState::Windup { .. }));
         let below = self.is_below();
         let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
@@ -1302,7 +1309,7 @@ impl Survival {
             } else {
                 let t = left / d;
                 m.pos = [m.pos[0] + (next[0] - m.pos[0]) * t, m.pos[1] + (next[1] - m.pos[1]) * t, m.pos[2]];
-                m.facing = facing(m.pos, next);
+                if !committed { m.facing = facing(m.pos, next); }
                 left = 0.0;
             }
         }
@@ -1791,7 +1798,7 @@ impl Survival {
 
     /// Whether another standing creature is within `r` of `at`.
     fn crowded(&self, id: Id, at: Vec3, r: f32) -> bool {
-        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && dist2d(m.pos, at) < r)
+        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && !self.duel_observer(*o) && dist2d(m.pos, at) < r)
     }
 
     /// Where to stand `r` from a foe at `foe`, coming from `from`: on its own side of them, or
@@ -2354,6 +2361,7 @@ impl Survival {
                     }
                     if self.mobs[&id].pattern.is_none() {
                         self.machinery_string_landed(id, completed, a.damage);
+                        self.vancleef_string_landed(id, completed);
                     }
                 } else {
                     self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: t2, mark, shown };
@@ -2478,6 +2486,7 @@ impl Survival {
     /// One of a creature's patterns that suits a foe `dist` off (`size` its body), weighted.
     pub(crate) fn pick_pattern(&mut self, id: Id, dist: f32, size: f32) -> Option<usize> {
         if self.is_machine(id) { return self.machine_pattern(id, dist, size); }
+        if self.is_vancleef(id) { return self.vancleef_pattern(id, dist, size); }
         let m = self.mobs.get(&id)?;
         let d = &self.content.mobs[m.def];
         // A raised guard in front of it: it reaches for the blow no guard stops.
@@ -2524,6 +2533,7 @@ impl Survival {
     }
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
+        if self.vancleef_invitation(id, foe, to) { return; }
         // A spell lab body swings only when the lab asks it to.
         if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) && !self.lab_stringing(id) {
             return;

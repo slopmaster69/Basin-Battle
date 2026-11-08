@@ -15,6 +15,7 @@ pub mod arena;
 pub(crate) mod beta;
 pub(crate) mod bosses;
 pub(crate) mod machinery;
+pub(crate) mod vancleef;
 pub(crate) mod perches;
 pub(crate) mod arsenal;
 pub mod cc;
@@ -1214,6 +1215,7 @@ pub struct Survival {
     /// Basin Battle's boss beats under way: a boss on its run, burning blows, burning ground.
     pub(crate) bosses: bosses::Bosses,
     pub(crate) machinery: machinery::Machinery,
+    pub(crate) vancleef: vancleef::VanCleef,
     pub(crate) perches: perches::Perches,
     pub(crate) arsenal: arsenal::Arsenal,
 }
@@ -1318,6 +1320,7 @@ impl Survival {
             warlord: warlord::Warlord::default(),
             bosses: bosses::Bosses::default(),
             machinery: machinery::Machinery::default(),
+            vancleef: vancleef::VanCleef::default(),
             perches: perches::Perches::default(),
             arsenal: arsenal::Arsenal::default(),
         }

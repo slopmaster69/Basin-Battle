@@ -1,0 +1,23 @@
+# Controlled lab demonstration, NOT an unassisted kill or balance playtest.
+# Compare honest two-cut recovery against the planted held guard. Waiting must not attack.
+# The second Invitation is provoked with an ordinary attack, followed by a dodge.
+# The existing client guard hold is ShieldBlock24; each special blow stays HumanMale57.
+hero warrior
+cam 0 -24 11
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es clearfoes
+12 .es goto -87 -820 39.5 0
+13 video
+14 .es lab whirlwind close dm_vancleef hud cam none stage here do wait:1,blow:string,wait:5 shots 60@100
+15 shots honest 24 0.25
+23 .es lab whirlwind close dm_vancleef hud cam none stage here do wait:1,blow:invitation,wait:4 shots 50@100
+24 shots waiting 20 0.25
+32 .es lab whirlwind close dm_vancleef hud cam none stage here do wait:1,blow:invitation,wait:0.3,attack,wait:0.7,dodge,wait:4 shots 70@100
+33 shots provoked 28 0.25
+43 .es lab whirlwind close dm_vancleef_unbowed hud cam none stage here do wait:1,blow:string,wait:8 shots 90@100
+44 shots unbowed 36 0.25
+55 .es lab clear
+56 end
