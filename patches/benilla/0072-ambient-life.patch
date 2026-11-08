@@ -1,4 +1,4 @@
-From 5c06e46febfdfffbce2421a703590f134c114801 Mon Sep 17 00:00:00 2001
+From e87655a068069e43825bb9c267d03510b2f98b9a Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 16:57:01 -0700
 Subject: [PATCH] Ambient life under the new look: fireflies, falling leaves,
@@ -43,22 +43,41 @@ worldLife 0 turns it off on its own; looklife <0-3> scales how much
 there is for film and looklife grade follows the hour again. worldLook 0
 draws none of it.
 
+Revised after the first films in the real client (#272, take 273):
+
+- Fireflies barely showed: pinpoint pale specks, each lit about 11% of the
+  time. A flash is long and soft now (width 0.35 of the period, was 0.11)
+  over a glow that never goes out (0.2, was 0.06), the glow is bigger
+  (0.45 yd, was 0.32) and warmer and stronger (2.1, 2.3, 0.55), enough for
+  the bloom.
+- Almost no leaves fell at Crystal Lake (1 out at the grade's density). A
+  tree no longer has to be named a tree or a canopy: any swaying plant that
+  is not a bush, a fern or the like, at least 3 yd tall, and its crown is
+  the box of its leaves (its alpha-tested batches' vertices, measured once
+  a model), else of its whole model, where the header box drew it before.
+  looklife says how many trees are near and how many crowns drop leaves.
+- Motes were invisible even with 270 out. They are bigger (0.13 yd, was
+  0.07) and brighter (gain 3.0, was 1.7, against 0070's golden rays now
+  0.6), seen over a wider lobe toward the sun (3, was 6), and the crowns'
+  shafts are more open (0.6 shut, was 0.78). looklife says how many the sun
+  reaches.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
  crates/benilla-app/src/cvars/mod.rs           |   20 +
  crates/benilla-app/src/cvars/table.rs         |   10 +
  crates/benilla-app/src/video.rs               |   13 +-
- crates/benilla-app/src/world_console.rs       |   64 +
+ crates/benilla-app/src/world_console.rs       |   69 +
  crates/benilla-world/src/lighting/mod.rs      |    5 +
- crates/benilla-world/src/look/life.rs         | 2121 +++++++++++++++++
+ crates/benilla-world/src/look/life.rs         | 2236 +++++++++++++++++
  crates/benilla-world/src/look/mod.rs          |   28 +-
  crates/benilla-world/src/look/wind.rs         |   55 +
  crates/benilla-world/src/terrain_stream.rs    |   29 +-
  .../benilla-world/src/terrain_stream/merge.rs |    1 +
  .../src/terrain_stream/spawn/mod.rs           |    1 +
  .../benilla-world/src/terrain_stream/weld.rs  |    1 +
- 12 files changed, 2342 insertions(+), 6 deletions(-)
+ 12 files changed, 2462 insertions(+), 6 deletions(-)
  create mode 100644 crates/benilla-world/src/look/life.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
@@ -159,7 +178,7 @@ index 47d787f..7d232e2 100644
              if let Some(mut look_weather) = look_weather {
                  look_weather.on = ev.flag();
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 295f8a9..08e8223 100644
+index 1a39d50..bf483f6 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
 @@ -139,6 +139,8 @@ impl Plugin for WorldConsolePlugin {
@@ -171,7 +190,7 @@ index 295f8a9..08e8223 100644
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -555,6 +557,41 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
+@@ -587,6 +589,46 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
      lines
  }
  
@@ -200,6 +219,11 @@ index 295f8a9..08e8223 100644
 +        lines.push(format!(
 +            "Out now: {flies} fireflies, {leaves} leaves, {motes} motes, {butterflies} butterflies."
 +        ));
++        let (trees, crowns) = life.trees();
++        lines.push(format!(
++            "Trees near: {trees}, {crowns} crowns dropping leaves; motes in the sun: {}.",
++            life.lit_motes()
++        ));
 +    }
 +    if !on {
 +        lines.push("worldLife is 0: no ambient life.".to_string());
@@ -213,7 +237,7 @@ index 295f8a9..08e8223 100644
  fn look_sky(world: &mut World, args: &str) -> Vec<String> {
      use benilla_world::look::{LookSky, WorldLook};
      let Some(clouds) = LookSky::parse(args) else {
-@@ -1242,6 +1279,33 @@ mod tests {
+@@ -1284,6 +1326,33 @@ mod tests {
          assert_eq!(lines[1], "worldWeather is 0: 1.12's look of the weather.");
      }
  
@@ -265,10 +289,10 @@ index ecfa3d3..e64177e 100644
          let mut offenders = Vec::new();
 diff --git a/crates/benilla-world/src/look/life.rs b/crates/benilla-world/src/look/life.rs
 new file mode 100644
-index 0000000..a66b42b
+index 0000000..b9b0c84
 --- /dev/null
 +++ b/crates/benilla-world/src/look/life.rs
-@@ -0,0 +1,2121 @@
+@@ -0,0 +1,2236 @@
 +//! Ambient life, the new look's own (no reference behaviour): WoW Forever's woods feel lived in.
 +//! A few small things move near the camera, never far from it and never many:
 +//! 1. **fireflies** at dusk and night: warm green motes that drift and blink low over the grass,
@@ -366,13 +390,19 @@ index 0000000..a66b42b
 +    pub const FIREFLY_WANDER_RATE: (f32, f32) = (0.15, 0.45);
 +    /// The blink: one flash a period (seconds, from and to), this sharp (its half-width as a share
 +    /// of the period), with this much left between flashes.
++    /// 0.35 and 0.2, were 0.11 and 0.06: on take 273 (the first in the real client) a fly was lit
++    /// about 11% of the time, so 3 of 30 glowed at once, half of them behind the camera, and a 2 s
++    /// look at 23:00 found 1 or 2 new trails. A flash is long and soft now, over a glow that never
++    /// goes out.
 +    pub const FIREFLY_BLINK_PERIOD: (f32, f32) = (2.2, 5.0);
-+    pub const FIREFLY_BLINK_WIDTH: f32 = 0.11;
-+    pub const FIREFLY_BLINK_FLOOR: f32 = 0.06;
++    pub const FIREFLY_BLINK_WIDTH: f32 = 0.35;
++    pub const FIREFLY_BLINK_FLOOR: f32 = 0.2;
 +    /// The glow: its colour at full flash (green-gold, over 1 to bloom), and the sprite's size
-+    /// (yards across, the halo; the bright core is the middle fifth).
-+    pub const FIREFLY_RGB: [f32; 3] = [1.25, 1.75, 0.5];
-+    pub const FIREFLY_SIZE: f32 = 0.32;
++    /// (yards across, the halo; the bright core is the middle fifth). Warmer and stronger, and
++    /// 0.45 yd (were (1.25, 1.75, 0.5) and 0.32): take 273 found pinpoint specks of 2 or 3 px,
++    /// pale white-green, with no bloom, hardly standing out from 1.12's own specks by the water.
++    pub const FIREFLY_RGB: [f32; 3] = [2.1, 2.3, 0.55];
++    pub const FIREFLY_SIZE: f32 = 0.45;
 +    /// The nearest few that are flashing light the ground: how many, how far a light reaches
 +    /// (yd), how strong (`look::lights`' intensity), and how close to the camera they must be.
 +    pub const FIREFLY_LIGHTS: usize = 3;
@@ -383,11 +413,14 @@ index 0000000..a66b42b
 +
 +    // ---- leaves ----
 +    /// The trees a leaf can fall from are those whose crown is this near the camera; at most this
-+    /// many of the nearest, looked for again this often or after the camera moves this far.
++    /// many of the nearest, looked for again this often or after the camera moves this far. A
++    /// tree is a swaying plant ([`super::is_tree`]) at least [`TREE_MIN_HEIGHT`] tall, its crown
++    /// the box of its leaves (its alpha-tested batches), else of its whole model.
 +    pub const LEAF_RADIUS: f32 = 40.0;
 +    pub const CROWNS_MAX: usize = 48;
 +    pub const CROWN_SCAN_S: f32 = 0.5;
 +    pub const CROWN_SCAN_MOVE: f32 = 4.0;
++    pub const TREE_MIN_HEIGHT: f32 = 3.0;
 +    /// At most this many falling at once.
 +    pub const LEAVES: f32 = 40.0;
 +    /// A crown drops this many a second on a still day, plus this many per unit of the wind's
@@ -447,12 +480,16 @@ index 0000000..a66b42b
 +    pub const MOTE_SUN_UP_DEG: (f32, f32) = (-1.0, 6.0);
 +    /// Seen toward the sun: the glow looking away from the sun as a share of looking into it, and
 +    /// how tight the forward lobe is (a power of the cosine).
++    /// The lobe 3, was 6: take 273 found no mote at all facing the low sun with 270 out.
 +    pub const MOTE_BACK: f32 = 0.12;
-+    pub const MOTE_LOBE: f32 = 6.0;
++    pub const MOTE_LOBE: f32 = 3.0;
 +    /// Their colour at full sun (the sun's own, warmed; over 1 to sparkle), and size (yd across).
-+    pub const MOTE_GAIN: f32 = 1.7;
++    /// 3.0 and 0.13 yd, were 1.7 and 0.07: take 273's motes were invisible even at `looklife 3`
++    /// (270 out), a 0.07 yd mote dimmed to the 3 px floor too faint to see. The golden hour's god
++    /// rays, which they take, are 0.6 now (0070, was 0.9).
++    pub const MOTE_GAIN: f32 = 3.0;
 +    pub const MOTE_WARM: [f32; 3] = [1.0, 0.92, 0.75];
-+    pub const MOTE_SIZE: f32 = 0.07;
++    pub const MOTE_SIZE: f32 = 0.13;
 +    /// The twinkle: depth and rate (Hz, from and to).
 +    pub const MOTE_TWINKLE: f32 = 0.5;
 +    pub const MOTE_TWINKLE_HZ: (f32, f32) = (0.6, 2.5);
@@ -464,8 +501,9 @@ index 0000000..a66b42b
 +    pub const MOTE_LIT_EASE_S: f32 = 0.15;
 +    /// The crowns between a mote and the sun shade it but for gaps: shafts this wide (yd) across
 +    /// the sun's direction, this share of them shut.
++    /// 0.6, was 0.78: under the woods' crowns nearly every mote read shaded.
 +    pub const SHAFT_CELL: f32 = 0.9;
-+    pub const CANOPY_SHUT: f32 = 0.78;
++    pub const CANOPY_SHUT: f32 = 0.6;
 +
 +    // ---- butterflies ----
 +    /// How many by day, how far out (from and to), and the clear ground they want: no crown
@@ -543,9 +581,12 @@ index 0000000..a66b42b
 +    }
 +}
 +
-+/// Whether a doodad's model is a tree a leaf falls from: a plant the wind sways
-+/// ([`wind::sways`]) whose path names a tree or a canopy, and whose file is not a bush, a fern or
-+/// the like that sits in a trees folder.
++/// Whether a doodad's model may be a tree a leaf falls from: a plant the wind sways
++/// ([`wind::sways`]) whose file is not a bush, a fern or the like (they sit in trees folders
++/// too). Its size decides the rest ([`Crown::of_model`]: [`tune::TREE_MIN_HEIGHT`]). The path no
++/// longer has to name a tree or a canopy: take 273 found almost no leaves at Crystal Lake (1 out
++/// at the grade's density, where 48 crowns give about 6), its oaks swaying in the wind but not
++/// taken for trees.
 +pub fn is_tree(path: &str) -> bool {
 +    const LOW: [&str; 12] = [
 +        "bush", "shrub", "fern", "grass", "flower", "reed", "cattail", "weed", "wheat", "vine",
@@ -556,7 +597,7 @@ index 0000000..a66b42b
 +    }
 +    let p = path.to_ascii_lowercase();
 +    let file = p.rsplit(['\\', '/']).next().unwrap_or(&p);
-+    (p.contains("tree") || p.contains("canopy")) && !LOW.iter().any(|w| file.contains(w))
++    !LOW.iter().any(|w| file.contains(w))
 +}
 +
 +fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
@@ -643,6 +684,36 @@ index 0000000..a66b42b
 +            center,
 +            radius: radius.max(1.0),
 +            half_height: (0.5 * (max[2] - bottom) * s).max(1.0),
++        })
++    }
++
++    /// The crown of a tree placed at `tf` from its model: `leaves`, the box of its alpha-tested
++    /// batches' vertices (WoW model space), the crown itself, a little inside its sides; without
++    /// leaves the box `whole` (its vertices', else its header's) as [`Self::of`] reads it. `None`
++    /// for a model under [`tune::TREE_MIN_HEIGHT`] tall at its scale.
++    pub fn of_model(
++        tf: &Transform,
++        whole: ([f32; 3], [f32; 3]),
++        leaves: Option<([f32; 3], [f32; 3])>,
++    ) -> Option<Self> {
++        let s = tf.scale.x.abs().max(0.01);
++        let (min, max) = whole;
++        if (max[2] - min[2]) * s < tune::TREE_MIN_HEIGHT {
++            return None;
++        }
++        let Some((lo, hi)) = leaves.filter(|(lo, hi)| hi[2] > lo[2]) else {
++            return Self::of(tf, min, max);
++        };
++        let mid = [
++            0.5 * (lo[0] + hi[0]),
++            0.5 * (lo[1] + hi[1]),
++            0.5 * (lo[2] + hi[2]),
++        ];
++        let center = tf.transform_point(benilla_assets::coords::wow_to_bevy(mid));
++        Some(Self {
++            center,
++            radius: (0.45 * (hi[0] - lo[0]).max(hi[1] - lo[1]) * s).max(1.0),
++            half_height: (0.5 * (hi[2] - lo[2]) * s).max(1.0),
 +        })
 +    }
 +
@@ -813,6 +884,8 @@ index 0000000..a66b42b
 +    butterflies: Vec<Butterfly>,
 +    /// The tree crowns near the camera ([`scan_crowns`]).
 +    pub crowns: Vec<Crown>,
++    /// The tree placements the last scan found within its reach, crowned or not.
++    trees_near: usize,
 +    /// Where the crowns were last looked for, and how long ago.
 +    scanned_at: Option<Vec3>,
 +    scan_age: f32,
@@ -849,6 +922,7 @@ index 0000000..a66b42b
 +            motes: Vec::with_capacity(cap(tune::MOTES)),
 +            butterflies: Vec::with_capacity(cap(tune::BUTTERFLIES)),
 +            crowns: Vec::with_capacity(tune::CROWNS_MAX),
++            trees_near: 0,
 +            scanned_at: None,
 +            scan_age: 0.0,
 +            gate: 1.0,
@@ -870,6 +944,17 @@ index 0000000..a66b42b
 +        self.butterflies.clear();
 +        self.crowns.clear();
 +        self.scanned_at = None;
++    }
++
++    /// The trees (swaying plants tall enough) placed near the camera at the last look, and the
++    /// crowns leaves fall from: `looklife` says both.
++    pub fn trees(&self) -> (usize, usize) {
++        (self.trees_near, self.crowns.len())
++    }
++
++    /// How many motes the sun reaches now (half lit or more): `looklife` says it.
++    pub fn lit_motes(&self) -> usize {
++        self.motes.iter().filter(|m| m.lit >= 0.5).count()
 +    }
 +
 +    /// How many of each are alive: fireflies, leaves, motes, butterflies.
@@ -1630,6 +1715,8 @@ index 0000000..a66b42b
 +    placements: Option<Res<crate::terrain_stream::Placements>>,
 +    models: Option<Res<Assets<benilla_assets::M2Model>>>,
 +    mut life: ResMut<Life>,
++    // Each tree model's boxes, measured once (its vertices are resident on the CPU).
++    mut boxes: Local<bevy::platform::collections::HashMap<AssetId<benilla_assets::M2Model>, Option<TreeBoxes>>>,
 +) {
 +    let (Some(placements), Some(models)) = (placements, models) else {
 +        return;
@@ -1643,14 +1730,46 @@ index 0000000..a66b42b
 +        return;
 +    }
 +    let reach = tune::LEAF_RADIUS + 30.0;
++    let mut seen = 0;
 +    let trees = placements.trees().filter_map(|(tf, model)| {
 +        if tf.translation.distance_squared(cam) > reach * reach {
 +            return None;
 +        }
-+        let b = models.get(model)?.bounds.as_ref()?;
-+        Crown::of(tf, b.bbox_min, b.bbox_max)
++        seen += 1;
++        let boxes = *boxes
++            .entry(model)
++            .or_insert_with(|| models.get(model).and_then(tree_boxes));
++        let (whole, leaves) = boxes?;
++        Crown::of_model(tf, whole, leaves)
 +    });
 +    life.set_crowns(cam, trees);
++    life.trees_near = seen;
++}
++
++/// A tree model's boxes, WoW model space: the whole model's (its vertices', else its header's)
++/// and its leaves' (the alpha-tested batches' vertices), `None` without either.
++type TreeBoxes = (([f32; 3], [f32; 3]), Option<([f32; 3], [f32; 3])>);
++
++fn tree_boxes(m: &benilla_assets::M2Model) -> Option<TreeBoxes> {
++    let grow = |b: &mut Option<([f32; 3], [f32; 3])>, p: &[f32; 3]| {
++        let (lo, hi) = b.get_or_insert((*p, *p));
++        for i in 0..3 {
++            lo[i] = lo[i].min(p[i]);
++            hi[i] = hi[i].max(p[i]);
++        }
++    };
++    let (mut whole, mut leaves) = (None, None);
++    for sub in &m.submeshes {
++        let leaf = sub.blend == benilla_formats::ModelBlend::AlphaTest;
++        for p in &sub.geometry.positions {
++            grow(&mut whole, p);
++            if leaf {
++                grow(&mut leaves, p);
++            }
++        }
++    }
++    let whole = whole.or_else(|| m.bounds.as_ref().map(|b| (b.bbox_min, b.bbox_max)))?;
++    Some((whole, leaves))
 +}
 +
 +/// One frame of the life.
@@ -2044,6 +2163,8 @@ index 0000000..a66b42b
 +            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Trees\\ElwynnTreeCanopy02.m2",
 +            "world/azeroth/elwynn/passivedoodads/trees/elwynnpine01.m2",
 +            "World\\Generic\\PassiveDoodads\\Trees\\TreeMid01.m2",
++            // A swaying plant whose path names no tree: its size decides (take 273's oaks).
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Plants\\ElwynnOakLeaf01.m2",
 +        ] {
 +            assert!(is_tree(p), "{p}");
 +        }
@@ -2096,12 +2217,11 @@ index 0000000..a66b42b
 +        let samples: Vec<f32> = (0..400).map(|i| blink(i as f32 * 0.01, p, 0.0)).collect();
 +        let peak = samples.iter().copied().fold(0.0, f32::max);
 +        let low = samples.iter().copied().fold(1.0, f32::min);
-+        assert!(
-+            peak > 0.99 && low < tune::FIREFLY_BLINK_FLOOR + 0.01,
-+            "{peak} {low}"
-+        );
++        assert!(peak > 0.99 && low < 0.4, "{peak} {low}");
++        assert!(low > tune::FIREFLY_BLINK_FLOOR - 0.01, "never out: {low}");
++        // Take 273: lit about 11% of the time, so few glowed at once. A long, soft flash now.
 +        let lit = samples.iter().filter(|&&g| g > 0.5).count();
-+        assert!((10..=80).contains(&lit), "a short flash: {lit} of 400");
++        assert!((160..=320).contains(&lit), "a long flash: {lit} of 400");
 +    }
 +
 +    #[test]
@@ -2145,6 +2265,25 @@ index 0000000..a66b42b
 +        assert!(
 +            Crown::of(&tf, [-0.5; 3], [0.5, 0.5, 1.0]).is_none(),
 +            "a shrub"
++        );
++    }
++
++    /// A crown from a model's leaves: the box of its alpha-tested batches, where the leaves are,
++    /// whatever the header box says; a model too short is no tree, and one with no leaves falls
++    /// back to its whole box.
++    #[test]
++    fn a_crown_is_where_the_leaves_are() {
++        let tf = Transform::from_translation(Vec3::new(10.0, 5.0, 0.0));
++        let whole = ([-5.0, -5.0, 0.0], [5.0, 5.0, 14.0]);
++        let leaves = ([-4.0, -4.0, 6.0], [4.0, 4.0, 14.0]);
++        let c = Crown::of_model(&tf, whole, Some(leaves)).expect("a tree");
++        assert!((c.center.y - (5.0 + 10.0)).abs() < 1e-3, "{}", c.center.y);
++        assert!((c.half_height - 4.0).abs() < 1e-3);
++        assert!((c.radius - 3.6).abs() < 1e-3);
++        assert!(Crown::of_model(&tf, ([-1.0; 3], [1.0, 1.0, 1.5]), None).is_none());
++        assert_eq!(
++            Crown::of_model(&tf, whole, None),
++            Crown::of(&tf, whole.0, whole.1)
 +        );
 +    }
 +
@@ -2391,7 +2530,7 @@ index 0000000..a66b42b
 +    }
 +}
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index aef83ef..ee4a890 100644
+index a329f9f..1f55519 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -5,9 +5,10 @@
@@ -2424,7 +2563,7 @@ index aef83ef..ee4a890 100644
  pub use lights::{LookLight, LookLightTune, LookPulse};
  pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
  pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
-@@ -240,6 +243,7 @@ pub(crate) fn init_resources(app: &mut App) {
+@@ -244,6 +247,7 @@ pub(crate) fn init_resources(app: &mut App) {
      wind::init_resources(app);
      sky::init_resources(app);
      weather::init_resources(app);
@@ -2432,7 +2571,7 @@ index aef83ef..ee4a890 100644
  }
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
-@@ -254,6 +258,7 @@ impl Plugin for LookPlugin {
+@@ -258,6 +262,7 @@ impl Plugin for LookPlugin {
                  Startup,
                  (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
              )
@@ -2440,7 +2579,7 @@ index aef83ef..ee4a890 100644
              .add_systems(PreUpdate, sync_view_look)
              // The weather: the film's hold drives the wire's override before the weather ticks,
              // and the look is read from this frame's state before the light is resolved, which it
-@@ -287,6 +292,23 @@ impl Plugin for LookPlugin {
+@@ -291,6 +296,23 @@ impl Plugin for LookPlugin {
                      .after(crate::skybox::SkyboxResolve)
                      .after(crate::liquid::SubmersionVerdict),
              )
