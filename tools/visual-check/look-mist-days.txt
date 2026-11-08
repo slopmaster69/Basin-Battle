@@ -1,0 +1,55 @@
+# The mist by the day and by events: Crystal Lake at first light (05:30). Each day rolls its own
+# strength, 0 to 2 times the hour's, and about one day in seven is a fog day, 3 to 4 times. Five
+# ordinary days from thinnest to thickest, then two fog days (lookmist day <n>: the server's calendar
+# day, days from 1970; 20763 is 2026-11-06, and a held day shows at once), then an event:
+# SetWorldMist(3.5, 2) eased in over 2 s over a thin day, and ClearWorldMist(2) eased back out.
+# Look for: whether 0-2 reads as a range of ordinary mornings, whether a fog day is still playable,
+# and whether the event's 2 s ease reads as weather rolling in or as a switch.
+hero warrior
+cam 200 0 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 330")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+# 2026-11-12: 0.06 times the hour's.
+5.0 lua ConsoleExec("lookmist day 20769")
+5.05 lua ClearWorldFog()
+5.8 shots day-0.06 2 0.6
+# 2026-11-09: 0.39.
+7.5 lua ConsoleExec("lookmist day 20766")
+7.55 lua ClearWorldFog()
+8.3 shots day-0.39 2 0.6
+# 2026-11-07: 0.83.
+10.0 lua ConsoleExec("lookmist day 20764")
+10.05 lua ClearWorldFog()
+10.8 shots day-0.83 2 0.6
+# 2026-11-06: 1.34.
+12.5 lua ConsoleExec("lookmist day 20763")
+12.55 lua ClearWorldFog()
+13.3 shots day-1.34 2 0.6
+# 2026-11-10: 1.66.
+15.0 lua ConsoleExec("lookmist day 20767")
+15.05 lua ClearWorldFog()
+15.8 shots day-1.66 2 0.6
+# 2026-11-08, a fog day: 3.35.
+17.5 lua ConsoleExec("lookmist day 20765")
+17.55 lua ClearWorldFog()
+18.3 shots fog-3.35 2 0.6
+# 2026-11-27, a fog day: 3.96.
+20.0 lua ConsoleExec("lookmist day 20784")
+20.05 lua ClearWorldFog()
+20.8 shots fog-3.96 2 0.6
+# An event over a thin day (0.39): 3.5 times, eased in over 2 s, held, then eased out over 2 s.
+22.5 lua ConsoleExec("lookmist day 20766")
+22.55 lua ClearWorldFog()
+23.3 shots event-before 1 0.6
+24.0 lua SetWorldMist(3.5, 2)
+24.1 shots event-in 4 0.5
+26.6 shots event-held 2 0.6
+28.0 lua ClearWorldMist(2)
+28.1 shots event-out 4 0.5
+30.6 shots event-after 1 0.6
+31.5 lua ConsoleExec("lookmist grade")
+32.0 end

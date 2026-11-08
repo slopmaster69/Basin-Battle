@@ -1,0 +1,23 @@
+# The new look's lights (client 0057): Holy Light (spell 635) on the hero at night (23:00), played
+# with `.es fx`: its 2.5 s cast, then its landing. Look for: a warm gold glow growing on the hero as
+# the cast is drawn up, then a softer, longer gold glow (about 1.4 s) as the heal lands, on the
+# hero and the ground around. Then Holy Nova for a holy burst.
+hero warrior
+cam 0 -2 5
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("looklights tuned")
+4.4 .es slot q holy_nova
+5.5 .es fx cast 635 2500
+5.6 shots cast 5 0.5
+8.0 .es fx spell 635
+8.05 shots land 10 0.15
+11.0 .es in ab 0 0
+11.2 .es in a {facing} 0
+11.25 .es in au {facing} 0
+11.1 shots nova 8 0.1
+14.5 end

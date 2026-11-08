@@ -1,0 +1,35 @@
+# The contact shadows' new default (client 0070, `look-tune-1`): Goldshire at golden hour (17:30),
+# facing the cart and the fences. The default is now what `lookao 2` was on the first films (#262): `lookao 0` (none),
+# `lookao 0.5` (the old default), `lookao grade` (the new default), `lookao 2` (twice the new),
+# then worldAO 0 (should match lookao 0) and 1.12's look.
+# Look for: at the grade's own, a soft shade about a yard wide along the inn's step and wall foot,
+# under the barrel and the cart, in the crease where the cobbles meet the wall, noticeable at a
+# glance; no dark rims, no halo round the hero or the posts, far hills not greyed; at lookao 2
+# heavier but still never black.
+hero warrior
+cam 180 -8 12
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldAO", "1")
+4.25 lua ConsoleExec("lookao 0")
+5.5 shots ao-off 2 0.6
+7.0 lua ConsoleExec("lookao 0.5")
+8.0 shots ao-old-default 2 0.6
+9.5 lua ConsoleExec("lookao grade")
+10.5 shots ao-new-default 3 0.6
+12.5 lua ConsoleExec("lookao 2")
+13.5 shots ao-x2 2 0.6
+15.0 lua ConsoleExec("lookao grade")
+15.05 lua SetCVar("worldAO", "0")
+16.0 shots worldao-0 2 0.6
+17.5 lua SetCVar("worldAO", "1")
+17.55 lua SetCVar("worldLook", "0")
+17.6 lua ClearWorldFog()
+18.5 shots classic 2 0.6
+20.0 lua SetCVar("worldLook", "1")
+20.05 lua ClearWorldFog()
+21 end

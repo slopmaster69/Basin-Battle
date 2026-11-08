@@ -1,0 +1,38 @@
+# The froth round a wading hero (client 0070), shot again with a clear camera: take 271's wade looked
+# through the shore's reeds and hid the hero for most of it. Crystal Lake at golden hour (17:30).
+# Here the camera faces the shore (yaw 20) from over the open water, 6 yd off and pitched 20 degrees
+# down, so the reeds stand behind the hero, not in front of the camera; the hero backs out into the
+# lake toward the camera (dashes "b"), stands, goes deeper, stands, then worldWater 0 and 1.12's
+# look, then walks back to the shore.
+# Look for: where the legs meet the water, a soft, lumpy, uneven froth following their outline and
+# thinning over the ripples round them; no crisp, thin, bright oval (a selection ring on the
+# floor). The shore's foam behind, a soft broken band, patchy with the ripples. The legs seen
+# through the clear water. If the reeds still cover the legs, say where they stand.
+hero warrior
+cam 20 -20 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+5.5 shots start 1 0.5
+6.0 lua ActionDash(2.0, 3, "b")
+6.1 shots wade-in 10 0.2
+8.5 shots standing 4 0.4
+10.5 lua ActionDash(1.5, 3, "b")
+10.6 shots deeper 8 0.2
+12.5 shots standing-deep 4 0.4
+14.0 lua SetCVar("worldWater", "0")
+14.8 shots worldwater-0 2 0.4
+15.7 lua SetCVar("worldWater", "1")
+15.75 lua SetCVar("worldLook", "0")
+15.8 lua ClearWorldFog()
+16.6 shots classic 2 0.4
+17.5 lua SetCVar("worldLook", "1")
+17.55 lua ClearWorldFog()
+18.0 lua ActionDash(2.0, 3, "f")
+18.1 shots wade-out 10 0.2
+21 end

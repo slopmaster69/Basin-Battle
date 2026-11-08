@@ -1,0 +1,38 @@
+# Visible weather at night, revised (client 0071, #271's third round): Goldshire at 23:30 in rain,
+# the camera on the road facing the inn's lit windows (left) and the lamp posts down the road
+# (centre), 10 yd off and pitched 12 degrees down so the wet road between lies in the foreground.
+# Take 272's night rain (yaw 180) went near-black and murky. Dry first, then a minute of rain to
+# soak the ground, then worldWeather 0 and 1.12's look.
+# Look for, against the dry frame:
+# - the rain frame no darker or murkier overall than the dry one (the overcast now dims the night
+#   much less, the wet ground darkens less, and the rain's mist lifts less by night);
+# - each lamp and lit window's light lying on the wet road and cobbles as a warm streak or broken
+#   puddle of reflected light running from under it toward the camera, which slides as the camera
+#   moves (it is a reflection), not a white blot and not a ring;
+# - the rain streaks near the lamps catching their orange light, the rest faint blue-grey.
+hero warrior
+cam 150 -12 10
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.5 shots dry 2 0.5
+7.0 lua ConsoleExec("lookweather rain 0.9")
+60.0 video
+60.5 shots wet 4 1.0
+65.0 lua ActionDash(1.5, 3, "l")
+65.2 shots wet-moving 6 0.25
+68.0 lua SetCVar("worldWeather", "0")
+69.5 shots worldweather-0 2 0.5
+71.0 lua SetCVar("worldWeather", "1")
+71.05 lua SetCVar("worldLook", "0")
+71.1 lua ClearWorldFog()
+72.5 shots classic 2 0.5
+74.0 lua SetCVar("worldLook", "1")
+74.05 lua ClearWorldFog()
+74.1 lua ConsoleExec("lookweather server")
+76 end

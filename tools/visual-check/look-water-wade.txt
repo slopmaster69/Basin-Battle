@@ -1,0 +1,31 @@
+# The new look's water (client 0066): the hero running into Crystal Lake's shallows at 17:30,
+# standing in them, going deeper, running out; then worldWater 0 and 1.12's look standing in them.
+# Look for: the foam ringing the legs, the shallows clear over the bed, no halo or line where the
+# water meets the legs, the water right at the camera, and the camera dipping under (1.12's water).
+hero warrior
+cam 160 -6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+6.0 shots shore 1 0.6
+6.5 lua ActionDash(3, 7, "f")
+6.6 shots run-in 8 0.5
+11.0 shots standing 3 0.7
+13.5 lua ActionDash(2, 7, "f")
+13.6 shots deeper 5 0.5
+16.5 shots deep 2 0.7
+18.0 lua SetCVar("worldWater", "0")
+19.5 shots worldwater-0 2 0.6
+21.0 lua SetCVar("worldWater", "1")
+21.05 lua SetCVar("worldLook", "0")
+21.1 lua ClearWorldFog()
+22.5 shots classic 2 0.6
+24.0 lua SetCVar("worldLook", "1")
+24.05 lua ClearWorldFog()
+25.5 shots new-again 2 0.6
+27 end

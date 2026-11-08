@@ -1,0 +1,34 @@
+# Ambient life (client 0072): the woods by Crystal Lake at golden hour (17:30), facing the low sun
+# (the sun sits at yaw 45), the camera pitched a little up into the god rays; then looklife 3,
+# worldLife 0 and worldLook 0. look-life-woods-golden-back is the same with the sun behind.
+# Look for: tiny warm specks drifting slowly in the air toward the sun, sparkling where a shaft of
+# sun comes through the crowns and gone in the shade of the trees and hills (dark, not grey);
+# brightest looking into the sun (almost gone with it behind, in the other film); leaves from the
+# crowns, tumbling and drifting downwind; no butterflies after 19:00, fireflies only after dusk.
+hero warrior
+cam 45 4 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+4.35 lua ConsoleExec("lookwind grade")
+10.0 video
+10.5 shots into-sun 24 0.25
+21.0 lua ConsoleExec("looklife 3")
+25.0 shots life-x3 16 0.25
+29.5 lua ConsoleExec("looklife grade")
+29.55 lua SetCVar("worldLife", "0")
+31.0 shots worldlife-0 2 0.5
+32.5 lua SetCVar("worldLife", "1")
+32.55 lua SetCVar("worldLook", "0")
+32.6 lua ClearWorldFog()
+34.0 shots classic 2 0.5
+35.5 lua SetCVar("worldLook", "1")
+35.55 lua ClearWorldFog()
+35.6 lua ConsoleExec("lookweather server")
+37 end

@@ -1,0 +1,35 @@
+# Ambient life (client 0072): the woods across Crystal Lake at dusk (20:45), the camera low on the
+# shore looking over the water to the trees. The fireflies coming out: at the grade's density, then
+# looklife 2 and looklife 0, worldLife 0 (none) and worldLook 0 (1.12).
+# Look for: a few dozen small warm green-gold glows low over the water's edge and under the trees,
+# fewer in the open; each blinking on and off softly on its own beat (never all together), drifting
+# slowly; the bloom catching the near ones; the nearest few lighting the grass under them a little;
+# nothing popping in or out as the camera holds; none of them in the sky or under the ground.
+hero warrior
+cam 200 -6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1245")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+12.0 video
+12.5 shots dusk 24 0.25
+19.0 lua ConsoleExec("looklife 2")
+26.0 shots life-x2 12 0.25
+30.0 lua ConsoleExec("looklife 0")
+33.5 shots life-0 2 0.5
+35.0 lua ConsoleExec("looklife grade")
+35.05 lua SetCVar("worldLife", "0")
+36.5 shots worldlife-0 2 0.5
+38.0 lua SetCVar("worldLife", "1")
+38.05 lua SetCVar("worldLook", "0")
+38.1 lua ClearWorldFog()
+39.5 shots classic 2 0.5
+41.0 lua SetCVar("worldLook", "1")
+41.05 lua ClearWorldFog()
+41.1 lua ConsoleExec("lookweather server")
+43 end

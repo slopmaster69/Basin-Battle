@@ -1,0 +1,16 @@
+# #215's god rays, re-filmed with the view tilted UP (the cam line's second number is the pitch:
+# +20 looks up at the sky). dawn (worldclock 330), crystal_lake, heading 0; four headings so one
+# faces the low sun. Look for shafts toward the sun through the trees; then 1.12's look.
+hero warrior
+cam 0 20 7
+include _setup
+4.2 .es dummy clear
+4.5 .es goto crystal_lake
+6.0 lua ConsoleExec("worldclock 330")
+6.1 lua ClearWorldFog()
+6.2 lua UIParent:Hide()
+7.5 shots new 3 0.6
+10.0 lua SetCVar("worldLook","0")
+10.1 lua ClearWorldFog()
+11.5 shots old 2 0.6
+13.5 end

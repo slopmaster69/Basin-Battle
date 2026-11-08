@@ -1,0 +1,19 @@
+# #215's longer view, from the Tower of Azora at noon, high camera: the view slider at its 1.12
+# default (farclip 350: 1200 yd under the new look), then at the top (777: 2000 yd), then 1.12's
+# look at 350 (350 yd) for comparison. Look for: how far the land goes before the fog, no holes.
+hero warrior
+cam 0 -18 16
+include _setup
+4.2 .es dummy clear
+4.5 .es goto azora
+6.0 lua ConsoleExec("worldclock 720")
+6.2 lua UIParent:Hide()
+6.4 lua SetCVar("farclip","350")
+8.0 shots far350 3 0.6
+10.0 lua SetCVar("farclip","777")
+11.5 shots far777 3 0.6
+13.5 lua SetCVar("worldLook","0")
+13.6 lua SetCVar("farclip","350")
+15.0 shots old 3 0.6
+16.5 lua SetCVar("worldLook","1")
+17 end

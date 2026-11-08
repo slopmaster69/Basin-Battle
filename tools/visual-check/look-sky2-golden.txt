@@ -1,0 +1,35 @@
+# The painted sky's golden hour after the first films (client 0068, revised): Crystal Lake at 17:30,
+# the camera pitched up facing the sun (yaw 45: the visible sun keeps the north-west bearing all
+# day, 30 degrees up at this hour). The day's own cover, then held at 0.3, 0.6 and 0.8, then
+# worldSky 0 and 1.12's look.
+# Look for: the clouds by the sun gold-lit, their undersides warmer and darker (amber to brown),
+# never a white or white-yellow bloom; no second glow on 1.12's sun glare, the sky's warm halo a
+# ring round it; at 0.8 the sky going grey-gold and darker under the clouds, with breaks, not a
+# bright sheet; 1.12's glare dimmed where a cloud covers the sun.
+hero warrior
+cam 45 22 5
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+5.5 shots day 2 0.5
+7.0 lua ConsoleExec("looksky clouds 0.3")
+8.0 shots clouds-03 2 0.5
+9.5 lua ConsoleExec("looksky clouds 0.6")
+10.5 shots clouds-06 3 1.0
+13.5 lua ConsoleExec("looksky clouds 0.8")
+14.5 shots clouds-08 3 1.0
+17.5 lua ConsoleExec("looksky grade")
+17.55 lua SetCVar("worldSky", "0")
+18.5 shots worldsky-0 2 0.5
+20.0 lua SetCVar("worldSky", "1")
+20.05 lua SetCVar("worldLook", "0")
+20.1 lua ClearWorldFog()
+21.0 shots classic 2 0.5
+22.5 lua SetCVar("worldLook", "1")
+22.55 lua ClearWorldFog()
+23.5 end

@@ -1,0 +1,10 @@
+# Probe 2: light the Deadmines lamp the hero starts beside, go home by it, then goto goldshire, on the look films' timing.
+hero warrior
+cam 0 -8 10
+0.0 .es debug quiet
+0.1 .es interact
+0.6 .es home
+1.0 .es goto goldshire
+5.0 shots t5 1 0.5
+9.0 shots t9 1 0.5
+10 end

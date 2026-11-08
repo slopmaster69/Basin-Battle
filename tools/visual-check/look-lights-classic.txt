@@ -1,0 +1,37 @@
+# The new look's lights against 1.12's: the same night scenes with worldLook 0 (no look lights, no
+# grade, no bloom), each followed by worldLook 1 again. Look for: under 1.12's look nothing of
+# client 0057 shows (only the reference's own per-vertex torch light), and the new look's pools
+# and spell light come back on the switch.
+hero warrior
+cam 0 -4 7
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "0")
+4.2 lua ClearWorldFog()
+4.4 .es slot q fireball
+5.0 shots goldshire-old 2 0.5
+6.50 .es in ab 0 0
+6.70 .es in a {facing} 0
+6.75 .es in au {facing} 0
+6.60 shots fireball-old 12 0.08
+9.4 .es slot q frostbolt
+9.50 .es in ab 0 0
+9.70 .es in a {facing} 0
+9.75 .es in au {facing} 0
+9.60 shots frostbolt-old 12 0.08
+12.5 .es fx cast 635 2500
+12.6 shots holy-cast-old 3 0.6
+15.0 .es fx spell 635
+15.05 shots holy-land-old 6 0.2
+17.0 lua SetCVar("worldLook", "1")
+17.05 lua ClearWorldFog()
+17.5 shots goldshire-new 2 0.5
+18.4 .es slot q fireball
+18.50 .es in ab 0 0
+18.70 .es in a {facing} 0
+18.75 .es in au {facing} 0
+18.60 shots fireball-new 12 0.08
+21.5 end

@@ -1,0 +1,46 @@
+# Ambient life (client 0072): what it costs. Crystal Lake facing the low sun at golden hour (17:30:
+# motes, each asking whether the sun reaches it, and leaves), then night (23:00: fireflies and their
+# lights), standing still, the fps journal on (benilla-config/Diagnostics/fps-journal.csv): 10 s at
+# the grade's density, 10 s at looklife 3, 10 s with worldLife 0, 10 s with worldLook 0, at each
+# hour.
+# Look for: in the CSV, frame ms and gpu_ms: the sprites land in the effects (transparent) column,
+# the motes' sun rays and the leaves on the CPU frame. Please send the CSV with the film, and say
+# the GPU and the window size.
+hero warrior
+cam 45 4 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+14.0 lua SetCVar("fpsJournal", "1")
+15.0 shots cost-golden 1 1.0
+24.0 lua ConsoleExec("looklife 3")
+25.0 shots cost-golden-x3 1 1.0
+34.0 lua ConsoleExec("looklife grade")
+34.05 lua SetCVar("worldLife", "0")
+35.0 shots cost-golden-off 1 1.0
+44.0 lua SetCVar("worldLife", "1")
+44.05 lua SetCVar("worldLook", "0")
+45.0 shots cost-golden-classic 1 1.0
+54.0 lua SetCVar("worldLook", "1")
+54.05 lua ClearWorldFog()
+54.1 lua ConsoleExec("worldclock 1380")
+64.0 shots cost-night 1 1.0
+74.0 lua ConsoleExec("looklife 3")
+75.0 shots cost-night-x3 1 1.0
+84.0 lua ConsoleExec("looklife grade")
+84.05 lua SetCVar("worldLife", "0")
+85.0 shots cost-night-off 1 1.0
+94.0 lua SetCVar("worldLife", "1")
+94.05 lua SetCVar("worldLook", "0")
+95.0 shots cost-night-classic 1 1.0
+104.0 lua SetCVar("fpsJournal", "0")
+104.05 lua SetCVar("worldLook", "1")
+104.1 lua ClearWorldFog()
+104.15 lua ConsoleExec("lookweather server")
+106 end

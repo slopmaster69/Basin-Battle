@@ -1,0 +1,33 @@
+# Visible weather (client 0071): Crystal Lake in rain at noon (held here with lookweather, no
+# server needed), the camera low over the water toward the shore and the trees.
+# Look for: rings spreading on the water everywhere near the camera, small and quick, fading with
+# distance (no shimmer far off); the reflections broken up by them; the shore's stones and grass
+# darker and glistening once it has rained a minute; the streaks lit by the grey daylight, leaning
+# downwind; the sky grey and darker under its thick parts. Then worldWeather 0 (1.12's grey streaks
+# over the new look's water, no rings, dry shore) and worldLook 0 (1.12's rain exactly).
+hero warrior
+cam 160 2 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookweather clear")
+5.5 shots dry 2 0.5
+7.0 lua ConsoleExec("lookweather rain 0.8")
+22.0 video
+22.5 shots rain 2 1.0
+65.0 shots rain-wet 3 1.0
+69.0 lua SetCVar("worldWeather", "0")
+70.5 shots worldweather-0 2 0.5
+72.0 lua SetCVar("worldWeather", "1")
+72.05 lua SetCVar("worldLook", "0")
+72.1 lua ClearWorldFog()
+73.5 shots classic 2 0.5
+75.0 lua SetCVar("worldLook", "1")
+75.05 lua ClearWorldFog()
+75.1 lua ConsoleExec("lookweather server")
+77 end

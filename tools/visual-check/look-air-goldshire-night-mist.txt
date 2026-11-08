@@ -1,0 +1,41 @@
+# The air (client 0073): Goldshire at night (23:30) in mist, the camera on the road facing the inn's
+# lit windows and the lamp posts (as look-weather-r3-goldshire-night-rain), 10 yd off and pitched
+# 12 degrees down. The mist held at 3 times the hour's (lookmist 3), then the night's own mist, then
+# lookfog 2, worldFog 0 (the plain mist) and worldLook 0.
+# Look for:
+# - each lamp post and torch wrapped in a soft warm glow in the misty air, brightest close round
+#   the flame and fading over a few yards, not a hard disc and not a square;
+# - a fainter glow in the night's own mist, still a hint of one;
+# - the glow hidden where a wall or post stands in front of the lamp, not showing through it;
+# - no glow at worldFog 0 (1.12's lamps and the look's pools only).
+hero warrior
+cam 150 -12 10
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookfog grade")
+4.35 lua ConsoleExec("lookmist 3")
+6.0 video
+6.5 shots mist-3 3 0.5
+9.0 lua ConsoleExec("lookmist grade")
+10.0 shots night-mist 2 0.5
+11.5 lua ConsoleExec("lookmist 3")
+11.55 lua ConsoleExec("lookfog 2")
+12.5 shots lookfog-2 2 0.5
+14.0 lua ConsoleExec("lookfog grade")
+14.05 lua SetCVar("worldFog", "0")
+15.0 shots worldfog-0 2 0.5
+16.5 lua SetCVar("worldFog", "1")
+16.55 lua SetCVar("worldLook", "0")
+16.6 lua ClearWorldFog()
+18.0 shots classic 2 0.5
+19.5 lua SetCVar("worldLook", "1")
+19.55 lua ClearWorldFog()
+19.6 lua ConsoleExec("lookmist grade")
+19.65 lua ConsoleExec("lookweather server")
+21 end
