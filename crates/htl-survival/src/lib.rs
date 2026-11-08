@@ -102,6 +102,8 @@ mod tests_orb;
 #[cfg(test)]
 mod tests_fair;
 #[cfg(test)]
+mod tests_temper;
+#[cfg(test)]
 mod tests_fair_hero;
 #[cfg(test)]
 mod tests_rhythm;

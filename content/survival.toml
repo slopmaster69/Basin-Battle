@@ -319,6 +319,80 @@ space_band = 0.5
 # heavy blows an overhead or a chop. Undead male for the sword, axe, mace, two-hander and polearm
 # (a chop, an overhead, the polearm's slow overhead for every heavy), dwarf male for the dagger
 # (quick thrusts and a wide sweep). Rerun the picker after a new census; edit by hand freely.
+
+# How each kind of creature fights, over [ai] (docs/enemy-temperaments.md; Corey, Nov 7: "not all
+# enemies need to behave the exact same way"). A creature's `temper` names one. What one leaves
+# out is [ai]'s; the fairness rules (nothing at a reeling hero, no blade with a bolt in the air,
+# no two wind-ups at once) hold for all of them.
+# Brawler: straight in, takes its turn, punishes a greedy swing, now and then steps back.
+[[temper]]
+key = "brawler"
+punish = true
+retreat = 0.2
+
+# A captain: a brawler who presses harder.
+[[temper]]
+key = "captain"
+punish = true
+retreat = 0.15
+pace = 0.85
+
+# Backstabber: strikes only from behind you (or at an opening), working round to your back
+# whoever's turn it is, and gives ground after its flurry.
+[[temper]]
+key = "backstabber"
+backstab = true
+flank = true
+retreat = 0.6
+retreat_yards = 5.0
+pace = 0.85
+
+# Bruiser: plods in and never backs off; a light blow doesn't knock its wind-up aside (roll its
+# heavy blows; don't trade). Slow to see an opening.
+[[temper]]
+key = "bruiser"
+poise = true
+punish = false
+retreat = 0.0
+pace = 1.15
+
+# Coward: swarms, and hurt below a third it runs, once, before it comes back.
+[[temper]]
+key = "coward"
+punish = true
+flee_below = 0.35
+retreat = 0.1
+
+# Commander: holds back, circling 7 yd off, while its pack is on you; comes in when they're down.
+[[temper]]
+key = "commander"
+hold_back = true
+retreat = 0.0
+
+# Caster: keeps its distance and casts between the blows up close (the casters' own rules).
+[[temper]]
+key = "caster"
+
+# Skirmisher: shoots or throws from range, kicks you off when you close, a little quicker.
+[[temper]]
+key = "skirmisher"
+pace = 0.9
+
+# Duelist (VanCleef): punishes every greedy swing, steps out to make you come to him.
+[[temper]]
+key = "duelist"
+punish = true
+retreat = 0.35
+retreat_yards = 4.0
+pace = 0.85
+
+# Erratic (Cookie): wanders his kitchen between pots, hard to pin down.
+[[temper]]
+key = "erratic"
+flank = false
+retreat = 0.6
+retreat_yards = 6.0
+
 [[moveset]]
 key = "one_hand"
 light = [
