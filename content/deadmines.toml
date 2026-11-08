@@ -180,9 +180,9 @@ radius = 0.0
 count = 1
 
 # On the Juggernaut (off the way: up from the scaffold's south-west platform): Captain Greenskin
-# and his crew on the main deck, and Edwin VanCleef at the stern. Three fights in turn, not one:
-# the deck hands, then the captain and his finite firing line on the quarterdeck.
-# Linked, the intervening packs used to bring the whole deck at once.
+# and his crew on the main deck, and Edwin VanCleef at the stern. Separate pulls keep the deck
+# hands and intervening packs out of the captain's finite firing line on the quarterdeck.
+# Linked, they used to bring the whole deck at once.
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-62.0, -797.0]
@@ -724,9 +724,16 @@ aggro_sound = 5775
   steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, kit = 356 } ]
 
 # Captain Greenskin: the finite firing line controls the opening and the reload windows.
+[[temper]]
+key = "quarterdeck"
+punish = true
+# The encounter owns the reload windows; random retreats would spend them walking away.
+retreat = 0.0
+
 [[mob]]
 key = "dm_greenskin"
 name = "Captain Greenskin"
+temper = "quarterdeck"
 subname = "The Juggernaut's Captain"
 display = 7113
 windup_sound = 1409
@@ -788,6 +795,7 @@ death_text = "My ship..."
 [[mob]]
 key = "dm_deck_gunner"
 name = "Defias Deck Gunner"
+temper = "quarterdeck"
 subname = "The Juggernaut's Crew"
 display = 2347
 health = 85
