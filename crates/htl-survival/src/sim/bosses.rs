@@ -60,6 +60,9 @@ struct Run {
     falls_at: f32,
     /// When it reached the route's end (waiting there for the heroes).
     arrived: Option<f32>,
+    /// Where it last made headway, and when: a run that stands still this long is helped along.
+    went_from: Vec3,
+    went_at: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +100,8 @@ impl Survival {
                     leg: 0,
                     falls_at: now + e.run_falls.max(0.5),
                     arrived: None,
+                    went_from: home,
+                    went_at: now,
                 },
             );
             // Whatever it was winding up is let go: it runs.
@@ -137,6 +142,12 @@ impl Survival {
         let last = *e.run_to.last().unwrap();
         if run.arrived.is_none() {
             let to = e.run_to[run.leg.min(e.run_to.len() - 1)];
+            // Headway: where it last moved a yard, and when.
+            if dist2d(pos, run.went_from) >= 1.0 {
+                let r = self.bosses.runs.get_mut(&id).unwrap();
+                r.went_from = pos;
+                r.went_at = now;
+            }
             if dist2d(pos, to) < 1.5 && (pos[2] - to[2]).abs() < 4.0 {
                 let r = self.bosses.runs.get_mut(&id).unwrap();
                 r.leg += 1;
@@ -151,9 +162,13 @@ impl Survival {
                 let next = e.run_to[leg];
                 let speed = self.content.mobs[def].run_speed * RUN_HASTE;
                 self.go(id, next, speed);
-            } else if self.mobs[&id].lost_at.is_some_and(|t| now - t >= STUCK) {
-                // No way along this leg: set down at its end rather than standing in the wall.
-                self.set_back(id, to, "boss run, no way along the leg");
+            } else if self.mobs[&id].lost_at.is_some_and(|t| now - t >= STUCK) || (now - run.went_at >= STUCK && dist2d(pos, run.went_from) < 1.0) {
+                // No way along this leg, or no headway on it: set down at its end rather than
+                // standing in the wall (the log says where, to be looked into).
+                self.set_back(id, to, "boss run, no headway on the leg");
+                let r = self.bosses.runs.get_mut(&id).unwrap();
+                r.went_from = to;
+                r.went_at = now;
             } else if self.mobs[&id].path.is_empty() {
                 let speed = self.content.mobs[def].run_speed * RUN_HASTE;
                 self.go(id, to, speed);
