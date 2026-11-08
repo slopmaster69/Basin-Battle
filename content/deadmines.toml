@@ -870,6 +870,7 @@ slay_sound = 5781
 [[mob]]
 key = "dm_blackguard_observer"
 name = "Defias Blackguard"
+temper = "backstabber"
 subname = "Watching the Duel"
 display = 2357
 health = 1

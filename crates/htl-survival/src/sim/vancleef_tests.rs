@@ -145,6 +145,20 @@ fn an_off_hand_weapon_uses_the_same_invitation_contact_path() {
 }
 
 #[test]
+fn solo_vanish_does_not_reset_the_duel_or_replace_its_observers() {
+    let (mut s, band, id) = fight("dm_vancleef", 1);
+    invitation(&mut s, id, band[0]);
+    let watchers = s.vancleef.duels[&id].watchers.clone();
+    assert!(s.apply_cc(band[0], band[0], "veil", 4.0, 0.0, 0.0, "Vanish"));
+    assert!(s.unseen(band[0]));
+    assert!(s.next_in_fight(id).is_none());
+    run(&mut s, 2.1);
+    assert_eq!(s.mobs[&id].state.foe(), Some(Foe::Hero(band[0])));
+    assert!(s.vancleef.duels[&id].invited);
+    assert_eq!(s.vancleef.duels[&id].watchers, watchers);
+}
+
+#[test]
 fn control_and_a_posture_break_take_precedence_over_invitation() {
     let (mut s, band, id) = fight("dm_vancleef", 1);
     invitation(&mut s, id, band[0]);

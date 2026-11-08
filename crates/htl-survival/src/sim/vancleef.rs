@@ -223,7 +223,7 @@ impl Survival {
 
     fn duel_arrival(&mut self, id: Id) {
         self.halt(id);
-        if let Some(hero) = self.next_in_fight(id) {
+        if let Some(hero) = self.duel_hero(id) {
             let to = self.players[&hero].pos;
             let m = self.mobs.get_mut(&id).unwrap();
             m.facing = facing(m.pos, to);
@@ -234,6 +234,20 @@ impl Survival {
         self.vancleef.duels.get_mut(&id).unwrap().beat = Beat::Arrival { until: self.clock + ARRIVAL };
         self.events.push(Event::Sound { id, sound: 1335 });
         self.events.push(Event::Visual { id, kit: 379, by: None });
+    }
+
+    /// Bosses see through a veil (`unseen_by`). The generic replacement-target query
+    /// excludes veiled heroes, so using it alone here would turn solo Vanish into a wipe.
+    fn duel_hero(&self, id: Id) -> Option<Id> {
+        self.next_in_fight(id).or_else(|| {
+            let m = self.mobs.get(&id)?;
+            let leash = self.leash_of(m.def);
+            self.players.iter().filter(|(_, p)| p.health > 0 && (p.pos[2] - m.pos[2]).abs() < 10.0
+                && dist2d(p.pos, m.pos) <= self.content.mobs[m.def].leash
+                && !self.leashed(m.home, m.pos, p.pos, leash))
+                .min_by(|a, b| dist2d(a.1.pos, m.pos).total_cmp(&dist2d(b.1.pos, m.pos)))
+                .map(|(hero, _)| *hero)
+        })
     }
 
     /// Runs after walking, before ordinary thought and the disabled check. This lets a
@@ -251,7 +265,7 @@ impl Survival {
         let Some(foe) = self.mobs[&id].state.foe() else { return false };
         self.vancleef.duels.get_mut(&id).unwrap().began = true;
         // Wipes and leash exits clear poses, smoke and observers even during the stance/run.
-        let Some(hero) = self.next_in_fight(id) else {
+        let Some(hero) = self.duel_hero(id) else {
             self.remove_duel(id);
             self.halt(id);
             let m = self.mobs.get_mut(&id).unwrap();
