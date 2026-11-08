@@ -293,14 +293,16 @@ impl Survival {
         Ok(format!("Opened {}.", doors.join(", ")))
     }
 
-    /// (Debug) The nearest foe within 40 yards brought down to `share` of its health by this hero's
+    /// (Debug) The nearest foe within 40 yards (whose name or key holds `named`, if given) brought down to `share` of its health by this hero's
     /// hand, as a blow would (its phases come as they would): for filming a fight's turns.
-    pub fn dev_hurt(&mut self, me: Id, share: f32) -> Result<String, String> {
+    pub fn dev_hurt(&mut self, me: Id, share: f32, named: &str) -> Result<String, String> {
+        let named = named.to_lowercase();
         let at = self.players.get(&me).map(|p| p.pos).ok_or("No hero.")?;
         let (mid, health, max) = self
             .mobs
             .iter()
             .filter(|(_, m)| m.health > 0 && !m.friendly && dist2d(m.pos, at) <= 40.0)
+            .filter(|(_, m)| named.is_empty() || self.content.mobs[m.def].key.to_lowercase().contains(&named) || self.content.mobs[m.def].name.to_lowercase().contains(&named))
             .min_by(|a, b| dist2d(a.1.pos, at).total_cmp(&dist2d(b.1.pos, at)))
             .map(|(id, m)| (*id, m.health, m.max_health))
             .ok_or("No foe within 40 yards.")?;
