@@ -976,9 +976,9 @@ your Miner's Draughts and puts every foe but the bosses back at their posts.
 | The Cannon Gallery | The Cannon Gallery | pirates, goblin woodcutters, an engineer throwing dynamite, a Blackguard over a strongbox | — |
 | The Foundry | The Foundry's Back Door | Blackguards on the ramp, engineers on the ring | Gilnid (The Smelter's Spanner): the doors fog over while he fights, the smelter's channels overflow on a beat, and at half he calls two woodcutters and pours iron three ladles at a time; his back door opens when he falls |
 | The workshop and the Mast Room | The Mast Room's North Door | woodcutters, an engineer, a strongbox | Sneed's Shredder, and when it breaks Sneed himself climbs out (Sneed's Machete); if he wins, the shredder is back whole at the next rest |
-| The galleries and the mouth | The Galleries | miners, overseers (shield and cutlass), dynamiters (three sticks at a time), two strongboxes | Rhahk'Zor (Rhahk'Zor's Maul), the final boss: at 70% he brings the mine down, and the heroes retreat fighting him back through the whole dungeon ahead of the collapse, to a last stand on Smite's island before the Juggernaut |
+| The galleries and the mouth | The Galleries | miners, overseers (shield and cutlass), dynamiters (three sticks at a time), two strongboxes | Rhahk'Zor (Rhahk'Zor's Maul), the final boss: at 65% he runs back to the Foundry, then fights with a burning maul; at 35% the ceiling falls, and at 12% his pounding maul lodges in the floor |
 
-With Rhahk'Zor down, the front door is buried: walk out by the smugglers' tunnel at the landing to end the run. The Brotherhood's own
+With Rhahk'Zor down, walk out of the front door into Moonbrook to end the run. The Brotherhood's own
 leathers (vest, shoulderpads, leggings and the red mask) drop now and then from the miners and
 overseers.
 
