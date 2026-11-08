@@ -1,0 +1,17 @@
+# A look at the Juggernaut's west side from above, to find the plank off the ship toward Smite:
+# stills from a high camera at three spots along the deck edge, then from the walkway below.
+hero warrior
+cam 90 -55 22
+1 .es debug on
+2 .es goto -9624 675
+4 .es travel landing
+12 .es debug on
+15 .es goto -30 -812 39.4
+18 shots deck812 1 1
+20 .es goto -30 -800 39.4
+23 shots deck800 1 1
+25 .es goto -30 -824 39.4
+28 shots deck824 1 1
+30 .es goto -38 -806 34.6
+33 shots walk806 1 1
+36 end
