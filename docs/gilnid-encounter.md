@@ -1,6 +1,6 @@
 # Gilnid: trouble above the furnace
 
-Status: implemented in draft PR #295; automated verification is in progress, and real-client
+Status: implemented in PR #295; automated verification passed on November 8, 2026. Real-client
 capture and unassisted fight validation are still required.
 
 Codex owns this encounter, following the independent Codex and Claude design comparison.
@@ -56,6 +56,12 @@ does not link the server library, includes its own copy. This fixes the pre-exis
 link failures exposed by the required full test sweep.
 
 ## Verification and remaining acceptance
+
+After integrating the gauntlet from main `56c4b6a`, `cargo test --release --offline -j2` passed:
+1,060 workspace tests passed, 19 ignored, no failures. The survival crate passed 893 tests with
+4 ignored, including all 11 focused Gilnid tests. `cargo build --release -p htl-server --offline
+-j2` also passed. Both commands used `scripts/windows-rust.ps1` on Windows GNU. Repository rules
+(`scripts/check-pr.sh`) passed across all 17 changed files, with no failures or warnings.
 
 Focused simulation tests cover direct contact versus splash/damage over time, repeated and lethal
 hits, support reach/facing/floor, warned throws and automatic descents, wipe/repull, the valve's
