@@ -634,6 +634,7 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
+        self.machinery_hurt(mid, damage);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
         // weapons count more, and a blow in its recovery more again).
         if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 {
@@ -938,6 +939,7 @@ impl Survival {
         self.remove_perch_crew(mid);
         self.death_mark_reset(mid);
         self.boss_gone(mid);
+        self.machinery_died(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1072,6 +1074,7 @@ impl Survival {
             } else {
                 self.rise(s, killer, def);
             }
+            self.machinery_handoff(mid, s);
         }
         // A pack's creatures come back; one called up for testing doesn't. Below, they come
         // back when a hero rests (and a boss never does).
@@ -1180,6 +1183,7 @@ impl Survival {
         self.step_rises();
         self.step_boss_fires();
         self.step_boss_collapse(dt);
+        self.clean_machinery();
         self.step_perch_crews();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
@@ -1243,6 +1247,9 @@ impl Survival {
             // A target put up to stand still (`.es target ... still`): moved by what moves it,
             // never of its own will.
             if self.targets.get(&id).copied().unwrap_or(false) {
+                continue;
+            }
+            if self.step_machinery(id) {
                 continue;
             }
             if self.step_perch_valve(id) { continue; }
@@ -1770,7 +1777,7 @@ impl Survival {
         }
     }
 
-    fn foe_pos(&self, foe: Foe) -> Option<Vec3> {
+    pub(crate) fn foe_pos(&self, foe: Foe) -> Option<Vec3> {
         match foe {
             Foe::Hero(h) => self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos),
             Foe::Obj(o) => self.objs.get(&o).filter(|o| matches!(o.kind, ObjKind::Station { damaged: false, .. })).map(|o| o.pos),
@@ -1866,7 +1873,7 @@ impl Survival {
 
     /// A creature called up in a fight goes, out of the world: its wind-up's mark and what it
     /// had in the air with it.
-    fn dismiss(&mut self, id: Id) {
+    pub(crate) fn dismiss(&mut self, id: Id) {
         let Some(m) = self.mobs.remove(&id) else { return };
         if let MobState::Windup { mark: Some(mk), .. } = m.state {
             self.unmark(mk);
@@ -2309,6 +2316,7 @@ impl Survival {
                     if let Some(mk) = mark {
                         self.unmark(mk);
                     }
+                    let completed = self.mobs[&id].pattern.map(|(k, _)| k);
                     self.release(id, foe);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
@@ -2338,6 +2346,9 @@ impl Survival {
                             let cd = self.string_cooldown(a.cooldown * self.pace(id));
                             self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
                         }
+                    }
+                    if self.mobs[&id].pattern.is_none() {
+                        self.machinery_string_landed(id, completed, a.damage);
                     }
                 } else {
                     self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: t2, mark, shown };
@@ -2398,6 +2409,11 @@ impl Survival {
             (None, Some(s), true) => s.over(&d.attack),
             _ => d.attack.clone(),
         };
+        // The grind locks at its first pose and keeps that line, regardless of its target.
+        if self.machine_grind(id) {
+            a.turn_rate = 0.0;
+            a.lock = a.windup;
+        }
         // A blow held a beat (the delayed swing).
         a.windup += m.hold;
         // Quicker (and harder) in its later phases.
@@ -2456,6 +2472,7 @@ impl Survival {
 
     /// One of a creature's patterns that suits a foe `dist` off (`size` its body), weighted.
     pub(crate) fn pick_pattern(&mut self, id: Id, dist: f32, size: f32) -> Option<usize> {
+        if self.is_machine(id) { return self.machine_pattern(id, dist, size); }
         let m = self.mobs.get(&id)?;
         let d = &self.content.mobs[m.def];
         // A raised guard in front of it: it reaches for the blow no guard stops.
@@ -2540,6 +2557,7 @@ impl Survival {
             _ => None,
         };
         let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
+        let tele = if self.machine_grind(id) { Telegraph { reach: 7.5, width: 3.0, at: Some((pos, face)), ..tele } } else { tele };
         let mark = if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked
@@ -2629,11 +2647,14 @@ impl Survival {
             self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery, blockable: a.blockable, from });
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
+        self.machinery_windup(id);
     }
 
     /// The blow lands (or the missile flies): every hero in the arc and in reach of the creature's
     /// committed facing, or a station in the way.
     fn release(&mut self, id: Id, foe: Foe) {
+        // The moving saw hits along its actual swept path, once per hero, in machinery.
+        if self.machine_grind(id) { return; }
         let now = self.clock;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
@@ -2645,7 +2666,7 @@ impl Survival {
                 // Thrown where it was marked at the wind-up's start, its ring still there.
                 Some((at, mark)) => (at, lob_flight(dist2d(pos, at), a.speed), mark),
                 None => {
-                    let Some(to) = self.foe_pos(foe) else { return };
+                    let Some(to) = self.machinery_shot(id).or_else(|| self.foe_pos(foe)) else { return };
                     let at = self.ground_near(to[0], to[1], to[2]);
                     let fly = dist2d(pos, at) / a.speed.max(1.0);
                     // A splash's ground warned by its spell's own look; a bolt's small ring as drawn.
