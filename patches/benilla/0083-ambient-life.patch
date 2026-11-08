@@ -1,4 +1,4 @@
-From 2f3fe638b0230efc5f073f9890d75c3b3fb4a7c5 Mon Sep 17 00:00:00 2001
+From 73c31b37c6d254a7d704c87e489d303cf3bea296 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 16:57:01 -0700
 Subject: [PATCH] Ambient life under the new look: fireflies, falling leaves,
@@ -82,22 +82,34 @@ Revised after the fourth films (#272, take 280):
   hour, then the counts out before the change, and how many fireflies
   are ahead of the camera.
 
+Revised after the fifth films (#272, take 291):
+
+- Leaves: 24 crowns at Crystal Lake kept only 3 to 7 out where their rates
+  want 20 to 40. A crown whose roll came up and whose spot had no ground
+  under it, or under a yard of air, wasted the roll; it now tries four
+  spots. And looklife now says what became of the leaves since it last
+  ran (the rolls, the leaves born, the spots refused and why, how each
+  leaf ended and its mean life), so the next film shows which limit holds.
+- The nearest motes showed as big glowing orbs. No mote is drawn more than
+  14 px across now, so one at arm's length is a speck.
+- Fireflies were pale yellow. Their glow and their light are amber now.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
  crates/benilla-app/src/cvars/mod.rs           |   20 +
  crates/benilla-app/src/cvars/table.rs         |   10 +
  crates/benilla-app/src/video.rs               |   13 +-
- crates/benilla-app/src/world_console.rs       |   79 +
+ crates/benilla-app/src/world_console.rs       |   95 +
  crates/benilla-world/src/lighting/mod.rs      |    5 +
- crates/benilla-world/src/look/life.rs         | 2329 +++++++++++++++++
+ crates/benilla-world/src/look/life.rs         | 2441 +++++++++++++++++
  crates/benilla-world/src/look/mod.rs          |   28 +-
  crates/benilla-world/src/look/wind.rs         |   55 +
  crates/benilla-world/src/terrain_stream.rs    |   17 +
  .../benilla-world/src/terrain_stream/merge.rs |    1 +
  .../src/terrain_stream/spawn/mod.rs           |    1 +
  .../benilla-world/src/terrain_stream/weld.rs  |    1 +
- 12 files changed, 2555 insertions(+), 4 deletions(-)
+ 12 files changed, 2683 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/look/life.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
@@ -198,10 +210,10 @@ index 47d787f..7d232e2 100644
              if let Some(mut look_weather) = look_weather {
                  look_weather.on = ev.flag();
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index f715ad8..4f223d2 100644
+index 2c5ba5b..dd20a3f 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
-@@ -139,6 +139,8 @@ impl Plugin for WorldConsolePlugin {
+@@ -146,6 +146,8 @@ impl Plugin for WorldConsolePlugin {
              Some("<clear|overcast|rain|storm> [0-1] | server | grade"),
              look_weather,
          );
@@ -210,7 +222,7 @@ index f715ad8..4f223d2 100644
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -592,6 +594,56 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
+@@ -599,6 +601,72 @@ fn look_weather(world: &mut World, args: &str) -> Vec<String> {
      lines
  }
  
@@ -255,6 +267,22 @@ index f715ad8..4f223d2 100644
 +            life.lit_motes()
 +        ));
 +    }
++    if let Some(mut life) = world.get_resource_mut::<Life>() {
++        // What became of the leaves since the last `looklife`: which limit keeps them few.
++        let t = life.take_leaf_tally();
++        lines.push(format!(
++            "Leaves since the last looklife: {} rolls, {} born, {} spots with no ground, {} too \
++             low; {} lay and went, {} blew out of reach, {} fell too long; {:.1} s a leaf.",
++            t.rolls,
++            t.born,
++            t.no_ground,
++            t.too_low,
++            t.rested,
++            t.out_of_reach,
++            t.too_old,
++            t.mean_life()
++        ));
++    }
 +    if !on {
 +        lines.push("worldLife is 0: no ambient life.".to_string());
 +    }
@@ -267,7 +295,7 @@ index f715ad8..4f223d2 100644
  fn look_sky(world: &mut World, args: &str) -> Vec<String> {
      use benilla_world::look::{LookSky, WorldLook};
      let Some(clouds) = LookSky::parse(args) else {
-@@ -1289,6 +1341,33 @@ mod tests {
+@@ -1318,6 +1386,33 @@ mod tests {
          assert_eq!(lines[1], "worldWeather is 0: 1.12's look of the weather.");
      }
  
@@ -319,10 +347,10 @@ index ecfa3d3..e64177e 100644
          let mut offenders = Vec::new();
 diff --git a/crates/benilla-world/src/look/life.rs b/crates/benilla-world/src/look/life.rs
 new file mode 100644
-index 0000000..7a24eae
+index 0000000..a11b0ad
 --- /dev/null
 +++ b/crates/benilla-world/src/look/life.rs
-@@ -0,0 +1,2329 @@
+@@ -0,0 +1,2441 @@
 +//! Ambient life, the new look's own (no reference behaviour): WoW Forever's woods feel lived in.
 +//! A few small things move near the camera, never far from it and never many:
 +//! 1. **fireflies** at dusk and night: warm green motes that drift and blink low over the grass,
@@ -439,14 +467,16 @@ index 0000000..7a24eae
 +    /// 0.45 yd (were (1.25, 1.75, 0.5) and 0.32): take 273 found pinpoint specks of 2 or 3 px,
 +    /// pale white-green, with no bloom, hardly standing out from 1.12's own specks by the water.
 +    /// Warmer again (2.5, 2.0, 0.45, was 2.1, 2.3, 0.55): take 280 found them lime more than warm.
-+    pub const FIREFLY_RGB: [f32; 3] = [2.5, 2.0, 0.45];
++    /// Amber (2.6, 1.45, 0.25, was 2.5, 2.0, 0.45): take 291 found them pale yellow, not amber.
++    pub const FIREFLY_RGB: [f32; 3] = [2.6, 1.45, 0.25];
 +    pub const FIREFLY_SIZE: f32 = 0.45;
 +    /// The nearest few that are flashing light the ground: how many, how far a light reaches
 +    /// (yd), how strong (`look::lights`' intensity), and how close to the camera they must be.
 +    pub const FIREFLY_LIGHTS: usize = 3;
 +    pub const FIREFLY_LIGHT_RADIUS: f32 = 2.5;
 +    pub const FIREFLY_LIGHT: f32 = 0.6;
-+    pub const FIREFLY_LIGHT_COLOR: [f32; 3] = [1.0, 0.85, 0.35];
++    /// Amber like the glow (was 1.0, 0.85, 0.35).
++    pub const FIREFLY_LIGHT_COLOR: [f32; 3] = [1.0, 0.6, 0.18];
 +    pub const FIREFLY_LIGHT_REACH: f32 = 14.0;
 +
 +    // ---- leaves ----
@@ -495,6 +525,10 @@ index 0000000..7a24eae
 +    pub const LEAF_LIFT: f32 = 0.05;
 +    /// A falling leaf longer than this is gone (caught in a building's roof, say).
 +    pub const LEAF_MAX_FALL_S: f32 = 40.0;
++    /// A crown whose roll comes up tries this many spots for a leaf before it gives the roll up
++    /// (a spot with no ground under it, or under a yard of air, keeps none): one try wasted the
++    /// roll, which may be why take 291's 24 crowns at Crystal Lake kept only 3 to 7 out.
++    pub const LEAF_TRIES: usize = 4;
 +    /// Elwynn's leaves: summer greens with a few turning gold and rust (gamma, lit by the hour).
 +    pub const LEAF_COLORS: [[f32; 3]; 5] = [
 +        [0.42, 0.55, 0.16],
@@ -534,6 +568,11 @@ index 0000000..7a24eae
 +    pub const MOTE_GAIN: f32 = 5.0;
 +    pub const MOTE_WARM: [f32; 3] = [1.0, 0.92, 0.75];
 +    pub const MOTE_SIZE: f32 = 0.22;
++    /// No mote is drawn bigger than this on screen (pixels across): take 291 found the nearest
++    /// motes, 0.22 yd a yard or two off, as big glowing orbs, like fireflies by day. A mote nearer
++    /// than about 15 yd (at 1080p) is held to this, a speck at arm's length; farther ones are as
++    /// they were.
++    pub const MOTE_MAX_PX: f32 = 14.0;
 +    /// The twinkle: depth and rate (Hz, from and to).
 +    pub const MOTE_TWINKLE: f32 = 0.5;
 +    pub const MOTE_TWINKLE_HZ: (f32, f32) = (0.6, 2.5);
@@ -952,6 +991,37 @@ index 0000000..7a24eae
 +    last_heading: Vec2,
 +    clock: f32,
 +    rng: u32,
++    /// What became of the leaves since `looklife` last asked ([`LeafTally`]).
++    leaf_tally: LeafTally,
++}
++
++/// The leaves' fates since `looklife` last asked: how many crowns' rolls came up, how many were
++/// born and how many spots were refused (no ground under them, or too near it), and how each
++/// leaf ended (lay its rest out, blew out of reach, fell too long) and how long it lived. Take
++/// 291 found 24 crowns at Crystal Lake keeping only 3 to 7 leaves out, where their rates want
++/// 20 to 40: these say which limit holds.
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub struct LeafTally {
++    pub rolls: u32,
++    pub born: u32,
++    pub no_ground: u32,
++    pub too_low: u32,
++    pub rested: u32,
++    pub out_of_reach: u32,
++    pub too_old: u32,
++    pub life_sum: f32,
++}
++
++impl LeafTally {
++    /// The mean life (s) of the leaves that ended.
++    pub fn mean_life(&self) -> f32 {
++        let ended = self.rested + self.out_of_reach + self.too_old;
++        if ended == 0 {
++            0.0
++        } else {
++            self.life_sum / ended as f32
++        }
++    }
 +}
 +
 +impl Default for Life {
@@ -988,7 +1058,13 @@ index 0000000..7a24eae
 +            last_heading: Vec2::ZERO,
 +            clock: 0.0,
 +            rng: 0x2545_F491,
++            leaf_tally: LeafTally::default(),
 +        }
++    }
++
++    /// The leaves' fates since the last call, and a fresh tally from here (`looklife`).
++    pub fn take_leaf_tally(&mut self) -> LeafTally {
++        std::mem::take(&mut self.leaf_tally)
 +    }
 +
 +    /// Everything gone (the look or the life switched off, indoors, under water).
@@ -1248,18 +1324,31 @@ index 0000000..7a24eae
 +        }
 +    }
 +
-+    fn spawn_leaf(&mut self, crown: Crown, world: &mut impl LifeWorld, rain: f32) {
-+        // A point in the crown's lower half, toward its rim.
-+        let a = self.rand() * std::f32::consts::TAU;
-+        let rr = crown.radius * (0.35 + 0.6 * self.rand().sqrt());
-+        let y = crown.center.y - crown.half_height * (0.6 * self.rand());
-+        let (x, z) = (crown.center.x + rr * a.cos(), crown.center.z + rr * a.sin());
-+        let Some(ground) = world.ground(x, z) else {
-+            return;
-+        };
-+        if y <= ground + 1.0 {
-+            return;
++    /// A leaf from `crown`, at the first of [`tune::LEAF_TRIES`] spots in it that has ground
++    /// a yard or more under it; whether one was born.
++    fn spawn_leaf(&mut self, crown: Crown, world: &mut impl LifeWorld, rain: f32) -> bool {
++        for _ in 0..tune::LEAF_TRIES {
++            // A point in the crown's lower half, toward its rim.
++            let a = self.rand() * std::f32::consts::TAU;
++            let rr = crown.radius * (0.35 + 0.6 * self.rand().sqrt());
++            let y = crown.center.y - crown.half_height * (0.6 * self.rand());
++            let (x, z) = (crown.center.x + rr * a.cos(), crown.center.z + rr * a.sin());
++            let Some(ground) = world.ground(x, z) else {
++                self.leaf_tally.no_ground += 1;
++                continue;
++            };
++            if y <= ground + 1.0 {
++                self.leaf_tally.too_low += 1;
++                continue;
++            }
++            self.push_leaf(Vec3::new(x, y, z), ground, world, rain);
++            return true;
 +        }
++        false
++    }
++
++    fn push_leaf(&mut self, at: Vec3, ground: f32, world: &mut impl LifeWorld, rain: f32) {
++        let (x, y, z) = (at.x, at.y, at.z);
 +        let axis = Vec3::new(self.rand() - 0.5, self.rand() - 0.5, self.rand() - 0.5)
 +            .normalize_or(Vec3::X);
 +        let color = tune::LEAF_COLORS
@@ -1279,6 +1368,7 @@ index 0000000..7a24eae
 +            age: 0.0,
 +            landed: None,
 +        };
++        self.leaf_tally.born += 1;
 +        self.leaves.push(leaf);
 +    }
 +
@@ -1322,10 +1412,20 @@ index 0000000..7a24eae
 +                leaf.landed = Some(0.0);
 +            }
 +        }
++        let tally = &mut self.leaf_tally;
 +        self.leaves.retain(|l| {
-+            l.landed.is_none_or(|t| t < tune::LEAF_REST_S)
-+                && l.age < tune::LEAF_MAX_FALL_S
-+                && Self::edge_alive(cam, l.pos, tune::LEAF_RADIUS + 5.0)
++            let end = if l.landed.is_some_and(|t| t >= tune::LEAF_REST_S) {
++                &mut tally.rested
++            } else if l.age >= tune::LEAF_MAX_FALL_S {
++                &mut tally.too_old
++            } else if !Self::edge_alive(cam, l.pos, tune::LEAF_RADIUS + 5.0) {
++                &mut tally.out_of_reach
++            } else {
++                return true;
++            };
++            *end += 1;
++            tally.life_sum += l.age;
++            false
 +        });
 +        // New leaves from each crown, more in the wind, in a gust and in the rain.
 +        let hour = leaf_hour(env.minute);
@@ -1344,8 +1444,10 @@ index 0000000..7a24eae
 +                * hour
 +                * rain_more;
 +            if self.rand() < rate * dt {
-+                self.spawn_leaf(crown, world, rain);
-+                born += 1;
++                self.leaf_tally.rolls += 1;
++                if self.spawn_leaf(crown, world, rain) {
++                    born += 1;
++                }
 +            }
 +        }
 +    }
@@ -1966,6 +2068,23 @@ index 0000000..7a24eae
 +            * (1.0 - smoothstep(radius * (1.0 - tune::EDGE_FADE), radius, flat))
 +    }
 +
++    /// [`Self::glow`], no bigger on screen than `max_px` pixels across however near: a near
++    /// glow shrinks to it, keeping its brightness at the core.
++    #[allow(clippy::too_many_arguments)]
++    fn glow_capped(
++        &self,
++        out: &mut Vec<EffectVertex>,
++        p: Vec3,
++        size: f32,
++        max_px: f32,
++        rgb: [f32; 3],
++        a: f32,
++        cell: [f32; 2],
++    ) {
++        let z = (p - self.eye).dot(self.forward);
++        self.glow(out, p, size.min(max_px * z.max(0.0) * self.px), rgb, a, cell);
++    }
++
 +    /// A camera-facing glow of `size` yards across at `p`, grown to [`tune::GLOW_MIN_PX`] and
 +    /// dimmed to match when far.
 +    fn glow(
@@ -2047,10 +2166,11 @@ index 0000000..7a24eae
 +                    * tw
 +                    * mote_phase(dir, self.mote_sun)
 +                    * view.fade(m.pos, tune::MOTE_RADIUS);
-+                view.glow(
++                view.glow_capped(
 +                    out,
 +                    m.pos,
 +                    tune::MOTE_SIZE,
++                    tune::MOTE_MAX_PX,
 +                    self.mote_rgb,
 +                    a.min(1.0),
 +                    CELL_MOTE,
@@ -2650,10 +2770,30 @@ index 0000000..7a24eae
 +        let half = (Vec3::from(out[1].pos) - Vec3::from(out[0].pos)).length() * 0.5;
 +        assert!((half - 0.5 * tune::GLOW_MIN_PX * 1000.0 * 0.001).abs() < 1e-3);
 +        assert!(out[0].color[3] < 0.2);
++        // A mote a yard off is held to its pixel cap at full brightness; one far off is not.
++        out.clear();
++        let near = Vec3::new(0.0, 0.0, -1.0);
++        view.glow_capped(&mut out, near, tune::MOTE_SIZE, tune::MOTE_MAX_PX, [1.0; 3], 1.0, CELL_MOTE);
++        let half = (Vec3::from(out[1].pos) - Vec3::from(out[0].pos)).length() * 0.5;
++        assert!((half - 0.5 * tune::MOTE_MAX_PX * 0.001).abs() < 1e-5, "{half}");
++        assert_eq!(out[0].color[3], 1.0);
++        out.clear();
++        view.glow_capped(&mut out, Vec3::new(0.0, 0.0, -50.0), 0.22, 9.0, [1.0; 3], 1.0, CELL_MOTE);
++        let half = (Vec3::from(out[1].pos) - Vec3::from(out[0].pos)).length() * 0.5;
++        assert!((half - 0.11).abs() < 1e-4, "{half}");
++    }
++
++    /// Fireflies are amber: red well over green, green well over blue.
++    #[test]
++    fn fireflies_are_amber() {
++        let [r, g, b] = tune::FIREFLY_RGB;
++        assert!(g / r < 0.65 && b / g < 0.25, "{:?}", tune::FIREFLY_RGB);
++        let [r, g, b] = tune::FIREFLY_LIGHT_COLOR;
++        assert!(g / r < 0.7 && b / g < 0.35);
 +    }
 +}
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index 1ca8ccc..ccb6430 100644
+index 157d989..f6e61a9 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -5,9 +5,10 @@
@@ -2670,15 +2810,15 @@ index 1ca8ccc..ccb6430 100644
  
  use bevy::ecs::system::SystemParam;
  use bevy::prelude::*;
-@@ -18,6 +19,7 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
- 
+@@ -19,6 +20,7 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
  pub mod ao;
  pub mod grade;
+ pub mod lamps;
 +pub mod life;
  pub mod lights;
  pub mod mist;
  pub mod pass;
-@@ -32,6 +34,7 @@ pub mod weather;
+@@ -33,6 +35,7 @@ pub mod weather;
  pub mod wind;
  pub use ao::LookAo;
  pub use grade::{GradeKey, PostLook, Tint};
@@ -2686,7 +2826,7 @@ index 1ca8ccc..ccb6430 100644
  pub use lights::{LookLight, LookLightTune, LookPulse};
  pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
  pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
-@@ -245,6 +248,7 @@ pub(crate) fn init_resources(app: &mut App) {
+@@ -246,6 +249,7 @@ pub(crate) fn init_resources(app: &mut App) {
      wind::init_resources(app);
      sky::init_resources(app);
      weather::init_resources(app);
@@ -2694,7 +2834,7 @@ index 1ca8ccc..ccb6430 100644
  }
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
-@@ -259,6 +263,7 @@ impl Plugin for LookPlugin {
+@@ -260,6 +264,7 @@ impl Plugin for LookPlugin {
                  Startup,
                  (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
              )
@@ -2702,7 +2842,7 @@ index 1ca8ccc..ccb6430 100644
              .add_systems(PreUpdate, sync_view_look)
              // The weather: the film's hold drives the wire's override before the weather ticks,
              // and the look is read from this frame's state before the light is resolved, which it
-@@ -292,6 +297,23 @@ impl Plugin for LookPlugin {
+@@ -293,6 +298,23 @@ impl Plugin for LookPlugin {
                      .after(crate::skybox::SkyboxResolve)
                      .after(crate::liquid::SubmersionVerdict),
              )
