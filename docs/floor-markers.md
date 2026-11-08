@@ -1,6 +1,6 @@
 # Optional floor markers
 
-Implementation prepared; required validation is pending. The agreed encounter designs use animation, sound and
+The agreed encounter designs use animation, sound and
 environmental effects as the default warning language. Floor markers remain available in
 Controls for players who want them, but start hidden until explicitly enabled.
 
@@ -12,5 +12,13 @@ An unset preference or saved `noMarks = 1` hides overlays. Explicitly enabling t
 Controls saves `noMarks = false`; toggling them off saves `1` and clears visible overlays.
 Add-on version 60 matches the server's update notice.
 
-Pending validation: the existing add-on harness, server build, release tests, repository rules,
-and a real-client toggle/reload check. Code inspection is not a substitute for these checks.
+Automated validation passed: `scripts/check-addon.sh` reported zero Lua errors for both add-ons,
+`cargo build --release -p htl-server` succeeded, and `cargo test --release --no-fail-fast`
+passed 1,114 tests (19 ignored). Repository rules passed with no warnings. On Windows GNU,
+the add-on harness needed a local import library for the native UCRT timezone functions;
+no repository source or shared toolchain was changed for that workaround.
+
+A focused harness verified absent settings, an unset preference, saved `1`, explicit `false`,
+the Controls labels and toggle, suppression of TG/TA/MK overlays, and immediate clearing.
+Real-client rendering and persistence through an actual save and reload remain untested.
+Use a fresh temporary client home for that check; the player's settings must stay untouched.
