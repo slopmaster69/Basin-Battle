@@ -593,6 +593,11 @@ function Invoke-Scenario($s, $name, $out) {
     if ($v) { $videoNote = $v.Status }
     $runLog += $videoNote
     Set-Content (Join-Path $out "run.txt") $runLog
+    # The client's frame-time journal (SetCVar("fpsJournal", "1") in a scenario) is written into the
+    # run's own client home, which goes next: keep it beside the stills for a cost measurement.
+    foreach ($journal in @((Join-Path $chome "Diagnostics\fps-journal.csv"), (Join-Path $chome "benilla-config\Diagnostics\fps-journal.csv"))) {
+        if (Test-Path $journal) { Copy-Item $journal (Join-Path $out "fps-journal.csv") -ErrorAction SilentlyContinue }
+    }
     Remove-Item -Recurse -Force $chome -ErrorAction SilentlyContinue
     $done = (Test-Path $log) -and (Select-String -Path $log -Pattern 'visual-check: done' -Quiet)
     $msg = if ($shots -eq 0) {

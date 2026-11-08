@@ -1,0 +1,42 @@
+# The air (client 0073): what it costs. The woods by Crystal Lake at dawn (07:00) in thick mist
+# (lookmist 3.5), facing the sun, standing still, the fps journal on
+# (benilla-config/Diagnostics/fps-journal.csv): 10 s at each fog quality step (1, 2, 3), 10 s with
+# worldFog 0, 10 s with worldSharpen 0, 10 s with worldLook 0. (The far windows' cost is in the
+# look pass and small; look-air-windows-east keeps the journal on too.)
+# Look for: in the CSV, frame ms and gpu_ms per step, and the passes "world_fog" and
+# "world_fog_resolve" (the march and the resolve) and "world_look" (the sharpen and the windows
+# land there). Please send the CSV with the film, and say the GPU and the window size.
+hero warrior
+cam 45 6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 420")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldSharpen", "0.4")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("lookmist 3.5")
+4.4 lua ConsoleExec("lookfog quality 1")
+14.0 lua SetCVar("fpsJournal", "1")
+15.0 shots cost-q1 1 1.0
+24.0 lua ConsoleExec("lookfog quality 2")
+25.0 shots cost-q2 1 1.0
+34.0 lua ConsoleExec("lookfog quality 3")
+35.0 shots cost-q3 1 1.0
+44.0 lua ConsoleExec("lookfog quality 2")
+44.05 lua SetCVar("worldFog", "0")
+45.0 shots cost-fog-off 1 1.0
+54.0 lua SetCVar("worldFog", "1")
+54.05 lua SetCVar("worldSharpen", "0")
+55.0 shots cost-sharpen-off 1 1.0
+64.0 lua SetCVar("worldSharpen", "0.4")
+64.05 lua SetCVar("worldLook", "0")
+65.0 shots cost-classic 1 1.0
+74.0 lua SetCVar("fpsJournal", "0")
+74.05 lua SetCVar("worldLook", "1")
+74.1 lua ClearWorldFog()
+74.15 lua ConsoleExec("lookmist grade")
+74.2 lua ConsoleExec("lookweather server")
+76 end

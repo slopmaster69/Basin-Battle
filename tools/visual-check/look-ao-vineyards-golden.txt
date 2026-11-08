@@ -1,0 +1,30 @@
+# The new look's contact shadows (ambient occlusion, client 0064): Northshire's vineyards at golden hour, along the rows (17:30).
+# Each the same view with lookao 0 (none), the grade's own, then twice it (lookao 2); then
+# worldAO 0 (should match lookao 0), and 1.12's look (worldLook 0) to compare.
+# Look for: a soft shade at the foot of each row and between the vines, the rows reading as solid; nothing shimmering or crawling between frames on the leaves; the far rows fading out smoothly with distance, not cut.
+hero warrior
+cam 90 -8 10
+include _look_setup
+1.0 .es goto vineyards
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldAO", "1")
+4.25 lua ConsoleExec("lookao 0")
+5.5 shots ao-off 2 0.6
+7.0 lua ConsoleExec("lookao grade")
+8.0 shots ao-grade 3 0.6
+10.0 lua ConsoleExec("lookao 2")
+11.0 shots ao-x2 2 0.6
+12.5 lua ConsoleExec("lookao grade")
+12.55 lua SetCVar("worldAO", "0")
+13.5 shots worldao-0 2 0.6
+15.0 lua SetCVar("worldAO", "1")
+15.05 lua SetCVar("worldLook", "0")
+15.1 lua ClearWorldFog()
+16.0 shots classic 2 0.6
+17.5 lua SetCVar("worldLook", "1")
+17.55 lua ClearWorldFog()
+18.5 shots ao-grade-again 2 0.6
+20 end

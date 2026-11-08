@@ -1,0 +1,9 @@
+# Probe: does `.es home` bring a hero out of the Deadmines to Elwynn, and does `.es goto goldshire` work after?
+hero warrior
+cam 0 -8 10
+0.0 .es debug quiet
+0.5 .es home
+3.0 shots after-home 1 0.5
+5.0 .es goto goldshire
+9.0 shots after-goto 1 0.5
+10 end

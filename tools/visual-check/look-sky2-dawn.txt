@@ -1,0 +1,32 @@
+# The painted sky at dawn (client 0068, revised): Crystal Lake at 06:00, the camera over the lake's
+# open sky (yaw 200, south-south-east across the water, pitched up) where the first dawn film
+# (yaw 70) looked into a tree's canopy. The day's own cover, held clear, held at 0.8 a few stills
+# apart for the drift, then worldSky 0 and 1.12's look.
+# Look for: pink-lit clouds, the stars gone; soft painted clouds thinning into the haze at the
+# horizon, no tiling, banding or shimmer; drifting slowly between stills; at 0.8 a grey-pink
+# cover, darker underneath, not a bright sheet.
+hero warrior
+cam 200 22 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 360")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+5.5 shots day 2 0.5
+7.0 lua ConsoleExec("looksky clouds 0")
+8.0 shots clear 2 0.5
+9.5 lua ConsoleExec("looksky clouds 0.8")
+10.5 shots clouds-08 6 2.0
+23.0 lua ConsoleExec("looksky grade")
+23.05 lua SetCVar("worldSky", "0")
+24.0 shots worldsky-0 2 0.5
+25.5 lua SetCVar("worldSky", "1")
+25.55 lua SetCVar("worldLook", "0")
+25.6 lua ClearWorldFog()
+26.5 shots classic 2 0.5
+28.0 lua SetCVar("worldLook", "1")
+28.05 lua ClearWorldFog()
+29.0 end

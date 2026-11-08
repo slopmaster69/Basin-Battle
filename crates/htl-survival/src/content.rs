@@ -201,6 +201,14 @@ pub struct WorldDef {
     pub clock: Option<[u32; 2]>,
     #[serde(default = "clock_every")]
     pub clock_every: f32,
+    /// How fast the game clock runs: 1, a minute a minute, the pin holding the hour; 120, a whole
+    /// day in 12 minutes, for watching every hour of the look in one sitting (`.es tune
+    /// world.clock_speed 120`). Over 1 the clock starts at `clock` (or the time it is now) and
+    /// everyone is set to where it has got to every `clock_every` seconds, so a late hero sees the
+    /// same hour; a change of speed or of `clock` starts it again. The client holds a rate from 1
+    /// through 3600. Real time below and in Siege.
+    #[serde(default = "one_w")]
+    pub clock_speed: f32,
     /// The camp's own things' looks (`GameObjectDisplayInfo`) and sizes: the chest, the bell
     /// (raised `alarm_lift` over the ground), the weapon rack, and what the Logbook lies on (its
     /// top `book_stand_height` over the ground).

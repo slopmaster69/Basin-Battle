@@ -1,0 +1,40 @@
+# The new look's wind and sky (client 0068): the woods by Crystal Lake at noon. The trees and the
+# grass in the world's own wind, a long run so a gust front crosses (one passes a point about every
+# 30 s), then lookwind 2, lookwind 0 (still), worldWind 0 and 1.12's look.
+# Look for: crowns leaning and swaying slowly, more at the top and the edges, the trunk bases still;
+# neighbouring trees out of step, never all together; a gust bending trees one after another as it
+# crosses, not all at once; leaves fluttering a little; the grass bending from the root in a ripple
+# running downwind; no leaf cards tearing away from their branches, no trunk sliding on the ground;
+# the trees' shadows on the ground moving with them; worldWind 0 and 1.12's look standing still
+# (1.12's own swaying trees, if any, still sway alone).
+hero warrior
+cam 200 -4 7
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWind", "1")
+4.25 lua SetCVar("worldSky", "1")
+4.3 lua ConsoleExec("lookwind grade")
+4.35 lua ConsoleExec("looksky grade")
+5.5 shots sway 16 0.25
+9.6 shots gust 40 0.75
+40.0 lua ConsoleExec("lookwind 2")
+41.0 shots wind-x2 12 0.25
+44.5 lua ConsoleExec("lookwind 1 3")
+45.5 shots gusts-x3 24 0.75
+64.0 lua ConsoleExec("lookwind 0")
+65.0 shots still 4 0.5
+67.5 lua ConsoleExec("lookwind grade")
+67.55 lua SetCVar("worldWind", "0")
+68.5 shots worldwind-0 4 0.5
+71.0 lua SetCVar("worldWind", "1")
+71.05 lua SetCVar("worldLook", "0")
+71.1 lua ClearWorldFog()
+72.0 shots classic 4 0.5
+74.5 lua SetCVar("worldLook", "1")
+74.55 lua ClearWorldFog()
+75.5 shots new-again 4 0.5
+78 end

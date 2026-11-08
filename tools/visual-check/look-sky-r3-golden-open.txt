@@ -1,0 +1,41 @@
+# The painted sky at golden hour (client 0068), shot again with open sky: take 271's
+# look-sky2-golden faced the oaks' trunks and crowns. Crystal Lake at 17:30, the camera facing the
+# sun (yaw 45, about 30 degrees up at this hour) and pitched up 35 degrees, after the hero backs
+# out about 35 yd south-west across the lake (two dashes "b", away from the camera's facing), so the
+# north shore's oaks sit low and far at the bottom of the frame and the sky fills the rest. The
+# day's own cover, then 0.3, 0.6 and 0.8, then worldSky 0 and 1.12's look.
+# Look for: the clouds by the sun gold-lit, their undersides warmer and darker (amber to brown),
+# never a white or white-yellow bloom; no second glow on 1.12's sun glare, the sky's warm halo a
+# ring round it; at 0.8 a grey-gold sky darker under the clouds, with breaks, not a bright sheet;
+# 1.12's glare dimmed where a cloud covers the sun. If the oaks still fill the frame, the hero
+# stayed near the shore: say so.
+hero warrior
+cam 45 35 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("looksky grade")
+4.5 lua ActionDash(3.0, 7, "b")
+8.0 lua ActionDash(2.0, 7, "b")
+11.0 shots day 2 0.5
+12.5 lua ConsoleExec("looksky clouds 0.3")
+13.5 shots clouds-03 2 0.5
+15.0 lua ConsoleExec("looksky clouds 0.6")
+16.0 shots clouds-06 3 1.0
+19.0 lua ConsoleExec("looksky clouds 0.8")
+20.0 shots clouds-08 3 1.0
+23.0 lua ConsoleExec("looksky grade")
+23.05 lua SetCVar("worldSky", "0")
+24.0 shots worldsky-0 2 0.5
+25.5 lua SetCVar("worldSky", "1")
+25.55 lua SetCVar("worldLook", "0")
+25.6 lua ClearWorldFog()
+26.5 shots classic 2 0.5
+28.0 lua SetCVar("worldLook", "1")
+28.05 lua ClearWorldFog()
+29 end

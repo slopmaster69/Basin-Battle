@@ -1,0 +1,26 @@
+# The new look's lights (client 0057): Goldshire at night (23:00), the inn's lamps and the torches
+# casting warm pools, then the same with every light scaled 0, 2 and back to 1 (`looklights`), then
+# 17:30 (the torches only coming up) and noon (all but out).
+# Look for: a readable warm pool of 6-10 yd under each torch and lamp post, a slow small flicker,
+# the colour more than the brightness.
+hero warrior
+cam 0 -2 7
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("looklights tuned")
+5.5 shots night 3 1.0
+11.6 lua ConsoleExec("looklights 0")
+12.5 shots scale0 2 0.5
+13.6 lua ConsoleExec("looklights 2")
+14.5 shots scale2 2 0.5
+15.6 lua ConsoleExec("looklights tuned")
+15.7 lua ConsoleExec("worldclock 1050")
+16.5 shots dusk 2 0.5
+17.6 lua ConsoleExec("worldclock 720")
+18.5 shots noon 2 0.5
+19.6 lua ConsoleExec("worldclock 1380")
+21 end

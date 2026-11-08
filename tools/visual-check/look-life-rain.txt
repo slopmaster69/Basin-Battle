@@ -1,0 +1,27 @@
+# Ambient life (client 0072) in the weather (client 0071): the woods across Crystal Lake at night
+# (22:30) with the fireflies out, then rain (lookweather rain 0.7), then clear again.
+# Look for: the fireflies fading away over a few seconds as the rain sets in (not vanishing in one
+# frame), none at all in the rain; after lookweather clear, coming back over a few seconds as the
+# rain eases off. The rain itself is 0071's.
+hero warrior
+cam 200 -6 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1350")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua SetCVar("worldWeather", "1")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("looklife grade")
+12.0 shots dry 4 0.5
+14.5 lua ConsoleExec("lookweather rain 0.7")
+14.6 video
+15.0 shots rain-in 40 0.5
+36.0 shots raining 2 1.0
+38.5 lua ConsoleExec("lookweather clear")
+39.0 shots clearing 40 0.5
+60.0 shots after 2 1.0
+62.0 lua ConsoleExec("lookweather server")
+63 end

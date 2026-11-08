@@ -1,0 +1,22 @@
+# Goldshire at night (23:00) with the darker night: the new look, then 1.12's, then the new look with
+# the mist held at 2 and 3 times the night's own. Look for a dark, eerie night that still reads.
+hero warrior
+cam 0 -6 7
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+5.5 shots new 2 0.6
+7.5 lua SetCVar("worldLook", "0")
+7.55 lua ClearWorldFog()
+8.3 shots old 2 0.6
+10.0 lua SetCVar("worldLook", "1")
+10.05 lua ClearWorldFog()
+10.1 lua ConsoleExec("lookmist 2")
+10.9 shots mist2 2 0.6
+12.5 lua ConsoleExec("lookmist 3")
+13.3 shots mist3 2 0.6
+15.0 lua ConsoleExec("lookmist grade")
+15.5 end

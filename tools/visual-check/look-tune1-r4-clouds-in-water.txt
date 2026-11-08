@@ -1,0 +1,35 @@
+# Clouds in the water (0068's sky in 0066/0070's water): Stone Cairn Lake, whose far shore is low,
+# at 12:00 and 17:30, the camera level across the lake (yaw 45, pitched 4 down, 6 yd), the day's
+# cover, then looksky clouds 0.8 and 0, and worldSky 0.
+# The goto line answers with where the hero stands; if it is in the water or the camera sinks
+# under it, say so (back off with the camera, never into the lake).
+# Look for: the painted clouds mirrored in the open water toward the far shore, the clouds-0.8
+# water greyer and the clouds-0 water plain sky, against worldSky 0's flat sky colour.
+hero warrior
+cam 45 -4 6
+include _look_setup
+1.0 .es goto stone_cairn_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("looksky grade")
+6.0 shots noon-day 2 0.5
+7.5 lua ConsoleExec("looksky clouds 0.8")
+8.5 shots noon-clouds-08 2 0.5
+10.0 lua ConsoleExec("looksky clouds 0")
+11.0 shots noon-clouds-0 2 0.5
+12.5 lua ConsoleExec("looksky grade")
+12.55 lua SetCVar("worldSky", "0")
+13.5 shots noon-worldsky-0 2 0.5
+15.0 lua SetCVar("worldSky", "1")
+15.05 lua ConsoleExec("worldclock 1050")
+16.5 shots golden-day 2 0.5
+18.0 lua ConsoleExec("looksky clouds 0.8")
+19.0 shots golden-clouds-08 2 0.5
+20.5 lua ConsoleExec("looksky grade")
+20.55 lua ConsoleExec("lookweather server")
+22 end
