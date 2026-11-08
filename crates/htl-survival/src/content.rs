@@ -2225,6 +2225,9 @@ pub struct MobDef {
     /// A finite crew on low work platforms, with breakable supports and a furnace valve.
     #[serde(default)]
     pub perch_crew: Option<PerchCrewDef>,
+    /// Ordered equipment changes at a physical rack, using the health phases as milestones.
+    #[serde(default)]
+    pub arsenal: Option<ArsenalDef>,
     /// Its posture: this much damage within `posture_secs` breaks its stance (it reels, open to
     /// a riposte). 0: none.
     #[serde(default)]
@@ -2318,6 +2321,23 @@ pub struct PerchCrewDef {
     pub spots: Vec<[f32; 2]>,
     pub valve: [f32; 2],
     pub channel: Vec<[f32; 2]>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArsenalDef {
+    /// Offset from the original home, projected onto that floor and checked for a walking path.
+    pub rack: [f32; 2],
+    pub display: u32,
+    pub loadouts: Vec<ArsenalLoadout>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArsenalLoadout {
+    pub weapon: u32,
+    #[serde(default)]
+    pub off_hand: u32,
+    pub grip: String,
+    pub patterns: Vec<String>,
 }
 
 impl MobDef {
@@ -3417,6 +3437,20 @@ impl Content {
             }
         }
         for m in &self.mobs {
+            if let Some(a) = &m.arsenal {
+                if a.loadouts.len() != m.phases.len() + 1 || a.display == 0 || a.rack.iter().any(|x| !x.is_finite()) {
+                    bail!("mob {}: arsenal needs a rack and one loadout per stage", m.key);
+                }
+                for g in &a.loadouts {
+                    if g.weapon == 0 || g.patterns.is_empty() || !["1h", "2h", "sword", "hammer"].contains(&g.grip.as_str())
+                        || g.patterns.iter().any(|name| !m.patterns.iter().any(|p| &p.name == name && p.weight > 0.0)) {
+                        bail!("mob {}: invalid arsenal loadout", m.key);
+                    }
+                }
+                if m.phases.iter().any(|p| p.speed != 1.0 || p.might != 1.0 || p.shove != 0.0 || !p.pattern.is_empty()) {
+                    bail!("mob {}: arsenal phases only request equipment changes", m.key);
+                }
+            }
             if let Some(c) = &m.perch_crew {
                 if !m.boss || !(2..=3).contains(&c.spots.len()) || c.channel.is_empty() || c.channel.len() > 5 {
                     bail!("mob {}: a perch crew needs a boss, 2-3 platforms and 1-5 channel points", m.key);

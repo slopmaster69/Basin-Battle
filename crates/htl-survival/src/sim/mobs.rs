@@ -634,6 +634,7 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
+        if damage > 0 { self.arsenal_hurt(mid); }
         self.machinery_hurt(mid, damage);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
         // weapons count more, and a blow in its recovery more again).
@@ -686,6 +687,7 @@ impl Survival {
 
     /// Whether a creature's next phase is due (below its share, and not had yet).
     pub(crate) fn due_enrage(&self, mid: Id) -> bool {
+        if self.has_arsenal(mid) { return false; }
         self.mobs.get(&mid).is_some_and(|m| {
             m.health > 0 && self.content.mobs[m.def].phases.get(m.phase).is_some_and(|e| m.health as f32 <= e.at * m.max_health as f32)
         })
@@ -940,6 +942,7 @@ impl Survival {
         self.remove_perch_crew(mid);
         self.death_mark_reset(mid);
         self.boss_gone(mid);
+        self.remove_arsenal(mid);
         self.machinery_died(mid);
         self.remove_duel(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
@@ -1188,6 +1191,7 @@ impl Survival {
         self.clean_machinery();
         self.clean_duels();
         self.step_perch_crews();
+        self.clean_arsenals();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1256,6 +1260,7 @@ impl Survival {
                 continue;
             }
             if self.step_perch_valve(id) { continue; }
+            if self.step_arsenal(id) { continue; }
             if self.step_vancleef(id) { continue; }
             if self.disabled(id) {
                 continue;
@@ -2497,7 +2502,8 @@ impl Survival {
             .patterns
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32)
+            .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32
+                && self.arsenal_pattern_allowed(id, &p.name))
             .filter_map(|(k, p)| {
                 let first = p.steps.first()?;
                 let reach = first.range.unwrap_or(d.attack.range) + size - 0.3 + first.lunge;
