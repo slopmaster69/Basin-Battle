@@ -41,12 +41,18 @@ const MARGIN: f32 = 20.0;
 /// client spawns the same list (benilla patch, `terrain_stream.rs`, `DEADMINES_BRIDGES`): change
 /// both together, so the server's floors and the player's feet agree.
 /// 1. The gangway off the Juggernaut's gun deck onto the plank down to Mr. Smite's dock. The data
-///    leaves a 5 yd hole between the deck's sloping edge (z 30, along (-33, -800)–(-36.5, -802))
-///    and the plank's top (z 31.5, along (-31, -804)–(-34.6, -807)), over a trough at z 27.7;
-///    players had to jump it (Corey, 7 Nov 2026).
-pub const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 2] = [
-    [[-33.0, -799.3, 30.2], [-36.5, -802.0, 31.4], [-34.6, -807.0, 30.5]],
-    [[-33.0, -799.3, 30.2], [-34.6, -807.0, 30.5], [-31.0, -804.3, 31.5]],
+///    leaves a 5 yd hole between the deck's edge (z 30-31, along (-32.6, -798.3)–(-37, -802.6))
+///    and the plank's top (z 30.5-31.6, along (-30.3, -803.2)–(-34.9, -807.4)), over a trough at
+///    z 27.7; players had to jump it (Corey, 7 Nov 2026). The first slab joined only the middle
+///    4 yd of the two edges, and stepping off at either end still fell in (Corey, 8 Nov): this one
+///    joins the whole of both, a strip of six triangles between points measured on each edge.
+pub const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 6] = [
+    [[-32.6, -798.3, 30.4], [-33.6, -800.1, 30.1], [-31.6, -804.2, 31.6]],
+    [[-32.6, -798.3, 30.4], [-31.6, -804.2, 31.6], [-30.3, -803.2, 31.4]],
+    [[-33.6, -800.1, 30.1], [-35.0, -802.3, 30.2], [-33.3, -805.6, 31.3]],
+    [[-33.6, -800.1, 30.1], [-33.3, -805.6, 31.3], [-31.6, -804.2, 31.6]],
+    [[-35.0, -802.3, 30.2], [-37.0, -802.6, 31.2], [-34.9, -807.4, 30.5]],
+    [[-35.0, -802.3, 30.2], [-34.9, -807.4, 30.5], [-33.3, -805.6, 31.3]],
 ];
 
 pub struct LoadedDeadmines {
