@@ -1,0 +1,2481 @@
+From 3c198dcdd4433f08c25ee4c5c9c66d42a30d38be Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 08:32:17 -0700
+Subject: [PATCH] Water that answers what moves through it: wakes, rings and
+ splashes under the new look
+
+Corey's reference (a retail pond seen from above) shows what our water
+lacked: a swimmer leaves a crisp white wake fanning out behind him in a
+V, a hero wading in sends rings out and splashes where he steps in, the
+bed wavers under the moving surface, the shore thins to clear water with
+a faint pale edge, and the shallows show their sand plainly.
+
+The wakes. A ripple field of 256 x 256 texels over 64 yd round the
+camera (a little ahead of it, where the view falls), snapped to whole
+texels, is stepped on the GPU each frame (look_wakes.wgsl, one compute
+pass, look_wakes in the fps journal's gpu_look column) as a linear
+shallow-water wave at fixed 1/120 s steps, in pairs. Every unit with its
+feet in the water pushes on it by its speed (a still one only breathes
+gentle rings), one coming in splashes, a fishing bobber nods, and rain
+drops dimple it. A swimmer outruns his own rings, so they pile up into a
+V. Foam is born where a body churns the water and on the rising crests,
+carried by the water's drift, and fades over about a second and a half;
+the water draws it white, smeared along the crests into curling streaks.
+The field's slopes add to the water's own ripples, so the mirror, the
+glint and the bed move with it.
+
+They replace 0081's wading froth and 1.12's own wade wake and rings
+(water_fx), which drew an older ring over them: the ring round a
+standing hero's neck that four films found is 1.12's, and it no longer
+draws while the wakes run. `lookwater wakes 0` brings both back.
+
+The bed through moving water: the bed seen under the water is drawn back
+from the surface's tilt, more the deeper it lies, so it wavers under the
+ripples and the wakes; faint moving light lies on the shallow bed in the
+sun. Where the bend is under a pixel the frame's blend keeps the bed it
+already holds, so a calm surface still shows what is drawn behind it.
+
+The shore and the shallows, retuned toward the reference: no foam line,
+fully clear at the waterline with a faint pale haze over its first
+0.7 yd, clearer water (1.8 yd to a third, was 1.4), a greener shallow
+colour that holds to 1.2 yd and turns to the deep by 3.5.
+
+Switches: worldWater 0 and worldLook 0 run 1.12's water and wade foam
+untouched. `lookwater wakes [0|1]` (with no value it reports the bodies
+pushing, the field's size and the share of it under foam, read back from
+the GPU; the same line is logged every 10 s while something moves the
+water), `lookwater refract <0-2>` and `lookwater caustics <0-2>` hold the
+bend and the light, `grade` lets go.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/entities.rs            |  24 +-
+ crates/benilla-app/src/perf/journal.rs        |   5 +-
+ crates/benilla-app/src/shaders.rs             |  14 +
+ crates/benilla-app/src/world_console.rs       | 132 ++-
+ crates/benilla-assets/src/materials.rs        |  46 +
+ crates/benilla-assets/src/shaders/liquid.wgsl | 152 ++-
+ crates/benilla-world/src/liquid/surface.rs    |   3 +-
+ crates/benilla-world/src/look/mod.rs          |  11 +-
+ crates/benilla-world/src/look/wakes.rs        | 990 ++++++++++++++++++
+ crates/benilla-world/src/look/wakes_pass.rs   | 212 ++++
+ crates/benilla-world/src/look/water.rs        | 163 ++-
+ crates/benilla-world/src/shaders.rs           |   5 +-
+ .../benilla-world/src/shaders/look_wakes.wgsl | 167 +++
+ crates/benilla-world/src/water_fx/mod.rs      |  14 +-
+ crates/benilla-world/src/world_unit.rs        |   5 +
+ 15 files changed, 1896 insertions(+), 47 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/wakes.rs
+ create mode 100644 crates/benilla-world/src/look/wakes_pass.rs
+ create mode 100644 crates/benilla-world/src/shaders/look_wakes.wgsl
+
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index aeed5d9..a9efbaa 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -655,6 +655,28 @@ fn publish_world_units(
+     }
+ }
+ 
++/// A fishing bobber (`GAMEOBJECT_TYPE_FISHINGNODE`, 17) as the world knows it
++/// ([`benilla_world::world_unit::Bobber`]), for the new look's wakes on the water round it.
++type BobberCandidate = (
++    Changed<crate::net::ObjectStore>,
++    Without<benilla_world::world_unit::Bobber>,
++);
++
++fn mark_bobbers(
++    mut commands: Commands,
++    objects: Query<(Entity, &NetEntity, &crate::net::ObjectStore), BobberCandidate>,
++) {
++    for (entity, net, store) in &objects {
++        if net.kind == EntityKind::GameObject
++            && store.0.gameobject_type_id() == crate::target::cursor_mode::GO_TYPE_FISHINGNODE
++        {
++            commands
++                .entity(entity)
++                .insert(benilla_world::world_unit::Bobber);
++        }
++    }
++}
++
+ /// Loads the display catalogs at startup and each frame gives every net entity its visual.
+ pub(crate) struct EntitiesPlugin;
+ 
+@@ -662,7 +684,7 @@ impl Plugin for EntitiesPlugin {
+     fn build(&self, app: &mut App) {
+         app.add_systems(
+             Update,
+-            publish_world_units
++            (publish_world_units, mark_bobbers)
+                 .after(benilla_world::schedule::WorldStage::Net)
+                 .before(benilla_world::schedule::WorldStage::Input),
+         )
+diff --git a/crates/benilla-app/src/perf/journal.rs b/crates/benilla-app/src/perf/journal.rs
+index 5ccfcb5..3de4f43 100644
+--- a/crates/benilla-app/src/perf/journal.rs
++++ b/crates/benilla-app/src/perf/journal.rs
+@@ -102,8 +102,8 @@ enum GpuBucket {
+     /// Every span this file does not name, counted, never dropped.
+     Other,
+     /// The new look's own passes (`benilla_world::look`): its sun-shadow slices, the contact
+-    /// shadows and their blur, the volumetric fog's march and resolve, the water's scene copy and
+-    /// the look pass itself. Take 291's cost run found them all in [`Self::Other`].
++    /// shadows and their blur, the volumetric fog's march and resolve, the water's scene copy, the
++    /// wakes' ripple field (`look_wakes`) and the look pass itself. Take 291's cost run found them all in [`Self::Other`].
+     Look,
+ }
+ 
+@@ -443,6 +443,7 @@ mod tests {
+             "look_shadow_0",
+             "look_shadow_3",
+             "look_water_copy",
++            "look_wakes",
+         ] {
+             assert_eq!(b(&format!("render/{pass}/elapsed_gpu")), Some(Look), "{pass}");
+         }
+diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
+index eb68538..24c47bc 100644
+--- a/crates/benilla-app/src/shaders.rs
++++ b/crates/benilla-app/src/shaders.rs
+@@ -214,6 +214,20 @@ mod tests {
+         }
+     }
+ 
++    /// The new look's wakes (`benilla_world::look::wakes_pass`): the ripple field's compute step,
++    /// composed, validated and translated.
++    #[test]
++    fn the_look_wakes_shader_composes_and_translates() {
++        let (mut cache, ids) = embedded_shader_cache();
++        let id = *ids
++            .get("benilla_world/shaders/look_wakes.wgsl")
++            .expect("look_wakes.wgsl is embedded");
++        let module = cache
++            .get(&(), 0, id, &[])
++            .unwrap_or_else(|e| panic!("look_wakes.wgsl does not compose: {e:?}"));
++        validate_and_translate(&module, "look_wakes.wgsl");
++    }
++
+     /// Bevy's `ShaderCache` over every embedded shader library, as the pipeline cache composes,
+     /// and each shader's id by its embedded path.
+     #[expect(
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 5e4aaaa..3513703 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -117,12 +117,7 @@ impl Plugin for WorldConsolePlugin {
+             look_shadow,
+         );
+         // benilla's own: the new look's water held for tuning on film.
+-        app.console_command(
+-            "lookwater",
+-            GRAPHICS,
+-            Some("<reflect 0-2> [clarity 0-2] | grade"),
+-            look_water,
+-        );
++        app.console_command("lookwater", GRAPHICS, Some(LOOK_WATER_USAGE), look_water);
+         // benilla's own: the new look's wind held for tuning on film.
+         app.console_command(
+             "lookwind",
+@@ -489,15 +484,24 @@ fn look_shadow(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++const LOOK_WATER_USAGE: &str =
++    "<reflect 0-2> [clarity 0-2] | grade | wakes [0|1] | refract <0-2> | caustics <0-2>";
++
+ /// `lookwater <reflect> [clarity]`, benilla's own (1.12 has no such command): holds the new look's
+ /// water (`benilla_world::look::water`) for tuning on film: its mirror at a multiple of the tuned
+ /// one, 0 to 2 (0 none, 1 the tuned, 2 twice it), and optionally its clarity, 0 to 2 (toward 0
+ /// murky, 2 twice as clear); `lookwater grade`, or no argument, lets go. `worldWater 0` and the
+ /// classic look (`worldLook 0`) have 1.12's water either way.
++/// `lookwater wakes <0|1>` turns the wakes (`benilla_world::look::wakes`) off and on, and with no
++/// value says what they are doing; `refract` and `caustics` hold the bent bed and the light on it
++/// at a multiple of the tuned, 0 to 2, and `grade` lets either go.
+ fn look_water(world: &mut World, args: &str) -> Vec<String> {
+     use benilla_world::look::{LookWater, WorldLook};
++    if let Some(wakes) = benilla_world::look::LookWakes::parse(args) {
++        return look_wakes(world, wakes);
++    }
+     let Some((reflect, clarity)) = LookWater::parse(args) else {
+-        return vec!["Usage: lookwater <reflect 0-2> [clarity 0-2] | grade".to_string()];
++        return vec![format!("Usage: lookwater {LOOK_WATER_USAGE}")];
+     };
+     let on = {
+         let mut water = world.get_resource_or_init::<LookWater>();
+@@ -521,6 +525,67 @@ fn look_water(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++/// `lookwater`'s words for the wakes and the bed (`benilla_world::look::wakes`).
++fn look_wakes(
++    world: &mut World,
++    command: Result<benilla_world::look::wakes::WakesCommand, ()>,
++) -> Vec<String> {
++    use benilla_world::look::wakes::WakesCommand;
++    use benilla_world::look::{LookWakes, LookWater, WakeStats, WorldLook};
++    let Ok(command) = command else {
++        return vec![format!("Usage: lookwater {LOOK_WATER_USAGE}")];
++    };
++    let mut lines = Vec::new();
++    {
++        let mut wakes = world.get_resource_or_init::<LookWakes>();
++        match command {
++            WakesCommand::Wakes(Some(on)) => {
++                wakes.on = on;
++                lines.push(if on {
++                    "Wakes on: the water answers what moves through it.".to_string()
++                } else {
++                    "Wakes off: 1.12's wade rings and the old froth instead.".to_string()
++                });
++            }
++            WakesCommand::Wakes(None) => {
++                lines.push(format!("Wakes {}.", if wakes.on { "on" } else { "off" }))
++            }
++            WakesCommand::Refract(r) => {
++                wakes.refract = r;
++                lines.push(match r {
++                    None => "The bed's bend at its tuning.".to_string(),
++                    Some(r) => format!("The bed's bend held at {r} times its own."),
++                });
++            }
++            WakesCommand::Caustics(c) => {
++                wakes.caustics = c;
++                lines.push(match c {
++                    None => "The light on the bed at its tuning.".to_string(),
++                    Some(c) => format!("The light on the bed held at {c} times its own."),
++                });
++            }
++        }
++    }
++    let stats = world
++        .get_resource::<WakeStats>()
++        .copied()
++        .unwrap_or_default();
++    let on = world.get_resource::<LookWakes>().is_some_and(|w| w.on);
++    if on {
++        lines.push(format!("Wakes: {}.", stats.line()));
++    }
++    if !world.get_resource::<LookWater>().is_some_and(|w| w.on) {
++        lines.push("worldWater is 0: 1.12's water.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has 1.12's water.".to_string());
++    }
++    for line in &lines {
++        info!("[look wakes] lookwater: {line}");
++    }
++    lines
++}
++
+ /// `lookwind <strength> [gust]`, benilla's own (1.12 has no such command): holds the new look's
+ /// wind (`benilla_world::look::wind`) for tuning on film: its strength at a multiple of the
+ /// world's own, 0 to 3 (0 still, 1 the world's, 3 three times it), and optionally its gusts, 0 to
+@@ -1388,7 +1453,7 @@ mod tests {
+         assert_eq!(held(&mut app).clarity, Some(2.0));
+         assert_eq!(
+             run(&mut app, "lookwater 3"),
+-            ["Usage: lookwater <reflect 0-2> [clarity 0-2] | grade"]
++            [format!("Usage: lookwater {LOOK_WATER_USAGE}")]
+         );
+         assert_eq!(
+             held(&mut app).reflect,
+@@ -1404,6 +1469,57 @@ mod tests {
+         assert_eq!(lines[1], "worldWater is 0: 1.12's water.");
+     }
+ 
++    /// `lookwater wakes|refract|caustics`: the wakes off and on with their counts, the bed's bend
++    /// and light held and let go, and a bad word leaves them as they were.
++    #[test]
++    fn the_look_water_turns_the_wakes() {
++        use benilla_world::look::{LookWakes, LookWater, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        app.world_mut().get_resource_or_init::<LookWater>();
++        let held = |app: &mut App| *app.world_mut().get_resource_or_init::<LookWakes>();
++        let lines = run(&mut app, "lookwater wakes 0");
++        assert_eq!(
++            lines,
++            ["Wakes off: 1.12's wade rings and the old froth instead."]
++        );
++        assert!(!held(&mut app).on);
++        let lines = run(&mut app, "lookwater wakes 1");
++        assert_eq!(
++            lines[0],
++            "Wakes on: the water answers what moves through it."
++        );
++        assert!(
++            lines[1].starts_with("Wakes: 0 pushing, field 256x256 over 64 yd"),
++            "{lines:?}"
++        );
++        assert!(held(&mut app).on);
++        assert_eq!(run(&mut app, "lookwater wakes")[0], "Wakes on.");
++        assert_eq!(
++            run(&mut app, "lookwater refract 0.5")[0],
++            "The bed's bend held at 0.5 times its own."
++        );
++        assert_eq!(held(&mut app).refract, Some(0.5));
++        assert_eq!(
++            run(&mut app, "lookwater caustics 2")[0],
++            "The light on the bed held at 2 times its own."
++        );
++        assert_eq!(
++            run(&mut app, "lookwater caustics 9"),
++            [format!("Usage: lookwater {LOOK_WATER_USAGE}")]
++        );
++        assert_eq!(
++            held(&mut app).caustics,
++            Some(2.0),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "lookwater refract grade")[0],
++            "The bed's bend at its tuning."
++        );
++        assert_eq!(held(&mut app).refract, None);
++    }
++
+     /// `lookwind`: a strength (and a gust) holds the wind, `grade` or nothing lets go, and anything
+     /// out of range leaves it as it was with the usage line.
+     #[test]
+diff --git a/crates/benilla-assets/src/materials.rs b/crates/benilla-assets/src/materials.rs
+index ea94dab..2509f07 100644
+--- a/crates/benilla-assets/src/materials.rs
++++ b/crates/benilla-assets/src/materials.rs
+@@ -122,6 +122,47 @@ pub fn water_scene_images(width: u32, height: u32) -> (Image, Image) {
+     (scene, depth)
+ }
+ 
++/// The new look's wakes (`benilla_world::look::wakes`): the ripple field round the camera, a
++/// square of `Rgba16Float` texels holding the surface's height, its velocity potential and its
++/// foam, which a compute pass steps each frame and the liquid material binds at 117 (sampled with
++/// the scene copy's sampler, 114). Two fixed handles, as [`WATER_SCENE`]: the pass reads one and
++/// writes the other, in pairs, so each frame's field ends in [`WAKE_FIELD`].
++pub const WAKE_FIELD: Handle<Image> =
++    bevy::asset::uuid_handle!("5ad0a0e1-0085-4c0a-9e5b-5ad0a0e10085");
++
++/// [`WAKE_FIELD`]'s partner: the field between a pair's two steps.
++pub const WAKE_FIELD_B: Handle<Image> =
++    bevy::asset::uuid_handle!("5ad0a0e1-0085-4c0a-9e5b-5ad0a0e1b085");
++
++/// One wake field image, `size` texels square: read by texel or sampled (linear, clamped) and
++/// written as a storage texture. wgpu clears a new texture to zero, a calm surface with no foam.
++pub fn wake_field_image(size: u32) -> Image {
++    use bevy::asset::RenderAssetUsages;
++    use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
++    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
++    let mut image = Image::new_uninit(
++        Extent3d {
++            width: size.max(1),
++            height: size.max(1),
++            depth_or_array_layers: 1,
++        },
++        TextureDimension::D2,
++        TextureFormat::Rgba16Float,
++        RenderAssetUsages::RENDER_WORLD,
++    );
++    image.texture_descriptor.label = Some("look_wake_field");
++    image.texture_descriptor.usage = TextureUsages::TEXTURE_BINDING | TextureUsages::STORAGE_BINDING;
++    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
++        label: Some("look_wake_field".into()),
++        address_mode_u: ImageAddressMode::ClampToEdge,
++        address_mode_v: ImageAddressMode::ClampToEdge,
++        mag_filter: ImageFilterMode::Linear,
++        min_filter: ImageFilterMode::Linear,
++        ..Default::default()
++    });
++    image
++}
++
+ /// `StandardMaterial` plus the per-tile layer-blend extension.
+ pub type TerrainMaterial = ExtendedMaterial<StandardMaterial, TerrainExtension>;
+ 
+@@ -490,6 +531,11 @@ pub struct LiquidExt {
+     /// all zero (1.12's water) under the classic look and with `worldWater 0`.
+     #[storage(116, read_only, buffer, visibility(fragment))]
+     pub water_buf: Buffer,
++    /// The new look's wakes: the ripple field round the camera, always [`WAKE_FIELD`], sampled
++    /// with 114's sampler (no sampler of its own, for Metal's sixteen); read only while the water
++    /// block says the wakes are on.
++    #[texture(117, visibility(fragment))]
++    pub wake_field: Handle<Image>,
+ }
+ 
+ impl MaterialExtension for LiquidExt {
+diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
+index dfbd806..239e657 100644
+--- a/crates/benilla-assets/src/shaders/liquid.wgsl
++++ b/crates/benilla-assets/src/shaders/liquid.wgsl
+@@ -25,8 +25,9 @@
+ // The new look's water (`look_water`, benilla's own, no reference behaviour; `look::water`): while
+ // the water block's row 0 `.x` is set (`worldLook 1`, `worldWater 1`), water seen from above is
+ // shaded per pixel instead: reflections, see-through shallows, ripples, sun glint and shore foam,
+-// from the scene copied under it (`look::water_pass`). An all-zero block, or a camera under the
+-// surface, runs 1.12's arms below untouched.
++// from the scene copied under it (`look::water_pass`); under the wakes (`look::wakes`) the ripple
++// field round the camera moves it, foams it and bends the bed seen through it. An all-zero block,
++// or a camera under the surface, runs 1.12's arms below untouched.
+ 
+ #import bevy_pbr::{
+     mesh_functions,
+@@ -75,21 +76,26 @@ struct WowLight {
+ 
+ // The new look's water (`look::water`): the sun-shadow map (`textureLoad` only), the scene copied
+ // under the water (gamma colour, sampled; device depth, by texel) and the water block
+-// (`look::water::pack_rows`, WATER_ROWS = 23; keep in sync):
++// (`look::water::pack_rows`, WATER_ROWS = 26; keep in sync):
+ //   0 [on, mirror, clarity (yd), foam] · 1 [glint body (camera to it), glint] ·
+ //   2 [glint colour (linear), sharpness] · 3 [sky zenith (linear), ripple slope] ·
+ //   4 [sky horizon (linear), ripple wavelength (yd)] · 5 [shallow (sRGB), tint weight] ·
+ //   6 [deep (sRGB), deep at (yd)] · 7 [march reach (yd), F0, foam depth (yd), shore soft (yd)] ·
+ //   8 [sky middle (linear), sheen] · 9 [classic ripples, shadow dim, ocean clarity (yd), rain rings] ·
+-//   10-22 the new look's painted sky (`look::sky::pack_rows`, `LookSkyRows`), all zero while off.
++//   10-22 the new look's painted sky (`look::sky::pack_rows`, `LookSkyRows`), all zero while off ·
++//   23 [wakes on, field origin x, z (yd), field span (yd)] · 24 [wake normal gain, wake foam,
++//   refraction (yd), caustics] · 25 [shore haze, haze depth (yd), deep from (yd), field texels].
+ @group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
+ @group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
+ @group(#{MATERIAL_BIND_GROUP}) @binding(114) var scene_samp: sampler;
+ @group(#{MATERIAL_BIND_GROUP}) @binding(115) var scene_depth: texture_2d<f32>;
+ struct WaterBlock {
+-    rows: array<vec4<f32>, 23>,
++    rows: array<vec4<f32>, 26>,
+ };
+ @group(#{MATERIAL_BIND_GROUP}) @binding(116) var<storage, read> water: WaterBlock;
++// The wakes' ripple field (`look::wakes`): [height (yd), velocity potential, foam, 0] a texel over
++// a square round the camera (row 23), sampled with the scene copy's sampler.
++@group(#{MATERIAL_BIND_GROUP}) @binding(117) var wake_field: texture_2d<f32>;
+ 
+ struct LiquidVsOut {
+     @builtin(position) clip_position: vec4<f32>,
+@@ -260,6 +266,13 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
+ const WATER_NIGHT_FLECKS: f32 = 0.0;
+ const WATER_NIGHT_FLECK_LANE: f32 = 0.12;
+ const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
++// `look::wakes::tune`'s `FOAM_FROM` and `FOAM_EDGE` (`look::water`'s test compares them): where the
++// wakes' foam shows against its streaks, and how crisp its edge is.
++const WAKE_FOAM_FROM: f32 = 0.5;
++const WAKE_FOAM_EDGE: f32 = 0.12;
++// `look::water::tune`'s `REFRACT_DEPTH` (the same test compares it): the deepest the bed's bend
++// grows with.
++const WATER_REFRACT_DEPTH: f32 = 2.0;
+ // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
+ const WATER_SHADOW_TAPS: u32 = 6u;
+ const WATER_SHADOW_TEXELS: f32 = 1.5;
+@@ -652,6 +665,62 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
+     return slope * (0.9 * amount * fade);
+ }
+ 
++// The wakes' field at `p` (the surface's XZ, `look::wakes`): its slope (x, z), its foam and its
++// weight, which fades it in from the field's edge; all zero with the wakes off or outside it.
++fn wake_sample(p: vec2<f32>) -> vec4<f32> {
++    if (water.rows[23].x < 0.5) {
++        return vec4<f32>(0.0);
++    }
++    let span = max(water.rows[23].w, 1.0);
++    let uv = (p - water.rows[23].yz) / span;
++    let border = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
++    let w = smoothstep(0.0, 0.08, border);
++    if (w <= 0.0) {
++        return vec4<f32>(0.0);
++    }
++    let tx = 1.0 / max(water.rows[25].w, 1.0);
++    let c = textureSampleLevel(wake_field, scene_samp, uv, 0.0);
++    let hx1 = textureSampleLevel(wake_field, scene_samp, uv + vec2<f32>(tx, 0.0), 0.0).x;
++    let hx0 = textureSampleLevel(wake_field, scene_samp, uv - vec2<f32>(tx, 0.0), 0.0).x;
++    let hz1 = textureSampleLevel(wake_field, scene_samp, uv + vec2<f32>(0.0, tx), 0.0).x;
++    let hz0 = textureSampleLevel(wake_field, scene_samp, uv - vec2<f32>(0.0, tx), 0.0).x;
++    let slope = vec2<f32>(hx1 - hx0, hz1 - hz0) / (2.0 * tx * span);
++    return vec4<f32>(slope * w, max(c.z, 0.0) * w, w);
++}
++
++// The wakes' foam drawn out into streaks along the crests: a fine noise averaged along each
++// crest's line (`slope` across it), so the streaks follow the wake's curling crests and are crisp
++// across them; where a pixel (`fp` yards) spans many streaks, their mean.
++fn wake_streaks(p: vec2<f32>, slope: vec2<f32>, t: f32, fp: f32) -> f32 {
++    let sl = length(slope);
++    var along = vec2<f32>(1.0, 0.0);
++    if (sl > 1e-4) {
++        along = vec2<f32>(-slope.y, slope.x) / sl;
++    }
++    let reach = 0.45 * clamp(sl / 0.15, 0.0, 1.0);
++    let k = 4.0;
++    let drift = t * vec2<f32>(0.05, -0.04);
++    var n = 0.0;
++    for (var i = 0u; i < 4u; i = i + 1u) {
++        let s = (f32(i) - 1.5) / 1.5 * reach;
++        n += water_noise((p + along * s) * k + drift).x;
++    }
++    n = clamp((0.25 * n - 0.5) * 1.8 + 0.5, 0.0, 1.0);
++    let grain = water_noise(p * (2.3 * k) + vec2<f32>(17.3, 5.1) - drift).x;
++    n = 0.75 * n + 0.25 * grain;
++    let fine = 1.0 - smoothstep(0.25 / k, 1.0 / k, fp);
++    return mix(0.5, n, fine);
++}
++
++// Faint moving light on the shallow bed at `p` (the bed's XZ): two drifting noises whose crossing
++// lines brighten, 0 to 1.
++fn water_caustics(p: vec2<f32>, t: f32, fp: f32) -> f32 {
++    let a = water_noise(p * 1.7 + t * vec2<f32>(0.11, 0.07)).x;
++    let b = water_noise(p * 2.2 + vec2<f32>(5.2, 1.7) - t * vec2<f32>(0.08, 0.12)).x;
++    let ridge = pow(clamp(1.0 - 2.5 * abs(a - b), 0.0, 1.0), 4.0);
++    return ridge * (1.0 - smoothstep(0.08, 0.3, fp));
++}
++
+ // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
+ // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
+ // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
+@@ -688,9 +757,14 @@ fn look_water(
+ 
+     // Ripples, calmed into the shore.
+     var N = water_normal(P.xz, t, water.rows[3].w * (0.3 + 0.7 * shore), water.rows[4].w, fp);
+-    // The rain's rings, while it rains (`look::weather`).
++    // The wakes' field (`look::wakes`): its slopes tilt the surface (so the mirror, the glint and
++    // the bed move with it), and its foam.
++    let wake = wake_sample(P.xz);
++    N = normalize(N + vec3<f32>(-wake.x, 0.0, -wake.y) * water.rows[24].x);
++    // The rain's rings, while it rains (`look::weather`); inside the field its own drops take
++    // most of their place.
+     if (water.rows[9].w > 0.0) {
+-        let ring = rain_rings(P.xz, t, water.rows[9].w, fp);
++        let ring = rain_rings(P.xz, t, water.rows[9].w, fp) * (1.0 - 0.7 * wake.w);
+         N = normalize(N + vec3<f32>(ring.x, 0.0, ring.y));
+     }
+ 
+@@ -707,7 +781,7 @@ fn look_water(
+         vec3<f32>(0.0),
+         vec3<f32>(1.0),
+     );
+-    var body = water_decode(mix(sh, dp, smoothstep(0.0, water.rows[6].w, depth_v)) * lit_g);
++    var body = water_decode(mix(sh, dp, smoothstep(water.rows[25].z, water.rows[6].w, depth_v)) * lit_g);
+     // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term). By night (the
+     // glint is the moon's lane, a negative sharpness) its white flecks keep a share off the lane.
+     var flecks = water.rows[9].x;
+@@ -791,7 +865,8 @@ fn look_water(
+     var stand = 0.0;
+     var on_step = 0.0;
+     var hits = 0.0;
+-    if (eye_z < WATER_FROTH_REACH && water.rows[0].w > 0.0) {
++    // 0081's froth stands in for the wakes only while they are off (`lookwater wakes 0`).
++    if (eye_z < WATER_FROTH_REACH && water.rows[23].x < 0.5) {
+         let wob = water_noise(P.xz * WATER_FROTH_WOBBLE + vec2<f32>(0.07, -0.05) * t).x;
+         let reach = WATER_FROTH_YD * (0.3 + 0.9 * wob);
+         // The taps' turn wanders smoothly over the surface, not pixel by pixel: the per-pixel
+@@ -847,15 +922,66 @@ fn look_water(
+         * (1.0 - smoothstep(60.0, 120.0, eye_z));
+     let foam_rgb = water_decode(lit_g) * 0.8;
+ 
+-    // Over the bed: the mirror takes `fres`, the body the rest of what the bed loses; the glint
+-    // adds; the foam lies on top.
++    // The bed seen through moving water: drawn back from the surface's tilt, more the deeper it
++    // lies, so it wavers under the ripples and the wakes; with faint moving light on it in the
++    // sun's shallows. Where the bent ray would land on something in front of the water, the
++    // straight one. The frame's blend lays the bed itself where the bend is under a pixel, so a
++    // calm surface still shows what is drawn behind it.
++    var bed = vec3<f32>(0.0);
++    var w_bed = 0.0;
++    let refract = water.rows[24].z;
++    if (refract > 0.0 && bed_z > 0.0 && trans > 0.002) {
++        let lean = vec2<f32>(N.x, N.z) * (refract * min(depth_v, WATER_REFRACT_DEPTH));
++        let at_bed = P - V * path;
++        let cb = view.clip_from_world * vec4<f32>(at_bed + vec3<f32>(-lean.x, 0.0, -lean.y), 1.0);
++        var ub = uv;
++        if (cb.w > 0.05) {
++            let u2 = water_uv(cb);
++            if (all(u2 >= vec2<f32>(0.0)) && all(u2 <= vec2<f32>(1.0))
++                && water_scene_z(u2) > eye_z) {
++                ub = u2;
++            }
++        }
++        bed = water_decode(textureSampleLevel(scene_tex, scene_samp, ub, 0.0).rgb);
++        // The light on the bed: the sun's (a positive sharpness), up, in the shallows.
++        let caustics = water.rows[24].w;
++        if (caustics > 0.0 && water.rows[2].w > 0.0 && water.rows[1].w > 0.0) {
++            let shallow_bed = smoothstep(0.03, 0.25, depth_v) * (1.0 - smoothstep(0.8, 3.0, depth_v));
++            let fpb = fp * (1.0 + path / max(dist, 1.0));
++            bed *= 1.0 + caustics * vis * shallow_bed * water_caustics(at_bed.xz - lean, t, fpb);
++        }
++        let bend_px = length((ub - uv) * view.viewport.zw);
++        w_bed = (1.0 - fres) * trans * smoothstep(0.3, 1.5, bend_px);
++    }
++
++    // The shore's haze: none at the waterline, a faint pale veil over the first stretch of depth,
++    // drifting with the noise; no foam line.
++    let haze = water.rows[25].x * smoothstep(0.0, 0.04, depth_v)
++        * (1.0 - smoothstep(0.1, max(water.rows[25].y, 0.11), depth_v)) * (0.7 + 0.6 * na);
++    let haze_rgb = mix(water_decode(lit_g), water.rows[3].rgb, 0.3) * 0.85;
++
++    // The wakes' foam: crisp white streaks along the crests where the field holds foam.
++    var wfoam = 0.0;
++    if (wake.z > 0.02) {
++        let streak = wake_streaks(P.xz, vec2<f32>(wake.x, wake.y), t, fp);
++        wfoam = smoothstep(WAKE_FOAM_FROM, WAKE_FOAM_FROM + WAKE_FOAM_EDGE, wake.z * (0.35 + streak))
++            * water.rows[24].y * (1.0 - smoothstep(60.0, 120.0, eye_z));
++    }
++    let wfoam_rgb = water_decode(lit_g) * 0.95;
++
++    // Over the bed: the mirror takes `fres`, the body the rest of what the bed loses, the bent bed
++    // what it keeps; the glint adds; the haze, the foam and the wakes' foam lie on top.
+     let w_body = (1.0 - fres) * (1.0 - trans);
+-    var a = fres + w_body;
+-    var c = mirror * fres + body * w_body;
++    var a = fres + w_body + w_bed;
++    var c = mirror * fres + body * w_body + bed * w_bed;
+     c += glint;
+     a = max(a, min(dot(glint, WATER_LUMA), 1.0));
++    c = c * (1.0 - haze) + haze_rgb * haze;
++    a = a * (1.0 - haze) + haze;
+     c = c * (1.0 - foam) + foam_rgb * foam;
+     a = a * (1.0 - foam) + foam;
++    c = c * (1.0 - wfoam) + wfoam_rgb * wfoam;
++    a = a * (1.0 - wfoam) + wfoam;
+     a = clamp(a, 0.0, 1.0);
+     let rgb = water_encode(c / max(a, 1e-4));
+     return vec4<f32>(apply_fog(rgb, P, in.room_fog), a);
+diff --git a/crates/benilla-world/src/liquid/surface.rs b/crates/benilla-world/src/liquid/surface.rs
+index 6257971..8f151ca 100644
+--- a/crates/benilla-world/src/liquid/surface.rs
++++ b/crates/benilla-world/src/liquid/surface.rs
+@@ -414,11 +414,12 @@ pub(super) fn setup_liquid(
+                     ),
+                     light_buf: world_assets.shared_light.clone(),
+                     // The new look's: the sun-shadow map, the scene under the water and its
+-                    // depth, and the water block.
++                    // depth, the water block and the wakes' ripple field.
+                     shadow_map: benilla_assets::materials::SHADOW_MAP,
+                     scene: benilla_assets::materials::WATER_SCENE,
+                     scene_depth: benilla_assets::materials::WATER_DEPTH,
+                     water_buf: water_buf.clone(),
++                    wake_field: benilla_assets::materials::WAKE_FIELD,
+                 },
+             });
+             assets
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index 1a0af64..68319c5 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -8,7 +8,8 @@
+ //! wet ground and lightning ([`weather`]), and the woods are lived in: fireflies at night,
+ //! falling leaves, motes in the sun's shafts and butterflies by day ([`life`]), and the air holds
+ //! shafts of sun in the mist with the lamps glowing in it, the picture is sharpened, and far lit
+-//! windows glow through the night ([`air`]). One switch,
++//! windows glow through the night ([`air`]), and the water answers what moves through it: wakes,
++//! rings and splashes ([`wakes`]). One switch,
+ //! [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look is then
+ //! exactly the reference's.
+ 
+@@ -33,6 +34,8 @@ pub mod shadow_pass;
+ pub mod shadows;
+ pub mod sky;
+ pub mod switch_watch;
++pub mod wakes;
++pub mod wakes_pass;
+ pub mod water;
+ pub mod water_pass;
+ pub mod weather;
+@@ -46,6 +49,7 @@ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
+ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+ pub use shadows::{LookShadows, ShadowFrame};
+ pub use sky::{LookGlare, LookSky, SkyFrame};
++pub use wakes::{LookWakes, WakeFrame, WakeStats};
+ pub use water::{LookWater, WaterFrame};
+ pub use weather::{LookWeather, WeatherLook};
+ pub use wind::{LookWind, WindFrame};
+@@ -251,6 +255,7 @@ pub(crate) fn init_resources(app: &mut App) {
+     lights::init_resources(app);
+     shadows::init_resources(app);
+     water::init_resources(app);
++    wakes::init_resources(app);
+     wind::init_resources(app);
+     sky::init_resources(app);
+     weather::init_resources(app);
+@@ -292,6 +297,7 @@ impl Plugin for LookPlugin {
+                 (
+                     wind::publish_wind,
+                     sky::publish_sky.in_set(sky::SkyPublish),
++                    wakes::publish_wakes.before(water::publish_water),
+                     water::publish_water.after(sky::SkyPublish),
+                 )
+                     .in_set(crate::lighting::LightingConsumeSet),
+@@ -330,6 +336,8 @@ impl Plugin for LookPlugin {
+         pass::build(app);
+         shadow_pass::build(app);
+         water_pass::build(app);
++        wakes::build(app);
++        wakes_pass::build(app);
+         switch_watch::build(app);
+         lamps::build(app);
+     }
+@@ -338,6 +346,7 @@ impl Plugin for LookPlugin {
+         pass::finish(app);
+         shadow_pass::finish(app);
+         water_pass::finish(app);
++        wakes_pass::finish(app);
+     }
+ }
+ 
+diff --git a/crates/benilla-world/src/look/wakes.rs b/crates/benilla-world/src/look/wakes.rs
+new file mode 100644
+index 0000000..b81b9e1
+--- /dev/null
++++ b/crates/benilla-world/src/look/wakes.rs
+@@ -0,0 +1,990 @@
++//! Wakes, the new look's own (no reference behaviour): water that answers what moves through it,
++//! as WoW Forever's lakes do. A swimmer leaves a crisp white wake fanning out behind him in a V,
++//! a hero wading in sends rings out and splashes where he steps in, a bobber sits in a small
++//! disturbance, and rain dimples the surface.
++//!
++//! 1. **The ripple field**: a square of [`tune::GRID`]² texels over [`tune::SPAN_YD`] yards round
++//!    the camera (a little ahead of it, where the view falls), snapped to whole texels so it never
++//!    swims, and stepped each frame on the GPU (`look::wakes_pass`, `look_wakes.wgsl`) as a
++//!    linear shallow-water wave at fixed steps of [`tune::STEP_S`]: [`cpu_step`] is the same step
++//!    in Rust, for the tests.
++//! 2. **What pushes it** ([`publish_wakes`]): every unit whose feet are in the water (wading or
++//!    swimming, by its speed; a still one only breathes gentle rings), a splash where one comes in,
++//!    a fishing bobber ([`crate::world_unit::Bobber`]), and raindrops while it rains
++//!    (`look::weather`); the nearest [`tune::MAX_SOURCES`] to the field.
++//! 3. **Foam**: born where a body churns the water and on the rising crests it sends out, carried
++//!    by the water's drift, fading over [`tune::FOAM_LIFE_S`]: the trailing V with its streaks.
++//!    `liquid.wgsl` draws it white, drawn out along the crests into curling streaks.
++//! 4. The field's slopes add to the water's own ripples, so the mirror, the glint and the
++//!    refracted bed (`liquid.wgsl`) all move with it.
++//!
++//! While the wakes are on they take the place of 0081's wading froth and of 1.12's own wade wake
++//! and rings (`water_fx`), which would draw a second, older ring over them. `lookwater wakes 0`
++//! brings both back; `worldWater 0` and `worldLook 0` run 1.12's water and foam untouched.
++
++use bevy::ecs::entity::EntityHashMap;
++use bevy::prelude::*;
++use bevy::render::extract_resource::ExtractResource;
++
++use benilla_assets::coords::bevy_to_wow;
++
++use super::{LookWater, WorldLook};
++use crate::liquid::{FoamPatch, WaterChunkInfo, WaterIndex};
++use crate::view::{Viewer, WorldCamera};
++use crate::world_unit::{Bobber, ViewerUnit, WorldUnit};
++
++/// Every tunable of the wakes, in one place. Lengths are yards, times seconds. A first pass from
++/// the reference video (a swimmer's wake in a retail pond, seen from above), to tune on film.
++pub mod tune {
++    /// The field's texels a side and the yards it spans: a quarter of a yard a texel.
++    pub const GRID: u32 = 256;
++    pub const SPAN_YD: f32 = 64.0;
++    /// How far ahead of the camera, along its view on the ground, the field's centre lies, as a
++    /// share of its span: a camera looking down on the hero from 15 yd has him about 10 yd ahead.
++    pub const AHEAD: f32 = 0.25;
++    /// One step, fixed whatever the frame rate; steps run in pairs (the field ends each frame in
++    /// the texture the water reads), at most [`MAX_PAIRS`] a frame, so a slow frame drops time
++    /// rather than stall.
++    pub const STEP_S: f32 = 1.0 / 120.0;
++    pub const MAX_PAIRS: u32 = 3;
++    /// How fast a ring travels (yd/s). A swimmer at 4.7 yd/s outruns it, so his rings pile up
++    /// into a V about 25° either side of his track, as a boat's does.
++    pub const WAVE_SPEED: f32 = 2.0;
++    /// A ring fades to a third over this long, and the foam does.
++    pub const WAVE_LIFE_S: f32 = 1.4;
++    pub const FOAM_LIFE_S: f32 = 0.55;
++    /// The pressure a body pushes with for each yd/s it moves at (up to [`PUSH_SPEED_MOST`]),
++    /// and the gentle breathing push of one standing still, at [`IDLE_HZ`].
++    pub const PUSH: f32 = 0.15;
++    pub const PUSH_SPEED_MOST: f32 = 8.0;
++    pub const IDLE_PUSH: f32 = 0.03;
++    pub const IDLE_HZ: f32 = 1.3;
++    /// A body's radius at the waterline at model scale 1.
++    pub const RADIUS: f32 = 0.35;
++    /// The foam a body churns at its sides (per second, at 4 yd/s, at most 1.5 times it), the
++    /// foam a rising crest makes per yd/s it rises faster than [`CREST_FROM`], and the most foam
++    /// a texel holds.
++    pub const BODY_FOAM: f32 = 8.0;
++    pub const CREST_FOAM: f32 = 80.0;
++    /// Above a still body's breathing (its crests rise at most about 0.06 yd/s), so a hero
++    /// standing in the water makes rings and no foam.
++    pub const CREST_FROM: f32 = 0.07;
++    pub const FOAM_MOST: f32 = 2.0;
++    /// How much faster than the water's own drift the foam is carried: the drift of a small
++    /// ripple is a few inches a second, the foam on a wake spreads at about half a yard.
++    pub const DRIFT: f32 = 6.0;
++    /// A body coming into the water: the splash's push (yd²/s, at once) and the foam it throws, a
++    /// share of the splash.
++    pub const SPLASH: f32 = 0.3;
++    pub const SPLASH_FOAM: f32 = 4.0;
++    /// Raindrops while it rains (a drop on this many texels a second at full rain, about two a
++    /// square yard), each this hard.
++    pub const RAIN_RATE: f32 = 0.125;
++    pub const RAIN_DROP: f32 = 0.03;
++    /// A fishing bobber: a small body nodding at this push and rate.
++    pub const BOBBER_RADIUS: f32 = 0.15;
++    pub const BOBBER_PUSH: f32 = 0.015;
++    pub const BOBBER_HZ: f32 = 0.7;
++    /// How far under the surface a bobber's origin may sit, or over it.
++    pub const BOBBER_REACH: f32 = 0.6;
++    /// The texels round the edge that soak up what reaches them.
++    pub const EDGE_TEXELS: f32 = 8.0;
++    /// The most bodies pushing at once: the nearest to the field.
++    pub const MAX_SOURCES: usize = 32;
++    /// A body counts as in the water from this deep (yd) to its gate, `max(2·height, 1)`, as 1.12's
++    /// foam; it pushes harder as it goes in, fully from [`FULL_DEPTH`].
++    pub const WET_FROM: f32 = 0.02;
++    pub const FULL_DEPTH: f32 = 0.6;
++    /// A body that jumps further than this in a frame (a teleport, a zone-in) leaves no streak.
++    pub const JUMP_YD: f32 = 6.0;
++    /// In `liquid.wgsl`: how much the field's slopes tilt the water's normal, the most a foam
++    /// streak hides of the water, and where the foam shows (its value against the streak noise, a
++    /// crisp edge over [`FOAM_EDGE`]).
++    pub const NORMAL_GAIN: f32 = 1.0;
++    pub const FOAM_SHOW: f32 = 0.9;
++    pub const FOAM_FROM: f32 = 0.5;
++    pub const FOAM_EDGE: f32 = 0.12;
++    /// Log the counts this often while something moves the water.
++    pub const LOG_EVERY_S: f32 = 10.0;
++}
++
++/// The yards a texel spans.
++pub const TEXEL_YD: f32 = tune::SPAN_YD / tune::GRID as f32;
++
++/// `lookwater wakes`: the wakes on or off under the new water (on by default); the console's
++/// holds of the refraction and the light on the bed live with them (`lookwater refract`,
++/// `lookwater caustics`).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookWakes {
++    pub on: bool,
++    pub refract: Option<f32>,
++    pub caustics: Option<f32>,
++}
++
++impl Default for LookWakes {
++    fn default() -> Self {
++        Self {
++            on: true,
++            refract: None,
++            caustics: None,
++        }
++    }
++}
++
++/// One of `lookwater`'s words for the wakes and the bed under the water.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub enum WakesCommand {
++    /// `wakes <0|1>`, or `wakes` alone to read the counts.
++    Wakes(Option<bool>),
++    /// `refract <0-2>` (a multiple of the tuned), or `refract grade`.
++    Refract(Option<f32>),
++    /// `caustics <0-2>`, or `caustics grade`.
++    Caustics(Option<f32>),
++}
++
++impl LookWakes {
++    /// `lookwater wakes|refract|caustics ...`; `None` when the words are not one of these, which
++    /// `lookwater`'s own mirror and clarity then read.
++    pub fn parse(args: &str) -> Option<Result<WakesCommand, ()>> {
++        let mut words = args.split_whitespace();
++        let head = words.next()?.to_ascii_lowercase();
++        let value = words.next();
++        if words.next().is_some() {
++            return matches!(head.as_str(), "wakes" | "refract" | "caustics").then_some(Err(()));
++        }
++        let scale = |w: Option<&str>| -> Result<Option<f32>, ()> {
++            match w {
++                Some(w) if w.eq_ignore_ascii_case("grade") => Ok(None),
++                Some(w) => w
++                    .parse::<f32>()
++                    .ok()
++                    .filter(|v| (0.0..=2.0).contains(v))
++                    .map(Some)
++                    .ok_or(()),
++                None => Err(()),
++            }
++        };
++        Some(match head.as_str() {
++            "wakes" => match value {
++                None => Ok(WakesCommand::Wakes(None)),
++                Some("0") => Ok(WakesCommand::Wakes(Some(false))),
++                Some("1") => Ok(WakesCommand::Wakes(Some(true))),
++                Some(_) => Err(()),
++            },
++            "refract" => scale(value).map(WakesCommand::Refract),
++            "caustics" => scale(value).map(WakesCommand::Caustics),
++            _ => return None,
++        })
++    }
++}
++
++/// One body pushing on the field this frame: its path since the field last stepped (Bevy XZ), its
++/// radius, its steady push and foam, a splash if it came in, and its idle breathing.
++#[derive(Clone, Copy, Debug, PartialEq, Default)]
++pub struct WakeSource {
++    pub from: Vec2,
++    pub to: Vec2,
++    pub radius: f32,
++    pub push: f32,
++    pub foam: f32,
++    pub splash: f32,
++    pub idle: f32,
++    pub idle_hz: f32,
++    pub phase: f32,
++}
++
++/// This frame's wakes, from [`publish_wakes`] to the render world (`look::wakes_pass`) and the
++/// water block: whether they run, the field's place after this frame's steps, how far it moved,
++/// how many step pairs to run and what pushes.
++#[derive(Resource, Clone, Debug, PartialEq, ExtractResource)]
++pub struct WakeFrame {
++    pub on: bool,
++    /// The field starts over from calm water (just switched on, or the camera jumped).
++    pub reset: bool,
++    /// The field's lowest corner (Bevy X, Z) in whole texels, and in yards.
++    pub cell: IVec2,
++    pub origin: Vec2,
++    /// Texels the field moved since it last stepped.
++    pub shift: IVec2,
++    pub pairs: u32,
++    /// The field's clock at this frame's first step, and that step's number (wrapped).
++    pub clock: f32,
++    pub first_step: u32,
++    /// The rain, 0 to 1.
++    pub rain: f32,
++    pub sources: Vec<WakeSource>,
++}
++
++impl Default for WakeFrame {
++    fn default() -> Self {
++        Self {
++            on: false,
++            reset: true,
++            cell: IVec2::ZERO,
++            origin: Vec2::ZERO,
++            shift: IVec2::ZERO,
++            pairs: 0,
++            clock: 0.0,
++            first_step: 0,
++            rain: 0.0,
++            sources: Vec::new(),
++        }
++    }
++}
++
++/// The counts `lookwater wakes` and the log report: the bodies pushing, and from the GPU the foam
++/// and moving texels on the last frame it read back.
++#[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
++pub struct WakeStats {
++    pub sources: usize,
++    pub foam_texels: u32,
++    pub moving_texels: u32,
++    pub read: bool,
++}
++
++impl WakeStats {
++    /// The share of the field under foam.
++    pub fn foam_share(&self) -> f32 {
++        self.foam_texels as f32 / (tune::GRID * tune::GRID) as f32
++    }
++
++    /// The counts in one line, for the console and the log.
++    pub fn line(&self) -> String {
++        format!(
++            "{} pushing, field {}x{} over {} yd, foam on {:.2}% ({} texels), moving {} texels{}",
++            self.sources,
++            tune::GRID,
++            tune::GRID,
++            tune::SPAN_YD,
++            100.0 * self.foam_share(),
++            self.foam_texels,
++            self.moving_texels,
++            if self.read {
++                ""
++            } else {
++                " (not read back yet)"
++            },
++        )
++    }
++}
++
++/// A body's place the field last stepped to, and whether it was in the water.
++#[derive(Clone, Copy, Debug)]
++struct Body {
++    stepped: Vec2,
++    last: Vec3,
++    wet: bool,
++    seen: bool,
++}
++
++/// The wakes' memory across frames: the time not yet stepped, the field's place, its clock, and
++/// the bodies.
++#[derive(Resource, Default)]
++pub(crate) struct WakeTrack {
++    owed: f32,
++    cell: Option<IVec2>,
++    clock: f32,
++    steps: u32,
++    was_on: bool,
++    bodies: EntityHashMap<Body>,
++    since_log: f32,
++}
++
++/// The step pairs a frame of `dt` seconds pays for, out of what is `owed`: whole pairs, at most
++/// [`tune::MAX_PAIRS`]; a slow frame forgets the rest rather than catching up.
++pub fn pairs_for(owed: &mut f32, dt: f32) -> u32 {
++    let pair = 2.0 * tune::STEP_S;
++    *owed += dt.clamp(0.0, 0.25);
++    let pairs = ((*owed / pair).floor() as u32).min(tune::MAX_PAIRS);
++    *owed -= pairs as f32 * pair;
++    if pairs == tune::MAX_PAIRS {
++        *owed = owed.min(pair);
++    }
++    pairs
++}
++
++/// The field's lowest corner, in whole texels, for a camera at `eye` (Bevy) looking along `fwd`:
++/// centred [`tune::AHEAD`] of the span ahead of it on the ground.
++pub fn field_cell(eye: Vec3, fwd: Vec3) -> IVec2 {
++    let flat = Vec2::new(fwd.x, fwd.z).normalize_or_zero();
++    let centre = Vec2::new(eye.x, eye.z) + flat * (tune::AHEAD * tune::SPAN_YD);
++    (centre / TEXEL_YD).floor().as_ivec2() - IVec2::splat(tune::GRID as i32 / 2)
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// A body's push for this frame: `depth` its feet under the surface (yd), `speed` its planar
++/// speed (yd/s), `scale` its model's; `None` out of the water or too deep to reach the surface
++/// (`gate`).
++pub fn body_source(depth: f32, gate: f32, speed: f32, scale: f32) -> Option<WakeSource> {
++    if depth < tune::WET_FROM || depth > gate {
++        return None;
++    }
++    let wet = smoothstep(tune::WET_FROM, tune::FULL_DEPTH, depth);
++    let speed = speed.clamp(0.0, tune::PUSH_SPEED_MOST);
++    Some(WakeSource {
++        radius: tune::RADIUS * scale.clamp(0.5, 3.0),
++        push: tune::PUSH * speed * wet,
++        foam: tune::BODY_FOAM * (speed / 4.0).min(1.5) * wet,
++        idle: tune::IDLE_PUSH * wet,
++        idle_hz: tune::IDLE_HZ,
++        ..default()
++    })
++}
++
++/// The compute pass's uniform (`look_wakes.wgsl`'s `WakeParams`): seven rows and three a source,
++/// [`tune::MAX_SOURCES`] of them.
++pub const PARAM_ROWS: usize = 7 + 3 * tune::MAX_SOURCES;
++
++/// [`PARAM_ROWS`] for this frame.
++pub fn pack_params(frame: &WakeFrame) -> Vec<[f32; 4]> {
++    let mut rows = vec![[0.0; 4]; PARAM_ROWS];
++    let steps = 2 * frame.pairs;
++    rows[0] = [tune::GRID as f32, TEXEL_YD, tune::STEP_S, steps as f32];
++    rows[1] = [
++        tune::WAVE_SPEED * tune::WAVE_SPEED,
++        (-tune::STEP_S / tune::WAVE_LIFE_S).exp(),
++        (-tune::STEP_S / tune::FOAM_LIFE_S).exp(),
++        tune::DRIFT,
++    ];
++    // The bodies' foam comes in their own rows ([`body_source`]); 1 here takes it as it is.
++    rows[2] = [1.0, tune::CREST_FOAM, tune::CREST_FROM, tune::FOAM_MOST];
++    let rain = tune::RAIN_RATE * frame.rain.clamp(0.0, 1.0) * tune::STEP_S;
++    rows[3] = [rain, tune::RAIN_DROP, tune::SPLASH_FOAM, tune::EDGE_TEXELS];
++    rows[4] = [
++        frame.clock,
++        frame.first_step as f32,
++        frame.shift.x as f32,
++        frame.shift.y as f32,
++    ];
++    rows[5] = [
++        frame.origin.x,
++        frame.origin.y,
++        frame.cell.x as f32,
++        frame.cell.y as f32,
++    ];
++    let n = frame.sources.len().min(tune::MAX_SOURCES);
++    rows[6] = [if frame.reset { 1.0 } else { 0.0 }, n as f32, 0.0, 0.0];
++    for (i, s) in frame.sources.iter().take(n).enumerate() {
++        rows[7 + 3 * i] = [s.from.x, s.from.y, s.to.x, s.to.y];
++        rows[8 + 3 * i] = [s.radius, s.push, s.foam, s.splash];
++        rows[9 + 3 * i] = [s.idle, s.idle_hz, s.phase, 0.0];
++    }
++    rows
++}
++
++/// The water block's wake rows (`look::water::pack_rows`, rows 23 to 25), all zero with the wakes
++/// off: `[on, origin x, origin z, span]`.
++pub fn water_row(frame: &WakeFrame) -> [f32; 4] {
++    if !frame.on {
++        return [0.0; 4];
++    }
++    [1.0, frame.origin.x, frame.origin.y, tune::SPAN_YD]
++}
++
++/// The surface over a WoW-space point, from the water chunks under it.
++fn surface_at(
++    index: &WaterIndex,
++    water: &Query<&WaterChunkInfo, With<FoamPatch>>,
++    wow: [f32; 3],
++) -> Option<f32> {
++    index
++        .over(wow[0], wow[1])
++        .iter()
++        .find_map(|&e| water.get(e).ok()?.surface_z_at(wow[0], wow[1]))
++}
++
++fn phase_of(e: Entity) -> f32 {
++    let h = (e.to_bits() as u32).wrapping_mul(2_654_435_761);
++    (h >> 8) as f32 / 16_777_216.0 * std::f32::consts::TAU
++}
++
++/// Publishes this frame's [`WakeFrame`]: the field's place, the steps owed and every body pushing
++/// on it.
++#[allow(clippy::too_many_arguments)]
++pub(crate) fn publish_wakes(
++    time: Res<Time>,
++    look: Res<WorldLook>,
++    water_on: Res<LookWater>,
++    wakes: Res<LookWakes>,
++    viewer: Res<Viewer>,
++    weather: Option<Res<super::WeatherLook>>,
++    cams: Query<&Transform, With<WorldCamera>>,
++    self_unit: Query<&WorldUnit, With<ViewerUnit>>,
++    units: Query<(Entity, &Transform, &WorldUnit), Without<ViewerUnit>>,
++    bobbers: Query<(Entity, &GlobalTransform), With<Bobber>>,
++    water: Query<&WaterChunkInfo, With<FoamPatch>>,
++    index: Option<Res<WaterIndex>>,
++    mut track: ResMut<WakeTrack>,
++    mut frame: ResMut<WakeFrame>,
++    mut stats: ResMut<WakeStats>,
++) {
++    let on = look.on && water_on.on && wakes.on;
++    let cam = cams.iter().next();
++    let (Some(cam), Some(index), true) = (cam, index, on) else {
++        if frame.on {
++            *frame = WakeFrame::default();
++        }
++        track.was_on = false;
++        track.bodies.clear();
++        stats.sources = 0;
++        return;
++    };
++    let dt = time.delta_secs();
++    let reset = !track.was_on;
++    track.was_on = true;
++    if reset {
++        track.owed = 0.0;
++        track.cell = None;
++        track.bodies.clear();
++    }
++    let pairs = pairs_for(&mut track.owed, dt).max(u32::from(reset));
++    let cell = field_cell(cam.translation, cam.forward().as_vec3());
++    let mut next = WakeFrame {
++        on: true,
++        reset,
++        cell: track.cell.unwrap_or(cell),
++        origin: track.cell.unwrap_or(cell).as_vec2() * TEXEL_YD,
++        shift: IVec2::ZERO,
++        pairs,
++        clock: track.clock,
++        first_step: track.steps,
++        rain: weather.map_or(0.0, |w| w.rings()),
++        sources: Vec::new(),
++    };
++    if pairs > 0 {
++        let shift = cell - track.cell.unwrap_or(cell);
++        next.reset |= shift.abs().max_element() >= tune::GRID as i32;
++        next.shift = shift;
++        next.cell = cell;
++        next.origin = cell.as_vec2() * TEXEL_YD;
++        track.cell = Some(cell);
++        let steps = 2 * pairs;
++        track.clock = (track.clock + steps as f32 * tune::STEP_S) % 3600.0;
++        track.steps = (track.steps + steps) % (1 << 24);
++    }
++
++    // The bodies: the viewer's own and every other that wades, then the bobbers.
++    for b in track.bodies.values_mut() {
++        b.seen = false;
++    }
++    let mut found: Vec<(Entity, Vec3, f32, f32, bool)> = Vec::new();
++    if let Some(at) = viewer.at {
++        let scale = self_unit.single().map(|u| u.scale).unwrap_or(1.0);
++        found.push((Entity::PLACEHOLDER, at, viewer.height, scale, false));
++    }
++    for (e, t, u) in &units {
++        if u.wades {
++            found.push((e, t.translation, u.height, u.scale, false));
++        }
++    }
++    for (e, t) in &bobbers {
++        found.push((e, t.translation(), 0.0, 1.0, true));
++    }
++    let centre = next.origin + Vec2::splat(0.5 * tune::SPAN_YD);
++    let reach = 0.5 * tune::SPAN_YD + 2.0;
++    let mut sources: Vec<(f32, WakeSource)> = Vec::new();
++    let dt = dt.max(1.0e-4);
++    for (e, pos, height, scale, bobber) in found {
++        let flat = Vec2::new(pos.x, pos.z);
++        if (flat - centre).abs().max_element() > reach {
++            continue;
++        }
++        let body = track.bodies.entry(e).or_insert(Body {
++            stepped: flat,
++            last: pos,
++            wet: false,
++            seen: true,
++        });
++        body.seen = true;
++        let moved = pos - body.last;
++        body.last = pos;
++        if moved.length() > tune::JUMP_YD || reset {
++            body.stepped = flat;
++        }
++        let speed = Vec2::new(moved.x, moved.z).length() / dt;
++        let wow = bevy_to_wow(pos);
++        let Some(surface) = surface_at(&index, &water, wow) else {
++            body.wet = false;
++            body.stepped = flat;
++            continue;
++        };
++        let depth = surface - wow[2];
++        let source = if bobber {
++            (depth.abs() <= tune::BOBBER_REACH).then_some(WakeSource {
++                radius: tune::BOBBER_RADIUS,
++                idle: tune::BOBBER_PUSH,
++                idle_hz: tune::BOBBER_HZ,
++                ..default()
++            })
++        } else {
++            let gate = (2.0 * height).max(1.0);
++            body_source(depth, gate, speed, scale)
++        };
++        let Some(mut s) = source else {
++            body.wet = false;
++            body.stepped = flat;
++            continue;
++        };
++        if !body.wet {
++            s.splash = tune::SPLASH * if bobber { 0.4 } else { scale.clamp(0.5, 2.0) };
++            body.wet = true;
++        }
++        s.from = body.stepped;
++        s.to = flat;
++        s.phase = phase_of(e);
++        if pairs > 0 {
++            body.stepped = flat;
++        } else {
++            // Nothing steps this frame: the splash waits for the next that does.
++            body.wet = s.splash == 0.0;
++        }
++        sources.push(((flat - centre).length_squared(), s));
++    }
++    track.bodies.retain(|_, b| b.seen);
++    sources.sort_by(|a, b| a.0.total_cmp(&b.0));
++    next.sources = sources
++        .into_iter()
++        .take(tune::MAX_SOURCES)
++        .map(|(_, s)| s)
++        .collect();
++    stats.sources = next.sources.len();
++
++    track.since_log += dt;
++    if track.since_log >= tune::LOG_EVERY_S && (stats.sources > 0 || stats.foam_texels > 0) {
++        track.since_log = 0.0;
++        info!("[look wakes] {}", stats.line());
++    }
++    if *frame != next {
++        *frame = next;
++    }
++}
++
++/// The wakes' stats buffer, a few counters the pass adds to and the main world reads back.
++#[derive(Resource, Clone, ExtractResource)]
++pub struct WakeStatsBuffer(pub Handle<bevy::render::storage::ShaderStorageBuffer>);
++
++/// The entity that reads the stats back while the wakes are on.
++#[derive(Component)]
++struct WakeReadback;
++
++fn setup_stats(
++    mut commands: Commands,
++    buffers: Option<ResMut<Assets<bevy::render::storage::ShaderStorageBuffer>>>,
++) {
++    use bevy::render::render_resource::BufferUsages;
++    let Some(mut buffers) = buffers else { return };
++    let mut buf = bevy::render::storage::ShaderStorageBuffer::from([0u32; 4]);
++    buf.buffer_description.label = Some("look_wake_stats");
++    buf.buffer_description.usage =
++        BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST;
++    commands.insert_resource(WakeStatsBuffer(buffers.add(buf)));
++}
++
++/// Reads the counters back while the wakes run, and stops when they do.
++fn read_stats(
++    mut commands: Commands,
++    frame: Res<WakeFrame>,
++    buffer: Option<Res<WakeStatsBuffer>>,
++    readers: Query<Entity, With<WakeReadback>>,
++    mut stats: ResMut<WakeStats>,
++) {
++    let Some(buffer) = buffer else { return };
++    match (frame.on, readers.iter().next()) {
++        (true, None) => {
++            commands
++                .spawn((
++                    WakeReadback,
++                    bevy::render::gpu_readback::Readback::buffer(buffer.0.clone()),
++                ))
++                .observe(
++                    |ev: On<bevy::render::gpu_readback::ReadbackComplete>,
++                     mut stats: ResMut<WakeStats>| {
++                        let words: Vec<u32> = ev
++                            .data
++                            .as_chunks::<4>()
++                            .0
++                            .iter()
++                            .map(|c| u32::from_le_bytes(*c))
++                            .collect();
++                        if words.len() >= 2 {
++                            stats.foam_texels = words[0];
++                            stats.moving_texels = words[1];
++                            stats.read = true;
++                        }
++                    },
++                );
++        }
++        (false, Some(e)) => {
++            commands.entity(e).despawn();
++            *stats = WakeStats::default();
++        }
++        _ => {}
++    }
++}
++
++/// Inserts the two field images before any liquid material is made, so none waits on them.
++pub(crate) fn insert_wake_field(images: Option<ResMut<Assets<Image>>>) {
++    use benilla_assets::materials::{wake_field_image, WAKE_FIELD, WAKE_FIELD_B};
++    let Some(mut images) = images else { return };
++    for handle in [WAKE_FIELD, WAKE_FIELD_B] {
++        if images.get(handle.id()).is_none() {
++            let _ = images.insert(handle.id(), wake_field_image(tune::GRID));
++        }
++    }
++}
++
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookWakes>()
++        .init_resource::<WakeFrame>()
++        .init_resource::<WakeStats>()
++        .init_resource::<WakeTrack>();
++}
++
++pub(super) fn build(app: &mut App) {
++    app.add_systems(Startup, setup_stats)
++        .add_systems(PostUpdate, read_stats);
++}
++
++/// The field on the CPU: `look_wakes.wgsl`'s step in Rust, for the tests (keep in sync). `n`
++/// texels a side, each `[h, φ, foam, 0]`.
++#[derive(Clone)]
++pub struct CpuField {
++    pub n: usize,
++    pub texels: Vec<[f32; 4]>,
++}
++
++impl CpuField {
++    pub fn new(n: usize) -> Self {
++        Self {
++            n,
++            texels: vec![[0.0; 4]; n * n],
++        }
++    }
++
++    fn at(&self, x: i32, z: i32) -> [f32; 4] {
++        let n = self.n as i32;
++        if x < 0 || z < 0 || x >= n || z >= n {
++            return [0.0; 4];
++        }
++        self.texels[(z * n + x) as usize]
++    }
++
++    fn foam_at(&self, t: Vec2) -> f32 {
++        let f = t - Vec2::splat(0.5);
++        let i = f.floor();
++        let w = f - i;
++        let (x, z) = (i.x as i32, i.y as i32);
++        let a = self.at(x, z)[2];
++        let b = self.at(x + 1, z)[2];
++        let d = self.at(x, z + 1)[2];
++        let e = self.at(x + 1, z + 1)[2];
++        let lerp = |p: f32, q: f32, s: f32| p + (q - p) * s;
++        lerp(lerp(a, b, w.x), lerp(d, e, w.x), w.y)
++    }
++
++    /// The texel holding Bevy XZ `p` when the field's corner is at `origin`.
++    pub fn texel_of(&self, origin: Vec2, p: Vec2) -> Option<[f32; 4]> {
++        let t = ((p - origin) / TEXEL_YD).floor();
++        let n = self.n as f32;
++        (t.x >= 0.0 && t.y >= 0.0 && t.x < n && t.y < n).then(|| self.at(t.x as i32, t.y as i32))
++    }
++}
++
++/// One step `k` of `steps` of the field on the CPU, as `look_wakes.wgsl`'s `step_field`: the
++/// params are [`pack_params`]'s (the grid's size is the field's own here). No rain, no shift.
++pub fn cpu_step(field: &CpuField, params: &[[f32; 4]], k: u32) -> CpuField {
++    let n = field.n as i32;
++    let [_, dx, dt, steps] = params[0];
++    let steps = steps.max(1.0);
++    let wave = params[1];
++    let foam_p = params[2];
++    let more = params[3];
++    let clock = params[4];
++    let place = params[5];
++    let count = params[6][1] as usize;
++    let kf = k as f32;
++    let mut out = CpuField::new(field.n);
++    for z in 0..n {
++        for x in 0..n {
++            let s = field.at(x, z);
++            let xl = field.at(x - 1, z);
++            let xr = field.at(x + 1, z);
++            let zl = field.at(x, z - 1);
++            let zr = field.at(x, z + 1);
++            let pos = Vec2::new(place[0], place[1]) + (Vec2::new(x as f32, z as f32) + 0.5) * dx;
++            let t = clock[0] + kf * dt;
++            let (mut press, mut churn, mut splash) = (0.0, 0.0, 0.0);
++            for i in 0..count {
++                let s0 = params[7 + 3 * i];
++                let s1 = params[8 + 3 * i];
++                let s2 = params[9 + 3 * i];
++                let r2 = (s1[0] * s1[0]).max(1e-4);
++                let from = Vec2::new(s0[0], s0[1]);
++                let to = Vec2::new(s0[2], s0[3]);
++                let a = from.lerp(to, kf / steps);
++                let b = from.lerp(to, (kf + 1.0) / steps);
++                let v = b - a;
++                let l2 = v.length_squared().max(1e-8);
++                let sv = ((pos - a).dot(v) / l2).clamp(0.0, 1.0);
++                let d2 = (pos - a - sv * v).length_squared();
++                if d2 > 9.0 * r2 {
++                    continue;
++                }
++                let g = (-d2 / r2).exp();
++                press += (s1[1] + s2[0] * (std::f32::consts::TAU * s2[1] * t + s2[2]).sin()) * g;
++                churn += s1[2] * (-d2 / (1.69 * r2)).exp() * (d2 / r2).clamp(0.0, 1.0);
++                if k == 0 {
++                    splash += s1[3] * (-d2 / (2.25 * r2)).exp();
++                }
++            }
++            let lap = (xl[1] + xr[1] + zl[1] + zr[1] - 4.0 * s[1]) / (dx * dx);
++            let mut h = s[0] - dt * lap;
++            let mut phi = s[1] - dt * (wave[0] * h + press) - splash;
++            let edge = x.min(n - 1 - x).min(z.min(n - 1 - z)) as f32;
++            let e = (edge / more[3].max(1.0)).clamp(0.0, 1.0);
++            let keep = wave[1] * (1.0 - 0.2 * (1.0 - e) * (1.0 - e));
++            h *= keep;
++            phi *= keep;
++            let drift = Vec2::new(xr[1] - xl[1], zr[1] - zl[1]) / (2.0 * dx);
++            let back = Vec2::new(x as f32, z as f32) + 0.5 - drift * (wave[3] * dt / dx);
++            let rise = (h - s[0]) / dt;
++            let crest = (rise - foam_p[2]).max(0.0) * if h > 0.0 { 1.0 } else { 0.0 };
++            let foam = ((field.foam_at(back)
++                + (churn * foam_p[0] + crest * foam_p[1]) * dt
++                + splash * more[2])
++                * wave[2])
++                .min(foam_p[3]);
++            out.texels[(z * n + x) as usize] = [h, phi, foam, 0.0];
++        }
++    }
++    out
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// A body crossing a CPU field at `speed` yd/s along +X for `secs`, then (optionally) stopping
++    /// for `rest` more: the field, its corner, and the body's end.
++    fn run(speed: f32, secs: f32, rest: f32, depth: f32) -> (CpuField, Vec2, Vec2) {
++        let n = 96;
++        let origin = Vec2::ZERO;
++        let mut field = CpuField::new(n);
++        let mut pos = Vec2::new(4.0, 12.0);
++        let mut frame = WakeFrame {
++            on: true,
++            reset: false,
++            pairs: 1,
++            ..default()
++        };
++        let pair_s = 2.0 * tune::STEP_S;
++        let moving = (secs / pair_s) as u32;
++        let total = moving + (rest / pair_s) as u32;
++        let mut wet = false;
++        for i in 0..total {
++            let v = if i < moving { speed } else { 0.0 };
++            let next = pos + Vec2::new(v * pair_s, 0.0);
++            let mut s = body_source(depth, 4.0, v, 1.0).expect("in the water");
++            if !wet {
++                s.splash = tune::SPLASH;
++                wet = true;
++            }
++            s.from = pos;
++            s.to = next;
++            frame.sources = vec![s];
++            frame.clock = i as f32 * pair_s;
++            let mut params = pack_params(&frame);
++            params[0][0] = n as f32;
++            params[5] = [origin.x, origin.y, 0.0, 0.0];
++            field = cpu_step(&field, &params, 0);
++            field = cpu_step(&field, &params, 1);
++            pos = next;
++        }
++        (field, origin, pos)
++    }
++
++    fn foam(f: &CpuField, o: Vec2, p: Vec2) -> f32 {
++        f.texel_of(o, p).map_or(0.0, |t| t[2])
++    }
++
++    /// The reference's swimmer: at the swim speed (4.72 yd/s) the foam lies behind him in a V,
++    /// on both sides of his track and opening out the further back it lies; none ahead of him.
++    #[test]
++    fn a_swimmer_leaves_a_v_of_foam_behind_him() {
++        let (f, o, end) = run(4.72, 2.0, 0.0, 1.0);
++        // Ahead of him: calm, no foam.
++        assert_eq!(foam(&f, o, end + Vec2::new(2.0, 0.0)), 0.0);
++        // The V's half-width at 1.5 and 3 yd behind him: the widest foam either side.
++        let half_width = |back: f32| {
++            let mut w = [0.0f32; 2];
++            for (side, sign) in [(0, 1.0f32), (1, -1.0)] {
++                for j in 0..40 {
++                    let off = j as f32 * TEXEL_YD;
++                    if foam(&f, o, end + Vec2::new(-back, sign * off)) > 0.3 {
++                        w[side] = off;
++                    }
++                }
++            }
++            w
++        };
++        let near = half_width(1.5);
++        let far = half_width(3.0);
++        assert!(
++            near[0] > 0.0 && near[1] > 0.0,
++            "foam both sides near: {near:?}"
++        );
++        assert!(
++            far[0] > near[0] && far[1] > near[1],
++            "it opens out: {near:?} then {far:?}"
++        );
++        assert!(far[0] < 3.0, "a V, not a flood: {far:?}");
++    }
++
++    /// A hero standing still in the shallows breathes gentle rings and no foam.
++    #[test]
++    fn a_still_hero_makes_rings_not_foam() {
++        let (f, o, end) = run(0.0, 0.0, 3.0, 0.8);
++        let mut most_foam = 0.0f32;
++        let mut ring = 0.0f32;
++        for z in 0..f.n {
++            for x in 0..f.n {
++                let t = f.texels[z * f.n + x];
++                let p = o + (Vec2::new(x as f32, z as f32) + 0.5) * TEXEL_YD;
++                let r = (p - end).length();
++                most_foam = most_foam.max(t[2]);
++                if (1.5..3.0).contains(&r) {
++                    ring = ring.max(t[0].abs());
++                }
++            }
++        }
++        assert!(most_foam < 0.3, "no foam, not even round him: {most_foam}");
++        assert!(ring > 0.001 && ring < 0.05, "gentle rings: {ring} yd");
++    }
++
++    /// The wake fades: a second and a half after the swimmer stops, little foam is left, and the
++    /// field never grows.
++    #[test]
++    fn the_wake_fades_and_the_field_stays_calm() {
++        let (f, _, _) = run(4.72, 1.5, 2.0, 1.0);
++        let foam: usize = f.texels.iter().filter(|t| t[2] > 0.3).count();
++        let (moving, _, _) = run(4.72, 1.5, 0.0, 1.0);
++        let had: usize = moving.texels.iter().filter(|t| t[2] > 0.3).count();
++        assert!(had > 50, "{had} foamy texels while he swims");
++        let most = f.texels.iter().map(|t| t[0].abs()).fold(0.0f32, f32::max);
++        assert!(foam < 6, "{foam} foamy texels left");
++        assert!(most < 0.2, "the field stays small: {most} yd");
++    }
++
++    #[test]
++    fn steps_are_paid_in_pairs_and_slow_frames_forget() {
++        let mut owed = 0.0;
++        assert_eq!(pairs_for(&mut owed, 1.0 / 60.0), 1);
++        assert!(owed.abs() < 1e-5);
++        assert_eq!(pairs_for(&mut owed, 1.0 / 144.0), 0);
++        assert_eq!(pairs_for(&mut owed, 1.0 / 144.0), 0);
++        assert_eq!(
++            pairs_for(&mut owed, 1.0 / 144.0),
++            1,
++            "three short frames pay a pair"
++        );
++        let mut owed = 0.0;
++        assert_eq!(pairs_for(&mut owed, 0.5), tune::MAX_PAIRS);
++        assert!(owed <= 2.0 * tune::STEP_S + 1e-6, "{owed} owed");
++    }
++
++    #[test]
++    fn the_field_follows_the_camera_in_whole_texels_ahead_of_it() {
++        let a = field_cell(Vec3::new(10.0, 50.0, 10.0), Vec3::new(0.0, -0.7, -0.7));
++        let b = field_cell(Vec3::new(10.1, 50.0, 10.0), Vec3::new(0.0, -0.7, -0.7));
++        assert_eq!(a, b, "a tenth of a yard is under a texel");
++        let corner = a.as_vec2() * TEXEL_YD;
++        let centre = corner + Vec2::splat(0.5 * tune::SPAN_YD);
++        // Looking toward −Z: the centre is AHEAD of the span ahead, within a texel.
++        assert!((centre.x - 10.0).abs() <= TEXEL_YD);
++        assert!((centre.y - (10.0 - tune::AHEAD * tune::SPAN_YD)).abs() <= TEXEL_YD);
++    }
++
++    #[test]
++    fn a_body_pushes_only_in_the_water_and_harder_as_it_goes() {
++        assert!(body_source(0.0, 4.0, 4.0, 1.0).is_none(), "dry");
++        assert!(
++            body_source(5.0, 4.0, 4.0, 1.0).is_none(),
++            "too deep to reach the top"
++        );
++        let shin = body_source(0.2, 4.0, 4.0, 1.0).unwrap();
++        let waist = body_source(1.0, 4.0, 4.0, 1.0).unwrap();
++        assert!(shin.push < waist.push && shin.foam < waist.foam);
++        let still = body_source(1.0, 4.0, 0.0, 1.0).unwrap();
++        assert_eq!((still.push, still.foam), (0.0, 0.0));
++        assert!(still.idle > 0.0, "a still body breathes rings");
++    }
++
++    #[test]
++    fn the_params_carry_the_frame() {
++        let frame = WakeFrame {
++            on: true,
++            reset: true,
++            pairs: 2,
++            shift: IVec2::new(3, -1),
++            sources: vec![WakeSource {
++                from: Vec2::new(1.0, 2.0),
++                to: Vec2::new(3.0, 4.0),
++                radius: 0.4,
++                ..default()
++            }],
++            ..default()
++        };
++        let p = pack_params(&frame);
++        assert_eq!(p.len(), PARAM_ROWS);
++        assert_eq!(p[0][3], 4.0, "two pairs, four steps");
++        assert_eq!(p[4][2..], [3.0, -1.0]);
++        assert_eq!(p[6][..2], [1.0, 1.0]);
++        assert_eq!(p[7], [1.0, 2.0, 3.0, 4.0]);
++        assert_eq!(p[8][0], 0.4);
++        assert_eq!(water_row(&WakeFrame::default()), [0.0; 4]);
++    }
++
++    /// `look_wakes.wgsl`'s uniform is the packer's rows.
++    #[test]
++    fn the_shader_takes_the_packed_rows() {
++        let src = include_str!("../shaders/look_wakes.wgsl");
++        assert!(src.contains(&format!("src: array<vec4<f32>, {}>", 3 * tune::MAX_SOURCES)));
++        let rows_before_src = src
++            .split("struct WakeParams {")
++            .nth(1)
++            .unwrap()
++            .split("src:")
++            .next()
++            .unwrap()
++            .matches("vec4<f32>,")
++            .count();
++        assert_eq!(rows_before_src, 7);
++    }
++
++    #[test]
++    fn lookwater_reads_the_wake_words() {
++        use WakesCommand::*;
++        assert_eq!(LookWakes::parse("wakes 0"), Some(Ok(Wakes(Some(false)))));
++        assert_eq!(LookWakes::parse("WAKES 1"), Some(Ok(Wakes(Some(true)))));
++        assert_eq!(LookWakes::parse("wakes"), Some(Ok(Wakes(None))));
++        assert_eq!(LookWakes::parse("wakes 2"), Some(Err(())));
++        assert_eq!(
++            LookWakes::parse("refract 1.5"),
++            Some(Ok(Refract(Some(1.5))))
++        );
++        assert_eq!(LookWakes::parse("refract grade"), Some(Ok(Refract(None))));
++        assert_eq!(
++            LookWakes::parse("caustics 0"),
++            Some(Ok(Caustics(Some(0.0))))
++        );
++        assert_eq!(LookWakes::parse("caustics 3"), Some(Err(())));
++        assert_eq!(LookWakes::parse("refract"), Some(Err(())));
++        assert_eq!(LookWakes::parse("wakes 1 1"), Some(Err(())));
++        assert_eq!(LookWakes::parse("1.5"), None);
++        assert_eq!(LookWakes::parse(""), None);
++    }
++}
+diff --git a/crates/benilla-world/src/look/wakes_pass.rs b/crates/benilla-world/src/look/wakes_pass.rs
+new file mode 100644
+index 0000000..d980557
+--- /dev/null
++++ b/crates/benilla-world/src/look/wakes_pass.rs
+@@ -0,0 +1,212 @@
++//! The new look's wakes, their render half, benilla's own (no reference behaviour): the ripple
++//! field's steps (`look_wakes.wgsl`), once a frame before any camera draws, so every view's water
++//! reads this frame's field (`look::wakes`).
++//!
++//! A step reads one field image and writes the other; steps run in pairs, so the frame's field
++//! always ends in [`WAKE_FIELD`], which the liquid material binds. The compute pass is one span,
++//! `look_wakes`, in the fps journal's `gpu_look` column.
++
++use bevy::prelude::*;
++use bevy::render::diagnostic::RecordDiagnostics;
++use bevy::render::extract_resource::ExtractResourcePlugin;
++use bevy::render::render_asset::RenderAssets;
++use bevy::render::render_graph::{
++    Node, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel,
++};
++use bevy::render::render_resource::binding_types::{
++    storage_buffer_sized, texture_2d, texture_storage_2d, uniform_buffer_sized,
++};
++use bevy::render::render_resource::*;
++use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
++use bevy::render::storage::GpuShaderStorageBuffer;
++use bevy::render::texture::GpuImage;
++use bevy::render::{Render, RenderApp, RenderStartup, RenderSystems};
++
++use benilla_assets::materials::{WAKE_FIELD, WAKE_FIELD_B};
++
++use super::wakes::{pack_params, tune, WakeFrame, WakeStatsBuffer, PARAM_ROWS};
++
++#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
++pub(crate) struct LookWakesLabel;
++
++/// The uniform's bytes: [`PARAM_ROWS`] rows of four floats.
++const PARAM_BYTES: u64 = (PARAM_ROWS * 16) as u64;
++/// The most steps a frame runs.
++const MOST_STEPS: usize = 2 * tune::MAX_PAIRS as usize;
++/// The stats buffer: four counters.
++const STATS_BYTES: u64 = 16;
++
++#[derive(Resource)]
++struct WakePipeline {
++    layout: BindGroupLayoutDescriptor,
++    pipeline: CachedComputePipelineId,
++}
++
++/// The pass's buffers: the frame's uniform and one tiny uniform a step holding its number.
++#[derive(Resource)]
++struct WakeGpu {
++    params: Buffer,
++    steps: Vec<Buffer>,
++}
++
++fn init_pipeline(
++    mut commands: Commands,
++    cache: Res<PipelineCache>,
++    asset_server: Res<AssetServer>,
++    device: Res<RenderDevice>,
++) {
++    let layout = BindGroupLayoutDescriptor::new(
++        "look_wakes_layout",
++        &BindGroupLayoutEntries::sequential(
++            ShaderStages::COMPUTE,
++            (
++                texture_2d(TextureSampleType::Float { filterable: false }),
++                texture_storage_2d(TextureFormat::Rgba16Float, StorageTextureAccess::WriteOnly),
++                uniform_buffer_sized(false, std::num::NonZero::new(PARAM_BYTES)),
++                uniform_buffer_sized(false, std::num::NonZero::new(16)),
++                storage_buffer_sized(false, std::num::NonZero::new(STATS_BYTES)),
++            ),
++        ),
++    );
++    let pipeline = cache.queue_compute_pipeline(ComputePipelineDescriptor {
++        label: Some("look_wakes".into()),
++        layout: vec![layout.clone()],
++        push_constant_ranges: vec![],
++        shader: asset_server.load("embedded://benilla_world/shaders/look_wakes.wgsl"),
++        shader_defs: vec![],
++        entry_point: Some("step_field".into()),
++        zero_initialize_workgroup_memory: false,
++    });
++    commands.insert_resource(WakePipeline { layout, pipeline });
++    let params = device.create_buffer(&BufferDescriptor {
++        label: Some("look_wakes_params"),
++        size: PARAM_BYTES,
++        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
++        mapped_at_creation: false,
++    });
++    let steps = (0..MOST_STEPS as u32)
++        .map(|k| {
++            device.create_buffer_with_data(&BufferInitDescriptor {
++                label: Some("look_wakes_step"),
++                contents: bytemuck::cast_slice(&[k, 0, 0, 0]),
++                usage: BufferUsages::UNIFORM,
++            })
++        })
++        .collect();
++    commands.insert_resource(WakeGpu { params, steps });
++}
++
++/// Render world, in `PrepareResources`: the frame's uniform, while the field steps.
++fn upload_params(
++    queue: Res<RenderQueue>,
++    gpu: Option<Res<WakeGpu>>,
++    frame: Option<Res<WakeFrame>>,
++) {
++    let (Some(gpu), Some(frame)) = (gpu, frame) else {
++        return;
++    };
++    if !frame.on || frame.pairs == 0 {
++        return;
++    }
++    queue.write_buffer(&gpu.params, 0, bytemuck::cast_slice(&pack_params(&frame)));
++}
++
++#[derive(Default)]
++struct LookWakesNode;
++
++impl Node for LookWakesNode {
++    fn run<'w>(
++        &self,
++        _graph: &mut RenderGraphContext,
++        render_context: &mut RenderContext<'w>,
++        world: &'w World,
++    ) -> Result<(), NodeRunError> {
++        let Some(frame) = world.get_resource::<WakeFrame>() else {
++            return Ok(());
++        };
++        if !frame.on || frame.pairs == 0 {
++            return Ok(());
++        }
++        let (Some(pipe), Some(gpu), Some(stats)) = (
++            world.get_resource::<WakePipeline>(),
++            world.get_resource::<WakeGpu>(),
++            world.get_resource::<WakeStatsBuffer>(),
++        ) else {
++            return Ok(());
++        };
++        let cache = world.resource::<PipelineCache>();
++        let Some(pipeline) = cache.get_compute_pipeline(pipe.pipeline) else {
++            return Ok(()); // still compiling
++        };
++        let images = world.resource::<RenderAssets<GpuImage>>();
++        let (Some(a), Some(b)) = (images.get(&WAKE_FIELD), images.get(&WAKE_FIELD_B)) else {
++            return Ok(());
++        };
++        let Some(stats) = world
++            .resource::<RenderAssets<GpuShaderStorageBuffer>>()
++            .get(&stats.0)
++        else {
++            return Ok(());
++        };
++        let layout = cache.get_bind_group_layout(&pipe.layout);
++        let steps = (2 * frame.pairs as usize).min(MOST_STEPS);
++        let groups: Vec<BindGroup> = (0..steps)
++            .map(|k| {
++                let (from, to) = if k % 2 == 0 { (a, b) } else { (b, a) };
++                render_context.render_device().create_bind_group(
++                    "look_wakes",
++                    &layout,
++                    &BindGroupEntries::sequential((
++                        &from.texture_view,
++                        &to.texture_view,
++                        gpu.params.as_entire_binding(),
++                        gpu.steps[k].as_entire_binding(),
++                        stats.buffer.as_entire_binding(),
++                    )),
++                )
++            })
++            .collect();
++        let diagnostics = render_context.diagnostic_recorder();
++        let encoder = render_context.command_encoder();
++        encoder.clear_buffer(&stats.buffer, 0, None);
++        let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
++            label: Some("look_wakes"),
++            timestamp_writes: None,
++        });
++        let span = diagnostics.pass_span(&mut pass, "look_wakes");
++        pass.set_pipeline(pipeline);
++        let groups_a_side = tune::GRID.div_ceil(8);
++        for group in &groups {
++            pass.set_bind_group(0, group, &[]);
++            pass.dispatch_workgroups(groups_a_side, groups_a_side, 1);
++        }
++        span.end(&mut pass);
++        Ok(())
++    }
++}
++
++/// The main-world half: the frame's and the stats buffer's extracts; the render half in
++/// [`finish`].
++pub(super) fn build(app: &mut App) {
++    app.add_plugins((
++        ExtractResourcePlugin::<WakeFrame>::default(),
++        ExtractResourcePlugin::<WakeStatsBuffer>::default(),
++    ));
++}
++
++/// The render half, once the render app exists: the pipeline, the upload, and the steps ahead of
++/// every camera.
++pub(super) fn finish(app: &mut App) {
++    let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
++        return;
++    };
++    render_app
++        .add_systems(RenderStartup, init_pipeline)
++        .add_systems(
++            Render,
++            upload_params.in_set(RenderSystems::PrepareResources),
++        );
++    let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
++    graph.add_node(LookWakesLabel, LookWakesNode);
++    graph.add_node_edge(LookWakesLabel, bevy::render::graph::CameraDriverLabel);
++}
+diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
+index ec1dc9f..eec0e64 100644
+--- a/crates/benilla-world/src/look/water.rs
++++ b/crates/benilla-world/src/look/water.rs
+@@ -46,16 +46,34 @@ pub mod tune {
+     pub const MIRROR: f32 = 1.0;
+     /// The yards of water that let through about a third (1/e) of the bed's light at
+     /// `lookwater _ 1`: Elwynn's lakes are clear, the bed shows to about two yards deep.
+-    pub const CLEAR_YD: f32 = 1.4;
++    /// 1.8, was 1.4: Corey's reference pond (a retail lake seen from above) shows its sand, rocks
++    /// and weed plainly in the shallows, turning teal-green only by a yard or two.
++    pub const CLEAR_YD: f32 = 1.8;
+     /// The ocean is murkier.
+     pub const OCEAN_CLEAR_YD: f32 = 2.2;
+     /// The water's own colour in the shallows and in the deep, blended with the zone's `Light.dbc`
+     /// water colours at [`TINT_WEIGHT`] (1 ours only, 0 the zone's), then lit by its light.
+-    pub const SHALLOW: [f32; 3] = [0.18, 0.60, 0.56];
++    /// The shallow colour leans greener than it was ([0.18, 0.60, 0.56]), the reference's
++    /// teal-green over sand.
++    pub const SHALLOW: [f32; 3] = [0.20, 0.62, 0.50];
+     pub const DEEP: [f32; 3] = [0.04, 0.20, 0.24];
+     pub const TINT_WEIGHT: f32 = 0.6;
+-    /// Vertical yards from shallow to deep colour.
+-    pub const DEEP_AT: f32 = 3.0;
++    /// Vertical yards from shallow to deep colour: the shallow colour holds to [`DEEP_FROM`],
++    /// then turns to the deep by [`DEEP_AT`] (was 0 to 3.0, which tinted the first yard deep).
++    pub const DEEP_FROM: f32 = 1.2;
++    pub const DEEP_AT: f32 = 3.5;
++    /// The shoreline: no foam line, fully clear at the waterline, and a faint pale haze over the
++    /// first [`HAZE_YD`] of depth, at most [`HAZE`], as the reference's edge.
++    pub const HAZE: f32 = 0.2;
++    pub const HAZE_YD: f32 = 0.7;
++    /// The bed seen through moving water: it is drawn back from the tilt of the surface by this
++    /// many yards per unit of slope per yard of depth (to [`REFRACT_DEPTH`] deep), so it wavers
++    /// under the ripples and the wakes. `lookwater refract` holds a multiple of it.
++    pub const REFRACT: f32 = 1.0;
++    pub const REFRACT_DEPTH: f32 = 2.0;
++    /// Faint moving light on the shallow bed in the sun, a share of the bed's light at most.
++    /// `lookwater caustics` holds a multiple of it.
++    pub const CAUSTICS: f32 = 0.35;
+     /// Ripples: the normal's slope at the big octave's peak, and that octave's wavelength in yards
+     /// (the small one is a third of it). Calm (dawn, dusk, night: glassy) to breeze (day), and how
+     /// much rougher a full storm makes it.
+@@ -142,8 +160,10 @@ pub mod tune {
+     /// Shore foam: under this many yards deep, strongest just off the waterline, at this most.
+     pub const FOAM_DEPTH: f32 = 0.5;
+     /// 0.6, was 0.75: the shore's band read a fairly bright, even white on the first films; the
+-    /// ripples now break it up as well (`liquid.wgsl`).
+-    pub const FOAM: f32 = 0.6;
++    /// ripples now break it up as well (`liquid.wgsl`). 0, was 0.6: the reference's shore has no
++    /// foam line, only a faint pale haze ([`HAZE`]); foam comes from what moves the water
++    /// (`look::wakes`).
++    pub const FOAM: f32 = 0.0;
+     /// Froth round something standing in the water (a wading hero's legs, a post), where the
+     /// shore's band drew a crisp, thin, bright oval at the waterline: [`FROTH_TAPS`] points on the
+     /// surface within [`FROTH_YD`] of a pixel find the step in the bed the legs make, and the froth
+@@ -214,8 +234,13 @@ pub mod tune {
+ ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
+ ///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), rain rings]` ·
+ ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
+-///   the mirror's sky runs through, so the lakes mirror the clouds.
+-pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS;
++///   the mirror's sky runs through, so the lakes mirror the clouds ·
++///   23 `[wakes on, field origin x, z (yd), field span (yd)]` (`look::wakes::water_row`, zero
++///   with the wakes off) · 24 `[wake normal gain, wake foam, refraction (yd), caustics]` ·
++///   25 `[shore haze, haze depth (yd), deep from (yd), field texels]`.
++pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS + 3;
++/// The first of the wakes' and the shore's rows, after the sky's.
++pub const WAKE_ROW: usize = 10 + super::sky::SKY_ROWS;
+ 
+ /// `worldWater` and the film's hold: `on` (on by default, inert under the classic look); `reflect`
+ /// holds the mirror at a multiple of the tuned one, `clarity` the clarity (`lookwater`).
+@@ -373,6 +398,7 @@ pub fn pack_rows(
+     light: &WowLighting,
+     sky: &super::SkyFrame,
+     rings: f32,
++    wakes: (&super::WakeFrame, &super::LookWakes),
+ ) -> [[f32; 4]; WATER_ROWS] {
+     let mut rows = [[0.0; 4]; WATER_ROWS];
+     if !on {
+@@ -388,7 +414,7 @@ pub fn pack_rows(
+         } else {
+             sky.moon_clear
+         };
+-        rows[10..].copy_from_slice(&sky.rows);
++        rows[10..WAKE_ROW].copy_from_slice(&sky.rows);
+     }
+     // The sky's reflection: the hour's dome, toward the fog under cloud.
+     let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
+@@ -430,6 +456,20 @@ pub fn pack_rows(
+         tune::OCEAN_CLEAR_YD * clarity,
+         rings,
+     ];
++    let (wake, wake_held) = wakes;
++    rows[WAKE_ROW] = super::wakes::water_row(wake);
++    rows[WAKE_ROW + 1] = [
++        super::wakes::tune::NORMAL_GAIN,
++        super::wakes::tune::FOAM_SHOW,
++        tune::REFRACT * wake_held.refract.unwrap_or(1.0),
++        tune::CAUSTICS * wake_held.caustics.unwrap_or(1.0),
++    ];
++    rows[WAKE_ROW + 2] = [
++        tune::HAZE,
++        tune::HAZE_YD,
++        tune::DEEP_FROM,
++        super::wakes::tune::GRID as f32,
++    ];
+     rows
+ }
+ 
+@@ -440,14 +480,19 @@ pub(crate) fn publish_water(
+     light: Res<WowLighting>,
+     sky: Res<super::SkyFrame>,
+     weather: Option<Res<super::WeatherLook>>,
++    wakes: Option<Res<super::WakeFrame>>,
++    wakes_held: Option<Res<super::LookWakes>>,
+     mut frame: ResMut<WaterFrame>,
+ ) {
+     let on = look.on && water.on;
+     // The rain's rings (`look::weather`), none while it does not rain.
+     let rings = weather.map_or(0.0, |w| w.rings());
++    let no_wakes = super::WakeFrame::default();
++    let wake = wakes.as_deref().unwrap_or(&no_wakes);
++    let held = wakes_held.as_deref().copied().unwrap_or_default();
+     let next = WaterFrame {
+         on,
+-        rows: pack_rows(on, &water, &light, &sky, rings),
++        rows: pack_rows(on, &water, &light, &sky, rings, (wake, &held)),
+     };
+     if *frame != next {
+         *frame = next;
+@@ -520,7 +565,27 @@ mod tests {
+         }
+     }
+ 
+-    use crate::look::SkyFrame;
++    use crate::look::{LookWakes, SkyFrame, WakeFrame};
++
++    const NO_WAKES: (&WakeFrame, &LookWakes) = (
++        &WakeFrame {
++            on: false,
++            reset: true,
++            cell: IVec2::ZERO,
++            origin: Vec2::ZERO,
++            shift: IVec2::ZERO,
++            pairs: 0,
++            clock: 0.0,
++            first_step: 0,
++            rain: 0.0,
++            sources: Vec::new(),
++        },
++        &LookWakes {
++            on: true,
++            refract: None,
++            caustics: None,
++        },
++    );
+ 
+     #[test]
+     fn the_block_is_zero_when_off() {
+@@ -530,6 +595,7 @@ mod tests {
+             &noon(),
+             &SkyFrame::default(),
+             0.0,
++            NO_WAKES,
+         );
+         assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
+     }
+@@ -544,6 +610,7 @@ mod tests {
+             &noon(),
+             &SkyFrame::default(),
+             0.0,
++            NO_WAKES,
+         );
+         assert_eq!(rows[0], [1.0, tune::MIRROR, tune::CLEAR_YD, tune::FOAM]);
+         assert_eq!(rows[7][0], tune::SSR_REACH);
+@@ -555,6 +622,7 @@ mod tests {
+             &noon(),
+             &SkyFrame::default(),
+             0.7,
++            NO_WAKES,
+         );
+         assert_eq!(rain[9][3], 0.7, "the rain's rings");
+         let held = LookWater {
+@@ -562,7 +630,7 @@ mod tests {
+             clarity: Some(0.5),
+             ..default()
+         };
+-        let rows = pack_rows(true, &held, &noon(), &SkyFrame::default(), 0.0);
++        let rows = pack_rows(true, &held, &noon(), &SkyFrame::default(), 0.0, NO_WAKES);
+         assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
+         assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
+         assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
+@@ -836,6 +904,9 @@ mod tests {
+         assert_eq!(f("WATER_MOON_GLINT_MEAN"), tune::MOON_GLINT_MEAN);
+         assert_eq!(f("WATER_NIGHT_FLECKS"), tune::NIGHT_FLECKS);
+         assert_eq!(f("WATER_NIGHT_FLECK_LANE"), tune::NIGHT_FLECK_LANE);
++        assert_eq!(f("WATER_REFRACT_DEPTH"), tune::REFRACT_DEPTH);
++        assert_eq!(f("WAKE_FOAM_FROM"), crate::look::wakes::tune::FOAM_FROM);
++        assert_eq!(f("WAKE_FOAM_EDGE"), crate::look::wakes::tune::FOAM_EDGE);
+         let taps = read("WATER_FROTH_TAPS", "u32");
+         assert_eq!(
+             taps.trim_end_matches('u').parse::<u32>().unwrap(),
+@@ -843,10 +914,65 @@ mod tests {
+         );
+     }
+ 
+-    /// The block's size is its rows': its own ten and the painted sky's thirteen.
++    /// The block's size is its rows': its own ten, the painted sky's thirteen, and the wakes'
++    /// and the shore's three.
++    #[test]
++    fn the_block_is_twenty_six_rows() {
++        assert_eq!(WATER_BLOCK_BYTES, 416);
++        let src = include_str!("../../../benilla-assets/src/shaders/liquid.wgsl");
++        assert!(src.contains("rows: array<vec4<f32>, 26>"));
++    }
++
++    /// The wakes' rows: zero with the wakes off, the field's place with them on; the refraction
++    /// and the shore's haze either way, the console's holds scaling them.
+     #[test]
+-    fn the_block_is_twenty_three_rows() {
+-        assert_eq!(WATER_BLOCK_BYTES, 368);
++    fn the_block_carries_the_wakes_and_the_shore() {
++        let off = pack_rows(
++            true,
++            &LookWater::default(),
++            &noon(),
++            &SkyFrame::default(),
++            0.0,
++            NO_WAKES,
++        );
++        assert_eq!(off[WAKE_ROW], [0.0; 4]);
++        assert_eq!(off[WAKE_ROW + 1][2], tune::REFRACT);
++        assert_eq!(
++            off[WAKE_ROW + 2][..3],
++            [tune::HAZE, tune::HAZE_YD, tune::DEEP_FROM]
++        );
++        let frame = WakeFrame {
++            on: true,
++            origin: Vec2::new(-32.0, 10.0),
++            ..default()
++        };
++        let held = LookWakes {
++            refract: Some(0.0),
++            caustics: Some(2.0),
++            ..default()
++        };
++        let on = pack_rows(
++            true,
++            &LookWater::default(),
++            &noon(),
++            &SkyFrame::default(),
++            0.0,
++            (&frame, &held),
++        );
++        assert_eq!(
++            on[WAKE_ROW],
++            [1.0, -32.0, 10.0, crate::look::wakes::tune::SPAN_YD]
++        );
++        assert_eq!(on[WAKE_ROW + 1][2..], [0.0, 2.0 * tune::CAUSTICS]);
++        let classic = pack_rows(
++            false,
++            &LookWater::default(),
++            &noon(),
++            &SkyFrame::default(),
++            0.0,
++            (&frame, &held),
++        );
++        assert_eq!(classic, [[0.0; 4]; WATER_ROWS], "1.12's water");
+     }
+ 
+     /// Under the painted sky the mirror takes its rows, and the cloud over the sun dims the glint;
+@@ -859,8 +985,9 @@ mod tests {
+             &noon(),
+             &SkyFrame::default(),
+             0.0,
++            NO_WAKES,
+         );
+-        assert!(off[10..].iter().all(|r| *r == [0.0; 4]));
++        assert!(off[10..WAKE_ROW].iter().all(|r| *r == [0.0; 4]));
+         let input = crate::look::sky::SkyInputs {
+             secs: 1.76e9,
+             minute: 720.0,
+@@ -868,8 +995,8 @@ mod tests {
+             held: Some(1.0),
+         };
+         let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
+-        let on = pack_rows(true, &LookWater::default(), &noon(), &sky, 0.0);
+-        assert_eq!(on[10..], sky.rows[..]);
++        let on = pack_rows(true, &LookWater::default(), &noon(), &sky, 0.0, NO_WAKES);
++        assert_eq!(on[10..WAKE_ROW], sky.rows[..]);
+         assert!((on[1][3] - off[1][3] * sky.sun_clear).abs() < 1e-5);
+         assert!(sky.sun_clear < 1.0);
+     }
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index 9f53ed0..6ec8351 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -24,11 +24,14 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/look_shadow_map.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_water.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/look_sky.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/look_wakes.wgsl");
+     // The new look's sun-shadow map, which every terrain and model material binds: inserted before
+     // any material is made, so none waits on it.
+     app.add_systems(PreStartup, crate::look::shadow_pass::insert_shadow_map);
+     // And the new look's water scene copy, which every liquid material binds.
+     app.add_systems(PreStartup, crate::look::water::insert_water_scene);
++    // And the wakes' ripple field, which every liquid material binds too.
++    app.add_systems(PreStartup, crate::look::wakes::insert_wake_field);
+ }
+ 
+ #[cfg(test)]
+@@ -65,6 +68,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 15, "the engine's shader set changed size");
++        assert_eq!(found, 16, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/look_wakes.wgsl b/crates/benilla-world/src/shaders/look_wakes.wgsl
+new file mode 100644
+index 0000000..7e3bd32
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/look_wakes.wgsl
+@@ -0,0 +1,167 @@
++// The new look's wakes (`look::wakes`, benilla's own, no reference behaviour): one step of the
++// ripple field round the camera. Each texel holds the surface's height (yd), its velocity
++// potential (yd²/s, the water's drift is its gradient) and its foam:
++//   x = h, y = φ, z = foam, w unused.
++// A linear shallow-water wave, stepped symplectically so it stays stable at any frame rate:
++//   h' = h − dt·∇²φ        φ' = (φ − dt·(c²·h' + p))
++// both kept by the wave's life each step, where p is the pressure the bodies in the water push
++// with. Foam is carried by the drift ∇φ, born where a body moves through the water and on the
++// rising crests it sends out (the trailing V), and fades over its life. `look::wakes::cpu_step` is
++// this step in Rust for the tests (keep in sync).
++
++struct WakeParams {
++    // [grid texels, texel (yd), step (s), steps this frame]
++    head: vec4<f32>,
++    // [wave speed², wave kept a step, foam kept a step, drift]
++    wave: vec4<f32>,
++    // [body foam scale, crest foam, crest from (yd/s), foam most]
++    foam: vec4<f32>,
++    // [rain drops a texel a step, rain drop (yd²/s), splash foam per splash, edge texels]
++    more: vec4<f32>,
++    // [clock at the first step (s), first step's number, shift x, shift z (texels)]
++    clock: vec4<f32>,
++    // [origin x, origin z (yd), origin cell x, origin cell z]
++    place: vec4<f32>,
++    // [reset, sources, 0, 0]
++    misc: vec4<f32>,
++    // Three rows a source: [from x, from z, to x, to z] (yd, over the whole frame) ·
++    // [radius (yd), push, foam, splash] · [idle push, idle Hz, phase, 0].
++    src: array<vec4<f32>, 96>,
++};
++
++@group(0) @binding(0) var field_in: texture_2d<f32>;
++@group(0) @binding(1) var field_out: texture_storage_2d<rgba16float, write>;
++@group(0) @binding(2) var<uniform> p: WakeParams;
++// x = this step's number within the frame.
++@group(0) @binding(3) var<uniform> step: vec4<u32>;
++// [foam texels over 0.3, moving texels (|h| over 0.005 yd), 0, 0], counted on the frame's last step.
++@group(0) @binding(4) var<storage, read_write> stats: array<atomic<u32>, 4>;
++
++// The texel the field held at `c` before this step: the first step reads through the shift (the
++// field follows the camera a whole texel at a time) and reads nothing after a reset; outside the
++// field is calm water.
++fn wake_load(c: vec2<i32>) -> vec4<f32> {
++    let n = i32(p.head.x);
++    var q = c;
++    if (step.x == 0u) {
++        if (p.misc.x > 0.5) {
++            return vec4<f32>(0.0);
++        }
++        q = c + vec2<i32>(i32(p.clock.z), i32(p.clock.w));
++    }
++    if (any(q < vec2<i32>(0)) || any(q >= vec2<i32>(n))) {
++        return vec4<f32>(0.0);
++    }
++    return textureLoad(field_in, q, 0);
++}
++
++// The foam at `t` (texel units, centres at +0.5), bilinear.
++fn wake_foam_at(t: vec2<f32>) -> f32 {
++    let f = t - vec2<f32>(0.5);
++    let i = floor(f);
++    let w = f - i;
++    let c = vec2<i32>(i);
++    let a = wake_load(c).z;
++    let b = wake_load(c + vec2<i32>(1, 0)).z;
++    let d = wake_load(c + vec2<i32>(0, 1)).z;
++    let e = wake_load(c + vec2<i32>(1, 1)).z;
++    return mix(mix(a, b, w.x), mix(d, e, w.x), w.y);
++}
++
++// The squared distance from `x` to the segment `a`–`b`.
++fn wake_seg_d2(x: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
++    let v = b - a;
++    let l2 = max(dot(v, v), 1e-8);
++    let s = clamp(dot(x - a, v) / l2, 0.0, 1.0);
++    let d = x - a - s * v;
++    return dot(d, d);
++}
++
++fn wake_hash(c: vec2<i32>, n: u32) -> f32 {
++    var h = bitcast<u32>(c.x) * 374761393u + bitcast<u32>(c.y) * 668265263u + n * 2246822519u;
++    h = (h ^ (h >> 13u)) * 1274126177u;
++    h = h ^ (h >> 16u);
++    return f32(h) * (1.0 / 4294967296.0);
++}
++
++@compute @workgroup_size(8, 8, 1)
++fn step_field(@builtin(global_invocation_id) id: vec3<u32>) {
++    let n = i32(p.head.x);
++    let c = vec2<i32>(id.xy);
++    if (any(c >= vec2<i32>(n))) {
++        return;
++    }
++    let dx = p.head.y;
++    let dt = p.head.z;
++    let steps = max(p.head.w, 1.0);
++    let k = f32(step.x);
++
++    let s = wake_load(c);
++    let xl = wake_load(c - vec2<i32>(1, 0));
++    let xr = wake_load(c + vec2<i32>(1, 0));
++    let zl = wake_load(c - vec2<i32>(0, 1));
++    let zr = wake_load(c + vec2<i32>(0, 1));
++
++    // The bodies: the pressure each pushes with along its path through this step, the foam it
++    // churns at its sides, and the splash of one that came in this frame.
++    let x = p.place.xy + (vec2<f32>(c) + vec2<f32>(0.5)) * dx;
++    let t = p.clock.x + k * dt;
++    var press = 0.0;
++    var churn = 0.0;
++    var splash = 0.0;
++    let count = u32(p.misc.y);
++    for (var i = 0u; i < count; i = i + 1u) {
++        let s0 = p.src[3u * i];
++        let s1 = p.src[3u * i + 1u];
++        let s2 = p.src[3u * i + 2u];
++        let r2 = max(s1.x * s1.x, 1e-4);
++        let a = mix(s0.xy, s0.zw, k / steps);
++        let b = mix(s0.xy, s0.zw, (k + 1.0) / steps);
++        let d2 = wake_seg_d2(x, a, b);
++        if (d2 > 9.0 * r2) {
++            continue;
++        }
++        let g = exp(-d2 / r2);
++        press += (s1.y + s2.x * sin(6.2831853 * s2.y * t + s2.z)) * g;
++        churn += s1.z * exp(-d2 / (1.69 * r2)) * clamp(d2 / r2, 0.0, 1.0);
++        if (step.x == 0u) {
++            splash += s1.w * exp(-d2 / (2.25 * r2));
++        }
++    }
++
++    // The wave.
++    let lap = (xl.y + xr.y + zl.y + zr.y - 4.0 * s.y) / (dx * dx);
++    var h = s.x - dt * lap;
++    var phi = s.y - dt * (p.wave.x * h + press) - splash;
++    // Raindrops, world-anchored so they do not slide with the field.
++    let cell = c + vec2<i32>(i32(p.place.z), i32(p.place.w));
++    if (p.more.x > 0.0 && wake_hash(cell, u32(p.clock.y) + step.x) < p.more.x) {
++        phi -= p.more.y;
++    }
++    // A sponge round the edge, so nothing comes back off it.
++    let edge = f32(min(min(c.x, n - 1 - c.x), min(c.y, n - 1 - c.y)));
++    let e = clamp(edge / max(p.more.w, 1.0), 0.0, 1.0);
++    let keep = p.wave.y * (1.0 - 0.2 * (1.0 - e) * (1.0 - e));
++    h *= keep;
++    phi *= keep;
++
++    // The foam, carried back along the drift, born on the rising crests and at the bodies.
++    let drift = vec2<f32>(xr.y - xl.y, zr.y - zl.y) / (2.0 * dx);
++    let back = vec2<f32>(c) + vec2<f32>(0.5) - drift * (p.wave.w * dt / dx);
++    let rise = (h - s.x) / dt;
++    let crest = max(rise - p.foam.z, 0.0) * select(0.0, 1.0, h > 0.0);
++    var foam = wake_foam_at(back) + (churn * p.foam.x + crest * p.foam.y) * dt
++        + splash * p.more.z;
++    foam = min(foam * p.wave.z, p.foam.w);
++
++    textureStore(field_out, c, vec4<f32>(h, phi, foam, 0.0));
++
++    if (step.x + 1u == u32(steps)) {
++        if (foam > 0.3) {
++            atomicAdd(&stats[0], 1u);
++        }
++        if (abs(h) > 0.005) {
++            atomicAdd(&stats[1], 1u);
++        }
++    }
++}
+diff --git a/crates/benilla-world/src/water_fx/mod.rs b/crates/benilla-world/src/water_fx/mod.rs
+index 22ef0cc..cc6b322 100644
+--- a/crates/benilla-world/src/water_fx/mod.rs
++++ b/crates/benilla-world/src/water_fx/mod.rs
+@@ -341,12 +341,15 @@ fn emit_water_foam(
+     water: Query<(Entity, &WaterChunkInfo, &FoamPatch)>,
+     index: Res<WaterIndex>,
+     ripples: Option<Res<WaterRipples>>,
++    wakes: Option<Res<crate::look::WakeFrame>>,
+ ) {
+     if materials.is_none() {
+         return;
+     }
+-    // `0x68bda3`: the emitter makes no record while `waterRipples` is 0.
+-    let emits = ripples.is_none_or(|r| r.0 != 0);
++    // `0x68bda3`: the emitter makes no record while `waterRipples` is 0. Benilla's own: nor while
++    // the new look's wakes (`look::wakes`) answer the water in its place; the driver still runs,
++    // so the step-in latches stay true and nothing splashes on the switch back.
++    let emits = ripples.is_none_or(|r| r.0 != 0) && !wakes.is_some_and(|w| w.on);
+     let now = time.elapsed_secs();
+     let dt = time.delta_secs().max(1.0e-4);
+ 
+@@ -461,10 +464,17 @@ fn push_water_foam(
+     mut foam: ResMut<WaterFoam>,
+     mut quads: ResMut<EffectQuads>,
+     chunks_alive: Query<(), With<WaterChunkInfo>>,
++    wakes: Option<Res<crate::look::WakeFrame>>,
+ ) {
+     let Some(assets) = assets else { return };
+     let Ok(cam) = cam.single() else { return };
+     let now = time.elapsed_secs();
++    // Benilla's own: under the new look's wakes the pool's records go at once, so no older ring
++    // lies over the wakes' own.
++    if wakes.is_some_and(|w| w.on) {
++        foam.pool.iter_mut().for_each(|slot| *slot = None);
++        return;
++    }
+ 
+     for slot in &mut foam.pool {
+         if slot.as_ref().is_some_and(|r| now - r.born >= r.lifetime) {
+diff --git a/crates/benilla-world/src/world_unit.rs b/crates/benilla-world/src/world_unit.rs
+index 641f1ed..9e11851 100644
+--- a/crates/benilla-world/src/world_unit.rs
++++ b/crates/benilla-world/src/world_unit.rs
+@@ -33,3 +33,8 @@ pub struct WorldUnit {
+ /// The viewer's own body; a marker because every use is a query filter.
+ #[derive(Component)]
+ pub struct ViewerUnit;
++
++/// A fishing bobber (`GAMEOBJECT_TYPE_FISHINGNODE`): the new look's wakes (`look::wakes`) give it
++/// a small disturbance on the water where it floats. A marker the game puts on the object.
++#[derive(Component)]
++pub struct Bobber;
+-- 
+2.43.0
+

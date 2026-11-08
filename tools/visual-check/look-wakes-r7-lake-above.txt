@@ -1,0 +1,79 @@
+# Wakes, rings and splashes (client 0085, on #273's stack): Crystal Lake from steeply above, as in
+# Corey's reference video (a retail pond seen from above, a swimmer's white V wake). The camera
+# sits over the shore in front of the hero (yaw 180), pitched 50 down, 16 yd back; the hero backs
+# out from the shore into the shallows, stands, swims out at full speed (4.7 yd/s), turns hard
+# left, and stops. Then the same wade and swim three more times: lookwater wakes 0 (0081's froth
+# and 1.12's own wade rings back), worldWater 0 (1.12's water) and worldLook 0 (1.12's look).
+# What changed: a ripple field round the camera (256 x 256 texels over 64 yd) stepped on the GPU;
+# bodies in the water push on it by their speed, a still one only breathes gentle rings, one
+# coming in splashes; foam is born on the rising crests and where a body churns the water,
+# carried by the water's drift, fading over about 1.5 s, drawn as white streaks along the
+# crests. The bed under the water is bent by the surface's tilt (it should waver), and the shore
+# is clear at the waterline with a faint pale haze, no foam line; the shallows are clearer and
+# greener. 1.12's own ring round a standing hero's neck (take 310) is hidden while the wakes run.
+# PLEASE send client.log's "[look wakes]" lines (the counts: bodies pushing, the field, the share
+# under foam).
+# Look for, crop 1:1 round the hero:
+#   wade-in: a splash where he steps in, rings and a short foamy trail behind him;
+#   standing: gentle rings spreading from him, no foam ring at the waterline or the neck;
+#   swim: a crisp white V of curling streaks trailing behind him, fanning out and fading over
+#   1 to 2 s; the bed and any weed or rock under the wake wavering;
+#   turn: the wake bending round the corner; stop: the V fading out, rings left;
+#   shore (every still's edge of the lake): no hard line, no foam line, a faint pale haze;
+#   wakes-0: the old froth and 1.12's thin ring instead; worldwater-0 and classic: 1.12's water.
+hero warrior
+cam 180 -50 16
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+5.0 video
+5.5 shots shore 1 0.5
+6.0 lua ActionDash(2.0, 3, "b")
+6.1 shots wade-in 7 0.3
+8.6 lua ConsoleExec("lookwater wakes")
+8.6 shots standing 6 0.5
+11.6 lua ActionDash(4.0, 4.7, "b")
+11.7 shots swim 13 0.3
+14.0 lua ConsoleExec("lookwater wakes")
+15.7 lua ActionDash(2.0, 4.7, "l")
+15.8 shots turn 7 0.3
+17.8 shots stop 10 0.25
+20.5 lua ConsoleExec("lookwater wakes")
+21.0 lua ConsoleExec("lookwater wakes 0")
+21.1 .es goto crystal_lake
+24.0 lua ActionDash(2.0, 3, "b")
+24.1 shots wakes-0-wade 4 0.5
+26.5 shots wakes-0-standing 3 0.5
+28.0 lua ActionDash(3.0, 4.7, "b")
+28.1 shots wakes-0-swim 6 0.4
+31.2 shots wakes-0-stop 3 0.4
+32.5 lua ConsoleExec("lookwater wakes 1")
+32.55 lua SetCVar("worldWater", "0")
+32.6 .es goto crystal_lake
+35.5 lua ActionDash(2.0, 3, "b")
+35.6 shots worldwater-0-wade 4 0.5
+38.0 shots worldwater-0-standing 3 0.5
+39.5 lua ActionDash(3.0, 4.7, "b")
+39.6 shots worldwater-0-swim 6 0.4
+42.7 shots worldwater-0-stop 3 0.4
+44.0 lua SetCVar("worldWater", "1")
+44.05 lua SetCVar("worldLook", "0")
+44.1 lua ClearWorldFog()
+44.15 .es goto crystal_lake
+47.0 lua ActionDash(2.0, 3, "b")
+47.1 shots classic-wade 4 0.5
+49.5 shots classic-standing 3 0.5
+51.0 lua ActionDash(3.0, 4.7, "b")
+51.1 shots classic-swim 6 0.4
+54.2 shots classic-stop 3 0.4
+55.5 lua SetCVar("worldLook", "1")
+55.55 lua ClearWorldFog()
+55.6 lua ConsoleExec("lookweather server")
+57 end
