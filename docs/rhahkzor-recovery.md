@@ -22,5 +22,10 @@ The intended gauntlet remains: collapse at 70%, a front moving at 4 yd/sec with 
 maul at 25%, lodged pound at 12%, and escape through the smugglers' tunnel. Any change to that
 design requires comparison, not an implicit consequence of a movement repair.
 
-Claim: Codex owns this rollback and the subsequent route repair. Implementation and validation
-are pending. No repaired client run or unassisted clear is claimed.
+The rollback's release server build and full release test sweep passed: 1,102 tests passed,
+19 ignored, no failures. Repository checks passed with no warnings. Parsed content comparison
+confirms the Rhahk definition exactly matches #291 and all 29 other mob definitions match
+main `7d2747d`. Every Cargo invocation used the Windows Rust setup script and one build job.
+
+Codex owns the subsequent route repair. No new client run of the restored forge encounter,
+repaired gauntlet run, or unassisted clear is claimed.
