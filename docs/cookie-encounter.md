@@ -55,10 +55,17 @@ this encounter's authored beats. Other boss behavior is unchanged. Separate comm
 Smite's 3 loadouts explain existing tuning in response to the PR #298 review; their numbers do
 not change.
 
-Validation is in progress. The focused tests exercise actual AI/exchange counting, interruption
-with plain light attacks, success/heal limits, a fixed pour and dry side, solo/duo completion while
-waiting through every scoop, 4-hero progression, Gorged, route timeout, and cleanup. The controller
-uses inflated hero health and flat terrain; it is evidence of progress, not a normal-health clear.
+The release server build passed. The full release test sweep passed every test except an obsolete
+bestiary-camera fixture for Cookie's removed pot attack. That fixture now uses the Shadow Hunter's
+ranged hex, preserving the far-camera assertion; all 36 server-library tests passed on rerun.
+Together, the sweep and affected-suite rerun cover 1,109 passing tests and 19 ignored tests.
+The scenario parser and repository PR checks also passed.
+
+All 12 kitchen tests passed. They exercise actual AI/exchange counting, interruption with plain
+light attacks, success/heal limits, mug flight before heat, a fixed pour and dry side, solo/duo
+completion while waiting through every scoop, 4-hero progression, Gorged, route timeout, and cleanup.
+The controller uses inflated hero health and flat terrain; it is evidence of progress, not a
+normal-health clear.
 
 `tools/visual-check/cookie-kitchen.txt` and `cookie-gorged.txt` are isolated markers-off controlled
 scenarios. They clear existing foes and summon fresh actors, so old dungeon completion cannot
