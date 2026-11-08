@@ -6,7 +6,7 @@
 # sidestep; captain cuts during reload; first gunner death does not escalate; second causes
 # a visible gun draw; slow shot and avoidable rope/harpoon pull; all crew gone on captain death.
 hero warrior
-cam 0 -24 13
+cam 0 -35 22
 0 .es debug quiet
 1 .es travel landing
 10 .es debug quiet

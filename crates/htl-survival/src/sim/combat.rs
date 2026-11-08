@@ -2489,6 +2489,7 @@ impl Survival {
         for m in due {
             self.unmark(m.mark);
             let follow = self.firing_follow(m.owner, m.land_at);
+            let firing = self.is_firing_captain(m.owner) || self.firing_sees_veil(m.owner);
             // A grounding totem near where it lands takes it.
             if self.grounded_at(m.at) {
                 continue;
@@ -2504,12 +2505,14 @@ impl Survival {
             let caught: Vec<Id> = self
                 .players
                 .iter()
-                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius)
+                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius
+                    && (!firing || (p.pos[2] - m.at[2]).abs() < 3.0))
                 .map(|(id, _)| *id)
                 .collect();
             for v in caught {
                 let area = Some(Area::Circle { at: m.at, radius: m.radius });
-                self.strike_fair(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, follow.clone());
+                let how = if firing { HitKind::Projectile } else { HitKind::Area };
+                self.strike_fair_as(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, follow.clone(), how);
             }
         }
     }
