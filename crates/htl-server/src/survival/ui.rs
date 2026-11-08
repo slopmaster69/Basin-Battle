@@ -1911,6 +1911,10 @@ impl SurvivalGame {
                 Err(_) => Err("Try .es hurt 0.6 [name] (the share of its health to leave it).".into()),
             },
             "hurt" => Err("Turn debug on first (.es debug).".into()),
+            // (debug) Every creature below taken away but those named: `.es clearfoes rhahk`. For
+            // filming one fight with nothing else in it.
+            "clearfoes" if self.sim.debug => self.sim.dev_clear_foes(&arg).map(|said| self.say_to(conn, &said)),
+            "clearfoes" => Err("Turn debug on first (.es debug).".into()),
             // Testing the progression from a blank slate: this hero back to their first day, or
             // (debug) the camp's whole world, its save copied aside first.
             "reset" => match arg.as_str() {
