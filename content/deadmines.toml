@@ -1451,7 +1451,9 @@ name = "Sneed's Shredder"
 temper = "bruiser"
 subname = "Lumbermaster"
 display = 1269
-windup_sound = 1977
+windup_sound = 0
+aggro_sound = 1982
+death_sound = 1980
 scale = 1.1
 health = 950
 run_speed = 6.0
@@ -1479,17 +1481,18 @@ then_text = "That was company property!"
   lock = 0.6
   blockable = true
   heavy = true
+  sound = 1977
   [[mob.pattern]]
   name = "saws"
-  steps = [ { clip = 16, take = 1, windup = 1.0, damage = 30, recovery = 1.4 } ]
+  steps = [ { clip = 16, take = 0, windup = 1.0, damage = 30, recovery = 1.4 } ]
   [[mob.pattern]]
   name = "stamp and rake"
-  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.2, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, kit = 356 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
+  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.2, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, kit = 356, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
   # Locks as the engine revs, travels 6 yd in 0.9 sec, then stalls for 3.5 sec.
   [[mob.pattern]]
   name = "grind"
   max_range = 8.0
-  steps = [ { clip = 130, take = 0, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, kit = 379 } ]
+  steps = [ { clip = 16, take = 1, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, kit = 379, sound = 1982 } ]
 
 # Fragile on foot: a thrown wrench covers a scramble, a close flurry when cornered.
 [[mob]]

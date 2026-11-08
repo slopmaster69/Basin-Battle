@@ -2652,7 +2652,7 @@ impl Survival {
                 // Thrown where it was marked at the wind-up's start, its ring still there.
                 Some((at, mark)) => (at, lob_flight(dist2d(pos, at), a.speed), mark),
                 None => {
-                    let Some(to) = self.foe_pos(foe) else { return };
+                    let Some(to) = self.machinery_shot(id).or_else(|| self.foe_pos(foe)) else { return };
                     let at = self.ground_near(to[0], to[1], to[2]);
                     let fly = dist2d(pos, at) / a.speed.max(1.0);
                     // A splash's ground warned by its spell's own look; a bolt's small ring as drawn.

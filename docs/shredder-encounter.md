@@ -8,7 +8,7 @@ Walls stop the grind. A sidestep works without a dodge, parry, interrupt or rang
 There are no health-triggered phases or damage multipliers in either form.
 
 The machine still has 950 base health. Its driver has 340 base health, down from 700. Sneed
-throws the native wrench missile, scrambles back 4 yd where the ground allows, and flurries up
+aims the native wrench missile during its tell, then scrambles back 4 yd where the ground allows, and flurries up
 close. After at least 5 sec on foot, at a safe attack boundary, he returns to the wreck. He has
 6 sec to get there; no path means he abandons the attempt. At the wreck he visibly works for
 4 sec, using the existing Mining cast and repeated sparks. Any positive damage or a stagger
@@ -24,8 +24,11 @@ The implementation is in `sim/machinery.rs`, with small attack and lifecycle hoo
 content, shared boss-run behavior, the client patches and the native creature models stay with
 their existing owners. The native Throw Wrench spell 13398 was verified against the rig's client
 data: `Spells\Missile_Wrench.mdx`, speed 20. Smoke and work use existing spell visuals 1856 and
-2575. Native Shredder clips 16 and 130 are retained. Silhouette, exact steam appearance, sound
-separation and work animation still need the real-client visual pass.
+2575. The native model audit confirmed attack 16 takes 0/1, special 130 and StandWound 8; it
+has no separate stun clip. Sweep uses take 0, stamp uses 130 and grind uses take 1, with native
+attack/pre-aggro/aggro sounds 1977/1981/1982. Stall uses StandWound and wound sound 1979. The
+special and take 1 share impact timings, so distinct silhouettes must still be checked on film.
+Exact smoke appearance, sound separation and the work animation also need that visual pass.
 
 ## Capture checklist
 

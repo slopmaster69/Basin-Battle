@@ -22,6 +22,8 @@ pub(crate) struct Machinery {
     pressure: BTreeMap<Id, u8>,
     steam_at: BTreeMap<Id, f32>,
     grinds: BTreeMap<Id, Grind>,
+    stalls: BTreeMap<Id, f32>,
+    wrenches: BTreeMap<Id, Vec3>,
     drivers: BTreeMap<Id, Driver>,
     /// A repaired machine carries its driver's remaining health, never a fresh driver.
     rebuilt: BTreeMap<Id, u32>,
@@ -221,13 +223,71 @@ mod tests {
         let away = [8.0, 0.0, 0.0];
         s.mobs.get_mut(&driver).unwrap().pos = away;
         s.mobs.get_mut(&driver).unwrap().path.clear();
-        s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Seeking { until: s.clock + SEEK_LIMIT };
+        s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Seeking { until: s.clock + SEEK_LIMIT, repath_at: s.clock };
         s.land = Box::new(NoRoute);
         run(&mut s, SEEK_LIMIT + 0.1);
         assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
         assert!(dist2d(s.mobs[&driver].pos, away) < 0.1);
         assert!(!s.mobs.contains_key(&machine));
         assert!(live(&s, MACHINE).is_none());
+    }
+
+    #[test]
+    fn shredder_stalls_at_a_wall_and_a_posture_break_cannot_shorten_the_opening() {
+        let (mut s, band, id) = fight(1, 22);
+        s.land = Box::new(FlatLand { walls: vec![([4.0, 0.0], 0.7)], ..Default::default() });
+        let k = s.content.mobs[s.mobs[&id].def].patterns.iter().position(|p| p.name == "grind").unwrap();
+        s.begin_pattern(id, k, false);
+        s.windup(id, Foe::Hero(band[0]), [8.0, 0.0, 0.0]);
+        s.move_player(band[0], [4.8, 0.0, 0.0], 0.0, Moving::default());
+        let hp = s.players[&band[0]].health;
+        run(&mut s, 2.4);
+        assert!(s.mobs[&id].pos[0] <= 3.3, "saw stops before the wall");
+        assert_eq!(s.players[&band[0]].health, hp, "no hit through the wall");
+        let until = s.machinery.stalls[&id];
+        s.stagger_mob(id, 0.6, false);
+        run(&mut s, 0.8);
+        assert!(matches!(s.mobs[&id].state, MobState::Recover { until: end, .. } if end >= until));
+    }
+
+    #[test]
+    fn shredder_zero_damage_does_not_cancel_work_but_a_departed_party_resets_it() {
+        let (mut s, band, machine) = fight(1, 21);
+        s.hurt_mob(machine, band[0], u32::MAX);
+        let driver = live(&s, DRIVER).unwrap();
+        working(&mut s, driver);
+        s.hurt_mob(driver, band[0], 0);
+        assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Working { .. }));
+        s.move_player(band[0], [500.0, 0.0, 0.0], 0.0, Moving::default());
+        run(&mut s, 0.1);
+        assert!(!s.mobs.contains_key(&driver) && !s.mobs.contains_key(&machine));
+        let back = live(&s, MACHINE).unwrap();
+        assert_eq!(s.mobs[&back].health, s.mobs[&back].max_health);
+        assert!(s.machinery.drivers.is_empty() && !s.slain("sneed"));
+    }
+
+    #[test]
+    fn shredder_driver_commits_his_wrench_before_retreating() {
+        let (mut s, band, machine) = fight(1, 31);
+        s.hurt_mob(machine, band[0], u32::MAX);
+        let driver = live(&s, DRIVER).unwrap();
+        s.move_player(band[0], [8.0, 0.0, 0.0], 0.0, Moving::default());
+        let mut wound = false;
+        for _ in 0..100 {
+            let ev = s.step(DT);
+            if ev.iter().any(|e| matches!(e, Event::Cast { caster, spell: 13398, .. } if *caster == driver)) {
+                wound = true;
+                break;
+            }
+        }
+        assert!(wound, "the AI chose its throw at range");
+        let at = s.mobs[&driver].pos;
+        s.move_player(band[0], [8.0, 3.0, 0.0], 0.0, Moving::default());
+        let hp = s.players[&band[0]].health;
+        let ev = run(&mut s, 2.0);
+        assert_eq!(s.players[&band[0]].health, hp, "a sidestep during the tell evades the wrench");
+        assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 13398, target: Target::Point(p) } if *caster == driver && dist2d(*p, [8.0, 0.0, 0.0]) < 0.1)));
+        assert!(dist2d(s.mobs[&driver].pos, at) > 3.0, "the throw covers his retreat");
     }
 }
 
@@ -251,7 +311,7 @@ struct Driver {
 #[derive(Clone, Copy)]
 enum RepairStage {
     Fighting { after: f32 },
-    Seeking { until: f32 },
+    Seeking { until: f32, repath_at: f32 },
     Working { until: f32, spark_at: f32 },
     Spent,
 }
@@ -276,8 +336,21 @@ impl Survival {
 
     pub(crate) fn machinery_windup(&mut self, id: Id) {
         if self.machine_grind(id) {
-            self.yell(id, "That'll cut it!".into());
+            self.yell(id, "That'll cut it!");
         }
+        let m = &self.mobs[&id];
+        if self.content.mobs[m.def].key == DRIVER {
+            self.machinery.wrenches.remove(&id);
+            if m.pattern.is_some_and(|(k, _)| self.content.mobs[m.def].patterns[k].name == "wrench") {
+                if let Some(at) = m.state.foe().and_then(|f| self.foe_pos(f)) {
+                    self.machinery.wrenches.insert(id, at);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn machinery_shot(&mut self, id: Id) -> Option<Vec3> {
+        self.machinery.wrenches.remove(&id)
     }
 
     /// Called only after the last blow actually executes, before its recovery. Interrupted
@@ -342,6 +415,8 @@ impl Survival {
         self.machinery.pressure.remove(&id);
         self.machinery.steam_at.remove(&id);
         self.machinery.grinds.remove(&id);
+        self.machinery.stalls.remove(&id);
+        self.machinery.wrenches.remove(&id);
         // Keep rebuilt until the normal second-form handoff consumes it.
         if let Some(d) = self.machinery.drivers.remove(&id) {
             self.events.push(Event::CastEnd { caster: id });
@@ -362,6 +437,7 @@ impl Survival {
             if let Some(foe) = m.state.foe() {
                 m.state = MobState::Recover { foe, until: self.clock + 1.2 };
                 m.ready_at = self.clock + 1.2;
+                m.think = 0.0;
             }
         }
         if let Some(wreck) = wreck { self.dismiss(wreck); }
@@ -383,12 +459,26 @@ impl Survival {
         self.machinery.steam_at.retain(|id, _| self.machinery.pressure.contains_key(id));
         self.machinery.rebuilt.retain(|id, _| self.mobs.get(id).is_some_and(|m| m.health > 0 && m.state.foe().is_some()));
         self.machinery.grinds.retain(|id, _| self.mobs.get(id).is_some_and(|m| m.health > 0));
+        self.machinery.stalls.retain(|id, _| self.mobs.get(id).is_some_and(|m| m.health > 0 && m.state.foe().is_some()));
+        self.machinery.wrenches.retain(|id, _| self.mobs.get(id).is_some_and(|m| m.health > 0 && matches!(m.state, MobState::Windup { .. })));
     }
 
     /// Runs after walking but before generic AI/CC checks, so a stun cannot finish a repair or
     /// leave a machine grinding while disabled. Return true while this beat owns its thinking.
     pub(crate) fn step_machinery(&mut self, id: Id) -> bool {
         let now = self.clock;
+        if let Some(until) = self.machinery.stalls.get(&id).copied() {
+            if now < until {
+                let m = self.mobs.get_mut(&id).unwrap();
+                if let Some(foe) = m.state.foe() {
+                    // A posture break during the opening may extend it, never shorten it.
+                    m.state = MobState::Recover { foe, until: until.max(m.stagger_until) };
+                    m.pattern = None;
+                    return true;
+                }
+            }
+            self.machinery.stalls.remove(&id);
+        }
         let heat = self.machinery.pressure.get(&id).copied().unwrap_or(0);
         if heat > 0 && now >= self.machinery.steam_at.get(&id).copied().unwrap_or(0.0) {
             self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
@@ -400,7 +490,7 @@ impl Survival {
             if !stopped {
                 let at = m.pos;
                 let len = dist2d(g.last, at) + 1.5;
-                let victims: Vec<Id> = self.players.iter().filter(|(h, p)| p.health > 0 && !g.hit.contains(h) && combat::in_strip(g.last, g.facing, len, HALF_WIDTH, p.pos)).map(|(h, _)| *h).collect();
+                let victims: Vec<Id> = self.players.iter().filter(|(h, p)| p.health > 0 && !g.hit.contains(h) && combat::in_strip(g.last, g.facing, len, HALF_WIDTH, p.pos) && crate::land::clear_line(self.land.as_ref(), g.last, p.pos)).map(|(h, _)| *h).collect();
                 for h in victims {
                     g.hit.insert(h);
                     self.strike_fair(id, h, g.damage, g.last, false, false, false, Blow::Light,
@@ -414,9 +504,12 @@ impl Survival {
                     let m = self.mobs.get_mut(&id).unwrap();
                     m.state = MobState::Recover { foe, until: now + STALL };
                     m.ready_at = now + STALL;
-                    self.yell(id, "C'mon, you heap of junk!".into());
+                    self.machinery.stalls.insert(id, now + STALL);
+                    self.yell(id, "C'mon, you heap of junk!");
                     self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
-                    self.events.push(Event::React { id, anim: combat::STUN_ANIM, from: g.last, lean: 0.0, hold: STALL, fit: 0.0 });
+                    // This model has StandWound (8), but no stun clip.
+                    self.events.push(Event::React { id, anim: 8, from: g.last, lean: 0.0, hold: STALL, fit: 0.0 });
+                    self.events.push(Event::Sound { id, sound: 1979 });
                 }
             } else {
                 self.machinery.grinds.insert(id, g);
@@ -445,23 +538,24 @@ impl Survival {
             RepairStage::Fighting { after } => {
                 let boundary = matches!(m.state, MobState::Chase { .. }) || matches!(m.state, MobState::Recover { until, .. } if now >= until && m.pattern.is_none());
                 if now < after || !boundary || !free { return false; }
-                self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { until: now + SEEK_LIMIT };
+                self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { until: now + SEEK_LIMIT, repath_at: now + 0.5 };
                 let m = self.mobs.get_mut(&id).unwrap();
                 m.pattern = None;
                 m.state = MobState::Chase { foe: foe.unwrap() };
                 self.go(id, wreck, 5.0);
                 true
             }
-            RepairStage::Seeking { until } => {
+            RepairStage::Seeking { until, repath_at } => {
                 if now >= until {
                     self.abandon_repair(id);
                 } else if free && dist2d(pos, wreck) <= 1.6 && (pos[2] - wreck[2]).abs() < 2.0 {
                     self.halt(id);
                     self.mobs.get_mut(&id).unwrap().facing = facing(pos, wreck);
                     self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { until: now + REPAIR, spark_at: now };
-                    self.yell(id, "Just... one... bolt...".into());
+                    self.yell(id, "Just... one... bolt...");
                     self.events.push(Event::Cast { caster: id, spell: WORK, ms: (REPAIR * 1000.0) as u32 });
-                } else if free && !self.held_still(id) && self.mobs[&id].path.is_empty() {
+                } else if free && !self.held_still(id) && self.mobs[&id].path.is_empty() && now >= repath_at {
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { until, repath_at: now + 0.5 };
                     self.go(id, wreck, 5.0);
                 }
                 true
