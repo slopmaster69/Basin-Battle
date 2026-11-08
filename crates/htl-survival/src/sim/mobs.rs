@@ -1236,7 +1236,6 @@ impl Survival {
                 }
                 continue;
             }
-            if self.step_firing_gunner(id, dt) { continue; }
             // Far from every hero, a creature at rest sleeps (the land is wide).
             if heroes.iter().all(|p| dist2d(*p, self.mobs[&id].pos) > SLEEP_RANGE) {
                 let m = &self.mobs[&id];
@@ -1259,6 +1258,7 @@ impl Survival {
             if self.targets.get(&id).copied().unwrap_or(false) {
                 continue;
             }
+            if self.step_firing_gunner(id, dt) { continue; }
             if self.step_machinery(id) {
                 continue;
             }

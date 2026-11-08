@@ -245,6 +245,18 @@ fn normal_charged_projectile_inputs_can_kill_a_gunner() {
 }
 
 #[test]
+fn a_gunner_keeps_normal_knockback_motion_while_his_ai_holds_the_post() {
+    let (mut s, h, _, crew, _) = fight(false);
+    let g = crew[0];
+    let before = s.mobs[&g].pos;
+    let effect = crate::content::AbilityEffect { kind: "knockback".into(), amount: 3.0, from_caster: true, ..Default::default() };
+    s.displace(h, g, &effect);
+    tick(&mut s, 0.4);
+    assert!(dist2d(s.mobs[&g].pos, before) > 2.0);
+    assert!(s.firing_line.owners.contains_key(&g));
+}
+
+#[test]
 fn killing_the_captain_first_clears_his_elite_pack_and_pays_once() {
     let mut s = Survival::new_dungeon(Content::dev(), Box::new(FlatLand::default()), 31, 0.0);
     let h = s.join("boarder", "Boarder", None);

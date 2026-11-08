@@ -187,6 +187,8 @@ impl Survival {
     /// independent caster AI, so a stagger or a party retarget cannot bunch the next volley.
     pub(crate) fn step_firing_gunner(&mut self, id: Id, dt: f32) -> bool {
         let Some(owner) = self.firing_line.owners.get(&id).copied() else { return false };
+        // Their own legs stay planted, but ordinary melee knockbacks and pulls still move them.
+        if self.mobs[&id].thrown_until > self.clock { return true; }
         self.halt(id);
         if self.disabled(id) || self.mobs[&id].stagger_until > self.clock { return true; }
         self.firing_shoulder(id);
