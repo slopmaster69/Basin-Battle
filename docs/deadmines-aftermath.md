@@ -49,7 +49,8 @@ The eight named views are `mouth`, `galleries`, `mast`, `workshop`, `foundry`, `
 and `landing`. `.es aftermath status` reports the object count and any authored sites rejected
 for missing floors. `.es aftermath point <x> <y> <z> [facing]` moves an inspector to another dry
 floor; it checks the actual collapsed map, including the absence of the ship decks. `.es where`
-reports the inspection position. Named view footings are kept clear of the debris bounds.
+reports the inspection position. A 0.9 yd standing capsule at each named view stays clear of the
+oriented debris bounds, with low rubble and timber aprons beginning nearby.
 
 The first activation reads and caches the ship-free ground from the server's existing `--data`
 or `WOW_DATA` folder. No game files are changed. The server freezes the original simulation and
@@ -73,7 +74,7 @@ and their ramp, Marisa's side room, the Cannon Gallery and cove passages, the en
 pantry, beach, landing and sea tunnel. The ship's former quarters and deck are replaced by a
 seabed-backed collapse basin, not props balanced on the old deck floor.
 
-Large native Westfall boulders establish the collapsed space. Smaller dark rocks and wall rubble
+Large native dark Burning Steppes boulders establish the collapsed space. Smaller dark rocks and wall rubble
 form their aprons. Fallen supports, lumber and timber piles connect the falls to the mine's
 structure. Wrecked mine carts, broken crates and barrels, tipped machinery and overturned cannons
 give each working area its own debris. Wrecked rowboats dress the cove edges. Bounds and pivots
@@ -92,7 +93,7 @@ disconnects and repeat activation. The ignored `native_aftermath_floors_support_
 test reads the user's installed map through `WOW_DATA`; it verifies authored floor coverage,
 retained inspection footing and the actual absence of the old ship floors.
 
-The installed-data check currently places 496 solids with no rejected sites: 24 at the entrance,
-90 in the galleries, 21 in the Mast Room, 40 in the workshop, 87 in the Foundry, 88 in the Cannon
-Gallery, 104 in the cove and 42 at the landing and sea tunnel. Floating wreckage uses the measured
+The installed-data check currently places 577 solids with no rejected sites: 31 at the entrance,
+99 in the galleries, 32 in the Mast Room, 51 in the workshop, 98 in the Foundry, 98 in the Cannon
+Gallery, 115 in the cove and 53 at the landing and sea tunnel. Floating wreckage uses the measured
 native water surface at -0.023 yd. These counts establish coverage, not visual approval.

@@ -85,13 +85,15 @@ const BOAT: usize = 12;
 const SUPPORT: usize = 13;
 
 const MODELS: &[Model] = &[
-    Model { display: 4315, name: "Fallen Boulder", min: [-8.11,-9.47,-1.26], max: [7.76,9.78,12.31] },
-    Model { display: 4316, name: "Broken Rock", min: [-9.12,-10.41,-0.98], max: [8.60,8.60,7.0] },
+    // Native check: the Westfall sea boulders read as luminous pale mounds indoors.
+    // These rough dark meshes share the mine rubble's ashrock04 texture instead.
+    Model { display: 5737, name: "Fallen Boulder", min: [-4.04,-4.73,-0.10], max: [4.08,4.31,9.42] },
+    Model { display: 5741, name: "Broken Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
     Model { display: 5741, name: "Cave Rubble", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 134, name: "Stone Fragments", min: [-0.64,-0.69,0.01], max: [0.63,0.68,0.82] },
-    Model { display: 1109, name: "Broken Timbers", min: [-1.69,-0.89,0.0], max: [1.69,0.88,1.67] },
+    Model { display: 134, name: "Stone Fragments", min: [-0.88,-0.79,0.01], max: [0.39,0.58,0.82] },
+    Model { display: 1109, name: "Broken Timbers", min: [-1.68,-0.91,0.0], max: [1.70,0.86,1.67] },
     Model { display: 6193, name: "Splintered Timber", min: [-3.0,-2.12,-0.02], max: [1.76,2.39,1.19] },
-    Model { display: 6481, name: "Broken Plank", min: [-1.28,-0.56,-0.01], max: [1.28,0.56,0.22] },
+    Model { display: 6481, name: "Broken Plank", min: [-1.69,-0.32,-0.01], max: [0.87,0.80,0.22] },
     Model { display: 1887, name: "Wrecked Mine Cart", min: [-0.82,-1.06,-0.10], max: [1.25,1.05,1.60] },
     Model { display: 9, name: "Broken Barrel", min: [-1.23,-0.58,-0.04], max: [0.43,0.82,1.02] },
     Model { display: 3791, name: "Broken Crate", min: [-0.89,-1.05,-0.02], max: [1.25,0.85,1.31] },
@@ -131,14 +133,22 @@ fn make_prop(site: &Site, model: usize, pos: [f32; 3], scale: f32, roll: f32, pi
         scale, rotation, facing: yaw }
 }
 
-/// Keep a small inspection footing at each named view. A conservative enclosing sphere is
-/// intentional: the camera must not spawn inside a tilted support or a boulder's shoulder.
+/// Test a 0.9 yd standing capsule against the actual oriented model box. The first native
+/// check showed that a model's enclosing sphere cleared enormous clean disks around views,
+/// even for a low plank or a tall rock whose solid body never reached the inspector.
 fn covers_view(p: &Prop) -> bool {
     let m = &MODELS[p.model];
-    let radius = (0..3).map(|a| m.min[a].abs().max(m.max[a].abs()).powi(2)).sum::<f32>().sqrt()*p.scale;
+    let [qx,qy,qz,w] = p.rotation;
+    let [x,y,z] = [-qx,-qy,-qz];
     layout::REGIONS.iter().any(|r| {
-        let d2 = (0..3).map(|a| (r.view[a]-p.pos[a]).powi(2)).sum::<f32>();
-        d2 < (radius+2.2).powi(2)
+        [0.15,0.95,1.75].iter().any(|height| {
+            let v = [(r.view[0]-p.pos[0])/p.scale, (r.view[1]-p.pos[1])/p.scale,
+                (r.view[2]+height-p.pos[2])/p.scale];
+            let t = [2.0*(y*v[2]-z*v[1]), 2.0*(z*v[0]-x*v[2]), 2.0*(x*v[1]-y*v[0])];
+            let local = [v[0]+w*t[0]+y*t[2]-z*t[1], v[1]+w*t[1]+z*t[0]-x*t[2], v[2]+w*t[2]+x*t[1]-y*t[0]];
+            let d2 = (0..3).map(|a| (local[a]-local[a].clamp(m.min[a],m.max[a])).powi(2)).sum::<f32>();
+            d2 < (0.9/p.scale).powi(2)
+        })
     })
 }
 
@@ -161,8 +171,8 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
                 props.push(make_prop(site, model, [at[0], at[1], z], scale*site.scale, roll, pitch, site.yaw+yaw));
             }
         };
-        place(BOULDER, [1.5, 1.3*hand], 0.48, 0.0, 0.06*hand, 0.2);
-        place(LOW_ROCK, [-2.5, 0.9*hand], 0.34, 0.0, -0.13, 1.7);
+        place(BOULDER, [1.5, 1.3*hand], 0.82, 0.08*hand, 0.13*hand, 0.2);
+        place(LOW_ROCK, [-2.5, 0.9*hand], 0.95, 0.0, -0.13, 1.7);
         place(DARK_ROCK, [0.0, -2.5*hand], 0.65, 0.0, 0.12, 2.8);
         place(RUBBLE, [2.6, -2.1*hand], 2.4, 0.0, 0.0, 0.6);
         match site.dressing {
@@ -179,7 +189,7 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
                 place(CRATE, [0.8, -4.0*hand], 1.4, 0.0, 0.0, 0.6);
             }
             Dressing::Machine => {
-                place(MACHINE, [-1.0, -2.0*hand], 1.6, 1.32, 0.2, 0.8);
+                place(MACHINE, [-2.2, -3.0*hand], 1.05, 1.32, 0.2, 0.8);
                 place(CART, [2.5, -2.5*hand], 1.3, 0.2, 0.0, 2.0);
                 place(SUPPORT, [-2.5, -1.5*hand], 0.9, 0.2, 1.5, 2.5);
                 place(WOODPILE, [0.6, -4.0*hand], 1.3, 0.0, 0.0, 1.4);
@@ -204,6 +214,23 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
             }
         }
     }
+    // The damage runs into the foreground: shallow aprons between the original support
+    // bases, with only the inspector's exact footing kept clear. No clean circular stage.
+    for (region, r) in layout::REGIONS.iter().enumerate() {
+        let apron = Site { region, name: "Rubble apron", at: r.view, yaw: r.facing, scale: 1.0, dressing: Dressing::Timber };
+        let (s,c) = r.facing.sin_cos();
+        for (model, dx, dy, scale, yaw) in [
+            (RUBBLE, 3.0, -1.5, 1.8, 0.2), (PLANK, 2.5, 1.7, 1.7, 0.8),
+            (LUMBER, 5.0, 2.7, 0.85, 1.9), (WOODPILE, 4.0, -3.3, 1.15, 2.5),
+            (DARK_ROCK, 6.5, 0.5, 0.6, 1.3), (RUBBLE, 2.0, -2.8, 1.7, 2.7),
+            (PLANK, -2.5, -2.2, 1.7, 0.5), (RUBBLE, -3.0, 2.5, 1.8, 1.5),
+        ] {
+            let at = [r.view[0]+c*dx-s*dy, r.view[1]+s*dx+c*dy, r.view[2]];
+            if let Some(z) = floor(land, at, false) {
+                props.push(make_prop(&apron, model, [at[0],at[1],z], scale, 0.0, 0.0, r.facing+yaw));
+            }
+        }
+    }
     // The ship's old footprint is water over a seabed at -16 yd. These masses are seated
     // on that bottom and rise 15–20 yd above it; they are not floating on vanished decks.
     let crater = Site { region: 6, name: "Juggernaut collapse basin", at: [0.0; 3], yaw: 0.0, scale: 1.0, dressing: Dressing::Shore };
@@ -211,8 +238,8 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
         ([-100.0,-850.0,-16.0], 2.0, 4.1), ([-60.0,-800.0,-16.0], 1.7, 1.2),
         ([-105.0,-821.0,-16.0], 2.4, 3.8)] {
         if let Some(z) = floor(land, at, true) {
-            props.push(make_prop(&crater, BOULDER, [at[0], at[1], z], scale, 0.0, 0.04, yaw));
-            props.push(make_prop(&crater, LOW_ROCK, [at[0]+5.0, at[1]+3.0, z], scale*0.7, 0.0, 0.0, yaw+1.5));
+            props.push(make_prop(&crater, BOULDER, [at[0], at[1], z], scale*1.43, 0.0, 0.04, yaw));
+            props.push(make_prop(&crater, LOW_ROCK, [at[0]+5.0, at[1]+3.0, z], scale*1.75, 0.0, 0.0, yaw+1.5));
         }
     }
     // Native DeadminesInstance_33_32 MCLQ: all 42 water chunks have surface -0.023 yd.

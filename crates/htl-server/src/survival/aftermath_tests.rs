@@ -50,9 +50,11 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
     let (props, missing) = compose(&AuthoredFloors);
     assert_eq!((props.clone(), missing.clone()), compose(&AuthoredFloors));
     assert!(missing.is_empty());
-    assert!((400..650).contains(&props.len()), "{} props", props.len());
+    assert!((400..700).contains(&props.len()), "{} props", props.len());
     for (region, _) in layout::REGIONS.iter().enumerate() {
         assert!(props.iter().filter(|p| p.region == region).count() >= 20, "region {region}");
+        assert!(props.iter().filter(|p| p.region == region && p.site == "Rubble apron").count() >= 5,
+            "each view has close debris around its small clear footing, region {region}");
     }
     for branch in ["Johnson's side gallery", "Sealed eastern niche", "Workshop rear cell", "Marisa's side room", "Pantry branch", "Smugglers' cache"] {
         assert!(props.iter().filter(|p| p.site == branch).count() >= 5, "{branch}");

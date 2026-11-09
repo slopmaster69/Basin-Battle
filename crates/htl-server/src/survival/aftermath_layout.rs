@@ -16,7 +16,7 @@ pub(super) const REGIONS: &[Region] = &[
 ];
 
 // Scale describes the whole collapse composition, not a dust radius. A tunnel's primary
-// Westfall boulder is 6–10 yd across; the Mast Room and cove use larger broken silhouettes.
+// dark boulder is 6–10 yd across; the Mast Room and cove use larger broken silhouettes.
 macro_rules! site {
     ($region:literal, $name:literal, $at:expr, $yaw:expr, $scale:expr, $kind:ident) => {
         Site { region: $region, name: $name, at: $at, yaw: $yaw, scale: $scale, dressing: $kind }
