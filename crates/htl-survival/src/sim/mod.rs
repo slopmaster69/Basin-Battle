@@ -65,6 +65,7 @@ pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT
 };
 pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
+pub use perches::LedgeView;
 pub use arena::Arena;
 pub use dungeon::{door_open, Below, BelowHero};
 pub use raid::RaidPhase;

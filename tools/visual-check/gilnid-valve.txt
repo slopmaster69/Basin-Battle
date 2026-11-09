@@ -1,0 +1,27 @@
+# DEV SETUP, not an unassisted clear: Gilnid pulled from the gap by the door, his crew brought
+# down by debug at once, so the take shows the rest: "Useless. Every one of you.", the run to
+# the melting pot's own valve, 2 sec of work, the glow, the whistle, steam along the channel and
+# the stripe of fire crossing the pit with dry ground either side; then "Then we'll melt the
+# lot!" and the finish, three blows and the spanner stuck in the floor, open 2.5 sec. Markers off.
+hero warrior
+cam off
+camera duel Gilnid
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes gilnid
+12 .es goto -178 -579 19.4 3.3
+13 video
+14 .es goto -188 -580 21 3.6
+16 .es goto -197 -585 21 3.8
+17 .es hurt 0 engineer
+17.3 .es hurt 0 engineer
+18 .es heal
+19 shots valve 16 0.3
+24 shots stripe 20 0.25
+29 .es heal
+30 shots finish 20 0.5
+34 .es heal
+39 .es heal
+44 end

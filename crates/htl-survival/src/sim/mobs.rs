@@ -654,6 +654,8 @@ impl Survival {
             let heft = if open { heft * self.content.combat.recovery_posture.max(1.0) } else { heft };
             // VanCleef's own (`sim::vancleef`): debug damage never counts, his hunch counts more.
             let heft = heft * self.vancleef_posture_share(mid, label);
+            // Gilnid's and his crew's (`sim::perches`): debug damage never counts.
+            let heft = heft * self.perch_posture_share(mid, label);
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
@@ -2444,6 +2446,7 @@ impl Survival {
                         self.machinery_string_landed(id, completed, a.damage);
                         self.kitchen_string_landed(id, released);
                         self.vancleef_string_landed(id, completed);
+                        self.perch_string_landed(id, completed);
                     }
                     // Install the authored opening after ordinary recovery/cooldown bookkeeping,
                     // which must not shorten it. Earlier interrupted blows never reach this point.
@@ -2592,7 +2595,8 @@ impl Survival {
             .iter()
             .enumerate()
             .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32
-                && self.arsenal_pattern_allowed(id, &p.name) && self.firing_pattern_allowed(id, &p.name))
+                && self.arsenal_pattern_allowed(id, &p.name) && self.firing_pattern_allowed(id, &p.name)
+                && self.perch_pattern_allowed(id, p))
             .filter_map(|(k, p)| {
                 let first = p.steps.first()?;
                 let reach = first.range.unwrap_or(d.attack.range) + size - 0.3 + first.lunge;
@@ -2765,6 +2769,8 @@ impl Survival {
         if self.machine_grind(id) { return; }
         if self.kitchen_release(id) { return; }
         if self.vancleef_release(id) { return; }
+        // A perched engineer's stick: thrown in an arc, then it sits sparking (`sim::perches`).
+        if self.perch_release(id) { return; }
         let now = self.clock;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];

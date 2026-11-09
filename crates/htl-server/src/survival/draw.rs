@@ -1444,7 +1444,7 @@ fn grip_info(grip: &str) -> u32 {
 #[cfg(test)]
 mod rope_tests {
     #[test]
-    fn gilnid_platforms_keep_collision_while_visual_cues_appear_immediately() {
+    fn gilnid_planks_and_poles_keep_collision_while_visual_cues_appear_immediately() {
         use htl_survival::{content::Content, land::FlatLand};
         let mut game = super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
         game.sim.mobs.clear();
@@ -1457,23 +1457,28 @@ mod rope_tests {
         p.max_health = 100_000;
         game.sim.spawn_target(hero, "dm_gilnid", 8.0, false, false, 1.0).unwrap();
         game.sim.step(0.05);
-        assert_eq!(game.sim.objects().iter().filter(|o| matches!(o.display, 36 | 6481)).count(), 4);
+        // Two planks over the drop, two poles under them; no crate stacks.
+        assert_eq!(game.sim.objects().iter().filter(|o| matches!(o.display, 6481 | 1508)).count(), 4);
+        assert!(!game.sim.objects().iter().any(|o| o.display == 36));
         let mut seen = [false; 3];
         for _ in 0..300 {
             for obj in game.sim.objects() {
                 let no_hull = game.obj_look_in(&obj).1 & super::GO_FLAG_PREVIEW_MOVE != 0;
+                let visual = game.sim.is_perch_visual_prop(obj.id);
                 match obj.display {
-                    36 | 6481 => assert!(!no_hull, "platform display {} must retain its collision hull", obj.display),
-                    353 | 755 | 1108 => {
-                        assert!(no_hull, "visual display {} must be immediate", obj.display);
-                        seen[match obj.display { 353 => 0, 755 => 1, _ => 2 }] = true;
+                    // A standing plank or pole keeps its hull; a fallen plank shows at once.
+                    1508 => assert!(!no_hull, "a standing pole must retain its collision hull"),
+                    6481 => assert_eq!(no_hull, visual, "a plank's hull goes only once it has fallen"),
+                    353 | 397 | 423 | 1108 => {
+                        assert!(no_hull && visual, "visual display {} must be immediate", obj.display);
+                        if let Some(k) = [423, 397, 1108].iter().position(|d| *d == obj.display) { seen[k] = true; }
                     }
                     _ => {}
                 }
             }
             game.sim.step(0.05);
         }
-        assert_eq!(seen, [true; 3], "exercise steam, valve and dropped support debris");
+        assert_eq!(seen, [true; 3], "exercise the stick, the flames and the fallen pole");
     }
 
     #[test]

@@ -1029,11 +1029,13 @@ boss = "gilnid"
 bars = [[-240.0, -572.0], [-240.0, -586.0]]
 text = "Gilnid is beaten. The Foundry's back door stands open at the top of the ramp."
 
-# Gilnid in the pit, by the smelter.
+# Gilnid in the pit, by the smelter. (He stood at (-205, -592), behind the cargo, the cannonballs
+# and the ramp's rock base from the way in: a hero stepping into the Foundry couldn't see or lock
+# him. Here he's in sight from the gap by the door. Nov 9 2026, the boss review.)
 [[dungeon.pack]]
 key = "gilnid"
 mob = "dm_gilnid"
-at = [-205.0, -592.0]
+at = [-200.0, -587.0]
 z = 21.0
 radius = 0.0
 count = 1
@@ -1309,6 +1311,8 @@ respawn = 0.0
 
 # This pair belongs to the encounter, never to a pack. The same engineer changes to
 # wrench fighting on landing; ambient engineers elsewhere retain their own behavior.
+# The stick: a 3 sec fuse lit in his hand (Heavy Dynamite's own ready pose and lit stick), thrown
+# in an arc, then it sits sparking 1 sec before it blows (`sim::perches`).
 [[mob]]
 key = "dm_perched_engineer"
 temper = "skirmisher"
@@ -1325,7 +1329,8 @@ grip = "1h"
 respawn = 0.0
   [mob.attack]
   ranged = true
-  windup = 1.8
+  # The fuse: Corey's 3 sec (Nov 9 2026, was 1.8).
+  windup = 3.0
   damage = 18
   range = 26.0
   arc = 0.0
@@ -1334,8 +1339,9 @@ respawn = 0.0
   turn_rate = 180.0
   lock = 0.7
   blockable = false
-  speed = 10.0
-  # At least LOB_RADIUS (2.5): the landing is warned during the fuse and flight.
+  # The client flies Heavy Dynamite at 14 yd a second; the arc's two legs are timed by it.
+  speed = 14.0
+  # At least LOB_RADIUS (2.5): the landing is warned during the fuse, the flight and the sit.
   radius = 2.5
   spell = 4062
   look = 3204
@@ -1367,7 +1373,8 @@ respawn = 0.0
   lock = 0.35
   blockable = true
 
-# Gilnid, the Smelter: a wrench up close, molten iron thrown far, and the channels overflowing.
+# Gilnid, the Smelter: a spanner up close, his crew's dynamite from the ramp, then the furnace's
+# own fire, and a last flurry that sticks his spanner in the floor (docs/gilnid-encounter.md).
 [[mob]]
 key = "dm_gilnid"
 name = "Gilnid"
@@ -1394,10 +1401,13 @@ respawn = 0.0
   [mob.perch_crew]
   airborne = "dm_perched_engineer"
   grounded = "dm_ground_engineer"
-  # Probed on the lower Foundry floor (~21 yd), not the upper ring.
-  spots = [[-6.0, 3.0], [6.0, 3.0]]
-  valve = [0.0, -6.0]
-  channel = [[-6.0, -3.0], [0.0, -3.0], [6.0, -3.0]]
+  # Two planks laid from the rail of the spiral ramp's south side (rail tops measured at about
+  # z 29.2 and 30.3) out over the pit, the first 8.6 yd up and the second 9.7, splayed apart.
+  # Each rests on a pole from the pit floor (`tests/gilnid_native.rs` checks them on the map).
+  ledges = [ { at = [-9.98, -8.65, 8.57], out = 1.771 }, { at = [-6.18, -8.75, 9.67], out = 1.221 } ]
+  # The valve on the melting pot's south face, (-208.1, -583.1), and the pot's mouth.
+  valve = [-8.1, 3.9]
+  furnace = [-5.7, 8.0, 6.8]
   [mob.attack]
   windup = 0.6
   damage = 24
@@ -1425,6 +1435,13 @@ respawn = 0.0
   weight = 1.5
   max_range = 2.6
   steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
+  # The finish, once the valve is done, and then only this (`sim::perches`): three blows pressing
+  # forward, the last over-reaching into the floor. The spanner sticks there: he's open 2.5 sec,
+  # hunched over it.
+  [[mob.pattern]]
+  name = "flurry"
+  weight = 1.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.4, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.8, damage = 30, arc = 80.0, heavy = true, lunge = 1.5, recovery = 2.5, kit = 379 } ]
 
 # Sneed's machine (docs/shredder-encounter.md): saw sweep, stamp and rake, then the grind (a rev in
 # place, a straight drive) and a slumped stall. sim/machinery owns this cycle, the walk in, the break
