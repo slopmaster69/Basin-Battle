@@ -1,0 +1,551 @@
+diff --git a/crates/benilla-app/src/deadmines_aftermath.rs b/crates/benilla-app/src/deadmines_aftermath.rs
+new file mode 100644
+index 00000000..edbb8846
+--- /dev/null
++++ b/crates/benilla-app/src/deadmines_aftermath.rs
+@@ -0,0 +1,80 @@
++//! Basin Battle's map variant signal, not a stock 1.12 behavior. A map-wide, model-less GO
++//! exists for the lifetime of the ruined state; deriving from the snapshot covers late joins,
++//! destroy packets, reconnects and leaving the map without a second protocol.
++use benilla_protocol::EntityKind;
++use benilla_world::schedule::{WorldLive, WorldStage};
++use benilla_world::terrain_stream::DeadminesAftermath;
++use benilla_world::world_map::CurrentMap;
++use bevy::prelude::*;
++
++use crate::net::{Guid, NetEntity, ObjectStore};
++
++const MARKER_ENTRY: u32 = 500100;
++const MARKER_GUID: u64 = 0xF110_07A1_84FF_FFFF;
++
++pub(crate) fn plugin(app: &mut App) {
++    app.init_resource::<DeadminesAftermath>().add_systems(
++        Update,
++        sync.after(WorldStage::Input).before(WorldStage::Stream),
++    );
++}
++
++fn sync(
++    live: Res<WorldLive>,
++    map: Option<Res<CurrentMap>>,
++    objects: Query<(&Guid, &NetEntity, &ObjectStore)>,
++    mut after: ResMut<DeadminesAftermath>,
++) {
++    let enabled = live.0
++        && map.is_some_and(|m| m.0 == 36)
++        && objects.iter().any(|(guid, net, fields)| {
++            guid.0 == MARKER_GUID
++                && net.kind == EntityKind::GameObject
++                && net.display_id.unwrap_or(0) == 0
++                && fields.0.object_entry() == Some(MARKER_ENTRY)
++        });
++    if after.0 != enabled {
++        after.0 = enabled;
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use benilla_protocol::ObjectFields;
++
++    #[test]
++    fn late_join_marker_removal_and_map_exit_restore_the_original_world() {
++        let mut app = App::new();
++        app.insert_resource(WorldLive(true))
++            .insert_resource(CurrentMap(36));
++        plugin(&mut app);
++        let marker = app
++            .world_mut()
++            .spawn((
++                Guid(MARKER_GUID),
++                NetEntity {
++                    kind: EntityKind::GameObject,
++                    display_id: Some(0),
++                    scale: 1.0,
++                },
++                ObjectStore(ObjectFields::from_pairs(&[(3, MARKER_ENTRY)])),
++            ))
++            .id();
++        app.update();
++        assert!(app.world().resource::<DeadminesAftermath>().0);
++        app.world_mut().resource_mut::<CurrentMap>().0 = 0;
++        app.update();
++        assert!(!app.world().resource::<DeadminesAftermath>().0);
++        app.world_mut().resource_mut::<CurrentMap>().0 = 36;
++        app.update();
++        assert!(app.world().resource::<DeadminesAftermath>().0);
++        app.world_mut().resource_mut::<WorldLive>().0 = false;
++        app.update();
++        assert!(!app.world().resource::<DeadminesAftermath>().0);
++        app.world_mut().resource_mut::<WorldLive>().0 = true;
++        app.world_mut().despawn(marker);
++        app.update();
++        assert!(!app.world().resource::<DeadminesAftermath>().0);
++    }
++}
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index 616dcd79..39b9eaf7 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -109,6 +109,7 @@ impl PluginGroup for GamePlugins {
+             .add(crate::missile_look::MissileLookPlugin)
+             .add(crate::unit_rope::UnitRopePlugin)
+             .add(crate::go_glow::GoGlowPlugin)
++            .add(crate::deadmines_aftermath::plugin)
+             .add(crate::look_lights::LookLightsPlugin)
+             .add(FishingLinePlugin)
+             .add(QuestMarkersPlugin)
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index 0875e4ea..c325db28 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -190,6 +190,7 @@ mod vm_pass;
+ mod vplates;
+ mod wdb;
+ mod go_glow;
++mod deadmines_aftermath;
+ mod look_lights;
+ mod missile_look;
+ mod unit_rope;
+diff --git a/crates/benilla-assets/src/deadmines_aftermath.rs b/crates/benilla-assets/src/deadmines_aftermath.rs
+new file mode 100644
+index 00000000..b9db4b56
+--- /dev/null
++++ b/crates/benilla-assets/src/deadmines_aftermath.rs
+@@ -0,0 +1,239 @@
++//! Basin Battle's finished Deadmines, not a 1.12 behavior. The ship is authored as groups of
++//! the mine WMO, so its render, collision, interior and prop ownership must change together.
++use benilla_formats::CollisionMesh;
++
++use crate::wmo::{collision_tri_bounds, collision_tri_grids, WmoModel};
++
++pub const LABEL: &str = "aftermath";
++// Mirrored in Basin Battle's htl-map/src/deadmines/aftermath.rs.
++pub const SHIP_GROUPS: &[u32] = &[17, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 40, 43];
++pub const SHIP_DOODADS: usize = 64;
++
++pub fn is_ship_root(path: &str) -> bool {
++    path.replace('\\', "/")
++        .eq_ignore_ascii_case("world/wmo/dungeon/az_deadmines/az_deadmines_b.wmo")
++}
++
++/// Keep absolute group and MODD indices: portals and the prop lighting tables index them.
++pub(crate) fn variant(
++    intact: &WmoModel,
++    walking: CollisionMesh,
++    camera: CollisionMesh,
++) -> WmoModel {
++    let mut m = intact.clone();
++    let keep = |group: u16| !SHIP_GROUPS.contains(&u32::from(group));
++    let (meshes, groups) = m
++        .submeshes
++        .into_iter()
++        .zip(m.submesh_group)
++        .filter(|(_, group)| keep(*group))
++        .unzip();
++    m.submeshes = meshes;
++    m.submesh_group = groups;
++    m.collision = (!walking.indices.is_empty()).then_some(walking);
++    m.collision_camera = (!camera.indices.is_empty()).then_some(camera);
++    let old_refs = std::mem::take(&mut m.portal_refs);
++    for (index, nav) in m.group_nav.iter_mut().enumerate() {
++        let start = nav.ref_start as usize;
++        let end = start + nav.ref_count as usize;
++        nav.ref_start = m.portal_refs.len() as u16;
++        if keep(index as u16) {
++            m.portal_refs.extend(
++                old_refs
++                    .get(start..end)
++                    .unwrap_or(&[])
++                    .iter()
++                    .filter(|r| keep(r.group))
++                    .copied(),
++            );
++            nav.ref_count = (m.portal_refs.len() - nav.ref_start as usize) as u16;
++            continue;
++        }
++        nav.ref_count = 0;
++        nav.flags = 0;
++        nav.area_table_id = 0;
++        nav.bbox_min = [f32::INFINITY; 3];
++        nav.bbox_max = [f32::NEG_INFINITY; 3];
++        nav.group_liquid = benilla_formats::NO_GROUP_LIQUID;
++        if let Some(group) = m.group_bounds.get_mut(index) {
++            group.interior = false;
++            group.show_skybox = false;
++            group.bbox_min = nav.bbox_min;
++            group.bbox_max = nav.bbox_max;
++        }
++        if let Some(t) = m.group_collision_tris.get_mut(index) {
++            t.clear();
++        }
++        if let Some(t) = m.group_camera_only_tris.get_mut(index) {
++            t.clear();
++        }
++        if let Some(t) = m.group_liquids.get_mut(index) {
++            *t = None;
++        }
++        if let Some(t) = m.group_footprints.get_mut(index) {
++            *t = None;
++        }
++        if let Some(t) = m.group_footprint_bounds.get_mut(index) {
++            *t = None;
++        }
++        if let Some(t) = m.group_footprint_grids.get_mut(index) {
++            *t = None;
++        }
++    }
++    // Zero any fixture referenced exclusively by removed groups. Empty ownership alone would
++    // make spawn_wmo_lights_for treat it as an ungated light. Native ship groups have none.
++    for (light, value) in m.lights.iter_mut().enumerate() {
++        let owners: Vec<_> = intact
++            .group_light_refs
++            .iter()
++            .enumerate()
++            .filter(|(_, refs)| refs.contains(&(light as u16)))
++            .map(|(g, _)| g)
++            .collect();
++        if !owners.is_empty() && owners.iter().all(|g| !keep(*g as u16)) {
++            value.intensity = 0.0;
++        }
++    }
++    for &group in SHIP_GROUPS {
++        if let Some(refs) = m.group_light_refs.get_mut(group as usize) {
++            refs.clear();
++        }
++    }
++    for d in m.doodads.iter_mut().take(SHIP_DOODADS) {
++        d.model.clear();
++    }
++    (m.group_collision_bounds, m.collision_bounds) = collision_tri_bounds(&m.group_collision_tris);
++    m.group_collision_grids = collision_tri_grids(&m.group_collision_tris);
++    m
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn native_labeled_variant_loads_render_and_both_collision_sets() {
++        use bevy::asset::io::AssetSourceBuilder;
++        use bevy::asset::{AssetApp, AssetMetaCheck, AssetPlugin};
++        use bevy::prelude::*;
++        let data = benilla_formats::wow_data_or_skip!();
++        let reader = crate::MpqAssetReader::open(&data).unwrap();
++        let mut app = App::new();
++        app.add_plugins(MinimalPlugins)
++            .register_asset_source(
++                "mpq",
++                AssetSourceBuilder::new(move || Box::new(reader.clone())),
++            )
++            .add_plugins(AssetPlugin {
++                meta_check: AssetMetaCheck::Never,
++                ..Default::default()
++            })
++            .init_asset::<Image>()
++            .init_asset_loader::<crate::BlpImageLoader>()
++            .init_asset::<WmoModel>()
++            .init_asset_loader::<crate::WmoModelLoader>();
++        let server = app.world().resource::<AssetServer>().clone();
++        let after: Handle<WmoModel> =
++            server.load("mpq://world/wmo/dungeon/az_deadmines/az_deadmines_b.wmo#aftermath");
++        let base: Handle<WmoModel> =
++            server.load("mpq://world/wmo/dungeon/az_deadmines/az_deadmines_b.wmo");
++        // Request the variant first: its own texture dependencies must be tracked.
++        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
++        while !server.is_loaded_with_dependencies(after.id()) {
++            app.update();
++            assert!(
++                std::time::Instant::now() < deadline,
++                "aftermath asset did not become ready: {:?}",
++                server.load_state(after.id())
++            );
++            std::thread::sleep(std::time::Duration::from_millis(5));
++        }
++        app.update();
++        let assets = app.world().resource::<Assets<WmoModel>>();
++        let before = assets.get(&base).expect("intact root still resident");
++        let after = assets.get(&after).unwrap();
++        assert_eq!(after.group_nav.len(), before.group_nav.len());
++        assert!(after.submeshes.len() < before.submeshes.len());
++        assert!(after
++            .submesh_group
++            .iter()
++            .all(|g| !SHIP_GROUPS.contains(&u32::from(*g))));
++        assert!(
++            after.collision.as_ref().unwrap().indices.len()
++                < before.collision.as_ref().unwrap().indices.len()
++        );
++        assert!(
++            after.collision_camera.as_ref().unwrap().indices.len()
++                < before.collision_camera.as_ref().unwrap().indices.len()
++        );
++        assert!(after.doodads[..SHIP_DOODADS]
++            .iter()
++            .all(|d| d.model.is_empty()));
++        assert_eq!(
++            after.group_collision_tris[42],
++            before.group_collision_tris[42]
++        );
++        assert!(after.group_collision_tris[17].is_empty());
++        assert_eq!(after.group_nav[17].area_table_id, 0);
++    }
++
++    #[test]
++    fn variant_preserves_other_rooms_and_the_intact_model() {
++        use crate::wmo::WmoGroupNav;
++        let nav = WmoGroupNav {
++            flags: 0x2000,
++            bbox_min: [0.; 3],
++            bbox_max: [1.; 3],
++            ref_start: 0,
++            ref_count: 0,
++            area_table_id: 7,
++            fog_indices: [0; 4],
++            group_liquid: benilla_formats::NO_GROUP_LIQUID,
++        };
++        let tri = [[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]];
++        let mut intact = WmoModel {
++            group_nav: vec![nav; 44],
++            group_collision_tris: vec![vec![tri]; 44],
++            doodads: vec![
++                benilla_formats::WmoDoodad {
++                    model: "cargo.m2".to_owned(),
++                    position: [0.; 3],
++                    orientation: [0., 0., 0., 1.],
++                    scale: 1.,
++                    color: [255; 4],
++                };
++                65
++            ],
++            ..Default::default()
++        };
++        intact.group_nav[17].ref_count = 1;
++        intact.portal_refs.push(benilla_formats::WmoPortalRef {
++            portal: 0,
++            group: 42,
++            side: 1,
++        });
++        intact.group_nav[42].ref_start = 1;
++        intact.group_nav[42].ref_count = 1;
++        intact.portal_refs.push(benilla_formats::WmoPortalRef {
++            portal: 0,
++            group: 17,
++            side: -1,
++        });
++        let after = variant(&intact, CollisionMesh::default(), CollisionMesh::default());
++        assert_eq!(after.group_nav.len(), 44);
++        assert!(after.group_collision_tris[30].is_empty());
++        assert_eq!(after.group_collision_tris[42], vec![tri]);
++        assert_eq!(after.group_collision_tris[41], vec![tri]);
++        assert_eq!(after.group_nav[17].area_table_id, 0);
++        assert_eq!(after.group_nav[17].ref_count, 0);
++        assert_eq!(
++            after.group_nav[42].ref_count, 0,
++            "no portal enters the missing cabin"
++        );
++        assert!(after.doodads[..64].iter().all(|d| d.model.is_empty()));
++        assert_eq!(after.doodads[64].model, "cargo.m2");
++        assert_eq!(intact.doodads[0].model, "cargo.m2");
++        assert_eq!(intact.group_nav[17].area_table_id, 7);
++        assert_eq!(intact.group_collision_tris[30], vec![tri]);
++    }
++}
+diff --git a/crates/benilla-assets/src/lib.rs b/crates/benilla-assets/src/lib.rs
+index 3f932d78..b7ddb0e9 100644
+--- a/crates/benilla-assets/src/lib.rs
++++ b/crates/benilla-assets/src/lib.rs
+@@ -15,6 +15,7 @@ use bevy::prelude::*;
+ 
+ pub mod column_grid;
+ pub mod coords;
++pub mod deadmines_aftermath;
+ pub mod materials;
+ pub mod minimap_grid;
+ mod spatial_cache;
+diff --git a/crates/benilla-assets/src/wmo.rs b/crates/benilla-assets/src/wmo.rs
+index 50c5953b..b4c2bdf8 100644
+--- a/crates/benilla-assets/src/wmo.rs
++++ b/crates/benilla-assets/src/wmo.rs
+@@ -412,6 +412,9 @@ impl AssetLoader for WmoModelLoader {
+         let mut col_idx: Vec<u32> = Vec::new();
+         let mut cam_pos: Vec<[f32; 3]> = Vec::new();
+         let mut cam_idx: Vec<u32> = Vec::new();
++        let ship_root = crate::deadmines_aftermath::is_ship_root(&root_path);
++        let mut after_walk = CollisionMesh::default();
++        let mut after_camera = CollisionMesh::default();
+         let mut group_doodad_refs: Vec<Vec<u16>> = vec![Vec::new(); root.group_count() as usize];
+         let mut group_light_refs: Vec<Vec<u16>> = vec![Vec::new(); root.group_count() as usize];
+         let mut group_liquids: Vec<Option<LiquidMesh>> =
+@@ -423,6 +426,14 @@ impl AssetLoader for WmoModelLoader {
+             let Ok(gbytes) = ctx.read_asset_bytes(group_url).await else {
+                 continue; // a missing or unreadable group is skipped
+             };
++            if ship_root && !crate::deadmines_aftermath::SHIP_GROUPS.contains(&gi) {
++                accumulate_wmo_group_collision(
++                    &gbytes, &mut after_walk.positions, &mut after_walk.indices,
++                );
++                accumulate_wmo_group_camera_collision(
++                    &gbytes, &mut after_camera.positions, &mut after_camera.indices,
++                );
++            }
+             if let (Some(h), Some(nav)) =
+                 (wmo_group_header(&gbytes), group_nav.get_mut(gi as usize))
+             {
+@@ -547,7 +558,7 @@ impl AssetLoader for WmoModelLoader {
+         let group_footprint_bounds = footprint_tri_bounds(&group_footprints);
+         let group_collision_grids = collision_tri_grids(&group_collision_tris);
+         let group_footprint_grids = footprint_tri_grids(&group_footprints);
+-        Ok(WmoModel {
++        let model = WmoModel {
+             wmo_id: benilla_formats::wmo_root_id(&bytes),
+             submeshes,
+             submesh_group,
+@@ -579,7 +590,25 @@ impl AssetLoader for WmoModelLoader {
+             group_light_refs,
+             group_liquids,
+             convex_volume: root.convex_volume().to_vec(),
+-        })
++        };
++        if ship_root {
++            let mut after = crate::deadmines_aftermath::variant(&model, after_walk, after_camera);
++            // A labeled model owns its texture dependencies too: its first load may precede
++            // the intact model's, and it must not publish ready before those textures land.
++            ctx.labeled_asset_scope(
++                crate::deadmines_aftermath::LABEL.to_owned(),
++                |label_ctx| {
++                    for sub in &mut after.submeshes {
++                        let path = sub.texture.as_ref().and_then(|h| h.path()).cloned();
++                        if let Some(path) = path {
++                            sub.texture = Some(label_ctx.load(path));
++                        }
++                    }
++                    Ok::<_, std::io::Error>(after)
++                },
++            )?;
++        }
++        Ok(model)
+     }
+ 
+     fn extensions(&self) -> &[&str] {
+diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
+index e7a5b715..ca880978 100644
+--- a/crates/benilla-world/src/terrain_stream.rs
++++ b/crates/benilla-world/src/terrain_stream.rs
+@@ -64,6 +64,10 @@ pub use residency::TerrainResidency;
+ /// uncapped, a cold start spawns the whole ring at once and blocks the main thread for seconds.
+ const SPAWN_BUDGET: Duration = Duration::from_millis(4);
+ 
++/// Basin Battle's map-wide aftermath marker. The game derives this from its live object snapshot.
++#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
++pub struct DeadminesAftermath(pub bool);
++
+ /// The streamer's residency state: the loaded tiles and the entity each spawned as.
+ #[derive(Resource, Default)]
+ pub struct TerrainStreamer {
+@@ -71,6 +75,7 @@ pub struct TerrainStreamer {
+     tiles: HashMap<(i32, i32), TileState>,
+     /// The map directory the tiles are for; a change drops every tile.
+     map_dir: Option<String>,
++    aftermath: bool,
+     /// The focus tile last streamed around, the furnisher's nearest-first key.
+     focus: (i32, i32),
+     /// The window's `(inner, outer)` half-widths last frame, logged once per change.
+@@ -463,6 +468,7 @@ impl Plugin for TerrainPlugin {
+         app.init_resource::<ViewFocus>()
+             .init_resource::<WorldLoadProgress>()
+             .init_resource::<TerrainStreamer>()
++            .init_resource::<DeadminesAftermath>()
+             .init_resource::<TerrainResidency>()
+             .init_resource::<StreamActivity>()
+             .init_resource::<Placements>()
+@@ -553,6 +559,7 @@ impl Plugin for TerrainPlugin {
+ fn stream_terrain(
+     mut commands: Commands,
+     mut state: ResMut<TerrainStreamer>,
++    aftermath: Res<DeadminesAftermath>,
+     placements: ResMut<Placements>,
+     asset_server: Res<AssetServer>,
+     wdts: Res<Assets<WdtIndex>>,
+@@ -596,7 +603,8 @@ fn stream_terrain(
+     };
+ 
+     // A new map directory: drop every tile and request the new map's WDT.
+-    if state.map_dir.as_deref() != Some(dir.as_str()) {
++    let after = aftermath.0 && map_id == 36;
++    if state.map_dir.as_deref() != Some(dir.as_str()) || state.aftermath != after {
+         info!(
+             "terrain: streaming map {dir} (was {:?}, {} tiles released)",
+             state.map_dir,
+@@ -612,6 +620,7 @@ fn stream_terrain(
+             &mut activity,
+         );
+         state.map_dir = Some(dir.clone());
++        state.aftermath = after;
+         state.wdt = Some(asset_server.load(format!("mpq://World/Maps/{dir}/{dir}.wdt")));
+         state.wdt_ungated = false;
+         for e in &bridges {
+@@ -619,7 +628,7 @@ fn stream_terrain(
+         }
+         // Basin Battle: the pieces Elwynn Survival adds to this map's floor, walkable from either
+         // side (both windings), in world coordinates beside whatever the map's tiles place.
+-        for tri in map_bridges(&dir) {
++        for tri in map_bridges(&dir, after) {
+             let verts: Vec<Vec3> = tri.iter().map(|&p| wow_to_bevy(p)).collect();
+             commands.spawn((
+                 MapBridge,
+@@ -669,6 +678,7 @@ fn stream_terrain(
+                     doodad_set: g.doodad_set,
+                     name_set: g.name_set,
+                 },
++                after,
+             );
+             state.global_wmo = true;
+         }
+@@ -1031,7 +1041,7 @@ fn spawn_streamed_tiles(
+             tile.placements.push(d.unique_id);
+         }
+         for w in &adt.wmos {
+-            register_wmo(placements, &asset_server, w);
++            register_wmo(placements, &asset_server, w, state.aftermath);
+             tile.placements.push(w.unique_id);
+         }
+ 
+@@ -1228,8 +1238,8 @@ const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 6] = [
+ ];
+ 
+ /// The pieces added to the map in directory `dir`.
+-fn map_bridges(dir: &str) -> &'static [[[f32; 3]; 3]] {
+-    if dir.eq_ignore_ascii_case("DeadminesInstance") {
++fn map_bridges(dir: &str, aftermath: bool) -> &'static [[[f32; 3]; 3]] {
++    if dir.eq_ignore_ascii_case("DeadminesInstance") && !aftermath {
+         &DEADMINES_BRIDGES
+     } else {
+         &[]
+@@ -1237,12 +1247,22 @@ fn map_bridges(dir: &str) -> &'static [[[f32; 3]; 3]] {
+ }
+ 
+ /// Register one WMO placement, or bump its refcount; a 1.12 WMO placement has no scale.
+-fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &WmoInstance) {
++fn register_wmo(
++    placements: &mut Placements,
++    asset_server: &AssetServer,
++    w: &WmoInstance,
++    aftermath: bool,
++) {
+     if let Some(p) = placements.by_id.get_mut(&w.unique_id) {
+         p.refs += 1;
+         return;
+     }
+-    let handle: Handle<WmoModel> = asset_server.load(wmo_url(&w.model));
++    let mut url = wmo_url(&w.model);
++    if aftermath && benilla_assets::deadmines_aftermath::is_ship_root(&w.model) {
++        url.push('#');
++        url.push_str(benilla_assets::deadmines_aftermath::LABEL);
++    }
++    let handle: Handle<WmoModel> = asset_server.load(url);
+     placements.by_id.insert(
+         w.unique_id,
+         Placement {
