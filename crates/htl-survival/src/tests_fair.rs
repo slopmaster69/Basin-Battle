@@ -242,11 +242,12 @@ fn a_caster_casts_between_the_blows_up_close_never_during_one() {
 
 #[test]
 fn a_string_stops_at_the_guard_it_breaks_and_nothing_strikes_the_reeling_hero() {
-    // Mr. Smite's flurry broke a buckler on its third blow and its fourth landed in the stagger.
+    // Smite's axe crosscut must stop at a broken guard instead of striking the stagger.
     let (mut s, p) = turns_world();
     let smite = s.content.mob("dm_smite").unwrap();
     let m = s.spawn_mob(smite, [2.0, 0.0, 0.0], None, false);
-    let k = s.content.mobs[smite].patterns.iter().position(|x| x.name == "flurry").unwrap();
+    let k = s.content.mobs[smite].patterns.iter().position(|x| x.name == "crosscut").unwrap();
+    s.mobs.get_mut(&m).unwrap().phase = 1; // This focused guard fixture starts with axes equipped.
     let blows = s.content.mobs[smite].patterns[k].steps.len();
     assert!(blows >= 3);
     // Guard up, nearly winded: the first blocked blow breaks it.
@@ -265,7 +266,7 @@ fn a_string_stops_at_the_guard_it_breaks_and_nothing_strikes_the_reeling_hero() 
         for e in s.step(0.02) {
             match e {
                 Event::Swing { attacker, victim: Some(v), outcome: Outcome::GuardBroken, .. } if attacker == m && v == p => broke = broke.or(Some(s.clock)),
-                // The string's next blow would begin within its recovery (0.12 s), and a new one
+                // The string's next blow would begin within its recovery (0.2 s), and a new one
                 // as an opening while the hero reels (0.8 s).
                 Event::MobWindup { id, .. } if id == m && broke.is_some_and(|t| s.clock - t < 0.6) => after += 1,
                 _ => {}

@@ -1,0 +1,44 @@
+# Controlled mechanic demonstration, NOT an unassisted kill or balance playtest.
+# Uses a fresh Gilnid at his authored home. Debug healing keeps the camera hero alive;
+# debug kills at the end reveal the workforce-driven valve without an HP phase skip.
+# Check: platforms on the foundry floor; first molten overflow drops one worker;
+# the other descends by 30 sec; continuous falls, stunned landings, then wrench fighting;
+# a visible valve discharge with a dry side, and no remaining props after Gilnid dies.
+hero warrior
+cam 0 -28 16
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es unbar all
+12 .es goto -205 -592 21 0
+12.5 .es hurt 0 gilnid
+13 .es hurt 0 engineer
+13.5 .es hurt 0 engineer
+14 .es hurt 0 blackguard
+14.5 .es hurt 0 blackguard
+15 .es heal
+16 .es goto -213 -592 21 0
+17 .es spawn dm_gilnid
+17.1 video
+18 shots crew 8 0.6
+21 .es heal
+25 shots overflow 12 0.3
+26 .es heal
+31 .es heal
+36 .es heal
+41 .es heal
+43 shots descent 12 0.3
+46 .es heal
+49 shots wrench 8 0.5
+51 .es heal
+# Both finite workers are brought down by the controller, then felled for the valve demo.
+53 .es hurt 0 furnace
+53.5 .es hurt 0 furnace
+54 shots valve 24 0.4
+56 .es heal
+62 .es heal
+65 shots hammer 8 0.5
+69 .es hurt 0 gilnid
+69.1 shots cleanup 6 0.4
+73 end

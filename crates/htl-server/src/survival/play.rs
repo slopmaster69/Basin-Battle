@@ -597,6 +597,13 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::MobGear { id } => {
+                if let Some(guid) = self.guid_of(id) {
+                    let mut f = Fields::new();
+                    self.mob_gear_fields(id, &mut f);
+                    self.broadcast(&packets::update_object(&[], &[(guid, &f)]));
+                }
+            }
             Event::Gear { player } => {
                 self.show_gear(player);
                 // A casting staff in hand: every add-on's client launches this hero's bolts from

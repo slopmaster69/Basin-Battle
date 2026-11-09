@@ -2393,10 +2393,18 @@ impl Survival {
             let before = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
             self.burst(p, p.pos, Some(victim));
             let after = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
+            // A bursting projectile still directly struck this body. Nearby splash victims
+            // don't bring down a perch; only its actual contact does.
+            if before.zip(after).is_some_and(|(before, after)| after < before) {
+                self.drop_perch(victim);
+            }
             // A critical's own effects on the one it struck, as without a burst (a perfect
             // Fireball's longer burn); not if the burst came to nothing on them (dodged, guarded).
             if p.critical && !d.crit_effects.is_empty() && self.alive(victim) && after != before {
                 self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
+            }
+            if before.zip(after).is_some_and(|(before, after)| after < before) {
+                self.vancleef_hit(victim, p.owner, from);
             }
             return;
         }
@@ -2651,6 +2659,10 @@ impl Survival {
         let was = self.fx_from.replace(from);
         self.ability_after(owner, mid, ability, share, damage, killed);
         self.fx_from = was;
+        if how != HitKind::Area && damage > 0 { self.vancleef_hit(mid, owner, from); }
+        if how == HitKind::Projectile && damage > 0 {
+            self.drop_perch(mid);
+        }
         if killed {
             // The kill's weight: its sound from the foe's spot (everyone near hears it there),
             // and its beat on the killer's own screen alone.
@@ -3276,6 +3288,8 @@ impl Survival {
     /// heroes' side (a `friendly` creature, or set down by `by` or a friend of theirs) that isn't
     /// a totem, or a totem its rules make `healable` (a Priest's orb). A totem never otherwise.
     pub(crate) fn takes_help(&self, by: Id, mid: Id) -> bool {
+        // Story spectators must not intercept a heal or consume an ally-target slot.
+        if self.duel_observer(mid) { return false; }
         let Some(m) = self.mobs.get(&mid) else { return false };
         if m.health == 0 || m.hidden {
             return false;

@@ -1,0 +1,592 @@
+From 0c15dd27eff00b8db0d8578d172354187682d5f7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 9 Nov 2026 10:59:35 -0600
+Subject: [PATCH] The cameraman films a fight from outside it (WOW_SPECTATE)
+ (patch 0088)
+
+`WOW_SPECTATE=<subject>,<hero>[,<shot>]` makes this client Basin Battle's cameraman: its camera
+leaves its own body (free-fly, the body hidden, the sound heard at the camera) and keeps the named
+creature (a boss) and player (the hero) in view, framed by the shot:
+
+- `duel` (the default): a three-quarter side view from the hero's side, 10 to 14 yd out.
+- `low`: 20 yd out and low, for a big body (the Shredder).
+- `high`: 45 to 60 degrees up, so a ground hazard's edge shows.
+
+The distance grows past the shot's range only when the two would not fit. When either is hidden
+from the camera for more than 0.3 s, by the world (the camera's own collision sweep) or by another
+body standing on the line, the camera cuts to the shot's next position whose view of both is
+clear: the other side, square to the side, behind, then the same higher. Otherwise the eye follows
+the fight smoothly, and the fight's axis turns slowly, so the camera doesn't whip round as the two
+circle. With no subject, or none in sight, it frames the hero alone, looking past them the way
+they face; with the hero gone for 3 s (a world change) it goes back to the body.
+
+The eye is written after `control` and the camera shake, each frame, so a teleport of the body or
+a shake never moves it. `fly_free` hides the body while a cameraman has the eye (`filming` on the
+rig), where it used to keep it opaque. Unset: nothing changes.
+
+The server keeps the cameraman's hero out of the fight and unseen (Basin Battle's `.es watch`);
+the visual check runs it as a second client beside the hero's (docs/visual-check.md there).
+---
+ crates/benilla-app/src/player.rs           |   3 +
+ crates/benilla-app/src/player/camera.rs    |   7 +-
+ crates/benilla-app/src/player/spectator.rs | 489 +++++++++++++++++++++
+ docs/MAP.md                                |   1 +
+ 4 files changed, 498 insertions(+), 2 deletions(-)
+ create mode 100644 crates/benilla-app/src/player/spectator.rs
+
+diff --git a/crates/benilla-app/src/player.rs b/crates/benilla-app/src/player.rs
+index 61e8418c..d41248fe 100644
+--- a/crates/benilla-app/src/player.rs
++++ b/crates/benilla-app/src/player.rs
+@@ -57,6 +57,8 @@ pub(crate) mod land;
+ mod move_trace;
+ mod movement_net;
+ mod posture;
++// Basin Battle's cameraman (`WOW_SPECTATE`): free-fly framing a fight it takes no part in.
++mod spectator;
+ // `pub(crate)`: a remote mover's dead-reckon (`crate::net::motion::remote`) steps through the same
+ // walk resolve, as the reference runs every mover through one controller.
+ pub(crate) mod mover;
+@@ -283,6 +285,7 @@ impl Plugin for PlayerPlugin {
+         camera_clip::plugin(app);
+         camera_saved::plugin(app);
+         camera_view::plugin(app);
++        spectator::plugin(app);
+         // The stream focus is published after `control`'s teleport snap and before the stream
+         // stage, and the post-snap hold released after it. Both edges are needed: without
+         // `.after(Input)` the focus can precede the snap, the world streams around the departure,
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index 3749c869..4674d866 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -605,6 +605,9 @@ pub(crate) struct CameraControl {
+     /// [`benilla_ui::action_combat::camera_shoulder`] asks for.
+     pub(super) shoulder_right: f32,
+     pub(super) shoulder_up: f32,
++    /// Basin Battle's cameraman ([`super::spectator`]) has the free-fly eye: the body it left
++    /// is hidden rather than opaque.
++    pub(super) filming: bool,
+ }
+ 
+ impl CameraControl {
+@@ -1759,8 +1762,8 @@ pub(super) fn fly_free(
+     cam_t: &mut Transform,
+ ) {
+     let keys_pressed = |k: KeyCode| !typing && keys.pressed(k);
+-    // Detached, the avatar stays opaque.
+-    rig.self_fade_alpha = 1.0;
++    // Detached, the avatar stays opaque, unless a cameraman left it ([`super::spectator`]).
++    rig.self_fade_alpha = if rig.filming { 0.0 } else { 1.0 };
+     cam_t.rotation = Quat::from_euler(EulerRot::YXZ, cam.yaw, cam.pitch, 0.0);
+     let forward = *cam_t.forward();
+     let right = *cam_t.right();
+diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
+new file mode 100644
+index 00000000..8e3c77cf
+--- /dev/null
++++ b/crates/benilla-app/src/player/spectator.rs
+@@ -0,0 +1,489 @@
++//! `WOW_SPECTATE=<subject>,<hero>[,<shot>]`: the cameraman, Basin Battle's spectator camera for
++//! filming a fight honestly. This client plays no part in the fight (its server keeps its body
++//! out of the rules and unseen, `.es watch`); its camera leaves the body and holds the named
++//! creature (`subject`, a boss) and player (`hero`) in view, framed by the shot's rules:
++//!
++//! - `duel` (the default): a three-quarter side view from the hero's side, 10 to 14 yd out.
++//! - `low`: 20 yd out and low, for a big body (the Shredder).
++//! - `high`: 45 to 60 degrees up, so a ground hazard's edge shows.
++//!
++//! The distance grows past the shot's range only when both would not fit otherwise; where the
++//! world is in the way the eye comes in along its line until both are in sight. When either is
++//! hidden from the camera for more than [`BLOCKED_SECS`] (by the world, another body, or each
++//! other), the camera cuts to the next position of the shot with a clear view of both (the other
++//! side, then square to the side, then behind, then higher), or holds where it is when there's
++//! none. Names match in any case; with several units of the subject's name, a living one nearest
++//! the hero. With no subject (`,<hero>`) or none within [`SUBJECT_REACH`] of the hero, the hero
++//! alone is framed, looking past them the way they face. The body left behind is hidden, and the
++//! sound is heard at the camera (free-fly's listener).
++//!
++//! It drives free-fly ([`Player::detached`]): the eye is written after `control` and the camera
++//! shake, every frame, so a teleport of the body or a shake never moves it. With the hero gone
++//! (a world change, a logout) for [`LOST_SECS`] the camera goes back to the body.
++
++use bevy::prelude::*;
++
++use benilla_world::collision::WorldCollision;
++
++use super::camera::FlyCam;
++use super::{head_height, CameraControl, CameraPivot, Player};
++use crate::names::NameCache;
++use crate::net::{Guid, NetEntity, ObjectStore, SelfPlayer};
++use benilla_protocol::EntityKind;
++use crate::query_cache::Ask;
++
++/// A view blocked this long (seconds) moves the camera to its next position.
++const BLOCKED_SECS: f32 = 0.3;
++/// The hero out of sight this long (seconds) gives the camera back to the body.
++const LOST_SECS: f32 = 3.0;
++/// How quickly the eye and the point it looks at follow the fight (time constants, seconds),
++/// and the fight's axis turns (so the camera doesn't whip round as the two circle).
++const EYE_LAG: f32 = 0.35;
++const LOOK_LAG: f32 = 0.15;
++const AXIS_LAG: f32 = 0.8;
++/// The view's half-angles' tangents: `CAM_FOVY` (45 degrees) tall at 16:9, with a margin.
++const TAN_HALF_TALL: f32 = 0.414 * 0.85;
++const TAN_HALF_WIDE: f32 = 0.414 * 16.0 / 9.0 * 0.8;
++/// An eye pulled in to less than this share of the shot's distance is a position only to fall
++/// back on.
++const CLEAR_BOOM: f32 = 0.75;
++/// A subject further than this from the hero (yd) isn't in the fight: the hero is filmed alone
++/// (a hero fallen and back at a lamp).
++const SUBJECT_REACH: f32 = 40.0;
++/// The eye's place jumping further than this at once (yd) is taken as a cut.
++const JUMP: f32 = 25.0;
++
++/// The framing rules.
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++pub(crate) enum Shot {
++    Duel,
++    Low,
++    High,
++}
++
++/// A shot's distances (yd), elevation (degrees up), and the azimuths it tries in order (degrees
++/// round from straight behind the hero, looking at the subject: positive to the hero's right).
++struct ShotRule {
++    near: f32,
++    far: f32,
++    up: f32,
++    /// Degrees added to `up` for the second round of positions, when no first one is clear.
++    higher: f32,
++    sides: &'static [f32],
++}
++
++impl Shot {
++    fn parse(s: &str) -> Option<Self> {
++        match s.trim().to_ascii_lowercase().as_str() {
++            "" | "duel" => Some(Self::Duel),
++            "low" => Some(Self::Low),
++            "high" => Some(Self::High),
++            _ => None,
++        }
++    }
++
++    fn rule(self) -> ShotRule {
++        match self {
++            Self::Duel => ShotRule { near: 10.0, far: 14.0, up: 15.0, higher: 25.0, sides: &[50.0, -50.0, 90.0, -90.0, 130.0, -130.0, 20.0, -20.0] },
++            Self::Low => ShotRule { near: 20.0, far: 20.0, up: 4.0, higher: 20.0, sides: &[70.0, -70.0, 110.0, -110.0, 30.0, -30.0, 150.0, -150.0] },
++            Self::High => ShotRule { near: 12.0, far: 18.0, up: 52.0, higher: 8.0, sides: &[40.0, -40.0, 100.0, -100.0, 160.0, -160.0, 0.0] },
++        }
++    }
++}
++
++/// What to film, from `WOW_SPECTATE`.
++#[derive(Resource, Clone, Debug, PartialEq)]
++pub(crate) struct Spectate {
++    subject: String,
++    hero: String,
++    shot: Shot,
++}
++
++impl Spectate {
++    /// `<subject>,<hero>[,<shot>]`; the hero is needed, the subject may be empty.
++    fn parse(spec: &str) -> Option<Self> {
++        let mut parts = spec.split(',');
++        let subject = parts.next()?.trim().to_string();
++        let hero = parts.next()?.trim().to_string();
++        let shot = Shot::parse(parts.next().unwrap_or(""))?;
++        (!hero.is_empty() && parts.next().is_none()).then_some(Self { subject, hero, shot })
++    }
++}
++
++/// One of the two in the picture: the point framed (its chest) and its height (yd).
++#[derive(Clone, Copy, Debug)]
++struct Body {
++    at: Vec3,
++    tall: f32,
++}
++
++/// Where the camera stands for one position of a shot: the point it looks at, the way out from
++/// it to the eye (unit), and how far (yd).
++#[derive(Clone, Copy, Debug)]
++struct Pose {
++    look: Vec3,
++    out: Vec3,
++    dist: f32,
++}
++
++/// The positions a shot tries, first round then higher.
++fn positions(rule: &ShotRule) -> usize {
++    rule.sides.len() * 2
++}
++
++/// Position `pick` of the shot, framing `subject` and `hero` with the fight's axis at `axis` (a
++/// yaw: the direction from the subject to the hero, `(sin, 0, cos)`).
++fn pose(shot: Shot, subject: Body, hero: Body, axis: f32, pick: usize) -> Pose {
++    let rule = shot.rule();
++    let n = rule.sides.len();
++    let side = rule.sides[pick % n].to_radians();
++    let up = (rule.up + if pick >= n { rule.higher } else { 0.0 }).min(80.0).to_radians();
++    let mut look = (subject.at + hero.at) * 0.5;
++    if shot == Shot::High {
++        // The ground between them, so what's drawn on it fills the picture.
++        look.y = look.y.min(subject.at.y.min(hero.at.y)) - 0.5;
++    }
++    let yaw = axis + side;
++    let out = Vec3::new(yaw.sin() * up.cos(), up.sin(), yaw.cos() * up.cos());
++    // Wide enough for both side by side (as far apart as they look from here), tall enough for
++    // the taller.
++    let apart = (hero.at - subject.at).length() * 0.5 * side.sin().abs() + 1.2;
++    let wide = apart / TAN_HALF_WIDE;
++    let tall = (subject.tall.max(hero.tall) * 0.6 + 0.5) / TAN_HALF_TALL;
++    let fit = wide.max(tall);
++    let dist = if fit > rule.far { fit.min(45.0) } else { fit.clamp(rule.near, rule.far) };
++    Pose { look, out, dist }
++}
++
++/// The yaw and pitch (radians, [`FlyCam`]'s) that look from `eye` at `look`.
++fn aim(eye: Vec3, look: Vec3) -> (f32, f32) {
++    let d = (look - eye).normalize_or(Vec3::NEG_Z);
++    ((-d.x).atan2(-d.z), d.y.clamp(-1.0, 1.0).asin())
++}
++
++/// The way from `a` to `b` round the circle, in (-PI, PI].
++fn turn(a: f32, b: f32) -> f32 {
++    (b - a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
++}
++
++/// The camera's state between frames.
++#[derive(Default)]
++struct Framing {
++    /// The eye and the point it looks at, once filming.
++    eye: Option<Vec3>,
++    look: Vec3,
++    axis: f32,
++    pick: usize,
++    /// How long the view of either has been blocked, and the hero been out of sight.
++    blocked: f32,
++    lost: f32,
++}
++
++/// Whether the line from `eye` to `to` passes through one of `others`: within a body's girth (a
++/// fifth of its height, and a little) of its chest, between the two.
++fn hidden_by(others: &[Body], eye: Vec3, to: Vec3) -> bool {
++    let line = to - eye;
++    let len2 = line.length_squared().max(1e-4);
++    others.iter().any(|b| {
++        let t = (b.at - eye).dot(line) / len2;
++        t > 0.02 && t < 0.92 && (eye + line * t).distance(b.at) < b.tall * 0.22 + 0.15
++    })
++}
++
++/// What the camera films this frame: the two, and every other body that can stand in the way.
++struct Scene {
++    subject: Body,
++    hero: Body,
++    others: Vec<Body>,
++}
++
++impl Scene {
++    /// Both in sight from `eye`: no world between (stopping short of the body itself) and no
++    /// other body, the two counting as each other's.
++    fn in_sight(&self, collide: &WorldCollision, eye: Vec3) -> bool {
++        let seen = |to: Body, other: Body| {
++            let line = to.at - eye;
++            let len = line.length();
++            len < 1.0
++                || (collide.cast_camera(eye, line * ((len - 0.6) / len), false).is_none()
++                    && !hidden_by(&self.others, eye, to.at)
++                    && !hidden_by(&[other], eye, to.at))
++        };
++        seen(self.subject, self.hero) && seen(self.hero, self.subject)
++    }
++}
++
++/// How good a position is: both in sight from as far out as the shot asks (or nearly), only
++/// from nearer in, or from nowhere on its line.
++#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
++enum Sight {
++    None,
++    Near,
++    Full,
++}
++
++/// The eye for a pose: as far out as the shot asks, or pulled in along its line (never through
++/// the world) until both are in sight, and how good that is.
++fn place(collide: &WorldCollision, scene: &Scene, p: Pose) -> (Vec3, Sight) {
++    let reach = collide.cast_camera(p.look, p.out * p.dist, false).map_or(p.dist, |hit| (hit - 0.3).max(1.0));
++    for share in [1.0, 0.8, 0.6, 0.45, 0.3] {
++        let d = (p.dist * share).min(reach).max(2.5_f32.min(reach));
++        let eye = p.look + p.out * d;
++        if scene.in_sight(collide, eye) {
++            return (eye, if d >= p.dist * CLEAR_BOOM { Sight::Full } else { Sight::Near });
++        }
++    }
++    (p.look + p.out * reach, Sight::None)
++}
++
++/// The first of the shot's positions, in order from `from`, with the best sight there is.
++fn best(collide: &WorldCollision, scene: &Scene, shot: Shot, axis: f32, from: usize) -> Option<(usize, Sight)> {
++    let count = positions(&shot.rule());
++    let mut found: Option<(usize, Sight)> = None;
++    for k in (0..count).map(|k| (from + k) % count) {
++        let (_, sight) = place(collide, scene, pose(shot, scene.subject, scene.hero, axis, k));
++        if sight == Sight::Full {
++            return Some((k, sight));
++        }
++        if sight > found.map_or(Sight::None, |f| f.1) {
++            found = Some((k, sight));
++        }
++    }
++    found
++}
++
++/// The streamed bodies the camera reads: where, how tall, what, and whether drawn.
++type Units<'w, 's> = Query<
++    'w,
++    's,
++    (&'static Guid, &'static Transform, &'static ObjectStore, &'static NetEntity, Option<&'static CameraPivot>, Option<&'static InheritedVisibility>),
++    (Without<FlyCam>, Without<SelfPlayer>),
++>;
++
++/// The units named in the spec, as a scene: the hero, the subject (a living one nearest the
++/// hero, within [`SUBJECT_REACH`]; with none, a point ahead of the hero, so the camera looks past
++/// them the way they face), and every other drawn body.
++fn find(spec: &Spectate, names: &NameCache, units: &Units) -> Option<Scene> {
++    let mut hero = None;
++    let mut subjects = Vec::new();
++    let mut others = Vec::new();
++    for (guid, t, store, net, pivot, shown) in units.iter() {
++        if !matches!(net.kind, EntityKind::Player | EntityKind::Unit) {
++            continue;
++        }
++        let tall = head_height(pivot, net.scale);
++        let body = Body { at: t.translation + Vec3::Y * tall * 0.75, tall };
++        let name = names.resolve_unit(guid.0, Some(store), Ask::Read).unwrap_or("");
++        if name.eq_ignore_ascii_case(&spec.hero) {
++            let ahead = (t.rotation * Vec3::NEG_Z).with_y(0.0).normalize_or(Vec3::NEG_Z);
++            hero = Some((body, ahead));
++        } else if !spec.subject.is_empty() && name.eq_ignore_ascii_case(&spec.subject) {
++            subjects.push((body, store.0.unit_health().is_none_or(|h| h > 0)));
++        } else if net.display_id.is_some() && shown.is_none_or(|v| v.get()) {
++            others.push(body);
++        }
++    }
++    let (hero, ahead) = hero?;
++    let nearest = |a: &(Body, bool), b: &(Body, bool)| {
++        (!a.1, a.0.at.distance(hero.at)).partial_cmp(&(!b.1, b.0.at.distance(hero.at))).unwrap_or(std::cmp::Ordering::Equal)
++    };
++    let subject = subjects.iter().copied().filter(|(b, _)| b.at.distance(hero.at) <= SUBJECT_REACH).min_by(nearest).map(|(b, _)| b);
++    // Another of the subject's name stands in the way like anyone else.
++    others.extend(subjects.into_iter().map(|(b, _)| b).filter(|b| subject.is_none_or(|s| s.at != b.at)));
++    let subject = subject.unwrap_or(Body { at: hero.at + ahead * 5.0, tall: hero.tall });
++    Some(Scene { subject, hero, others })
++}
++
++/// Films the fight: after `control` and the camera shake, so the eye written here is the one
++/// rendered.
++#[allow(clippy::too_many_arguments)] // one Bevy system's inputs
++fn film(
++    spec: Res<Spectate>,
++    time: Res<Time>,
++    names: Res<NameCache>,
++    collide: WorldCollision,
++    mut player: ResMut<Player>,
++    mut rig: ResMut<CameraControl>,
++    mut cams: Query<(&mut Transform, &mut FlyCam), With<Camera>>,
++    units: Units,
++    mut state: Local<Framing>,
++) {
++    let dt = time.delta_secs().min(0.1);
++    let found = if player.active { find(&spec, &names, &units) } else { None };
++    let Some(scene) = found else {
++        state.lost += dt;
++        if state.eye.is_some() && (!player.active || state.lost > LOST_SECS) {
++            info!("spectate: {} is out of sight; the camera goes back to the body", spec.hero);
++            *state = Framing::default();
++            player.detached = false;
++            rig.filming = false;
++        }
++        return;
++    };
++    state.lost = 0.0;
++    let Ok((mut cam_t, mut cam)) = cams.single_mut() else { return };
++    let (subject, hero) = (scene.subject, scene.hero);
++    let flat = (hero.at - subject.at).with_y(0.0);
++    let axis = if flat.length() > 0.3 { flat.x.atan2(flat.z) } else { state.axis };
++    let shot = spec.shot;
++    let Some(eye) = state.eye else {
++        // The first frame: the best position, straight there.
++        let pick = best(&collide, &scene, shot, axis, 0).map_or(0, |(k, _)| k);
++        let p = pose(shot, subject, hero, axis, pick);
++        let (eye, sight) = place(&collide, &scene, p);
++        info!("spectate: filming {} and {} ({shot:?}), position {pick} ({sight:?})", if spec.subject.is_empty() { "nothing" } else { &spec.subject }, spec.hero);
++        *state = Framing { eye: Some(eye), look: p.look, axis, pick, blocked: 0.0, lost: 0.0 };
++        player.detached = true;
++        rig.filming = true;
++        write(&mut cam_t, &mut cam, eye, p.look);
++        return;
++    };
++    state.axis += turn(state.axis, axis) * (1.0 - (-dt / AXIS_LAG).exp());
++    // Blocked: from where the camera is now, either one hidden by the world or another body.
++    if scene.in_sight(&collide, eye) {
++        state.blocked = 0.0;
++    } else {
++        state.blocked += dt;
++    }
++    let mut cut = false;
++    if state.blocked > BLOCKED_SECS {
++        let next = best(&collide, &scene, shot, state.axis, state.pick + 1).filter(|(k, _)| *k != state.pick);
++        info!(
++            "spectate: blocked {:.2} s at position {}; {}",
++            state.blocked,
++            state.pick,
++            next.map_or("no clear position, holding".to_string(), |(k, sight)| format!("cut to position {k} ({sight:?})"))
++        );
++        if let Some((k, _)) = next {
++            state.pick = k;
++            cut = true;
++        }
++        state.blocked = 0.0;
++    }
++    let p = pose(shot, subject, hero, state.axis, state.pick);
++    let (want, _) = place(&collide, &scene, p);
++    // A cut, or the fight gone somewhere else at once (a teleport, a fall and a lamp): straight
++    // there, never a sweep through the world between.
++    let (eye, look) = if cut || want.distance(eye) > JUMP {
++        (want, p.look)
++    } else {
++        (eye.lerp(want, 1.0 - (-dt / EYE_LAG).exp()), state.look.lerp(p.look, 1.0 - (-dt / LOOK_LAG).exp()))
++    };
++    state.eye = Some(eye);
++    state.look = look;
++    player.detached = true;
++    rig.filming = true;
++    write(&mut cam_t, &mut cam, eye, look);
++}
++
++/// The camera at `eye`, looking at `look`, and the free-fly rig agreeing with it.
++fn write(cam_t: &mut Transform, cam: &mut FlyCam, eye: Vec3, look: Vec3) {
++    let (yaw, pitch) = aim(eye, look);
++    cam.park(yaw, pitch);
++    cam_t.translation = eye;
++    cam_t.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
++}
++
++/// Registers the camera when `WOW_SPECTATE` names what to film; inert otherwise.
++pub(super) fn plugin(app: &mut App) {
++    let Ok(raw) = std::env::var("WOW_SPECTATE") else { return };
++    let Some(spec) = Spectate::parse(&raw) else {
++        warn!("spectate: WOW_SPECTATE={raw:?} isn't <subject>,<hero>[,duel|low|high] — inert");
++        return;
++    };
++    info!("spectate: will film {spec:?}");
++    app.insert_resource(spec).add_systems(
++        Update,
++        film.in_set(benilla_world::schedule::WorldStage::Input)
++            .after(super::controller::control)
++            .after(crate::camera_shake::apply_camera_shake)
++            .in_set(crate::client_state::InWorldGated),
++    );
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn body(x: f32, z: f32) -> Body {
++        Body { at: Vec3::new(x, 1.5, z), tall: 2.0 }
++    }
++
++    #[test]
++    fn the_spec_names_a_subject_a_hero_and_a_shot() {
++        let s = Spectate::parse("Captain Greenskin, Vcwarrior, low").unwrap();
++        assert_eq!((s.subject.as_str(), s.hero.as_str(), s.shot), ("Captain Greenskin", "Vcwarrior", Shot::Low));
++        assert_eq!(Spectate::parse("Rhahk'Zor,Vcwarrior").unwrap().shot, Shot::Duel);
++        assert_eq!(Spectate::parse(",Vcwarrior,high").unwrap().subject, "");
++        assert!(Spectate::parse("Rhahk'Zor").is_none(), "no hero");
++        assert!(Spectate::parse("Rhahk'Zor,").is_none(), "an empty hero");
++        assert!(Spectate::parse("Rhahk'Zor,Vcwarrior,sideways").is_none(), "an unknown shot");
++        assert!(Spectate::parse("a,b,duel,more").is_none());
++    }
++
++    /// A duel's first position: three-quarter, from the hero's side, 10 to 14 yd out, a little up.
++    #[test]
++    fn a_duel_is_three_quarter_from_the_heros_side_10_to_14_yd_out() {
++        let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
++        let axis = 0.0; // subject to hero is +z
++        let p = pose(Shot::Duel, subject, hero, axis, 0);
++        assert!((10.0..=14.0).contains(&p.dist), "{}", p.dist);
++        let eye = p.look + p.out * p.dist;
++        assert!(eye.z > hero.at.z, "on the hero's side: {eye}");
++        let flat = p.out.with_y(0.0).normalize();
++        let off_axis = flat.z.acos().to_degrees();
++        assert!((40.0..=60.0).contains(&off_axis), "three-quarter: {off_axis}");
++        assert!(p.out.y > 0.1 && p.out.y < 0.5, "a little above them: {}", p.out.y);
++        // Far apart, it stands back past 14 yd rather than lose either.
++        let wide = pose(Shot::Duel, subject, body(0.0, 30.0), axis, 0);
++        assert!(wide.dist > 14.0);
++    }
++
++    #[test]
++    fn low_is_20_yd_and_high_is_45_to_60_degrees_up() {
++        let (subject, hero) = (body(0.0, 0.0), body(4.0, 0.0));
++        let low = pose(Shot::Low, subject, hero, 0.0, 0);
++        assert_eq!(low.dist, 20.0);
++        assert!(low.out.y.asin().to_degrees() < 10.0);
++        let high = pose(Shot::High, subject, hero, 0.0, 0);
++        let up = high.out.y.asin().to_degrees();
++        assert!((45.0..=60.0).contains(&up), "{up}");
++        assert!(high.look.y < subject.at.y, "it looks at the ground between them");
++    }
++
++    /// The positions go round: the other side next, and the second round higher.
++    #[test]
++    fn the_next_position_is_the_other_side_then_higher() {
++        let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
++        let a = pose(Shot::Duel, subject, hero, 0.0, 0);
++        let b = pose(Shot::Duel, subject, hero, 0.0, 1);
++        assert!(a.out.x * b.out.x < 0.0, "the other side");
++        let n = Shot::Duel.rule().sides.len();
++        assert_eq!(positions(&Shot::Duel.rule()), n * 2);
++        assert!(pose(Shot::Duel, subject, hero, 0.0, n).out.y > a.out.y);
++    }
++
++    /// A body between the camera and one of the two hides them; one beside the line, behind the
++    /// camera or past the one filmed doesn't.
++    #[test]
++    fn a_body_on_the_line_hides_what_is_past_it() {
++        let (eye, to) = (Vec3::new(0.0, 1.5, 0.0), Vec3::new(0.0, 1.5, 10.0));
++        let at = |x: f32, z: f32| [body(x, z)];
++        assert!(hidden_by(&at(0.0, 5.0), eye, to));
++        assert!(hidden_by(&at(0.4, 3.0), eye, to), "its girth");
++        assert!(!hidden_by(&at(1.5, 5.0), eye, to), "beside the line");
++        assert!(!hidden_by(&at(0.0, -2.0), eye, to), "behind the camera");
++        assert!(!hidden_by(&at(0.0, 12.0), eye, to), "past the one filmed");
++        assert!(!hidden_by(&[], eye, to));
++    }
++
++    #[test]
++    fn the_camera_looks_at_the_point() {
++        for (eye, look) in [(Vec3::new(3.0, 4.0, -2.0), Vec3::ZERO), (Vec3::new(-10.0, 1.0, 7.0), Vec3::new(1.0, 1.5, 2.0))] {
++            let (yaw, pitch) = aim(eye, look);
++            let fwd = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0) * Vec3::NEG_Z;
++            assert!(fwd.distance((look - eye).normalize()) < 1e-4, "{fwd} toward {look} from {eye}");
++        }
++        assert!((turn(3.0, -3.0) - (std::f32::consts::TAU - 6.0)).abs() < 1e-5, "the short way round");
++    }
++}
+diff --git a/docs/MAP.md b/docs/MAP.md
+index 6b10569a..4bc578cf 100644
+--- a/docs/MAP.md
++++ b/docs/MAP.md
+@@ -459,6 +459,7 @@
+ - `WOW_SHOT_REQUIRE_DIST` — benilla-app/src/capture/live_shot.rs
+ - `WOW_SKY_DEPTH` — benilla-assets/src/materials.rs
+ - `WOW_SOUND_PROBE` — benilla-app/src/sound/probe.rs
++- `WOW_SPECTATE` — benilla-app/src/player/spectator.rs
+ - `WOW_STALL` — benilla-app/src/capture/probes/stall.rs, benilla-app/src/dev.rs
+ - `WOW_STALL_INJECT` — benilla-app/src/perf/stall.rs
+ - `WOW_STALL_SAMPLE` — benilla-app/src/perf/stall.rs
+-- 
+2.46.2.windows.1
+

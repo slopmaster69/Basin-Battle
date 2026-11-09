@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 60
+local VERSION = 61
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1143,10 +1143,10 @@ local function Settings()
   return ElwynnSurvivalSettings
 end
 
--- The floor markers (creatures' blows coming, ground about to burn): on unless turned off in the
--- Controls card. Those up now, to take down when they're turned off.
+-- Optional floor markers start hidden. An explicit false saves the player's choice to show
+-- them in Controls; nil (including an older unset preference) keeps the default hidden.
 function ES.MarksOn()
-  return not (ElwynnSurvivalSettings and ElwynnSurvivalSettings.noMarks)
+  return ElwynnSurvivalSettings ~= nil and ElwynnSurvivalSettings.noMarks == false
 end
 ES.marksUp = { tg = {}, mk = {} }
 function ES.ClearMarks()
@@ -6376,7 +6376,7 @@ card.slower:SetPoint("RIGHT", card.mouseText, "LEFT", -6, 0)
 -- ground. Off, none are drawn (those up now go at once).
 card.marks = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
-  if set.noMarks then set.noMarks = nil else set.noMarks = 1 end
+  if ES.MarksOn() then set.noMarks = 1 else set.noMarks = false end
   if set.noMarks then ES.ClearMarks() end
   ES.DrawKeys()
 end)

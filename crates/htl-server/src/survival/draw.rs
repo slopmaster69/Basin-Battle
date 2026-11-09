@@ -292,7 +292,7 @@ impl SurvivalGame {
         // the flag is also its "never fade" (Corey's review: the trap should appear instantly).
         match v.kind {
             ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
-            ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) || self.sim.is_perch_visual_prop(v.id) || self.sim.is_kitchen_prop(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             _ => (kind, flags),
         }
     }
@@ -385,6 +385,7 @@ impl SurvivalGame {
     }
 
     pub(crate) fn gameobject_query(&self, conn: ConnId, entry: u32) {
+        if self.aftermath_query(conn, entry) { return; }
         let found = self.go_entries.iter().find(|(_, e)| **e == entry).map(|(k, _)| k.clone());
         let p = match found {
             Some((display, name, kind)) => packets::gameobject_query_response(entry, kind, display, &name),
@@ -707,6 +708,21 @@ impl SurvivalGame {
         )
     }
 
+    /// Equipment slots are updated on the existing unit, without destroying/recreating it.
+    pub(crate) fn mob_gear_fields(&self, id: Id, f: &mut Fields) {
+        if let Some(g) = self.sim.arsenal_loadout(id) {
+            arsenal_gear_fields(g, f);
+        } else if let Some(m) = self.sim.mobs.get(&id) {
+            mob_def_gear_fields(&self.sim.content.mobs[m.def], f);
+        }
+        if let Some(gun) = self.sim.firing_line_gun(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2, gun)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 4, 2 | 3 << 8 | 2 << 16 | 26 << 24)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
+                .set(idx::UNIT_BYTES_2, 2);
+        }
+    }
+
     // --- creatures ---------------------------------------------------------------------------------
 
     pub(crate) fn mob_create(&self, id: Id) -> Option<Packet> {
@@ -748,6 +764,7 @@ impl SurvivalGame {
                 .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
                 .set(idx::UNIT_BYTES_2, 2);
         }
+        self.mob_gear_fields(id, &mut f);
         // A shield up between blows, for those who arrive meanwhile.
         if m.guarding && m.health > 0 {
             f.set(idx::UNIT_NPC_EMOTESTATE, super::play::POSE_SHIELD);
@@ -1083,6 +1100,11 @@ impl SurvivalGame {
             let p = self.player_create(id, false);
             self.send(conn, p);
         }
+        if self.aftermath.is_some() {
+            self.send_aftermath_to(conn);
+            self.aftermath_arrival(conn);
+            return;
+        }
         // (Not an ambusher still lying in wait.)
         let mobs: Vec<Id> = self.sim.mobs.iter().filter(|(_, m)| !m.hidden)
             .map(|(id, _)| *id).collect();
@@ -1366,11 +1388,48 @@ impl SurvivalGame {
     }
 }
 
+fn arsenal_gear_fields(g: &htl_survival::content::ArsenalLoadout, f: &mut Fields) {
+    let info = grip_info(&g.grip);
+    f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, g.weapon)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO, info)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, if info >> 24 == 17 { 1 } else { 3 })
+        .set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 1, g.off_hand)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 2, if g.off_hand == 0 { 0 } else { grip_info(&g.grip) })
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 3, if g.off_hand == 0 { 0 } else { 3 })
+        .set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2, 0)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 4, 0)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
+        .set(idx::UNIT_BYTES_2, 1);
+}
+
+/// Ordinary definition handoffs (an engineer landing with a wrench) use the same live update.
+/// Explicit zeros matter: an off-hand weapon or bow from the old definition must disappear.
+fn mob_def_gear_fields(d: &htl_survival::content::MobDef, f: &mut Fields) {
+    let info = match grip_info(&d.grip) { 0 => 2 | 7 << 8 | 1 << 16 | 13 << 24, n => n };
+    let (off, off_info, sheath) = if d.shield != 0 {
+        (d.shield, 4 | 6 << 8 | 1 << 16 | 14 << 24, 4)
+    } else if d.off_hand != 0 {
+        (d.off_hand, 2 | 15 << 8 | 1 << 16 | 13 << 24, 3)
+    } else { (0, 0, 0) };
+    f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, d.weapon)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO, if d.weapon == 0 { 0 } else { info })
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, if d.weapon == 0 { 0 } else if info >> 24 == 17 { 1 } else { 3 })
+        .set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 1, off)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 2, off_info)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 3, sheath)
+        .set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2, d.bow)
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 4, if d.bow == 0 { 0 } else { 2 | 2 << 8 | 2 << 16 | 15 << 24 })
+        .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
+        .set(idx::UNIT_BYTES_2, if d.bow != 0 { 2 } else { u32::from(d.weapon != 0) });
+}
+
 /// How a creature holds its weapon, as `UNIT_VIRTUAL_ITEM_INFO` packs it (class, subclass,
 /// material, inventory type): a one-handed axe at the hip, a two-handed weapon across the back.
 fn grip_info(grip: &str) -> u32 {
     let (sub, inv) = match grip {
         "2h" => (1, 17),
+        "hammer" => (5, 17),
+        "sword" => (7, 13),
         "staff" => (10, 17),
         "polearm" => (6, 17),
         "dagger" => (15, 13),
@@ -1382,6 +1441,83 @@ fn grip_info(grip: &str) -> u32 {
 
 #[cfg(test)]
 mod rope_tests {
+    #[test]
+    fn gilnid_platforms_keep_collision_while_visual_cues_appear_immediately() {
+        use htl_survival::{content::Content, land::FlatLand};
+        let mut game = super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
+        game.sim.mobs.clear();
+        game.sim.objs.clear();
+        let hero = game.sim.join("smith", "Smith", None);
+        let p = game.sim.players.get_mut(&hero).unwrap();
+        p.pos = [0.0, 0.0, 0.0];
+        p.facing = 0.0;
+        p.health = 100_000;
+        p.max_health = 100_000;
+        game.sim.spawn_target(hero, "dm_gilnid", 8.0, false, false, 1.0).unwrap();
+        game.sim.step(0.05);
+        assert_eq!(game.sim.objects().iter().filter(|o| matches!(o.display, 36 | 6481)).count(), 4);
+        let mut seen = [false; 3];
+        for _ in 0..300 {
+            for obj in game.sim.objects() {
+                let no_hull = game.obj_look_in(&obj).1 & super::GO_FLAG_PREVIEW_MOVE != 0;
+                match obj.display {
+                    36 | 6481 => assert!(!no_hull, "platform display {} must retain its collision hull", obj.display),
+                    353 | 755 | 1108 => {
+                        assert!(no_hull, "visual display {} must be immediate", obj.display);
+                        seen[match obj.display { 353 => 0, 755 => 1, _ => 2 }] = true;
+                    }
+                    _ => {}
+                }
+            }
+            game.sim.step(0.05);
+        }
+        assert_eq!(seen, [true; 3], "exercise steam, valve and dropped support debris");
+    }
+
+    #[test]
+    fn smite_gear_updates_clear_the_offhand_and_match_a_late_observer() {
+        use crate::fields::{idx, Fields};
+        let c = htl_survival::content::Content::builtin();
+        let gear = &c.mobs[c.mob("dm_smite").unwrap()].arsenal.as_ref().unwrap().loadouts;
+        let mut live = Fields::new();
+        for g in gear {
+            super::arsenal_gear_fields(g, &mut live);
+            let mut late = Fields::new();
+            super::arsenal_gear_fields(g, &mut late);
+            for field in [idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 1,
+                idx::UNIT_VIRTUAL_ITEM_INFO, idx::UNIT_VIRTUAL_ITEM_INFO + 1,
+                idx::UNIT_VIRTUAL_ITEM_INFO + 2, idx::UNIT_VIRTUAL_ITEM_INFO + 3, idx::UNIT_BYTES_2] {
+                assert_eq!(live.get(field), late.get(field));
+            }
+        }
+        assert_eq!(live.get(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY), Some(2056));
+        assert_eq!(live.get(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 1), Some(0));
+        assert_eq!(live.get(idx::UNIT_VIRTUAL_ITEM_INFO + 2), Some(0));
+        assert_eq!(live.get(idx::UNIT_VIRTUAL_ITEM_INFO + 3), Some(0));
+        assert_eq!(live.get(idx::UNIT_VIRTUAL_ITEM_INFO + 1), Some(1), "hammer sheath across the back");
+        assert_eq!(live.get(idx::UNIT_VIRTUAL_ITEM_INFO).unwrap() >> 8 & 255, 5, "two-handed mace subclass");
+    }
+
+    #[test]
+    fn a_definition_handoff_replaces_the_weapon_and_clears_old_shield_and_bow() {
+        use crate::fields::{idx, Fields};
+        let c = htl_survival::content::Content::builtin();
+        let mut air = c.mobs[c.mob("dm_perched_engineer").unwrap()].clone();
+        air.weapon = 18575;
+        air.shield = 1;
+        air.bow = 2;
+        let ground = &c.mobs[c.mob("dm_ground_engineer").unwrap()];
+        let mut f = Fields::new();
+        super::mob_def_gear_fields(&air, &mut f);
+        assert_eq!(f.get(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY), Some(18575));
+        super::mob_def_gear_fields(ground, &mut f);
+        assert_eq!(f.get(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY), Some(ground.weapon));
+        for field in [idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 1, idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2,
+            idx::UNIT_VIRTUAL_ITEM_INFO + 2, idx::UNIT_VIRTUAL_ITEM_INFO + 3, idx::UNIT_VIRTUAL_ITEM_INFO + 4] {
+            assert_eq!(f.get(field), Some(0));
+        }
+    }
+
     #[test]
     fn a_missile_look_line_says_each_field_and_a_caster_only_when_its_for_one_missile() {
         assert_eq!(super::missile_look_line(19434, "F2E6C8", 0.18, 0.3, 1.0, 0.0, None, false, 0.0), "ML\t19434\tF2E6C8\t0.18\t0.30\t1.00\t0.00");

@@ -1,0 +1,39 @@
+# Controlled mechanic demonstration, NOT an unassisted clear or a balance playtest.
+# Normal spawn at the authored home, isolated from the ambient deck. Healing and .es hurt
+# expose the crew-death transition. Marks remain off. Camera0 faces+x BEFORE .es spawn:
+# hero[-70,-815,41.5]+8yd gives Greenskin[-62,-815,41.5]. Do not change yaw without moving setup.
+# Acceptance: exactly2 reachable armed gunners; separate shoulders/shots; fixed aim misses a
+# sidestep; captain cuts during reload; first gunner death does not escalate; second causes
+# a visible gun draw; slow shot and avoidable rope/harpoon pull; all crew gone on captain death.
+hero warrior
+cam 0 -35 22
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es clearfoes
+12 .es goto -70 -815 41.5 0
+13 video
+14 .es spawn dm_greenskin
+14.1 shots opening 32 0.25
+16 lua ActionDash(0.45, 6, "l")
+19.6 lua ActionDash(0.45, 6, "r")
+22 .es goto -65 -815 41.5 0
+22.1 shots captain-reload-window 24 0.25
+25 .es heal
+29 .es hurt 0 deck_gunner
+29.1 shots one-gunner-down 16 0.3
+34 .es heal
+36 .es goto -70 -815 41.5 0
+37 .es hurt 0 deck_gunner
+37.1 shots captain-draw 28 0.25
+39.2 lua ActionDash(0.45, 6, "l")
+43 .es heal
+46 .es goto -70 -815 41.5 0
+47 shots captain-alone 40 0.4
+50 .es heal
+55 .es heal
+60 .es heal
+64 .es hurt 0 greenskin
+64.1 shots cleanup 10 0.3
+69 end
