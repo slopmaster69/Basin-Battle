@@ -88,6 +88,16 @@ fn a_watcher_leaves_the_rules_and_every_other_client() {
     say(&mut game, 2, ".es watch");
     assert!(told(&drain(&cam_rx), "You're watching Vcwarrior."));
     assert!(!game.sim.players.contains_key(&cam));
+    // It plays no part: its keys and the rest of its lines do nothing.
+    let foes = game.sim.mobs.len();
+    say(&mut game, 2, ".es spawn dm_greenskin");
+    say(&mut game, 2, ".es in a");
+    game.handle(Inbound::Packet { conn: 2, opcode: u32::from(op::CMSG_ATTACKSWING), body: 1u64.to_le_bytes().to_vec() });
+    assert_eq!(game.sim.mobs.len(), foes);
+    let heard = drain(&cam_rx);
+    assert!(told(&heard, "You're watching. Use .es watch off to play again."), "the spawn is turned down");
+    assert!(heard.iter().all(|p| p.opcode != op::SMSG_ATTACKSWING_CANT_ATTACK), "the attack isn't even heard");
+    assert!(!game.sim.players.contains_key(&cam));
 }
 
 #[test]
