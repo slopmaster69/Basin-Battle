@@ -24,6 +24,9 @@ pub const SCHOOLS: [&str; 9] = ["warrior", "paladin", "hunter", "rogue", "priest
 /// The board's second page: generic cards any class can own and slot (each on its own row's key),
 /// free to take from the board, there to be tried out. Not a class's column: a card's `school`.
 pub const BETA: &str = "beta";
+/// An ability's `body` for its cast's clip: the whole body standing and the torso while the legs
+/// walk (""), or the whole body always ("full").
+pub const BODIES: [&str; 2] = ["", "full"];
 /// At most this many beta cards to a row (the page is five rows of four).
 pub const BETA_ROW: usize = 4;
 /// Each class's `ChrClasses.dbc` id, in the order of [`SCHOOLS`] (the creation screen's class).
@@ -170,6 +173,10 @@ pub struct AbilityDef {
     /// A rhythm's casts, beat by beat (cycled): the body's clip for each missile.
     #[serde(default)]
     pub beat_clips: Vec<u16>,
+    /// How much of the body its cast's clip drives: "" (the whole body standing, the torso while
+    /// the legs walk on), or "full" (the whole body even walking: a blow the legs are part of).
+    #[serde(default)]
+    pub body: String,
     /// Damage, range and radius at the least and the full charge (one value: both).
     #[serde(default)]
     pub damage: [f32; 2],
