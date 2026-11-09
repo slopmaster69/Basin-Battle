@@ -275,7 +275,9 @@ fn load_variant(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32;
         let mut placed = std::collections::HashSet::new();
         for t in &tiles {
             for d in &t.doodads {
-                if d.model.is_empty() || !placed.insert(d.unique_id) {
+                if d.model.is_empty() || !placed.insert(d.unique_id)
+                    || (aftermath && aftermath::SHIP_ADT_DOODADS.contains(&d.unique_id))
+                {
                     continue;
                 }
                 let hull = match hulls.get(&d.model) {

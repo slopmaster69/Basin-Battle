@@ -8,6 +8,18 @@ use benilla_formats::{accumulate_wmo_group_collision, parse_wmo_root, Chain, Col
 pub(super) const SHIP_GROUPS: &[u32] = &[17, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 40, 43];
 // MODR: shiphull (30) and hull_platforms (43) exclusively own indices 0 through 63.
 pub(super) const SHIP_DOODADS: usize = 64;
+// Independently placed MDDF fixtures attached to the hull, platforms and ramps.
+// Native attachment pivots verified against the removed group triangles; preserve shore lights.
+pub(super) const SHIP_ADT_DOODADS: &[u32] = &[
+    293853, 293855, 293857, 293858, 293862, 293863, 293865, 293866,
+    293867, 293868, 293869, 293871, 293872, 293873, 293874, 293875,
+    293876, 293877, 293878, 293879, 293880, 293881, 294176, 294178,
+    294179, 294180, 294182, 294183, 294184, 333883, 333884, 333885,
+    333886, 333887, 333888, 333889, 333890, 333896, 333897, 333898,
+    333899, 333900, 333901, 333902, 333903, 333904, 333905, 333906,
+    333907, 333908, 333909, 333910, 333911, 333912, 333913, 333914,
+    333915, 333916, 333917, 333918, 333919,
+];
 const SHIP_ROOT: &str = "world/wmo/dungeon/az_deadmines/az_deadmines_b.wmo";
 
 pub(super) fn is_ship_root(path: &str) -> bool {
@@ -61,5 +73,18 @@ mod tests {
         let new = after.ground.height_near(-2.0, -768.0, 9.63);
         assert!((old - new).abs() < 0.1, "Smite's dock must remain");
         assert!(after.props.len() < intact.props.len());
+        let mut chain = Chain::open(std::path::Path::new(&data)).unwrap();
+        let tile = benilla_formats::load_tile_mesh(&mut chain, "DeadminesInstance", 33, 32).unwrap();
+        let fixtures: Vec<_> = tile.doodads.iter()
+            .filter(|d| SHIP_ADT_DOODADS.contains(&d.unique_id)).collect();
+        assert_eq!(fixtures.len(), 61);
+        for fixture in fixtures {
+            assert!(intact.props.iter().any(|(_, pos, _)| *pos == fixture.position));
+            assert!(!after.props.iter().any(|(_, pos, _)| *pos == fixture.position),
+                "orphaned native fixture {} remains", fixture.unique_id);
+        }
+        let shore = tile.doodads.iter().find(|d| d.unique_id == 333891).unwrap();
+        assert!(after.props.iter().any(|(_, pos, _)| *pos == shore.position));
+
     }
 }
