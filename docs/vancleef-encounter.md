@@ -94,14 +94,29 @@ the open deck, from the first exchange and after 15 sec of fighting.
 
 ## Filming
 
-`tools/visual-check/vancleef-*.txt` film each beat with the spectator cameraman (`camera duel
-Edwin VanCleef`), markers off, from the hero's own keys once the video starts. Setup (the deck
-cleared, the boss spawned, the hero healed) happens before the video. A clip that needs a health
-change after that says "dev setup" in its first line and proves nothing about the fight.
+`tools/visual-check/vancleef-clear.txt` is an unassisted solo clear, filmed by the spectator
+cameraman (`camera duel Edwin VanCleef`) with markers off. Setup before the video: the deck
+cleared, the quarters secret found, the warrior healed 14 yd from the cabin door. From the
+video on, only the warrior's own keys play (`.es in`), pressed by a small player in the
+interface that reads only what the client shows: the hunch or kneel held (`WP` clip 8 or 75: hit,
+0.3 sec after it shows), a windup (`AN`: guard the first blow as it lands, roll from a string's
+follow-up), the red glow (`WG`: roll aside). It hits into every other Invitation to draw the
+riposte and waits out the rest. `vancleef-late.txt` is the same from 33% (dev setup: a `.es hurt`
+before the video), for the late beats alone.
+
+On Nov 9 the clear succeeded on the third version of that player, with the Footman's Axe: VanCleef
+in about 2 min (2 posture breaks, 4 ripostes rolled aside, the Blackguards gone, the 12% kneel),
+Unbowed rising 4 sec later and falling about 1.8 min after, the warrior ending on 50 of 200
+health. Earlier takes found what the player had to learn: hold the camera at no fixed yaw so the
+lock-on turns the hero to him, guard only a string's first blow and roll the follow-up, and wait
+a human's reaction before hitting a hunch (the blow that ends in it settles a round trip later).
 
 ## Not tested in the client
 
-The hunch is the model's own StandWound and the kneel EmoteKneel, held by the add-on's `WP`
-line; whether they read at duel distance, and the Blackwing blades and dark swirl, need the
-real client. So do the red glow on a creature's weapon, the smoke puff's opacity, the native
-deck's light at the duel spot, and the Blackguards' walk out of sight.
+Seen in the Nov 9 footage, not yet judged by a person: the walk out of the doorway, the smoke puff
+(a clear white ring, seen through), Unbowed's dark swirl and black blades, the body lying 4 sec and
+the kneel before he rises. Hard to see: the hunch itself, because the Footman's Axe's bleed sets
+VanCleef alight for most of the fight (a sword hero should be filmed), and the Blackguards'
+walk off the ship, small at the back of the duel shot. The red riposte glow and the scrape and
+scuff sounds need someone to watch and listen. The duel camera sometimes pulls in close where the
+deck's masts, cabin and rails crowd it.
