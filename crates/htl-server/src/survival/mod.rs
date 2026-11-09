@@ -30,6 +30,7 @@ pub mod realms;
 mod siege_ui;
 mod ui;
 mod wager_ui;
+mod watch;
 
 pub(crate) const TICK: Duration = Duration::from_millis(50);
 /// Saves at most this often (and when a hero leaves).
@@ -135,6 +136,9 @@ pub(crate) struct Session {
     pub hero: String,
     pub out: Sender<Packet>,
     pub world: Option<InWorld>,
+    /// The hero this client films as a cameraman (`.es watch`, survival/watch.rs), by name: out
+    /// of the rules and unseen while it does. It rides with the session from world to world.
+    pub watching: Option<String>,
 }
 
 impl Session {
@@ -278,6 +282,8 @@ pub struct SurvivalGame {
     pub(crate) lab_caster: Option<Id>,
     /// When the lab's queue file was last looked at.
     pub(crate) lab_polled: Instant,
+    /// The cameramen's bodies (survival/watch.rs), out of the rules: not in `sim.players`.
+    pub(crate) watchers: BTreeMap<Id, htl_survival::Player>,
     /// A temporary finished dungeon, independent of simulation and saved progression.
     pub(crate) aftermath: Option<aftermath::Aftermath>,
     pub(crate) aftermath_land: Option<Box<dyn htl_survival::Land>>,
@@ -397,6 +403,7 @@ impl SurvivalGame {
             lab_allies: Vec::new(),
             lab_caster: None,
             lab_polled: Instant::now(),
+            watchers: BTreeMap::new(),
             aftermath: None,
             aftermath_land: None,
         };
@@ -417,6 +424,7 @@ impl SurvivalGame {
                 let events = self.sim.step(TICK.as_secs_f32());
                 self.lab_trace(&events);
                 self.play(events);
+                self.keep_watchers_near();
                 self.ui_flush();
                 self.hold_clock();
                 if self.dirty && self.saved_at.elapsed() >= SAVE_EVERY {
@@ -475,7 +483,7 @@ impl SurvivalGame {
         self.dirty = false;
         self.saved_at = Instant::now();
         let Some(path) = &self.save_path else { return };
-        let save = self.sim.save(&self.offline);
+        let save = self.sim.save(&self.offline_and_watchers());
         match htl_survival::save::to_toml(&save) {
             Ok(text) => {
                 if let Some(dir) = path.parent() {
@@ -520,14 +528,18 @@ impl SurvivalGame {
         match msg {
             Inbound::Connected { conn, account, out } => {
                 let hero = account.to_lowercase();
-                self.sessions.insert(conn, Session { account, hero, out, world: None });
+                self.sessions.insert(conn, Session { account, hero, out, world: None, watching: None });
             }
             Inbound::Disconnected { conn } => {
                 self.leave_world(conn);
                 self.sessions.remove(&conn);
             }
             Inbound::Packet { conn, opcode, body } => {
-                if let Err(e) = self.packet(conn, opcode, &body) {
+                // A watcher's body is in the rules only while its own client is heard.
+                self.lend_watcher(conn);
+                let done = self.packet(conn, opcode, &body);
+                self.set_watcher_aside(conn);
+                if let Err(e) = done {
                     eprintln!("[survival] bad {opcode:#06x} from connection {conn}: {e}");
                 }
             }
@@ -817,8 +829,11 @@ impl SurvivalGame {
         self.send(conn, me);
         self.sync_items(conn);
         self.send_world_to(conn, id);
-        let other = self.player_create(id, false);
-        self.broadcast_except(conn, &other);
+        // (A watcher arriving with the hero it films stays unseen.)
+        if !self.watching(conn) {
+            let other = self.player_create(id, false);
+            self.broadcast_except(conn, &other);
+        }
         let name = self
             .world_of(conn)
             .map(|w| w.name.clone())
@@ -876,6 +891,7 @@ impl SurvivalGame {
 
     /// A hero leaves for the other world: off this one (saved), and their connection with them.
     pub(crate) fn depart(&mut self, conn: ConnId) -> Option<(Session, PlayerSave, Carry)> {
+        self.lend_watcher(conn);
         let w = self.sessions.get_mut(&conn).and_then(|s| s.world.take())?;
         let carry = Carry {
             addon: w.addon,
@@ -952,6 +968,8 @@ impl SurvivalGame {
         }
         self.pending_carry.insert(conn, carry);
         self.send(conn, packets::new_world(self.realm.map, pos, facing));
+        // A watcher following its hero here: out of the rules from the start.
+        self.set_watcher_aside(conn);
         self.save();
     }
 
@@ -971,6 +989,11 @@ impl SurvivalGame {
     }
 
     pub(crate) fn leave_world(&mut self, conn: ConnId) {
+        self.lend_watcher(conn);
+        // A login after this one plays, whatever this one did.
+        if let Some(s) = self.sessions.get_mut(&conn) {
+            s.watching = None;
+        }
         let Some(w) = self.sessions.get_mut(&conn).and_then(|s| s.world.take()) else { return };
         let account = self.sessions.get(&conn).map(|s| s.hero.clone()).unwrap_or_default();
         // (Siege keeps no hero: the camp holds their save meanwhile.)
@@ -1001,6 +1024,11 @@ impl SurvivalGame {
     fn movement(&mut self, conn: ConnId, opcode: u16, body: &[u8]) -> std::io::Result<()> {
         let Some(w) = self.world_of(conn).filter(|w| !w.porting && w.aftermath_return.is_none()) else { return Ok(()) };
         let (guid, id) = (w.guid, w.id);
+        // A watcher's body goes where its hero goes (`keep_watchers_near`), unseen: what its
+        // client says of it moves nothing and is told to no one.
+        if self.watching(conn) {
+            return Ok(());
+        }
         let mut r = Reader::new(body);
         let flags = r.u32()?;
         let _time = r.u32()?;

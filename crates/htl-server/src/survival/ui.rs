@@ -1919,6 +1919,13 @@ impl SurvivalGame {
                 Err(_) => Err("Try .es hurt 0.6 [name] (the share of its health to leave it).".into()),
             },
             "hurt" => Err("Turn debug on first (.es debug).".into()),
+            // The cameraman: this client films a hero's fight from outside it (survival/watch.rs).
+            "watch" if self.dev_ok() => {
+                // (The hero's name as it was written, for the answer.)
+                let name = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("watch")).nth(1).unwrap_or("").to_string();
+                self.watch_command(conn, &name)
+            }
+            "watch" => Err("Turn debug on first (.es debug).".into()),
             // (debug) Every creature below taken away but those named: `.es clearfoes rhahk`. For
             // filming one fight with nothing else in it.
             "clearfoes" if self.sim.debug => self.sim.dev_clear_foes(&arg).map(|said| self.say_to(conn, &said)),
