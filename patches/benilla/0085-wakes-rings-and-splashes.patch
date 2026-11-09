@@ -1,4 +1,4 @@
-From d1a5230aa8ea69121967a454d88a5be0ccacd956 Mon Sep 17 00:00:00 2001
+From a3cd56c64ad276ff78a94c0dd28877f26d58ea64 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 8 Nov 2026 08:32:17 -0700
 Subject: [PATCH] Water that answers what moves through it: wakes, rings and
@@ -62,7 +62,7 @@ The open water's surface under the wakes (look::water_surface): four
 layers of gradient-noise wavelets, 3.2, 1.28, 0.36 and 0.2 yd long,
 drift along the wind (look::wind's downwind, each turned off it by 0,
 35, -55 and 120 degrees, so the sheet never slides one way) at 0.6, 0.9,
-0.45 and 0.55 yd/s, weighted 0.5, 0.45, 0.6 and 0.6 (0.7 to 1.3 of that as the wind strengthens), each only
+0.45 and 0.55 yd/s, weighted 0.5, 0.45, 0.3 and 0.6 (0.7 to 1.3 of that as the wind strengthens), each only
 sliding, so nothing pops; their crossing keeps the pattern changing. A compute pass, look_water_surface (the fps
 journal's gpu_look, named on its GPU_PASSES line), bakes them once a
 frame into one 25.6 yd tile of 512 x 512 texels (the long pair's slope
@@ -77,9 +77,18 @@ highlight off it is broader (sharpness 320, at 0.35 of 0081's, the grain
 counting half) and never brighter than 1.6, so a crest is a soft streak,
 not a speck; the brightness of all the water (the bed seen through it
 too) follows the wavelets, a facet toward the sun's bearing brighter
-and away darker, by 0.08 for the long pair and 0.5 for the grain at
-twice each pair's own mean slope, half of that in shade, so the fine
-grain shows and its drift moves the sheet; the sky's mirror is
+and away darker, by 0.04 for the long pair and 0.2 for the grain at
+twice each pair's own mean slope, half of that in shade, so its drift
+moves the sheet without reading as an embossed relief. A fine grain of
+about 0.1 yd lies over it, per pixel (the map's 0.05 yd texels cannot
+hold it): two octaves (0.1 and 0.06 yd) of the bake's gradient noise,
+periodic over the tile, drifting at about a capillary ripple's pace,
+each faded out as a pixel grows from a quarter to 0.6 of its
+wavelength; it shades the water by 0.25 at its mean tilt toward the
+sun, tilts the surface by that share of the slope and bends the bed. At
+the films' camera (1920x1080, 0.0135 yd a pixel) it lies at 4 to 7 px,
+where the reference's fine texture is; the finest baked wavelet (0.2 yd)
+lies at 15 px; the sky's mirror is
 Fresnel's (0.1 looking straight down), faint looking down and strong
 toward the horizon, its clouds mirrored with an edge four times softer
 and blurred to their broadest octave, and four-fifths of it kept in
@@ -115,14 +124,15 @@ only with the wakes on, so `lookwater wakes 0`, `worldWater 0` and
 Pale, milky shallows under the drifting wavelets: Corey's reference pond
 is pale and milky green (about 127 of luminance) where the fifth filming's
 lake was dark (about 50). Over the view's path through the water the
-bed's light gives way to the water's own, up to 0.5 of it, coming in
-over about 0.9 yd of path and none at the waterline, so the bed shows
-through a pale veil; the water takes 0.6 of the hour's absorption, so
+bed's light gives way to the water's own, up to 0.35 of it, coming in
+over about 0.9 yd of path and none at the waterline, and fully only
+past 1.2 yd of depth, so the bed shows plainly under the first yard and
+through a pale veil beyond; the water takes 0.6 of the hour's absorption, so
 the bed shows plainly; the milky water is lit by the hour's ambient and
 0.85 of its sun even in shade (light scattered in from the lit water
 round it); the shallow colour goes most of the way (0.85) to a pale,
-slightly warm green (sRGB 0.60, 0.76, 0.68), the deep colour 0.3 of the
-way, and it turns to the deep from 1 yd to 5 (1.2 to 3.5 drew a pale band down a shelf's middle
+slightly warm green (sRGB 0.60, 0.76, 0.68) at 0.85 of its brightness,
+the deep colour 0.3 of the way to it at its own, and it turns to the deep from 1 yd to 5 (1.2 to 3.5 drew a pale band down a shelf's middle
 depths); the shore's haze is 0.4 of the classic surface's, spread over
 twice the depth, so no pale band runs along the shore; and the eight-bit
 colour is dithered by half a step so the pale water's broad gradients
@@ -161,12 +171,14 @@ how deep it stands (with the smoothed depth's difference in red), the
 sun's share at the surface, how much of the bed comes through, and the
 bed as the scene copy holds it.
 
-Rain on the drifting wavelets: drops ring in cells of 0.75 yd, three
-offset layers, each ring growing to about 0.3 yd and 0.075 yd across over
-two-thirds of a second, kept until a pixel spans 0.1 yd; they tilt the
-surface and lay a pale line, at most 0.35 of the water's light (1.12's
-rings, a tenth as wide and gone from a pixel of 0.035 yd, stay with the
-wakes off).
+Rain on the drifting wavelets: drops ring in cells of 0.9 yd, three
+offset layers, one ring a second in each cell with drops, each growing
+to about 0.38 yd and 0.09 yd across over that second, kept until a
+pixel spans 0.1 yd; they tilt the surface and lay a pale line, 0.8 of
+the way to a pale white at a ring's birth, fading with its age, and
+the crest's sun side is brighter and its far side darker by 0.3 of
+that (1.12's rings, a tenth as wide and gone from a pixel of 0.035 yd,
+stay with the wakes off).
 
 A body that jumps (a teleport: over 3 yd in a frame, or over a yard
 across at more than 25 yd/s, as the mover spreads one over frames)
@@ -181,7 +193,14 @@ how deep our feet are, and the fastest body's speed and depth, each with
 the most since the last report, which then starts over; the same line
 is logged every 5 s while something moves the water), `lookwater refract <0-2>`
 and `lookwater caustics <0-2>` hold the bend and the light, `grade` lets
-go, and `lookwater show` is above.
+go, and `lookwater show` is above. `lookwater tune <knob> <value>` holds
+one of the open water's main numbers for tuning on film (milk,
+milk_deep, milk_depth, milk_tone, absorb, coarse, mid, fine, relief,
+relief_long, grain, grain_yd, sky, sheen, rain, rain_size, rain_rate;
+the defaults are the tuning above), `tune <knob> grade` or `tune grade`
+lets it or all go, and `tune` alone prints them all; each change is
+logged ("[look water] tune set: ..."), so a film's frames can be matched
+to the values. They reach only the surface under the wakes.
 
 For the visual check, `probemove <seconds> <f|b|l|r|fl|fr|bl|br>
 [facing]`, a dev console command: our body holds those keys for that
@@ -200,21 +219,21 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/player/controller.rs   |   46 +
  crates/benilla-app/src/player/state.rs        |   72 +
  crates/benilla-app/src/shaders.rs             |   28 +
- crates/benilla-app/src/world_console.rs       |  189 +-
+ crates/benilla-app/src/world_console.rs       |  290 ++-
  crates/benilla-assets/src/materials.rs        |   65 +
- crates/benilla-assets/src/shaders/liquid.wgsl |  813 +++++++-
+ crates/benilla-assets/src/shaders/liquid.wgsl |  949 ++++++++-
  crates/benilla-world/src/liquid/surface.rs    |    5 +-
  crates/benilla-world/src/look/mod.rs          |   18 +-
- crates/benilla-world/src/look/wakes.rs        | 1773 +++++++++++++++++
+ crates/benilla-world/src/look/wakes.rs        | 1789 +++++++++++++++++
  crates/benilla-world/src/look/wakes_pass.rs   |  212 ++
- crates/benilla-world/src/look/water.rs        |  399 +++-
- .../benilla-world/src/look/water_surface.rs   |  890 +++++++++
+ crates/benilla-world/src/look/water.rs        |  456 ++++-
+ .../benilla-world/src/look/water_surface.rs   | 1452 +++++++++++++
  crates/benilla-world/src/shaders.rs           |    8 +-
  .../benilla-world/src/shaders/look_wakes.wgsl |  236 +++
- .../src/shaders/look_water_surface.wgsl       |   79 +
+ .../src/shaders/look_water_surface.wgsl       |   82 +
  crates/benilla-world/src/water_fx/mod.rs      |   14 +-
  crates/benilla-world/src/world_unit.rs        |    5 +
- 20 files changed, 4823 insertions(+), 69 deletions(-)
+ 20 files changed, 5697 insertions(+), 70 deletions(-)
  create mode 100644 crates/benilla-world/src/look/wakes.rs
  create mode 100644 crates/benilla-world/src/look/wakes_pass.rs
  create mode 100644 crates/benilla-world/src/look/water_surface.rs
@@ -534,7 +553,7 @@ index eb68538..240fbf1 100644
      /// and each shader's id by its embedded path.
      #[expect(
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 5e4aaaa..fc1919b 100644
+index 5e4aaaa..013aba6 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
 @@ -81,6 +81,9 @@ impl Plugin for WorldConsolePlugin {
@@ -599,12 +618,12 @@ index 5e4aaaa..fc1919b 100644
  /// `lookbloom <intensity> [threshold]`, benilla's own (1.12 has no such command): holds the new
  /// look's bloom at an intensity (and its prefilter's threshold, 0..1 of the gamma frame) whatever
  /// the hour's grade asks, so one take can compare several; `lookbloom grade`, or no argument, lets
-@@ -489,15 +518,25 @@ fn look_shadow(world: &mut World, args: &str) -> Vec<String> {
+@@ -489,15 +518,36 @@ fn look_shadow(world: &mut World, args: &str) -> Vec<String> {
      lines
  }
  
 +const LOOK_WATER_USAGE: &str =
-+    "<reflect 0-2> [clarity 0-2] | grade | wakes [0|1] | refract <0-2> | caustics <0-2> | show <off|depth|shadow|clear|bed>";
++    "<reflect 0-2> [clarity 0-2] | grade | wakes [0|1] | refract <0-2> | caustics <0-2> | show <off|depth|shadow|clear|bed> | tune [<knob> [<value>|grade]|grade]";
 +
  /// `lookwater <reflect> [clarity]`, benilla's own (1.12 has no such command): holds the new look's
  /// water (`benilla_world::look::water`) for tuning on film: its mirror at a multiple of the tuned
@@ -615,8 +634,19 @@ index 5e4aaaa..fc1919b 100644
 +/// value says what they are doing; `refract` and `caustics` hold the bent bed and the light on it
 +/// at a multiple of the tuned, 0 to 2, and `grade` lets either go. `lookwater show <word>` draws,
 +/// under the wakes, what the water is drawn from in its place (`LookWakes::show`), for film.
++/// `lookwater tune <knob> <value>` holds one of the open water's surface's knobs
++/// (`benilla_world::look::water_surface::KNOBS`), `tune <knob> grade` or `tune grade` lets it or
++/// all go, and `tune` alone prints them all; each change is logged, so a film's frames can be
++/// matched to the values.
  fn look_water(world: &mut World, args: &str) -> Vec<String> {
      use benilla_world::look::{LookWater, WorldLook};
++    let words: Vec<&str> = args.split_whitespace().collect();
++    if words
++        .first()
++        .is_some_and(|w| w.eq_ignore_ascii_case("tune"))
++    {
++        return look_water_tune(world, &words[1..]);
++    }
 +    if let Some(wakes) = benilla_world::look::LookWakes::parse(args) {
 +        return look_wakes(world, wakes);
 +    }
@@ -626,10 +656,65 @@ index 5e4aaaa..fc1919b 100644
      };
      let on = {
          let mut water = world.get_resource_or_init::<LookWater>();
-@@ -521,6 +560,79 @@ fn look_water(world: &mut World, args: &str) -> Vec<String> {
+@@ -521,6 +571,134 @@ fn look_water(world: &mut World, args: &str) -> Vec<String> {
      lines
  }
  
++/// `lookwater tune`: the open water's surface's knobs (`benilla_world::look::water_surface`).
++fn look_water_tune(world: &mut World, words: &[&str]) -> Vec<String> {
++    use benilla_world::look::water_surface::{SurfaceTune, TuneCommand, KNOBS};
++    use benilla_world::look::{LookWakes, LookWater, WorldLook};
++    let command = match TuneCommand::parse(words) {
++        Ok(c) => c,
++        Err(why) => return vec![why, format!("Usage: lookwater {LOOK_WATER_USAGE}")],
++    };
++    let mut lines = Vec::new();
++    let mut changed = false;
++    {
++        let mut wakes = world.get_resource_or_init::<LookWakes>();
++        match command {
++            TuneCommand::Show => {}
++            TuneCommand::Reset => {
++                wakes.tune = SurfaceTune::default();
++                lines.push("Every knob at its tuning.".to_string());
++                changed = true;
++            }
++            TuneCommand::Read(i) => {
++                let k = &KNOBS[i];
++                lines.push(format!(
++                    "{} {} (default {}, {} to {}): {}.",
++                    k.name, wakes.tune.0[i], k.default, k.range.0, k.range.1, k.what
++                ));
++            }
++            TuneCommand::Set(i, v) => {
++                let k = &KNOBS[i];
++                let v = v.unwrap_or(k.default);
++                wakes.tune.0[i] = v;
++                lines.push(format!("{} set to {v} (default {}).", k.name, k.default));
++                changed = true;
++            }
++        }
++        lines.push(format!("Knobs: {}.", wakes.tune.line()));
++        if !wakes.on {
++            lines.push("The wakes are off: the knobs reach only the water under them.".to_string());
++        }
++    }
++    if !world.get_resource::<LookWater>().is_some_and(|w| w.on) {
++        lines.push("worldWater is 0: 1.12's water.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has 1.12's water.".to_string());
++    }
++    // Logged, change or not, so a film's frames can be matched to the values.
++    for line in &lines {
++        info!(
++            "[look water] tune{}: {line}",
++            if changed { " set" } else { "" }
++        );
++    }
++    lines
++}
++
 +/// `lookwater`'s words for the wakes and the bed (`benilla_world::look::wakes`).
 +fn look_wakes(
 +    world: &mut World,
@@ -706,7 +791,7 @@ index 5e4aaaa..fc1919b 100644
  /// `lookwind <strength> [gust]`, benilla's own (1.12 has no such command): holds the new look's
  /// wind (`benilla_world::look::wind`) for tuning on film: its strength at a multiple of the
  /// world's own, 0 to 3 (0 still, 1 the world's, 3 three times it), and optionally its gusts, 0 to
-@@ -1388,7 +1500,7 @@ mod tests {
+@@ -1388,7 +1566,7 @@ mod tests {
          assert_eq!(held(&mut app).clarity, Some(2.0));
          assert_eq!(
              run(&mut app, "lookwater 3"),
@@ -715,7 +800,7 @@ index 5e4aaaa..fc1919b 100644
          );
          assert_eq!(
              held(&mut app).reflect,
-@@ -1404,6 +1516,67 @@ mod tests {
+@@ -1404,6 +1582,102 @@ mod tests {
          assert_eq!(lines[1], "worldWater is 0: 1.12's water.");
      }
  
@@ -778,6 +863,41 @@ index 5e4aaaa..fc1919b 100644
 +            "The water drawn as it is."
 +        );
 +        assert_eq!(held(&mut app).show, 0);
++    }
++
++    /// `lookwater tune`: a knob held and let go, all printed, and a bad name or value leaves
++    /// them as they were.
++    #[test]
++    fn the_look_water_tunes_the_surface() {
++        use benilla_world::look::water_surface::{k, SurfaceTune, KNOBS};
++        use benilla_world::look::{LookWakes, LookWater, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        app.world_mut().get_resource_or_init::<LookWater>();
++        let held = |app: &mut App| app.world_mut().get_resource_or_init::<LookWakes>().tune;
++        let lines = run(&mut app, "lookwater tune milk 0.15");
++        assert_eq!(
++            lines[0],
++            format!("milk set to 0.15 (default {}).", KNOBS[k::MILK].default)
++        );
++        assert!(
++            lines[1].starts_with("Knobs: milk 0.15 (default"),
++            "{lines:?}"
++        );
++        assert_eq!(held(&mut app).0[k::MILK], 0.15);
++        let lines = run(&mut app, "lookwater tune");
++        assert!(lines[0].contains("grain_yd 0.1"), "{lines:?}");
++        assert!(run(&mut app, "lookwater tune grain 9")[0].starts_with("grain takes 0 to 1"));
++        assert!(run(&mut app, "lookwater tune foo 1")[0].starts_with("No knob foo"));
++        assert_eq!(held(&mut app).0[k::GRAIN], KNOBS[k::GRAIN].default);
++        run(&mut app, "lookwater tune milk grade");
++        assert_eq!(held(&mut app), SurfaceTune::default());
++        run(&mut app, "lookwater tune rain 1.5");
++        assert_eq!(
++            run(&mut app, "lookwater tune grade")[0],
++            "Every knob at its tuning."
++        );
++        assert_eq!(held(&mut app), SurfaceTune::default());
 +    }
 +
      /// `lookwind`: a strength (and a gust) holds the wind, `grade` or nothing lets go, and anything
@@ -867,7 +987,7 @@ index ea94dab..a91d8fd 100644
  
  impl MaterialExtension for LiquidExt {
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index dfbd806..fb30e9e 100644
+index dfbd806..4702fad 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -25,8 +25,9 @@
@@ -882,12 +1002,12 @@ index dfbd806..fb30e9e 100644
  
  #import bevy_pbr::{
      mesh_functions,
-@@ -75,21 +76,33 @@ struct WowLight {
+@@ -75,21 +76,34 @@ struct WowLight {
  
  // The new look's water (`look::water`): the sun-shadow map (`textureLoad` only), the scene copied
  // under the water (gamma colour, sampled; device depth, by texel) and the water block
 -// (`look::water::pack_rows`, WATER_ROWS = 23; keep in sync):
-+// (`look::water::pack_rows`, WATER_ROWS = 30; keep in sync):
++// (`look::water::pack_rows`, WATER_ROWS = 35; keep in sync):
  //   0 [on, mirror, clarity (yd), foam] · 1 [glint body (camera to it), glint] ·
  //   2 [glint colour (linear), sharpness] · 3 [sky zenith (linear), ripple slope] ·
  //   4 [sky horizon (linear), ripple wavelength (yd)] · 5 [shallow (sRGB), tint weight] ·
@@ -898,8 +1018,9 @@ index dfbd806..fb30e9e 100644
 +//   23 [wakes on, field origin x, z (yd), field span (yd)] · 24 [wake normal gain, wake foam,
 +//   refraction (yd), caustics] · 25 [shore haze, haze depth (yd), deep from (yd), field texels] ·
 +//   26 [absorption r, g, b (× 1/clarity a yard), shallow glint], zero with the wakes off ·
-+//   27-29 the open water's drifting wavelets (`look::water_surface`): 27 [layer 0 offset, layer 1
-+//   offset] · 28 [layer 2, layer 3] · 29 [on, tile (yd), texels a side, show], zero with the
++//   27-34 the open water's drifting wavelets (`look::water_surface`): 27 [layer 0 offset, layer 1
++//   offset] · 28 [layer 2, layer 3] · 29 [on, tile (yd), texels a side, show] · 30-34 the knobs
++//   (`lookwater tune`, `look::water_surface::KNOBS`, four a row, read by `knob`), zero with the
 +//   wakes off.
  @group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
  @group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
@@ -907,7 +1028,7 @@ index dfbd806..fb30e9e 100644
  @group(#{MATERIAL_BIND_GROUP}) @binding(115) var scene_depth: texture_2d<f32>;
  struct WaterBlock {
 -    rows: array<vec4<f32>, 23>,
-+    rows: array<vec4<f32>, 30>,
++    rows: array<vec4<f32>, 35>,
  };
  @group(#{MATERIAL_BIND_GROUP}) @binding(116) var<storage, read> water: WaterBlock;
 +// The wakes' ripple field (`look::wakes`): [height (yd), velocity potential, foam, 0] a texel over
@@ -919,7 +1040,7 @@ index dfbd806..fb30e9e 100644
  
  struct LiquidVsOut {
      @builtin(position) clip_position: vec4<f32>,
-@@ -260,9 +273,114 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
+@@ -260,9 +274,141 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
  const WATER_NIGHT_FLECKS: f32 = 0.0;
  const WATER_NIGHT_FLECK_LANE: f32 = 0.12;
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
@@ -985,20 +1106,17 @@ index dfbd806..fb30e9e 100644
 +const SURFACE_GLINT: f32 = 0.35;
 +const SURFACE_GLINT_MOST: f32 = 1.6;
 +const SURFACE_GLINT_FINE: f32 = 0.25;
-+const SURFACE_SHADE: f32 = 0.08;
 +const SURFACE_BEND: f32 = 1.1;
 +// The long pair's share of the four layers' slope variance (`tune::WEIGHT`: 0.4525 of 1.1725).
 +const SURFACE_LONG_SHARE: f32 = 0.3859275;
 +// `look::water_surface::tune`'s sixth-round numbers (`look::water`'s test compares them): the
-+// grain's own share of the brightness and of the bed's bend; the milky in-scatter (the share of
-+// the bed's light it takes at most, the yards of path over which it comes in, its colour (sRGB)
-+// and how far the shallow colour goes to it); the surface's own shallow-to-deep span; its mirror
++// grain's share of the bed's bend; the milky in-scatter (the yards of path over which it comes in,
++// its colour (sRGB) and how far the shallow colour goes to it; its strength is `lookwater tune
++// milk`); the surface's own shallow-to-deep span; its mirror
 +// looking straight down; the share of the hour's sun shadow the water takes, feathered over
 +// `SURFACE_SHADOW_YD` with `SURFACE_SHADOW_TAPS` taps; the bed's light a multiple of
 +// `lookwater caustics`' and its pace; and the shore's haze, its share and its spread.
-+const SURFACE_SHADE_GRAIN: f32 = 0.5;
 +const SURFACE_BEND_GRAIN: f32 = 0.4;
-+const SURFACE_MILK: f32 = 0.5;
 +const SURFACE_MILK_YD: f32 = 0.9;
 +const SURFACE_MILK_RGB: vec3<f32> = vec3<f32>(0.6, 0.76, 0.68);
 +const SURFACE_MILK_MIX: f32 = 0.85;
@@ -1014,27 +1132,57 @@ index dfbd806..fb30e9e 100644
 +const SURFACE_HAZE_SPREAD: f32 = 2.0;
 +// `look::water_surface::tune`'s seventh-round numbers (`look::water`'s test compares them): the
 +// share of the sun's light the milky water keeps in shade (in-scatter from the lit water round
-+// it), the share of the way the deep colour goes to the milk's, the share of the hour's absorption
-+// the water takes over its path, the share of the mirror's shade it is spared; the mirrored
-+// clouds' softness (a multiple) and blur (a pixel's angle, radians); and the rain's drop rings:
-+// their cell (yd), reach and width (of a cell), the pixel span (yd) they fade over and their
-+// sheen.
++// it), the share of the mirror's shade it is spared; the mirrored clouds' softness (a multiple)
++// and blur (a pixel's angle, radians); and the rain's drop rings: their reach and width (of a
++// cell) and the pixel span (yd) they fade over. The rest of the seventh round's are knobs now.
 +const SURFACE_MILK_KEEP: f32 = 0.85;
-+const SURFACE_DEEP_MILK: f32 = 0.3;
-+const SURFACE_CLEAR: f32 = 0.6;
 +const SURFACE_SKY_KEEP: f32 = 0.8;
 +const SURFACE_SKY_SOFT: f32 = 4.0;
 +const SURFACE_SKY_BLUR: f32 = 0.2;
-+const SURFACE_RAIN_CELL_YD: f32 = 0.75;
 +const SURFACE_RAIN_REACH: f32 = 0.42;
 +const SURFACE_RAIN_WIDTH: f32 = 0.1;
 +const SURFACE_RAIN_FADE_FROM: f32 = 0.04;
 +const SURFACE_RAIN_FADE_TO: f32 = 0.1;
-+const SURFACE_RAIN_SHEEN: f32 = 0.35;
++// The eighth round's (`look::water_surface::tune`; `look::water`'s test compares them): a rain
++// ring's shaded side, a share of its crest's line; the fine grain's second octave (a share of its
++// wavelength), the two octaves' weights, drift (yd/s) and ways, and the span (shares of an
++// octave's wavelength) a pixel fades it over.
++const SURFACE_RAIN_RELIEF: f32 = 0.3;
++const SURFACE_GRAIN_SECOND: f32 = 0.6;
++const SURFACE_GRAIN_WEIGHT: vec2<f32> = vec2<f32>(1.0, 0.7);
++const SURFACE_GRAIN_SPEED: vec2<f32> = vec2<f32>(0.3, 0.25);
++const SURFACE_GRAIN_DIR_0: vec2<f32> = vec2<f32>(0.8, 0.6);
++const SURFACE_GRAIN_DIR_1: vec2<f32> = vec2<f32>(-0.6, 0.8);
++const SURFACE_GRAIN_FADE_FROM: f32 = 0.25;
++const SURFACE_GRAIN_FADE_TO: f32 = 0.6;
++// `lookwater tune`'s knobs (`look::water_surface::KNOBS`, in its order; the test compares the
++// indices), four a row from `WATER_TUNE_ROW`; read only under the drifting wavelets.
++const WATER_TUNE_ROW: u32 = 30u;
++const K_MILK: u32 = 0u;
++const K_MILK_DEEP: u32 = 1u;
++const K_MILK_DEPTH: u32 = 2u;
++const K_MILK_TONE: u32 = 3u;
++const K_ABSORB: u32 = 4u;
++const K_COARSE: u32 = 5u;
++const K_MID: u32 = 6u;
++const K_FINE: u32 = 7u;
++const K_RELIEF: u32 = 8u;
++const K_RELIEF_LONG: u32 = 9u;
++const K_GRAIN: u32 = 10u;
++const K_GRAIN_YD: u32 = 11u;
++const K_SKY: u32 = 12u;
++const K_SHEEN: u32 = 13u;
++const K_RAIN: u32 = 14u;
++const K_RAIN_SIZE: u32 = 15u;
++const K_RAIN_RATE: u32 = 16u;
++
++fn knob(i: u32) -> f32 {
++    return water.rows[WATER_TUNE_ROW + i / 4u][i % 4u];
++}
  
  fn water_decode(c: vec3<f32>) -> vec3<f32> {
      let x = max(c, vec3<f32>(0.0));
-@@ -515,6 +633,28 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
+@@ -515,6 +661,28 @@ fn water_sky(R: vec3<f32>) -> vec3<f32> {
      return water_decode(water_encode(sky) * (1.0 - c.a) + c.rgb);
  }
  
@@ -1063,7 +1211,7 @@ index dfbd806..fb30e9e 100644
  // The moon's lane (`look::water::tune::MOON_LANE`; its tests mirror this): how near the mirrored
  // ray `R` comes to the moon `L` (both unit), across its bearing (half-width `width`, radians) and
  // along its elevation (far toward the horizon, near toward the camera), as a soft weight 0 to 1.
-@@ -574,7 +714,7 @@ fn water_shadow_tap(t: vec2<f32>, layer: i32, z: f32, lim: i32) -> f32 {
+@@ -574,7 +742,7 @@ fn water_shadow_tap(t: vec2<f32>, layer: i32, z: f32, lim: i32) -> f32 {
  // How much of the sun reaches the water surface at P (eye depth `eye_z`), 1 lit, at the hour's
  // strength: the sun shadows' low filter on the slice P falls in (`look::shadows`; the receivers'
  // `sun_shadow` in terrain.wgsl is the full one), faded out over the reach's last share.
@@ -1072,7 +1220,7 @@ index dfbd806..fb30e9e 100644
      let head = wow_light.shadow[0];
      if (head.x < 0.5 || eye_z >= head.w) {
          return 1.0;
-@@ -603,17 +743,87 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
+@@ -603,17 +771,87 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
      let t = uv * res;
      let lim = i32(res) - 1;
      let turn = 6.2831853 * fract(52.9829189 * fract(dot(pix, vec2<f32>(0.06711056, 0.00583715))));
@@ -1161,25 +1309,30 @@ index dfbd806..fb30e9e 100644
  // The rain's rings on the water (`look::weather`, benilla's own): in cells of about two-thirds of a
  // yard, three offset layers, a drop lands in a share of the cells (`amount`, the rain) and its ring
  // spreads and fades over about two-thirds of a second, each cell on its own beat. Returns the
-@@ -652,6 +862,242 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
+@@ -652,6 +890,324 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
      return slope * (0.9 * amount * fade);
  }
  
 +// The rain's drop rings on the drifting wavelets (`look::water_surface::tune::RAIN_*`): as
-+// `rain_rings`, in cells of `SURFACE_RAIN_CELL_YD`, each ring growing to `SURFACE_RAIN_REACH` of
-+// a cell and `SURFACE_RAIN_WIDTH` of one across, kept until a pixel spans `SURFACE_RAIN_FADE_TO`
-+// (0081's are a tenth as wide and gone at the films' camera). The slope (x, z) they add and how
-+// near the point lies to a ring's crest (0 to 1, fading with the ring's age), for its pale line.
-+fn rain_rings_wide(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec3<f32> {
++// `rain_rings`, in cells of `lookwater tune rain_size` yd, each ring growing to
++// `SURFACE_RAIN_REACH` of a cell and `SURFACE_RAIN_WIDTH` of one across, `rain_rate` a second,
++// kept until a pixel spans `SURFACE_RAIN_FADE_TO` (0081's are a tenth as wide and gone at the
++// films' camera). The slope (x, z) they add, how near the point lies to a ring's crest (0 to 1,
++// fading with the ring's age), for its pale line, and the crest's tilt toward `bearing` (the
++// sun's, -1 to 1, fading with its age), so a ring's sun side is bright and its far side dark.
++fn rain_rings_wide(p: vec2<f32>, t: f32, amount: f32, fp: f32, bearing: vec2<f32>) -> vec4<f32> {
 +    let fade = 1.0 - smoothstep(SURFACE_RAIN_FADE_FROM, SURFACE_RAIN_FADE_TO, fp);
 +    if (amount <= 0.0 || fade <= 0.0) {
-+        return vec3<f32>(0.0);
++        return vec4<f32>(0.0);
 +    }
++    let cell = max(knob(K_RAIN_SIZE), 0.05);
++    let rate = knob(K_RAIN_RATE);
 +    var slope = vec2<f32>(0.0);
 +    var line = 0.0;
++    var tilt = 0.0;
 +    for (var k = 0u; k < 3u; k = k + 1u) {
 +        let kf = f32(k);
-+        let q = p / SURFACE_RAIN_CELL_YD + vec2<f32>(kf * 0.37, kf * 0.71);
++        let q = p / cell + vec2<f32>(kf * 0.37, kf * 0.71);
 +        let c = floor(q);
 +        let h = rain_hash3(c + vec2<f32>(kf * 17.0, kf * 29.0));
 +        if (h.z > 0.25 + 0.6 * amount) {
@@ -1188,18 +1341,20 @@ index dfbd806..fb30e9e 100644
 +        let centre = c + vec2<f32>(0.3) + 0.4 * h.xy;
 +        let d = q - centre;
 +        let r = length(d);
-+        let age = fract(t * 1.5 + h.z * 13.0 + h.x * 7.0);
++        let age = fract(t * rate + h.z * 13.0 + h.x * 7.0);
 +        let x = (r - age * SURFACE_RAIN_REACH) / SURFACE_RAIN_WIDTH;
 +        if (abs(x) >= 1.0 || r < 1e-4) {
 +            continue;
 +        }
 +        let life = (1.0 - age) * (1.0 - age);
-+        slope += (d / r) * (-sin(x * 3.14159265) * life);
++        let wave = -sin(x * 3.14159265) * life;
++        slope += (d / r) * wave;
 +        line = max(line, cos(x * 1.5707963) * life);
++        tilt += dot(d / r, bearing) * wave;
 +    }
 +    // Per yard: the ring's crest rises over half its width.
 +    let k = 0.9 * amount * fade;
-+    return vec3<f32>(slope * k, line * fade);
++    return vec4<f32>(slope * k, line * fade, clamp(tilt, -1.0, 1.0) * fade);
 +}
 +
 +// The wakes' field at a point (`look::wakes`): its slope (x, z), its foam, its weight (faded in
@@ -1337,7 +1492,75 @@ index dfbd806..fb30e9e 100644
 +    glint: vec2<f32>,
 +    s: f32,
 +    lost: f32,
++    // The fine grain (`surface_grain`), root mean square about 1, faded; its slope is in `total`.
++    fine: vec2<f32>,
 +};
++
++// The fine grain (`look::water_surface::grain_at`; keep in sync): the bake's gradient noise
++// (`look_water_surface.wgsl`'s `surface_hash` and `surface_noise`, layers 4 and 5), two octaves
++// of `yd` and `SURFACE_GRAIN_SECOND` of it, each a whole number of cells over the tile, drifting,
++// each faded out as a pixel (`fp` yd) grows from `SURFACE_GRAIN_FADE_FROM` to `_TO` of its
++// wavelength. Per pixel, not in the map: the map's 0.05 yd texels cannot hold a 0.1 yd wavelet,
++// and the seventh filming's finest (0.2 yd) lay at 15 px, above any fine grain.
++fn grain_hash(c: vec2<i32>, period: i32, layer: u32) -> f32 {
++    let w = ((c % vec2<i32>(period)) + vec2<i32>(period)) % vec2<i32>(period);
++    var h = bitcast<u32>(w.x) * 374761393u + bitcast<u32>(w.y) * 668265263u + layer * 2246822519u;
++    h = (h ^ (h >> 13u)) * 1274126177u;
++    h = h ^ (h >> 16u);
++    return f32(h) * (1.0 / 4294967296.0);
++}
++
++fn grain_grad(c: vec2<i32>, period: i32, layer: u32) -> vec2<f32> {
++    let a = 6.2831853 * grain_hash(c, period, layer);
++    return vec2<f32>(cos(a), sin(a));
++}
++
++// The slope of gradient noise at `p` (cells), periodic over `period` cells.
++fn grain_noise(p: vec2<f32>, period: i32, layer: u32) -> vec2<f32> {
++    let i = floor(p);
++    let f = p - i;
++    let c = vec2<i32>(i);
++    let ga = grain_grad(c, period, layer);
++    let gb = grain_grad(c + vec2<i32>(1, 0), period, layer);
++    let gc = grain_grad(c + vec2<i32>(0, 1), period, layer);
++    let gd = grain_grad(c + vec2<i32>(1, 1), period, layer);
++    let va = dot(ga, f);
++    let vb = dot(gb, f - vec2<f32>(1.0, 0.0));
++    let vc = dot(gc, f - vec2<f32>(0.0, 1.0));
++    let vd = dot(gd, f - vec2<f32>(1.0, 1.0));
++    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
++    let du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
++    let k = va - vb - vc + vd;
++    return ga + u.x * (gb - ga) + u.y * (gc - ga) + u.x * u.y * (ga - gb - gc + gd)
++        + du * (vec2<f32>(u.y, u.x) * k + vec2<f32>(vb - va, vc - va));
++}
++
++fn surface_grain(p: vec2<f32>, t: f32, fp: f32, yd: f32) -> vec2<f32> {
++    let tile = max(water.rows[29].y, 1.0);
++    let q = p - tile * floor(p / tile);
++    var g = vec2<f32>(0.0);
++    for (var o = 0u; o < 2u; o = o + 1u) {
++        var wl = yd;
++        var way = SURFACE_GRAIN_DIR_0;
++        var speed = SURFACE_GRAIN_SPEED.x;
++        var weight = SURFACE_GRAIN_WEIGHT.x;
++        if (o == 1u) {
++            wl = yd * SURFACE_GRAIN_SECOND;
++            way = SURFACE_GRAIN_DIR_1;
++            speed = SURFACE_GRAIN_SPEED.y;
++            weight = SURFACE_GRAIN_WEIGHT.y;
++        }
++        let cells = max(round(tile / wl), 1.0);
++        let fade = 1.0 - smoothstep(SURFACE_GRAIN_FADE_FROM * wl, SURFACE_GRAIN_FADE_TO * wl, fp);
++        if (fade <= 0.0) {
++            continue;
++        }
++        // The drift as a share of the tile, wrapped, so the pattern slides without a jump.
++        let shift = fract(way * (t * speed / tile)) * cells;
++        g += grain_noise(q / tile * cells - shift, i32(cells), 4u + o) * (weight * fade);
++    }
++    return g / (0.625 * 1.41421356 * length(SURFACE_GRAIN_WEIGHT));
++}
 +
 +fn surface_at(p: vec2<f32>, t: f32, fp: f32) -> SurfaceSlopes {
 +    var o: SurfaceSlopes;
@@ -1351,7 +1574,14 @@ index dfbd806..fb30e9e 100644
 +    o.s = water.rows[3].w * SURFACE_GAIN * (1.0 + SURFACE_SWELL_VARY * (swell - 0.5));
 +    o.broad = tap.xy * (o.s * coarse);
 +    let grain = tap.zw * (o.s * fine);
-+    o.total = o.broad + grain;
++    // The fine grain tilts the surface by `grain` of the slope (not the highlight: its tips
++    // would catch the sun as specks).
++    o.fine = vec2<f32>(0.0);
++    let grain_k = knob(K_GRAIN);
++    if (grain_k > 0.0) {
++        o.fine = surface_grain(p, t, fp, max(knob(K_GRAIN_YD), 0.02));
++    }
++    o.total = o.broad + grain + o.fine * (o.s * grain_k);
 +    o.glint = o.broad + SURFACE_GLINT_FINE * grain;
 +    o.lost = SURFACE_LONG_SHARE * (1.0 - coarse * coarse)
 +        + (1.0 - SURFACE_LONG_SHARE) * (1.0 - fine * fine);
@@ -1404,7 +1634,7 @@ index dfbd806..fb30e9e 100644
  // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
  // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
  // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
-@@ -685,29 +1131,135 @@ fn look_water(
+@@ -685,29 +1241,147 @@ fn look_water(
          depth_v = max(cam.y - P.y, 0.0) * beyond;
      }
      let shore = smoothstep(0.0, water.rows[7].w, depth_v);
@@ -1438,6 +1668,7 @@ index dfbd806..fb30e9e 100644
 +    surf.glint = vec2<f32>(0.0);
 +    surf.s = 0.0;
 +    surf.lost = 0.0;
++    surf.fine = vec2<f32>(0.0);
 +    let calm_shore = 0.3 + 0.7 * shore;
 +    if (surface_on) {
 +        surf = surface_at(P.xz, t, fp);
@@ -1451,12 +1682,21 @@ index dfbd806..fb30e9e 100644
 +    // most of their place.
 +    var rain_slope = vec2<f32>(0.0);
 +    var rain_line = 0.0;
++    var rain_tilt = 0.0;
++    // The sun's bearing on the surface, for the wavelets' and the rings' shade.
++    let sun_to = -normalize(wow_light.light_sun.xyz);
++    var bearing = normalize(vec2<f32>(0.8, 0.6));
++    if (length(sun_to.xz) > 1e-3) {
++        bearing = sun_to.xz / length(sun_to.xz);
++    }
 +    if (water.rows[9].w > 0.0 && surface_on) {
 +        // On the drifting wavelets the wide rings, over the field's own drops too (too faint to
-+        // see from the films' camera on the sixth filming).
-+        let rr = rain_rings_wide(P.xz, t, water.rows[9].w, fp);
++        // see from the films' camera on the sixth filming; a pale line on pale water on the
++        // seventh: now a stronger line, and a shaded side).
++        let rr = rain_rings_wide(P.xz, t, water.rows[9].w, fp, bearing);
 +        rain_slope = rr.xy;
 +        rain_line = rr.z * clamp(water.rows[9].w, 0.0, 1.0);
++        rain_tilt = rr.w * clamp(water.rows[9].w, 0.0, 1.0);
 +    } else if (water.rows[9].w > 0.0) {
 +        rain_slope = rain_rings(P.xz, t, water.rows[9].w, fp) * (1.0 - 0.7 * wake.w);
 +    }
@@ -1502,8 +1742,10 @@ index dfbd806..fb30e9e 100644
 +    var deep_at = water.rows[6].w;
 +    var dp_c = dp;
 +    if (surface_on) {
-+        sh = mix(sh, SURFACE_MILK_RGB, SURFACE_MILK_MIX);
-+        dp_c = mix(dp, SURFACE_MILK_RGB, SURFACE_DEEP_MILK);
++        // `lookwater tune milk_tone` and `milk_deep`: the shallows' milk a little darker than
++        // the seventh round's (its shallows read 155 against the reference's ~130).
++        sh = mix(sh, SURFACE_MILK_RGB * knob(K_MILK_TONE), SURFACE_MILK_MIX);
++        dp_c = mix(dp, SURFACE_MILK_RGB, knob(K_MILK_DEEP));
 +        deep_from = SURFACE_DEEP_FROM;
 +        deep_at = SURFACE_DEEP_AT;
 +    }
@@ -1528,28 +1770,28 @@ index dfbd806..fb30e9e 100644
 +    }
 +    var body = water_decode(mix(sh, dp_c, smoothstep(deep_from, deep_at, depth_c)) * lit_body);
 +    // The wavelets shade the water (all of it, the bed seen through it too): a facet turned
-+    // toward the sun's bearing brighter, away darker, the long pair by `SURFACE_SHADE` and the
-+    // grain by `SURFACE_SHADE_GRAIN` each at its own mean tilt, so the fine grain shows and its
-+    // drift moves the sheet's brightness; half of it in shade, calmed into the shore.
++    // toward the sun's bearing brighter, away darker, the long pair by `relief_long` and the
++    // grain by `relief` each at its own mean tilt, so the fine grain shows and its drift moves
++    // the sheet's brightness; half of it in shade, calmed into the shore.
++    // Eighth round: the knobs `relief_long` and `relief` (0.04 and 0.2, were 0.08 and 0.5: the
++    // seventh filming's embossed relief), and the fine grain by `grain` at its own mean tilt.
 +    var facet = 1.0;
 +    if (surface_on && surf.s > 1e-4) {
-+        let sun_flat = vec2<f32>(to_light.x, to_light.z);
-+        var bearing = normalize(vec2<f32>(0.8, 0.6));
-+        if (length(sun_flat) > 1e-3) {
-+            bearing = sun_flat / length(sun_flat);
-+        }
-+        let grain = surf.total - surf.broad;
++        let fine_slope = surf.fine * (surf.s * knob(K_GRAIN));
++        let grain = surf.total - surf.broad - fine_slope;
 +        let toward_long = -dot(surf.broad, bearing) / (2.0 * surf.s * sqrt(SURFACE_LONG_SHARE));
 +        let toward_grain = -dot(grain, bearing) / (2.0 * surf.s * sqrt(1.0 - SURFACE_LONG_SHARE));
++        let toward_fine = -dot(surf.fine, bearing) * 0.70710678;
 +        let day = clamp(4.0 * to_light.y, 0.0, 1.0);
-+        facet = 1.0 + (SURFACE_SHADE * clamp(toward_long, -1.0, 1.0)
-+            + SURFACE_SHADE_GRAIN * clamp(toward_grain, -1.0, 1.0))
++        facet = 1.0 + (knob(K_RELIEF_LONG) * clamp(toward_long, -1.0, 1.0)
++            + knob(K_RELIEF) * clamp(toward_grain, -1.0, 1.0)
++            + knob(K_GRAIN) * clamp(toward_fine, -1.0, 1.0))
 +            * (0.5 + 0.5 * vis * day) * calm_shore;
 +    }
      // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term). By night (the
      // glint is the moon's lane, a negative sharpness) its white flecks keep a share off the lane.
      var flecks = water.rows[9].x;
-@@ -716,18 +1268,60 @@ fn look_water(
+@@ -716,19 +1390,70 @@ fn look_water(
          let on_lane = water_moon_lane(R_flat, normalize(water.rows[1].xyz), WATER_NIGHT_FLECK_LANE);
          flecks *= mix(WATER_NIGHT_FLECKS, 1.0, clamp(on_lane, 0.0, 1.0));
      }
@@ -1589,15 +1831,22 @@ index dfbd806..fb30e9e 100644
 +    if (by_colour) {
 +        var absorb = water.rows[26].xyz;
 +        if (surface_on) {
-+            // The bed shows through more: `SURFACE_CLEAR` of the hour's absorption.
-+            absorb *= SURFACE_CLEAR;
++            // The bed shows through more: `lookwater tune absorb` of the hour's absorption.
++            absorb *= knob(K_ABSORB);
 +        }
 +        trans3 = exp(-path_c * absorb / max(clarity, 0.05));
 +        // Under the drifting wavelets the water is milky: over the first yard of the view's path
-+        // it takes up to `SURFACE_MILK` of the bed's light and lays its own pale colour there, so
-+        // the bed shows through a pale veil, as the reference pond's does; none at the waterline.
++        // it takes up to `lookwater tune milk` of the bed's light and lays its own pale colour
++        // there, so the bed shows through a pale veil, as the reference pond's does; none at the
++        // waterline, and only fully past `milk_depth` of depth, so the bed shows plainly under the
++        // first yard (the seventh filming's veil hid it).
 +        if (surface_on) {
-+            trans3 *= 1.0 - SURFACE_MILK * (1.0 - exp(-path_c / SURFACE_MILK_YD));
++            let md = knob(K_MILK_DEPTH);
++            var cap = 1.0;
++            if (md > 0.0) {
++                cap = smoothstep(0.0, md, depth_c);
++            }
++            trans3 *= 1.0 - knob(K_MILK) * cap * (1.0 - exp(-path_c / SURFACE_MILK_YD));
 +        }
 +        trans = max(trans3.x, max(trans3.y, trans3.z));
 +    }
@@ -1607,14 +1856,18 @@ index dfbd806..fb30e9e 100644
 +    // the sky looking down on the drifting wavelets.
      let cos_v = clamp(dot(N, V), 0.0, 1.0);
 -    let f0 = water.rows[7].y;
+-    let fres = clamp((f0 + (1.0 - f0) * pow(1.0 - cos_v, 5.0)) * water.rows[0].y, 0.0, 1.0) * shore;
 +    var f0 = water.rows[7].y;
++    var mirror_k = water.rows[0].y;
 +    if (surface_on) {
 +        f0 = SURFACE_F0;
++        mirror_k *= knob(K_SKY);
 +    }
-     let fres = clamp((f0 + (1.0 - f0) * pow(1.0 - cos_v, 5.0)) * water.rows[0].y, 0.0, 1.0) * shore;
++    let fres = clamp((f0 + (1.0 - f0) * pow(1.0 - cos_v, 5.0)) * mirror_k, 0.0, 1.0) * shore;
      var R = reflect(-V, N);
      // A ripple never mirrors into the water itself.
-@@ -750,8 +1344,17 @@ fn look_water(
+     R.y = max(R.y, 0.01);
+@@ -750,8 +1475,17 @@ fn look_water(
      let calm = mix(WATER_SKY_CALM_NEAR, WATER_SKY_CALM_FAR, smoothstep(4.0, 40.0, eye_z));
      var R_sky = reflect(-V, normalize(mix(N, vec3<f32>(0.0, 1.0, 0.0), calm)));
      R_sky.y = max(R_sky.y, 0.01);
@@ -1634,7 +1887,7 @@ index dfbd806..fb30e9e 100644
  
      // The glint: the sun's highlight on the ripples, sharp, with a soft sheen; or by night the
      // moon's lane (a negative sharpness, its half-width): the ripples whose mirrored rays come
-@@ -762,7 +1365,17 @@ fn look_water(
+@@ -762,7 +1496,17 @@ fn look_water(
      if (water.rows[1].w > 0.0 && body_dir.y > -0.05) {
          let sharp = water.rows[2].w;
          var spec = 0.0;
@@ -1653,7 +1906,7 @@ index dfbd806..fb30e9e 100644
              let H = normalize(normalize(body_dir) + V);
              let nh = clamp(dot(N, H), 0.0, 1.0);
              spec = pow(nh, sharp) + water.rows[8].w * pow(nh, sharp * 0.04);
-@@ -776,6 +1389,13 @@ fn look_water(
+@@ -776,6 +1520,13 @@ fn look_water(
                  * reach;
          }
          glint = water.rows[2].rgb * (water.rows[1].w * spec * vis * shore);
@@ -1662,12 +1915,12 @@ index dfbd806..fb30e9e 100644
 +            glint = mix(glint, vec3<f32>(dot(glint, WATER_LUMA)), WATER_GLINT_WHITE) * shallow_calm;
 +        }
 +        if (surface_on) {
-+            glint *= min(1.0, SURFACE_GLINT_MOST / max(dot(glint, WATER_LUMA), 1e-4));
++            glint *= min(1.0, SURFACE_GLINT_MOST / max(dot(glint, WATER_LUMA), 1e-4)) * knob(K_SHEEN);
 +        }
      }
  
      // The foam: a soft line just off the waterline under the foam depth, broken up and lapping.
-@@ -791,7 +1411,8 @@ fn look_water(
+@@ -791,7 +1542,8 @@ fn look_water(
      var stand = 0.0;
      var on_step = 0.0;
      var hits = 0.0;
@@ -1677,7 +1930,7 @@ index dfbd806..fb30e9e 100644
          let wob = water_noise(P.xz * WATER_FROTH_WOBBLE + vec2<f32>(0.07, -0.05) * t).x;
          let reach = WATER_FROTH_YD * (0.3 + 0.9 * wob);
          // The taps' turn wanders smoothly over the surface, not pixel by pixel: the per-pixel
-@@ -847,17 +1468,147 @@ fn look_water(
+@@ -847,17 +1599,150 @@ fn look_water(
          * (1.0 - smoothstep(60.0, 120.0, eye_z));
      let foam_rgb = water_decode(lit_g) * 0.8;
  
@@ -1792,9 +2045,12 @@ index dfbd806..fb30e9e 100644
      a = a * (1.0 - foam) + foam;
 +    c = c * (1.0 - ring) + ring_rgb * ring;
 +    a = a * (1.0 - ring) + ring;
-+    // The rain's drop rings on the drifting wavelets: a pale line along each crest.
++    // The rain's drop rings on the drifting wavelets: a pale line along each crest, at most
++    // `lookwater tune rain` at a ring's birth, its sun side brighter and its far side darker.
 +    if (surface_on && rain_line > 0.0) {
-+        let rl = SURFACE_RAIN_SHEEN * rain_line * far_fade;
++        let rk = knob(K_RAIN);
++        c *= 1.0 + rk * SURFACE_RAIN_RELIEF * rain_tilt * far_fade;
++        let rl = clamp(rk * rain_line * far_fade, 0.0, 1.0);
 +        c = c * (1.0 - rl) + ring_rgb * rl;
 +        a = a * (1.0 - rl) + rl;
 +    }
@@ -1927,10 +2183,10 @@ index 1a0af64..ba2f536 100644
  
 diff --git a/crates/benilla-world/src/look/wakes.rs b/crates/benilla-world/src/look/wakes.rs
 new file mode 100644
-index 0000000..8f749f8
+index 0000000..0e3bdcd
 --- /dev/null
 +++ b/crates/benilla-world/src/look/wakes.rs
-@@ -0,0 +1,1773 @@
+@@ -0,0 +1,1789 @@
 +//! Wakes, the new look's own (no reference behaviour): water that answers what moves through it,
 +//! as WoW Forever's lakes do. A swimmer leaves a crisp white wake fanning out behind him in a V,
 +//! a hero wading in sends rings out and splashes where he steps in, a bobber sits in a small
@@ -2159,6 +2415,9 @@ index 0000000..8f749f8
 +    /// `lookwater show`: the film's view of what the water is drawn from, in place of the water
 +    /// (0 the water; [`SHOW_WORDS`] in order from 1), under the wakes only.
 +    pub show: u8,
++    /// `lookwater tune`: the open water's surface's knobs (`look::water_surface::KNOBS`), at
++    /// their defaults until a film or a tester holds them.
++    pub tune: super::water_surface::SurfaceTune,
 +}
 +
 +impl Default for LookWakes {
@@ -2168,6 +2427,7 @@ index 0000000..8f749f8
 +            refract: None,
 +            caustics: None,
 +            show: 0,
++            tune: Default::default(),
 +        }
 +    }
 +}
@@ -3224,13 +3484,25 @@ index 0000000..8f749f8
 +    fn a_teleport_is_a_jump_and_a_run_is_not() {
 +        let dt = 1.0 / 60.0;
 +        assert!(jumped(Vec3::new(20.0, 0.0, -9.0), dt), "a goto");
-+        assert!(jumped(Vec3::new(3.5, 0.0, 0.0), 0.25), "a goto's frame on a slow machine");
-+        assert!(jumped(Vec3::new(1.4, 0.0, 0.6), dt), "a goto spread over frames");
++        assert!(
++            jumped(Vec3::new(3.5, 0.0, 0.0), 0.25),
++            "a goto's frame on a slow machine"
++        );
++        assert!(
++            jumped(Vec3::new(1.4, 0.0, 0.6), dt),
++            "a goto spread over frames"
++        );
 +        assert!(!jumped(Vec3::new(7.0 * dt, 0.0, 0.0), dt), "a run");
 +        assert!(!jumped(Vec3::new(14.0 * dt, 0.0, 0.0), dt), "a gallop");
 +        assert!(!jumped(Vec3::new(0.0, 0.5, 0.0), dt), "a hop");
-+        assert!(!jumped(Vec3::new(1.8, 0.0, 0.0), 0.25), "a run's frame on a hitch");
-+        assert!(!jumped(Vec3::new(0.3, 0.0, 0.2), dt), "a snap back by the mover");
++        assert!(
++            !jumped(Vec3::new(1.8, 0.0, 0.0), 0.25),
++            "a run's frame on a hitch"
++        );
++        assert!(
++            !jumped(Vec3::new(0.3, 0.0, 0.2), dt),
++            "a snap back by the mover"
++        );
 +    }
 +
 +    /// The reference's swimmer: at the swim speed (4.72 yd/s) the foam lies behind him in a V of
@@ -3923,7 +4195,7 @@ index 0000000..2190cc8
 +    graph.add_node_edge(LookWakesLabel, bevy::render::graph::CameraDriverLabel);
 +}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index ec1dc9f..60ffaa1 100644
+index ec1dc9f..c2df4eb 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
 @@ -46,16 +46,79 @@ pub mod tune {
@@ -4023,7 +4295,7 @@ index ec1dc9f..60ffaa1 100644
      /// Froth round something standing in the water (a wading hero's legs, a post), where the
      /// shore's band drew a crisp, thin, bright oval at the waterline: [`FROTH_TAPS`] points on the
      /// surface within [`FROTH_YD`] of a pixel find the step in the bed the legs make, and the froth
-@@ -214,8 +279,19 @@ pub mod tune {
+@@ -214,8 +279,22 @@ pub mod tune {
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
  ///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), rain rings]` ·
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
@@ -4034,18 +4306,21 @@ index ec1dc9f..60ffaa1 100644
 +///   with the wakes off) · 24 `[wake normal gain, wake foam, refraction (yd), caustics]` ·
 +///   25 `[shore haze, haze depth (yd), deep from (yd), field texels]` ·
 +///   26 `[absorption r, g, b (× 1/clarity a yard), shallow glint]`, zero with the wakes off ·
-+///   27-29 the open water's drifting wavelets under the wakes (`look::water_surface::rows`):
++///   27-34 the open water's drifting wavelets under the wakes (`look::water_surface::rows`):
 +///   27 `[layer 0 offset (cells), layer 1 offset]` · 28 `[layer 2, layer 3]` ·
-+///   29 `[on, tile (yd), texels a side, show]`, zero with the wakes off.
-+pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS + 7;
++///   29 `[on, tile (yd), texels a side, show]` · 30-34 `lookwater tune`'s knobs, four a row
++///   (`look::water_surface::KNOBS`, from [`TUNE_ROW`]), zero with the wakes off.
++pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS + 4 + super::water_surface::ROWS;
 +/// The first of the wakes' and the shore's rows, after the sky's.
 +pub const WAKE_ROW: usize = 10 + super::sky::SKY_ROWS;
 +/// The first of the surface's rows, after the wakes' and the shore's.
 +pub const SURFACE_ROW: usize = WAKE_ROW + 4;
++/// The first of the surface's knobs' rows (`liquid.wgsl`'s `knob`).
++pub const TUNE_ROW: usize = SURFACE_ROW + 3;
  
  /// `worldWater` and the film's hold: `on` (on by default, inert under the classic look); `reflect`
  /// holds the mirror at a multiple of the tuned one, `clarity` the clarity (`lookwater`).
-@@ -373,6 +449,8 @@ pub fn pack_rows(
+@@ -373,6 +452,8 @@ pub fn pack_rows(
      light: &WowLighting,
      sky: &super::SkyFrame,
      rings: f32,
@@ -4054,7 +4329,7 @@ index ec1dc9f..60ffaa1 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -388,7 +466,7 @@ pub fn pack_rows(
+@@ -388,7 +469,7 @@ pub fn pack_rows(
          } else {
              sky.moon_clear
          };
@@ -4063,7 +4338,7 @@ index ec1dc9f..60ffaa1 100644
      }
      // The sky's reflection: the hour's dome, toward the fog under cloud.
      let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
-@@ -430,6 +508,30 @@ pub fn pack_rows(
+@@ -430,6 +511,33 @@ pub fn pack_rows(
          tune::OCEAN_CLEAR_YD * clarity,
          rings,
      ];
@@ -4088,13 +4363,16 @@ index ec1dc9f..60ffaa1 100644
 +            tune::ABSORB[2],
 +            tune::GLINT_SHALLOW,
 +        ];
-+        rows[SURFACE_ROW..SURFACE_ROW + 3]
-+            .copy_from_slice(&super::water_surface::rows(surface, wake_held.show));
++        rows[SURFACE_ROW..].copy_from_slice(&super::water_surface::rows(
++            surface,
++            wake_held.show,
++            &wake_held.tune,
++        ));
 +    }
      rows
  }
  
-@@ -440,14 +542,21 @@ pub(crate) fn publish_water(
+@@ -440,14 +548,21 @@ pub(crate) fn publish_water(
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
      weather: Option<Res<super::WeatherLook>>,
@@ -4117,7 +4395,7 @@ index ec1dc9f..60ffaa1 100644
      };
      if *frame != next {
          *frame = next;
-@@ -520,7 +629,29 @@ mod tests {
+@@ -520,7 +635,30 @@ mod tests {
          }
      }
  
@@ -4143,12 +4421,13 @@ index ec1dc9f..60ffaa1 100644
 +            refract: None,
 +            caustics: None,
 +            show: 0,
++            tune: crate::look::water_surface::SurfaceTune::DEFAULT,
 +        },
 +    );
  
      #[test]
      fn the_block_is_zero_when_off() {
-@@ -530,6 +661,8 @@ mod tests {
+@@ -530,6 +668,8 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -4157,7 +4436,7 @@ index ec1dc9f..60ffaa1 100644
          );
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
-@@ -544,6 +677,8 @@ mod tests {
+@@ -544,6 +684,8 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -4166,7 +4445,7 @@ index ec1dc9f..60ffaa1 100644
          );
          assert_eq!(rows[0], [1.0, tune::MIRROR, tune::CLEAR_YD, tune::FOAM]);
          assert_eq!(rows[7][0], tune::SSR_REACH);
-@@ -555,6 +690,8 @@ mod tests {
+@@ -555,6 +697,8 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.7,
@@ -4175,7 +4454,7 @@ index ec1dc9f..60ffaa1 100644
          );
          assert_eq!(rain[9][3], 0.7, "the rain's rings");
          let held = LookWater {
-@@ -562,7 +699,15 @@ mod tests {
+@@ -562,7 +706,15 @@ mod tests {
              clarity: Some(0.5),
              ..default()
          };
@@ -4192,7 +4471,7 @@ index ec1dc9f..60ffaa1 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -836,6 +981,95 @@ mod tests {
+@@ -836,6 +988,124 @@ mod tests {
          assert_eq!(f("WATER_MOON_GLINT_MEAN"), tune::MOON_GLINT_MEAN);
          assert_eq!(f("WATER_NIGHT_FLECKS"), tune::NIGHT_FLECKS);
          assert_eq!(f("WATER_NIGHT_FLECK_LANE"), tune::NIGHT_FLECK_LANE);
@@ -4228,14 +4507,11 @@ index ec1dc9f..60ffaa1 100644
 +            assert_eq!(f("SURFACE_GLINT"), sf::GLINT);
 +            assert_eq!(f("SURFACE_GLINT_MOST"), sf::GLINT_MOST);
 +            assert_eq!(f("SURFACE_GLINT_FINE"), sf::GLINT_FINE);
-+            assert_eq!(f("SURFACE_SHADE"), sf::SHADE);
 +            assert_eq!(f("SURFACE_BEND"), sf::BEND);
 +            let w2: f32 = sf::WEIGHT.iter().map(|w| w * w).sum();
 +            let share = (sf::WEIGHT[0].powi(2) + sf::WEIGHT[1].powi(2)) / w2;
 +            assert!((f("SURFACE_LONG_SHARE") - share).abs() < 1.0e-6);
-+            assert_eq!(f("SURFACE_SHADE_GRAIN"), sf::SHADE_GRAIN);
 +            assert_eq!(f("SURFACE_BEND_GRAIN"), sf::BEND_GRAIN);
-+            assert_eq!(f("SURFACE_MILK"), sf::MILK);
 +            assert_eq!(f("SURFACE_MILK_YD"), sf::MILK_YD);
 +            let [r, g, b] = sf::MILK_RGB;
 +            assert!(src.contains(&format!(
@@ -4259,17 +4535,49 @@ index ec1dc9f..60ffaa1 100644
 +            assert_eq!(f("SURFACE_HAZE"), sf::HAZE);
 +            assert_eq!(f("SURFACE_HAZE_SPREAD"), sf::HAZE_SPREAD);
 +            assert_eq!(f("SURFACE_MILK_KEEP"), sf::MILK_KEEP);
-+            assert_eq!(f("SURFACE_DEEP_MILK"), sf::DEEP_MILK);
-+            assert_eq!(f("SURFACE_CLEAR"), sf::CLEAR);
 +            assert_eq!(f("SURFACE_SKY_KEEP"), sf::SKY_KEEP);
 +            assert_eq!(f("SURFACE_SKY_SOFT"), sf::SKY_SOFT);
 +            assert_eq!(f("SURFACE_SKY_BLUR"), sf::SKY_BLUR);
-+            assert_eq!(f("SURFACE_RAIN_CELL_YD"), sf::RAIN_CELL_YD);
 +            assert_eq!(f("SURFACE_RAIN_REACH"), sf::RAIN_REACH);
 +            assert_eq!(f("SURFACE_RAIN_WIDTH"), sf::RAIN_WIDTH);
 +            assert_eq!(f("SURFACE_RAIN_FADE_FROM"), sf::RAIN_FADE_YD[0]);
 +            assert_eq!(f("SURFACE_RAIN_FADE_TO"), sf::RAIN_FADE_YD[1]);
-+            assert_eq!(f("SURFACE_RAIN_SHEEN"), sf::RAIN_SHEEN);
++            assert_eq!(f("SURFACE_RAIN_RELIEF"), sf::RAIN_RELIEF);
++            assert_eq!(f("SURFACE_GRAIN_SECOND"), sf::GRAIN_SECOND);
++            assert_eq!(f("SURFACE_GRAIN_FADE_FROM"), sf::GRAIN_FADE[0]);
++            assert_eq!(f("SURFACE_GRAIN_FADE_TO"), sf::GRAIN_FADE[1]);
++            let v2 = |name: &str, v: [f32; 2]| {
++                assert!(
++                    src.contains(&format!(
++                        "const {name}: vec2<f32> = vec2<f32>({:?}, {:?});",
++                        v[0], v[1]
++                    )),
++                    "{name}"
++                );
++            };
++            v2("SURFACE_GRAIN_WEIGHT", sf::GRAIN_WEIGHT);
++            v2("SURFACE_GRAIN_SPEED", sf::GRAIN_SPEED_YD);
++            v2("SURFACE_GRAIN_DIR_0", sf::GRAIN_DIR[0]);
++            v2("SURFACE_GRAIN_DIR_1", sf::GRAIN_DIR[1]);
++            // The knobs: each `K_<NAME>` is its index, read from the knobs' first row.
++            for (i, knob) in crate::look::water_surface::KNOBS.iter().enumerate() {
++                let name = format!("K_{}", knob.name.to_ascii_uppercase());
++                assert_eq!(
++                    read(&name, "u32")
++                        .trim_end_matches('u')
++                        .parse::<usize>()
++                        .unwrap(),
++                    i,
++                    "{name}"
++                );
++            }
++            assert_eq!(
++                read("WATER_TUNE_ROW", "u32")
++                    .trim_end_matches('u')
++                    .parse::<usize>()
++                    .unwrap(),
++                TUNE_ROW
++            );
 +        }
 +        {
 +            use crate::look::wakes::tune as wk;
@@ -4288,7 +4596,7 @@ index ec1dc9f..60ffaa1 100644
          let taps = read("WATER_FROTH_TAPS", "u32");
          assert_eq!(
              taps.trim_end_matches('u').parse::<u32>().unwrap(),
-@@ -843,10 +1077,129 @@ mod tests {
+@@ -843,10 +1113,150 @@ mod tests {
          );
      }
  
@@ -4296,9 +4604,7 @@ index ec1dc9f..60ffaa1 100644
 +    /// Under the wakes the bed shows plainly through the shallows and the colour deepens below:
 +    /// `liquid.wgsl`'s `exp(-path · ABSORB / clarity)` for a view 38° off straight down (the
 +    /// films' steep camera) through 0.8, 1.5 and 5 yd of lake.
-     #[test]
--    fn the_block_is_twenty_three_rows() {
--        assert_eq!(WATER_BLOCK_BYTES, 368);
++    #[test]
 +    fn the_shallows_show_the_bed_and_the_deep_hides_it() {
 +        let through = |deep: f32| -> [f32; 3] {
 +            let path = deep / 38f32.to_radians().cos();
@@ -4323,12 +4629,15 @@ index ec1dc9f..60ffaa1 100644
 +    }
 +
 +    /// The block's size is its rows': its own ten, the painted sky's thirteen, the wakes' and
-+    /// the shore's four, and the open water's surface's three.
-+    #[test]
-+    fn the_block_is_thirty_rows() {
-+        assert_eq!(WATER_BLOCK_BYTES, 480);
++    /// the shore's four, and the open water's surface's three and its knobs' five.
+     #[test]
+-    fn the_block_is_twenty_three_rows() {
+-        assert_eq!(WATER_BLOCK_BYTES, 368);
++    fn the_block_is_thirty_five_rows() {
++        assert_eq!(WATER_ROWS, 35);
++        assert_eq!(WATER_BLOCK_BYTES, 560);
 +        let src = include_str!("../../../benilla-assets/src/shaders/liquid.wgsl");
-+        assert!(src.contains("rows: array<vec4<f32>, 30>"));
++        assert!(src.contains("rows: array<vec4<f32>, 35>"));
 +    }
 +
 +    /// The wakes' rows: zero with the wakes off, the field's place with them on; the refraction
@@ -4382,9 +4691,29 @@ index ec1dc9f..60ffaa1 100644
 +            &drift,
 +        );
 +        assert_eq!(
-+            on[SURFACE_ROW..SURFACE_ROW + 3],
-+            crate::look::water_surface::rows(&drift, 2)[..]
++            on[SURFACE_ROW..],
++            crate::look::water_surface::rows(&drift, 2, &held.tune)[..]
 +        );
++        // The knobs, at their defaults, four a row; a held one reaches the block.
++        let defaults = crate::look::water_surface::SurfaceTune::default();
++        assert_eq!(on[TUNE_ROW..], defaults.rows()[..]);
++        assert_eq!(
++            on[TUNE_ROW][0],
++            crate::look::water_surface::tune::MILK,
++            "milk first"
++        );
++        let mut tuned = held;
++        tuned.tune.0[crate::look::water_surface::k::GRAIN] = 0.5;
++        let on2 = pack_rows(
++            true,
++            &LookWater::default(),
++            &noon(),
++            &SkyFrame::default(),
++            0.0,
++            (&frame, &tuned),
++            &drift,
++        );
++        assert_eq!(on2[TUNE_ROW + 2][2], 0.5, "grain held");
 +        assert_eq!(
 +            on[SURFACE_ROW + 2],
 +            [
@@ -4421,7 +4750,7 @@ index ec1dc9f..60ffaa1 100644
      }
  
      /// Under the painted sky the mirror takes its rows, and the cloud over the sun dims the glint;
-@@ -859,8 +1212,10 @@ mod tests {
+@@ -859,8 +1269,10 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -4433,7 +4762,7 @@ index ec1dc9f..60ffaa1 100644
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
              minute: 720.0,
-@@ -868,8 +1223,16 @@ mod tests {
+@@ -868,8 +1280,16 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
@@ -4454,10 +4783,10 @@ index ec1dc9f..60ffaa1 100644
      }
 diff --git a/crates/benilla-world/src/look/water_surface.rs b/crates/benilla-world/src/look/water_surface.rs
 new file mode 100644
-index 0000000..892c972
+index 0000000..b486c93
 --- /dev/null
 +++ b/crates/benilla-world/src/look/water_surface.rs
-@@ -0,0 +1,890 @@
+@@ -0,0 +1,1452 @@
 +//! The open water's moving surface under the wakes, benilla's own (no reference behaviour).
 +//!
 +//! Corey's reference pond (a retail lake seen from steeply above) moves as a sheet: a fine, even
@@ -4493,9 +4822,26 @@ index 0000000..892c972
 +//!    of it too ([`tune::DEEP_MILK`]), the bed shows through more ([`tune::CLEAR`]), the sky's
 +//!    mirror is a little stronger, holds in shade and mirrors the clouds softly
 +//!    ([`tune::SKY_SOFT`], [`tune::SKY_BLUR`]); the two long layers are cut to half and the
-+//!    0.56 yd layer is now a 0.36 yd grain, even with the finest, both slower.
++//!    0.56 yd layer is now a 0.36 yd grain, even with the finest, both slower;
++//! 6. **a fine grain and a clear shallow bed, tuned on film** (the eighth round, against the
++//!    seventh filming: shallows 155 against the reference's ~130 and the bed hidden; fine texture
++//!    0.9 to 1.7 against 6 to 9; an embossed, crinkled relief; no rain rings to see). The film's
++//!    spectrum told why the grain was missing: the client draws 1920x1080 (1280x720 at a scale of
++//!    1.5), 0.0135 yd a pixel at the films' camera, so the finest wavelet (0.2 yd) lay at 15 px and
++//!    the 0.36 yd one at 26 px; the film held 3.1 of luminance at 16 to 32 px and 0.5 at 2 to 8,
++//!    where the reference holds 6 (the CPU model drew 0.022 yd a pixel, so its 0.2 yd wavelet fell
++//!    under its 5 px measure). Most of the reference's fine texture is its bed, through clear
++//!    water. Neither the map's filtering (read by texel, no mips, faded only past 0.04 yd a pixel)
++//!    nor the video's encode (the reference went through the same) took it. So: a per-pixel grain
++//!    of about 0.1 yd ([`grain_at`], two octaves, periodic over the tile, faded by the pixel's
++//!    span), the 0.36 yd layer and the grain's relief turned down, the milky veil held off the
++//!    first yard or two of depth ([`k::MILK_DEPTH`]) so the bed shows, a darker milk in the
++//!    shallows, and rain rings with a crest and a shaded side. Its main numbers are knobs
++//!    ([`KNOBS`], `lookwater tune <name> <value>`), so a film can step through them and the right
++//!    ones be chosen from the client itself; each change is logged.
 +//!
-+//! `lookwater wakes 0`, `worldWater 0` and `worldLook 0` never bake it and draw the water as before.
++//! `lookwater wakes 0`, `worldWater 0` and `worldLook 0` never bake it and draw the water as before;
++//! the knobs reach only this surface.
 +
 +use bevy::math::DVec2;
 +use bevy::prelude::*;
@@ -4575,9 +4921,11 @@ index 0000000..892c972
 +    /// shade. The fifth filming's fine texture was 3.6 against the reference's 9.9 (and mostly the
 +    /// bed's leaves): the grain now shows (was 0.12 of the body alone, the grain inside it).
 +    /// Seventh round: the long pair's 0.08 (was 0.15) and the grain's 0.5 (was 0.45), so the
-+    /// swells no longer read as a relief and the grain is the sheet's texture.
-+    pub const SHADE: f32 = 0.08;
-+    pub const SHADE_GRAIN: f32 = 0.5;
++    /// swells no longer read as a relief and the grain is the sheet's texture. Eighth round:
++    /// knobs, `relief_long` and `relief` ([`super::KNOBS`]), 0.04 and 0.2: the seventh filming's
++    /// surface read as an embossed relief.
++    pub const SHADE: f32 = 0.04;
++    pub const SHADE_GRAIN: f32 = 0.2;
 +    /// The bed's bend from the wavelets, a share of the wakes' (`look::water::tune::REFRACT`): the
 +    /// bed wobbles even when nobody swims, under the long pair ([`BEND`], was 0.6) and the grain
 +    /// ([`BEND_GRAIN`], was none).
@@ -4600,11 +4948,23 @@ index 0000000..892c972
 +    /// takes [`CLEAR`] of the hour's absorption over its path, so the bed shows through more; the
 +    /// mirror looking down is 0.1 (was 0.07), and [`SKY_KEEP`] of it holds in shade (the sky is
 +    /// still mirrored there).
-+    pub const MILK: f32 = 0.5;
++    ///
++    /// Eighth round, the seventh filming's shallows 155 against the reference's ~130, pale and
++    /// sandy, the bed hidden: knobs ([`super::KNOBS`]). Its `lookwater show` stills told why: the
++    /// pale band lay 1.2 to 3.6 yd deep (153 to 158), over a dark bed (about 60) the water let
++    /// through at 0.5 to 0.65, so its light was the shallow milk colour's, brighter than the deep
++    /// water's (114); the bed was all but hidden only under the first half yard. So the veil takes
++    /// at most 0.35 of the bed's light (`milk`, was 0.5) and comes in fully only past
++    /// [`MILK_DEPTH`] of depth (`milk_depth`; none at the waterline, 0.74 of it at 0.8 yd), and the
++    /// shallows' milk colour is [`MILK_TONE`] as bright (`milk_tone`); `milk_deep` and `absorb`
++    /// hold [`DEEP_MILK`] and [`CLEAR`].
++    pub const MILK: f32 = 0.35;
 +    pub const MILK_YD: f32 = 0.9;
 +    pub const MILK_RGB: [f32; 3] = [0.6, 0.76, 0.68];
 +    pub const MILK_MIX: f32 = 0.85;
 +    pub const MILK_KEEP: f32 = 0.85;
++    pub const MILK_DEPTH: f32 = 1.2;
++    pub const MILK_TONE: f32 = 0.85;
 +    pub const DEEP_MILK: f32 = 0.3;
 +    pub const CLEAR: f32 = 0.6;
 +    pub const DEEP_FROM: f32 = 1.0;
@@ -4639,16 +4999,317 @@ index 0000000..892c972
 +    /// yd, about the films' camera): cells of [`RAIN_CELL_YD`], a ring growing to [`RAIN_REACH`]
 +    /// of a cell, [`RAIN_WIDTH`] of a cell across, kept until a pixel spans [`RAIN_FADE_YD`]; it
 +    /// tilts the surface and lays a pale line, at most [`RAIN_SHEEN`] of the water's light.
-+    pub const RAIN_CELL_YD: f32 = 0.75;
++    ///
++    /// Eighth round, no rings to see on the seventh filming (a pale line at 0.35 times the rain,
++    /// twice over, on pale water): knobs ([`super::KNOBS`]): the line is [`RAIN_SHEEN`] at a
++    /// ring's birth (`rain`), its crest's sun side brighter and its far side darker by
++    /// [`RAIN_RELIEF`] of that; cells of [`RAIN_CELL_YD`] (`rain_size`, rings to about 0.38 yd
++    /// across, 28 px on the films), [`RAIN_RATE`] rings a second a cell (`rain_rate`, was 1.5, so
++    /// each lasts long enough to see).
++    pub const RAIN_CELL_YD: f32 = 0.9;
 +    pub const RAIN_REACH: f32 = 0.42;
 +    pub const RAIN_WIDTH: f32 = 0.1;
 +    pub const RAIN_FADE_YD: [f32; 2] = [0.04, 0.1];
-+    pub const RAIN_SHEEN: f32 = 0.35;
++    pub const RAIN_SHEEN: f32 = 0.8;
++    pub const RAIN_RELIEF: f32 = 0.3;
++    pub const RAIN_RATE: f32 = 1.0;
++    /// The fine grain (eighth round), per pixel in `liquid.wgsl` rather than in the map (whose
++    /// 0.05 yd texels cannot hold it): two octaves of the bake's gradient noise, [`GRAIN_YD`]
++    /// (`grain_yd`) and [`GRAIN_SECOND`] of it, weighted [`GRAIN_WEIGHT`], each a whole number of
++    /// cells over the tile, drifting at [`GRAIN_SPEED_YD`] along [`GRAIN_DIR`] (about a
++    /// capillary ripple's own pace), each faded out as a pixel grows from [`GRAIN_FADE`] of its
++    /// wavelength to the second; it shades the water by [`GRAIN`] (`grain`) at its mean tilt
++    /// toward the sun, tilts the surface by that share of the hour's slope, and bends the bed.
++    pub const GRAIN: f32 = 0.25;
++    pub const GRAIN_YD: f32 = 0.1;
++    pub const GRAIN_SECOND: f32 = 0.6;
++    pub const GRAIN_WEIGHT: [f32; 2] = [1.0, 0.7];
++    pub const GRAIN_SPEED_YD: [f32; 2] = [0.3, 0.25];
++    pub const GRAIN_DIR: [[f32; 2]; 2] = [[0.8, 0.6], [-0.6, 0.8]];
++    pub const GRAIN_FADE: [f32; 2] = [0.25, 0.6];
++    /// The 0.36 yd layer's share of its weight (`mid`): it read as the embossed relief.
++    pub const MID: f32 = 0.5;
++    /// The mirror and the sun's highlight off this surface, a multiple of the tuned (`sky`,
++    /// `sheen`): the reference's water is flat and clear, a little less of the sky's sheen.
++    pub const SKY: f32 = 0.85;
++    pub const SHEEN: f32 = 1.0;
 +}
 +
-+/// The bake's uniform: two rows of the four layers' offsets (cells) and one of
-+/// `[texels a side, tile (yd), 0, 0]`.
-+const PARAM_BYTES: u64 = 3 * 16;
++/// `lookwater tune`'s knobs (eighth round), in the order the water block packs them (four a row
++/// from `look::water::TUNE_ROW`, [`TUNE_ROWS`] rows), each with its default (the surface's
++/// tuning), its range and what it holds. `liquid.wgsl` reads them by [`k`]'s indices (its `K_*`;
++/// `look::water`'s test compares them) and the bake takes `coarse`, `mid` and `fine` as the
++/// layers' weights. Only the surface under the wakes reads them.
++pub struct Knob {
++    pub name: &'static str,
++    pub default: f32,
++    pub range: (f32, f32),
++    pub what: &'static str,
++}
++
++/// The knobs' indices.
++pub mod k {
++    pub const MILK: usize = 0;
++    pub const MILK_DEEP: usize = 1;
++    pub const MILK_DEPTH: usize = 2;
++    pub const MILK_TONE: usize = 3;
++    pub const ABSORB: usize = 4;
++    pub const COARSE: usize = 5;
++    pub const MID: usize = 6;
++    pub const FINE: usize = 7;
++    pub const RELIEF: usize = 8;
++    pub const RELIEF_LONG: usize = 9;
++    pub const GRAIN: usize = 10;
++    pub const GRAIN_YD: usize = 11;
++    pub const SKY: usize = 12;
++    pub const SHEEN: usize = 13;
++    pub const RAIN: usize = 14;
++    pub const RAIN_SIZE: usize = 15;
++    pub const RAIN_RATE: usize = 16;
++}
++
++pub const KNOBS: [Knob; 17] = [
++    Knob {
++        name: "milk",
++        default: tune::MILK,
++        range: (0.0, 1.0),
++        what: "the shallows' milky veil: the most of the bed's light it takes",
++    },
++    Knob {
++        name: "milk_deep",
++        default: tune::DEEP_MILK,
++        range: (0.0, 1.0),
++        what: "how far the deep colour goes to the milk's",
++    },
++    Knob {
++        name: "milk_depth",
++        default: tune::MILK_DEPTH,
++        range: (0.0, 6.0),
++        what: "the depth (yd) by which the veil is fully in (0: from the waterline)",
++    },
++    Knob {
++        name: "milk_tone",
++        default: tune::MILK_TONE,
++        range: (0.3, 1.5),
++        what: "the shallows' milk colour, a multiple of its brightness",
++    },
++    Knob {
++        name: "absorb",
++        default: tune::CLEAR,
++        range: (0.0, 2.0),
++        what: "the share of the hour's absorption the water takes (lower: the bed shows more)",
++    },
++    Knob {
++        name: "coarse",
++        default: 1.0,
++        range: (0.0, 2.0),
++        what: "the 3.2 and 1.28 yd swells' weight, a multiple",
++    },
++    Knob {
++        name: "mid",
++        default: tune::MID,
++        range: (0.0, 2.0),
++        what: "the 0.36 yd layer's weight, a multiple",
++    },
++    Knob {
++        name: "fine",
++        default: 1.0,
++        range: (0.0, 2.0),
++        what: "the 0.2 yd layer's weight, a multiple",
++    },
++    Knob {
++        name: "relief",
++        default: tune::SHADE_GRAIN,
++        range: (0.0, 1.0),
++        what: "how much the 0.36 and 0.2 yd layers shade the water (the embossed look)",
++    },
++    Knob {
++        name: "relief_long",
++        default: tune::SHADE,
++        range: (0.0, 0.5),
++        what: "how much the swells shade the water",
++    },
++    Knob {
++        name: "grain",
++        default: tune::GRAIN,
++        range: (0.0, 1.0),
++        what: "the fine grain's strength: its shade and its share of the slope",
++    },
++    Knob {
++        name: "grain_yd",
++        default: tune::GRAIN_YD,
++        range: (0.04, 0.4),
++        what: "the fine grain's wavelength (yd)",
++    },
++    Knob {
++        name: "sky",
++        default: tune::SKY,
++        range: (0.0, 2.0),
++        what: "the mirror of the sky and the shore, a multiple",
++    },
++    Knob {
++        name: "sheen",
++        default: tune::SHEEN,
++        range: (0.0, 3.0),
++        what: "the sun's highlight and sheen, a multiple",
++    },
++    Knob {
++        name: "rain",
++        default: tune::RAIN_SHEEN,
++        range: (0.0, 2.0),
++        what: "a rain ring's pale crest at its birth (its shaded side goes with it)",
++    },
++    Knob {
++        name: "rain_size",
++        default: tune::RAIN_CELL_YD,
++        range: (0.2, 3.0),
++        what: "the rain rings' cell (yd); a ring grows to 0.42 of it",
++    },
++    Knob {
++        name: "rain_rate",
++        default: tune::RAIN_RATE,
++        range: (0.1, 5.0),
++        what: "rain rings a second in each cell that has drops",
++    },
++];
++
++/// The water block's rows the knobs take, four a row.
++pub const TUNE_ROWS: usize = KNOBS.len().div_ceil(4);
++
++/// The knobs' values, held by `lookwater tune` (`look::LookWakes::tune`); the defaults are the
++/// surface's tuning.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct SurfaceTune(pub [f32; KNOBS.len()]);
++
++impl Default for SurfaceTune {
++    fn default() -> Self {
++        Self::DEFAULT
++    }
++}
++
++impl SurfaceTune {
++    /// Every knob at its default.
++    pub const DEFAULT: Self = {
++        let mut v = [0.0; KNOBS.len()];
++        let mut i = 0;
++        while i < KNOBS.len() {
++            v[i] = KNOBS[i].default;
++            i += 1;
++        }
++        Self(v)
++    };
++
++    /// A knob's index by its name (any case).
++    pub fn index(name: &str) -> Option<usize> {
++        KNOBS.iter().position(|k| k.name.eq_ignore_ascii_case(name))
++    }
++
++    /// The knobs packed four a row for the water block.
++    pub fn rows(&self) -> [[f32; 4]; TUNE_ROWS] {
++        let mut rows = [[0.0; 4]; TUNE_ROWS];
++        for (i, v) in self.0.iter().enumerate() {
++            rows[i / 4][i % 4] = *v;
++        }
++        rows
++    }
++
++    /// The bake's four layers' weights, multiples of [`tune::WEIGHT`]: the swells' (`coarse`)
++    /// twice, `mid` and `fine`.
++    pub fn layer_scale(&self) -> [f32; 4] {
++        let c = self.0[k::COARSE];
++        [c, c, self.0[k::MID], self.0[k::FINE]]
++    }
++
++    /// Every knob as `name value`, the ones held off their default marked.
++    pub fn line(&self) -> String {
++        KNOBS
++            .iter()
++            .zip(self.0)
++            .map(|(k, v)| {
++                if v == k.default {
++                    format!("{} {}", k.name, v)
++                } else {
++                    format!("{} {} (default {})", k.name, v, k.default)
++                }
++            })
++            .collect::<Vec<_>>()
++            .join(", ")
++    }
++}
++
++/// `lookwater tune`'s words: `tune` alone (print them all), `tune grade` (all to their
++/// defaults), `tune <name>` (one's value and what it holds), `tune <name> <value|grade>`.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub enum TuneCommand {
++    Show,
++    Reset,
++    Read(usize),
++    Set(usize, Option<f32>),
++}
++
++impl TuneCommand {
++    /// The words after `tune`; `Err` names what is wrong.
++    pub fn parse(words: &[&str]) -> Result<Self, String> {
++        match words {
++            [] => Ok(Self::Show),
++            [w] if w.eq_ignore_ascii_case("grade") => Ok(Self::Reset),
++            [name, rest @ ..] => {
++                let i = SurfaceTune::index(name).ok_or_else(|| {
++                    let names: Vec<&str> = KNOBS.iter().map(|k| k.name).collect();
++                    format!("No knob {name}; the knobs: {}.", names.join(", "))
++                })?;
++                match rest {
++                    [] => Ok(Self::Read(i)),
++                    [v] if v.eq_ignore_ascii_case("grade") => Ok(Self::Set(i, None)),
++                    [v] => {
++                        let (lo, hi) = KNOBS[i].range;
++                        v.parse::<f32>()
++                            .ok()
++                            .filter(|x| (lo..=hi).contains(x))
++                            .map(|x| Self::Set(i, Some(x)))
++                            .ok_or_else(|| format!("{} takes {lo} to {hi}.", KNOBS[i].name))
++                    }
++                    _ => Err("tune <name> <value>".to_string()),
++                }
++            }
++        }
++    }
++}
++
++/// `liquid.wgsl`'s `surface_grain`: the fine grain's slope at `p` (the surface's XZ, yd) at `t`,
++/// a pixel spanning `fp` yd, wavelength `yd`: root mean square about 1 where it is not faded.
++pub fn grain_at(p: Vec2, t: f32, fp: f32, yd: f32) -> Vec2 {
++    let tile = tune::TILE_YD;
++    let q = p - tile * (p / tile).floor();
++    let mut g = Vec2::ZERO;
++    let mut w2 = 0.0;
++    for o in 0..2 {
++        let wl = yd * if o == 0 { 1.0 } else { tune::GRAIN_SECOND };
++        let cells = (tile / wl).round().max(1.0);
++        let fade = 1.0 - smooth(tune::GRAIN_FADE[0] * wl, tune::GRAIN_FADE[1] * wl, fp);
++        let w = tune::GRAIN_WEIGHT[o];
++        w2 += w * w;
++        if fade <= 0.0 {
++            continue;
++        }
++        let way = Vec2::from(tune::GRAIN_DIR[o]);
++        // The drift as a share of the tile, wrapped, so the pattern slides without a jump.
++        let shift = ((way * (t * tune::GRAIN_SPEED_YD[o] / tile)).fract_gl()) * cells;
++        let n = surface_noise(q / tile * cells - shift, cells as i32, 4 + o as u32);
++        g += Vec2::new(n.y, n.z) * (w * fade);
++    }
++    g / (tune::NOISE_RMS * std::f32::consts::SQRT_2 * w2.sqrt())
++}
++
++fn smooth(a: f32, b: f32, x: f32) -> f32 {
++    let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// The bake's uniform: two rows of the four layers' offsets (cells), one of
++/// `[texels a side, tile (yd), 0, 0]` and one of the layers' weights, multiples of
++/// [`tune::WEIGHT`] (`lookwater tune coarse|mid|fine`, [`SurfaceTune::layer_scale`]).
++const PARAM_BYTES: u64 = 4 * 16;
 +
 +/// The four layers' drift, in cells, each modulo its layer's cells across the tile.
 +#[derive(Resource, Clone, Copy, Debug, PartialEq, Default)]
@@ -4685,15 +5346,20 @@ index 0000000..892c972
 +    }
 +}
 +
++/// The surface's rows of the water block (`look::water::SURFACE_ROW` on).
++pub const ROWS: usize = 3 + TUNE_ROWS;
++
 +/// The water block's surface rows (`look::water::SURFACE_ROW` on): the four offsets, then
-+/// `[on, tile (yd), texels a side, show]` (`show` the film's view of the water's inputs).
-+pub fn rows(drift: &SurfaceDrift, show: u8) -> [[f32; 4]; 3] {
++/// `[on, tile (yd), texels a side, show]` (`show` the film's view of the water's inputs), then
++/// the knobs ([`SurfaceTune::rows`]).
++pub fn rows(drift: &SurfaceDrift, show: u8, knobs: &SurfaceTune) -> [[f32; 4]; ROWS] {
 +    let o = drift.offsets.map(|v| v.as_vec2());
-+    [
-+        [o[0].x, o[0].y, o[1].x, o[1].y],
-+        [o[2].x, o[2].y, o[3].x, o[3].y],
-+        [1.0, tune::TILE_YD, tune::MAP as f32, f32::from(show)],
-+    ]
++    let mut rows = [[0.0; 4]; ROWS];
++    rows[0] = [o[0].x, o[0].y, o[1].x, o[1].y];
++    rows[1] = [o[2].x, o[2].y, o[3].x, o[3].y];
++    rows[2] = [1.0, tune::TILE_YD, tune::MAP as f32, f32::from(show)];
++    rows[3..].copy_from_slice(&knobs.rows());
++    rows
 +}
 +
 +/// Steps the drift each frame while the wakes run, from the wind's block; a deterministic run's
@@ -4766,15 +5432,22 @@ index 0000000..892c972
 +    1.0 / (tune::NOISE_RMS * std::f32::consts::SQRT_2 * w2.sqrt())
 +}
 +
-+/// One texel of the bake at `uv` (0 to 1 across the tile) under `drift`: the long pair's slope
-+/// (x, z) and the short pair's, each per cell of its own layer, weighted and scaled by [`norm`].
++/// One texel of the bake at `uv` (0 to 1 across the tile) under `drift`, at the knobs' default
++/// weights: the long pair's slope (x, z) and the short pair's, each per cell of its own layer,
++/// weighted and scaled by [`norm`].
 +pub fn bake_at(uv: Vec2, drift: &SurfaceDrift) -> Vec4 {
++    bake_with(uv, drift, SurfaceTune::default().layer_scale())
++}
++
++/// [`bake_at`] with the layers' weights at `scale` times [`tune::WEIGHT`] ([`norm`] stays the
++/// tuned weights', so a knob turned down takes its layer's slope away).
++pub fn bake_with(uv: Vec2, drift: &SurfaceDrift, scale: [f32; 4]) -> Vec4 {
 +    let mut out = [Vec2::ZERO; 2];
 +    for i in 0..4 {
 +        let cells = tune::CELLS[i] as f32;
 +        let p = uv * cells + drift.offsets[i].as_vec2();
 +        let n = surface_noise(p, tune::CELLS[i] as i32, i as u32);
-+        out[i / 2] += Vec2::new(n.y, n.z) * tune::WEIGHT[i];
++        out[i / 2] += Vec2::new(n.y, n.z) * (tune::WEIGHT[i] * scale[i]);
 +    }
 +    let k = norm();
 +    Vec4::new(out[0].x, out[0].y, out[1].x, out[1].y) * k
@@ -4863,10 +5536,15 @@ index 0000000..892c972
 +    });
 +}
 +
-+/// The surface's rows of this frame's water block, while they are on.
++/// The surface's rows of this frame's water block, while they are on: the offsets, and the
++/// layers' weights from the knobs.
 +fn surface_rows(frame: &WaterFrame) -> Option<[[f32; 4]; 3]> {
-+    let rows = &frame.rows[SURFACE_ROW..SURFACE_ROW + 3];
-+    (frame.on && rows[2][0] > 0.5).then(|| [rows[0], rows[1], rows[2]])
++    let rows = &frame.rows[SURFACE_ROW..SURFACE_ROW + ROWS];
++    let mut knobs = SurfaceTune::default();
++    for (i, v) in knobs.0.iter_mut().enumerate() {
++        *v = rows[3 + i / 4][i % 4];
++    }
++    (frame.on && rows[2][0] > 0.5).then(|| [rows[0], rows[1], knobs.layer_scale()])
 +}
 +
 +/// Render world, in `PrepareResources`: the frame's offsets, while the surface is on.
@@ -4885,6 +5563,7 @@ index 0000000..892c972
 +        rows[0],
 +        rows[1],
 +        [tune::MAP as f32, tune::TILE_YD, 0.0, 0.0],
++        rows[2],
 +    ];
 +    queue.write_buffer(&pipe.params, 0, bytemuck::cast_slice(&params));
 +}
@@ -5217,12 +5896,23 @@ index 0000000..892c972
 +        assert!(old > 0.02, "the fifth round's: {old} yd off");
 +    }
 +
-+    /// `liquid.wgsl`'s brightness off the wavelets at `p` at time `t` (the drift from rest along
-+    /// the still wind at `pace`), with the sun's bearing `bearing`, lit, a pixel of 0.02 yd: the
-+    /// factor the water's colour is shaded by (`facet`).
-+    fn facet_at(p: Vec2, drift: &SurfaceDrift, bearing: Vec2) -> f32 {
-+        let t = bake_at((p / tune::TILE_YD).fract_gl(), drift);
-+        let (coarse, fine, _) = fades(0.02);
++    /// The films' pixel: 1920x1080 (1280x720 at a scale of 1.5), a 45° view, about 18.5 yd
++    /// from the water.
++    const FILM_PX_YD: f32 = 0.0135;
++
++    /// `liquid.wgsl`'s brightness off the wavelets at `p` at `secs` (the drift `drift`), with the
++    /// sun's bearing `bearing`, lit, a pixel of `fp` yd, under the knobs `knobs`: the factor the
++    /// water's colour is shaded by (`facet`).
++    fn facet_at(
++        p: Vec2,
++        drift: &SurfaceDrift,
++        secs: f32,
++        bearing: Vec2,
++        fp: f32,
++        knobs: &SurfaceTune,
++    ) -> f32 {
++        let t = bake_with((p / tune::TILE_YD).fract_gl(), drift, knobs.layer_scale());
++        let (coarse, fine, _) = fades(fp);
 +        let s = crate::look::water::tune::RIPPLE_BREEZE * tune::GAIN;
 +        let w2: f32 = tune::WEIGHT.iter().map(|w| w * w).sum();
 +        let share = (tune::WEIGHT[0].powi(2) + tune::WEIGHT[1].powi(2)) / w2;
@@ -5230,7 +5920,25 @@ index 0000000..892c972
 +        let grain = Vec2::new(t.z, t.w) * s * fine;
 +        let long = -broad.dot(bearing) / (2.0 * s * share.sqrt());
 +        let short = -grain.dot(bearing) / (2.0 * s * (1.0 - share).sqrt());
-+        1.0 + tune::SHADE * long.clamp(-1.0, 1.0) + tune::SHADE_GRAIN * short.clamp(-1.0, 1.0)
++        let mut fine_g = 0.0;
++        if knobs.0[k::GRAIN] > 0.0 {
++            let g = grain_at(p, secs, fp, knobs.0[k::GRAIN_YD]);
++            fine_g = -g.dot(bearing) * std::f32::consts::FRAC_1_SQRT_2;
++        }
++        1.0 + knobs.0[k::RELIEF_LONG] * long.clamp(-1.0, 1.0)
++            + knobs.0[k::RELIEF] * short.clamp(-1.0, 1.0)
++            + knobs.0[k::GRAIN] * fine_g.clamp(-1.0, 1.0)
++    }
++
++    /// The seventh round's knobs: the 0.36 yd layer whole, its relief and the swells' at 0.5 and
++    /// 0.08, no fine grain.
++    fn seventh_round() -> SurfaceTune {
++        let mut t = SurfaceTune::default();
++        t.0[k::MID] = 1.0;
++        t.0[k::RELIEF] = 0.5;
++        t.0[k::RELIEF_LONG] = 0.08;
++        t.0[k::GRAIN] = 0.0;
++        t
 +    }
 +
 +    /// The sheet's brightness visibly drifts and has a fine grain: over a patch of open water the
@@ -5241,30 +5949,42 @@ index 0000000..892c972
 +    #[test]
 +    fn the_sheet_drifts_with_a_visible_grain() {
 +        let bearing = Vec2::new(0.6, 0.8);
++        let knobs = SurfaceTune::default();
 +        let mut drift = SurfaceDrift::default();
 +        let n = 48;
 +        let at = |k: usize| Vec2::new((k % n) as f32 * 0.05 + 1.0, (k / n) as f32 * 0.05 + 2.0);
-+        let mut prev: Vec<f32> = (0..n * n).map(|k| facet_at(at(k), &drift, bearing)).collect();
++        let facets = |drift: &SurfaceDrift, secs: f32| -> Vec<f32> {
++            (0..n * n)
++                .map(|k| facet_at(at(k), drift, secs, bearing, FILM_PX_YD, &knobs))
++                .collect()
++        };
++        let mut prev = facets(&drift, 0.0);
 +        let (mut step, mut most, mut steps) = (0.0f32, 0.0f32, 0);
 +        let mut spread = 0.0f32;
-+        for _ in 0..8 {
++        for frame in 1..9 {
 +            advance(&mut drift, Vec2::ZERO, 1.0, 1.0 / 30.0);
-+            let now: Vec<f32> = (0..n * n).map(|k| facet_at(at(k), &drift, bearing)).collect();
++            let now = facets(&drift, frame as f32 / 30.0);
 +            for (a, b) in now.iter().zip(&prev) {
 +                step += (a - b).abs();
 +                most = most.max((a - b).abs());
 +                steps += 1;
 +            }
 +            let mean = now.iter().sum::<f32>() / now.len() as f32;
-+            spread += (now.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / now.len() as f32)
-+                .sqrt();
++            spread +=
++                (now.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / now.len() as f32).sqrt();
 +            prev = now;
 +        }
 +        let step = step / steps as f32;
 +        let spread = spread / 8.0;
-+        assert!((0.012..0.06).contains(&step), "a 30th of a second's change {step}");
++        assert!(
++            (0.012..0.06).contains(&step),
++            "a 30th of a second's change {step}"
++        );
 +        assert!(most < 0.25, "a jump of {most}");
-+        assert!((0.08..0.25).contains(&spread), "the brightness spreads {spread}");
++        assert!(
++            (0.08..0.25).contains(&spread),
++            "the brightness spreads {spread}"
++        );
 +    }
 +
 +    /// The seam: across a sharp step in the bed (a shelf from 1.3 to 4 yd, on the diagonal) the
@@ -5346,6 +6066,177 @@ index 0000000..892c972
 +        assert!(n < 0.6 * tune::SHARPNESS && peak < 0.6, "{n} {peak}");
 +        let (n, peak) = rough_lobe(tune::SHARPNESS, 0.07, 0.0);
 +        assert_eq!((n, peak), (tune::SHARPNESS, 1.0));
++    }
++
++    /// The knobs: unique names, defaults inside their ranges, packed four a row in order, and
++    /// `coarse`, `mid` and `fine` the bake's weights.
++    #[test]
++    fn the_knobs_pack_in_order() {
++        for (i, a) in KNOBS.iter().enumerate() {
++            assert!(
++                (a.range.0..=a.range.1).contains(&a.default),
++                "{} {}",
++                a.name,
++                a.default
++            );
++            assert!(
++                KNOBS[i + 1..].iter().all(|b| b.name != a.name),
++                "{}",
++                a.name
++            );
++            assert_eq!(SurfaceTune::index(a.name), Some(i));
++        }
++        assert_eq!(TUNE_ROWS, 5);
++        let mut t = SurfaceTune::default();
++        t.0[k::RAIN_RATE] = 2.5;
++        t.0[k::MID] = 0.25;
++        let rows = t.rows();
++        assert_eq!(rows[0][0], tune::MILK);
++        assert_eq!(rows[4], [2.5, 0.0, 0.0, 0.0]);
++        assert_eq!(t.layer_scale(), [1.0, 1.0, 0.25, 1.0]);
++        assert_eq!(rows[k::MID / 4][k::MID % 4], 0.25);
++        // The rows a drift and the knobs give the block, and the knobs' weights the bake's.
++        let all = rows_of(&t);
++        assert_eq!(all[3..], rows[..]);
++        assert!(t.line().contains("mid 0.25 (default 0.5)"), "{}", t.line());
++    }
++
++    fn rows_of(t: &SurfaceTune) -> [[f32; 4]; ROWS] {
++        rows(&SurfaceDrift::default(), 0, t)
++    }
++
++    /// `lookwater tune`'s words.
++    #[test]
++    fn tune_reads_its_words() {
++        use TuneCommand::*;
++        assert_eq!(TuneCommand::parse(&[]), Ok(Show));
++        assert_eq!(TuneCommand::parse(&["GRADE"]), Ok(Reset));
++        assert_eq!(TuneCommand::parse(&["milk"]), Ok(Read(k::MILK)));
++        assert_eq!(
++            TuneCommand::parse(&["Grain_YD", "0.08"]),
++            Ok(Set(k::GRAIN_YD, Some(0.08)))
++        );
++        assert_eq!(TuneCommand::parse(&["sky", "grade"]), Ok(Set(k::SKY, None)));
++        assert!(TuneCommand::parse(&["milk", "2"]).is_err());
++        assert!(TuneCommand::parse(&["milk", "x"]).is_err());
++        assert!(TuneCommand::parse(&["milk", "0.1", "0.2"]).is_err());
++        assert!(TuneCommand::parse(&["nope", "1"])
++            .unwrap_err()
++            .contains("rain_rate"));
++    }
++
++    /// The fine grain wraps over the tile without a seam, has a root mean square of about 1 where
++    /// a pixel is small, fades where it spans the grain, and drifts smoothly.
++    #[test]
++    fn the_fine_grain_wraps_fades_and_drifts() {
++        let yd = tune::GRAIN_YD;
++        let mut sum = 0.0f32;
++        let n = 64;
++        for y in 0..n {
++            for x in 0..n {
++                let p = Vec2::new(x as f32 * 0.031 + 3.0, y as f32 * 0.029 - 7.0);
++                sum += grain_at(p, 0.0, 0.005, yd).length_squared();
++                // Across the tile's edge, and a long way off, it reads the same.
++                let a = grain_at(p, 1.3, 0.005, yd);
++                let b = grain_at(
++                    p + Vec2::new(tune::TILE_YD * 37.0, -tune::TILE_YD),
++                    1.3,
++                    0.005,
++                    yd,
++                );
++                assert!((a - b).length() < 2.0e-2, "{a} against {b}");
++            }
++        }
++        let rms = (sum / (n * n) as f32).sqrt();
++        assert!((0.75..1.3).contains(&rms), "rms {rms}");
++        // Past 0.6 of each octave's wavelength a pixel has none of it.
++        assert_eq!(grain_at(Vec2::new(1.0, 2.0), 0.0, 0.07, yd), Vec2::ZERO);
++        // A 30th of a second moves it a little, never a jump; its wrap of the drift (a whole
++        // tile) changes nothing.
++        let p = Vec2::new(0.37, 1.91);
++        let mut most = 0.0f32;
++        for f in 0..60 {
++            let a = grain_at(p, f as f32 / 30.0, 0.005, yd);
++            let b = grain_at(p, (f + 1) as f32 / 30.0, 0.005, yd);
++            most = most.max((a - b).length());
++        }
++        assert!(most > 0.0 && most < 1.5, "a frame's step {most}");
++    }
++
++    /// Why the seventh filming had no fine texture, and that the eighth round's surface has it:
++    /// on the films' screen (0.0135 yd a pixel) the brightness the wavelets shade, less its blur
++    /// over 5 px (the films' measure of fine texture), was a small share of it under the seventh
++    /// round's knobs (its finest wavelet lay at 15 px), and is several times more now, while its
++    /// coarse relief (what is left after that blur) is less.
++    #[test]
++    fn the_grain_lands_under_the_films_pixels() {
++        let bearing = Vec2::new(0.6, 0.8);
++        let drift = SurfaceDrift::default();
++        let n = 160usize;
++        let field = |knobs: &SurfaceTune| -> Vec<f32> {
++            (0..n * n)
++                .map(|i| {
++                    let p = Vec2::new((i % n) as f32, (i / n) as f32) * FILM_PX_YD
++                        + Vec2::new(2.0, 5.0);
++                    facet_at(p, &drift, 0.5, bearing, FILM_PX_YD, knobs)
++                })
++                .collect()
++        };
++        // The std of what a 5 px box takes away, and of the box itself.
++        let split = |f: &[f32]| -> (f32, f32) {
++            let (mut fine, mut coarse, mut m) = (0.0f64, 0.0f64, 0.0f64);
++            let mut boxes = Vec::new();
++            for y in 2..n - 2 {
++                for x in 2..n - 2 {
++                    let mut b = 0.0;
++                    for dy in 0..5 {
++                        for dx in 0..5 {
++                            b += f[(y + dy - 2) * n + x + dx - 2];
++                        }
++                    }
++                    let b = b / 25.0;
++                    fine += f64::from((f[y * n + x] - b).powi(2));
++                    boxes.push(b);
++                    m += f64::from(b);
++                }
++            }
++            let c = boxes.len() as f64;
++            m /= c;
++            for b in &boxes {
++                coarse += (f64::from(*b) - m).powi(2);
++            }
++            ((fine / c).sqrt() as f32, (coarse / c).sqrt() as f32)
++        };
++        let (old_fine, old_coarse) = split(&field(&seventh_round()));
++        let (new_fine, new_coarse) = split(&field(&SurfaceTune::default()));
++        assert!(
++            new_fine > 3.0 * old_fine,
++            "fine {new_fine} against the seventh round's {old_fine}"
++        );
++        assert!(
++            new_coarse < old_coarse,
++            "relief {new_coarse} against the seventh round's {old_coarse}"
++        );
++        assert!(
++            old_fine < 0.3 * old_coarse,
++            "the seventh round's shade was mostly relief: {old_fine} {old_coarse}"
++        );
++    }
++
++    /// The bake takes the knobs' weights, and `liquid.wgsl`'s grain is the bake's noise.
++    #[test]
++    fn the_shaders_take_the_knobs() {
++        let bake = include_str!("../shaders/look_water_surface.wgsl");
++        assert!(bake.contains("rows: array<vec4<f32>, 4>,"));
++        assert!(bake.contains("(weight_of[i] * sp.rows[3][i])"));
++        assert_eq!(PARAM_BYTES, 64);
++        let liquid = include_str!("../../../benilla-assets/src/shaders/liquid.wgsl");
++        assert!(liquid.contains("fn grain_hash(c: vec2<i32>, period: i32, layer: u32) -> f32 {"));
++        assert!(liquid.contains(
++            "bitcast<u32>(w.x) * 374761393u + bitcast<u32>(w.y) * 668265263u + layer * 2246822519u"
++        ));
++        assert!(liquid.contains("grain_noise(q / tile * cells - shift, i32(cells), 4u + o)"));
++        assert!(liquid.contains("return g / (0.625 * 1.41421356 * length(SURFACE_GRAIN_WEIGHT));"));
 +    }
 +}
 diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
@@ -5622,10 +6513,10 @@ index 0000000..0b2cec7
 +}
 diff --git a/crates/benilla-world/src/shaders/look_water_surface.wgsl b/crates/benilla-world/src/shaders/look_water_surface.wgsl
 new file mode 100644
-index 0000000..3a980eb
+index 0000000..96f8250
 --- /dev/null
 +++ b/crates/benilla-world/src/shaders/look_water_surface.wgsl
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,82 @@
 +// The open water's moving surface under the wakes (`look::water_surface`, benilla's own; no
 +// reference behaviour): bakes one tile of four layers of drifting wavelets into the surface map
 +// once a frame, the long pair's slope (x, z) in `xy` and the short pair's in `zw`, each per cell of
@@ -5634,8 +6525,9 @@ index 0000000..3a980eb
 +// `look::water_surface`'s `surface_hash`, `surface_noise`, `bake_at` and `tune`.
 +
 +struct SurfaceParams {
-+    // [layer 0 offset (cells), layer 1 offset] · [layer 2, layer 3] · [texels a side, tile (yd), 0, 0]
-+    rows: array<vec4<f32>, 3>,
++    // [layer 0 offset (cells), layer 1 offset] · [layer 2, layer 3] · [texels a side, tile (yd), 0, 0] ·
++    // [the four layers' weights, multiples of `weight_of` (`lookwater tune coarse|mid|fine`)]
++    rows: array<vec4<f32>, 4>,
 +};
 +
 +@group(0) @binding(0) var surface_map: texture_storage_2d<rgba16float, write>;
@@ -5694,7 +6586,9 @@ index 0000000..3a980eb
 +    var w2 = 0.0;
 +    for (var i = 0u; i < 4u; i = i + 1u) {
 +        let cells = cells_of[i];
-+        let g = surface_noise(uv * f32(cells) + offs[i], cells, i).yz * weight_of[i];
++        // The knobs scale a layer's weight; the scale below stays the tuned weights', so a layer
++        // turned down takes its slope away.
++        let g = surface_noise(uv * f32(cells) + offs[i], cells, i).yz * (weight_of[i] * sp.rows[3][i]);
 +        if (i < 2u) {
 +            swell += g;
 +        } else {

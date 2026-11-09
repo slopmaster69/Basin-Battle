@@ -1,0 +1,111 @@
+# Wakes, eighth round (client 0085): the open water's surface, its colour and how it moves, on
+# Crystal Lake seen nearly straight down, as Corey's reference video is. Corey on the seventh
+# filming: the wake is okay; deep and mid brightness and movement now match; the hard edge and the
+# teleport foam are gone. Still off: the shallows too bright (155 against ~130, pale and sandy);
+# the bed not showing through the milk; fine texture 0.9 to 1.7 against the reference's 6 to 9,
+# the surface an embossed, crinkled relief (the reference: flat, clear, soft faint ripples with a
+# fine even grain); no rain rings to see.
+# Why the fine texture was missing: this client draws 1920x1080 (scale 1.5), 0.0135 yd a pixel at
+# this camera, so the finest wavelet (0.2 yd) lay at 15 px and the 0.36 yd one at 26 px; the
+# seventh film held 3.1 of luminance at 16 to 32 px and 0.5 at 2 to 8 px, where the reference
+# holds 6 (most of it its bed, seen through clear water). Under the wakes this round: a per-pixel
+# fine grain of about 0.1 yd (7 px here); the 0.36 yd layer at half its weight and the wavelets'
+# relief at 0.2 (was 0.5), so no embossed dents; the milky veil held off the first yard or so of
+# depth so the bed shows, and the shallows' milk colour darker; a little less mirror. The
+# numbers are knobs now (`lookwater tune`); look-wakes-r14-sweep steps through them on film.
+# The camera: yaw 90 (looking west), pitched 76 down, 18 yd back. Every start spot is r13's.
+# 1. surface: the hero stands at the spit's tip, WoW (-9461, -333), facing west; 6 s of the open
+#    water west of him, the top of the frame (please film it whole: the motion is what to judge).
+# 2. the swim as in r13: from (-9461, -333) 10 yd west, a 2 s stop, 10 yd more, back east.
+# 3. seam: at the start again, the inputs the water is drawn from, one still each, in place of the
+#    water (`lookwater show`): depth, shadow (white sunlit), clear, bed; then the water with sun
+#    shadows off (`lookshadow 0`).
+# 4. the walk-in: from (-9461, -335.5), about a yard up the spit's shore, a quarter second into
+#    the shallows, then a 3 yd hop there, standing.
+# 5. a swim west each with lookwater wakes 0, worldWater 0 and worldLook 0 (all exactly as r13's).
+# PLEASE send client.log's "[look wakes]" and "[look water]" lines.
+# Look for:
+#   surface: shallows about 120 to 130 of luminance, the bed (its mud, weed and stones) plainly
+#   through the water under the first yard and through a faint veil beyond; the band 1 to 3 yd
+#   deep no paler than the deep; deep and mid as on the seventh filming; a fine, even grain
+#   drifting smoothly over a flat surface, no embossed dents; no white flecks, no tiling;
+#   swim: the V as r13's; the surface around it as above;
+#   seam: `show clear` paler (clearer) in the shallows than r13's;
+#   walk-in and hop: a splash of droplets and a ring as he lands, standing;
+#   wakes-0, worldwater-0 and classic: exactly as in r13 (1.12's sparkle comes back with wakes 0).
+hero warrior
+cam 90 -76 18
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9461 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.27 lua ConsoleExec("lookwater tune grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookshadow grade")
+4.45 lua ConsoleExec("lookwater show off")
+5.0 video
+6.0 shots surface 13 0.5
+13.0 .es goto -9461 -333
+16.0 shots start 2 0.5
+16.8 lua ConsoleExec("lookwater wakes")
+17.0 lua ConsoleExec("probemove 2.2 f 90")
+17.3 shots swim-out 8 0.25
+19.3 shots stop-rings 9 0.25
+21.3 lua ConsoleExec("probemove 2.2 f 90")
+21.6 shots swim-on 8 0.25
+23.6 shots stop 8 0.25
+25.6 lua ConsoleExec("lookwater wakes")
+26.0 lua ConsoleExec("probemove 4.4 f 270")
+26.3 shots swim-back 15 0.3
+30.6 shots back-stop 6 0.25
+32.5 .es goto -9461 -333
+35.5 shots seam 2 0.5
+36.6 lua ConsoleExec("lookwater show depth")
+37.0 shots seam-depth 1 0.5
+37.6 lua ConsoleExec("lookwater show shadow")
+38.0 shots seam-shadow 1 0.5
+38.6 lua ConsoleExec("lookwater show clear")
+39.0 shots seam-clear 1 0.5
+39.6 lua ConsoleExec("lookwater show bed")
+40.0 shots seam-bed 1 0.5
+40.6 lua ConsoleExec("lookwater show off")
+40.7 lua ConsoleExec("lookshadow 0")
+41.2 shots seam-no-shadow 2 0.5
+42.5 lua ConsoleExec("lookshadow grade")
+43.0 .es goto -9461 -335.5
+45.5 shots wade-start 1 0.5
+46.0 lua ConsoleExec("probemove 0.25 f 90")
+46.05 shots wade-in 6 0.1
+46.8 .es hop 3
+46.85 shots jump-in 14 0.1
+50.0 lua ConsoleExec("lookwater wakes")
+50.5 lua ConsoleExec("lookwater wakes 0")
+50.6 .es goto -9461 -333
+53.5 shots wakes-0-start 2 0.5
+54.5 lua ConsoleExec("probemove 4 f 90")
+54.6 shots wakes-0-swim 8 0.5
+58.7 shots wakes-0-stop 3 0.4
+61.0 lua ConsoleExec("lookwater wakes 1")
+61.05 lua SetCVar("worldWater", "0")
+61.1 .es goto -9461 -333
+64.0 shots worldwater-0-start 2 0.5
+65.0 lua ConsoleExec("probemove 4 f 90")
+65.1 shots worldwater-0-swim 8 0.5
+69.2 shots worldwater-0-stop 3 0.4
+71.5 lua SetCVar("worldWater", "1")
+71.55 lua SetCVar("worldLook", "0")
+71.6 lua ClearWorldFog()
+71.65 .es goto -9461 -333
+74.5 shots classic-start 2 0.5
+75.5 lua ConsoleExec("probemove 4 f 90")
+75.6 shots classic-swim 8 0.5
+79.7 shots classic-stop 3 0.4
+82.0 lua SetCVar("worldLook", "1")
+82.05 lua ClearWorldFog()
+82.1 lua ConsoleExec("lookweather server")
+84 end
