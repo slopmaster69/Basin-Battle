@@ -44,6 +44,7 @@ watcher, below).
    | `ffmpeg` | `Documents\visual-check\ffmpeg\ffmpeg.exe` | |
    | `settle` | `6` | seconds the world gets to load in before a scenario starts |
    | `login_timeout` | `120` | seconds the client gets to log in |
+   | `tail` | `5` | with a `camera` line, seconds the video goes on once the fight is over (the hero or the boss fell); `off` films to the scenario's end |
 
 5. **The test heroes**: run the `setup` scenario once (`Visual Check.bat setup`). It makes a dwarf
    hunter, a human warrior and a human cameraman with the names in the settings on the test
@@ -171,15 +172,31 @@ the first client, as in any scenario. One line in the scenario asks for it:
 ```
 hero warrior
 camera duel Rhahk'Zor          # camera <shot> <the subject's name, as the game shows it>
+camera high Cookie|Gorged      # a boss and the form it comes back as, in turn
 ```
 
 - **The shots**: `duel` is a three-quarter side view from the hero's side, 10 to 14 yd out (a
   duel); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up, so a ground
   hazard's edge shows. The camera stands further back than that only when the two wouldn't fit.
   With no name (`camera duel`) it films the hero alone, looking past them the way they face.
-- **Out of view**: when the world hides either of them from the camera for more than 0.3 s, it
-  cuts to its next position whose view of both is clear: the other side, square to the side,
-  behind, then the same higher up. Each cut is in `run.txt` (`camera: spectate: ...`).
+  With a boss's forms named in turn (`Cookie|Gorged`, `Sneed's Shredder|Sneed`), the living one
+  nearest the hero is filmed.
+- **Never inside a body, never outside the world**: the camera keeps out of every body's bounds
+  (the boss's, the hero's and anyone's near them) by more than a yard, and out of where a body's
+  walk takes it in the next second, so it cuts before a charging boss reaches its spot. Each
+  position has solid ground below it and a clear line from the fight, and the camera never sweeps
+  through a wall between two positions.
+- **Out of view**: one of the two is hidden when most of five points on them (low, chest, head,
+  either side) can't be seen, so a thin post or a crate in front doesn't count. When either is
+  hidden for more than 0.3 s, and the camera has held its position at least 3 s, it cuts to its
+  clearest position, if that is clearly better: nothing hiding either, little in the foreground,
+  then the other side, square to the side, behind, then the same higher up. Both hidden for more
+  than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
+  (`camera: spectate: t=12.3 ...`).
+- **The end of the fight**: when the hero falls, or the subject does (the last of its forms), the
+  camera holds where it is (it doesn't follow the hero to a lamp) and the video ends `tail`
+  seconds later (5), with the run. `run.txt` and the summary say when (`the fight is over
+  (Vcwarrior fell) at 40.6 s of the video`).
 - **What it films**: `<scenario>.mp4` is the cameraman's window from the scenario's video time to
   its end, with sound (below). The stills (`<burst>-NN.jpg`) are frames of that video at the
   bursts' times, within a few tenths of a second; the hero's client takes none. `run.txt` has the
