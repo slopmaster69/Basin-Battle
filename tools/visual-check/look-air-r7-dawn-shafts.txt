@@ -1,0 +1,44 @@
+# Dawn shafts in the mist (client 0084, #273's seventh round): the woods by Crystal Lake at 07:45
+# on thick mist (lookmist 3.5), facing the sun (yaw 45, pitched 16 up, 6 yd), standing still. Take
+# 310 found the fog as bright as the plain mist (120 against 118) but no distinct shafts: a sunlit
+# stretch of mist was only two and a half times its shade, lost in the mist's own colour. A shaft
+# is now five times its shade (the fog's sun gain 2.2, its shade floor 0.2), and the half-lit
+# fog a little brighter on average than before. Fog quality 2, then 3, worldShadows 0 (no shafts:
+# the march needs the sun's shadow map), worldFog 0, worldLook 0.
+# Look for: bright lanes of sun in the mist between the trunks, dark lanes behind them, at
+# fog-q2 and fog-q3; none at worldshadows-0; the plain mist at worldfog-0.
+hero warrior
+cam 45 16 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 465")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldFogQuality", "2")
+4.3 lua SetCVar("worldShadows", "2")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookfog grade")
+4.45 lua ConsoleExec("lookmist 3.5")
+4.5 lua ConsoleExec("lookwind 0")
+6.0 video
+6.5 shots fog-q2 4 0.5
+9.0 lua SetCVar("worldFogQuality", "3")
+10.0 shots fog-q3 3 0.5
+12.0 lua SetCVar("worldFogQuality", "2")
+12.05 lua SetCVar("worldShadows", "0")
+13.0 shots worldshadows-0 2 0.5
+14.5 lua SetCVar("worldShadows", "2")
+14.55 lua SetCVar("worldFog", "0")
+15.5 shots worldfog-0 2 0.5
+17.0 lua SetCVar("worldFog", "1")
+17.05 lua SetCVar("worldLook", "0")
+17.1 lua ClearWorldFog()
+18.5 shots classic 2 0.5
+20.0 lua SetCVar("worldLook", "1")
+20.05 lua ClearWorldFog()
+20.1 lua ConsoleExec("lookmist grade")
+20.15 lua ConsoleExec("lookwind grade")
+20.2 lua ConsoleExec("lookweather server")
+22 end

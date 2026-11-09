@@ -1,4 +1,4 @@
-From 6a022c5308cfb42ce54b86bbfb342ce62b63d06f Mon Sep 17 00:00:00 2001
+From f8985a5c192c07fb5e620c54e080fec8e9b1f441 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 18:19:25 -0700
 Subject: [PATCH] Shafts of sun in the mist, a sharper picture and far lit
@@ -117,6 +117,23 @@ Revised after the fifth films (#273, take 291):
   now holds them (the shadow slices, the contact shadows, the fog, the
   water's copy and the look pass).
 
+Seventh round (take 310):
+- Far windows: a window on a wall facing away from the camera is left
+  out (its pane's normal, faced out of its batch's middle or its
+  placement's origin): seen past its own roof's edge by the occlusion
+  taps, it was the glow on the roof. The glows are added after the grade
+  and the shoulder, screened on: drawn before them, the night grade's lost
+  saturation turned their amber pale pink. As the mist spreads a halo it
+  no longer gathers more light than the mist takes (the colour keeps the
+  light of the clear-air shape). Take 310's mist 3 letting more through
+  was that day's own mist being thicker than 3.
+- Noon cobbles: the last shoulder now rolls from 0.5 toward 0.85 (was 0.6
+  toward 1), so only what comes in over about 0.93 passes 230.
+- Dawn shafts: a sunlit stretch of mist is five times its shade (the
+  fog's sun gain 2.2 and shade floor 0.2, were 1.8 and 0.4).
+- The far windows are picked again only when the view, their weight or
+  the town's buildings change, not every frame.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -125,29 +142,29 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/perf/journal.rs        |   34 +-
  crates/benilla-app/src/shaders.rs             |   17 +
  crates/benilla-app/src/video.rs               |   22 +-
- crates/benilla-app/src/world_console.rs       |  143 +++
+ crates/benilla-app/src/world_console.rs       |  143 ++
  .../src/lighting/global_light.rs              |    2 +-
  crates/benilla-world/src/lighting/mod.rs      |    8 +
- crates/benilla-world/src/look/air.rs          | 1069 +++++++++++++++++
- crates/benilla-world/src/look/fog_pass.rs     |  619 ++++++++++
+ crates/benilla-world/src/look/air.rs          | 1210 +++++++++++++++++
+ crates/benilla-world/src/look/fog_pass.rs     |  619 +++++++++
  crates/benilla-world/src/look/grade.rs        |    6 +-
  crates/benilla-world/src/look/mod.rs          |    8 +-
- crates/benilla-world/src/look/pass.rs         |  196 ++-
+ crates/benilla-world/src/look/pass.rs         |  197 ++-
  crates/benilla-world/src/shaders.rs           |    3 +-
- .../benilla-world/src/shaders/world_fog.wgsl  |  290 +++++
- .../benilla-world/src/shaders/world_look.wgsl |  211 +++-
+ .../benilla-world/src/shaders/world_fog.wgsl  |  290 ++++
+ .../benilla-world/src/shaders/world_look.wgsl |  216 ++-
  crates/benilla-world/src/static_gx/cull.rs    |    2 +
- crates/benilla-world/src/static_gx/mod.rs     |   21 +
- 18 files changed, 2667 insertions(+), 37 deletions(-)
+ crates/benilla-world/src/static_gx/mod.rs     |   28 +
+ 18 files changed, 2821 insertions(+), 37 deletions(-)
  create mode 100644 crates/benilla-world/src/look/air.rs
  create mode 100644 crates/benilla-world/src/look/fog_pass.rs
  create mode 100644 crates/benilla-world/src/shaders/world_fog.wgsl
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index f79e4b8..76f0f6a 100644
+index 5b8b07c..babf5b2 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -1794,6 +1794,33 @@ mod tests {
+@@ -1805,6 +1805,33 @@ mod tests {
          assert!(res::<LookLife>(&app).on);
      }
  
@@ -181,7 +198,7 @@ index f79e4b8..76f0f6a 100644
      /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
      #[test]
      fn the_ffx_switches_reach_the_pass() {
-@@ -2922,6 +2949,7 @@ mod tests {
+@@ -2933,6 +2960,7 @@ mod tests {
              .init_resource::<benilla_world::look::LookSky>()
              .init_resource::<benilla_world::look::LookWeather>()
              .init_resource::<benilla_world::look::LookLife>()
@@ -190,10 +207,10 @@ index f79e4b8..76f0f6a 100644
              .insert_resource(RenderScale(1.0))
              // Literal: `Realmlist::default()` reads `$WOW_HOST`.
 diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
-index 6ac0dea..105148c 100644
+index c8c4a0b..a8c890e 100644
 --- a/crates/benilla-app/src/cvars/table.rs
 +++ b/crates/benilla-app/src/cvars/table.rs
-@@ -953,6 +953,31 @@ pub(crate) const REGISTERED: &[Registered] = &[
+@@ -962,6 +962,31 @@ pub(crate) const REGISTERED: &[Registered] = &[
          "benilla's own — 1.12's world has no fireflies, leaves or motes; this turns the new \
           look's ambient life off on its own",
      ),
@@ -599,10 +616,10 @@ index e64177e..6e31736 100644
          let mut offenders = Vec::new();
 diff --git a/crates/benilla-world/src/look/air.rs b/crates/benilla-world/src/look/air.rs
 new file mode 100644
-index 0000000..08aee7d
+index 0000000..5a94bc3
 --- /dev/null
 +++ b/crates/benilla-world/src/look/air.rs
-@@ -0,0 +1,1069 @@
+@@ -0,0 +1,1210 @@
 +//! The air, the new look's own (no reference behaviour): volumetric fog with light shafts, a
 +//! sharper picture, and lit windows glowing from afar. WoW Forever's last touches: a misty morning
 +//! in the woods fills with shafts of sun between the trunks, the lamps glow in the night mist,
@@ -662,8 +679,11 @@ index 0000000..08aee7d
 +    /// gain the fog came out dimmer on average than the mist it replaced.
 +    /// 1.8 and 0.4, were 1.6 and 0.3: the shade under the crowns took less than the mist it
 +    /// replaced (take 280); a shaft is still two and a half times its shade.
-+    pub const FOG_SUN_GAIN: f32 = 1.8;
-+    pub const FOG_SHADE_FLOOR: f32 = 0.4;
++    /// 2.2 and 0.2: take 310's dawn fog was as bright as the plain mist (120 against 118) but
++    /// showed no shafts, two and a half times its shade being lost in the mist's own colour. A
++    /// shaft is now five times its shade, and half-lit fog a little brighter than before.
++    pub const FOG_SUN_GAIN: f32 = 2.2;
++    pub const FOG_SHADE_FLOOR: f32 = 0.2;
 +    /// The lamps' glow over the frame eases off past this (linear, `glow / (1 + luma / knee)`):
 +    /// in `lookmist 3` at Goldshire's lamps the glow veiled a hero as brightly as the street
 +    /// behind him (take 275's see-through hero).
@@ -714,7 +734,11 @@ index 0000000..08aee7d
 +    /// the new look (11.7% of the frame over 230 against 3.0% in 1.12's): the noon grade's
 +    /// contrast (1.06 about mid-grey), the bloom and the sharpen each lift a bright stone texel,
 +    /// and past 1.0 it clipped flat white.
-+    pub const HIGHLIGHT_KNEE: f32 = 0.6;
++    /// 0.5 toward 0.85, was 0.6 toward 1: take 310 still found 9.2% of the noon frame over 230
++    /// (2.65% under 1.12): rolled off toward white, anything over 0.81 still passed 230. Now only
++    /// what comes in over about 0.93 does, and nothing goes past [`HIGHLIGHT_WHITE`] (236).
++    pub const HIGHLIGHT_KNEE: f32 = 0.5;
++    pub const HIGHLIGHT_WHITE: f32 = 0.85;
 +
 +    /// Window points: a window batch's triangles are pooled in cubes this wide, and a pool
 +    /// smaller than the area (yd²) is dropped; at most so many points a batch, the largest first.
@@ -756,7 +780,10 @@ index 0000000..08aee7d
 +    pub const WINDOW_INTENSITY: f32 = 0.7;
 +    /// A glow's colour is its window's SIDN colour taken this share toward [`WINDOW_WARM`]
 +    /// (linear), so a far window reads as lamplight, not white. 0.85 toward a deeper amber
-+    /// (was 0.5 toward 1.0, 0.55, 0.22): take 291 found them white, not warm.
++    /// (was 0.5 toward 1.0, 0.55, 0.22): take 291 found them white, not warm. Take 310 found
++    /// them pale pink (150, 122, 114): drawn before the night grade, which takes a quarter of the
++    /// saturation and rolls the highlights toward white. They're added after it now
++    /// (`world_look.wgsl`), screened on, so the amber is the amber drawn.
 +    pub const WINDOW_WARM: [f32; 3] = [1.0, 0.48, 0.16];
 +    pub const WINDOW_WARMTH: f32 = 0.85;
 +    /// A glow hides behind anything nearer than its window by this much (its own wall is not).
@@ -769,8 +796,15 @@ index 0000000..08aee7d
 +    /// did not dim them. 1, all of it, and in mist the glow's halo spreads by up to
 +    /// [`WINDOW_MIST_SPREAD`] (its share of the light the mist scatters): take 291 found mist 3
 +    /// still not dimming them, the cores past white whatever the dimming.
++    /// Take 310 found mist 3 still not dimming them: the spread halo kept its share at the
++    /// wider sigma, gathering more light than the mist took; the light is now kept as it spreads
++    /// ([`super::spread_keep`]).
 +    pub const WINDOW_MIST_KEEP: f32 = 1.0;
 +    pub const WINDOW_MIST_SPREAD: f32 = 1.5;
++    /// A window whose wall faces away from the camera by more than this (the cosine) glows not
++    /// at all; its batch's middle must be this far (yd, level) from it to tell its outside.
++    pub const WINDOW_BACK_TOL: f32 = 0.1;
++    pub const WINDOW_FACING_MIN: f32 = 1.0;
 +    /// The most `lookwindows` scales the glows by.
 +    pub const WINDOWS_MAX_SCALE: f32 = 2.0;
 +}
@@ -985,13 +1019,14 @@ index 0000000..08aee7d
 +}
 +
 +/// The highlight shoulder the look pass ends on (`world_look.wgsl`'s `shoulder`): linear values up
-+/// to [`tune::HIGHLIGHT_KNEE`] pass, those above roll off toward 1 and never reach it.
++/// to [`tune::HIGHLIGHT_KNEE`] pass, those above roll off toward [`tune::HIGHLIGHT_WHITE`] and
++/// never reach it.
 +pub fn shoulder(x: f32) -> f32 {
-+    let k = tune::HIGHLIGHT_KNEE;
++    let (k, w) = (tune::HIGHLIGHT_KNEE, tune::HIGHLIGHT_WHITE);
 +    if x <= k {
 +        x
 +    } else {
-+        k + (1.0 - k) * ((x - k) / (1.0 - k)).tanh()
++        k + (w - k) * ((x - k) / (w - k)).tanh()
 +    }
 +}
 +
@@ -1036,12 +1071,14 @@ index 0000000..08aee7d
 +
 +// ---------------------------------------------------------------- the windows
 +
-+/// One lit window from afar: where it is (Bevy space) and its glow's colour (linear, its hue at
-+/// a peak of 1, times its size's weight).
++/// One lit window from afar: where it is (Bevy space), its glow's colour (linear, its hue at
++/// a peak of 1, times its size's weight) and the way its wall faces out (unit; zero when its
++/// batch could not tell, which is never culled).
 +#[derive(Clone, Copy, Debug, PartialEq)]
 +pub struct WindowPoint {
 +    pub pos: Vec3,
 +    pub color: [f32; 3],
++    pub facing: Vec3,
 +}
 +
 +fn srgb_to_linear(c: f32) -> f32 {
@@ -1071,6 +1108,8 @@ index 0000000..08aee7d
 +    // 291 found a glow on a roof edge, where a pane round a corner, pooled with its neighbour,
 +    // put the point inside the building.
 +    let mut pools: Vec<WallPool> = Vec::new();
++    // The batch's middle (area-weighted), which a wall's outside faces away from.
++    let (mut mid_sum, mut mid_area) = (Vec3::ZERO, 0.0f32);
 +    let at = |i: u32| {
 +        positions
 +            .get(i as usize)
@@ -1087,33 +1126,56 @@ index 0000000..08aee7d
 +            continue;
 +        }
 +        let centre = (a + b + c) / 3.0;
++        mid_sum += centre * area;
++        mid_area += area;
 +        let key = (centre / tune::WINDOW_CELL).floor().as_ivec3();
 +        let key = (key.x, key.y, key.z, wall_of(normal));
 +        match pools.iter_mut().find(|p| p.0 == key) {
 +            Some(p) => {
 +                p.1 += centre * area;
 +                p.2 += area;
++                p.3 += normal;
 +            }
-+            None => pools.push((key, centre * area, area)),
++            None => pools.push((key, centre * area, area, normal)),
 +        }
 +    }
++    let mid = mid_sum / mid_area.max(1e-6);
 +    pools.retain(|p| p.2 >= tune::WINDOW_MIN_AREA);
 +    pools.sort_by(|a, b| b.2.total_cmp(&a.2));
 +    pools.truncate(tune::WINDOW_PER_BATCH);
 +    pools
 +        .into_iter()
-+        .map(|(_, sum, area)| {
++        .map(|(_, sum, area, normal)| {
 +            let w = (area / tune::WINDOW_REF_AREA).sqrt().clamp(0.5, 1.5);
++            let pos = sum / area;
 +            WindowPoint {
-+                pos: sum / area,
++                pos,
 +                color: hue.map(|c| c * w),
++                facing: outward(normal, pos, mid, transform.translation),
 +            }
 +        })
 +        .collect()
 +}
 +
-+/// A window pool: its cube and wall ([`wall_of`]), its area-weighted centre's sum and its area.
-+type WallPool = ((i32, i32, i32, u8), Vec3, f32);
++/// A window pool: its cube and wall ([`wall_of`]), its area-weighted centre's sum, its area and
++/// its triangles' normals' sum (each as long as twice its area).
++type WallPool = ((i32, i32, i32, u8), Vec3, f32, Vec3);
++
++/// The way a window at `pos` faces out of its building, from its panes' normal (which a batch
++/// may wind either way): away from its batch's middle `mid`, or, for a window at that middle
++/// (a batch of one), away from the placement's origin `origin`; zero when neither tells.
++fn outward(normal: Vec3, pos: Vec3, mid: Vec3, origin: Vec3) -> Vec3 {
++    let n = normal.normalize_or_zero();
++    let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
++    // The first of the two that lies off the window's wall, not along it.
++    [pos - mid, pos - origin]
++        .into_iter()
++        .map(flat)
++        .find(|v| {
++            v.length() >= tune::WINDOW_FACING_MIN && n.dot(v.normalize_or_zero()).abs() > 0.2
++        })
++        .map_or(Vec3::ZERO, |v| n * n.dot(v).signum())
++}
 +
 +/// The wall a triangle lies on, by its normal: the main axis (0, 1, 2) and its side.
 +fn wall_of(n: Vec3) -> u8 {
@@ -1161,6 +1223,11 @@ index 0000000..08aee7d
 +            if band <= 0.0 {
 +                return None;
 +            }
++            // A window on a wall facing away is behind its own building: take 310's glow on a
++            // roof edge was one, seen past the building's silhouette by the occlusion taps.
++            if p.facing.dot(cam - p.pos) < -tune::WINDOW_BACK_TOL * d {
++                return None;
++            }
 +            let clip = clip_from_world * p.pos.extend(1.0);
 +            if clip.w <= 1e-4 {
 +                return None;
@@ -1176,7 +1243,14 @@ index 0000000..08aee7d
 +                let warm = tune::WINDOW_WARM[i] * peak;
 +                (p.color[i] + (warm - p.color[i]) * tune::WINDOW_WARMTH) * k
 +            });
-+            Some((d, WindowPoint { pos: p.pos, color }))
++            Some((
++                d,
++                WindowPoint {
++                    pos: p.pos,
++                    color,
++                    facing: p.facing,
++                },
++            ))
 +        })
 +        .collect();
 +    out.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -1203,6 +1277,7 @@ index 0000000..08aee7d
 +    gx: Option<Res<crate::static_gx::StaticGx>>,
 +    cam: Query<(&GlobalTransform, &Projection), With<crate::view::WorldCamera>>,
 +    mut out: ResMut<WindowGlows>,
++    mut last: Local<Option<WindowPick>>,
 +) {
 +    let scale = air.map_or(1.0, |a| a.windows);
 +    let weight = if look.on {
@@ -1213,12 +1288,48 @@ index 0000000..08aee7d
 +    let next = match (gx, cam.iter().next()) {
 +        (Some(gx), Some((t, proj))) if weight > 0.0 => {
 +            let clip_from_world = proj.get_clip_from_view() * t.to_matrix().inverse();
++            // Picked again only when the view, the light or the town changed: every window
++            // point of every loaded building projected, sorted and thinned each frame was a
++            // night frame's CPU for nothing while the camera stood still.
++            let pick = WindowPick {
++                clip_from_world,
++                weight,
++                points: gx.window_point_count(),
++            };
++            if last.as_ref().is_some_and(|l| l.same(&pick)) {
++                return;
++            }
++            *last = Some(pick);
 +            pick_windows(gx.window_points(), clip_from_world, t.translation(), weight)
 +        }
-+        _ => Vec::new(),
++        _ => {
++            *last = None;
++            Vec::new()
++        }
 +    };
 +    if out.glows != next {
 +        out.glows = next;
++    }
++}
++
++/// What the far windows were last picked for: the view, the windows' weight and how many
++/// window points the town had.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct WindowPick {
++    pub clip_from_world: Mat4,
++    pub weight: f32,
++    pub points: usize,
++}
++
++impl WindowPick {
++    /// The same pick: the view moved by under a ten-thousandth of its matrix, the weight by
++    /// under 1%, and no building came or went.
++    pub fn same(&self, o: &WindowPick) -> bool {
++        self.points == o.points
++            && (self.weight - o.weight).abs() <= 0.01 * self.weight.max(o.weight)
++            && self
++                .clip_from_world
++                .abs_diff_eq(o.clip_from_world, 1e-4)
 +    }
 +}
 +
@@ -1253,12 +1364,16 @@ index 0000000..08aee7d
 +        // One yard up, as a share of the screen's height (NDC spans 2).
 +        let yard = ((above.y - ndc.y) * 0.5).abs();
 +        let scattered = 1.0 - (-mist(g.pos)).exp();
-+        let keep = 1.0 - tune::WINDOW_MIST_KEEP * scattered;
++        let spread = 1.0 + tune::WINDOW_MIST_SPREAD * scattered;
++        // The light kept, and no more of it as the halo spreads: take 310 found mist 3 not
++        // dimming a glow, as the wider halo at its full share gathered more light than the mist
++        // took.
++        let keep = (1.0 - tune::WINDOW_MIST_KEEP * scattered) * spread_keep(spread);
 +        rows[2 * n] = [
 +            ndc.x * 0.5 + 0.5,
 +            0.5 - ndc.y * 0.5,
 +            tune::WINDOW_CORE_YD * yard,
-+            tune::WINDOW_HALO_YD * yard * (1.0 + tune::WINDOW_MIST_SPREAD * scattered),
++            tune::WINDOW_HALO_YD * yard * spread,
 +        ];
 +        rows[2 * n + 1] = [
 +            g.color[0] * keep,
@@ -1269,6 +1384,13 @@ index 0000000..08aee7d
 +        n += 1;
 +    }
 +    n
++}
++
++/// The share of a glow's colour that holds its light (core plus halo, each a gaussian of its
++/// sigma squared) as it was with the halo `spread` times wider.
++pub fn spread_keep(spread: f32) -> f32 {
++    let (c, h, k) = (tune::WINDOW_CORE_YD, tune::WINDOW_HALO_YD, tune::WINDOW_HALO);
++    (c * c + k * h * h) / (c * c + k * (h * spread) * (h * spread))
 +}
 +
 +/// What `lookwindows` says: how many far windows glow with the windows at `scale` (picked now,
@@ -1300,7 +1422,12 @@ index 0000000..08aee7d
 +            g.pos.y,
 +            d,
 +        );
-+        (d, 1.0 - tune::WINDOW_MIST_KEEP * (1.0 - (-od).exp()))
++        let scattered = 1.0 - (-od).exp();
++        let spread = 1.0 + tune::WINDOW_MIST_SPREAD * scattered;
++        (
++            d,
++            (1.0 - tune::WINDOW_MIST_KEEP * scattered) * spread_keep(spread),
++        )
 +    });
 +    Some((picked.len(), nearest))
 +}
@@ -1495,6 +1622,7 @@ index 0000000..08aee7d
 +        has(look, "FOG_SHADE_FLOOR", tune::FOG_SHADE_FLOOR);
 +        has(look, "FOG_GLOW_KNEE", tune::FOG_GLOW_KNEE);
 +        has(look, "HIGHLIGHT_KNEE", tune::HIGHLIGHT_KNEE);
++        has(look, "HIGHLIGHT_WHITE", tune::HIGHLIGHT_WHITE);
 +        has(fog, "HALO_REF_RADIUS", tune::HALO_REF_RADIUS);
 +        has(fog, "HALO_PEAK_FROM", tune::HALO_PEAK_FROM);
 +        has(fog, "HALO_PEAK_TO", tune::HALO_PEAK_TO);
@@ -1519,7 +1647,7 @@ index 0000000..08aee7d
 +            let half = 0.5 * (sun(mu, 1.0) + sun(mu, 0.0));
 +            assert!(half >= mu.powi(8) - 1e-4, "{deg}°: {half} against {}", mu.powi(8));
 +        }
-+        assert!(sun(1.0, 1.0) > 2.4 * sun(1.0, 0.0), "a shaft against its shade");
++        assert!(sun(1.0, 1.0) > 4.5 * sun(1.0, 0.0), "a shaft against its shade");
 +    }
 +
 +    /// Take 280's noon cobbles: what clipped flat white keeps its texture, what is under the
@@ -1528,8 +1656,11 @@ index 0000000..08aee7d
 +    fn the_highlights_roll_off_and_the_rest_is_untouched() {
 +        assert_eq!(shoulder(0.3), 0.3);
 +        assert_eq!(shoulder(tune::HIGHLIGHT_KNEE), tune::HIGHLIGHT_KNEE);
-+        assert!(shoulder(1.0) < 0.92 && shoulder(1.0) > 0.85);
-+        assert!(shoulder(1.3) > shoulder(1.0) && shoulder(2.0) < 1.0);
++        assert!(shoulder(1.0) < tune::HIGHLIGHT_WHITE && shoulder(1.0) > 0.78);
++        assert!(shoulder(1.3) > shoulder(1.0) && shoulder(2.0) < tune::HIGHLIGHT_WHITE);
++        // Take 310's noon cobbles: only what comes in well over 0.9 passes 230 (0.791 linear).
++        assert!(shoulder(0.9) < 0.791, "{}", shoulder(0.9));
++        assert!(shoulder(0.45) == 0.45, "mid-tones untouched");
 +        // Smooth at the knee: its slope there is 1.
 +        let k = tune::HIGHLIGHT_KNEE;
 +        assert!(((shoulder(k + 1e-3) - k) / 1e-3 - 1.0).abs() < 1e-2);
@@ -1611,6 +1742,14 @@ index 0000000..08aee7d
 +        assert_eq!(two.len(), 2, "{two:?}");
 +        assert!(two.iter().any(|p| p.pos.z.abs() < 1e-5));
 +        assert!(two.iter().any(|p| p.pos.x.abs() < 1e-5));
++        // Both panes lie on one wall, as does the placement's origin: no side told.
++        assert!(pts.iter().all(|p| p.facing == Vec3::ZERO), "{pts:?}");
++        // Out of the batch's middle, else out of the placement's origin, else unknown.
++        let o = Vec3::ZERO;
++        assert_eq!(outward(Vec3::X, o, Vec3::new(-3.0, 0.0, 0.0), o), Vec3::X);
++        assert_eq!(outward(Vec3::X, o, Vec3::new(3.0, 0.0, 0.0), o), Vec3::NEG_X);
++        assert_eq!(outward(Vec3::X, o, Vec3::Z * 3.0, Vec3::new(4.0, 0.0, 1.0)), Vec3::NEG_X);
++        assert_eq!(outward(Vec3::X, o, o, o), Vec3::ZERO);
 +        // A stray index is skipped, not a panic.
 +        assert!(window_points(&positions, &[0, 1, 99], &t, [255; 3]).is_empty());
 +    }
@@ -1626,6 +1765,7 @@ index 0000000..08aee7d
 +        let at = |x: f32, z: f32| WindowPoint {
 +            pos: Vec3::new(x, 55.0, z),
 +            color: [1.0, 0.7, 0.4],
++            facing: Vec3::ZERO,
 +        };
 +        let mut pts = vec![at(0.0, -30.0), at(0.0, 300.0), at(900.0, -100.0)];
 +        for i in 0..100 {
@@ -1662,7 +1802,25 @@ index 0000000..08aee7d
 +        let misty = glow_rows(&picked, clip_from_world, cam, Vec3::Y, |_| 1.0, &mut rows);
 +        assert_eq!(misty, n);
 +        assert!(rows[0][3] > 1.5 * halo_clear, "the mist spreads the halo");
-+        assert!(rows[1][0] < picked[0].color[0] && rows[1][0] > 0.3 * picked[0].color[0]);
++        assert!(rows[1][0] < 0.5 * picked[0].color[0] && rows[1][0] > 0.05 * picked[0].color[0]);
++        // The glow's whole light (core plus halo) is never more than in clear air.
++        let light = |c: f32, h: f32, col: f32| col * (c * c + tune::WINDOW_HALO * h * h);
++        assert!(
++            light(rows[0][2], rows[0][3], rows[1][0])
++                < light(rows[0][2], halo_clear, picked[0].color[0]),
++            "the mist dims the light it spreads"
++        );
++        // A window on a wall facing away from the camera is behind its building.
++        let back = WindowPoint {
++            facing: Vec3::NEG_Z,
++            ..at(0.0, -400.0)
++        };
++        let front = WindowPoint {
++            facing: Vec3::Z,
++            ..at(0.0, -400.0)
++        };
++        assert!(pick_windows([back].iter(), clip_from_world, cam, 1.0).is_empty());
++        assert_eq!(pick_windows([front].iter(), clip_from_world, cam, 1.0).len(), 1);
 +        assert!(
 +            !picked.iter().any(|p| p.pos == Vec3::new(-200.0, 55.0, -301.0)),
 +            "thinned"
@@ -2356,7 +2514,7 @@ index f6e61a9..1a0af64 100644
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
 diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
-index 7e0b069..bee88c7 100644
+index 7e0b069..5a6d9ea 100644
 --- a/crates/benilla-world/src/look/pass.rs
 +++ b/crates/benilla-world/src/look/pass.rs
 @@ -1,6 +1,8 @@
@@ -2699,7 +2857,7 @@ index 7e0b069..bee88c7 100644
              0.0,
              "no occlusion this frame: none applied"
          );
-@@ -757,9 +882,42 @@ mod tests {
+@@ -757,9 +882,43 @@ mod tests {
              ..frame
          };
          assert_eq!(
@@ -2725,6 +2883,7 @@ index 7e0b069..bee88c7 100644
 +        let window = WindowPoint {
 +            pos: Vec3::new(0.0, 50.0, -400.0),
 +            color: [1.0, 0.7, 0.4],
++            facing: Vec3::ZERO,
 +        };
 +        let lit = LookUniform::new(
 +            &frame,
@@ -3060,7 +3219,7 @@ index 0000000..e60c644
 +    return vec4<f32>(here.rgb, mix(filtered, prev, keep));
 +}
 diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
-index 8aad35f..f21f339 100644
+index 8aad35f..10e6f53 100644
 --- a/crates/benilla-world/src/shaders/world_look.wgsl
 +++ b/crates/benilla-world/src/shaders/world_look.wgsl
 @@ -1,16 +1,25 @@
@@ -3122,7 +3281,7 @@ index 8aad35f..f21f339 100644
  
  const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
  const MID_GREY: f32 = 0.18;
-@@ -68,6 +90,22 @@ const RAY_RADIUS: f32 = 0.8;
+@@ -68,6 +90,24 @@ const RAY_RADIUS: f32 = 0.8;
  const RAY_SKY_SHARE: f32 = 0.35;
  // The density exponent's clamp (`look::rays::MIST_EXP_LIMIT`).
  const MIST_EXP_LIMIT: f32 = 30.0;
@@ -3136,16 +3295,18 @@ index 8aad35f..f21f339 100644
 +// keeps this share, so the fog is at least as golden on average as the mist it replaces, and the
 +// shafts stand out of it. And the lamps' glow over the frame eases off past this much
 +// (`FOG_GLOW_KNEE`), so dense mist round the lamps veils a hero or a wall, never erases it.
-+const FOG_SUN_GAIN: f32 = 1.8;
-+const FOG_SHADE_FLOOR: f32 = 0.4;
++const FOG_SUN_GAIN: f32 = 2.2;
++const FOG_SHADE_FLOOR: f32 = 0.2;
 +// The highlight shoulder the pass ends on (`look::air::tune::HIGHLIGHT_KNEE`, `look::air::shoulder`):
-+// linear values over the knee roll off toward white, so near-white keeps its texture.
-+const HIGHLIGHT_KNEE: f32 = 0.6;
++// linear values over the knee roll off toward `HIGHLIGHT_WHITE`, so near-white keeps its texture
++// and a bright stone texel stays under it (`look::air::tune::HIGHLIGHT_WHITE`).
++const HIGHLIGHT_KNEE: f32 = 0.5;
++const HIGHLIGHT_WHITE: f32 = 0.85;
 +const FOG_GLOW_KNEE: f32 = 0.6;
  
  fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
      let lo = c / 12.92;
-@@ -89,6 +127,116 @@ fn load_depth(px: vec2<i32>) -> f32 {
+@@ -89,6 +129,116 @@ fn load_depth(px: vec2<i32>) -> f32 {
  #endif
  }
  
@@ -3262,7 +3423,7 @@ index 8aad35f..f21f339 100644
  fn grade(c: vec3<f32>, saturation: f32, contrast: f32, warmth: f32) -> vec3<f32> {
      // White balance: the tint runs from the cool shadow target to the warm highlight one, split at
      // mid-grey; each target is divided by its own luminance, so the shift keeps brightness.
-@@ -101,6 +249,14 @@ fn grade(c: vec3<f32>, saturation: f32, contrast: f32, warmth: f32) -> vec3<f32>
+@@ -101,6 +251,15 @@ fn grade(c: vec3<f32>, saturation: f32, contrast: f32, warmth: f32) -> vec3<f32>
      return max(mix(vec3<f32>(l2), con, saturation), vec3<f32>(0.0));
  }
  
@@ -3270,14 +3431,15 @@ index 8aad35f..f21f339 100644
 +// toward 1 (tanh), its slope 1 at the knee.
 +fn shoulder(c: vec3<f32>) -> vec3<f32> {
 +    let k = HIGHLIGHT_KNEE;
-+    let over = max(c - vec3<f32>(k), vec3<f32>(0.0)) / (1.0 - k);
-+    return select(c, vec3<f32>(k) + (1.0 - k) * tanh(over), c > vec3<f32>(k));
++    let w = HIGHLIGHT_WHITE;
++    let over = max(c - vec3<f32>(k), vec3<f32>(0.0)) / (w - k);
++    return select(c, vec3<f32>(k) + (w - k) * tanh(over), c > vec3<f32>(k));
 +}
 +
  // How much open sky lies between this pixel and the sun, decayed with distance along the march:
  // 0 in full shadow, about 0.5 with nothing in the way.
  fn shafts(uv: vec2<f32>, dims: vec2<f32>) -> f32 {
-@@ -184,6 +340,13 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+@@ -184,6 +343,13 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
          world = w4.xyz / w4.w;
      }
  
@@ -3291,7 +3453,7 @@ index 8aad35f..f21f339 100644
      // Contact shadows, on geometry only, before anything is added over the frame.
      if look.ao.x > 0.0 && depth > 0.0 {
          let z = dot(world - look.camera.xyz, look.ao_fwd.xyz);
-@@ -195,7 +358,7 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+@@ -195,7 +361,7 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
      var lin = srgb_to_linear(gamma);
  
      // Mist, on geometry only: the sky keeps its own dome.
@@ -3300,7 +3462,7 @@ index 8aad35f..f21f339 100644
          let ray = world - look.camera.xyz;
          let dist = length(ray);
          let od = mist_depth(
-@@ -208,6 +371,35 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+@@ -208,6 +374,35 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
          lin = mix(lin, mist, amount);
      }
  
@@ -3336,17 +3498,19 @@ index 8aad35f..f21f339 100644
      // God rays toward the sun, fading with distance from it on screen (in screen heights).
      let strength = look.sun.z * look.sun.w;
      if strength > 0.0 {
-@@ -219,7 +411,12 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+@@ -219,7 +414,14 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
          }
      }
  
 -    let graded = grade(lin, look.grade.x, look.grade.y, look.grade.z);
-+    // The far lit windows, over the fog.
++    var graded = shoulder(grade(lin, look.grade.x, look.grade.y, look.grade.z));
++    // The far lit windows, over the fog and after the grade, screened on: drawn before it, the
++    // night grade's lost saturation and the shoulder turned their amber pale pink (take 310).
 +    if look.windows.x > 0.0 {
-+        lin += windows_at(in.position.xy, dims, depth);
++        let w = max(windows_at(in.position.xy, dims, depth), vec3<f32>(0.0));
++        graded = graded + w * (vec3<f32>(1.0) - min(graded, vec3<f32>(1.0)));
 +    }
 +
-+    let graded = shoulder(grade(lin, look.grade.x, look.grade.y, look.grade.z));
      let encoded = linear_to_srgb(clamp(graded, vec3<f32>(0.0), vec3<f32>(1.0)));
      return vec4<f32>(sun_glare(encoded, uv, dims), scene.a);
  }
@@ -3369,7 +3533,7 @@ index 2c3bf8b..a5d4010 100644
      props.retain(|e, _| instances.contains(*e));
      world.props.retain(|e, _| instances.contains(*e));
 diff --git a/crates/benilla-world/src/static_gx/mod.rs b/crates/benilla-world/src/static_gx/mod.rs
-index 4e0cce0..606b571 100644
+index 4e0cce0..5e62f03 100644
 --- a/crates/benilla-world/src/static_gx/mod.rs
 +++ b/crates/benilla-world/src/static_gx/mod.rs
 @@ -308,6 +308,10 @@ pub struct StaticGx {
@@ -3383,7 +3547,7 @@ index 4e0cce0..606b571 100644
  }
  
  /// The divert hook's per-call facts, gathered at `assemble.rs`'s gate.
-@@ -442,6 +446,11 @@ impl StaticGx {
+@@ -442,6 +446,18 @@ impl StaticGx {
          )
      }
  
@@ -3392,10 +3556,17 @@ index 4e0cce0..606b571 100644
 +        self.windows.values().flatten()
 +    }
 +
++    /// A key that changes as buildings with lit windows come and go: their count and their
++    /// points' (`look::air`'s pick is redone on a change).
++    pub fn window_point_count(&self) -> usize {
++        let points: usize = self.windows.values().map(Vec::len).sum();
++        points.wrapping_add(self.windows.len().wrapping_mul(1_000_003))
++    }
++
      /// Bake every dirty region on the next flush, quiet or not: the reveal gate's end of a load.
      pub(crate) fn flush_now(&mut self) {
          self.flush_now = true;
-@@ -477,6 +486,18 @@ impl StaticGx {
+@@ -477,6 +493,18 @@ impl StaticGx {
              }
          };
          let wmo_key = b.wmo.as_ref().map(|w| w.instance);
