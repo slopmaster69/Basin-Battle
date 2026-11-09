@@ -647,6 +647,8 @@ impl Survival {
             let m = &self.mobs[&mid];
             let open = matches!(m.state, MobState::Recover { .. }) && m.stagger_until <= now;
             let heft = if open { heft * self.content.combat.recovery_posture.max(1.0) } else { heft };
+            // VanCleef's own (`sim::vancleef`): debug damage never counts, his hunch counts more.
+            let heft = heft * self.vancleef_posture_share(mid, label);
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
@@ -916,7 +918,8 @@ impl Survival {
             self.events.push(Event::Missile { caster: s, spell: of.then_look, target: Target::Point(at) });
         }
         self.yell(s, of.then_text.clone());
-        if of.then_after > 0.0 {
+        // (VanCleef's Unbowed kneels first and roars as he stands: `sim::vancleef`.)
+        if of.then_after > 0.0 && !self.is_vancleef(s) {
             self.events.push(Event::Emote { id: s, emote: ROAR_EMOTE });
             let sound = self.content.mobs[nd].aggro_sound;
             if sound != 0 {
@@ -930,6 +933,7 @@ impl Survival {
         if let Some(h) = foe {
             self.engage(s, Foe::Hero(h));
         }
+        self.vancleef_risen(s);
     }
 
     /// Secret forms whose time has come rise.
@@ -1522,7 +1526,7 @@ impl Survival {
 
     /// A creature waiting its turn: it stands where it is, facing `to` (unless it's backing off to
     /// make space, which it finishes).
-    fn hold_facing(&mut self, id: Id, to: Vec3) {
+    pub(crate) fn hold_facing(&mut self, id: Id, to: Vec3) {
         let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return };
         let moving = !m.path.is_empty();
@@ -2352,9 +2356,11 @@ impl Survival {
                 // A lunge: the last moment of the wind-up carries it forward into the blow.
                 let lunge = self.pattern_step(id).map_or(0.0, |s| s.lunge);
                 // No farther than to land in front of the foe.
-                let lunge = match self.foe_pos(foe) {
-                    Some(at) => lunge.min((dist2d(self.mobs[&id].pos, at) - LUNGE_SHORT).max(0.0)),
-                    None => lunge,
+                let lunge = match (self.vancleef_lunge(id), self.foe_pos(foe)) {
+                    // VanCleef's riposte carries past where its hero stood (`sim::vancleef`).
+                    (Some(past), _) => past,
+                    (None, Some(at)) => lunge.min((dist2d(self.mobs[&id].pos, at) - LUNGE_SHORT).max(0.0)),
+                    (None, None) => lunge,
                 };
                 if lunge > 0.0 && !self.mobs[&id].lunged && t2 >= a.windup - LUNGE_SECS {
                     let m = self.mobs.get_mut(&id).unwrap();
@@ -2753,6 +2759,7 @@ impl Survival {
         // The moving saw hits along its actual swept path, once per hero, in machinery.
         if self.machine_grind(id) { return; }
         if self.kitchen_release(id) { return; }
+        if self.vancleef_release(id) { return; }
         let now = self.clock;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];

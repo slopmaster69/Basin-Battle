@@ -1,0 +1,33 @@
+# DEV SETUP: VanCleef starts at 33% (.es hurt before the video), so the late beats (the
+# Blackguards leaving, "Cowards!", the 12% kneel, Unbowed rising) come within a short take. It
+# proves the beats' look, not the fight's balance. Otherwise as vancleef-clear: from the video on,
+# only the warrior's own keys, pressed by the same small player reading the client's cues.
+hero warrior
+# No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to him.
+cam off
+camera duel Edwin VanCleef
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes vancleef
+12 .es goto -105 -818 37.9 0
+13 .es goto -64 -819.5 41.5 3.141593
+13.5 .es hurt 0.33 vancleef
+14.5 .es heal
+12.2 lua VB = { q = {}, open = 0, nextHit = 0, anAt = 0, glow = false, hunchEnd = 0, hunchLen = 0, provoked = 0, k = 0, on = false }
+12.2 lua function VB.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function VB.after(d, f) table.insert(VB.q, { GetTime() + d, f }) end
+12.2 lua function VB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+12.2 lua function VB.hit(why) VB.log(why) VB.say(".es in a") VB.after(0.08, function() VB.say(".es in au") end) end
+12.2 lua function VB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.2 lua function VB.react(land) local now = GetTime() local follow = land - (VB.lastLand or 0) < 1.3 VB.lastLand = land if VB.glow or follow then VB.after(math.max(0, land - 0.2 - now), function() VB.log((VB.glow and "roll aside from the glow" or "roll from the follow-up") .. " hp " .. UnitHealth("player")) VB.say(".es in d") end) else local d = math.max(0, land - 0.15 - now) VB.after(d, function() VB.say(".es in g") end) VB.after(d + 0.35, function() VB.say(".es in gu") end) VB.log("guard hp " .. UnitHealth("player")) end end
+12.2 lua function VB.line(l) local f = VB.split(l) local v, now = f[1], GetTime() if v == "WP" and f[5] ~= "1" then local c, s = tonumber(f[3]), tonumber(f[4]) or 0 if c == 8 or c == 75 then if s > 0 then VB.openAt = now + 0.3 VB.open = now + s VB.hunchEnd = now + s VB.hunchLen = s VB.log("open " .. c .. " " .. s .. " hp " .. UnitHealth("player")) else VB.open = 0 end end elseif v == "AN" and f[11] == "mob" then local land = now + (tonumber(f[4]) or 0) VB.open = 0 VB.anAt = now VB.glow = false local seen = now VB.after(0.3, function() if VB.anAt == seen then VB.react(land) end end) elseif v == "WG" then VB.glow = true end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) VB.line(l) return old(l) end
+12.2 lua VB.f = CreateFrame("Frame") VB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(VB.q) do local a = VB.q[i] if now >= a[1] then table.remove(VB.q, i) a[2]() else i = i + 1 end end if not VB.on then return end if now >= (VB.openAt or 0) and now < VB.open - 0.35 and now >= VB.nextHit then VB.nextHit = now + 0.75 VB.hit("hit the hunch") end if VB.hunchLen > 1.7 and VB.hunchLen < 1.9 and now > VB.hunchEnd + 1.4 and now < VB.hunchEnd + 2.0 and VB.anAt < VB.hunchEnd and VB.provoked < VB.hunchEnd then VB.provoked = now VB.k = VB.k + 1 if math.mod(VB.k, 2) == 0 then VB.hit("hit into the Invitation") else VB.log("wait out the Invitation") end end end)
+14.6 video
+14.7 lua VB.on = true
+17 .es in lock
+15 shots late 30 3.0
+110 shots unbowed 30 4.0
+240 end
