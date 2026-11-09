@@ -1,0 +1,37 @@
+# The storm's and the look's CPU cost (client 0082 and the stack, #271's seventh round): Goldshire
+# at 23:00 held at storm 1, standing still, the fps journal on: 10 s with everything on, 10 s with
+# worldWeather 0, 10 s with worldLook 0, 10 s on again, then 10 s with lookwindows 0. Corey's
+# desktop (RTX 4090, 1280x720) found the frame's CPU at 33 ms with the look and the storm, 26.5
+# with worldWeather 0 and 20.5 with worldLook 0, the GPU under 2 ms. Since: the lamps lit only
+# near (24 within 110 yd, was about 290 across the whole window, each read every frame by the
+# light table and the rain's streaks), the far windows picked again only when the view moves
+# (was every window point of the town every frame at night), and the sun shadows' extract no
+# longer asks each blended texture's path every frame. The first 50 s soak the ground.
+# Look for: in the CSV, cpu_ms in each stretch against take 310's 33 / 26.5 / 20.5; gpu_ms.
+# PLEASE send the CSV and client.log's "[look lamps]" lines, and say the GPU and window size.
+hero warrior
+cam 180 -8 12
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua ConsoleExec("lookweather storm 1")
+54.0 video
+55.0 lua SetCVar("fpsJournal", "1")
+56.0 shots cost-on 1 1.0
+66.0 lua SetCVar("worldWeather", "0")
+67.0 shots cost-noweather 1 1.0
+77.0 lua SetCVar("worldWeather", "1")
+77.05 lua SetCVar("worldLook", "0")
+78.0 shots cost-classic 1 1.0
+88.0 lua SetCVar("worldLook", "1")
+89.0 shots cost-on-again 1 1.0
+99.0 lua ConsoleExec("lookwindows 0")
+100.0 shots cost-windows-0 1 1.0
+110.0 lua ConsoleExec("lookwindows 1")
+110.05 lua SetCVar("fpsJournal", "0")
+110.1 lua ConsoleExec("lookweather server")
+112 end

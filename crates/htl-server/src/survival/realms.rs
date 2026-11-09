@@ -277,7 +277,49 @@ impl Realms {
                 self.camp.sim.from_below_at(place.as_deref(), &counts, &items);
             }
         }
+        self.follow_watched();
         self.sync_pages();
+    }
+
+    /// Each watcher (survival/watch.rs) goes into the world of the hero it watches, the camp's
+    /// or a dungeon's (never Siege's), arriving where that hero stands.
+    pub(crate) fn follow_watched(&mut self) {
+        let worlds: Vec<(Option<usize>, &SurvivalGame)> =
+            std::iter::once((None, &self.camp)).chain(self.below.iter().enumerate().map(|(k, b)| (Some(k), b))).collect();
+        let mut moves = Vec::new();
+        for (from, game) in &worlds {
+            for (conn, s, w) in game.in_world() {
+                let Some(name) = s.watching.as_deref().filter(|_| !w.porting) else { continue };
+                let hero = worlds.iter().find_map(|(to, g)| g.hero_at(name).map(|at| (*to, at)));
+                if let Some((to, at)) = hero.filter(|(to, _)| to != from) {
+                    moves.push((*conn, *from, to, at));
+                }
+            }
+        }
+        for (conn, from, to, (pos, facing)) in moves {
+            let map = match to {
+                Some(k) => self.below[k].realm.map,
+                None => self.camp.realm.map,
+            };
+            let src = match from {
+                Some(k) => &mut self.below[k],
+                None => &mut self.camp,
+            };
+            src.send(conn, packets::transfer_pending(map));
+            let Some((session, mut save, carry)) = src.depart(conn) else { continue };
+            save.pos = pos;
+            save.facing = facing;
+            match to {
+                Some(k) => {
+                    self.below[k].arrive(conn, session, save, carry, None);
+                    self.in_below.insert(conn, k);
+                }
+                None => {
+                    self.camp.arrive(conn, session, save, carry, None);
+                    self.in_below.remove(&conn);
+                }
+            }
+        }
     }
 
     /// Heroes crossing to Siege (its page in the book at camp) and back (its banner): there, a

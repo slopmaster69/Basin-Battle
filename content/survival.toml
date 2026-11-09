@@ -3924,6 +3924,9 @@ cooldown = 8.0
 clip = 18
 take = 0
 from = "NightElfMale"
+# The whole body even walking: the slam is the legs' as much as the arms', and a torso alone over
+# walking legs reads as a tap (client 0079 plays every other cast on the torso while the legs walk).
+body = "full"
 # Force Punch's look (24189): the same ThunderClap shock ring as Shockwave's own (25425), but
 # with no cast animation of its own. 25425's cast anim 54 threw the hero's hand up after the
 # chop (Corey's "Michael Jackson" hand, his review, Nov 3); every other ThunderClap look in the
@@ -5427,6 +5430,9 @@ arc = 70.0
 stamina = 10.0
 spell = 12294
 clip = 57
+# The whole body even walking: the rising blow lifts the hero off the ground with it (1.12 too
+# keeps 57 on the whole body; client 0079 plays every other cast on the torso while the legs walk).
+body = "full"
 impact_kit = 83
 also = "raptor_rise"
 recast = "stoop"
