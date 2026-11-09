@@ -1362,6 +1362,12 @@ impl SurvivalGame {
         let verb = if verb == "es" { words.next().unwrap_or("").to_lowercase() } else { verb };
         let arg = words.next().unwrap_or("").to_lowercase();
         let arg2 = words.next().unwrap_or("");
+        // A watcher plays no part (survival/watch.rs): only its lines about watching, and the
+        // add-on's own, are heard; its keys (`.es in`) do nothing.
+        if self.watching(conn) && !matches!(verb.as_str(), "watch" | "debug" | "hello" | "po" | "bb" | "where" | "speech") {
+            if verb != "in" { self.tell(conn, "You're watching. Use .es watch off to play again."); }
+            return;
+        }
         if self.aftermath.is_some() && !matches!(verb.as_str(), "aftermath" | "hello" | "po" | "bb" | "where") {
             if verb != "in" { self.say_to(conn, "End the preview with .es aftermath off before playing."); }
             return;

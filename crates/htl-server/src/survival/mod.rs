@@ -618,13 +618,10 @@ impl SurvivalGame {
 
     fn packet(&mut self, conn: ConnId, opcode: u32, body: &[u8]) -> std::io::Result<()> {
         let Ok(opcode) = u16::try_from(opcode) else { return Ok(()) };
-        // An inspection cannot use inventory, doors, combat or any other gameplay input.
-        // Movement is handled separately without moving the saved hero.
-        if self.aftermath.is_some() && !MOVE_OPCODES.contains(&opcode) && !matches!(opcode,
-            op::CMSG_PING | op::CMSG_QUERY_TIME | op::CMSG_PLAYER_LOGIN | op::CMSG_LOGOUT_REQUEST |
-            op::CMSG_NAME_QUERY | op::CMSG_CREATURE_QUERY | op::CMSG_GAMEOBJECT_QUERY |
-            op::CMSG_ITEM_QUERY_SINGLE | op::MSG_MOVE_WORLDPORT_ACK | op::CMSG_SET_ACTIVE_MOVER |
-            op::CMSG_MESSAGECHAT) { return Ok(()); }
+        // An inspection cannot use inventory, doors, combat or any other gameplay input, and
+        // nor can a watcher (survival/watch.rs). Movement is handled separately without moving
+        // the saved hero.
+        if (self.aftermath.is_some() || self.watching(conn)) && !only_looking(opcode) { return Ok(()); }
         let mut r = Reader::new(body);
         let me = self.world_of(conn).map(|w| w.id);
         match opcode {
@@ -1111,6 +1108,16 @@ impl SurvivalGame {
         self.broadcast(&packets::chat(out, packets::LANG_UNIVERSAL, guid, trimmed));
         Ok(())
     }
+}
+
+/// What a client that plays no part (an aftermath inspector, a watcher) may still send: moves,
+/// the session's own business, look-ups and chat (whose `.es` lines `command` sorts).
+fn only_looking(opcode: u16) -> bool {
+    MOVE_OPCODES.contains(&opcode) || matches!(opcode,
+        op::CMSG_PING | op::CMSG_QUERY_TIME | op::CMSG_PLAYER_LOGIN | op::CMSG_LOGOUT_REQUEST |
+        op::CMSG_NAME_QUERY | op::CMSG_CREATURE_QUERY | op::CMSG_GAMEOBJECT_QUERY |
+        op::CMSG_ITEM_QUERY_SINGLE | op::MSG_MOVE_WORLDPORT_ACK | op::CMSG_SET_ACTIVE_MOVER |
+        op::CMSG_MESSAGECHAT)
 }
 
 /// `ChatMsg` (1.12's numbering): away and busy.
