@@ -1579,6 +1579,12 @@ pub struct DungeonDef {
     /// The boss (a pack's key) that must be down for the front door to open.
     #[serde(default)]
     pub exit_boss: String,
+    /// Other ways out, open on the same terms (the smugglers' sea tunnel, once the mine has come
+    /// down on the front door), and what the banner says when they open (empty: the front door's).
+    #[serde(default)]
+    pub more_exits: Vec<[f32; 3]>,
+    #[serde(default)]
+    pub way_out: String,
     /// The lamp's quartermaster: what plunder buys (item key to its price).
     #[serde(default)]
     pub trade: BTreeMap<String, u32>,
@@ -2216,6 +2222,12 @@ pub struct MobDef {
     /// come with a pattern's `below`. Read in order once loaded (see [`Content::settle`]).
     #[serde(rename = "phase", default)]
     pub phases: Vec<EnrageDef>,
+    /// A finite crew on low work platforms, with breakable supports and a furnace valve.
+    #[serde(default)]
+    pub perch_crew: Option<PerchCrewDef>,
+    /// Ordered equipment changes at a physical rack, using the health phases as milestones.
+    #[serde(default)]
+    pub arsenal: Option<ArsenalDef>,
     /// Its posture: this much damage within `posture_secs` breaks its stance (it reels, open to
     /// a riposte). 0: none.
     #[serde(default)]
@@ -2300,6 +2312,34 @@ pub struct MobDef {
     pub heavy_sound: u32,
 }
 
+/// Offsets are from the boss's original home, on that floor. The crew is encounter-owned:
+/// it never becomes a respawning pack or leaves a second set behind after a wipe.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PerchCrewDef {
+    pub airborne: String,
+    pub grounded: String,
+    pub spots: Vec<[f32; 2]>,
+    pub valve: [f32; 2],
+    pub channel: Vec<[f32; 2]>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArsenalDef {
+    /// Offset from the original home, projected onto that floor and checked for a walking path.
+    pub rack: [f32; 2],
+    pub display: u32,
+    pub loadouts: Vec<ArsenalLoadout>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArsenalLoadout {
+    pub weapon: u32,
+    #[serde(default)]
+    pub off_hand: u32,
+    pub grip: String,
+    pub patterns: Vec<String>,
+}
+
 impl MobDef {
     /// It stands and is struck, nothing more (a totem, a dummy).
     pub fn inert(&self) -> bool {
@@ -2362,6 +2402,45 @@ pub struct EnrageDef {
     /// later (a heavy blow), and a dry way left between them.
     #[serde(default)]
     pub debris: Vec<[f32; 3]>,
+    /// Rocks brought down round it, wherever it stands, this far out (0: none): six falls in a
+    /// ring, dust first.
+    #[serde(default)]
+    pub rocks_round: f32,
+    /// The place coming down behind the heroes (`sim::bosses`'s collapse): a front that runs
+    /// along a route, everything behind it buried.
+    #[serde(default)]
+    pub collapse: Option<CollapseDef>,
+}
+
+/// A collapse (`[mob.phase.collapse]`): a front runs along `route` (the heroes' way out, point to
+/// point) at `speed` yards a second. Behind it rock is falling everywhere and a hero there is
+/// crushed (`crush`, a share of their health each second); for `lead` yards ahead of it dust
+/// trickles and lighter rocks come down, and those heroes are warned. The boss fights on through
+/// it, unhurt, and can't be brought below `hold` of its health until the front reaches the route's
+/// end, where it yells `end_text` and the last of the fight is fought.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CollapseDef {
+    pub route: Vec<[f32; 3]>,
+    pub speed: f32,
+    #[serde(default = "collapse_lead")]
+    pub lead: f32,
+    #[serde(default = "collapse_crush")]
+    pub crush: f32,
+    #[serde(default)]
+    pub hold: f32,
+    #[serde(default)]
+    pub end_text: String,
+    /// Yelled the first time a blow would have brought it below `hold` before the end.
+    #[serde(default)]
+    pub held_text: String,
+}
+
+fn collapse_lead() -> f32 {
+    12.0
+}
+
+fn collapse_crush() -> f32 {
+    0.2
 }
 
 /// Burning ground a boss's heavy blow leaves (`[mob.phase.burn]`): how wide, what it does each
@@ -3358,6 +3437,37 @@ impl Content {
             }
         }
         for m in &self.mobs {
+            if let Some(a) = &m.arsenal {
+                if a.loadouts.len() != m.phases.len() + 1 || a.display == 0 || a.rack.iter().any(|x| !x.is_finite()) {
+                    bail!("mob {}: arsenal needs a rack and one loadout per stage", m.key);
+                }
+                for g in &a.loadouts {
+                    if g.weapon == 0 || g.patterns.is_empty() || !["1h", "2h", "sword", "hammer"].contains(&g.grip.as_str())
+                        || g.patterns.iter().any(|name| !m.patterns.iter().any(|p| &p.name == name && p.weight > 0.0)) {
+                        bail!("mob {}: invalid arsenal loadout", m.key);
+                    }
+                }
+                if m.phases.iter().any(|p| p.speed != 1.0 || p.might != 1.0 || p.shove != 0.0 || !p.pattern.is_empty()) {
+                    bail!("mob {}: arsenal phases only request equipment changes", m.key);
+                }
+            }
+            if let Some(c) = &m.perch_crew {
+                if !m.boss || !(2..=3).contains(&c.spots.len()) || c.channel.is_empty() || c.channel.len() > 5 {
+                    bail!("mob {}: a perch crew needs a boss, 2-3 platforms and 1-5 channel points", m.key);
+                }
+                for key in [&c.airborne, &c.grounded] {
+                    let Some(k) = self.mob(key) else { bail!("mob {}: no crew mob {key}", m.key) };
+                    if self.mobs[k].perch_crew.is_some() || self.mobs[k].boss || self.mobs[k].inert() {
+                        bail!("mob {}: crew {key} must be an ordinary fighter", m.key);
+                    }
+                }
+                if !self.mobs[self.mob(&c.airborne).unwrap()].attack.ranged || self.mobs[self.mob(&c.grounded).unwrap()].attack.ranged {
+                    bail!("mob {}: its perched crew throws, its grounded crew fights up close", m.key);
+                }
+                if c.spots.iter().chain(c.channel.iter()).chain(std::iter::once(&c.valve)).flatten().any(|n| !n.is_finite() || n.abs() > 30.0) {
+                    bail!("mob {}: crew offsets must be finite and within 30 yd", m.key);
+                }
+            }
             if !m.temper.is_empty() && !self.tempers.iter().any(|t| t.key == m.temper) {
                 bail!("mob {}: temper {} is no [[temper]]", m.key, m.temper);
             }
@@ -3751,6 +3861,9 @@ impl Content {
             }
             if !SLOTS.contains(&a.slot.as_str()) {
                 bail!("{what}: slot {:?} (one of {SLOTS:?})", a.slot);
+            }
+            if !BODIES.contains(&a.body.as_str()) {
+                bail!("{what}: body {:?} (\"\" for the torso while the legs walk, or \"full\")", a.body);
             }
             if a.school != "core" && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
                 bail!("{what}: school {:?} (core, {BETA} or one of {SCHOOLS:?})", a.school);

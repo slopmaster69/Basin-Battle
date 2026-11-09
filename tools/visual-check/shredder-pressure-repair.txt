@@ -1,0 +1,34 @@
+# DEV-COMMAND DEMONSTRATION, NOT AN UNASSISTED FULL FIGHT.
+# Natural attack cycle in the Mast Room; repeated heals keep the camera hero alive.
+# .es hurt forces machine/driver transitions. Do not label these as earned kills.
+# Requires a fresh dungeon where Sneed has not been slain. Coordinates are the authored post;
+# camera framing and all timings require the capture operator's visual pass.
+# Inspect: distinct saw/stamp/rev poses, straight grind, steam, 3.5 sec exposed stall,
+# native wrench missile, retained wreck, Sneed working beside its edge (whole body clear),
+# facing the wreck for 4 sec with sparks, restart at the original wreck center at one-third health.
+hero warrior
+cam 180 -14 11
+0.5 .es debug quiet
+1.0 .es goto -9624 675
+3.0 .es travel landing
+12.0 .es goto -270 -505 50 3.14159
+13.0 .es heal
+14.0 video
+14.2 shots approach 2 1
+16.0 .es goto -285 -505 50 3.14159
+17.0 shots cycle 24 0.75
+20.0 .es heal
+26.0 .es heal
+32.0 .es heal
+38.0 .es heal
+40.0 .es hurt 0 dm_shredder
+40.2 shots emerge 12 0.25
+44.0 .es heal
+46.0 shots repair 24 0.5
+52.0 .es heal
+58.0 .es hurt 0 dm_shredder
+58.2 shots spent 16 0.4
+64.0 .es heal
+68.0 .es hurt 0 dm_sneed
+68.2 shots finish 12 0.4
+74.0 end

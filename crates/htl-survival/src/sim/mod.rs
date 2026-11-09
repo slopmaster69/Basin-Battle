@@ -14,6 +14,12 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub(crate) mod bosses;
+pub(crate) mod machinery;
+pub(crate) mod vancleef;
+pub(crate) mod perches;
+pub(crate) mod arsenal;
+pub(crate) mod firing_line;
+pub(crate) mod kitchen;
 pub mod cc;
 pub mod cues;
 mod building;
@@ -254,6 +260,8 @@ pub enum Event {
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
     Gear { player: Id },
+    /// A creature changed its held equipment at an encounter milestone.
+    MobGear { id: Id },
     /// A unit takes a blow, for the clients that play clips: the reaction (`anim`, held `hold`
     /// seconds, looping, for a stagger) and how far it's thrown back from where the blow came.
     /// `fit`: the clip's whole length fitted to that many seconds (a knockdown), 0 its own.
@@ -412,13 +420,16 @@ pub enum Event {
 /// How much of a unit a clip drives ([`Event::Clip`]): all of it (the usual), its arms and
 /// torso only (a draw, a cast, the legs free to run), or its pelvis and legs only (Skyfall's
 /// hang: the legs drawn up while the arms keep drawing the bow). The lower half takes client
-/// patch 0037 (`ac23`); an older client plays it as a whole-body clip.
+/// patch 0037 (`ac23`); an older client plays it as a whole-body clip. `Auto`, an ability's
+/// cast by default: the whole body standing, the torso while the legs walk (client patch 0079,
+/// `ac29`; an older client is sent `Full`, as it played every cast before).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ClipBody {
     #[default]
     Full,
     Upper,
     Lower,
+    Auto,
 }
 
 impl ClipBody {
@@ -428,6 +439,7 @@ impl ClipBody {
             ClipBody::Full => "full",
             ClipBody::Upper => "upper",
             ClipBody::Lower => "lower",
+            ClipBody::Auto => "auto",
         }
     }
 }
@@ -953,6 +965,11 @@ pub struct Mob {
     /// Where the way it's on was searched to (its last leg's end, on a long walk), so a goal that
     /// has hardly moved keeps that way instead of searching again.
     pub plan_to: Option<Vec3>,
+    /// Last dry, open floor actually stood on; an airborne step never replaces it.
+    pub(crate) footing: Option<Vec3>,
+    /// Repeated floor failures without two yards of verified progress end the fight.
+    pub(crate) floor_failures: u8,
+    pub(crate) floor_recovery: Option<Vec3>,
     /// A second form (`then`): the creature it stepped out of, back in its place at a rest.
     pub form_of: Option<usize>,
     /// A panic's last stride.
@@ -1208,6 +1225,12 @@ pub struct Survival {
     pub(crate) warlord: warlord::Warlord,
     /// Basin Battle's boss beats under way: a boss on its run, burning blows, burning ground.
     pub(crate) bosses: bosses::Bosses,
+    pub(crate) machinery: machinery::Machinery,
+    pub(crate) vancleef: vancleef::VanCleef,
+    pub(crate) perches: perches::Perches,
+    pub(crate) arsenal: arsenal::Arsenal,
+    pub(crate) firing_line: firing_line::FiringLine,
+    pub(crate) kitchen: kitchen::Kitchen,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -1309,6 +1332,12 @@ impl Survival {
             beta: beta::Beta::default(),
             warlord: warlord::Warlord::default(),
             bosses: bosses::Bosses::default(),
+            machinery: machinery::Machinery::default(),
+            vancleef: vancleef::VanCleef::default(),
+            perches: perches::Perches::default(),
+            arsenal: arsenal::Arsenal::default(),
+            firing_line: firing_line::FiringLine::default(),
+            kitchen: kitchen::Kitchen::default(),
         }
     }
 
