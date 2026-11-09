@@ -376,6 +376,10 @@ fn the_finish_is_a_flurry_that_sticks_his_spanner_in_the_floor_open_two_and_a_ha
     assert_eq!(patterns[flurry].steps.len(), 3);
     assert!(patterns[flurry].steps.iter().all(|st| st.lunge > 0.0), "pressing forward");
     assert!(!s.perch_pattern_allowed(boss, &patterns[flurry]), "not before the valve");
+    for _ in 0..50 {
+        s.begin_pattern(boss, flurry, true);
+        assert_eq!(s.mobs[&boss].string_len, 0, "never cut short or run on");
+    }
     s.perches.crews.get_mut(&boss).unwrap().stage = Stage::Finished;
     for p in &patterns { assert_eq!(s.perch_pattern_allowed(boss, p), p.name == FINISH, "{}", p.name); }
     let foe = s.mobs[&boss].state.foe().unwrap();

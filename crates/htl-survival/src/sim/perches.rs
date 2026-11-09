@@ -422,7 +422,7 @@ impl Survival {
             // Neither two sticks at once, nor one while a man is falling.
             let c = &self.perches.crews[&owner];
             let busy = !c.sticks.is_empty() || c.demo.is_some()
-                || ids.iter().any(|id| self.mobs.get(id).is_some_and(|m| matches!(m.state, MobState::Windup { .. })))
+                || ids.iter().any(|id| self.perch_controlled(*id) && self.mobs.get(id).is_some_and(|m| matches!(m.state, MobState::Windup { .. })))
                 || ids.iter().any(|id| self.perches.workers.get(id).is_some_and(|w| !matches!(w.state, Place::Perched | Place::Ground)));
             if busy || now < c.next_throw { continue; }
             let perched: Vec<_> = ids.iter().copied().filter(|id| alive(self, id)
@@ -809,6 +809,13 @@ impl Survival {
         self.perches.crews.get(&owner).is_some_and(|c| !c.sticks.is_empty()
             || c.workers.iter().any(|w| self.perch_controlled(*w)
                 && self.mobs.get(w).is_some_and(|m| matches!(m.state, MobState::Windup { .. }))))
+    }
+
+    /// Pattern `k` is his finish: always its three blows, never cut short or run on, so the
+    /// last one is the one that sticks.
+    pub(crate) fn perch_finish(&self, id: Id, k: usize) -> bool {
+        self.mobs.get(&id).is_some_and(|m| self.content.mobs[m.def].perch_crew.is_some()
+            && self.content.mobs[m.def].patterns.get(k).is_some_and(|p| p.name == FINISH))
     }
 
     /// His finish landed: the spanner sticks in the floor and he hauls at it, open.

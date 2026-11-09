@@ -428,7 +428,8 @@ impl Survival {
     /// With `vary`, a boss's string up close may stop one short or run one longer, and may have
     /// one of its blows held a beat.
     pub(crate) fn begin_pattern(&mut self, id: Id, k: usize, vary: bool) {
-        let vary = vary && !self.has_arsenal(id) && !self.is_machinery(id) && !self.is_kitchen(id) && !self.is_vancleef(id);
+        let vary = vary && !self.has_arsenal(id) && !self.is_machinery(id) && !self.is_kitchen(id) && !self.is_vancleef(id)
+            && !self.perch_finish(id, k);
         let ai = self.content.ai.clone();
         let Some(m) = self.mobs.get(&id) else { return };
         let d = &self.content.mobs[m.def];
