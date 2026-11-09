@@ -167,7 +167,7 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
         place(RUBBLE, [2.6, -2.1*hand], 2.4, 0.0, 0.0, 0.6);
         match site.dressing {
             Dressing::Tunnel | Dressing::Timber => {
-                place(SUPPORT, [-0.8, -0.8*hand], 0.85, 1.38, 0.12, 0.5);
+                place(SUPPORT, [-0.8, -0.8*hand], 0.85, 0.12, 1.38, 0.5);
                 place(LUMBER, [2.2, -2.8*hand], 1.25, 0.0, 0.15, 1.9);
                 place(WOODPILE, [-2.8, -2.5*hand], 1.1, 0.0, 0.0, 0.0);
                 place(PLANK, [0.5, -4.0*hand], 1.8, 0.09, 0.16, 2.5);
@@ -181,7 +181,7 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
             Dressing::Machine => {
                 place(MACHINE, [-1.0, -2.0*hand], 1.6, 1.32, 0.2, 0.8);
                 place(CART, [2.5, -2.5*hand], 1.3, 0.2, 0.0, 2.0);
-                place(SUPPORT, [-2.5, -1.5*hand], 0.9, 1.5, 0.2, 2.5);
+                place(SUPPORT, [-2.5, -1.5*hand], 0.9, 0.2, 1.5, 2.5);
                 place(WOODPILE, [0.6, -4.0*hand], 1.3, 0.0, 0.0, 1.4);
             }
             Dressing::Cannon => {
@@ -198,7 +198,7 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
             }
             Dressing::Shore => {
                 place(BOAT, [-1.0, -3.0*hand], 0.6, 0.2, 0.12, 1.1);
-                place(SUPPORT, [2.0, -2.0*hand], 1.0, 1.5, 0.12, 2.4);
+                place(SUPPORT, [2.0, -2.0*hand], 1.0, 0.12, 1.5, 2.4);
                 place(WOODPILE, [-3.0, -2.0*hand], 1.8, 0.0, 0.0, 0.5);
                 place(CRATE, [0.5, -4.5*hand], 1.5, 0.0, 0.2, 2.8);
             }

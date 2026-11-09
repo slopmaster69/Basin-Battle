@@ -75,6 +75,13 @@ fn tilted_wrecks_are_seated_by_their_rotated_bottom() {
     }
     assert!(floor(&htl_survival::FlatLand { z: 300.0, ..Default::default() }, [-190.0,-480.0,54.0], false).is_none(),
         "a missing tunnel floor cannot silently move a collapse to the outdoor roof");
+    let (props, _) = compose(&AuthoredFloors);
+    for p in props.iter().filter(|p| p.model == SUPPORT) {
+        let [x,y,z,w] = p.rotation;
+        let row = [2.0*(x*z-y*w), 2.0*(y*z+x*w), 1.0-2.0*(x*x+y*y)];
+        let height: f32 = (0..3).map(|a| row[a].abs()*(MODELS[SUPPORT].max[a]-MODELS[SUPPORT].min[a])).sum();
+        assert!(height < 2.0, "the 11.39 yd Y axis must remain fallen, not stand on end: {height}");
+    }
 }
 
 #[test]
