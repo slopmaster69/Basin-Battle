@@ -1362,7 +1362,15 @@ impl SurvivalGame {
         let verb = if verb == "es" { words.next().unwrap_or("").to_lowercase() } else { verb };
         let arg = words.next().unwrap_or("").to_lowercase();
         let arg2 = words.next().unwrap_or("");
+        if self.aftermath.is_some() && !matches!(verb.as_str(), "aftermath" | "hello" | "po" | "bb" | "where") {
+            if verb != "in" { self.say_to(conn, "End the preview with .es aftermath off before playing."); }
+            return;
+        }
         let result: Result<(), String> = match verb.as_str() {
+            "aftermath" => {
+                let target = std::iter::once(arg2).chain(words).collect::<Vec<_>>().join(" ");
+                self.aftermath_command(conn, &arg, target.trim())
+            }
             "hello" => {
                 if let Some(w) = self.world_mut(conn) {
                     w.addon = true;
@@ -1950,6 +1958,10 @@ impl SurvivalGame {
                 Ok(())
             }
             "where" => {
+                if let Some((pos, facing)) = self.aftermath_where(conn) {
+                    self.say_to(conn, &format!("Preview position {:.1}, {:.1}, {:.1} facing {:.2}.", pos[0], pos[1], pos[2], facing));
+                    return;
+                }
                 if let Some(p) = self.sim.players.get(&me) {
                     let text = format!("You're at {:.1}, {:.1}, {:.1} facing {:.2}.", p.pos[0], p.pos[1], p.pos[2], p.facing);
                     self.say_to(conn, &text);
