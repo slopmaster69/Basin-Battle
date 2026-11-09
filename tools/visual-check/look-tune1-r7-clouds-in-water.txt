@@ -1,0 +1,38 @@
+# Clouds in the water (client 0081, #270's seventh round): Crystal Lake from its south shore at
+# WoW (-9462, -350), the camera facing north-west over the lake (yaw 45), pitched 10 down, 7 yd
+# back. Take 310 found the lake the same at looksky clouds 0.45 as at 0 (mean 172.5 against
+# 171.3). A lake's mirrored rays leave it a few degrees over the horizon, where the sky's own
+# clouds thin out, go into the haze and smooth to their mean, so the mirror had nothing to show.
+# The mirror's clouds now keep their shapes down to the horizon (a fifth of the sky's horizon
+# window, three times its haze, a third of its pixel). #311 blurs them later; here they may still
+# be crisp. Cover 0.45, 0.8, 0, worldSky 0 at noon, then 0.45 at 17:30.
+# Look for: soft white cloud shapes in the open water at clouds-045 that clouds-0 takes away;
+# greyer and darker at clouds-08; worldsky-0 the flat colour. If the frame shows little water or
+# little sky, say so.
+hero warrior
+cam 45 -10 7
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9462 -350
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("looksky clouds 0.45")
+5.5 video
+6.0 shots noon-clouds-045 2 0.5
+7.5 lua ConsoleExec("looksky clouds 0.8")
+8.5 shots noon-clouds-08 2 0.5
+10.0 lua ConsoleExec("looksky clouds 0")
+11.0 shots noon-clouds-0 2 0.5
+12.5 lua ConsoleExec("looksky clouds 0.45")
+12.55 lua SetCVar("worldSky", "0")
+13.5 shots noon-worldsky-0 2 0.5
+15.0 lua SetCVar("worldSky", "1")
+15.05 lua ConsoleExec("worldclock 1050")
+16.5 shots golden-clouds-045 2 0.5
+18.0 lua ConsoleExec("looksky grade")
+18.05 lua ConsoleExec("lookweather server")
+20 end
