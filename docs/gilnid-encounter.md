@@ -111,5 +111,5 @@ Nothing here has been filmed. `tools/visual-check/gilnid-ledges.txt` and `gilnid
 the takes to film (dev setup: debug heals, and debug kills for the valve take). To look for: the
 plank's hull holding each engineer in the client, the pole's look, the arc's two flights reading
 as one throw, the stick and its ring on the floor, the spill and the stripe, SitGround and
-SitGroundUp on the goblin, the stuck pose, and whether a hero walking the ramp bumps a plank's
-back end.
+SitGroundUp on the goblin, and the stuck pose. The server's floor doesn't know the planks
+(they're objects, not map floor), so a hero who climbs onto one isn't stood on it by the rules.
