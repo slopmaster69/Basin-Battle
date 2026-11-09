@@ -1,4 +1,4 @@
-From 962b25c5d666c81148174677b73f9fad909d9e03 Mon Sep 17 00:00:00 2001
+From dad1bf6714b00bd8c1afd209352b13b17aa4e14b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 8 Nov 2026 08:32:17 -0700
 Subject: [PATCH] Water that answers what moves through it: wakes, rings and
@@ -223,6 +223,9 @@ can't press the movement keys, and the action layer's dash stops as the
 hero starts to swim, so a scripted swim went about 9 yd. Nothing a
 player does runs through it.
 
+Corey's picks from the ninth sweep: grain 0.5, grain_speed 0.06,
+milk_shallow 0.75, milk_mid 0.3, milk_deep 0.8.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -240,13 +243,13 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/look/wakes.rs        | 1789 +++++++++++++++++
  crates/benilla-world/src/look/wakes_pass.rs   |  212 ++
  crates/benilla-world/src/look/water.rs        |  461 ++++-
- .../benilla-world/src/look/water_surface.rs   | 1650 +++++++++++++++
+ .../benilla-world/src/look/water_surface.rs   | 1653 +++++++++++++++
  crates/benilla-world/src/shaders.rs           |    8 +-
  .../benilla-world/src/shaders/look_wakes.wgsl |  236 +++
  .../src/shaders/look_water_surface.wgsl       |   82 +
  crates/benilla-world/src/water_fx/mod.rs      |   14 +-
  crates/benilla-world/src/world_unit.rs        |    5 +
- 20 files changed, 5943 insertions(+), 70 deletions(-)
+ 20 files changed, 5946 insertions(+), 70 deletions(-)
  create mode 100644 crates/benilla-world/src/look/wakes.rs
  create mode 100644 crates/benilla-world/src/look/wakes_pass.rs
  create mode 100644 crates/benilla-world/src/look/water_surface.rs
@@ -362,7 +365,7 @@ index 61e8418..739cf41 100644
      HOVER_CLIMB_RATE, HOVER_HEIGHT, SETTLE_TIMEOUT, STEP_UP_HEIGHT, TERMINAL_VELOCITY,
  };
 diff --git a/crates/benilla-app/src/player/controller.rs b/crates/benilla-app/src/player/controller.rs
-index ec600ee..aa8158b 100644
+index f67aed3..5c342ab 100644
 --- a/crates/benilla-app/src/player/controller.rs
 +++ b/crates/benilla-app/src/player/controller.rs
 @@ -474,6 +474,8 @@ pub(super) fn control(
@@ -374,7 +377,7 @@ index ec600ee..aa8158b 100644
          let input::MoveAxes {
              fwd: fwd_axis,
              side: side_axis,
-@@ -597,6 +599,21 @@ pub(super) fn control(
+@@ -599,6 +601,21 @@ pub(super) fn control(
              },
              None => speeds,
          };
@@ -396,8 +399,8 @@ index ec600ee..aa8158b 100644
          // `GetCurrentSpeed` (`0x7c4c90`), shared with the remote extrapolator: the walk arm comes
          // before the backward min, so walking backwards is walk speed. It takes this frame's gait
          // intent, since the wire word is built after the mover.
-@@ -974,6 +991,35 @@ fn self_seat(
-     })
+@@ -1039,6 +1056,35 @@ fn legs_pose_speed(
+     }
  }
  
 +/// The swim speed `probemove` runs at before the server has given ours (1.12's, 4.72 yd/s).
@@ -433,11 +436,11 @@ index ec600ee..aa8158b 100644
  /// enough to keep a foe in front, slow enough that one rolling past gets behind for a moment.
  const LOCK_TURN_RATE: f32 = 5.0;
 diff --git a/crates/benilla-app/src/player/state.rs b/crates/benilla-app/src/player/state.rs
-index de5e48f..ceba5bc 100644
+index 3fe000c..f3d6b03 100644
 --- a/crates/benilla-app/src/player/state.rs
 +++ b/crates/benilla-app/src/player/state.rs
-@@ -323,6 +323,57 @@ pub(crate) struct ActionDash {
-     pub(crate) keys_now: bool,
+@@ -335,6 +335,57 @@ pub(crate) struct ActionDash {
+     pub(crate) under_speed: f32,
  }
  
 +/// The visual check's held movement (`probemove`, benilla's own, a dev console command): our body
@@ -494,7 +497,7 @@ index de5e48f..ceba5bc 100644
  /// Our avatar: until `active` the camera free-flies, then we drive the body the server placed.
  /// `PartialEq` serves the test that the session end resets the whole of it to `Player::default()`.
  #[derive(Resource, Default, PartialEq)]
-@@ -516,6 +567,8 @@ pub(crate) struct Player {
+@@ -528,6 +579,8 @@ pub(crate) struct Player {
      pub(crate) action_dash: Option<ActionDash>,
      /// Dashes asked for that start later (an attack's lunge at its wind-up's end).
      pub(crate) pending_dashes: Vec<(f32, ActionDash)>,
@@ -503,7 +506,7 @@ index de5e48f..ceba5bc 100644
  }
  
  /// The player's attachment to a transport's frame ([`Player::ride`]).
-@@ -1358,3 +1411,22 @@ mod move_mode_tests {
+@@ -1370,3 +1423,22 @@ mod move_mode_tests {
          );
      }
  }
@@ -4251,7 +4254,7 @@ index 0000000..2190cc8
 +    graph.add_node_edge(LookWakesLabel, bevy::render::graph::CameraDriverLabel);
 +}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index ec1dc9f..d3e0543 100644
+index 36d28e3..92cec08 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
 @@ -46,16 +46,79 @@ pub mod tune {
@@ -4351,7 +4354,7 @@ index ec1dc9f..d3e0543 100644
      /// Froth round something standing in the water (a wading hero's legs, a post), where the
      /// shore's band drew a crisp, thin, bright oval at the waterline: [`FROTH_TAPS`] points on the
      /// surface within [`FROTH_YD`] of a pixel find the step in the bed the legs make, and the froth
-@@ -214,8 +279,22 @@ pub mod tune {
+@@ -223,8 +288,22 @@ pub mod tune {
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
  ///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), rain rings]` ·
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
@@ -4376,7 +4379,7 @@ index ec1dc9f..d3e0543 100644
  
  /// `worldWater` and the film's hold: `on` (on by default, inert under the classic look); `reflect`
  /// holds the mirror at a multiple of the tuned one, `clarity` the clarity (`lookwater`).
-@@ -373,6 +452,8 @@ pub fn pack_rows(
+@@ -395,6 +474,8 @@ pub fn pack_rows(
      light: &WowLighting,
      sky: &super::SkyFrame,
      rings: f32,
@@ -4385,16 +4388,16 @@ index ec1dc9f..d3e0543 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -388,7 +469,7 @@ pub fn pack_rows(
+@@ -410,7 +491,7 @@ pub fn pack_rows(
          } else {
              sky.moon_clear
          };
--        rows[10..].copy_from_slice(&sky.rows);
-+        rows[10..WAKE_ROW].copy_from_slice(&sky.rows);
+-        rows[10..].copy_from_slice(&mirror_sky_rows(sky.rows));
++        rows[10..WAKE_ROW].copy_from_slice(&mirror_sky_rows(sky.rows));
      }
      // The sky's reflection: the hour's dome, toward the fog under cloud.
      let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
-@@ -430,6 +511,33 @@ pub fn pack_rows(
+@@ -452,6 +533,33 @@ pub fn pack_rows(
          tune::OCEAN_CLEAR_YD * clarity,
          rings,
      ];
@@ -4428,7 +4431,7 @@ index ec1dc9f..d3e0543 100644
      rows
  }
  
-@@ -440,14 +548,21 @@ pub(crate) fn publish_water(
+@@ -462,14 +570,21 @@ pub(crate) fn publish_water(
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
      weather: Option<Res<super::WeatherLook>>,
@@ -4451,7 +4454,7 @@ index ec1dc9f..d3e0543 100644
      };
      if *frame != next {
          *frame = next;
-@@ -520,7 +635,30 @@ mod tests {
+@@ -542,7 +657,30 @@ mod tests {
          }
      }
  
@@ -4483,7 +4486,7 @@ index ec1dc9f..d3e0543 100644
  
      #[test]
      fn the_block_is_zero_when_off() {
-@@ -530,6 +668,8 @@ mod tests {
+@@ -552,6 +690,8 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -4492,7 +4495,7 @@ index ec1dc9f..d3e0543 100644
          );
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
-@@ -544,6 +684,8 @@ mod tests {
+@@ -566,6 +706,8 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -4501,7 +4504,7 @@ index ec1dc9f..d3e0543 100644
          );
          assert_eq!(rows[0], [1.0, tune::MIRROR, tune::CLEAR_YD, tune::FOAM]);
          assert_eq!(rows[7][0], tune::SSR_REACH);
-@@ -555,6 +697,8 @@ mod tests {
+@@ -577,6 +719,8 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.7,
@@ -4510,7 +4513,7 @@ index ec1dc9f..d3e0543 100644
          );
          assert_eq!(rain[9][3], 0.7, "the rain's rings");
          let held = LookWater {
-@@ -562,7 +706,15 @@ mod tests {
+@@ -584,7 +728,15 @@ mod tests {
              clarity: Some(0.5),
              ..default()
          };
@@ -4527,7 +4530,7 @@ index ec1dc9f..d3e0543 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -836,6 +988,128 @@ mod tests {
+@@ -858,6 +1010,128 @@ mod tests {
          assert_eq!(f("WATER_MOON_GLINT_MEAN"), tune::MOON_GLINT_MEAN);
          assert_eq!(f("WATER_NIGHT_FLECKS"), tune::NIGHT_FLECKS);
          assert_eq!(f("WATER_NIGHT_FLECK_LANE"), tune::NIGHT_FLECK_LANE);
@@ -4656,7 +4659,7 @@ index ec1dc9f..d3e0543 100644
          let taps = read("WATER_FROTH_TAPS", "u32");
          assert_eq!(
              taps.trim_end_matches('u').parse::<u32>().unwrap(),
-@@ -843,10 +1117,151 @@ mod tests {
+@@ -865,10 +1139,151 @@ mod tests {
          );
      }
  
@@ -4763,7 +4766,7 @@ index ec1dc9f..d3e0543 100644
 +            "milk first"
 +        );
 +        let mut tuned = held;
-+        tuned.tune.0[crate::look::water_surface::k::GRAIN] = 0.5;
++        tuned.tune.0[crate::look::water_surface::k::GRAIN] = 0.7;
 +        let on2 = pack_rows(
 +            true,
 +            &LookWater::default(),
@@ -4774,7 +4777,7 @@ index ec1dc9f..d3e0543 100644
 +            &drift,
 +        );
 +        let g = crate::look::water_surface::k::GRAIN;
-+        assert_eq!(on2[TUNE_ROW + g / 4][g % 4], 0.5, "grain held");
++        assert_eq!(on2[TUNE_ROW + g / 4][g % 4], 0.7, "grain held");
 +        assert_eq!(
 +            on[SURFACE_ROW + 2],
 +            [
@@ -4811,7 +4814,7 @@ index ec1dc9f..d3e0543 100644
      }
  
      /// Under the painted sky the mirror takes its rows, and the cloud over the sun dims the glint;
-@@ -859,8 +1274,10 @@ mod tests {
+@@ -881,8 +1296,10 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -4823,12 +4826,12 @@ index ec1dc9f..d3e0543 100644
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
              minute: 720.0,
-@@ -868,8 +1285,16 @@ mod tests {
+@@ -890,8 +1307,16 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
 -        let on = pack_rows(true, &LookWater::default(), &noon(), &sky, 0.0);
--        assert_eq!(on[10..], sky.rows[..]);
+-        assert_eq!(on[10..], mirror_sky_rows(sky.rows)[..]);
 +        let on = pack_rows(
 +            true,
 +            &LookWater::default(),
@@ -4838,16 +4841,16 @@ index ec1dc9f..d3e0543 100644
 +            NO_WAKES,
 +            &crate::look::water_surface::SurfaceDrift::default(),
 +        );
-+        assert_eq!(on[10..WAKE_ROW], sky.rows[..]);
++        assert_eq!(on[10..WAKE_ROW], mirror_sky_rows(sky.rows)[..]);
+         // The mirror's clouds reach lower and further than the sky's own.
+         assert!(on[19][3] < sky.rows[9][3] && on[17][3] > sky.rows[7][3]);
          assert!((on[1][3] - off[1][3] * sky.sun_clear).abs() < 1e-5);
-         assert!(sky.sun_clear < 1.0);
-     }
 diff --git a/crates/benilla-world/src/look/water_surface.rs b/crates/benilla-world/src/look/water_surface.rs
 new file mode 100644
-index 0000000..eb08185
+index 0000000..178c507
 --- /dev/null
 +++ b/crates/benilla-world/src/look/water_surface.rs
-@@ -0,0 +1,1650 @@
+@@ -0,0 +1,1653 @@
 +//! The open water's moving surface under the wakes, benilla's own (no reference behaviour).
 +//!
 +//! Corey's reference pond (a retail lake seen from steeply above) moves as a sheet: a fine, even
@@ -4906,8 +4909,9 @@ index 0000000..eb08185
 +//!    depths before the deep and the shallows). The grain only ever slid, never re-randomised,
 +//!    but at 0.3 yd/s its 0.1 and 0.06 yd octaves moved a tenth and a seventh of their wavelength
 +//!    each frame, along crossing ways, so the pattern boiled: it now drifts at
-+//!    [`tune::GRAIN_SPEED`] (`grain_speed`, 0.04 yd/s, near still: under a hundredth of a
-+//!    wavelength a frame), so its texture can rise ([`tune::GRAIN`], 0.45) without shimmer. The
++//!    [`tune::GRAIN_SPEED`] (`grain_speed`, 0.06 yd/s since the ninth sweep, near still: about a
++//!    hundredth of a wavelength a frame), so its texture can rise ([`tune::GRAIN`], 0.5) without
++//!    shimmer. The
 +//!    veil's strength is three knobs, at the shallows, the middle depths and the deep
 +//!    ([`tune::MILK_AT_YD`]), so each can be brought to the reference's brightness; the rain rings
 +//!    are a little sparser ([`tune::RAIN_DENSITY`]).
@@ -5042,9 +5046,10 @@ index 0000000..eb08185
 +    /// luminance for the whole veil in the shallows, the middle and the deep): 0.65, 0.3 and 0.65
 +    /// for shallows ~127, middle ~130 and deep ~122. `lookwater tune milk <v>` sets all three.
 +    /// The eighth round's `milk_deep` (the deep colour's share of the milk's) is `deep_tint`.
-+    pub const MILK_SHALLOW: f32 = 0.65;
++    /// Corey's pick from the ninth filming's sweep: 0.75, 0.3 and 0.8 (were 0.65, 0.3, 0.65).
++    pub const MILK_SHALLOW: f32 = 0.75;
 +    pub const MILK_MID: f32 = 0.3;
-+    pub const MILK_DEEP: f32 = 0.65;
++    pub const MILK_DEEP: f32 = 0.8;
 +    pub const MILK_AT_YD: [f32; 3] = [1.0, 2.5, 4.5];
 +    pub const MILK_YD: f32 = 0.9;
 +    pub const MILK_RGB: [f32; 3] = [0.6, 0.76, 0.68];
@@ -5119,12 +5124,13 @@ index 0000000..eb08185
 +    /// texture (the reference's, a quarter). It drifts at [`GRAIN_SPEED`] yd/s now
 +    /// (`grain_speed`), the second octave at [`GRAIN_SPEED_SHARE`] of it, near still, so its
 +    /// texture can rise to the reference's: [`GRAIN`] 0.45 (was 0.25; the sweep's 0.35 gave a
-+    /// fine texture of 3.4 and 0.5 gave 5.3, against the reference's 6.4 to 9).
-+    pub const GRAIN: f32 = 0.45;
++    /// fine texture of 3.4 and 0.5 gave 5.3, against the reference's 6.4 to 9). Corey's pick
++    /// from the ninth filming's sweep: [`GRAIN`] 0.5 and [`GRAIN_SPEED`] 0.06 (were 0.45, 0.04).
++    pub const GRAIN: f32 = 0.5;
 +    pub const GRAIN_YD: f32 = 0.1;
 +    pub const GRAIN_SECOND: f32 = 0.6;
 +    pub const GRAIN_WEIGHT: [f32; 2] = [1.0, 0.7];
-+    pub const GRAIN_SPEED: f32 = 0.04;
++    pub const GRAIN_SPEED: f32 = 0.06;
 +    pub const GRAIN_SPEED_SHARE: [f32; 2] = [1.0, 0.85];
 +    pub const GRAIN_DIR: [[f32; 2]; 2] = [[0.8, 0.6], [-0.6, 0.8]];
 +    pub const GRAIN_FADE: [f32; 2] = [0.25, 0.6];
