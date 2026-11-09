@@ -6885,8 +6885,9 @@ function ES.Line(line)
     local key = "es" .. (f[2] or "")
     -- The striker itself lights up for its wind-up (its weapon, or a beast's whole body: a bear's
     -- paw is small), amber for a blow a guard stops and red for one it doesn't, so a blow reads
-    -- with the floor markers off too.
-    if f[3] and f[3] ~= "" and SetUnitWeaponGlow and (f[8] == "block" or f[8] == "unblockable") then
+    -- with the floor markers off too. One whose body tells its blows (f[13] "1": Sneed's Shredder,
+    -- an arm out, a stamp, a rev) isn't tinted over.
+    if f[3] and f[3] ~= "" and SetUnitWeaponGlow and (f[8] == "block" or f[8] == "unblockable") and f[13] ~= "1" then
       local secs = tonumber(f[7]) or 0.8
       SetUnitWeaponGlow(f[3], (f[8] == "block") and "FFB030" or DANGER_RED, math.max(0.3, secs + 0.05))
     end

@@ -2166,6 +2166,10 @@ pub struct MobDef {
     pub clips_from: Option<String>,
     #[serde(default = "one_f")]
     pub scale: f32,
+    /// Its body's half-width at scale 1, where a blow reaches it from and where a foe stops
+    /// (0: half a yard). A machine on legs stands wider than its middle.
+    #[serde(default)]
+    pub girth: f32,
     pub health: u32,
     pub run_speed: f32,
     pub walk_speed: f32,
@@ -2344,6 +2348,11 @@ impl MobDef {
     /// It stands and is struck, nothing more (a totem, a dummy).
     pub fn inert(&self) -> bool {
         self.totem || self.dummy
+    }
+
+    /// Its body's half-width as drawn (`girth` at its scale; half a yard at its scale by default).
+    pub fn body(&self) -> f32 {
+        self.scale * if self.girth > 0.0 { self.girth } else { 0.5 }
     }
 }
 

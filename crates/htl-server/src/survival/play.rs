@@ -671,7 +671,9 @@ impl SurvivalGame {
             }
             Event::Danger { player, secs, from } => {
                 // `WN\t<secs>\t<the creature's guid>`: the blow's foe warned; on a client that
-                // can, the creature's weapon goes red for it (the guid empty: a hazard).
+                // can, the creature's weapon goes red for it (the guid empty: a hazard). A body
+                // that tells its blows itself (Sneed's Shredder) never goes red all over.
+                let from = from.filter(|m| !self.sim.tells_by_body(*m));
                 let g = from.and_then(|m| self.guid_of(m)).map_or(String::new(), |g| format!("{g:#X}"));
                 if let Some(c) = self.conn_of(player) {
                     if self.has_addon(c) {

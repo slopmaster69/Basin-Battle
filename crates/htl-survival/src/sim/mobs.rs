@@ -615,6 +615,10 @@ impl Survival {
         if self.own_totem(mid, by) {
             return;
         }
+        // Sneed in the air, thrown out of his wreck, isn't there to strike yet (`sim::machinery`).
+        if self.machinery_shielded(mid) {
+            return;
+        }
         if damage > 0 { self.perch_hurt(mid, by); }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
@@ -638,10 +642,11 @@ impl Survival {
             return;
         }
         if damage > 0 { self.arsenal_hurt(mid); }
-        self.machinery_hurt(mid, damage);
+        self.machinery_hurt(mid, damage, label);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
-        // weapons count more, and a blow in its recovery more again).
-        if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 {
+        // weapons count more, and a blow in its recovery more again). (Never debug damage on
+        // Sneed and his machine: `sim::machinery`.)
+        if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 && !self.machinery_debug(mid, label) {
             let heft = self.players.get(&by).map_or(1.0, |p| self.weapon_of(p).posture).max(1.0);
             // Struck just after its own blow, it's open: that counts more.
             let m = &self.mobs[&mid];
@@ -2568,7 +2573,7 @@ impl Survival {
 
     /// One of a creature's patterns that suits a foe `dist` off (`size` its body), weighted.
     pub(crate) fn pick_pattern(&mut self, id: Id, dist: f32, size: f32) -> Option<usize> {
-        if self.is_machine(id) { return self.machine_pattern(id, dist, size); }
+        if self.is_machinery(id) { return self.machinery_pattern(id, dist, size); }
         if self.is_kitchen(id) { return self.kitchen_pattern(id, dist, size); }
         if self.is_vancleef(id) { return self.vancleef_pattern(id, dist, size); }
         let m = self.mobs.get(&id)?;
