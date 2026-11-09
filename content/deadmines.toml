@@ -201,11 +201,13 @@ z = 41.5
 radius = 0.0
 count = 1
 
+# He waits in his cabin's doorway and, pulled, steps out onto the lit main deck to duel
+# (docs/vancleef-encounter.md); his Blackguards watch from the west rail.
 [[dungeon.pack]]
 key = "vancleef"
 mob = "dm_vancleef"
-at = [-84.0, -820.0]
-z = 39.5
+at = [-77.0, -820.0]
+z = 40.0
 radius = 0.0
 count = 1
 
@@ -781,7 +783,8 @@ respawn = 0.0
   spell = 8682
   sound = 1147
 
-# Edwin VanCleef: two honest cuts, then an Invitation that can be waited out.
+# Edwin VanCleef: hunched means hit, blades up means wait (docs/vancleef-encounter.md). Two honest
+# cuts and a hunch, then the Invitation: wait it out, or be answered by the riposte.
 [[mob]]
 key = "dm_vancleef"
 name = "Edwin VanCleef"
@@ -803,6 +806,10 @@ grip = "1h"
 evade = 0.0
 boss = true
 posture = 300
+# His posture drains over 7 sec, not 6, and each hit in a hunch counts 3 times: a lone sword hero
+# who parries his cuts and punishes his hunches breaks it 2 to 6 times a fight (the duel-by-tells
+# test), where before only a debug command ever did.
+posture_secs = 7.0
 drops = { plunder = [40, 50] }
 trophy = { cruel_barb = 1, blackened_armor = 1 }
 gear = ["cruel_barb", "vancleef_pauldrons"]
@@ -837,16 +844,17 @@ slay_sound = 5781
   min_range = 3.5
   max_range = 9.0
   steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 4.0, damage = 26, recovery = 1.8 } ]
-  # The module holds the native guard pose with both blades. This dummy step never fires.
+  # The module holds the native guard pose with both blades for 2 sec. This dummy step never fires.
   [[mob.pattern]]
   name = "invitation"
   weight = 0.0
-  steps = [ { windup = 1.8, damage = 0, recovery = 1.2 } ]
-  # Keep Desktop's HumanMale 57 correction: no borrowed crouching/leaping special.
+  steps = [ { windup = 2.0, damage = 0, recovery = 1.2 } ]
+  # A thrust (Pierce), not the cuts' raised arm, his weapon glowing red: no guard stops it. The
+  # module carries the lunge past where the hero stood and keeps it from killing.
   [[mob.pattern]]
   name = "riposte"
   weight = 0.0
-  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.9, damage = 36, arc = 80.0, lunge = 2.0, heavy = true, recovery = 2.4, kit = 379 } ]
+  steps = [ { from = "HumanMale", clip = 85, take = 0, windup = 0.9, damage = 36, arc = 80.0, heavy = true, blockable = false, recovery = 2.4 } ]
   [[mob.pattern]]
   name = "advance"
   weight = 0.0
@@ -2585,8 +2593,10 @@ run_speed = 8.0
 walk_speed = 2.4
 aggro = 30.0
 leash = 40.0
-weapon = 1928
-off_hand = 2806
+# Risen, he carries black blades and a dark swirl at his feet: another look.
+weapon = 31855
+off_hand = 31856
+aura = 15473
 grip = "1h"
 # The authored retreat and advance own his footwork; no random backstep interrupts a tell.
 evade = 0.0
@@ -2618,14 +2628,7 @@ slay_sound = 5781
   min_range = 3.5
   max_range = 10.0
   steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 5.0, damage = 28, recovery = 2.2 } ]
-  [[mob.pattern]]
-  name = "invitation"
-  weight = 0.0
-  steps = [ { windup = 1.8, damage = 0, recovery = 1.2 } ]
-  [[mob.pattern]]
-  name = "riposte"
-  weight = 0.0
-  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.9, damage = 38, arc = 80.0, lunge = 2.0, heavy = true, recovery = 2.8, kit = 379 } ]
+  # No Invitation once risen: long strings, and only the final hunch is open.
   [[mob.pattern]]
   name = "advance"
   weight = 0.0

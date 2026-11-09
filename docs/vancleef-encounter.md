@@ -1,87 +1,107 @@
 # Edwin VanCleef: the false opening
 
-VanCleef opens with exactly 2 committed cuts and a 1.8 sec recovery. His next close
-exchange is the Invitation: a held guard pose with both swords equipped for 1.8 sec.
-Waiting ends it without an attack and leaves another 1.2 sec opening. A damaging direct
-hit from within the frontal 140-degree sector spends the Invitation once. It still deals
-its normal damage, then starts a 0.9 sec riposte toward that attacker. The facing is fixed
-from its start, and the riposte leaves 2.4 sec of recovery. No instant counter damage.
+Corey's revised design (Nov 8, "Deadmines bosses: review and redesign"). The rule a hero learns:
+**hunched means hit, blades up means wait.** Every completed combination ends in a hunch
+(StandWound held for its whole recovery; a kneel for the last one), and only a hunch is open.
+The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `content/deadmines.toml`.
 
-Ordinary melee, weapon arts and direct projectiles use the same contact rule. A bursting
-projectile counts only its directly contacted body. Splash, periodic damage, beams and pets
-do not provoke it. Death, posture breaks and disabling effects take precedence. The encounter
-uses no class, ability, hand or party-size requirement. Rear hits remain ordinary damage.
-Control keeps the game's existing boss rules: effects explicitly allowed against bosses
-can interrupt him; an ordinary stun or root is still resisted.
+## The nine beats
 
-A posture break preserves the entire existing stagger reward. Afterward he walks a checked
-4 yd route away from a living opponent, under a small native smoke emitter. The emitter goes
-away before a 0.9 sec arrival cue and the advance's full 1.1 sec first windup. The advance
-has 3 committed blows and a 2.5 sec recovery. Blocked, wet, wrong-floor or excessive-detour
-routes are rejected; he gives the arrival cue where he stands. A rooted or stalled route
-ends in place within 2.5 sec. He remains vulnerable throughout.
+1. **Pull.** He waits in his cabin's doorway (home (-77, -820), under the roof). Pulled, he walks
+   7 yd north onto the open main deck at (-70, -819.5) before his first blow, under the lantern
+   over the door. Two friendly Blackguards watch from the west rail, at (-64, -808) and
+   (-68, -807.5). They have no pack, aggro, attack, loot or reward. The Juggernaut's main deck is
+   also Captain Greenskin's: the duel assumes he has fallen first, as the way to the cabin passes him.
+2. **Honest string.** Two cuts (0.75 and 0.65 sec windups), then a 1.8 sec hunch. Hits in a hunch
+   count 2 times more toward his posture (3 times with the recovery bonus every boss has).
+3. **The Invitation.** Blades up (the native held guard, both swords out), feet planted, the
+   steel's scrape (sound 700), held 2 sec. "Go on, then." on the first, and again only after
+   20 sec. Waited out, he drops into a 1.2 sec hunch: punish it.
+4. **The riposte.** A direct frontal hit (melee, off hand, or a projectile's direct contact) in the
+   Invitation spends it once. He thrusts (HumanMale Pierce, 85, not the cuts' raised arm), his
+   weapon glowing red for the 0.9 sec windup, the only blow that glows. His lunge carries him from
+   where he stood, along the line fixed at contact, 1.5 yd past where the hero stood. It strikes
+   along that whole line; no guard stops it. A hero who sidestepped is behind him for a backstab
+   through his 2.4 sec hunch. One who stood still takes it, but it never takes their last point
+   of health. Rear hits, splash, periodic damage, beams, pets and zero damage never provoke; a
+   second hero's hit can't restart it; control and a posture break come first.
+5. **The posture break, earned.** Posture 300, draining over 7 sec. A lone sword hero who parries
+   his cuts (a parry fills a quarter) and punishes his hunches breaks it 2 to 6 times a fight. A
+   debug health change never counts toward it. "You've learned something." After the whole 2.2
+   sec reel: a smoke puff at his feet (Vanish's, 1856), and he walks 4 yd backward out of it,
+   facing the hero, at 2.2 yd/sec, never under a roof (so never back into his cabin). A scuff on
+   the boards (649) and a glint (kit 379), 0.9 sec, then the advance: 3 blows (block or
+   sidestep), then a 2.5 sec hunch. Blocked or roofed routes leave him in place with the same cue.
+6. **About 30%.** The Blackguards wait for a quiet moment (no blow in his hands), turn toward the
+   bow, one shakes his head (emote 274), and after 1.5 sec both walk off the ship along the deck
+   and down onto the scaffold at (-54, -793), 33 to 37 yd, and are gone when they get there (about
+   12 sec). Then, alone: "Cowards! All of you!"
+7. **Alone**, his gap between combinations (planted, squared up, after each hunch) halves from 1
+   to 0.5 sec. His windups don't change.
+8. **12%.** At the end of whatever string or recovery he's in: "This ends here." Four blows (0.65
+   sec windups at least), then he kneels 3 sec: the last opening. It happens once, and never
+   holds his health above zero. When he dies, any held pose stops at once, so death plays.
+9. **Unbowed.** Through the quarters secret only. The body lies 4 sec, then he rises where it
+   lay: kneeling 1 sec, then a roar as he stands, then 2.5 sec before his first attack. He's
+   dropped the Invitation and the riposte. His strings are 4 blows (the last stand 5), and only
+   the final hunch is open (2.8, 3 and 3.4 sec); the blows between have 0.2 to 0.3 sec and no
+   hunch. He looks different: black Blackwing blades (displays 31855 and 31856) and Shadowform's
+   dark swirl at his feet (15473). His gap is the halved one from the start.
 
-Two friendly, noncombat Blackguard observers stand near his home if both their standing
-points and departure paths are reachable on that floor. They have no pack, aggro, attack,
-loot or reward requirement. At 30% health they walk away along the deck and leave the
-encounter. They never respawn during that fight. At 12%, his 4-blow last stand starts only
-after the current string and recovery; it has 0.65 sec minimum windups and 3 sec recovery.
-It happens once, can be interrupted, and never holds his health above zero.
+His lines never come closer than 2 sec together: one due sooner waits its turn. Both forms bypass
+random string cuts and extensions, held beats, extra chains, tactical retreats and circling, so
+the visible exchange stays honest. The ordinary lunge still closes distance without spending the
+next Invitation. Reset, return, wipe, death and the handoff remove his poses and the Blackguards.
 
-Unbowed rises through the existing quarters-secret handoff. He has no observers or summons.
-His ordinary and advancing strings have 4 blows, his last stand has 5, and recoveries grow
-to 2.8, 3 and 3.4 sec respectively. Windups never accelerate at low health. Both forms bypass
-random string cuts/extensions, held beats, extra chains and tactical retreats so the visible
-exchange remains honest. The ordinary lunge still closes distance without spending the next
-Invitation. Reset, return, wipe, death and handoff remove encounter poses, smoke and observers.
+## The shared fixes, done here for VanCleef alone
 
-## Verification and filming
+Corey's table of shared fixes belongs to another session, which builds them engine-wide. These
+are the VanCleef and Unbowed versions, for it to fold in:
 
-The installed-data regression in `crates/htl-server/tests/vancleef_native.rs` uses the actual
-pack at (-84, -820), with the hero at (-76, -820, 40.2). It checks observer creation before
-the health gate, every 50 ms of departure, both arrivals before cleanup, no attacks or
-replacements, and the complete smoke/retreat/arrival/advance sequence. The hero is healed
-and health gates are injected; this is movement proof, not an unassisted clear.
+| Shared fix | Here |
+| --- | --- |
+| Punish windows look like idling | The hunch (`HoldPose` StandWound 8) for every final recovery, and the kneel (EmoteKneel 75) for the last stand. `vancleef_string_landed`, `duel_open` |
+| Debug damage counts as real | `vancleef_posture_share` gives "debug" damage no posture (`hurt_mob_as`) |
+| Second forms are instant swaps | Unbowed kneels, roars, then waits 2.5 sec (`vancleef_risen`, called from `rise`; the generic roar there skips him) |
+| Things outlive their boss | The Blackguards leave on their own at 30% and are removed with the duel on death or reset |
+| Deaths lag | `remove_duel` stops any held pose (`HoldPose` 0) as he falls |
+| Yells collide | `duel_say` keeps his lines 2 sec apart |
 
-Deterministic tests cover actual solo/duo/4-hero AI, exact strings and recovery, waiting,
-melee and projectile contact, the second simultaneous hitter, rear/splash/periodic immunity
-to provocation, CC precedence, posture reward, continuous retreat, blocked/rooted fallback,
-finite spectators, pack-clear independence, secret handoff, and encounter cleanup.
+The riposte's lunge and its line of contact are VanCleef's own hooks in `mobs.rs`
+(`vancleef_lunge`, `vancleef_release`).
 
-- `vancleef-invitation.txt` is a controlled lab demonstration of the honest recovery, safe
-  waiting, a provoked riposte answered by a dodge, and Unbowed's longer string.
-- `vancleef-story.txt` is a controlled encounter with labelled debug health changes, for the
-  retreat, departing Brotherhood, final combination, actual secret handoff and cleanup.
-- Neither scenario is an unassisted kill or a balance playtest. Film a complete solo and duo
-  fight separately, with markers off, before making balance or full-fight showcase claims.
+## Verification
 
-Read-only data queries verified display 2029 and 2357 use HumanMale, native HumanMale attack
-17 and special 57 exist, and the held guard uses Emote43 / ShieldBlock24. Existing client
-patch 0010 holds that guard pose; the HumanMale57 correction from PR285 remains intact.
-Sound kits 5780/5781/5782 and smoke display45 resolve in the local 1.12 data. The smoke is a
-particle emitter with no mesh; its opacity and timing need real-client inspection.
-The original observer posts were valid, but their northbound departures around the cabin
-measured 35.760 and 20.351 yd against a 19.4 yd short-route limit after the native navigation
-repair. Every segment passed; total length rejected both observers before they spawned.
-The posts stay at (-88, -818.5) and (-80, -818.5). Their exits now follow the cabin's southern
-lip toward (-78, -816) and (-72, -820), on the same dry deck. Boss home, floor/height checks,
-detour bounds, movement speed and the 8 sec cleanup remain unchanged. Custom terrain that
-cannot support a standing point or departure still omits that observer.
+`crates/htl-survival/src/sim/vancleef_tests.rs` covers each beat: the pull's walk-out, two cuts
+and their hunch, hunch hits and debug damage on posture, waiting out the Invitation, its scrape
+and line, the provoked riposte (once, glowing, a thrust, past the spot, sidestepped, never
+lethal), what never provokes, control and break precedence, the backward retreat out of smoke
+into the scuff and three blows, the Blackguards' quiet-moment departure and "Cowards!", line
+spacing, the last stand's kneel and death stopping it, cleanup, the secret handoff with
+Unbowed's kneel, roar and wait, and Unbowed's strings.
 
-The original short smoke retreat already works at home and after 12 sec of actual AI on
-this floor, so its combat source is unchanged. From a posture break, allow about 2.2 sec
-for the full stagger reward, then 1 sec to walk 4 yd. The cloud lasts 0.65 sec and is gone
-before arrival; the advance begins about 4.2 sec after the break, with its full 1.1 sec
-first windup. Frame the cabin frontage through that whole interval. The drop south at
-(-84, -824) remains rejected rather than used as a retreat.
+`a_lone_sword_hero_playing_by_the_tells_clears_both_forms` plays both forms with a warrior on the
+starting sword and their own 200 health, reading only what the client shows (the hunch and kneel,
+the raised blades, each windup, the red glow) with a 0.3 sec reaction: parry the cuts, sidestep
+the glow, hit only hunches. Patient, it clears VanCleef in about 2.5 min with 2 breaks; hitting
+into Invitations to draw ripostes, in about 2.2 min with 6. Unbowed takes about 1.8 min. It never
+uses a debug command. That's the simulation, not the client.
+
+`crates/htl-server/tests/vancleef_native.rs` (installed data, `--ignored`) walks the real deck:
+the walk-out from under the cabin roof to the open deck, the Blackguards' posts in the open,
+their walk off the ship (every stride a walker's, no falls), and the posture retreat staying on
+the open deck, from the first exchange and after 15 sec of fighting.
+
+## Filming
+
+`tools/visual-check/vancleef-*.txt` film each beat with the spectator cameraman (`camera duel
+Edwin VanCleef`), markers off, from the hero's own keys once the video starts. Setup (the deck
+cleared, the boss spawned, the hero healed) happens before the video. A clip that needs a health
+change after that says "dev setup" in its first line and proves nothing about the fight.
 
 ## Not tested in the client
 
-The native held guard is the implemented Invitation silhouette. It cannot promise the exact
-ideal of one blade across his chest and the other drawn back until filmed. Ordinary attack
-recovery returns to the native ready pose; there is no custom shoulder-drop animation.
-
-The smoke emitter, glint, actual stern-floor paths and departure staging, native animation
-blend, controlled-scenario timing, and solo/duo encounter duration remain under `needs playtest`.
-Observers walk away out of the duel and are removed after 8 sec; there is no cinematic or
-entire-ship evacuation route. No client patch or camera takeover is added by this encounter.
+The hunch is the model's own StandWound and the kneel EmoteKneel, held by the add-on's `WP`
+line; whether they read at duel distance, and the Blackwing blades and dark swirl, need the
+real client. So do the red glow on a creature's weapon, the smoke puff's opacity, the native
+deck's light at the duel spot, and the Blackguards' walk out of sight.
