@@ -978,6 +978,9 @@ impl SurvivalGame {
         self.broadcast(&packets::destroy_object(w.guid));
         println!("[survival] {} left", w.name);
         self.save();
+        // The departure above still belongs to the preview and cannot write its save. Once
+        // its final inspector is gone, resume the untouched realm instead of freezing it forever.
+        if self.aftermath.is_some() && self.in_world().next().is_none() { self.aftermath_stop(); }
     }
 
     fn name_query(&self, conn: ConnId, guid: u64) {
@@ -999,6 +1002,7 @@ impl SurvivalGame {
         let _time = r.u32()?;
         let pos = [r.f32()?, r.f32()?, r.f32()?];
         let facing = r.f32()?;
+        if self.aftermath.is_some() && (pos.iter().any(|v| !v.is_finite()) || !facing.is_finite()) { return Ok(()); }
         if self.aftermath_movement(conn, pos, facing) {
             let mut b = Body::new();
             b.packed_guid(guid).bytes(body);

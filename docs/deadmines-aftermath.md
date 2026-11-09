@@ -61,7 +61,8 @@ drop an arriving observer into the water.
 Movement during inspection belongs to the preview alone. Combat, inventory, progression and
 other gameplay inputs are blocked, and the world does not write its save. Turning the preview
 off removes its objects and ship marker, redraws the intact world and returns each hero to their
-original position. Disconnecting keeps the original hero position, too. A server restart starts
+original position. Disconnecting keeps the original hero position, too. The last inspector's
+departure restores the normal realm after finishing without a save write. A server restart starts
 with the intact world; there is no saved aftermath flag and no edit to a player's saved file.
 
 ## Composition and protocol
@@ -90,3 +91,8 @@ packet parsing and batch sizes, late observers, marker cleanup, unchanged simula
 disconnects and repeat activation. The ignored `native_aftermath_floors_support_every_region_and_no_ship_deck`
 test reads the user's installed map through `WOW_DATA`; it verifies authored floor coverage,
 retained inspection footing and the actual absence of the old ship floors.
+
+The installed-data check currently places 496 solids with no rejected sites: 24 at the entrance,
+90 in the galleries, 21 in the Mast Room, 40 in the workshop, 87 in the Foundry, 88 in the Cannon
+Gallery, 104 in the cove and 42 at the landing and sea tunnel. Floating wreckage uses the measured
+native water surface at -0.023 yd. These counts establish coverage, not visual approval.

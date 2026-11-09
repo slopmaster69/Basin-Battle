@@ -33,7 +33,7 @@ fn creates(packets: &[Packet]) -> Vec<(u64, ObjectType, BTreeMap<u16, u32>)> {
     for p in packets {
         assert!(p.body.len() < 16_384, "bounded batches stay far below the 16-bit wire limit");
         let (parsed, tail) = parse_server_with_tail(p.opcode, &p.body).expect("native client parses packet");
-        assert!(tail.is_empty(), "packet consumed completely");
+        assert_eq!(tail, 0, "packet consumed completely");
         if let ServerPacket::UpdateObject { objects, .. } = parsed {
             for object in objects {
                 if let Object::Create { guid, object_type, mask, .. } = object {
@@ -149,6 +149,7 @@ fn preview_does_not_write_the_save_even_when_an_inspector_disconnects() {
     game.aftermath_command(1, "visit", "mouth").unwrap();
     game.save();
     game.leave_world(1);
+    assert!(game.aftermath.is_none(), "the last inspector restores the normal realm");
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "unchanged save sentinel");
     assert_eq!(game.offline["observer1"].pos, original);
     std::fs::remove_file(path).unwrap();
@@ -166,6 +167,19 @@ fn preview_is_scoped_to_debug_and_the_deadmines() {
 }
 
 #[test]
+fn invalid_inspection_movement_is_never_relayed_to_an_observer() {
+    let mut game = game();
+    observer(&mut game, 1);
+    let (_, rx) = observer(&mut game, 2);
+    game.aftermath_start(1).unwrap();
+    rx.try_iter().for_each(drop);
+    let mut movement = Body::new();
+    movement.u32(0).u32(0).vec3([f32::NAN, 0.0, 0.0]).f32(0.0).u32(0);
+    game.movement(1, op::MSG_MOVE_HEARTBEAT, &movement.into_vec()).unwrap();
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
 #[ignore = "requires the user's WoW 1.12.1 Data folder in WOW_DATA"]
 fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     let data = std::env::var_os("WOW_DATA").expect("set WOW_DATA");
@@ -173,6 +187,16 @@ fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     let land = super::super::land::DeadminesLand::new(loaded);
     let (props, missing) = compose(&land);
     println!("{} native ruins; unavailable sites: {missing:?}", props.len());
+    for site in layout::SITES.iter().filter(|s| missing.contains(&s.name)) {
+        for dx in [-10.0, 0.0, 10.0] {
+            for dy in [-10.0, 0.0, 10.0] {
+                let (x, y) = (site.at[0]+dx, site.at[1]+dy);
+                if let Some((i,j)) = land.ground().cell_at(x,y) {
+                    println!("{} near {x},{y}: {:?}", site.name, land.ground().floors_at(i,j));
+                }
+            }
+        }
+    }
     for (i, region) in layout::REGIONS.iter().enumerate() {
         let count = props.iter().filter(|p| p.region == i).count();
         println!("{}: {count} solids", region.name);

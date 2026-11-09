@@ -95,7 +95,7 @@ const MODELS: &[Model] = &[
     Model { display: 1887, name: "Wrecked Mine Cart", min: [-0.82,-1.06,-0.10], max: [1.25,1.05,1.60] },
     Model { display: 9, name: "Broken Barrel", min: [-1.23,-0.58,-0.04], max: [0.43,0.82,1.02] },
     Model { display: 3791, name: "Broken Crate", min: [-0.89,-1.05,-0.02], max: [1.25,0.85,1.31] },
-    Model { display: 2029, name: "Toppled Machinery", min: [-1.30,-1.77,0.0], max: [1.30,1.77,2.13] },
+    Model { display: 2029, name: "Toppled Machinery", min: [-1.30,-1.77,-0.02], max: [1.30,1.77,2.11] },
     Model { display: 245, name: "Overturned Cannon", min: [-4.72,-2.24,-0.01], max: [5.48,2.23,4.13] },
     Model { display: 223, name: "Shattered Boat", min: [-6.71,-1.77,-1.96], max: [2.79,2.24,2.32] },
     Model { display: 4651, name: "Fallen Support", min: [-0.28,-5.57,0.0], max: [0.22,5.82,2.29] },
@@ -214,6 +214,26 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
             props.push(make_prop(&crater, BOULDER, [at[0], at[1], z], scale, 0.0, 0.04, yaw));
             props.push(make_prop(&crater, LOW_ROCK, [at[0]+5.0, at[1]+3.0, z], scale*0.7, 0.0, 0.0, yaw+1.5));
         }
+    }
+    // Native DeadminesInstance_33_32 MCLQ: all 42 water chunks have surface -0.023 yd.
+    // A sparse trail occupies the vanished decks and stores. These are floating fragments,
+    // deliberately partly submerged, not a replacement walkable ship or a hidden old hull.
+    const WATER: f32 = -0.023;
+    for (name, x, y, yaw) in [
+        ("East scaffold drift", -24.0, -832.0, 1.4),
+        ("East stores drift", -34.0, -846.0, 3.2),
+        ("Broken bow timbers", -51.0, -806.0, 0.8),
+        ("Stern wreck trail", -88.0, -861.0, 4.1),
+        ("Quartermaster's scattered cargo", -103.0, -828.0, 2.4),
+    ] {
+        if !land.water_near(x, y, -16.0) { continue; }
+        let drift = Site { region: 6, name, at: [x,y,WATER], yaw, scale: 1.0, dressing: Dressing::Shore };
+        let mut boat = make_prop(&drift, BOAT, [x,y,WATER-1.25], 1.1, 0.25, 0.12, yaw);
+        boat.pos[2] -= 0.15;
+        props.push(boat);
+        props.push(make_prop(&drift, WOODPILE, [x+4.0,y-2.0,WATER-0.6], 1.4, 0.05, 0.0, yaw+1.2));
+        props.push(make_prop(&drift, PLANK, [x-4.0,y+2.0,WATER-0.18], 2.3, 0.08, 0.0, yaw-0.4));
+        props.push(make_prop(&drift, CRATE, [x+2.0,y+3.0,WATER-0.7], 1.1, 0.4, 0.15, yaw+2.0));
     }
     props.retain(|p| !covers_view(p));
     (props, missing)
