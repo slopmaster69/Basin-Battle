@@ -74,8 +74,9 @@ and their ramp, Marisa's side room, the Cannon Gallery and cove passages, the en
 pantry, beach, landing and sea tunnel. The ship's former quarters and deck are replaced by a
 seabed-backed collapse basin, not props balanced on the old deck floor.
 
-Large native dark Burning Steppes boulders establish the collapsed space. Smaller dark rocks and wall rubble
-form their aprons. Fallen supports, lumber and timber piles connect the falls to the mine's
+Large native dark Burning Steppes boulders establish the collapsed space, with varied landed
+orientations. Smaller dark fragments and scattered boards form distinct foregrounds for each
+region. Fallen supports, lumber and timber piles connect the falls to the mine's
 structure. Wrecked mine carts, broken crates and barrels, tipped machinery and overturned cannons
 give each working area its own debris. Wrecked rowboats dress the cove edges. Bounds and pivots
 come from the installed meshes, including the rotated bottom of tipped objects. Native appearance
@@ -93,7 +94,7 @@ disconnects and repeat activation. The ignored `native_aftermath_floors_support_
 test reads the user's installed map through `WOW_DATA`; it verifies authored floor coverage,
 retained inspection footing and the actual absence of the old ship floors.
 
-The installed-data check currently places 577 solids with no rejected sites: 31 at the entrance,
-99 in the galleries, 32 in the Mast Room, 51 in the workshop, 98 in the Foundry, 98 in the Cannon
-Gallery, 115 in the cove and 53 at the landing and sea tunnel. Floating wreckage uses the measured
+The installed-data check currently places 580 solids with no rejected sites: 32 at the entrance,
+99 in the galleries, 34 in the Mast Room, 50 in the workshop, 99 in the Foundry, 98 in the Cannon
+Gallery, 117 in the cove and 51 at the landing and sea tunnel. Floating wreckage uses the measured
 native water surface at -0.023 yd. These counts establish coverage, not visual approval.

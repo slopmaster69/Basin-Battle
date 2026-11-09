@@ -90,7 +90,7 @@ const MODELS: &[Model] = &[
     Model { display: 5737, name: "Fallen Boulder", min: [-4.04,-4.73,-0.10], max: [4.08,4.31,9.42] },
     Model { display: 5741, name: "Broken Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
     Model { display: 5741, name: "Cave Rubble", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 134, name: "Stone Fragments", min: [-0.88,-0.79,0.01], max: [0.39,0.58,0.82] },
+    Model { display: 5741, name: "Stone Fragments", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
     Model { display: 1109, name: "Broken Timbers", min: [-1.68,-0.91,0.0], max: [1.70,0.86,1.67] },
     Model { display: 6193, name: "Splintered Timber", min: [-3.0,-2.12,-0.02], max: [1.76,2.39,1.19] },
     Model { display: 6481, name: "Broken Plank", min: [-1.69,-0.32,-0.01], max: [0.87,0.80,0.22] },
@@ -152,6 +152,19 @@ fn covers_view(p: &Prop) -> bool {
     })
 }
 
+fn fallen_rock_pose(index: usize) -> (f32, f32) {
+    let quarter = std::f32::consts::FRAC_PI_2;
+    // Cardinal landings also seat against an actual measured X or Y extremum, avoiding the
+    // empty corner of a rotated bounding box under these irregular, pointed meshes.
+    match index % 5 {
+        0 => (0.0, 0.0),
+        1 => (0.0, quarter),
+        2 => (quarter, 0.0),
+        3 => (0.0, -quarter),
+        _ => (quarter, quarter),
+    }
+}
+
 /// A site has a tall main fall, a lower shoulder, an apron, and room-specific wreckage.
 /// The changing yaw, handedness and size are authored, never seeded randomly at load time.
 fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
@@ -171,10 +184,11 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
                 props.push(make_prop(site, model, [at[0], at[1], z], scale*site.scale, roll, pitch, site.yaw+yaw));
             }
         };
-        place(BOULDER, [1.5, 1.3*hand], 0.82, 0.08*hand, 0.13*hand, 0.2);
+        let (roll, pitch) = fallen_rock_pose(index);
+        place(BOULDER, [1.5, 1.3*hand], 0.82, roll, pitch, 0.2);
         place(LOW_ROCK, [-2.5, 0.9*hand], 0.95, 0.0, -0.13, 1.7);
         place(DARK_ROCK, [0.0, -2.5*hand], 0.65, 0.0, 0.12, 2.8);
-        place(RUBBLE, [2.6, -2.1*hand], 2.4, 0.0, 0.0, 0.6);
+        place(RUBBLE, [2.6, -2.1*hand], 0.3, 0.0, 0.0, 0.6);
         match site.dressing {
             Dressing::Tunnel | Dressing::Timber => {
                 place(SUPPORT, [-0.8, -0.8*hand], 0.85, 0.12, 1.38, 0.5);
@@ -219,12 +233,7 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
     for (region, r) in layout::REGIONS.iter().enumerate() {
         let apron = Site { region, name: "Rubble apron", at: r.view, yaw: r.facing, scale: 1.0, dressing: Dressing::Timber };
         let (s,c) = r.facing.sin_cos();
-        for (model, dx, dy, scale, yaw) in [
-            (RUBBLE, 3.0, -1.5, 1.8, 0.2), (PLANK, 2.5, 1.7, 1.7, 0.8),
-            (LUMBER, 5.0, 2.7, 0.85, 1.9), (WOODPILE, 4.0, -3.3, 1.15, 2.5),
-            (DARK_ROCK, 6.5, 0.5, 0.6, 1.3), (RUBBLE, 2.0, -2.8, 1.7, 2.7),
-            (PLANK, -2.5, -2.2, 1.7, 0.5), (RUBBLE, -3.0, 2.5, 1.8, 1.5),
-        ] {
+        for &(model, [dx,dy], scale, yaw) in layout::APRONS[region] {
             let at = [r.view[0]+c*dx-s*dy, r.view[1]+s*dx+c*dy, r.view[2]];
             if let Some(z) = floor(land, at, false) {
                 props.push(make_prop(&apron, model, [at[0],at[1],z], scale, 0.0, 0.0, r.facing+yaw));
@@ -234,11 +243,13 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
     // The ship's old footprint is water over a seabed at -16 yd. These masses are seated
     // on that bottom and rise 15–20 yd above it; they are not floating on vanished decks.
     let crater = Site { region: 6, name: "Juggernaut collapse basin", at: [0.0; 3], yaw: 0.0, scale: 1.0, dressing: Dressing::Shore };
-    for (at, scale, yaw) in [([-80.0,-820.0,-16.0], 2.5, 0.5), ([-60.0,-850.0,-16.0], 2.1, 2.3),
+    for (i, (at, scale, yaw)) in [([-80.0,-820.0,-16.0], 2.5, 0.5), ([-60.0,-850.0,-16.0], 2.1, 2.3),
         ([-100.0,-850.0,-16.0], 2.0, 4.1), ([-60.0,-800.0,-16.0], 1.7, 1.2),
-        ([-105.0,-821.0,-16.0], 2.4, 3.8)] {
+        ([-105.0,-821.0,-16.0], 2.4, 3.8)].into_iter().enumerate() {
         if let Some(z) = floor(land, at, true) {
-            props.push(make_prop(&crater, BOULDER, [at[0], at[1], z], scale*1.43, 0.0, 0.04, yaw));
+            let (roll, pitch) = fallen_rock_pose(i+1);
+            let tall = if pitch.abs() > 1.0 { 1.67 } else if roll.abs() > 1.0 { 1.5 } else { 1.43 };
+            props.push(make_prop(&crater, BOULDER, [at[0], at[1], z], scale*tall, roll, pitch, yaw));
             props.push(make_prop(&crater, LOW_ROCK, [at[0]+5.0, at[1]+3.0, z], scale*1.75, 0.0, 0.0, yaw+1.5));
         }
     }

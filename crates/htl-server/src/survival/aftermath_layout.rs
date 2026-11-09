@@ -1,7 +1,7 @@
 //! Authored ruin sites, in WoW world coordinates. These cover the side galleries and both
 //! Foundry floors as well as the route through the instance. No placement follows a boss.
 
-use super::{Dressing, Region, Site};
+use super::{Dressing, Region, Site, BARREL, CART, CRATE, DARK_ROCK, PLANK, RUBBLE, WOODPILE};
 use Dressing::*;
 
 pub(super) const REGIONS: &[Region] = &[
@@ -13,6 +13,53 @@ pub(super) const REGIONS: &[Region] = &[
     Region { key: "cannon", name: "Cannon Gallery", view: [-133.0, -591.0, 18.7], facing: 5.0 },
     Region { key: "cove", name: "Ironclad Cove", view: [-2.0, -768.0, 9.6], facing: 3.9 },
     Region { key: "landing", name: "Smugglers' Landing", view: [-80.0, -936.0, 40.0], facing: 1.8 },
+];
+
+// Foregrounds are deliberately different at each view. Keep the focal path open and lay
+// shallow fragments toward the support bases; no repeated central cone or neat log bundle.
+// Each row is (model, forward/side offset from the view, scale, additional yaw).
+pub(super) const APRONS: &[&[(usize, [f32; 2], f32, f32)]] = &[
+    &[
+        (WOODPILE,[3.5,-3.4],0.8,1.5), (PLANK,[2.6,2.2],1.25,0.3),
+        (PLANK,[4.9,1.5],1.1,2.2), (RUBBLE,[5.4,-1.8],0.26,1.1),
+        (DARK_ROCK,[6.8,3.4],0.32,2.8), (PLANK,[-2.6,-2.4],1.1,0.8), (RUBBLE,[-2.0,3.1],0.22,2.7),
+    ],
+    &[
+        (CART,[6.9,-2.6],0.75,2.1), (PLANK,[3.1,2.5],1.3,-1.0),
+        (WOODPILE,[5.0,3.5],0.75,0.8), (RUBBLE,[2.8,-2.2],0.25,1.8),
+        (PLANK,[-3.2,1.6],1.1,2.5), (DARK_ROCK,[7.2,3.0],0.28,0.5),
+    ],
+    &[
+        (WOODPILE,[5.8,3.1],1.0,2.1), (PLANK,[3.0,-2.7],1.8,0.4),
+        (PLANK,[4.5,-3.4],1.4,-0.8), (PLANK,[2.1,3.2],1.2,1.8),
+        (DARK_ROCK,[7.0,-4.0],0.3,2.7), (RUBBLE,[-2.0,-2.8],0.23,1.2),
+        (PLANK,[-3.4,1.7],1.3,2.8), (WOODPILE,[7.5,1.8],0.75,0.5),
+    ],
+    &[
+        (WOODPILE,[4.2,3.7],0.8,0.2), (PLANK,[3.6,-2.2],1.35,2.0),
+        (CRATE,[7.0,-3.5],0.75,1.1), (RUBBLE,[5.2,2.0],0.23,0.4),
+        (PLANK,[-2.4,2.8],1.25,-1.0), (PLANK,[-3.2,-1.7],1.1,1.5),
+    ],
+    &[
+        (CART,[7.8,2.3],0.65,0.5), (WOODPILE,[4.8,-3.0],0.75,2.6),
+        (PLANK,[2.4,2.8],1.0,1.3), (DARK_ROCK,[7.0,-3.0],0.35,0.8),
+        (RUBBLE,[-3.0,2.3],0.25,1.4), (CRATE,[5.5,3.5],0.7,2.9), (PLANK,[-3.0,-2.0],0.9,0.4),
+    ],
+    &[
+        (BARREL,[6.2,-3.1],1.0,0.4), (CRATE,[7.3,2.5],0.8,1.8),
+        (PLANK,[3.7,-2.4],1.25,2.6), (RUBBLE,[4.8,3.3],0.27,0.7),
+        (PLANK,[-2.8,2.4],1.0,0.2), (WOODPILE,[6.5,3.9],0.65,1.2),
+    ],
+    &[
+        (PLANK,[3.2,2.7],1.6,0.5), (PLANK,[5.8,-2.4],1.3,-0.9),
+        (BARREL,[7.0,3.2],0.9,2.3), (CRATE,[5.0,-3.6],0.8,1.6),
+        (WOODPILE,[7.2,-2.1],0.9,0.8), (DARK_ROCK,[-3.2,2.6],0.25,2.8),
+        (RUBBLE,[4.6,3.7],0.28,1.1), (PLANK,[-2.4,-2.8],1.15,1.8),
+    ],
+    &[
+        (PLANK,[3.4,-2.6],1.3,0.7), (CRATE,[6.4,2.7],0.75,2.1),
+        (PLANK,[4.9,-3.4],1.1,-0.4), (DARK_ROCK,[-2.8,2.3],0.25,1.4), (PLANK,[-3.0,-1.9],1.0,2.7),
+    ],
 ];
 
 // Scale describes the whole collapse composition, not a dust radius. A tunnel's primary

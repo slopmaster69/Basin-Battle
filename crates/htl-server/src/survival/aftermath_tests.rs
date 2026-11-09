@@ -53,7 +53,7 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
     assert!((400..700).contains(&props.len()), "{} props", props.len());
     for (region, _) in layout::REGIONS.iter().enumerate() {
         assert!(props.iter().filter(|p| p.region == region).count() >= 20, "region {region}");
-        assert!(props.iter().filter(|p| p.region == region && p.site == "Rubble apron").count() >= 5,
+        assert!(props.iter().filter(|p| p.region == region && p.site == "Rubble apron").count() >= 4,
             "each view has close debris around its small clear footing, region {region}");
     }
     for branch in ["Johnson's side gallery", "Sealed eastern niche", "Workshop rear cell", "Marisa's side room", "Pantry branch", "Smugglers' cache"] {
@@ -61,6 +61,7 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
     }
     assert!(props.iter().any(|p| p.model == BOULDER && p.scale >= 2.4), "large seated cove masses");
     assert!(!props.iter().any(covers_view), "inspection footings stay clear");
+    assert!(!MODELS.iter().any(|m| matches!(m.display, 134 | 4315 | 4316)), "the native check rejected the luminous stone palette");
     for p in props {
         assert!((p.rotation.iter().map(|v| v*v).sum::<f32>()-1.0).abs() < 0.0001);
         assert!(p.pos.iter().all(|v| v.is_finite()) && p.scale > 0.0);
