@@ -303,7 +303,7 @@ impl ElwynnLand {
 pub struct DeadminesLand {
     ground: htl_map::layers::Layers,
     failed:
-        std::sync::Mutex<std::collections::HashMap<(i32, i32, i32, i32, i32), std::time::Instant>>,
+        std::sync::Mutex<std::collections::HashMap<(i32, i32, i32, i32, i32, i32), std::time::Instant>>,
 }
 
 /// Asked with no height: from above everything (the highest floor).
@@ -328,8 +328,40 @@ impl DeadminesLand {
 
     /// A straight walk from a to b, floor to floor, with nothing solid and no drop.
     fn walkable(&self, a: Vec3, b: Vec3) -> bool {
+        if self.footing(a).is_none() || self.footing(b).is_none() { return false; }
         let d = (b[0] - a[0]).hypot(b[1] - a[1]);
         let steps = (d / 0.5).ceil().max(1.0) as usize;
+        // Uniform samples alone can miss a tiny diagonal slice through a blocked cell.
+        // Include the middle of every crossed grid-cell interval, however short it is.
+        let origin = self.ground.cell_xy(0, 0);
+        let cell = self.ground.cell();
+        let mut crossings = vec![0.0_f32, 1.0];
+        for axis in 0..2 {
+            let delta = b[axis] - a[axis];
+            if delta.abs() < 1.0e-6 { continue; }
+            let lo = a[axis].min(b[axis]);
+            let hi = a[axis].max(b[axis]);
+            let first = ((lo - origin[axis]) / cell - 0.5).ceil() as i32;
+            let last = ((hi - origin[axis]) / cell - 0.5).floor() as i32;
+            for i in first..=last {
+                let t = (origin[axis] + (i as f32 + 0.5) * cell - a[axis]) / delta;
+                if t > 0.0 && t < 1.0 { crossings.push(t); }
+            }
+        }
+        crossings.sort_by(f32::total_cmp);
+        let mut z = a[2];
+        let mut previous = 0.0;
+        for w in crossings.windows(2).filter(|w| (w[1] - w[0]) * d > 0.0001) {
+            let t = (w[0] + w[1]) * 0.5;
+            let (x, y) = (a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t);
+            let Some(f) = self.ground.floor_near(x, y, z) else { return false; };
+            let next_z = self.ground.height_near(x, y, z);
+            // These samples check every cell, including its floor, not the slope of tiny
+            // sub-cell height seams. The uniform half-yard samples below check the slope.
+            if f.blocked || f.water || (next_z-z).abs() > 1.5 + MAX_SLOPE*d*(t-previous) { return false; }
+            z = next_z;
+            previous = t;
+        }
         let mut z = a[2];
         for k in 1..=steps {
             let t = k as f32 / steps as f32;
@@ -337,10 +369,11 @@ impl DeadminesLand {
             let Some(f) = self.ground.floor_near(x, y, z) else {
                 return false;
             };
-            if f.blocked || f.water || (f.z - z).abs() > MAX_SLOPE * (d / steps as f32) + 0.05 {
+            let next_z = self.ground.height_near(x, y, z);
+            if f.blocked || f.water || (next_z - z).abs() > MAX_SLOPE * (d / steps as f32) + 0.05 {
                 return false;
             }
-            z = f.z;
+            z = next_z;
         }
         (z - b[2]).abs() < 1.0
     }
@@ -367,6 +400,9 @@ impl Land for DeadminesLand {
     }
     fn slab_between(&self, x: f32, y: f32, a: f32, b: f32) -> bool {
         self.ground.slab_between(x, y, a, b)
+    }
+    fn wet_near(&self, x: f32, y: f32, z: f32) -> bool {
+        self.ground.floor_near(x, y, z).is_some_and(|f| f.wet)
     }
     fn plans(&self) -> bool {
         true
@@ -407,12 +443,15 @@ impl DeadminesLand {
     }
 
     fn plan_inner(&self, from: Vec3, to: Vec3, limit: usize) -> Option<Vec<Vec3>> {
+        let from = self.footing(from)?;
+        let to = self.footing(to)?;
         let key = (
             (from[0] / 6.0).floor() as i32,
             (from[1] / 6.0).floor() as i32,
             (to[0] / 6.0).floor() as i32,
             (to[1] / 6.0).floor() as i32,
             (from[2] / 4.0).floor() as i32,
+            (to[2] / 4.0).floor() as i32,
         );
         let now = std::time::Instant::now();
         if let Ok(f) = self.failed.lock() {
@@ -431,11 +470,25 @@ impl DeadminesLand {
             }
             return None;
         };
-        // Pull the string, as on Elwynn's ground.
+        // Pull the string, as on Elwynn's ground. Grid endpoints are only hints: preserve
+        // the requested floor and check the short first/last legs as well as every corner.
+        let mut cells: Vec<Vec3> = cells.into_iter().map(|p| self.footing(p)).collect::<Option<_>>()?;
+        if cells.len() < 2 { return self.walkable(from, to).then(|| vec![to]); }
+        // The layer search replaces the first and last cell centers with the requested x/y.
+        // Restore those centers before joining the exact ends: otherwise a last diagonal can
+        // clip the neighbouring blocked cell at a ramp's edge.
+        for (i, endpoint) in [(0, from), (cells.len() - 1, to)] {
+            let (x, y) = self.ground.cell_at(endpoint[0], endpoint[1])?;
+            let xy = self.ground.cell_xy(x, y);
+            cells[i] = self.footing([xy[0], xy[1], endpoint[2]])?;
+        }
+        cells.insert(0, from);
+        cells.push(to);
         let mut out = Vec::new();
         let mut at = 0;
         while at + 1 < cells.len() {
             let mut next = at + 1;
+            if !self.walkable(cells[at], cells[next]) { return None; }
             let mut k = at + 4;
             while k < cells.len() && self.walkable(cells[at], cells[k]) {
                 next = k;
@@ -455,6 +508,22 @@ impl DeadminesLand {
 mod tests {
     use super::*;
     use htl_survival::Land;
+
+    #[test]
+    fn dungeon_paths_reject_wrong_floors_and_keep_the_exact_short_endpoint() {
+        use htl_map::layers::{Layers, Sources};
+        let terrain = |x: f32, y: f32| Some(if x > 5.0 || ((x-1.0).abs() < 0.1 && y.abs() < 0.1) { 300.0 } else { 0.0 });
+        let land = DeadminesLand::from_layers(Layers::build([-10.0, -10.0], [20.0, 10.0], 1.0,
+            &Sources { terrain: &terrain, solid: &[], liquid: &[] }));
+        let from = [0.0, 0.0, 0.0];
+        for invalid in [[6.0, 0.0, 0.0], [3.0, 0.0, 30.0], [f32::NAN, 0.0, 0.0]] {
+            assert!(land.path(from, invalid).is_none(), "invalid destination {invalid:?}");
+            assert!(land.path(invalid, from).is_none(), "invalid start {invalid:?}");
+        }
+        let to = [0.2, 0.1, 0.0];
+        assert_eq!(land.path(from, to), Some(vec![to]), "same-cell search still reaches its exact endpoint");
+        assert!(!land.walk_clear([0.0, 0.477, 0.0], [2.0, 0.557, 0.0]), "a short slice of another floor between uniform half-yard samples is still rejected");
+    }
 
     /// A small land: level ground, a cliff 20 yards high from x = 40 on, and a tree at (20, 0).
     fn land() -> ElwynnLand {

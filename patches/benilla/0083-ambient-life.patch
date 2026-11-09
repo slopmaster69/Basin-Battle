@@ -1,4 +1,4 @@
-From 73c31b37c6d254a7d704c87e489d303cf3bea296 Mon Sep 17 00:00:00 2001
+From 0ee88beb2d96d068de7f0f7358088ec0c63a58de Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 16:57:01 -0700
 Subject: [PATCH] Ambient life under the new look: fireflies, falling leaves,
@@ -94,6 +94,12 @@ Revised after the fifth films (#272, take 291):
   14 px across now, so one at arm's length is a speck.
 - Fireflies were pale yellow. Their glow and their light are amber now.
 
+Seventh round (take 310):
+- Leaves lived 2 to 3 s: born in their crowns' lower half, a yard or so
+  up, they were down in a second or two. A leaf is now born about its
+  crown's middle and at least 2.5 yd up (six tries, was four), falls at
+  0.45 to 0.8 yd/s (was 0.7 to 1.2) and lies 6 s (was 2.5).
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -102,21 +108,21 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/video.rs               |   13 +-
  crates/benilla-app/src/world_console.rs       |   95 +
  crates/benilla-world/src/lighting/mod.rs      |    5 +
- crates/benilla-world/src/look/life.rs         | 2441 +++++++++++++++++
+ crates/benilla-world/src/look/life.rs         | 2452 +++++++++++++++++
  crates/benilla-world/src/look/mod.rs          |   28 +-
  crates/benilla-world/src/look/wind.rs         |   55 +
  crates/benilla-world/src/terrain_stream.rs    |   17 +
  .../benilla-world/src/terrain_stream/merge.rs |    1 +
  .../src/terrain_stream/spawn/mod.rs           |    1 +
  .../benilla-world/src/terrain_stream/weld.rs  |    1 +
- 12 files changed, 2683 insertions(+), 4 deletions(-)
+ 12 files changed, 2694 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/look/life.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index d12b46d..f79e4b8 100644
+index 44f243f..5b8b07c 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -1775,6 +1775,25 @@ mod tests {
+@@ -1786,6 +1786,25 @@ mod tests {
          assert!(res::<LookWeather>(&app).on);
      }
  
@@ -142,7 +148,7 @@ index d12b46d..f79e4b8 100644
      /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
      #[test]
      fn the_ffx_switches_reach_the_pass() {
-@@ -2902,6 +2921,7 @@ mod tests {
+@@ -2913,6 +2932,7 @@ mod tests {
              .init_resource::<benilla_world::look::LookWind>()
              .init_resource::<benilla_world::look::LookSky>()
              .init_resource::<benilla_world::look::LookWeather>()
@@ -151,10 +157,10 @@ index d12b46d..f79e4b8 100644
              .insert_resource(RenderScale(1.0))
              // Literal: `Realmlist::default()` reads `$WOW_HOST`.
 diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
-index d8f730a..6ac0dea 100644
+index 7377f9b..c8c4a0b 100644
 --- a/crates/benilla-app/src/cvars/table.rs
 +++ b/crates/benilla-app/src/cvars/table.rs
-@@ -943,6 +943,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+@@ -952,6 +952,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
          "benilla's own — 1.12's rain is grey streaks; this turns the new look's weather (lit \
           rain, wet ground, rings on the water, lightning) off on its own",
      ),
@@ -347,10 +353,10 @@ index ecfa3d3..e64177e 100644
          let mut offenders = Vec::new();
 diff --git a/crates/benilla-world/src/look/life.rs b/crates/benilla-world/src/look/life.rs
 new file mode 100644
-index 0000000..a11b0ad
+index 0000000..3223839
 --- /dev/null
 +++ b/crates/benilla-world/src/look/life.rs
-@@ -0,0 +1,2441 @@
+@@ -0,0 +1,2452 @@
 +//! Ambient life, the new look's own (no reference behaviour): WoW Forever's woods feel lived in.
 +//! A few small things move near the camera, never far from it and never many:
 +//! 1. **fireflies** at dusk and night: warm green motes that drift and blink low over the grass,
@@ -506,7 +512,10 @@ index 0000000..a11b0ad
 +    pub const LEAF_DAY_OUT: (f32, f32) = (1170.0, 1260.0);
 +    pub const LEAF_NIGHT: f32 = 0.2;
 +    /// The fall (yd/s, from and to), faster in rain (a share, at full rain).
-+    pub const LEAF_FALL: (f32, f32) = (0.7, 1.2);
++    /// Slower (was 0.7 to 1.2): take 310 found leaves living only 2 to 3 s, born low and down
++    /// within a second or two, so none could be picked out on film; a leaf now drifts down from
++    /// its crown for 4 to 10 s.
++    pub const LEAF_FALL: (f32, f32) = (0.45, 0.8);
 +    pub const LEAF_RAIN_FALL: f32 = 1.2;
 +    /// Downwind: yd/s per unit of the wind's strength and per unit of gust, and how quickly a leaf
 +    /// takes up the air's speed (seconds).
@@ -518,9 +527,10 @@ index 0000000..a11b0ad
 +    pub const LEAF_SWING: f32 = 0.45;
 +    pub const LEAF_SWING_PERIOD: (f32, f32) = (1.6, 3.0);
 +    pub const LEAF_SPIN: (f32, f32) = (1.5, 5.0);
-+    /// A leaf's size (yd, from and to), and how long it lies before it is gone.
++    /// A leaf's size (yd, from and to), and how long it lies before it is gone (6 s, was 2.5,
++    /// so one is seen to land and lie).
 +    pub const LEAF_SIZE: (f32, f32) = (0.16, 0.26);
-+    pub const LEAF_REST_S: f32 = 2.5;
++    pub const LEAF_REST_S: f32 = 6.0;
 +    /// A leaf lies this far over the ground, so it never sinks into it.
 +    pub const LEAF_LIFT: f32 = 0.05;
 +    /// A falling leaf longer than this is gone (caught in a building's roof, say).
@@ -528,7 +538,13 @@ index 0000000..a11b0ad
 +    /// A crown whose roll comes up tries this many spots for a leaf before it gives the roll up
 +    /// (a spot with no ground under it, or under a yard of air, keeps none): one try wasted the
 +    /// roll, which may be why take 291's 24 crowns at Crystal Lake kept only 3 to 7 out.
-+    pub const LEAF_TRIES: usize = 4;
++    /// Six (was four): take 310 counted 181 spots refused as too low against 140 rolls.
++    pub const LEAF_TRIES: usize = 6;
++    /// A leaf is born in its crown from this far under the crown's middle to this far over it (a
++    /// share of the crown's half-height), and at least [`LEAF_MIN_DROP`] yd over the ground, so it
++    /// is seen to fall: take 310's were born in the crown's lower half, a yard or so up.
++    pub const LEAF_BORN: (f32, f32) = (0.5, 0.3);
++    pub const LEAF_MIN_DROP: f32 = 2.5;
 +    /// Elwynn's leaves: summer greens with a few turning gold and rust (gamma, lit by the hour).
 +    pub const LEAF_COLORS: [[f32; 3]; 5] = [
 +        [0.42, 0.55, 0.16],
@@ -1325,19 +1341,20 @@ index 0000000..a11b0ad
 +    }
 +
 +    /// A leaf from `crown`, at the first of [`tune::LEAF_TRIES`] spots in it that has ground
-+    /// a yard or more under it; whether one was born.
++    /// [`tune::LEAF_MIN_DROP`] or more under it; whether one was born.
 +    fn spawn_leaf(&mut self, crown: Crown, world: &mut impl LifeWorld, rain: f32) -> bool {
 +        for _ in 0..tune::LEAF_TRIES {
-+            // A point in the crown's lower half, toward its rim.
++            // A point about the crown's middle, toward its rim.
 +            let a = self.rand() * std::f32::consts::TAU;
 +            let rr = crown.radius * (0.35 + 0.6 * self.rand().sqrt());
-+            let y = crown.center.y - crown.half_height * (0.6 * self.rand());
++            let (under, over) = tune::LEAF_BORN;
++            let y = crown.center.y + crown.half_height * (over - (under + over) * self.rand());
 +            let (x, z) = (crown.center.x + rr * a.cos(), crown.center.z + rr * a.sin());
 +            let Some(ground) = world.ground(x, z) else {
 +                self.leaf_tally.no_ground += 1;
 +                continue;
 +            };
-+            if y <= ground + 1.0 {
++            if y <= ground + tune::LEAF_MIN_DROP {
 +                self.leaf_tally.too_low += 1;
 +                continue;
 +            }
@@ -2940,10 +2957,10 @@ index 2ead7ed..b1036db 100644
      fn the_front_origin_snaps_to_its_grid() {
          let o = front_origin(Vec3::new(9_100.0, 50.0, -300.0));
 diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
-index e7a5b71..09f8482 100644
+index a4c074d..0358c3b 100644
 --- a/crates/benilla-world/src/terrain_stream.rs
 +++ b/crates/benilla-world/src/terrain_stream.rs
-@@ -203,6 +203,18 @@ impl Placements {
+@@ -224,6 +224,18 @@ impl Placements {
              .flat_map(|p| p.entities.iter().copied())
              .collect()
      }
@@ -2962,7 +2979,7 @@ index e7a5b71..09f8482 100644
  }
  
  /// A shared placement: its model, transform and spawned entities.
-@@ -226,6 +238,8 @@ struct Placement {
+@@ -247,6 +259,8 @@ struct Placement {
      /// The tile owning an M2 doodad's hull weld and merged blobs, first the registering tile;
      /// WMOs never read it.
      owner: (i32, i32),
@@ -2971,7 +2988,7 @@ index e7a5b71..09f8482 100644
  }
  
  /// How much of the world wanted around the view focus is there, read by the loading bar and by
-@@ -1199,6 +1213,7 @@ fn register_doodad(
+@@ -1230,6 +1244,7 @@ fn register_doodad(
              portal_instance: None,
              refs: 1,
              owner: tile,
@@ -2979,7 +2996,7 @@ index e7a5b71..09f8482 100644
          },
      );
      placements.pending_spawns += 1;
-@@ -1260,6 +1275,7 @@ fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &Wmo
+@@ -1291,6 +1306,7 @@ fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &Wmo
              portal_instance: None,
              refs: 1,
              owner: (0, 0), // unread for WMOs: their prop hulls weld per placement
@@ -2987,7 +3004,7 @@ index e7a5b71..09f8482 100644
          },
      );
      placements.pending_spawns += 1;
-@@ -1650,6 +1666,7 @@ mod straddler_tests {
+@@ -1694,6 +1710,7 @@ mod straddler_tests {
              portal_instance: None,
              refs: 1,
              owner,

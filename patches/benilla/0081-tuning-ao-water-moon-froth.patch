@@ -1,4 +1,4 @@
-From 756638936f780a1042997174d29fd90484dd2e48 Mon Sep 17 00:00:00 2001
+From 580eb0a114bff7f02bb1afaedd1efc1d04f26218 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:26:57 -0700
 Subject: [PATCH] Contact shadows you notice, no band at the water's edge, a
@@ -37,7 +37,6 @@ Tuning from the first films of the contact shadows (#262) and the water
   band is a little dimmer (0.75 to 0.6) and patchy with the ripples.
 
 Revised after the third films (#270, take 273, and the laptop's take 275 on
-#268):
 
 - The moon's lane was one unbroken milky ribbon that widened and brightened
   toward the camera (its brightest, 254, at the bottom of the frame), and
@@ -125,20 +124,41 @@ Revised after the fifth films (#270, take 291):
   takes a calmer surface than the near reflections (half the ripple near
   the camera, a fifth from 40 yd).
 
+Seventh round (take 310):
+- The hitch: each worldLook 1 blocked 0.86 to 1.01 s with the spans
+  adding up to about 126 ms. The frame time beside them was the render
+  thread's pace, a frame or two behind, so the spans were often another
+  frame's. A slow frame is now also judged by its own stamps, and its line
+  carries the work notes of that frame (the tile pass's held wait, its
+  spawns and builds, the lamps lit). The cause found in the code: the held
+  inner window, which the tile pass waits for and builds whole in one
+  frame, was derived from the look's 1200 yd reach and grew from 11 to 37
+  chunks that frame. It now stays the farclip CVar's under the new look,
+  and the window's reach ramps out at 450 yd/s, so the look's extra reach
+  streams through the outer ring, one request a frame within the spawn
+  budget. An unpaced focus (entry, a teleport) takes it at once as before.
+- Clouds in the water: a lake's mirrored rays leave it a few degrees over
+  the horizon, where the sky's clouds thin out, go into the haze and
+  smooth to their mean. The mirror's copy of the cloud function takes a
+  fifth of the sky's horizon window, three times its haze and a third of
+  its pixel, so a cloud low over the far shore keeps its shape.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
  crates/benilla-app/src/world_console.rs       |  29 +
- crates/benilla-assets/src/shaders/liquid.wgsl | 187 ++++++-
+ crates/benilla-assets/src/shaders/liquid.wgsl | 187 +++++-
  crates/benilla-world/src/look/grade.rs        |  33 +-
  crates/benilla-world/src/look/mod.rs          |  32 +-
  crates/benilla-world/src/look/pass.rs         |  19 +-
- crates/benilla-world/src/look/sky.rs          | 139 ++++-
- crates/benilla-world/src/look/switch_watch.rs | 527 ++++++++++++++++++
- crates/benilla-world/src/look/water.rs        | 316 ++++++++++-
+ crates/benilla-world/src/look/sky.rs          | 139 +++-
+ crates/benilla-world/src/look/switch_watch.rs | 625 ++++++++++++++++++
+ crates/benilla-world/src/look/water.rs        | 344 +++++++++-
  .../benilla-world/src/shaders/world_look.wgsl |  44 +-
  crates/benilla-world/src/sun/follow.rs        |  82 ++-
- 10 files changed, 1350 insertions(+), 58 deletions(-)
+ crates/benilla-world/src/terrain_stream.rs    |  48 +-
+ .../src/terrain_stream/window.rs              |  22 +
+ 12 files changed, 1542 insertions(+), 62 deletions(-)
  create mode 100644 crates/benilla-world/src/look/switch_watch.rs
 
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
@@ -835,10 +855,10 @@ index 4060641..72728ed 100644
      /// The sun's halo is up by day and gone by night; the moon's the other way.
 diff --git a/crates/benilla-world/src/look/switch_watch.rs b/crates/benilla-world/src/look/switch_watch.rs
 new file mode 100644
-index 0000000..2697c6c
+index 0000000..21a2b6f
 --- /dev/null
 +++ b/crates/benilla-world/src/look/switch_watch.rs
-@@ -0,0 +1,527 @@
+@@ -0,0 +1,625 @@
 +//! What switching the look costs, in the log (benilla's own). Take 280 found a 0.6 to 2 s hitch
 +//! each time `worldLook` came back on, and one frame with the hero see-through (the oak behind him
 +//! showing through his body) right after a settings change; neither shows without the real
@@ -856,6 +876,14 @@ index 0000000..2697c6c
 +//! [`crate::schedule::WorldStage`]s (the stream, the net, the input), what is left for the render
 +//! sub-app and the present, and the render world's last finished frame by its sets (extract and
 +//! asset prepare, queue, sort, prepare, the graph). Stamps only: they order nothing new.
++//!
++//! Take 310 found the spans of the logged frame adding up to about 126 ms of a 0.86 to 1.01 s
++//! block: the frame time read from `Time<Real>` is the render thread's pace, a frame or two
++//! behind the main schedules, so the spans logged beside it were often another frame's. A frame
++//! is now also judged by its own stamps (the main frame's whole length, first stamp to the next
++//! frame's), and its line carries the work notes the look and the stream left for it
++//! ([`FrameNotes`]: the tile pass's wait for its held tiles and its spawns, the lamps lit), each
++//! as `name ms (count)`.
 +
 +use std::sync::Mutex;
 +use std::time::Instant;
@@ -946,11 +974,56 @@ index 0000000..2697c6c
 +struct Spans {
 +    marks: Vec<(&'static str, Instant)>,
 +    last: Vec<(&'static str, f32)>,
++    /// The last closed frame's whole length by its own stamps (ms).
++    last_total: f32,
++}
++
++/// Work a frame did that the look's switch window names (benilla's own): `(name, ms, count)`,
++/// written by whatever did it (the tile pass's held wait, the lamps lit) and rotated with the
++/// frame's spans, so a slow frame's line says what ran in it.
++#[derive(Resource, Default)]
++pub struct FrameNotes {
++    now: Vec<(&'static str, f32, u32)>,
++    last: Vec<(&'static str, f32, u32)>,
++}
++
++impl FrameNotes {
++    /// Note `ms` and `count` under `name` this frame (added to an earlier note of the name).
++    pub fn note(&mut self, name: &'static str, ms: f32, count: u32) {
++        if let Some(n) = self.now.iter_mut().find(|n| n.0 == name) {
++            n.1 += ms;
++            n.2 += count;
++        } else {
++            self.now.push((name, ms, count));
++        }
++    }
++
++    fn rotate(&mut self) {
++        std::mem::swap(&mut self.now, &mut self.last);
++        self.now.clear();
++    }
++
++    /// The last closed frame's notes as a line, largest first ("stream held wait 812.0 (14)").
++    fn line(&self) -> String {
++        let mut v: Vec<_> = self.last.iter().filter(|n| n.1 >= 0.1 || n.2 > 0).collect();
++        if v.is_empty() {
++            return "none".to_string();
++        }
++        v.sort_by(|a, b| b.1.total_cmp(&a.1));
++        v.iter()
++            .map(|(n, ms, c)| format!("{n} {ms:.1} ({c})"))
++            .collect::<Vec<_>>()
++            .join(", ")
++    }
 +}
 +
 +impl Spans {
 +    /// Close the frame: its spans in the order they closed, the rest as `render+present`.
 +    fn close(&mut self, now: Instant) {
++        self.last_total = self
++            .marks
++            .first()
++            .map_or(0.0, |(_, t0)| (now - *t0).as_secs_f32() * 1000.0);
 +        self.last.clear();
 +        for w in self.marks.windows(2) {
 +            self.last
@@ -1115,6 +1188,7 @@ index 0000000..2697c6c
 +    mut events: RemadeInputs,
 +    mut watch: ResMut<LookSwitchWatch>,
 +    spans: Option<Res<Spans>>,
++    notes: Option<Res<FrameNotes>>,
 +    mut last: Local<Option<Switches>>,
 +    mut tally: Local<Tally>,
 +) {
@@ -1137,7 +1211,10 @@ index 0000000..2697c6c
 +    let this = events.take();
 +    // The frame time measured now is the frame before this one: the switch's own frame shows
 +    // in frame 1.
-+    let ms = time.delta_secs() * 1000.0;
++    let paced_ms = time.delta_secs() * 1000.0;
++    // The main frame's own length by its stamps, which the spans below belong to.
++    let own_ms = spans.as_deref().map_or(0.0, |s| s.last_total);
++    let ms = paced_ms.max(own_ms);
 +    if watch.frame > 0 && ms >= SLOW_MS {
 +        tally.slow += 1;
 +        let main = spans
@@ -1153,9 +1230,12 @@ index 0000000..2697c6c
 +            this.line()
 +        );
 +        info!(
-+            "[look switch] {}, frame {}: its spans (ms): {main}; the render world's last frame \
-+             {render}",
-+            watch.what, watch.frame
++            "[look switch] {}, frame {}: the main frame before took {own_ms:.0} ms by its stamps \
++             ({paced_ms:.0} by the render pace); its spans (ms): {main}; its work: {}; the \
++             render world's last frame {render}",
++            watch.what,
++            watch.frame,
++            notes.as_deref().map_or_else(|| "-".to_string(), FrameNotes::line)
 +        );
 +        if ms > tally.worst_ms {
 +            tally.worst_ms = ms;
@@ -1215,7 +1295,23 @@ index 0000000..2697c6c
 +    }
 +}
 +
++/// The tile pass's self-times this frame, as notes: the wait for the held tiles' reads and the
++/// spawns and builds after it, with what each did.
++fn note_stream(
++    activity: Option<Res<crate::terrain_stream::StreamActivity>>,
++    mut notes: ResMut<FrameNotes>,
++) {
++    let Some(a) = activity else { return };
++    notes.note("stream held wait", a.wait_ms, 0);
++    notes.note("stream window", a.stream_ms, a.tiles_requested);
++    notes.note("stream placements", a.spawn_ms, a.placements_spawned);
++    notes.note("stream cells", a.furnish_ms, a.cells_spawned);
++    notes.note("stream forms", a.mfurnish_ms, a.model_meshes_built);
++    notes.note("stream colliders", a.collider_ms, a.colliders_attached);
++}
++
 +pub(crate) fn build(app: &mut App) {
++    app.init_resource::<FrameNotes>();
 +    app.init_resource::<LookSwitchWatch>()
 +        .add_plugins(ExtractResourcePlugin::<LookSwitchWatch>::default())
 +        .add_systems(Last, watch_switches);
@@ -1241,12 +1337,16 @@ index 0000000..2697c6c
 +    order.insert_after(Last, SpanMark(5));
 +    app.init_resource::<Spans>();
 +    for (i, name) in MAIN_MARKS {
-+        app.add_systems(SpanMark(i), move |mut s: ResMut<Spans>| {
-+            if i == 0 {
-+                s.close(Instant::now());
-+            }
-+            s.stamp(name);
-+        });
++        app.add_systems(
++            SpanMark(i),
++            move |mut s: ResMut<Spans>, mut notes: ResMut<FrameNotes>| {
++                if i == 0 {
++                    s.close(Instant::now());
++                    notes.rotate();
++                }
++                s.stamp(name);
++            },
++        );
 +    }
 +    let stage = |name: &'static str| move |mut s: ResMut<Spans>| s.stamp(name);
 +    app.add_systems(
@@ -1263,6 +1363,9 @@ index 0000000..2697c6c
 +                .after(WorldStage::Stream)
 +                .before(WorldStage::Present),
 +            stage("Update/Present").after(WorldStage::Present),
++            note_stream
++                .after(WorldStage::Stream)
++                .before(WorldStage::Present),
 +        ),
 +    );
 +    if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
@@ -1318,11 +1421,26 @@ index 0000000..2697c6c
 +        s.close(ms(913));
 +        let names: Vec<_> = s.last.iter().map(|x| x.0).collect();
 +        assert_eq!(names, ["First", "Update/Stream", "Last", "render+present"]);
++        assert!((s.last_total - 913.0).abs() < 0.5, "{}", s.last_total);
 +        assert!(s.marks.is_empty());
 +        let line = span_line(&s.last);
 +        assert!(line.starts_with("Update/Stream 900."), "{line}");
 +        assert!(line.contains("render+present 10."), "{line}");
 +        assert_eq!(span_line(&[("First", 0.1)]), "none over 0.5 ms");
++    }
++
++    /// A frame's notes add up by name, show once the frame closes, largest first.
++    #[test]
++    fn the_notes_say_what_a_frame_did() {
++        let mut n = FrameNotes::default();
++        n.note("lamps", 2.0, 8);
++        n.note("stream held wait", 800.0, 0);
++        n.note("lamps", 1.5, 4);
++        assert_eq!(n.line(), "none");
++        n.rotate();
++        assert_eq!(n.line(), "stream held wait 800.0 (0), lamps 3.5 (12)");
++        n.rotate();
++        assert_eq!(n.line(), "none");
 +    }
 +
 +    #[test]
@@ -1367,7 +1485,7 @@ index 0000000..2697c6c
 +    }
 +}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index 51196b7..e172c10 100644
+index 51196b7..a1cf32e 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
 @@ -72,8 +72,54 @@ pub mod tune {
@@ -1427,7 +1545,7 @@ index 51196b7..e172c10 100644
      pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
      /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
      /// cloud: a full overcast keeps this share of it.
-@@ -86,9 +132,70 @@ pub mod tune {
+@@ -86,9 +132,79 @@ pub mod tune {
      pub const SHADOW_DIM: f32 = 0.3;
      /// The reflection march: how far a mirrored ray is followed (yards).
      pub const SSR_REACH: f32 = 160.0;
@@ -1490,6 +1608,15 @@ index 51196b7..e172c10 100644
 +    /// calmer surface; the shore's reflections keep the whole ripple.
 +    pub const SKY_CALM_NEAR: f32 = 0.5;
 +    pub const SKY_CALM_FAR: f32 = 0.8;
++    /// The clouds in the mirror: its rays leave a lake a few degrees over the horizon, where the
++    /// sky's clouds thin out, go into the haze and smooth to their mean, so take 310 found the
++    /// lake the same under `looksky clouds 0.45` as under 0. The sky's rows the water block
++    /// carries ([`pack_rows`]) take this share of the sky's horizon window, this many times its
++    /// haze distance and this share of its pixel, so the mirror (`liquid.wgsl`'s copy of the
++    /// sky's cloud function, kept identical to it) keeps a low cloud's shape.
++    pub const MIRROR_CLOUD_HORIZON: f32 = 0.2;
++    pub const MIRROR_CLOUD_HAZE: f32 = 3.0;
++    pub const MIRROR_CLOUD_LOD: f32 = 0.35;
 +    pub const FROTH_DEEP_FROM: f32 = 0.45;
 +    pub const FROTH_DEEP_TO: f32 = 1.2;
 +    pub const FROTH_ARCS: f32 = 0.55;
@@ -1499,7 +1626,7 @@ index 51196b7..e172c10 100644
      /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
      /// hard edge.
      pub const SHORE_SOFT: f32 = 0.15;
-@@ -213,7 +320,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
+@@ -213,7 +329,8 @@ fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
  
  /// The glint's body this frame: the visible sun while it is up, else the white moon, each fading
  /// in as it rises and dimmed by cloud: `(camera to body, strength, colour (linear), sharpness)`;
@@ -1509,7 +1636,7 @@ index 51196b7..e172c10 100644
  pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
      let rise = |dir: Vec3| {
          smoothstep(
-@@ -239,7 +347,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
+@@ -239,7 +356,7 @@ pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
          moon,
          tune::MOON_GLINT * rise(moon) * cloud,
          tune::MOON_TINT,
@@ -1518,7 +1645,36 @@ index 51196b7..e172c10 100644
      )
  }
  
-@@ -308,7 +416,13 @@ pub fn pack_rows(
+@@ -256,6 +373,19 @@ pub fn ripple_slope(light: &WowLighting) -> f32 {
+         + tune::RIPPLE_STORM * light.storm_bcc.clamp(0.0, 1.0)
+ }
+ 
++/// The sky's rows as the mirror takes them: its clouds keep their shapes toward the horizon
++/// ([`tune::MIRROR_CLOUD_HORIZON`] of its horizon window, row 9; [`tune::MIRROR_CLOUD_HAZE`] times
++/// its haze, row 7; [`tune::MIRROR_CLOUD_LOD`] of its pixel, row 12).
++pub fn mirror_sky_rows(
++    mut rows: [[f32; 4]; super::sky::SKY_ROWS],
++) -> [[f32; 4]; super::sky::SKY_ROWS] {
++    rows[9][2] *= tune::MIRROR_CLOUD_HORIZON;
++    rows[9][3] *= tune::MIRROR_CLOUD_HORIZON;
++    rows[7][3] *= tune::MIRROR_CLOUD_HAZE;
++    rows[12][2] *= tune::MIRROR_CLOUD_LOD;
++    rows
++}
++
+ /// The water block for this frame ([`WATER_ROWS`]); all zero, which `liquid.wgsl` reads as 1.12's
+ /// water, when `on` is false. Under the painted sky (`sky.on`) the mirror's sky takes its rows and
+ /// its cloud over the glint's body dims the glint.
+@@ -279,7 +409,7 @@ pub fn pack_rows(
+         } else {
+             sky.moon_clear
+         };
+-        rows[10..].copy_from_slice(&sky.rows);
++        rows[10..].copy_from_slice(&mirror_sky_rows(sky.rows));
+     }
+     // The sky's reflection: the hour's dome, toward the fog under cloud.
+     let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
+@@ -308,7 +438,13 @@ pub fn pack_rows(
          tune::FOAM_DEPTH,
          tune::SHORE_SOFT,
      ];
@@ -1533,7 +1689,7 @@ index 51196b7..e172c10 100644
      rows[9] = [
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
-@@ -429,8 +543,142 @@ mod tests {
+@@ -429,8 +565,142 @@ mod tests {
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
      }
  
@@ -1678,7 +1834,7 @@ index 51196b7..e172c10 100644
      #[test]
      fn the_glint_follows_the_sun_then_the_moon() {
          let day = noon();
-@@ -447,7 +695,7 @@ mod tests {
+@@ -447,7 +717,7 @@ mod tests {
          let (dir, s, color, sharp) = glint(&night);
          assert!((dir - night.moon_dir_white).length() < 1e-6);
          assert!((s - tune::MOON_GLINT).abs() < 1e-4);
@@ -1687,7 +1843,7 @@ index 51196b7..e172c10 100644
          let dark = WowLighting {
              moon_dir_white: Vec3::new(0.0, -0.3, 1.0).normalize(),
              ..night
-@@ -520,6 +768,56 @@ mod tests {
+@@ -520,6 +790,56 @@ mod tests {
          assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
      }
  
@@ -1744,6 +1900,17 @@ index 51196b7..e172c10 100644
      /// The block's size is its rows': its own ten and the painted sky's thirteen.
      #[test]
      fn the_block_is_twenty_three_rows() {
+@@ -540,7 +860,9 @@ mod tests {
+         };
+         let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
+         let on = pack_rows(true, &LookWater::default(), &noon(), &sky);
+-        assert_eq!(on[10..], sky.rows[..]);
++        assert_eq!(on[10..], mirror_sky_rows(sky.rows)[..]);
++        // The mirror's clouds reach lower and further than the sky's own.
++        assert!(on[19][3] < sky.rows[9][3] && on[17][3] > sky.rows[7][3]);
+         assert!((on[1][3] - off[1][3] * sky.sun_clear).abs() < 1e-5);
+         assert!(sky.sun_clear < 1.0);
+     }
 diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
 index de5620e..8aad35f 100644
 --- a/crates/benilla-world/src/shaders/world_look.wgsl
@@ -1969,6 +2136,133 @@ index 76507a9..ef41c81 100644
      }
  
      /// Height oracle: a flat plain at WoW z = 0, with a 30-unit ridge crest everywhere more than
+diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
+index e7a5b71..a4c074d 100644
+--- a/crates/benilla-world/src/terrain_stream.rs
++++ b/crates/benilla-world/src/terrain_stream.rs
+@@ -101,6 +101,27 @@ pub struct TerrainStreamer {
+     /// This frame's plan, from [`stream_terrain`] to [`spawn_streamed_tiles`]; `None` on a frame
+     /// with nothing to do.
+     plan: Option<StreamPlan>,
++    /// The reach the window streams to (yd), ramped toward the view's ([`ramp_reach`]); `None`
++    /// before the first window.
++    window_reach: Option<f32>,
++}
++
++/// How fast the streamed window's reach grows toward a longer view, in yd per second (benilla's
++/// own): `worldLook 1` takes 350 yd to 1200 over about 2 s instead of in one frame, so the new
++/// tiles are asked for ring by ring, nearest first. A shorter view applies at once.
++pub const REACH_RAMP_YD_PER_S: f32 = 450.0;
++/// The longest frame the ramp counts (s), so one slow frame never jumps it.
++const REACH_RAMP_MAX_DT: f32 = 1.0 / 20.0;
++
++/// The window's reach this frame: `target` when it is no further than `last`, or with no `last`
++/// (entry), else `last` grown by the ramp over `dt`, up to `target`.
++pub fn ramp_reach(last: Option<f32>, target: f32, dt: f32) -> f32 {
++    match last {
++        Some(l) if target > l => {
++            (l + REACH_RAMP_YD_PER_S * dt.clamp(0.0, REACH_RAMP_MAX_DT)).min(target)
++        }
++        _ => target,
++    }
+ }
+ 
+ /// What [`stream_terrain`] decided this frame, for the spawn and the residency publish.
+@@ -577,6 +598,7 @@ fn stream_terrain(
+     ),
+     // Basin Battle: the pieces it adds to a map's floor ([`MapBridge`]), dropped with the map.
+     bridges: Query<Entity, With<MapBridge>>,
++    time: Option<Res<Time<Real>>>,
+ ) {
+     let (mut welds, mut static_merge, mut staticgx) = batchers;
+     let (current_map, map_catalog, view) = location;
+@@ -676,7 +698,16 @@ fn stream_terrain(
+ 
+     // The residency window is the reference's, from the live `farclip` in chunk units.
+     let center = focus.resolve(camera.single().ok().map(|c| c.translation));
+-    let window = StreamWindow::at(view.reach(), center[0], center[1]);
++    // Under the new look the held window stays the CVar's and the look's longer reach ramps in
++    // ([`ramp_reach`], [`StreamWindow::held_at`]); an unpaced focus (entry, a teleport) takes it
++    // at once under its cover.
++    let reach = if let (true, Some(time)) = (focus.paced, time.as_deref()) {
++        ramp_reach(state.window_reach, view.reach(), time.delta_secs())
++    } else {
++        view.reach()
++    };
++    state.window_reach = Some(reach);
++    let window = StreamWindow::held_at(view.farclip, reach, center[0], center[1]);
+     let (cx, cy) = window.focus_tile();
+     let same_window = state.streamed(&window);
+     // Skip an unchanged frame only in a paced, complete, presentable world, since the tail it
+@@ -704,7 +735,7 @@ fn stream_terrain(
+             window.outer,
+             window.outer as f32 * benilla_formats::CHUNK_SIZE,
+             window.outer + window::KEEP_BAND_CHUNKS,
+-            view.reach()
++            reach
+         );
+     }
+ 
+@@ -1573,6 +1604,19 @@ mod focus_tests {
+         Some(wow_to_bevy([SPAWN_XY.0, SPAWN_XY.1, 100.0]))
+     }
+ 
++    /// A longer view ramps in over frames, a slow frame counting as a short one; a shorter one
++    /// and the first window apply at once.
++    #[test]
++    fn the_reach_ramps_out_and_snaps_in() {
++        assert_eq!(ramp_reach(None, 1200.0, 0.016), 1200.0);
++        assert_eq!(ramp_reach(Some(1200.0), 350.0, 0.016), 350.0);
++        let one = ramp_reach(Some(350.0), 1200.0, 0.016);
++        assert!((one - (350.0 + REACH_RAMP_YD_PER_S * 0.016)).abs() < 1e-3, "{one}");
++        let slow = ramp_reach(Some(350.0), 1200.0, 0.9);
++        assert!((slow - (350.0 + REACH_RAMP_YD_PER_S * REACH_RAMP_MAX_DT)).abs() < 1e-3);
++        assert_eq!(ramp_reach(Some(1190.0), 1200.0, 0.05), 1200.0);
++    }
++
+     #[test]
+     fn the_pick_outranks_the_camera_until_the_avatar_exists() {
+         let idle = ViewFocus::entry(PICK.0, PICK.1);
+diff --git a/crates/benilla-world/src/terrain_stream/window.rs b/crates/benilla-world/src/terrain_stream/window.rs
+index af9b2f2..51fb41f 100644
+--- a/crates/benilla-world/src/terrain_stream/window.rs
++++ b/crates/benilla-world/src/terrain_stream/window.rs
+@@ -44,6 +44,19 @@ impl StreamWindow {
+         }
+     }
+ 
++    /// The windows under the new look (benilla's own): the held inner window from `held` yards
++    /// (the `farclip` CVar, as under 1.12) and the outer one from `reach`, the look's longer view.
++    /// Take 310's hitch: deriving both from the look's 1200 yd grew the held window from ±11 to
++    /// ±37 chunks the frame `worldLook` came back on, and the tile pass waits for and builds every
++    /// held tile within that frame (about a second); the look's extra reach now streams through
++    /// the outer ring, one request a frame and the spawn's time budget. `held >= reach` is
++    /// [`Self::at`] of `reach`.
++    pub fn held_at(held: f32, reach: f32, wow_x: f32, wow_y: f32) -> Self {
++        let mut w = Self::at(reach, wow_x, wow_y);
++        w.inner = w.inner.min(inner_radius(held));
++        w
++    }
++
+     /// The tile the focus stands on.
+     pub fn focus_tile(&self) -> (i32, i32) {
+         (
+@@ -117,6 +130,15 @@ pub fn max_resident_reach_yd(farclip: f32) -> f32 {
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++
++    /// Under the new look the held window stays the CVar's while the outer one reaches the look's.
++    #[test]
++    fn the_looks_reach_streams_outside_the_held_window() {
++        let w = StreamWindow::held_at(350.0, 1200.0, -9450.0, 60.0);
++        assert_eq!((w.inner, w.outer), (11, 39));
++        let same = StreamWindow::held_at(350.0, 350.0, -9450.0, 60.0);
++        assert_eq!(same, StreamWindow::at(350.0, -9450.0, 60.0));
++    }
+     use benilla_formats::tile_to_world;
+ 
+     /// 350 is the registered default; at 177 the outer window sits on its 8-chunk floor.
 -- 
 2.43.0
 

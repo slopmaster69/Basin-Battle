@@ -490,7 +490,9 @@ pub(crate) const VERSION: u32 = 2;
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
 /// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
 /// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
-pub(crate) const ADDON_NEWEST: u32 = 59;
+/// 61: the add-on says `ac29`: the legs walk under a swing (a lunge keeps the legs' walk, the leap
+/// and the kick stay on the whole body).
+pub(crate) const ADDON_NEWEST: u32 = 61;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -514,7 +516,9 @@ pub(crate) const ADDON_NEWEST: u32 = 59;
 /// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
 /// (0061 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
 /// round of its own: nothing new for the add-on to call.)
-pub(crate) const CLIENT_NEWEST: u8 = 28;
+/// 29: the legs walk under a swing (0079): a swing or an ability's cast (the body word `auto`)
+/// plays on the torso while the hero walks, and a lunge's `ActionDash` keeps the legs' walk.
+pub(crate) const CLIENT_NEWEST: u8 = 29;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1362,7 +1366,21 @@ impl SurvivalGame {
         let verb = if verb == "es" { words.next().unwrap_or("").to_lowercase() } else { verb };
         let arg = words.next().unwrap_or("").to_lowercase();
         let arg2 = words.next().unwrap_or("");
+        // A watcher plays no part (survival/watch.rs): only its lines about watching, and the
+        // add-on's own, are heard; its keys (`.es in`) do nothing.
+        if self.watching(conn) && !matches!(verb.as_str(), "watch" | "debug" | "hello" | "po" | "bb" | "where" | "speech") {
+            if verb != "in" { self.tell(conn, "You're watching. Use .es watch off to play again."); }
+            return;
+        }
+        if self.aftermath.is_some() && !matches!(verb.as_str(), "aftermath" | "hello" | "po" | "bb" | "where") {
+            if verb != "in" { self.say_to(conn, "End the preview with .es aftermath off before playing."); }
+            return;
+        }
         let result: Result<(), String> = match verb.as_str() {
+            "aftermath" => {
+                let target = std::iter::once(arg2).chain(words).collect::<Vec<_>>().join(" ");
+                self.aftermath_command(conn, &arg, target.trim())
+            }
             "hello" => {
                 if let Some(w) = self.world_mut(conn) {
                     w.addon = true;
@@ -1914,6 +1932,17 @@ impl SurvivalGame {
                 Err(_) => Err("Try .es hurt 0.6 [name] (the share of its health to leave it).".into()),
             },
             "hurt" => Err("Turn debug on first (.es debug).".into()),
+            // The cameraman: this client films a hero's fight from outside it (survival/watch.rs).
+            "watch" if self.dev_ok() => {
+                // (The hero's name as it was written, for the answer.)
+                let name = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("watch")).nth(1).unwrap_or("").to_string();
+                self.watch_command(conn, &name)
+            }
+            "watch" => Err("Turn debug on first (.es debug).".into()),
+            // (debug) Every creature below taken away but those named: `.es clearfoes rhahk`. For
+            // filming one fight with nothing else in it.
+            "clearfoes" if self.sim.debug => self.sim.dev_clear_foes(&arg).map(|said| self.say_to(conn, &said)),
+            "clearfoes" => Err("Turn debug on first (.es debug).".into()),
             // Testing the progression from a blank slate: this hero back to their first day, or
             // (debug) the camp's whole world, its save copied aside first.
             "reset" => match arg.as_str() {
@@ -1949,6 +1978,10 @@ impl SurvivalGame {
                 Ok(())
             }
             "where" => {
+                if let Some((pos, facing)) = self.aftermath_where(conn) {
+                    self.say_to(conn, &format!("Preview position {:.1}, {:.1}, {:.1} facing {:.2}.", pos[0], pos[1], pos[2], facing));
+                    return;
+                }
                 if let Some(p) = self.sim.players.get(&me) {
                     let text = format!("You're at {:.1}, {:.1}, {:.1} facing {:.2}.", p.pos[0], p.pos[1], p.pos[2], p.facing);
                     self.say_to(conn, &text);

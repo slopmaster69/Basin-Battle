@@ -1,0 +1,40 @@
+# Controlled mechanic demonstration, NOT an unassisted clear or a balance playtest.
+# Debug health milestones and healing expose all three loadouts on the authored dock.
+# Acceptance: native rack on dry dock floor; continuous run; visible sword -> two axes ->
+# hammer; no attack during fitting; axe pressure break; slow slam and native hoof stomp;
+# rack disappears on death. Exact clips and weapon grips must be reviewed in the real client.
+hero warrior
+cam 0 -22 13
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es unbar all
+12 .es goto 2 -768 9.5 3.14
+12.5 .es clearfoes smite
+13 .es hurt 0 smite
+14 .es goto -10 -768 9.5 0
+15 .es spawn dm_smite
+15.1 video
+16 shots sword 12 0.4
+19 .es heal
+24 .es heal
+26 .es hurt 0.6 smite
+26.1 shots first-rack-run 30 0.3
+29 .es heal
+34 .es heal
+39 .es heal
+41 shots axes 16 0.4
+44 .es heal
+49 .es heal
+51 .es hurt 0.3 smite
+51.1 shots second-rack-run 30 0.3
+54 .es heal
+59 .es heal
+64 .es heal
+65 shots hammer 24 0.4
+69 .es heal
+74 .es heal
+77 .es hurt 0 smite
+77.1 shots cleanup 8 0.3
+81 end

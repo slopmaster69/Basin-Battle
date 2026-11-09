@@ -1,0 +1,178 @@
+From 815a9bb20f6477dc1f1f6d3404f4772accca7f02 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 8 Nov 2026 13:47:57 -0600
+Subject: [PATCH] The window can be made where it's told (WOW_WINDOW_AT) (patch
+ 0086)
+
+`WOW_WINDOW_AT=<x>,<y>` makes the primary window at that desktop position, its outer top-left in
+physical pixels of the whole desktop (negative left of or above the primary monitor). A harness
+filming on another monitor then gets the window there from its first frame: until now it opened
+where Windows put it and only moved once the client answered a move, about 1.4 s in (after the
+graphics start), and Windows' STARTF_USEPOSITION hint isn't honoured.
+
+The position goes in the `Window` the app is built with (`WindowPosition::At`). winit makes the
+window hidden, sizes it, moves it there and only then is it shown, so it never shows on the primary
+screen. Physical pixels need no scale factor, so it holds on a monitor of another DPI: winit's
+WM_DPICHANGED keeps the window's top-left on the new monitor and rescales its size there.
+
+`bevy_winit` places only a windowed window; a fullscreen one is born on the `Primary` monitor. So a
+player whose mode is fullscreen (or maximized) is born windowed at the position when it is set, and
+`apply_window_mode`'s first run makes the window fullscreen on the monitor it stands on (`Current`,
+as every live toggle already does). A `RestartGx()` and a later windowed/fullscreen toggle keep to
+the window's own monitor as before. The no-pixel probe parking (`WOW_PROBE_PARK`) is unchanged.
+
+Unset or unparsable (anything but two integers and a comma): exactly today's behaviour.
+---
+ crates/benilla-app/src/lib.rs   |  3 ++
+ crates/benilla-app/src/video.rs | 76 ++++++++++++++++++++++++++++++---
+ docs/MAP.md                     |  1 +
+ 3 files changed, 74 insertions(+), 6 deletions(-)
+
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index 103c202c..0875e4ea 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -354,6 +354,9 @@ fn launch(build: BuildId, extend: Option<Extension<'_>>) -> AppExit {
+         // gamescope, spend the first second in the input state fullscreen is meant to end.
+         // Instrumented runs stay windowed (`video::windowed_env`).
+         mode: video::boot_window_mode(),
++        // `$WOW_WINDOW_AT=<x>,<y>` makes it at that desktop position (physical px), so a harness
++        // filming another monitor never sees it open on the primary first.
++        position: video::boot_window_position(),
+         // UI-fixture captures size the window to what they photograph: the action bar's 1024 px
+         // plus 128 px end caps get a wide, short window, and vplates pins 1024×768, where one gx
+         // unit is 1280 px and the plate lands at the border texture's native 128×32, diffable
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 4bdb8886..d8c21b94 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -26,7 +26,8 @@ use benilla_ui::script::ScreenResolution;
+ use bevy::prelude::*;
+ use bevy::render::renderer::RenderAdapterInfo;
+ use bevy::window::{
+-    Monitor, MonitorSelection, PresentMode, PrimaryWindow, WindowMode, WindowResolution,
++    Monitor, MonitorSelection, PresentMode, PrimaryWindow, WindowMode, WindowPosition,
++    WindowResolution,
+ };
+ use std::time::{Duration, Instant};
+ 
+@@ -68,6 +69,38 @@ pub(crate) fn at_requested_dpi(res: WindowResolution) -> WindowResolution {
+     }
+ }
+ 
++/// `$WOW_WINDOW_AT=<x>,<y>`: where the window is made, its outer top-left in physical pixels of the
++/// whole desktop (negative left of or above the primary monitor), so a harness filming on another
++/// monitor gets the window there from its first frame rather than moving it once it shows. Unset
++/// or unparsable: wherever the system puts it, as before.
++pub(crate) fn requested_window_position() -> Option<IVec2> {
++    parse_window_at(&std::env::var("WOW_WINDOW_AT").ok()?)
++}
++
++/// `"<x>,<y>"` (spaces allowed around either number) to a position.
++fn parse_window_at(value: &str) -> Option<IVec2> {
++    let (x, y) = value.split_once(',')?;
++    Some(IVec2::new(x.trim().parse().ok()?, y.trim().parse().ok()?))
++}
++
++/// The position the primary window is born at: [`requested_window_position`], or the system's.
++/// Physical pixels need no scale factor, so it holds on a monitor of another DPI than the primary;
++/// winit makes the window hidden, moves it there and only then is it shown.
++pub(crate) fn boot_window_position() -> WindowPosition {
++    requested_window_position().map_or(WindowPosition::Automatic, WindowPosition::At)
++}
++
++/// A window asked for at a position is born windowed even when the player's mode is fullscreen:
++/// `bevy_winit` places only a windowed window, and a fullscreen one is born on the `Primary`
++/// monitor. [`apply_window_mode`]'s first run then makes it fullscreen on the monitor it stands on
++/// (`Current`).
++fn born_at(mode: WindowMode, at: Option<IVec2>) -> WindowMode {
++    match (mode, at) {
++        (WindowMode::BorderlessFullscreen(_), Some(_)) => WindowMode::Windowed,
++        _ => mode,
++    }
++}
++
+ /// The display modes benilla ships; neither is the reference's mode-setting fullscreen.
+ #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+ pub(crate) enum DisplayMode {
+@@ -122,10 +155,13 @@ pub(crate) fn window_mode(
+ pub(crate) fn boot_window_mode() -> WindowMode {
+     // Quiet and lazy: the log plugin does not exist yet, and a config holding both rows needs no
+     // locale at all.
+-    boot_window_mode_for(
+-        || crate::ui_script::boot_client_locale().index(),
+-        crate::cvars::boot_cvar,
+-        windowed_env(),
++    born_at(
++        boot_window_mode_for(
++            || crate::ui_script::boot_client_locale().index(),
++            crate::cvars::boot_cvar,
++            windowed_env(),
++        ),
++        requested_window_position(),
+     )
+ }
+ 
+@@ -849,11 +885,15 @@ pub(crate) fn apply_window_mode(
+     restarts: Res<GxRestarts>,
+     mut windows: Query<&mut Window, With<PrimaryWindow>>,
+     mut last_restart: Local<u32>,
++    mut ran: Local<bool>,
+ ) {
+     // A `RestartGx()` re-asserts even when nothing moved, re-applying `gxResolution` to a window
+     // that is already windowed.
+     let forced = std::mem::replace(&mut *last_restart, restarts.0) != restarts.0;
+-    if !cfg.is_changed() && !forced {
++    // A window born windowed at `$WOW_WINDOW_AT` for a fullscreen player ([`born_at`]) goes
++    // fullscreen on its first run, on the monitor it was made on.
++    let placed = !std::mem::replace(&mut *ran, true) && requested_window_position().is_some();
++    if !cfg.is_changed() && !forced && !placed {
+         return;
+     }
+     let Ok(mut window) = windows.single_mut() else {
+@@ -1369,6 +1409,30 @@ mod tests {
+         );
+     }
+ 
++    /// `$WOW_WINDOW_AT` reads `x,y`, negative too (a monitor left of the primary); anything else
++    /// is no position.
++    #[test]
++    fn wow_window_at_parses_a_desktop_position() {
++        assert_eq!(parse_window_at("-1920,212"), Some(IVec2::new(-1920, 212)));
++        assert_eq!(parse_window_at(" 3440 , 0 "), Some(IVec2::new(3440, 0)));
++        assert_eq!(parse_window_at("100"), None);
++        assert_eq!(parse_window_at("100x200"), None);
++        assert_eq!(parse_window_at("a,b"), None);
++        assert_eq!(parse_window_at(""), None);
++    }
++
++    /// Only a placed window trades a fullscreen birth for a windowed one; unplaced, and windowed,
++    /// births are as they were.
++    #[test]
++    fn a_placed_window_is_born_windowed_where_it_was_asked() {
++        let full = WindowMode::BorderlessFullscreen(MonitorSelection::Primary);
++        let at = Some(IVec2::new(-1920, 212));
++        assert_eq!(born_at(full, at), WindowMode::Windowed);
++        assert_eq!(born_at(full, None), full);
++        assert_eq!(born_at(WindowMode::Windowed, at), WindowMode::Windowed);
++        assert_eq!(born_at(WindowMode::Windowed, None), WindowMode::Windowed);
++    }
++
+     #[test]
+     fn gxresolution_parses_the_reference_spelling() {
+         assert_eq!(parse_resolution("1280x800"), Some(UVec2::new(1280, 800)));
+diff --git a/docs/MAP.md b/docs/MAP.md
+index c28c25ea..6b10569a 100644
+--- a/docs/MAP.md
++++ b/docs/MAP.md
+@@ -517,6 +517,7 @@
+ - `WOW_WFX_MODE` — benilla-app/src/capture/mod.rs
+ - `WOW_WFX_SPEED` — benilla-app/src/capture/mod.rs
+ - `WOW_WIN` — benilla-app/src/video.rs, benilla-world/src/worldview.rs
++- `WOW_WINDOW_AT` — benilla-app/src/video.rs
+ - `WOW_WMO_BIAS` — benilla-world/src/model_render.rs, benilla-world/src/static_gx/mod.rs
+ - `WOW_WORLDVIEW_` — benilla-world/src/bgwin.rs
+ - `WOW_WORLDVIEW_AT` — benilla-world/src/worldview.rs
+-- 
+2.46.2.windows.1
+

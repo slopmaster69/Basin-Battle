@@ -1,4 +1,4 @@
-From b2059e323c4cde47532d1fef5ac59f089ae34711 Mon Sep 17 00:00:00 2001
+From d399173526eef92a0bf13cc2ce4b84af6f52b06b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 14:39:42 -0700
 Subject: [PATCH] Visible weather under the new look: grey skies, lit rain, wet
@@ -107,6 +107,15 @@ Revised after the fifth films (#271, take 291):
   half a yard under its top (look::lamps); it goes with its prop and
   with worldLook 0, and each is logged once ("[look lamps]").
 
+Seventh round (take 310):
+- The lamps: about 290 lamp props were lit across the whole streamed
+  window in the frame worldLook came back on, and every frame's light
+  table and rain streaks read them all. Each lamp prop streamed in is now
+  remembered, and only the 24 nearest within 110 yd of the camera are
+  lit, at most six new ones a frame, nearest first; a lit one goes past
+  1.15 times the reach or well out of the nearest. Rechecked every 0.25 s
+  or 8 yd. "[look lamps]" logs each lamp once, with its distance.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
@@ -120,7 +129,7 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  .../benilla-assets/src/shaders/terrain.wgsl   |  106 +-
  crates/benilla-formats/src/sound_entries.rs   |    5 +
  .../src/lighting/global_light.rs              |   18 +-
- crates/benilla-world/src/look/lamps.rs        |  241 ++++
+ crates/benilla-world/src/look/lamps.rs        |  406 +++++++
  crates/benilla-world/src/look/lights.rs       |   11 +
  crates/benilla-world/src/look/mist.rs         |    8 +-
  crates/benilla-world/src/look/mod.rs          |   36 +-
@@ -133,15 +142,15 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/weather/mod.rs       |   27 +-
  .../benilla-world/src/weather/precip/mod.rs   |   50 +-
  .../src/weather/precip/render.rs              |   40 +
- 23 files changed, 2268 insertions(+), 44 deletions(-)
+ 23 files changed, 2433 insertions(+), 44 deletions(-)
  create mode 100644 crates/benilla-world/src/look/lamps.rs
  create mode 100644 crates/benilla-world/src/look/weather.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index 369dbbd..d12b46d 100644
+index f46331a..44f243f 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -1756,6 +1756,25 @@ mod tests {
+@@ -1767,6 +1767,25 @@ mod tests {
          assert!(res::<LookWind>(&app).on && res::<LookSky>(&app).on);
      }
  
@@ -167,7 +176,7 @@ index 369dbbd..d12b46d 100644
      /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
      #[test]
      fn the_ffx_switches_reach_the_pass() {
-@@ -2882,6 +2901,7 @@ mod tests {
+@@ -2893,6 +2912,7 @@ mod tests {
              .init_resource::<benilla_world::look::LookWater>()
              .init_resource::<benilla_world::look::LookWind>()
              .init_resource::<benilla_world::look::LookSky>()
@@ -176,10 +185,10 @@ index 369dbbd..d12b46d 100644
              .insert_resource(RenderScale(1.0))
              // Literal: `Realmlist::default()` reads `$WOW_HOST`.
 diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
-index 693f8f7..d8f730a 100644
+index 05fac31..7377f9b 100644
 --- a/crates/benilla-app/src/cvars/table.rs
 +++ b/crates/benilla-app/src/cvars/table.rs
-@@ -933,6 +933,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+@@ -942,6 +942,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
          "benilla's own — 1.12's sky is a gradient with its own clouds; this turns the new look's \
           painted sky (drifting clouds, the sun's and the moon's halos) off on its own",
      ),
@@ -1068,10 +1077,10 @@ index 842bd8c..1a75eab 100644
      static POINTS_DUMP: std::sync::OnceLock<Option<std::ffi::OsString>> =
 diff --git a/crates/benilla-world/src/look/lamps.rs b/crates/benilla-world/src/look/lamps.rs
 new file mode 100644
-index 0000000..266ddec
+index 0000000..a7563ad
 --- /dev/null
 +++ b/crates/benilla-world/src/look/lamps.rs
-@@ -0,0 +1,241 @@
+@@ -0,0 +1,406 @@
 +//! Street lamps that light under the new look (benilla's own). A prop casts light only through an
 +//! M2 point light in its file (`terrain_stream::spawn::fx`), and Goldshire's lamp posts have none
 +//! that casts: take 291 found `lamppost.m2` #12341 19 yd from the camera with no light in the
@@ -1084,7 +1093,18 @@ index 0000000..266ddec
 +//! its prop or with the new look, so `worldLook 0` is 1.12's exactly. Each lamp lit is logged once
 +//! (`[look lamps]`) with its place.
 +
-+use std::collections::HashMap;
++//!
++//! Only the lamps near the camera are lit: take 310 found about 290 lamp props lit across the
++//! whole streamed window (118 Elwynn and 98 Duskwood lampposts) in the one frame `worldLook` came
++//! back on, the suspects in its second-long hitch, where a lamp more than about a hundred yards
++//! off adds nothing the look's light table (nearest first) or the mist would show. Every lamp prop
++//! streamed in is remembered ([`LampProps`]); the nearest [`tune::MAX_LIT`] within
++//! [`tune::REACH`] of the camera are lit, at most [`tune::PER_FRAME`] new ones a frame, nearest
++//! first, and a lit one goes once it is past [`tune::REACH`] × [`tune::LET_GO`] or well out of the
++//! nearest. The set is looked at again every [`tune::RECHECK_S`] or when the camera moves
++//! [`tune::RECHECK_MOVE`].
++use std::collections::{HashMap, HashSet};
++use std::time::Instant;
 +
 +use bevy::camera::primitives::Aabb;
 +use bevy::prelude::*;
@@ -1104,6 +1124,20 @@ index 0000000..266ddec
 +    pub const BELOW_TOP: f32 = 0.5;
 +    /// An authored light this near the lamp (yd) is its own: the prop then gets no second one.
 +    pub const NEAR_LIGHT: f32 = 2.5;
++    /// Lamps within this many yards of the camera are lit (the look's light table ranks to about
++    /// this far, and a lamp's glow in the mist fades well inside it).
++    pub const REACH: f32 = 110.0;
++    /// At most this many lamps lit at once, the nearest.
++    pub const MAX_LIT: usize = 24;
++    /// A lit lamp stays until it is this many times [`REACH`] away, or ranks past [`MAX_LIT`] by
++    /// [`KEEP_SPARE`], so one at the edge does not blink as the camera turns or steps.
++    pub const LET_GO: f32 = 1.15;
++    pub const KEEP_SPARE: usize = 6;
++    /// At most this many new lamp lights a frame.
++    pub const PER_FRAME: usize = 6;
++    /// The set is looked at again this often (s), or when the camera moves this far (yd).
++    pub const RECHECK_S: f32 = 0.25;
++    pub const RECHECK_MOVE: f32 = 8.0;
 +}
 +
 +/// Whether a model path names a lamp: its file, not its folder, has "lamp" or "lantern" in it.
@@ -1138,8 +1172,27 @@ index 0000000..266ddec
 +    })
 +}
 +
-+/// A lamp prop being lit: one of its meshes, its model's path and its meshes' world boxes.
-+type LampProp = (Entity, String, Vec<(Vec3, Vec3)>);
++/// A lamp prop the stream brought in: one of its meshes, its model's path, where its lamp hangs,
++/// and whether an authored light of its own sits there (`None` until asked).
++#[derive(Clone, Debug)]
++pub struct LampProp {
++    pub mesh: Entity,
++    pub label: String,
++    pub at: Vec3,
++    pub own_light: Option<bool>,
++}
++
++/// Every lamp prop streamed in under the new look, by placement id, and the ids already logged.
++#[derive(Resource, Default)]
++pub struct LampProps {
++    pub props: HashMap<u32, LampProp>,
++    logged: HashSet<u32>,
++    /// Where and when the lit set was last looked at.
++    checked: Option<(Vec3, f32)>,
++}
++
++/// A lamp prop's meshes as they come in: one of them, its model's path and their world boxes.
++type LampBoxes = (Entity, String, Vec<(Vec3, Vec3)>);
 +
 +type LampMesh = (
 +    Entity,
@@ -1148,16 +1201,44 @@ index 0000000..266ddec
 +    Option<&'static Aabb>,
 +);
 +
-+/// Light the lamp props that came in this frame, drop the lights whose prop went, and all of them
-+/// under the classic look.
++/// The lamp props to light this frame, nearest first, and the lit ones to let go: of `props`
++/// (id, distance), the nearest [`tune::MAX_LIT`] within [`tune::REACH`] not yet `lit`, and each
++/// lit one past [`tune::REACH`] × [`tune::LET_GO`] or ranked past the spare.
++pub fn plan_lamps(props: &[(u32, f32)], lit: &HashSet<u32>) -> (Vec<u32>, Vec<u32>) {
++    let mut by_near: Vec<(u32, f32)> = props.to_vec();
++    by_near.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
++    let light: Vec<u32> = by_near
++        .iter()
++        .take(tune::MAX_LIT)
++        .filter(|(id, d)| *d <= tune::REACH && !lit.contains(id))
++        .map(|(id, _)| *id)
++        .collect();
++    let keep: HashSet<u32> = by_near
++        .iter()
++        .take(tune::MAX_LIT + tune::KEEP_SPARE)
++        .filter(|(_, d)| *d <= tune::REACH * tune::LET_GO)
++        .map(|(id, _)| *id)
++        .collect();
++    let mut drop: Vec<u32> = lit.iter().copied().filter(|id| !keep.contains(id)).collect();
++    drop.sort_unstable();
++    (light, drop)
++}
++
++/// Remember the lamp props that came in this frame (all of them when the look turns on), light
++/// the nearest few and let the far ones go, and drop every lamp light under the classic look.
++#[allow(clippy::too_many_arguments)]
 +pub(crate) fn light_lamps(
 +    mut commands: Commands,
 +    look: Res<WorldLook>,
++    time: Res<Time<Real>>,
 +    fresh: Query<LampMesh, Added<WorldObject>>,
 +    all: Query<LampMesh>,
 +    authored: Query<&GlobalTransform, (With<WorldPointLight>, Without<LampLight>)>,
 +    lit: Query<(Entity, &LampLight)>,
 +    meshes: Query<(), With<WorldObject>>,
++    camera: Query<&GlobalTransform, With<crate::view::WorldCamera>>,
++    mut known: ResMut<LampProps>,
++    mut notes: Option<ResMut<super::switch_watch::FrameNotes>>,
 +    mut was_on: Local<bool>,
 +) {
 +    if !look.on {
@@ -1165,77 +1246,146 @@ index 0000000..266ddec
 +            for (e, _) in &lit {
 +                commands.entity(e).despawn();
 +            }
++            known.props.clear();
++            known.checked = None;
 +            *was_on = false;
 +        }
 +        return;
 +    }
++    let t0 = Instant::now();
 +    // Turned on: every prop is new to the look.
 +    let rescan = !*was_on;
 +    *was_on = true;
-+    for (e, lamp) in &lit {
-+        if meshes.get(lamp.mesh).is_err() {
-+            commands.entity(e).despawn();
-+        }
-+    }
-+    // The lamp props to light: each new lamp mesh's prop, with all its meshes' world boxes.
-+    let mut props: HashMap<u32, LampProp> = HashMap::new();
 +    let wanted = |o: &WorldObject| {
 +        o.id != 0 && matches!(o.kind, ModelKind::Doodad | ModelKind::GameObject) && is_lamp(&o.label)
 +    };
-+    let mut want_ids: Vec<u32> = Vec::new();
-+    let mut want = |o: &WorldObject| {
-+        if wanted(o) && !want_ids.contains(&o.id) {
-+            want_ids.push(o.id);
++    // The lamp props that came in: each one's meshes' world boxes.
++    let mut new_ids: HashSet<u32> = HashSet::new();
++    let source: Box<dyn Iterator<Item = (Entity, &WorldObject, &GlobalTransform, Option<&Aabb>)>> =
++        if rescan {
++            Box::new(all.iter())
++        } else {
++            Box::new(fresh.iter())
++        };
++    for (_, o, _, _) in source {
++        if wanted(o) {
++            new_ids.insert(o.id);
 +        }
-+    };
-+    if rescan {
-+        all.iter().for_each(|(_, o, _, _)| want(o));
-+    } else {
-+        fresh.iter().for_each(|(_, o, _, _)| want(o));
 +    }
-+    if want_ids.is_empty() {
++    let mut came = false;
++    if !new_ids.is_empty() {
++        let mut boxes: HashMap<u32, LampBoxes> = HashMap::new();
++        for (e, o, gt, aabb) in &all {
++            if !new_ids.contains(&o.id) || !wanted(o) {
++                continue;
++            }
++            let entry = boxes
++                .entry(o.id)
++                .or_insert_with(|| (e, o.label.clone(), Vec::new()));
++            if let Some(aabb) = aabb {
++                let c = gt.transform_point(Vec3::from(aabb.center));
++                let h = Vec3::from(aabb.half_extents) * gt.scale().abs();
++                entry.2.push((c - h, c + h));
++            }
++        }
++        for (id, (mesh, label, b)) in boxes {
++            let Some(at) = lamp_point(&b) else { continue };
++            known.props.insert(
++                id,
++                LampProp {
++                    mesh,
++                    label,
++                    at,
++                    own_light: None,
++                },
++            );
++            came = true;
++        }
++    }
++    // A prop that went takes its light with it.
++    let mut lit_now: HashMap<u32, Entity> = HashMap::new();
++    for (e, lamp) in &lit {
++        if meshes.get(lamp.mesh).is_err() {
++            commands.entity(e).despawn();
++            known.props.remove(&lamp.id);
++        } else {
++            lit_now.insert(lamp.id, e);
++        }
++    }
++    known.props.retain(|_, p| meshes.get(p.mesh).is_ok());
++    let Some(cam) = camera.iter().next().map(GlobalTransform::translation) else {
++        return;
++    };
++    let now = time.elapsed_secs();
++    let due = came
++        || rescan
++        || known.checked.is_none_or(|(at, t)| {
++            now - t >= tune::RECHECK_S || at.distance(cam) >= tune::RECHECK_MOVE
++        });
++    if !due {
 +        return;
 +    }
-+    let lit_ids: Vec<u32> = lit.iter().map(|(_, l)| l.id).collect();
-+    want_ids.retain(|id| !lit_ids.contains(id));
-+    for (e, o, gt, aabb) in &all {
-+        if !want_ids.contains(&o.id) || !wanted(o) {
-+            continue;
-+        }
-+        let entry = props
-+            .entry(o.id)
-+            .or_insert_with(|| (e, o.label.clone(), Vec::new()));
-+        if let Some(aabb) = aabb {
-+            let c = gt.transform_point(Vec3::from(aabb.center));
-+            let h = Vec3::from(aabb.half_extents) * gt.scale().abs();
-+            entry.2.push((c - h, c + h));
++    let near: Vec<(u32, f32)> = known
++        .props
++        .iter()
++        .filter(|(_, p)| p.own_light != Some(true))
++        .map(|(id, p)| (*id, p.at.distance(cam)))
++        .collect();
++    let lit_ids: HashSet<u32> = lit_now.keys().copied().collect();
++    let (light, drop) = plan_lamps(&near, &lit_ids);
++    for id in &drop {
++        if let Some(e) = lit_now.get(id) {
++            commands.entity(*e).despawn();
 +        }
 +    }
-+    for (id, (mesh, label, boxes)) in props {
-+        let Some(at) = lamp_point(&boxes) else {
-+            continue;
-+        };
-+        if authored
-+            .iter()
-+            .any(|gt| gt.translation().distance(at) < tune::NEAR_LIGHT)
-+        {
++    let mut made = 0u32;
++    let mut more = false;
++    for id in light {
++        if made as usize >= tune::PER_FRAME {
++            more = true;
++            break;
++        }
++        let Some(p) = known.props.get_mut(&id) else { continue };
++        // An authored light of its own: asked once, then remembered.
++        let own = *p.own_light.get_or_insert_with(|| {
++            authored
++                .iter()
++                .any(|gt| gt.translation().distance(p.at) < tune::NEAR_LIGHT)
++        });
++        if own {
 +            continue;
 +        }
-+        let w = benilla_assets::coords::bevy_to_wow(at);
-+        info!(
-+            "[look lamps] {label} #{id} gets a lamp's light at ({:.1}, {:.1}, {:.1})",
-+            w[0], w[1], w[2]
-+        );
++        let (mesh, at) = (p.mesh, p.at);
++        if known.logged.insert(id) {
++            let p = &known.props[&id];
++            let w = benilla_assets::coords::bevy_to_wow(at);
++            info!(
++                "[look lamps] {} #{id} gets a lamp's light at ({:.1}, {:.1}, {:.1}), {:.0} yd \
++                 from the camera",
++                p.label,
++                w[0],
++                w[1],
++                w[2],
++                at.distance(cam)
++            );
++        }
 +        commands.spawn((
 +            crate::terrain_stream::point_light(tune::COLOR, tune::SCALE),
 +            LampLight { id, mesh },
 +            Transform::from_translation(at),
 +        ));
++        made += 1;
++    }
++    // A batch left over is looked at again next frame.
++    known.checked = (!more).then_some((cam, now));
++    if let Some(n) = notes.as_deref_mut() {
++        n.note("lamps", t0.elapsed().as_secs_f32() * 1000.0, made);
 +    }
 +}
 +
 +pub(crate) fn build(app: &mut App) {
-+    app.add_systems(Update, light_lamps);
++    app.init_resource::<LampProps>()
++        .add_systems(Update, light_lamps);
 +}
 +
 +#[cfg(test)]
@@ -1268,12 +1418,36 @@ index 0000000..266ddec
 +        assert!(lamp_point(&[]).is_none());
 +    }
 +
++    /// Only the nearest lamps within reach are lit, a few a frame, and a lit one at the edge
++    /// stays until it is well past it.
++    #[test]
++    fn only_the_near_lamps_are_lit() {
++        let none = HashSet::new();
++        let far = [(1, 20.0), (2, tune::REACH + 1.0), (3, 5.0)];
++        let (light, drop) = plan_lamps(&far, &none);
++        assert_eq!(light, vec![3, 1]);
++        assert!(drop.is_empty());
++        let many: Vec<(u32, f32)> = (0..300).map(|i| (i, i as f32 * 0.3)).collect();
++        let (light, _) = plan_lamps(&many, &none);
++        assert_eq!(light.len(), tune::MAX_LIT);
++        assert_eq!(light[0], 0);
++        let lit: HashSet<u32> = [2, 9].into();
++        let edge = [(2, tune::REACH * 1.05), (9, tune::REACH * 1.3)];
++        let (light, drop) = plan_lamps(&edge, &lit);
++        assert!(light.is_empty());
++        assert_eq!(drop, vec![9], "the one well past the reach goes, the one at the edge stays");
++    }
++
 +    /// Under the new look a lamp prop gets one light, kept on later frames; with no authored
 +    /// light near, not twice; the classic look takes it away.
 +    #[test]
 +    fn a_lamp_lights_under_the_new_look_only() {
 +        let mut app = App::new();
-+        app.insert_resource(WorldLook::NEW);
++        app.insert_resource(WorldLook::NEW)
++            .init_resource::<Time<Real>>()
++            .init_resource::<LampProps>();
++        app.world_mut()
++            .spawn((crate::view::WorldCamera, GlobalTransform::IDENTITY));
 +        app.add_systems(Update, light_lamps);
 +        let lamp = WorldObject {
 +            kind: ModelKind::Doodad,
@@ -1493,10 +1667,10 @@ index cd780d5..7e0b069 100644
              PostLook::NEUTRAL
          },
 diff --git a/crates/benilla-world/src/look/shadows.rs b/crates/benilla-world/src/look/shadows.rs
-index 2ab1ca3..832ba1e 100644
+index e512da0..9b53c58 100644
 --- a/crates/benilla-world/src/look/shadows.rs
 +++ b/crates/benilla-world/src/look/shadows.rs
-@@ -561,6 +561,8 @@ pub(crate) struct ShadowInputs<'w, 's> {
+@@ -564,6 +564,8 @@ pub(crate) struct ShadowInputs<'w, 's> {
      shadows: Res<'w, LookShadows>,
      frame: ResMut<'w, ShadowFrame>,
      proj: Query<'w, 's, &'static Projection, With<crate::view::WorldCamera>>,
@@ -1505,7 +1679,7 @@ index 2ab1ca3..832ba1e 100644
  }
  
  impl ShadowInputs<'_, '_> {
-@@ -592,7 +594,10 @@ impl ShadowInputs<'_, '_> {
+@@ -595,7 +597,10 @@ impl ShadowInputs<'_, '_> {
              return ShadowFrame::default();
          };
          let light = ShadowLight {
@@ -1518,10 +1692,10 @@ index 2ab1ca3..832ba1e 100644
          };
          if light.strength <= 0.0 {
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index e172c10..ec1dc9f 100644
+index a1cf32e..36d28e3 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
-@@ -212,7 +212,7 @@ pub mod tune {
+@@ -221,7 +221,7 @@ pub mod tune {
  ///   2 `[glint colour (linear), sharpness]` · 3 `[sky zenith (linear), ripple slope]` ·
  ///   4 `[sky horizon (linear), ripple wavelength (yd)]` · 5 `[shallow (sRGB), tint weight]` ·
  ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
@@ -1530,7 +1704,7 @@ index e172c10..ec1dc9f 100644
  ///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
  ///   the mirror's sky runs through, so the lakes mirror the clouds.
  pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS;
-@@ -372,6 +372,7 @@ pub fn pack_rows(
+@@ -394,6 +394,7 @@ pub fn pack_rows(
      held: &LookWater,
      light: &WowLighting,
      sky: &super::SkyFrame,
@@ -1538,7 +1712,7 @@ index e172c10..ec1dc9f 100644
  ) -> [[f32; 4]; WATER_ROWS] {
      let mut rows = [[0.0; 4]; WATER_ROWS];
      if !on {
-@@ -427,7 +428,7 @@ pub fn pack_rows(
+@@ -449,7 +450,7 @@ pub fn pack_rows(
          tune::CLASSIC_RIPPLES,
          tune::SHADOW_DIM,
          tune::OCEAN_CLEAR_YD * clarity,
@@ -1547,7 +1721,7 @@ index e172c10..ec1dc9f 100644
      ];
      rows
  }
-@@ -438,12 +439,15 @@ pub(crate) fn publish_water(
+@@ -460,12 +461,15 @@ pub(crate) fn publish_water(
      water: Res<LookWater>,
      light: Res<WowLighting>,
      sky: Res<super::SkyFrame>,
@@ -1564,7 +1738,7 @@ index e172c10..ec1dc9f 100644
      };
      if *frame != next {
          *frame = next;
-@@ -520,7 +524,13 @@ mod tests {
+@@ -542,7 +546,13 @@ mod tests {
  
      #[test]
      fn the_block_is_zero_when_off() {
@@ -1579,7 +1753,7 @@ index e172c10..ec1dc9f 100644
          assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
      }
  
-@@ -528,16 +538,31 @@ mod tests {
+@@ -550,16 +560,31 @@ mod tests {
      /// mirror and the clarity, and lets go again.
      #[test]
      fn the_block_carries_the_tuning_and_the_hold() {
@@ -1613,7 +1787,7 @@ index e172c10..ec1dc9f 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -828,7 +853,13 @@ mod tests {
+@@ -850,7 +875,13 @@ mod tests {
      /// with it off, those rows stay zero and the glint whole.
      #[test]
      fn the_painted_sky_reaches_the_water() {
@@ -1628,15 +1802,15 @@ index e172c10..ec1dc9f 100644
          assert!(off[10..].iter().all(|r| *r == [0.0; 4]));
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
-@@ -837,7 +868,7 @@ mod tests {
+@@ -859,7 +890,7 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
 -        let on = pack_rows(true, &LookWater::default(), &noon(), &sky);
 +        let on = pack_rows(true, &LookWater::default(), &noon(), &sky, 0.0);
-         assert_eq!(on[10..], sky.rows[..]);
-         assert!((on[1][3] - off[1][3] * sky.sun_clear).abs() < 1e-5);
-         assert!(sky.sun_clear < 1.0);
+         assert_eq!(on[10..], mirror_sky_rows(sky.rows)[..]);
+         // The mirror's clouds reach lower and further than the sky's own.
+         assert!(on[19][3] < sky.rows[9][3] && on[17][3] > sky.rows[7][3]);
 diff --git a/crates/benilla-world/src/look/weather.rs b/crates/benilla-world/src/look/weather.rs
 new file mode 100644
 index 0000000..5f880d7

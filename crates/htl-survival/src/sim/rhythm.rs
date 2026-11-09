@@ -235,7 +235,7 @@ impl Survival {
             // The body's cast for this missile: the hands take turns.
             if !d.beat_clips.is_empty() {
                 let clip = d.beat_clips[k as usize % d.beat_clips.len()];
-                self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: d.beat_secs.max(0.25), at: 0.1, body: ClipBody::Full });
+                self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: d.beat_secs.max(0.25), at: 0.1, body: super::abilities::cast_body(&d) });
             }
             if let Some(p) = self.players.get_mut(&id) {
                 p.facing = yaw;

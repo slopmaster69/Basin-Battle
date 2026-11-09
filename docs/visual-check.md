@@ -34,16 +34,20 @@ watcher, below).
    | `host`, `port`, `realm` | `127.0.0.1`, `3724`, `Elwynn Survival` | the local test server |
    | `account`, `password` | `spelltest`, `hold` | the test account (test credentials only, local) |
    | `hunter`, `warrior` | `Vchunter`, `Vcwarrior` | the test heroes the scenarios play |
-   | `resolution` | `1280x720` | the client's window while it runs |
+   | `cameraman` | `Vccamera` | the hero whose client films a scenario with a `camera` line ("Filming a boss") |
+   | `resolution` | `1280x720` | the client's window while it runs (the cameraman's, with a `camera` line) |
+   | `hero_resolution` | `560x315` | with a `camera` line, the hero's own window, beside the cameraman's on the same screen |
+   | `monitor` | empty | which screen the game window goes on and the video films: empty or `0` is wherever Windows opens it; `1` is the main screen, `2` the next, and so on (the others in the order Windows lists them); or a name like `DISPLAY2` (Settings > System > Display > Identify shows which is which) |
+   | `mute` | `1` | `1` mutes the game's sound in Windows' volume mixer from the moment it has any (the client has no sound setting of its own); `0` leaves it |
    | `format`, `width` | `jpg`, `1280` | the stills: JPG (or `png`), scaled down past this width |
-   | `video` | `screen` | `screen` records the game window's rectangle by Desktop Duplication (it sees every frame); `title` and `desktop` are GDI's grabs, which see only a few stale frames of benilla's Vulkan window; `off` none |
+   | `video` | `screen` | `screen` records the game window's picture (inside its title bar and borders) by Desktop Duplication (it sees every frame); `title` and `desktop` are GDI's grabs, which see only a few stale frames of benilla's Vulkan window; `off` none |
    | `ffmpeg` | `Documents\visual-check\ffmpeg\ffmpeg.exe` | |
    | `settle` | `6` | seconds the world gets to load in before a scenario starts |
    | `login_timeout` | `120` | seconds the client gets to log in |
 
 5. **The test heroes**: run the `setup` scenario once (`Visual Check.bat setup`). It makes a dwarf
-   hunter and a human warrior with the names in the settings on the test account, through the
-   character screen (benilla's `WOW_PROBE_CHARCREATE`); a hero already there is left alone. Any
+   hunter, a human warrior and a human cameraman with the names in the settings on the test
+   account, through the character screen (benilla's `WOW_PROBE_CHARCREATE`); a hero already there is left alone. Any
    existing heroes on the account do as well: put their names in `hunter` and `warrior`. The class
    only decides the hero's look and gear: each scenario slots its own abilities (`.es spells` owns
    them all).
@@ -161,6 +165,66 @@ include _setup                # another file's lines, at their own times
 `scripts\visual-check-windows.ps1 -Check` reads every scenario and builds what it would hand the
 client, without running anything (the dev Release run does this too).
 
+## Filming a boss
+
+A boss's clip is filmed by a cameraman: a second client, on the same test account, whose hero takes
+no part in the fight and whose camera keeps the boss and the hero in view. The hero is played by
+the first client, as in any scenario. One line in the scenario asks for it:
+
+```
+hero warrior
+camera duel Rhahk'Zor          # camera <shot> <the subject's name, as the game shows it>
+```
+
+- **The shots**: `duel` is a three-quarter side view from the hero's side, 10 to 14 yd out (a
+  duel); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up, so a ground
+  hazard's edge shows. The camera stands further back than that only when the two wouldn't fit.
+  With no name (`camera duel`) it films the hero alone, looking past them the way they face.
+- **Out of view**: when the world hides either of them from the camera for more than 0.3 s, it
+  cuts to its next position whose view of both is clear: the other side, square to the side,
+  behind, then the same higher up. Each cut is in `run.txt` (`camera: spectate: ...`).
+- **What it films**: `<scenario>.mp4` is the cameraman's window from the scenario's video time to
+  its end, with sound (below). The stills (`<burst>-NN.jpg`) are frames of that video at the
+  bursts' times, within a few tenths of a second; the hero's client takes none. `run.txt` has the
+  hero's lines and the cameraman's (`camera: ...`).
+- **A clean picture**: no interface, chat, names, floor marks, debug drawing or cursor. The
+  cameraman's client hides it all; the scenario still says `.es debug quiet`.
+- **Sound**: the cameraman's client writes its own mix to a file (benilla's `WOW_MIX_TAP`), which
+  goes under the video. That mix is taken before the client's output, which is silent while its
+  window isn't focused and is muted in Windows' mixer anyway (`mute`); the hero's client opens no
+  sound device at all. Nobody at the PC hears the game.
+- **Setup before the video, nothing after it**: travel, `.es clearfoes`, `.es spawn`, `.es goto`
+  and `.es heal` go before the scenario's `video` time. A clip that needs `.es hurt`, `.es heal`
+  or a teleport once the fight has started is "dev setup", and proves nothing about the fight:
+  say so in its first comment line. From the video on, only the hero's own keys (`.es in ...`,
+  `ActionDash`, `.es hop`) play.
+- **A move's clip** (8 to 20 s) shows the boss's tell, the attack, the right answer, the boss's
+  recovery and the punish: time the `video` line and the bursts around them.
+
+`tools/visual-check/camera-greenskin.txt` is the first: the warrior and Captain Greenskin on the
+landing's deck.
+
+What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
+cameraman's own body), the cameraman hero (`setup` makes it), and a screen wide enough for both
+windows side by side: the cameraman's (`resolution`) and the hero's (`hero_resolution`) on the
+`monitor` screen. The run stops with an error rather than put one over the other.
+
+How it works:
+
+- The cameraman's client logs in first and says `.es watch <hero>`. The server then keeps its hero
+  out of every rule: no creature sees it, no blow or area reaches it, nothing collides with it,
+  and no count of heroes (scaling, aggro, a raid, an encounter, a dungeon's band) includes it. No
+  other client is told of it, and it follows the hero it watches into their world (the camp or a
+  dungeon) and stays near them, so the world around the fight is loaded. `.es watch off` makes it
+  a hero again; logging out ends it too. It needs debug on (`.es debug quiet`), like the other
+  dev commands.
+- benilla's `WOW_SPECTATE=<subject>,<hero>,<shot>` (client patch 0088) takes the camera off the
+  cameraman's body (free-fly, the body hidden) and frames the two each frame. The rig sets it, the
+  cameraman's driver (it hides the interface and names, and says `.es watch`) and `WOW_MIX_TAP`.
+- Then the hero's client starts beside it, and the scenario plays as any other; the video records
+  the cameraman's window from the hero's cue still. When the hero's client quits, the cameraman's
+  is closed, the sound goes under the video and the stills are cut from it.
+
 ## How it works, and its limits
 
 The script starts the dev client with a settings folder of the run's own (`BENILLA_HOME`: the
@@ -177,9 +241,17 @@ branch's and none of the player's settings are touched. benilla's env probes do 
   game's own `Screenshot()`, with the "Screen captured" line kept out of them.
 - The video starts when the driver's first (cue) still lands, so it's within a few tenths of a
   second of the plan. It's taken by Desktop Duplication (ffmpeg's `ddagrab`) from the window's
-  rectangle on the main screen, which works while the window is on top (as it is during a run) and
+  rectangle on the screen the window is on, which works while the window is on top (as it is during a run) and
   the screen isn't locked: keep the PC awake and unlocked while checks run. GDI's grabs see only a
   few stale frames of a Vulkan window, so they're the fallback, not the way.
+- With `monitor` set the client is told to make its window at the top-left of that screen's working
+  area (`WOW_WINDOW_AT`, read by a client with that patch), so it never shows on another screen. A
+  client without it makes its window where Windows puts it and answers a move only once it's
+  started (about a second and a half in): the rig moves it then (its size kept), and puts it back
+  there if the client moves it before the video starts. The video finds that screen's `ddagrab` output by its size, because DXGI numbers outputs in
+  an order of its own, and takes the window's rectangle from the screen's own top-left. A number
+  this PC has no screen for is said so in the run's output, and the window stays where Windows
+  opens it. The stills are the client's own screenshots, so they don't depend on the screen.
 - Trapper's Instinct answers a blow; the dummy never strikes, so its scenario shows the stance
   running out. Spawning a boar (commented in the file) shows the answer, but the boar stays.
 - Training dummies don't move back after Reverse Grapple or Tripwire; `_setup` clears every dummy

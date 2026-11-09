@@ -732,6 +732,33 @@ fn a_training_dummy_stays_a_step_from_home_and_a_panic_never_turns_it() {
 }
 
 #[test]
+fn an_abilitys_cast_clip_plays_on_the_walking_torso_unless_it_needs_the_legs() {
+    // A cast's clip goes as `Auto` (the whole body standing, the torso while the legs walk, on the
+    // clients that play it so); Uppercut's rise and Shockwave's slam need the legs: the whole body.
+    let mut s = world();
+    let frost = s.content.ability("frostbolt").unwrap();
+    s.content.abilities[frost].clip = 57;
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    slot(&mut s, p, "ranged", "frostbolt");
+    let mut ev = cast(&mut s, p, "ranged", false, 1.2);
+    ev.extend(run(&mut s, 0.5));
+    let body = ev.iter().find_map(|e| match e {
+        Event::Clip { id, body, .. } if *id == p => Some(*body),
+        _ => None,
+    });
+    assert_eq!(body, Some(ClipBody::Auto));
+    let c = Content::dev();
+    for key in ["raptor_uppercut", "shockwave"] {
+        let d = &c.abilities[c.ability(key).unwrap()];
+        assert_eq!(crate::sim::abilities::cast_body(d), ClipBody::Full, "{key}");
+    }
+    let mut c = Content::dev();
+    let f = c.ability("frostbolt").unwrap();
+    c.abilities[f].body = "upper".into();
+    assert!(c.validate_abilities().is_err(), "a body is \"\" or \"full\"");
+}
+
+#[test]
 fn an_abilitys_own_clip_comes_from_the_model_it_names_on_every_race() {
     // The same take of the same model for every hero, whatever their race (a cast's clip, and a
     // weapon art's blow); an ability naming no model plays the hero's own.

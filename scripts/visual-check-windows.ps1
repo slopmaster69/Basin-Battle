@@ -16,6 +16,8 @@
 # What it needs: the server running on this PC (Host Basin Battle.bat), benilla's dev build, and
 # visual-check-settings.txt (made on the first run; never committed). For video, ffmpeg.exe in
 # Documents\visual-check\ffmpeg\.
+# (Not positional: a scenario's name given alone is a name, never the -Folder.)
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [switch]$Watch,
     [switch]$InstallWatcher,
@@ -49,7 +51,11 @@ $Defaults = [ordered]@{
     password      = "hold"
     hunter        = "Vchunter"
     warrior       = "Vcwarrior"
+    cameraman     = "Vccamera"
     resolution    = "1280x720"
+    hero_resolution = "560x315"
+    monitor       = ""
+    mute          = "1"
     format        = "jpg"
     width         = "1280"
     video         = "screen"
@@ -65,8 +71,14 @@ $SettingsHelp = @(
     "# host, port, realm, account, password: the local test server and its test account (test credentials",
     "#   only, on a local server; the password is the one the host prints, 'hold' unless you changed it).",
     "# hunter, warrior: the test heroes on that account the scenarios play ('setup' makes them).",
+    "# cameraman: the hero whose client films a scenario with a 'camera' line ('setup' makes it too).",
     "# resolution: the client's window. format: jpg (small) or png. width: stills wider are scaled down.",
-    "# video: screen (the game window's rectangle, by Desktop Duplication: the one that sees a Vulkan",
+    "# hero_resolution: with a cameraman, the hero's own window, beside the cameraman's on the same screen.",
+    "# monitor: which screen the game window goes on, and the video films. Empty or 0: wherever Windows opens",
+    "#   it. 1 is the main screen (the one with the taskbar by default), 2 the next, and so on, the others in",
+    "#   the order Windows lists them; or a name like DISPLAY2 (Settings > System > Display > Identify).",
+    "# mute: 1 (the default) mutes the game's sound in Windows' mixer from the moment it starts; 0 leaves it.",
+    "# video: screen (the game window's picture, by Desktop Duplication: the one that sees a Vulkan",
     "#   window's frames), title or desktop (GDI: they see only a few stale frames of benilla's window), or off.",
     "#   ffmpeg: ffmpeg.exe (empty: Documents\visual-check\ffmpeg).",
     "# settle: seconds the world gets to load in before a scenario starts. login_timeout: seconds to log in."
@@ -152,11 +164,11 @@ function Test-Server($s) {
 
 # A client or a recording of ours left running (a run cut short) goes first: the client would
 # hold the account.
-function Stop-Strays($s) {
+function Stop-Strays($s, $keep = 0) {
     foreach ($exe in @($s.client, $s.ffmpeg)) {
         if (-not $exe) { continue }
         $name = [System.IO.Path]::GetFileNameWithoutExtension($exe)
-        Get-Process $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } | ForEach-Object {
+        Get-Process $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe -and $_.Id -ne $keep } | ForEach-Object {
             Say "Closing a visual-check $name still running (pid $($_.Id))."
             Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
         }
@@ -186,7 +198,7 @@ function List-Scenarios {
 # with the file's order kept among equals.
 function Read-Scenario($name, $depth = 0) {
     if ($depth -gt 4) { throw "$name includes itself." }
-    $sc = @{ Name = $name; Hero = ""; Cam = ""; End = $null; Video = $null; Steps = New-Object System.Collections.ArrayList }
+    $sc = @{ Name = $name; Hero = ""; Cam = ""; Camera = $null; End = $null; Video = $null; Steps = New-Object System.Collections.ArrayList }
     $file = Find-Scenario $name
     $n = 0
     foreach ($raw in Get-Content $file) {
@@ -197,6 +209,16 @@ function Read-Scenario($name, $depth = 0) {
         if ($line -match '^hero\s+(\S+)$') { $sc.Hero = $Matches[1].ToLower(); continue }
         # `cam off`: the camera isn't held (a scenario that turns it itself, as the god-ray circles do).
         if ($line -match '^cam\s+off$') { $sc.Cam = "off"; continue }
+        # `camera <duel|low|high> [<subject's name>]`: a second client, the cameraman, films it
+        # (docs/visual-check.md, "Filming a boss").
+        if ($line -match '^camera\s+(\S+)(?:\s+(.+))?$') {
+            $shot = $Matches[1].ToLower()
+            if ($shot -notin @("duel", "low", "high")) { throw "$($where): the camera's shot is duel, low or high, not $shot" }
+            $subject = "$($Matches[2])".Trim()
+            if ($subject.Contains(",")) { throw "$($where): a name with a comma can't be filmed" }
+            $sc.Camera = @{ Shot = $shot; Subject = $subject }
+            continue
+        }
         if ($line -match '^cam\s+(\S+)\s+(\S+)\s+(\S+)$') {
             $sc.Cam = "$(Fmt (Num $Matches[1])),$(Fmt (Num $Matches[2])),$(Fmt (Num $Matches[3]))@0"
             continue
@@ -206,6 +228,7 @@ function Read-Scenario($name, $depth = 0) {
             foreach ($st in $inner.Steps) { [void]$sc.Steps.Add($st) }
             if (-not $sc.Hero) { $sc.Hero = $inner.Hero }
             if (-not $sc.Cam) { $sc.Cam = $inner.Cam }
+            if (-not $sc.Camera) { $sc.Camera = $inner.Camera }
             continue
         }
         if ($line -notmatch '^([0-9]+(?:\.[0-9]+)?)\s+(.+)$') { throw "$($where): want '<seconds> <what>', got: $line" }
@@ -377,15 +400,160 @@ using System.Runtime.InteropServices;
 public static class VisualCheckWin {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+    [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr h, ref POINT p);
+    // The window's picture alone (not its title bar, borders or what shows past them), on the
+    // desktop.
+    public static bool GetPictureRect(IntPtr h, out RECT r) {
+        r = new RECT(); RECT c; POINT p = new POINT();
+        if (!GetClientRect(h, out c) || !ClientToScreen(h, ref p)) return false;
+        r.Left = p.X; r.Top = p.Y; r.Right = p.X + c.Right; r.Bottom = p.Y + c.Bottom;
+        return c.Right > 0 && c.Bottom > 0;
+    }
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    public delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    // Every visible window of the process (not a minimized one, nor a tiny helper) to (x, y), its
+    // size kept; how many there are. By the windows themselves, not Process.MainWindowHandle. For a
+    // client that doesn't read WOW_WINDOW_AT: its window shows where Windows puts it, and moves
+    // once the client answers (about a second and a half in).
+    public static int MoveAll(int pid, int x, int y) {
+        int n = 0;
+        EnumWindows(delegate (IntPtr h, IntPtr l) {
+            uint wp; GetWindowThreadProcessId(h, out wp);
+            RECT r;
+            if (wp != (uint)pid || !IsWindowVisible(h) || IsIconic(h) || !GetWindowRect(h, out r) || r.Right - r.Left < 100) return true;
+            n++;
+            // SWP_NOSIZE 0x1 | SWP_NOZORDER 0x4 | SWP_NOACTIVATE 0x10
+            if (r.Left != x || r.Top != y) SetWindowPos(h, IntPtr.Zero, x, y, 0, 0, 0x15);
+            return true;
+        }, IntPtr.Zero);
+        return n;
+    }
+}
+
+// The game's sound muted in Windows' mixer (its audio sessions on every playback device), as a
+// player would from the volume mixer: benilla has no setting of its own for it.
+public static class VisualCheckAudio {
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator {}
+    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceEnumerator { int EnumAudioEndpoints(int flow, int state, out IMMDeviceCollection c); }
+    [ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceCollection { int GetCount(out int n); int Item(int i, out IMMDevice d); }
+    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDevice { int Activate(ref Guid iid, int ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o); }
+    [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionManager2 {
+        int GetAudioSessionControl(IntPtr a, int b, out IntPtr c);
+        int GetSimpleAudioVolume(IntPtr a, int b, out IntPtr c);
+        int GetSessionEnumerator(out IAudioSessionEnumerator e);
+    }
+    [ComImport, Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionEnumerator { int GetCount(out int n); int GetSession(int i, out IAudioSessionControl2 s); }
+    [ComImport, Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioSessionControl2 {
+        int GetState(out int s); int GetDisplayName(out IntPtr p); int SetDisplayName(IntPtr a, IntPtr b);
+        int GetIconPath(out IntPtr p); int SetIconPath(IntPtr a, IntPtr b); int GetGroupingParam(out Guid g);
+        int SetGroupingParam(IntPtr a, IntPtr b); int RegisterAudioSessionNotification(IntPtr a);
+        int UnregisterAudioSessionNotification(IntPtr a);
+        int GetSessionIdentifier(out IntPtr p); int GetSessionInstanceIdentifier(out IntPtr p); int GetProcessId(out uint pid);
+    }
+    [ComImport, Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface ISimpleAudioVolume {
+        int SetMasterVolume(float v, ref Guid ctx); int GetMasterVolume(out float v);
+        int SetMute([MarshalAs(UnmanagedType.Bool)] bool m, ref Guid ctx); int GetMute([MarshalAs(UnmanagedType.Bool)] out bool m);
+    }
+    // The process's sessions found (each muted now if it wasn't).
+    public static int Mute(int pid) { int muted; return Sessions(pid, true, out muted); }
+    // The process's sessions, and how many of them are muted (muting them first if `mute`).
+    public static int Sessions(int pid, bool mute, out int muted) {
+        int n = 0; muted = 0;
+        IMMDeviceCollection devs;
+        if (((IMMDeviceEnumerator)new MMDeviceEnumerator()).EnumAudioEndpoints(0, 1, out devs) != 0) return 0;
+        int count; devs.GetCount(out count);
+        Guid iid = typeof(IAudioSessionManager2).GUID;
+        for (int i = 0; i < count; i++) {
+            IMMDevice d; object o; IAudioSessionEnumerator se; int sc;
+            if (devs.Item(i, out d) != 0 || d.Activate(ref iid, 23, IntPtr.Zero, out o) != 0) continue;
+            if (((IAudioSessionManager2)o).GetSessionEnumerator(out se) != 0) continue;
+            se.GetCount(out sc);
+            for (int k = 0; k < sc; k++) {
+                IAudioSessionControl2 c; uint sp;
+                if (se.GetSession(k, out c) != 0 || c.GetProcessId(out sp) != 0 || sp != (uint)pid) continue;
+                var vol = (ISimpleAudioVolume)c;
+                bool m; vol.GetMute(out m);
+                Guid g = Guid.Empty;
+                if (!m && mute) { vol.SetMute(true, ref g); vol.GetMute(out m); }
+                if (m) muted++;
+                n++;
+            }
+        }
+        return n;
+    }
 }
 "@
 [void][VisualCheckWin]::SetProcessDPIAware()
+Add-Type -AssemblyName System.Windows.Forms  # after DPI-aware, so Screen's bounds are real pixels
+
+# The screens in the order the `monitor` setting counts them: the primary is 1, then the others as
+# Windows lists them.
+function Get-Monitors {
+    $all = @([System.Windows.Forms.Screen]::AllScreens)
+    @($all | Where-Object { $_.Primary }) + @($all | Where-Object { -not $_.Primary })
+}
+
+# The screen the `monitor` setting names (a number, or DISPLAYn), or $null for "wherever Windows
+# opens it" (empty, 0) and, with a word of warning, for one this PC doesn't have.
+function Get-WantedMonitor($setting) {
+    $setting = ([string]$setting).Trim()
+    if (-not $setting -or $setting -eq "0") { return $null }
+    $screens = @(Get-Monitors)
+    if ($setting -match '^\d+$') {
+        $n = [int]$setting
+        if ($n -ge 1 -and $n -le $screens.Count) { return $screens[$n - 1] }
+    } else {
+        $name = $setting.TrimStart([char]92, '.').ToUpper()
+        $hit = @($screens | Where-Object { $_.DeviceName.TrimStart([char]92, '.').ToUpper() -eq $name })
+        if ($hit.Count) { return $hit[0] }
+    }
+    Say "  monitor = $($setting): this PC has $($screens.Count) screen(s) ($(($screens | ForEach-Object { $_.DeviceName.TrimStart([char]92, '.') }) -join ', ')); leaving the window where Windows opens it."
+    return $null
+}
+
+# ddagrab's output_idx for a screen: DXGI lists the outputs in an order of its own, so each index is
+# opened once for its size, and the one the size matches is it (equal sizes: Windows' order among
+# them). Cached for the run; $null when no index matches.
+$OutputSizes = $null
+function Get-OutputIdx([string]$ffmpeg, $screen) {
+    $ErrorActionPreference = "Continue"  # ffmpeg's report is on stderr
+    if (-not $script:OutputSizes) {
+        $script:OutputSizes = @()
+        for ($i = 0; $i -lt 8; $i++) {
+            $out = & $ffmpeg -hide_banner -nostdin -loglevel info -f lavfi -i "ddagrab=output_idx=$($i):framerate=5" -frames:v 1 -f null - 2>&1 | Out-String
+            if ($out -match 'Video: wrapped_avframe, d3d11, (\d+)x(\d+)') { $script:OutputSizes += ,@([int]$Matches[1], [int]$Matches[2]) } else { break }
+        }
+    }
+    $same = @([System.Windows.Forms.Screen]::AllScreens | Where-Object { $_.Bounds.Width -eq $screen.Bounds.Width -and $_.Bounds.Height -eq $screen.Bounds.Height })
+    $nth = [Array]::IndexOf(@($same | ForEach-Object { $_.DeviceName }), $screen.DeviceName)
+    $seen = 0
+    for ($i = 0; $i -lt $script:OutputSizes.Count; $i++) {
+        if ($script:OutputSizes[$i][0] -eq $screen.Bounds.Width -and $script:OutputSizes[$i][1] -eq $screen.Bounds.Height) {
+            if ($seen -eq [Math]::Max(0, $nth)) { return $i }
+            $seen++
+        }
+    }
+    return $null
+}
 
 # ffmpeg recording the client's window ("benilla", the title benilla's lib.rs gives it) for
-# $v.Duration seconds into $v.Out. `screen` (the default) takes the window's rectangle by Desktop
-# Duplication (ffmpeg's ddagrab), which sees every frame a Vulkan window presents; GDI's grabs
+# $v.Duration seconds into $v.Out. `screen` (the default) takes the window's picture (inside its
+# title bar and borders) by Desktop Duplication (ffmpeg's ddagrab), which sees every frame a Vulkan window presents; GDI's grabs
 # (`title`, the window; `desktop`, the screen's rectangle where it is) see only a few stale ones of
 # benilla's window (the first run on Corey's laptop: 3 different frames in 289).
 function Start-Video($v, $client, [string]$how) {
@@ -394,19 +562,24 @@ function Start-Video($v, $client, [string]$how) {
     if ($how -eq "screen") {
         $client.Refresh()
         $r = New-Object VisualCheckWin+RECT
-        if (-not [VisualCheckWin]::GetWindowRect($client.MainWindowHandle, [ref]$r)) { return $null }
-        # The primary screen's own coordinates; a window hanging past its edges is cut to them.
-        $sw = [VisualCheckWin]::GetSystemMetrics(0); $sh = [VisualCheckWin]::GetSystemMetrics(1)
-        $l = [Math]::Max(0, $r.Left); $t = [Math]::Max(0, $r.Top)
-        $w = [Math]::Min($sw, $r.Right) - $l; $h = [Math]::Min($sh, $r.Bottom) - $t
+        if (-not [VisualCheckWin]::GetPictureRect($client.MainWindowHandle, [ref]$r)) { return $null }
+        # The screen the window is on: its rectangle is cut to that screen and measured from that
+        # screen's own top-left, which is what ddagrab's offsets count from.
+        $scr = [System.Windows.Forms.Screen]::FromHandle($client.MainWindowHandle)
+        $b = $scr.Bounds
+        $idx = Get-OutputIdx $v.Ffmpeg $scr
+        if ($null -eq $idx) { return $null }
+        $l = [Math]::Max($b.Left, $r.Left); $t = [Math]::Max($b.Top, $r.Top)
+        $w = [Math]::Min($b.Right, $r.Right) - $l; $h = [Math]::Min($b.Bottom, $r.Bottom) - $t
         $w -= $w % 2; $h -= $h % 2
         if ($w -lt 64 -or $h -lt 64) { return $null }
-        $grab = @("-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=30:draw_mouse=0:offset_x=$($l):offset_y=$($t):video_size=$($w)x$($h)")
+        $l -= $b.Left; $t -= $b.Top
+        $grab = @("-f", "lavfi", "-i", "ddagrab=output_idx=$($idx):framerate=30:draw_mouse=0:offset_x=$($l):offset_y=$($t):video_size=$($w)x$($h)")
         $vf = "hwdownload,format=bgra," + $vf
     } elseif ($how -eq "desktop") {
         $client.Refresh()
         $r = New-Object VisualCheckWin+RECT
-        if (-not [VisualCheckWin]::GetWindowRect($client.MainWindowHandle, [ref]$r)) { return $null }
+        if (-not [VisualCheckWin]::GetPictureRect($client.MainWindowHandle, [ref]$r)) { return $null }
         $w = ($r.Right - $r.Left) - (($r.Right - $r.Left) % 2)
         $h = ($r.Bottom - $r.Top) - (($r.Bottom - $r.Top) % 2)
         $grab += @("-offset_x", "$($r.Left)", "-offset_y", "$($r.Top)", "-video_size", "$($w)x$($h)", "-i", "desktop")
@@ -425,13 +598,13 @@ function Start-Video($v, $client, [string]$how) {
 }
 
 # --- running the client --------------------------------------------------------------------------
-# Runs the client with these variables until it quits or the time is up (then it's closed), its
-# output in $log. With $v (a video), recording starts when the cue shot lands in the screenshots
-# folder. Returns whether the client quit by itself.
-function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null) {
-    Stop-Strays $s
+# Starts the client with these variables (and the run's own: the server, the account, the settings
+# folder $chome, the time limit), its output in $log.out and $log.err. Its window is made at $at
+# (a "x,y" desktop position, for a client that reads WOW_WINDOW_AT), else at the top-left of the
+# `monitor` setting's screen.
+function Start-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $at = $null) {
     $common = @{
-        WOW_DATA = $s.data; WOW_HOST = $s.host; WOW_REALM = $s.realm
+        WOW_DATA = $s.data; WOW_HOST = $(if ($s.port -and [string]$s.port -ne "3724") { "$($s.host):$($s.port)" } else { $s.host }); WOW_REALM = $s.realm
         WOW_USER = $s.account; WOW_PASS = $s.password
         BENILLA_HOME = $chome
         # Nobody at the keyboard: a refused login ends the run instead of waiting on a dialog;
@@ -439,31 +612,89 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
         WOW_UNATTENDED = "1"; WOW_BG = "0"
         WOW_PROBE_EXIT_AT = [string]($timeout - 5)
     }
+    # The window made on its monitor from the start (a client that reads WOW_WINDOW_AT).
+    $screen = Get-WantedMonitor $s.monitor
+    if ($at) { $common["WOW_WINDOW_AT"] = $at }
+    elseif ($screen) { $common["WOW_WINDOW_AT"] = "$($screen.WorkingArea.X),$($screen.WorkingArea.Y)" }
     foreach ($k in $vars.Keys) { $common[$k] = $vars[$k] }
     $saved = @{}
     foreach ($k in $common.Keys) {
         $saved[$k] = [Environment]::GetEnvironmentVariable($k, "Process")
         [Environment]::SetEnvironmentVariable($k, [string]$common[$k], "Process")
     }
+    try {
+        Start-Process -FilePath $s.client -WorkingDirectory $chome -PassThru `
+            -RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err"
+    } finally {
+        foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k], "Process") }
+    }
+}
+
+# Where a client is kept until its video starts: $at (a "x,y" string), else the top-left of the
+# `monitor` setting's screen; $null to leave it where Windows puts it.
+function Get-WindowSpot($s, $at) {
+    if ($at) { $xy = $at -split ','; return @([int]$xy[0], [int]$xy[1]) }
+    $screen = Get-WantedMonitor $s.monitor
+    if ($screen) { return @($screen.WorkingArea.X, $screen.WorkingArea.Y) }
+    $null
+}
+
+# A client's output, its two halves, into $log.
+function Close-ClientLog($log) {
+    $parts = @("$log.out", "$log.err") | Where-Object { Test-Path $_ }
+    if ($parts) { Get-Content $parts -ErrorAction SilentlyContinue | Set-Content $log }
+    Remove-Item $parts -ErrorAction SilentlyContinue
+}
+
+# Runs the client with these variables until it quits or the time is up (then it's closed), its
+# output in $log. With $v (a video), recording starts when the cue shot lands in the screenshots
+# folder. Returns whether the client quit by itself. With $film (the cameraman's client, already
+# running) the video records that client's window instead, which is kept on its screen and muted
+# meanwhile too; $at is where this client's window goes then (beside it).
+function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null, $at = $null, $film = $null) {
+    Stop-Strays $s $(if ($film) { $film.Id } else { 0 })
+    $spot = Get-WindowSpot $s $at
+    $filmSpot = Get-WindowSpot $s $null
     $p = $null
     $rec = $null
     $shotsDir = Join-Path $chome "Screenshots"
+    $muteNext = Get-Date
+    # The outputs ddagrab sees are looked at now, not when the video is due.
+    if ($v -and $s.video -eq "screen" -and $s.ffmpeg) { $null = Get-OutputIdx $s.ffmpeg ([System.Windows.Forms.Screen]::PrimaryScreen) }
     try {
-        $p = Start-Process -FilePath $s.client -WorkingDirectory $chome -PassThru `
-            -RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err"
+        $p = Start-Client $s $vars $timeout $chome $log $at
         $deadline = (Get-Date).AddSeconds($timeout)
         while (-not $p.HasExited -and (Get-Date) -lt $deadline) {
-            if ($v -and -not $rec -and (Test-Path $shotsDir) -and (Get-ChildItem $shotsDir -Filter *.png)) {
-                $rec = Start-Video $v $p $s.video
-                if (-not $rec) { $v.Status = "no video: the game window wasn't found" }
+            # The window goes to its spot the moment it exists, and is put back if the client
+            # moves it, until the video starts (its offsets are taken then).
+            if ($spot -and -not $rec) {
+                [void][VisualCheckWin]::MoveAll($p.Id, $spot[0], $spot[1])
+                if ($film -and $filmSpot) { [void][VisualCheckWin]::MoveAll($film.Id, $filmSpot[0], $filmSpot[1]) }
+            }
+            # Its sound muted as soon as it has any, and kept muted (a new device, a new session).
+            if ($s.mute -ne "0" -and ((Get-Date) -ge $muteNext)) {
+                try {
+                    $n = [VisualCheckAudio]::Mute($p.Id)
+                    if ($film) { $n += [VisualCheckAudio]::Mute($film.Id) }
+                    if ($n -gt 0) { $muteNext = (Get-Date).AddSeconds(1) }
+                } catch { $muteNext = (Get-Date).AddSeconds(1) }
+            }
+            if ($v -and -not $rec -and (Test-Path $shotsDir)) {
+                $cue = Get-ChildItem $shotsDir -Filter *.png | Sort-Object CreationTime | Select-Object -First 1
+                if ($cue) {
+                    $v.CueAt = $cue.CreationTime
+                    $rec = Start-Video $v $(if ($film) { $film } else { $p }) $s.video
+                    if (-not $rec) { $v.Status = "no video: the game window wasn't found" }
+                }
             }
             # Desktop Duplication refused (an ffmpeg without it, a locked screen), or the window's
             # title didn't match: once more, the next way down.
             if ($rec -and $rec.HasExited -and $null -ne $rec.ExitCode -and $rec.ExitCode -ne 0 -and $v.How -ne "desktop" -and ((Get-Date) - $v.Started).TotalSeconds -lt 5) {
                 $v.Duration = [Math]::Max(1.0, $v.Duration - ((Get-Date) - $v.Started).TotalSeconds)
-                $rec = Start-Video $v $p $(if ($v.How -eq "screen") { "title" } else { "desktop" })
+                $rec = Start-Video $v $(if ($film) { $film } else { $p }) $(if ($v.How -eq "screen") { "title" } else { "desktop" })
             }
-            Start-Sleep -Milliseconds 100
+            # Quick while the window is still to be caught.
+            Start-Sleep -Milliseconds $(if ($rec -or -not $spot) { 100 } else { 15 })
         }
         return $p.HasExited
     } finally {
@@ -473,7 +704,11 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
             $p.WaitForExit(10000) | Out-Null
         }
         if ($rec) {
-            if (-not $rec.WaitForExit(15000)) { Stop-Process -Id $rec.Id -Force -ErrorAction SilentlyContinue }
+            if ($rec.WaitForExit(15000)) {
+                # ffmpeg stops once it has the video's length: its first frame was that long
+                # before it quit (it starts some tenths of a second after it's asked to).
+                $v.First = $rec.ExitTime.AddSeconds(-$v.Duration)
+            } else { Stop-Process -Id $rec.Id -Force -ErrorAction SilentlyContinue }
             if ((Test-Path $v.Out) -and (Get-Item $v.Out).Length -gt 0) {
                 $v.Status = "video: $($v.Out) ($($v.How))"
                 Remove-Item "$($v.Out).log" -ErrorAction SilentlyContinue
@@ -483,21 +718,150 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
         } elseif ($v -and -not $v.Status) {
             $v.Status = "no video: the scenario's first shot never came"
         }
-        foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k], "Process") }
-        $parts = @("$log.out", "$log.err") | Where-Object { Test-Path $_ }
-        if ($parts) { Get-Content $parts -ErrorAction SilentlyContinue | Set-Content $log }
-        Remove-Item $parts -ErrorAction SilentlyContinue
+        Close-ClientLog $log
     }
+}
+
+# --- the cameraman -------------------------------------------------------------------------------
+# A scenario with a `camera` line is filmed by a second client, the cameraman (docs/visual-check.md,
+# "Filming a boss"): its hero says `.es watch <hero>` (the server keeps it out of every rule,
+# unseen, with the hero wherever they go) and benilla's WOW_SPECTATE holds its camera on the
+# subject and the hero. Its window is the one the video records; its picture is clean (no
+# interface, names or floor marks); its sound is its own mix (WOW_MIX_TAP), written before its
+# output, which is silent while its window isn't focused and muted in Windows' mixer anyway. The
+# hero's own client is beside it, smaller, and opens no sound device at all.
+
+# The cameraman's driver: the picture cleared every frame, then `.es watch` the hero.
+function Build-CameraLua($hero) {
+    @"
+if VisualCheck then return end
+local VC = { i = 1, steps = { { 0.5, ".es debug quiet" }, { 1.0, ".es watch $hero" } } }
+VisualCheck = VC
+local log = ProbeLog or function() end
+VC.t0 = GetTime()
+log("visual-check: the cameraman is in the world")
+SetCVar("UnitNameNPC", "0")
+SetCVar("UnitNamePlayer", "0")
+SetCVar("UnitNameOwn", "0")
+ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}
+ElwynnSurvivalSettings.noMarks = 1
+local ev = CreateFrame("Frame")
+ev:RegisterEvent("CHAT_MSG_SYSTEM")
+ev:RegisterEvent("UI_ERROR_MESSAGE")
+ev:SetScript("OnEvent", function() log("visual-check: server: " .. tostring(arg1)) end)
+local frame = CreateFrame("Frame")
+frame:SetScript("OnUpdate", function()
+  if UIParent:IsShown() then UIParent:Hide() end
+  if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+  local now = GetTime() - VC.t0
+  while VC.steps[VC.i] and VC.steps[VC.i][1] <= now do
+    log("visual-check: t=" .. string.format("%.2f", now) .. " say " .. VC.steps[VC.i][2])
+    SendChatMessage(VC.steps[VC.i][2], "SAY")
+    VC.i = VC.i + 1
+  end
+end)
+"@
+}
+
+# The cameraman's client, started and in the world watching $hero (or a throw that says why not):
+# @{ P = its process; Log; Wav; At = where the hero's window goes, beside it }.
+function Start-Cameraman($s, $sc, $hero, $out, [int]$timeout) {
+    $name = $s.cameraman
+    if (-not $name) { throw "$($sc.Name) has a camera, and the settings name no cameraman (set cameraman = <name>; 'setup' makes it)." }
+    $chome = Join-Path $out "camera"
+    New-ClientHome $s $chome $s.resolution
+    $log = Join-Path $out "camera.log"
+    $wav = Join-Path $out "sound.wav"
+    $vars = @{
+        WOW_CHAR = $name; WOW_PROBE_LUA = (Build-CameraLua $hero); WOW_PROBE_LUA_AT = "1"
+        WOW_SPECTATE = "$($sc.Camera.Subject),$hero,$($sc.Camera.Shot)"; WOW_MIX_TAP = $wav
+    }
+    Say "  the cameraman $name films $(if ($sc.Camera.Subject) { "$($sc.Camera.Subject) and " })$hero ($($sc.Camera.Shot))"
+    $p = Start-Client $s $vars $timeout $chome $log
+    $null = $p.Handle  # held now, or Windows PowerShell never learns its exit code
+    $spot = Get-WindowSpot $s $null
+    $deadline = (Get-Date).AddSeconds([int](Num $s.login_timeout))
+    $watching = $false
+    while (-not $p.HasExited -and -not $watching -and (Get-Date) -lt $deadline) {
+        if ($spot) { [void][VisualCheckWin]::MoveAll($p.Id, $spot[0], $spot[1]) }
+        if ($s.mute -ne "0") { try { [void][VisualCheckAudio]::Mute($p.Id) } catch { } }
+        $said = @("$log.out", "$log.err") | Where-Object { Test-Path $_ }
+        $watching = $said -and (Select-String -Path $said -Pattern "You're watching" -SimpleMatch -Quiet)
+        Start-Sleep -Milliseconds 15
+    }
+    $p.Refresh()
+    $fits = $false
+    if ($watching) {
+        # The hero's window beside the cameraman's, on the same screen.
+        $r = New-Object VisualCheckWin+RECT
+        [void][VisualCheckWin]::GetWindowRect($p.MainWindowHandle, [ref]$r)
+        $area = [System.Windows.Forms.Screen]::FromHandle($p.MainWindowHandle).WorkingArea
+        $w = [int](($s.hero_resolution -split 'x')[0])
+        $border = ($r.Right - $r.Left) - [int](($s.resolution -split 'x')[0])
+        $x = $r.Right + 8
+        $fits = $x + $w + $border -le $area.Right
+    }
+    if (-not $fits) {
+        Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+        $p.WaitForExit(10000) | Out-Null
+        Close-ClientLog $log
+        if (-not $watching) { throw "the cameraman $name never got to watching $hero (see camera.log: the login, or the server's answer to .es watch)" }
+        throw "the hero's window ($($s.hero_resolution)) doesn't fit beside the cameraman's on its screen: make resolution or hero_resolution smaller"
+    }
+    @{ P = $p; Log = $log; Wav = $wav; At = "$x,$($r.Top)" }
+}
+
+# When the video's first frame was taken: from when ffmpeg quit, or (killed) when it was started.
+function Get-VideoStart($v) {
+    if ($v.First -and $v.First -ge $v.Started) { return $v.First }
+    $v.Started
+}
+
+# The cameraman's sound under the video: the mix it wrote from its start, cut to where the video
+# starts (to about a tenth of a second). What it says goes in run.txt.
+function Add-Sound($s, $v, $wav) {
+    if (-not (Test-Path $v.Out)) { return "no sound: no video" }
+    if (-not (Test-Path $wav) -or (Get-Item $wav).Length -le 44) { return "no sound: the cameraman's mix wasn't written" }
+    $skip = [Math]::Max(0.0, ((Get-VideoStart $v) - (Get-Item $wav).CreationTime).TotalSeconds)
+    $tmp = "$($v.Out).sound.mp4"
+    $ErrorActionPreference = "Continue"
+    & $s.ffmpeg -hide_banner -nostdin -loglevel error -y -i $v.Out -ss (Fmt $skip) -i $wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest $tmp 2>&1 | Out-Null
+    if ((Test-Path $tmp) -and (Get-Item $tmp).Length -gt 0) {
+        Move-Item -Force $tmp $v.Out
+        Remove-Item $wav -ErrorAction SilentlyContinue
+        return "sound: the cameraman's own mix"
+    }
+    "no sound: ffmpeg couldn't put $wav under the video"
+}
+
+# Stills from the cameraman's video at the scenario's bursts' times, named as the client's would
+# be (<label>-NN): the video's first frame is the cue still's time plus what passed between them.
+function Save-FilmedShots($s, $sc, $v, $to) {
+    if (-not (Test-Path $v.Out) -or -not $v.CueAt) { return 0 }
+    $zero = $sc.Video + ((Get-VideoStart $v) - $v.CueAt).TotalSeconds
+    $ext = if ($s.format -eq "png") { "png" } else { "jpg" }
+    $saved = 0
+    $ErrorActionPreference = "Continue"
+    foreach ($st in @($sc.Steps | Where-Object { $_.Kind -eq "shots" })) {
+        for ($k = 0; $k -lt $st.Count; $k++) {
+            $at = $st.T + $k * $st.Every - $zero
+            if ($at -lt 0) { continue }
+            $file = Join-Path $to ("{0}-{1:D2}.{2}" -f $st.Text, $k, $ext)
+            & $s.ffmpeg -hide_banner -nostdin -loglevel error -y -ss (Fmt $at) -i $v.Out -frames:v 1 -vf "scale='min($([int]$s.width),iw)':-2" -q:v 3 $file 2>&1 | Out-Null
+            if (Test-Path $file) { $saved++ }
+        }
+    }
+    $saved
 }
 
 # A settings folder of the run's own: the bundled config at the chosen window size and this
 # checkout's add-ons, so the add-on under test is the branch's and no player setting is touched.
-function New-ClientHome($s, $dir) {
+function New-ClientHome($s, $dir, $resolution = $null) {
     if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
     New-Item -ItemType Directory -Force -Path (Join-Path $dir "AddOns") | Out-Null
     $config = @(Get-Content (Join-Path $Root "dist\windows\benilla-config\config.toml"))
     $config += "gxWindow = `"1`""
-    $config += "gxResolution = `"$($s.resolution)`""
+    $config += "gxResolution = `"$(if ($resolution) { $resolution } else { $s.resolution })`""
     Set-Content (Join-Path $dir "config.toml") $config
     Copy-Item -Recurse (Join-Path $Root "addon\ElwynnSurvival"), (Join-Path $Root "addon\BasinBattle") (Join-Path $dir "AddOns")
 }
@@ -570,14 +934,17 @@ function Invoke-Scenario($s, $name, $out) {
     if (Test-Path $out) { Remove-Item -Recurse -Force $out }
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     $chome = Join-Path $out "client"
-    New-ClientHome $s $chome
+    New-ClientHome $s $chome $(if ($sc.Camera) { $s.hero_resolution } else { $s.resolution })
     $settle = Num $s.settle
     $v = $null
     $videoNote = ""
     if ($s.video -eq "off") { $videoNote = "no video: video = off in the settings" }
     elseif (-not $s.ffmpeg) { $videoNote = "no video: no ffmpeg.exe in $(Join-Path $Folder 'ffmpeg') (or the ffmpeg setting)" }
     else { $v = @{ Ffmpeg = $s.ffmpeg; Out = (Join-Path $out "$name.mp4"); Duration = [Math]::Max(1.0, $sc.End - $sc.Video); Status = "" } }
-    $lua = Build-Lua $sc $settle $(if ($v) { $sc.Video } else { $null })
+    # With a cameraman its video gives the stills: the hero's client takes only the video's cue.
+    $played = $sc
+    if ($sc.Camera) { $played = $sc.Clone(); $played.Steps = @($sc.Steps | Where-Object { $_.Kind -ne "shots" }) }
+    $lua = Build-Lua $played $settle $(if ($v) { $sc.Video } else { $null })
     if ($lua.Length -gt 30000) { throw "$name is too long to hand the client ($($lua.Length) characters of Lua; 30000 at most)." }
     $asked = 0
     foreach ($st in $sc.Steps) { if ($st.Kind -eq "shots") { $asked += $st.Count } }
@@ -592,11 +959,34 @@ function Invoke-Scenario($s, $name, $out) {
     if (@($sc.Steps | Where-Object { $_.Kind -eq "lua" -and $_.Text -match 'fpsJournal' }).Count -gt 0) {
         $vars.WOW_FPS_JOURNAL = Join-Path $out "fps-journal.csv"
     }
-    $quit = Invoke-Client $s $vars $timeout $chome $log $v
-    $shots = Save-Shots $s (Join-Path $chome "Screenshots") $out $log ($null -ne $v)
+    $film = $null
+    if ($sc.Camera) {
+        Stop-Strays $s
+        $film = Start-Cameraman $s $sc $hero $out ($timeout + [int](Num $s.login_timeout))
+        # The cameraman's client is the one heard; the hero's opens no sound device.
+        $vars.WOW_NOSOUND = "1"
+    }
+    try {
+        $quit = Invoke-Client $s $vars $timeout $chome $log $v $(if ($film) { $film.At }) $(if ($film) { $film.P })
+    } finally {
+        if ($film) {
+            if (-not $film.P.HasExited) {
+                Stop-Process -Id $film.P.Id -Force -ErrorAction SilentlyContinue
+                $film.P.WaitForExit(10000) | Out-Null
+            }
+            Close-ClientLog $film.Log
+            Remove-Item -Recurse -Force (Join-Path $out "camera") -ErrorAction SilentlyContinue
+        }
+    }
+    if ($film -and $v) { $v.Status = "$($v.Status); $(Add-Sound $s $v $film.Wav)" }
+    $shots = if ($film) { if ($v) { Save-FilmedShots $s $sc $v $out } else { 0 } } else { Save-Shots $s (Join-Path $chome "Screenshots") $out $log ($null -ne $v) }
     $runLog = @()
     if (Test-Path $log) {
         $runLog = @(Select-String -Path $log -Pattern 'visual-check: (.*)$' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+    }
+    # What the cameraman did: its own lines, and where its camera went.
+    if ($film -and (Test-Path $film.Log)) {
+        $runLog += @(Select-String -Path $film.Log -Pattern '(?:probe-log: visual-check: |\bspectate: )(.*)$' | ForEach-Object { "camera: $($_.Matches[0].Groups[1].Value)" })
     }
     if ($v) { $videoNote = $v.Status }
     $runLog += $videoNote
@@ -623,12 +1013,12 @@ function Invoke-Scenario($s, $name, $out) {
 
 # The test heroes: each made at character select (benilla's WOW_PROBE_CHARCREATE), kept. A hero
 # already there stays as it is (the server answers that the name is in use).
-$HeroBodies = @{ hunter = "3,3,0"; warrior = "1,1,0" }  # race, class, gender: a dwarf hunter, a human warrior
+$HeroBodies = @{ hunter = "3,3,0"; warrior = "1,1,0"; cameraman = "1,1,0" }  # race, class, gender: a dwarf hunter, two human warriors
 function Invoke-Setup($s, $out) {
     if (Test-Path $out) { Remove-Item -Recurse -Force $out }
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     $results = @()
-    foreach ($role in @("hunter", "warrior")) {
+    foreach ($role in @("hunter", "warrior", "cameraman")) {
         $hero = $s[$role]
         if (-not $hero) { continue }
         $chome = Join-Path $out "client-$role"
