@@ -110,10 +110,10 @@ index 0875e4ea..c325db28 100644
  mod unit_rope;
 diff --git a/crates/benilla-assets/src/deadmines_aftermath.rs b/crates/benilla-assets/src/deadmines_aftermath.rs
 new file mode 100644
-index 00000000..b9db4b56
+index 00000000..8f556e0f
 --- /dev/null
 +++ b/crates/benilla-assets/src/deadmines_aftermath.rs
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,267 @@
 +//! Basin Battle's finished Deadmines, not a 1.12 behavior. The ship is authored as groups of
 +//! the mine WMO, so its render, collision, interior and prop ownership must change together.
 +use benilla_formats::CollisionMesh;
@@ -124,6 +124,16 @@ index 00000000..b9db4b56
 +// Mirrored in Basin Battle's htl-map/src/deadmines/aftermath.rs.
 +pub const SHIP_GROUPS: &[u32] = &[17, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 40, 43];
 +pub const SHIP_DOODADS: usize = 64;
++// Independently placed MDDF fixtures attached to the hull, platforms and ramps.
++// Native attachment pivots verified against the removed group triangles; preserve shore lights.
++pub const SHIP_ADT_DOODADS: &[u32] = &[
++    293853, 293855, 293857, 293858, 293862, 293863, 293865, 293866, 293867, 293868, 293869, 293871,
++    293872, 293873, 293874, 293875, 293876, 293877, 293878, 293879, 293880, 293881, 294176, 294178,
++    294179, 294180, 294182, 294183, 294184, 333883, 333884, 333885, 333886, 333887, 333888, 333889,
++    333890, 333896, 333897, 333898, 333899, 333900, 333901, 333902, 333903, 333904, 333905, 333906,
++    333907, 333908, 333909, 333910, 333911, 333912, 333913, 333914, 333915, 333916, 333917, 333918,
++    333919,
++];
 +
 +pub fn is_ship_root(path: &str) -> bool {
 +    path.replace('\\', "/")
@@ -233,6 +243,24 @@ index 00000000..b9db4b56
 +        use bevy::asset::{AssetApp, AssetMetaCheck, AssetPlugin};
 +        use bevy::prelude::*;
 +        let data = benilla_formats::wow_data_or_skip!();
++        let mut chain = benilla_formats::Chain::open(&data).unwrap();
++        let tile =
++            benilla_formats::load_tile_mesh(&mut chain, "DeadminesInstance", 33, 32).unwrap();
++        let fixtures: Vec<_> = tile
++            .doodads
++            .iter()
++            .filter(|d| SHIP_ADT_DOODADS.contains(&d.unique_id))
++            .collect();
++        assert_eq!(
++            fixtures.len(),
++            61,
++            "native ship fixtures must all be identified"
++        );
++        assert!(fixtures
++            .iter()
++            .all(|d| d.model.contains("torch") || d.model.contains("lantern")));
++        assert!(!SHIP_ADT_DOODADS.contains(&333891), "shore lantern remains");
++        assert!(!SHIP_ADT_DOODADS.contains(&293268), "dock torch remains");
 +        let reader = crate::MpqAssetReader::open(&data).unwrap();
 +        let mut app = App::new();
 +        app.add_plugins(MinimalPlugins)
@@ -431,7 +459,7 @@ index 50c5953b..b4c2bdf8 100644
  
      fn extensions(&self) -> &[&str] {
 diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
-index e7a5b715..ca880978 100644
+index e7a5b715..556c43ba 100644
 --- a/crates/benilla-world/src/terrain_stream.rs
 +++ b/crates/benilla-world/src/terrain_stream.rs
 @@ -64,6 +64,10 @@ pub use residency::TerrainResidency;
@@ -504,7 +532,16 @@ index e7a5b715..ca880978 100644
              );
              state.global_wmo = true;
          }
-@@ -1031,7 +1041,7 @@ fn spawn_streamed_tiles(
+@@ -1027,11 +1037,16 @@ fn spawn_streamed_tiles(
+         // Placements register by uniqueId; their ground shade resolves at spawn by a global lookup,
+         // since a doodad's origin may lie on another tile.
+         for d in &adt.doodads {
++            if state.aftermath
++                && benilla_assets::deadmines_aftermath::SHIP_ADT_DOODADS.contains(&d.unique_id)
++            {
++                continue;
++            }
+             register_doodad(placements, &asset_server, d, (tx, ty));
              tile.placements.push(d.unique_id);
          }
          for w in &adt.wmos {
@@ -513,7 +550,7 @@ index e7a5b715..ca880978 100644
              tile.placements.push(w.unique_id);
          }
  
-@@ -1228,8 +1238,8 @@ const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 6] = [
+@@ -1228,8 +1243,8 @@ const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 6] = [
  ];
  
  /// The pieces added to the map in directory `dir`.
@@ -524,7 +561,7 @@ index e7a5b715..ca880978 100644
          &DEADMINES_BRIDGES
      } else {
          &[]
-@@ -1237,12 +1247,22 @@ fn map_bridges(dir: &str) -> &'static [[[f32; 3]; 3]] {
+@@ -1237,12 +1252,22 @@ fn map_bridges(dir: &str) -> &'static [[[f32; 3]; 3]] {
  }
  
  /// Register one WMO placement, or bump its refcount; a 1.12 WMO placement has no scale.
