@@ -1,4 +1,4 @@
-From 2769e5bef8a06c20663e10f7a87d560c8becff1b Mon Sep 17 00:00:00 2001
+From 34a10f1435765d67a7b3afb9e58dac36210b1be3 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 8 Nov 2026 08:32:17 -0700
 Subject: [PATCH] Water that answers what moves through it: wakes, rings and
@@ -61,32 +61,37 @@ draws while the wakes run. `lookwater wakes 0` brings both back.
 The open water's surface under the wakes (look::water_surface): four
 layers of gradient-noise wavelets, 3.2, 1.28, 0.56 and 0.2 yd long,
 drift along the wind (look::wind's downwind, each turned off it by 0,
-30, -40 and 75 degrees) at 0.3 to 0.6 yd/s (0.7 to 1.3 of that as the
-wind strengthens), each only sliding, so nothing pops; their crossing
-keeps the pattern changing. A compute pass, look_water_surface (the fps
+35, -55 and 120 degrees, so the sheet never slides one way) at 0.5, 0.8,
+1.1 and 1.0 yd/s (0.7 to 1.3 of that as the wind strengthens), each only
+sliding, so nothing pops; their crossing keeps the pattern changing. A compute pass, look_water_surface (the fps
 journal's gpu_look, named on its GPU_PASSES line), bakes them once a
 frame into one 25.6 yd tile of 512 x 512 texels (the long pair's slope
 and the short pair's), each layer periodic over the tile and its drift
 kept on the CPU in whole cells modulo it, so the tile never jumps. The
 water reads it by texel (wrapped), its slope the hour's ripple slope
-times 0.55 (about 0.07 by day), varied 0.7 to 1.3 by an untiled swell of
+times 0.8 (about 0.1 by day), varied 0.7 to 1.3 by an untiled swell of
 about 12 yd so the repeat never shows. The short pair fades as a pixel
 grows from 0.04 to 0.14 yd, the long from 0.3 to 1; what fades is handed
 to the sun's highlight as roughness, which widens and dims it. The
 highlight off it is broader (sharpness 320, at 0.35 of 0081's, the grain
 counting half) and never brighter than 1.6, so a crest is a soft streak,
-not a speck; the water's brightness follows the wavelets (a facet toward
-the sun 12% brighter at twice the mean slope); the sky's mirror is
-Fresnel's, faint looking down and strong toward the horizon. 1.12's
+not a speck; the brightness of all the water (the bed seen through it
+too) follows the wavelets, a facet toward the sun's bearing brighter
+and away darker, by 0.15 for the long pair and 0.45 for the grain at
+twice each pair's own mean slope, half of that in shade, so the fine
+grain shows and its drift moves the sheet; the sky's mirror is
+Fresnel's (0.07 looking straight down), faint looking down and strong
+toward the horizon. 1.12's
 ripple flipbook and its sparkle (the white flecks over the whole lake on
 the fourth filming) are gone under it.
 
 The bed through moving water: the bed seen under the water is drawn back
 from the surface's tilt, 3.5 yd per unit of slope per yard of depth to
 1.5 yd deep, so it wavers under the ripples and the wakes (under the
-drifting wavelets the long pair alone bends it, at 0.6 of that, so it
-wobbles gently with nobody swimming); faint moving light lies on the
-shallow bed in the sun. Where the bend is under a
+drifting wavelets the long pair bends it at 1.1 of that and the grain at
+0.4, so it wobbles with nobody swimming); faint moving light lies on the
+shallow bed in the sun (under the wavelets 1.6 times as strong and three
+times as quick). Where the bend is under a
 pixel the frame's blend keeps the bed it already holds, so a calm
 surface still shows what is drawn behind it.
 
@@ -105,6 +110,19 @@ specks, so they are smaller; the glint is near-white too. All of this
 only with the wakes on, so `lookwater wakes 0`, `worldWater 0` and
 `worldLook 0` draw the water exactly as before.
 
+Pale, milky shallows under the drifting wavelets: Corey's reference pond
+is pale and milky green (about 127 of luminance) where the fifth filming's
+lake was dark (about 50). Over the view's path through the water the
+bed's light gives way to the water's own, up to 0.38 of it, coming in
+over about 0.9 yd of path and none at the waterline, so the bed shows
+through a pale veil; the shallow colour goes most of the way (0.85) to a
+pale, slightly warm green (sRGB 0.40, 0.59, 0.50) and turns to the deep
+from 1 yd to 5 (1.2 to 3.5 drew a pale band down a shelf's middle
+depths); the shore's haze is 0.4 of the classic surface's, spread over
+twice the depth, so no pale band runs along the shore; and the eight-bit
+colour is dithered by half a step so the pale water's broad gradients
+turn without bands.
+
 The shore and the shallows, retuned toward the reference: no foam line,
 fully clear at the waterline with a faint pale haze over its first
 0.7 yd, clearer water (1.8 yd to a third, was 1.4), a greener shallow
@@ -117,13 +135,22 @@ opaque blue-green beyond. The water's colour and clearness follow the
 bed's depth pixel by pixel, so where the lake bed drops off a shelf they
 turned along 1.12's terrain triangles, whose edges run on the diagonal
 two yards a step. Under the wakes they take the bed's depth averaged
-over 2.5 yd (8 taps round the pixel, not on it, turned smoothly over
-the surface; none on what
+over 2.5 yd (8 taps round the pixel, not on it, in opposite pairs,
+turned smoothly over the surface, so an even slope reads the pixel's own
+depth whatever their turn: one spiral of taps, its centre off the pixel,
+drew swirling contours across `show clear`; none on what
 stands in front of the water, none shallower than half the pixel's own,
 so a swimmer's legs clear no halo), from 0.3 yd deep, fully from 1
-(the waterline stays crisp), so the turn spreads over a few yards; and
-a sun shadow's edge on the water is at least 0.5 yd soft (its low
-filter's radius). `lookwater show <depth|shadow|clear|bed|off>` draws,
+(the waterline stays crisp), so the turn spreads over a few yards.
+
+The sun shadow on the water under the drifting wavelets: the fifth
+filming's straight diagonal seam was the shade's hand-over between two
+shadow slices (the water took the nearer slice's shade to a line of one
+eye depth and none past it). A point off a slice now falls through to
+the next and a slice's last share blends into it, as the ground's do;
+the shade's edge is feathered over 3.5 yd (12 taps), and the water takes
+half of the hour's shade, since the in-scatter and the sky still light
+it. With the wakes off the water's shadow is as before. `lookwater show <depth|shadow|clear|bed|off>` draws,
 under the wakes, what the water is drawn from in its place, for film:
 how deep it stands (with the smoothed depth's difference in red), the
 sun's share at the surface, how much of the bed comes through, and the
@@ -158,19 +185,19 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/shaders.rs             |   28 +
  crates/benilla-app/src/world_console.rs       |  189 +-
  crates/benilla-assets/src/materials.rs        |   65 +
- crates/benilla-assets/src/shaders/liquid.wgsl |  527 ++++-
+ crates/benilla-assets/src/shaders/liquid.wgsl |  688 ++++++-
  crates/benilla-world/src/liquid/surface.rs    |    5 +-
  crates/benilla-world/src/look/mod.rs          |   18 +-
  crates/benilla-world/src/look/wakes.rs        | 1727 +++++++++++++++++
  crates/benilla-world/src/look/wakes_pass.rs   |  212 ++
- crates/benilla-world/src/look/water.rs        |  362 +++-
- .../benilla-world/src/look/water_surface.rs   |  706 +++++++
+ crates/benilla-world/src/look/water.rs        |  387 +++-
+ .../benilla-world/src/look/water_surface.rs   |  839 ++++++++
  crates/benilla-world/src/shaders.rs           |    8 +-
  .../benilla-world/src/shaders/look_wakes.wgsl |  236 +++
  .../src/shaders/look_water_surface.wgsl       |   79 +
  crates/benilla-world/src/water_fx/mod.rs      |   14 +-
  crates/benilla-world/src/world_unit.rs        |    5 +
- 20 files changed, 4277 insertions(+), 62 deletions(-)
+ 20 files changed, 4592 insertions(+), 66 deletions(-)
  create mode 100644 crates/benilla-world/src/look/wakes.rs
  create mode 100644 crates/benilla-world/src/look/wakes_pass.rs
  create mode 100644 crates/benilla-world/src/look/water_surface.rs
@@ -823,7 +850,7 @@ index ea94dab..a91d8fd 100644
  
  impl MaterialExtension for LiquidExt {
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index dfbd806..d70802b 100644
+index dfbd806..e4ae0c2 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -25,8 +25,9 @@
@@ -875,7 +902,7 @@ index dfbd806..d70802b 100644
  
  struct LiquidVsOut {
      @builtin(position) clip_position: vec4<f32>,
-@@ -260,9 +273,72 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
+@@ -260,9 +273,95 @@ const WATER_MOON_GLINT_MEAN: f32 = 0.25;
  const WATER_NIGHT_FLECKS: f32 = 0.0;
  const WATER_NIGHT_FLECK_LANE: f32 = 0.12;
  const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
@@ -929,7 +956,7 @@ index dfbd806..d70802b 100644
 +// `look::water_surface::tune` (`look::water`'s test compares them): the surface's slope against
 +// the hour's, its untiled swell, the two pairs' fades, the sun's highlight off it, the grain's
 +// share in that, the brightness the wavelets add and take, and their share of the bed's bend.
-+const SURFACE_GAIN: f32 = 0.55;
++const SURFACE_GAIN: f32 = 0.8;
 +const SURFACE_SWELL_YD: f32 = 12.0;
 +const SURFACE_SWELL_SPEED: f32 = 0.15;
 +const SURFACE_SWELL_VARY: f32 = 0.6;
@@ -941,14 +968,37 @@ index dfbd806..d70802b 100644
 +const SURFACE_GLINT: f32 = 0.35;
 +const SURFACE_GLINT_MOST: f32 = 1.6;
 +const SURFACE_GLINT_FINE: f32 = 0.5;
-+const SURFACE_SHADE: f32 = 0.12;
-+const SURFACE_BEND: f32 = 0.6;
++const SURFACE_SHADE: f32 = 0.15;
++const SURFACE_BEND: f32 = 1.1;
 +// The long pair's share of the four layers' slope variance (`tune::WEIGHT`: 1.64 of 1.98).
 +const SURFACE_LONG_SHARE: f32 = 0.82828283;
++// `look::water_surface::tune`'s sixth-round numbers (`look::water`'s test compares them): the
++// grain's own share of the brightness and of the bed's bend; the milky in-scatter (the share of
++// the bed's light it takes at most, the yards of path over which it comes in, its colour (sRGB)
++// and how far the shallow colour goes to it); the surface's own shallow-to-deep span; its mirror
++// looking straight down; the share of the hour's sun shadow the water takes, feathered over
++// `SURFACE_SHADOW_YD` with `SURFACE_SHADOW_TAPS` taps; the bed's light a multiple of
++// `lookwater caustics`' and its pace; and the shore's haze, its share and its spread.
++const SURFACE_SHADE_GRAIN: f32 = 0.45;
++const SURFACE_BEND_GRAIN: f32 = 0.4;
++const SURFACE_MILK: f32 = 0.38;
++const SURFACE_MILK_YD: f32 = 0.9;
++const SURFACE_MILK_RGB: vec3<f32> = vec3<f32>(0.4, 0.59, 0.5);
++const SURFACE_MILK_MIX: f32 = 0.85;
++const SURFACE_DEEP_FROM: f32 = 1.0;
++const SURFACE_DEEP_AT: f32 = 5.0;
++const SURFACE_F0: f32 = 0.07;
++const SURFACE_SHADOW: f32 = 0.5;
++const SURFACE_SHADOW_YD: f32 = 3.5;
++const SURFACE_SHADOW_TAPS: u32 = 12u;
++const SURFACE_CAUSTICS: f32 = 1.6;
++const SURFACE_CAUSTICS_PACE: f32 = 3.0;
++const SURFACE_HAZE: f32 = 0.4;
++const SURFACE_HAZE_SPREAD: f32 = 2.0;
  
  fn water_decode(c: vec3<f32>) -> vec3<f32> {
      let x = max(c, vec3<f32>(0.0));
-@@ -574,7 +650,7 @@ fn water_shadow_tap(t: vec2<f32>, layer: i32, z: f32, lim: i32) -> f32 {
+@@ -574,7 +673,7 @@ fn water_shadow_tap(t: vec2<f32>, layer: i32, z: f32, lim: i32) -> f32 {
  // How much of the sun reaches the water surface at P (eye depth `eye_z`), 1 lit, at the hour's
  // strength: the sun shadows' low filter on the slice P falls in (`look::shadows`; the receivers'
  // `sun_shadow` in terrain.wgsl is the full one), faded out over the reach's last share.
@@ -957,7 +1007,7 @@ index dfbd806..d70802b 100644
      let head = wow_light.shadow[0];
      if (head.x < 0.5 || eye_z >= head.w) {
          return 1.0;
-@@ -603,11 +679,13 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
+@@ -603,17 +702,87 @@ fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
      let t = uv * res;
      let lim = i32(res) - 1;
      let turn = 6.2831853 * fract(52.9829189 * fract(dot(pix, vec2<f32>(0.06711056, 0.00583715))));
@@ -972,7 +1022,81 @@ index dfbd806..d70802b 100644
      }
      lit = lit / f32(WATER_SHADOW_TAPS);
      lit = mix(lit, 1.0, smoothstep(head.z, head.w, eye_z));
-@@ -652,6 +730,200 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
+     return 1.0 - head.y * (1.0 - lit);
+ }
+ 
++// Under the drifting wavelets (`look::water_surface`): slice `c`'s light at P over a disc of
++// `SURFACE_SHADOW_YD`, or -1 where P falls outside the slice.
++fn water_shadow_wide_slice(P: vec3<f32>, c: u32, turn: f32) -> f32 {
++    let centre = wow_light.shadow[6u + 2u * c];
++    let depth = wow_light.shadow[7u + 2u * c]; // near, 1/range, texel (yd), blend start
++    let res = wow_light.shadow[2].w;
++    let travel = wow_light.shadow[4].xyz;
++    let facing = clamp(-travel.y, 0.0, 1.0);
++    let push = depth.z * wow_light.shadow[4].w * (1.0 - 0.5 * facing);
++    let d = (P + vec3<f32>(0.0, push, 0.0)) - centre.xyz;
++    let uv = vec2<f32>(dot(d, wow_light.shadow[2].xyz), -dot(d, wow_light.shadow[3].xyz))
++        * (0.5 * centre.w) + vec2<f32>(0.5);
++    if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
++        return -1.0;
++    }
++    let z = (dot(d, travel) - depth.x) * depth.y - depth.z * wow_light.shadow[5].w * depth.y;
++    let t = uv * res;
++    let lim = i32(res) - 1;
++    let reach = max(WATER_SHADOW_TEXELS, SURFACE_SHADOW_YD / max(depth.z, 1e-4));
++    var lit = 0.0;
++    for (var i = 0u; i < SURFACE_SHADOW_TAPS; i = i + 1u) {
++        let r = sqrt((f32(i) + 0.5) / f32(SURFACE_SHADOW_TAPS));
++        let a = f32(i) * 2.3999632 + turn;
++        lit += water_shadow_tap(t + vec2<f32>(cos(a), sin(a)) * r * reach, i32(c), z, lim);
++    }
++    return lit / f32(SURFACE_SHADOW_TAPS);
++}
++
++// The sun's share at the surface under the drifting wavelets: the sixth filming's straight
++// diagonal seam was the shadow's hand-over between two slices (the water took the nearer slice's
++// shade up to a line of one eye depth, and none past it), and a canopy's edge drew sharp across
++// the lake. Here a point off a slice falls through to the next and the last share of a slice
++// blends into the next, as the ground's do (terrain.wgsl's `sun_shadow`); the edge is feathered
++// over `SURFACE_SHADOW_YD`, and the water takes `SURFACE_SHADOW` of the hour's shade (the
++// in-scatter and the sky's light still reach it).
++fn water_shadow_wide(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
++    let head = wow_light.shadow[0];
++    if (head.x < 0.5 || eye_z >= head.w) {
++        return 1.0;
++    }
++    let count = u32(head.x);
++    var c = 0u;
++    for (var i = 0u; i + 1u < count; i = i + 1u) {
++        if (eye_z > wow_light.shadow[1][i]) {
++            c = i + 1u;
++        }
++    }
++    let turn = 6.2831853 * fract(52.9829189 * fract(dot(pix, vec2<f32>(0.06711056, 0.00583715))));
++    var lit = water_shadow_wide_slice(P, c, turn);
++    if (lit < 0.0 && c + 1u < count) {
++        c = c + 1u;
++        lit = water_shadow_wide_slice(P, c, turn);
++    }
++    if (lit < 0.0) {
++        return 1.0;
++    }
++    let blend_from = wow_light.shadow[7u + 2u * c].w;
++    if (c + 1u < count && eye_z > blend_from) {
++        let next = water_shadow_wide_slice(P, c + 1u, turn);
++        if (next >= 0.0) {
++            let w = (eye_z - blend_from) / max(wow_light.shadow[1][c] - blend_from, 1e-3);
++            lit = mix(lit, next, clamp(w, 0.0, 1.0));
++        }
++    }
++    lit = mix(lit, 1.0, smoothstep(head.z, head.w, eye_z));
++    return 1.0 - head.y * SURFACE_SHADOW * (1.0 - lit);
++}
++
+ // The rain's rings on the water (`look::weather`, benilla's own): in cells of about two-thirds of a
+ // yard, three offset layers, a drop lands in a share of the cells (`amount`, the rain) and its ring
+ // spreads and fades over about two-thirds of a second, each cell on its own beat. Returns the
+@@ -652,6 +821,205 @@ fn rain_rings(p: vec2<f32>, t: f32, amount: f32, fp: f32) -> vec2<f32> {
      return slope * (0.9 * amount * fade);
  }
  
@@ -1140,13 +1264,18 @@ index dfbd806..d70802b 100644
 +// off the screen, or on the sky, is left out, and none reads shallower than `WATER_SEAM_FLOOR` of
 +// P's own, so a swimmer's legs under the water do not clear a halo round him.
 +fn water_depth_smoothed(P: vec3<f32>, cam: vec3<f32>, depth_v: f32) -> f32 {
-+    // Round P, not on it: P's own depth is the step itself.
++    // Round P, not on it: P's own depth is the step itself. The taps come in opposite pairs, so
++    // on an even slope they average to P's own depth whatever their turn: with the taps' centre
++    // off P, the turn's wander over the surface drew swirling contours across the sixth
++    // filming's `show clear`.
 +    var sum = 0.0;
 +    var n = 0.0;
 +    let spin = 6.2831853 * water_noise(P.xz * 0.37 + vec2<f32>(5.0, -3.0)).x;
++    let pairs = WATER_SEAM_TAPS / 2u;
 +    for (var k = 0u; k < WATER_SEAM_TAPS; k = k + 1u) {
-+        let ang = f32(k) * 2.3999632 + spin;
-+        let r = WATER_SEAM_YD * sqrt((f32(k) + 0.5) / f32(WATER_SEAM_TAPS));
++        let j = k / 2u;
++        let ang = f32(j) * 2.3999632 + spin + 3.1415927 * f32(k % 2u);
++        let r = WATER_SEAM_YD * sqrt((f32(j) + 0.5) / f32(pairs));
 +        let Q = P + vec3<f32>(cos(ang) * r, 0.0, sin(ang) * r);
 +        let cq = view.clip_from_world * vec4<f32>(Q, 1.0);
 +        if (cq.w <= 0.05) {
@@ -1173,7 +1302,7 @@ index dfbd806..d70802b 100644
  // The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
  // spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
  // by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
-@@ -685,17 +957,67 @@ fn look_water(
+@@ -685,29 +1053,114 @@ fn look_water(
          depth_v = max(cam.y - P.y, 0.0) * beyond;
      }
      let shore = smoothstep(0.0, water.rows[7].w, depth_v);
@@ -1226,7 +1355,8 @@ index dfbd806..d70802b 100644
 +        let k = calm_shore;
 +        N = normalize(vec3<f32>(-(surf.total.x * k + more.x), 1.0, -(surf.total.y * k + more.y)));
 +        N_glint = normalize(vec3<f32>(-(surf.glint.x * k + more.x), 1.0, -(surf.glint.y * k + more.y)));
-+        let bend = surf.broad * (k * SURFACE_BEND) + more;
++        let bend = surf.broad * (k * SURFACE_BEND) + (surf.total - surf.broad) * (k * SURFACE_BEND_GRAIN)
++            + more;
 +        N_bend = normalize(vec3<f32>(-bend.x, 1.0, -bend.y));
 +    } else {
 +        N = normalize(N + vec3<f32>(-wake.slope.x, 0.0, -wake.slope.y) * water.rows[24].x);
@@ -1243,27 +1373,59 @@ index dfbd806..d70802b 100644
 +    if (by_colour) {
 +        soft = WATER_SHADOW_SOFT_YD;
 +    }
-+    let vis = water_shadow(P, eye_z, pix, soft);
++    var vis = 1.0;
++    if (surface_on) {
++        vis = water_shadow_wide(P, eye_z, pix);
++    } else {
++        vis = water_shadow(P, eye_z, pix, soft);
++    }
  
      // The water's own colour: shallow to deep, ours blended with the zone's, lit by its light.
++    // Under the drifting wavelets the shallows are a pale milky green (Corey's reference pond,
++    // the fifth filming's lake about 50 against its 127 of luminance), turning deep over a
++    // longer span, so the shelf's middle depths draw no pale band of their own.
      let tint_w = water.rows[5].w;
-@@ -707,7 +1029,14 @@ fn look_water(
+-    let sh = mix(shallow_g, water.rows[5].rgb, tint_w);
++    var sh = mix(shallow_g, water.rows[5].rgb, tint_w);
+     let dp = mix(deep_g, water.rows[6].rgb, tint_w);
++    var deep_from = water.rows[25].z;
++    var deep_at = water.rows[6].w;
++    if (surface_on) {
++        sh = mix(sh, SURFACE_MILK_RGB, SURFACE_MILK_MIX);
++        deep_from = SURFACE_DEEP_FROM;
++        deep_at = SURFACE_DEEP_AT;
++    }
+     let to_light = -normalize(wow_light.light_sun.xyz);
+     let lit_g = clamp(
+         wow_light.light_ambient.rgb + wow_light.light_diffuse.rgb * max(to_light.y, 0.0) * vis,
          vec3<f32>(0.0),
          vec3<f32>(1.0),
      );
 -    var body = water_decode(mix(sh, dp, smoothstep(0.0, water.rows[6].w, depth_v)) * lit_g);
-+    var body = water_decode(mix(sh, dp, smoothstep(water.rows[25].z, water.rows[6].w, depth_c)) * lit_g);
-+    // The wavelets shade it: a facet turned toward the sun a little brighter, away a little
-+    // darker, so the sheet's brightness follows them.
++    var body = water_decode(mix(sh, dp, smoothstep(deep_from, deep_at, depth_c)) * lit_g);
++    // The wavelets shade the water (all of it, the bed seen through it too): a facet turned
++    // toward the sun's bearing brighter, away darker, the long pair by `SURFACE_SHADE` and the
++    // grain by `SURFACE_SHADE_GRAIN` each at its own mean tilt, so the fine grain shows and its
++    // drift moves the sheet's brightness; half of it in shade, calmed into the shore.
++    var facet = 1.0;
 +    if (surface_on && surf.s > 1e-4) {
 +        let sun_flat = vec2<f32>(to_light.x, to_light.z);
-+        let toward = -dot(surf.total, sun_flat) / (2.0 * surf.s);
-+        body *= 1.0 + SURFACE_SHADE * clamp(toward, -1.0, 1.0) * max(to_light.y, 0.0) * vis;
++        var bearing = normalize(vec2<f32>(0.8, 0.6));
++        if (length(sun_flat) > 1e-3) {
++            bearing = sun_flat / length(sun_flat);
++        }
++        let grain = surf.total - surf.broad;
++        let toward_long = -dot(surf.broad, bearing) / (2.0 * surf.s * sqrt(SURFACE_LONG_SHARE));
++        let toward_grain = -dot(grain, bearing) / (2.0 * surf.s * sqrt(1.0 - SURFACE_LONG_SHARE));
++        let day = clamp(4.0 * to_light.y, 0.0, 1.0);
++        facet = 1.0 + (SURFACE_SHADE * clamp(toward_long, -1.0, 1.0)
++            + SURFACE_SHADE_GRAIN * clamp(toward_grain, -1.0, 1.0))
++            * (0.5 + 0.5 * vis * day) * calm_shore;
 +    }
      // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term). By night (the
      // glint is the moon's lane, a negative sharpness) its white flecks keep a share off the lane.
      var flecks = water.rows[9].x;
-@@ -716,14 +1045,41 @@ fn look_water(
+@@ -716,18 +1169,55 @@ fn look_water(
          let on_lane = water_moon_lane(R_flat, normalize(water.rows[1].xyz), WATER_NIGHT_FLECK_LANE);
          flecks *= mix(WATER_NIGHT_FLECKS, 1.0, clamp(on_lane, 0.0, 1.0));
      }
@@ -1302,12 +1464,28 @@ index dfbd806..d70802b 100644
 +    var trans3 = vec3<f32>(trans);
 +    if (by_colour) {
 +        trans3 = exp(-path_c * water.rows[26].xyz / max(clarity, 0.05));
++        // Under the drifting wavelets the water is milky: over the first yard of the view's path
++        // it takes up to `SURFACE_MILK` of the bed's light and lays its own pale colour there, so
++        // the bed shows through a pale veil, as the reference pond's does; none at the waterline.
++        if (surface_on) {
++            trans3 *= 1.0 - SURFACE_MILK * (1.0 - exp(-path_c / SURFACE_MILK_YD));
++        }
 +        trans = max(trans3.x, max(trans3.y, trans3.z));
 +    }
  
-     // The mirror: Fresnel (Schlick), held by `lookwater`, in from the waterline.
+-    // The mirror: Fresnel (Schlick), held by `lookwater`, in from the waterline.
++    // The mirror: Fresnel (Schlick), held by `lookwater`, in from the waterline; a little more of
++    // the sky looking down on the drifting wavelets.
      let cos_v = clamp(dot(N, V), 0.0, 1.0);
-@@ -762,7 +1118,17 @@ fn look_water(
+-    let f0 = water.rows[7].y;
++    var f0 = water.rows[7].y;
++    if (surface_on) {
++        f0 = SURFACE_F0;
++    }
+     let fres = clamp((f0 + (1.0 - f0) * pow(1.0 - cos_v, 5.0)) * water.rows[0].y, 0.0, 1.0) * shore;
+     var R = reflect(-V, N);
+     // A ripple never mirrors into the water itself.
+@@ -762,7 +1252,17 @@ fn look_water(
      if (water.rows[1].w > 0.0 && body_dir.y > -0.05) {
          let sharp = water.rows[2].w;
          var spec = 0.0;
@@ -1326,7 +1504,7 @@ index dfbd806..d70802b 100644
              let H = normalize(normalize(body_dir) + V);
              let nh = clamp(dot(N, H), 0.0, 1.0);
              spec = pow(nh, sharp) + water.rows[8].w * pow(nh, sharp * 0.04);
-@@ -776,6 +1142,13 @@ fn look_water(
+@@ -776,6 +1276,13 @@ fn look_water(
                  * reach;
          }
          glint = water.rows[2].rgb * (water.rows[1].w * spec * vis * shore);
@@ -1340,7 +1518,7 @@ index dfbd806..d70802b 100644
      }
  
      // The foam: a soft line just off the waterline under the foam depth, broken up and lapping.
-@@ -791,7 +1164,8 @@ fn look_water(
+@@ -791,7 +1298,8 @@ fn look_water(
      var stand = 0.0;
      var on_step = 0.0;
      var hits = 0.0;
@@ -1350,7 +1528,7 @@ index dfbd806..d70802b 100644
          let wob = water_noise(P.xz * WATER_FROTH_WOBBLE + vec2<f32>(0.07, -0.05) * t).x;
          let reach = WATER_FROTH_YD * (0.3 + 0.9 * wob);
          // The taps' turn wanders smoothly over the surface, not pixel by pixel: the per-pixel
-@@ -847,16 +1221,121 @@ fn look_water(
+@@ -847,17 +1355,141 @@ fn look_water(
          * (1.0 - smoothstep(60.0, 120.0, eye_z));
      let foam_rgb = water_decode(lit_g) * 0.8;
  
@@ -1381,11 +1559,16 @@ index dfbd806..d70802b 100644
 +        }
 +        bed = water_decode(textureSampleLevel(scene_tex, scene_samp, ub, 0.0).rgb);
 +        // The light on the bed: the sun's (a positive sharpness), up, in the shallows.
-+        let caustics = water.rows[24].w;
++        var caustics = water.rows[24].w;
++        var t_light = t;
++        if (surface_on) {
++            caustics *= SURFACE_CAUSTICS;
++            t_light = t * SURFACE_CAUSTICS_PACE;
++        }
 +        if (caustics > 0.0 && water.rows[2].w > 0.0 && water.rows[1].w > 0.0) {
 +            let shallow_bed = smoothstep(0.03, 0.25, depth_v) * (1.0 - smoothstep(0.8, 3.0, depth_v));
 +            let fpb = fp * (1.0 + path / max(dist, 1.0));
-+            bed *= 1.0 + caustics * vis * shallow_bed * water_caustics(at_bed.xz - lean, t, fpb);
++            bed *= 1.0 + caustics * vis * shallow_bed * water_caustics(at_bed.xz - lean, t_light, fpb);
 +        }
 +        let bend_px = length((ub - uv) * view.viewport.zw);
 +        bend_w = smoothstep(0.3, 1.5, bend_px);
@@ -1394,8 +1577,16 @@ index dfbd806..d70802b 100644
 +
 +    // The shore's haze: none at the waterline, a faint pale veil over the first stretch of depth,
 +    // drifting with the noise; no foam line.
-+    let haze = water.rows[25].x * smoothstep(0.0, 0.04, depth_v)
-+        * (1.0 - smoothstep(0.1, max(water.rows[25].y, 0.11), depth_v)) * (0.7 + 0.6 * na);
++    // Under the drifting wavelets, whose milk veils the shallows already, fainter and spread over
++    // twice the depth, so it draws no pale band along the shore.
++    var haze_share = water.rows[25].x;
++    var haze_to = max(water.rows[25].y, 0.11);
++    if (surface_on) {
++        haze_share *= SURFACE_HAZE;
++        haze_to *= SURFACE_HAZE_SPREAD;
++    }
++    let haze = haze_share * smoothstep(0.0, 0.04, depth_v)
++        * (1.0 - smoothstep(0.1, haze_to, depth_v)) * (0.7 + 0.6 * na);
 +    let haze_rgb = mix(water_decode(lit_g), water.rows[3].rgb, 0.3) * 0.85;
 +
 +    // The wakes' foam: thin white streaks along the ridges of the foam where the field holds a
@@ -1443,6 +1634,7 @@ index dfbd806..d70802b 100644
 +        c = mirror * fres + body * ((1.0 - fres) * (1.0 - trans3));
 +        a = 1.0 - (1.0 - fres) * min(trans3.x, min(trans3.y, trans3.z));
 +    }
++    c *= facet;
 +    c += glint + sparkle * (1.0 - fres);
 +    a = max(a, min(dot(glint + sparkle, WATER_LUMA), 1.0));
 +    c = c * (1.0 - haze) + haze_rgb * haze;
@@ -1454,6 +1646,7 @@ index dfbd806..d70802b 100644
 +    c = c * (1.0 - wfoam) + wfoam_rgb * wfoam;
 +    a = a * (1.0 - wfoam) + wfoam;
      a = clamp(a, 0.0, 1.0);
+-    let rgb = water_encode(c / max(a, 1e-4));
 +    // `lookwater show`: what the water is drawn from, in its place, for film.
 +    if (surface_on && water.rows[29].w > 0.5) {
 +        let mode = u32(water.rows[29].w + 0.5);
@@ -1475,9 +1668,15 @@ index dfbd806..d70802b 100644
 +        }
 +        return vec4<f32>(dbg, 1.0);
 +    }
-     let rgb = water_encode(c / max(a, 1e-4));
++    var rgb = water_encode(c / max(a, 1e-4));
++    // Under the drifting wavelets the pale water's broad, slow gradients are dithered by half a
++    // step of the eight-bit target, so they turn without bands.
++    if (surface_on) {
++        rgb += vec3<f32>((jitter - 0.5) / 255.0);
++    }
      return vec4<f32>(apply_fog(rgb, P, in.room_fog), a);
  }
+ 
 diff --git a/crates/benilla-world/src/liquid/surface.rs b/crates/benilla-world/src/liquid/surface.rs
 index 6257971..4dc8ef2 100644
 --- a/crates/benilla-world/src/liquid/surface.rs
@@ -3523,7 +3722,7 @@ index 0000000..2190cc8
 +    graph.add_node_edge(LookWakesLabel, bevy::render::graph::CameraDriverLabel);
 +}
 diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
-index ec1dc9f..4a1e9bf 100644
+index ec1dc9f..45c2625 100644
 --- a/crates/benilla-world/src/look/water.rs
 +++ b/crates/benilla-world/src/look/water.rs
 @@ -46,16 +46,79 @@ pub mod tune {
@@ -3792,7 +3991,7 @@ index ec1dc9f..4a1e9bf 100644
          assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
          assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
          assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
-@@ -836,6 +981,58 @@ mod tests {
+@@ -836,6 +981,83 @@ mod tests {
          assert_eq!(f("WATER_MOON_GLINT_MEAN"), tune::MOON_GLINT_MEAN);
          assert_eq!(f("WATER_NIGHT_FLECKS"), tune::NIGHT_FLECKS);
          assert_eq!(f("WATER_NIGHT_FLECK_LANE"), tune::NIGHT_FLECK_LANE);
@@ -3833,6 +4032,31 @@ index ec1dc9f..4a1e9bf 100644
 +            let w2: f32 = sf::WEIGHT.iter().map(|w| w * w).sum();
 +            let share = (sf::WEIGHT[0].powi(2) + sf::WEIGHT[1].powi(2)) / w2;
 +            assert!((f("SURFACE_LONG_SHARE") - share).abs() < 1.0e-6);
++            assert_eq!(f("SURFACE_SHADE_GRAIN"), sf::SHADE_GRAIN);
++            assert_eq!(f("SURFACE_BEND_GRAIN"), sf::BEND_GRAIN);
++            assert_eq!(f("SURFACE_MILK"), sf::MILK);
++            assert_eq!(f("SURFACE_MILK_YD"), sf::MILK_YD);
++            let [r, g, b] = sf::MILK_RGB;
++            assert!(src.contains(&format!(
++                "const SURFACE_MILK_RGB: vec3<f32> = vec3<f32>({r:?}, {g:?}, {b:?});"
++            )));
++            assert_eq!(f("SURFACE_MILK_MIX"), sf::MILK_MIX);
++            assert_eq!(f("SURFACE_DEEP_FROM"), sf::DEEP_FROM);
++            assert_eq!(f("SURFACE_DEEP_AT"), sf::DEEP_AT);
++            assert_eq!(f("SURFACE_F0"), sf::F0);
++            assert_eq!(f("SURFACE_SHADOW"), sf::SHADOW);
++            assert_eq!(f("SURFACE_SHADOW_YD"), sf::SHADOW_YD);
++            assert_eq!(
++                read("SURFACE_SHADOW_TAPS", "u32")
++                    .trim_end_matches('u')
++                    .parse::<u32>()
++                    .unwrap(),
++                sf::SHADOW_TAPS
++            );
++            assert_eq!(f("SURFACE_CAUSTICS"), sf::CAUSTICS);
++            assert_eq!(f("SURFACE_CAUSTICS_PACE"), sf::CAUSTICS_PACE);
++            assert_eq!(f("SURFACE_HAZE"), sf::HAZE);
++            assert_eq!(f("SURFACE_HAZE_SPREAD"), sf::HAZE_SPREAD);
 +        }
 +        {
 +            use crate::look::wakes::tune as wk;
@@ -3851,7 +4075,7 @@ index ec1dc9f..4a1e9bf 100644
          let taps = read("WATER_FROTH_TAPS", "u32");
          assert_eq!(
              taps.trim_end_matches('u').parse::<u32>().unwrap(),
-@@ -843,10 +1040,129 @@ mod tests {
+@@ -843,10 +1065,129 @@ mod tests {
          );
      }
  
@@ -3984,7 +4208,7 @@ index ec1dc9f..4a1e9bf 100644
      }
  
      /// Under the painted sky the mirror takes its rows, and the cloud over the sun dims the glint;
-@@ -859,8 +1175,10 @@ mod tests {
+@@ -859,8 +1200,10 @@ mod tests {
              &noon(),
              &SkyFrame::default(),
              0.0,
@@ -3996,7 +4220,7 @@ index ec1dc9f..4a1e9bf 100644
          let input = crate::look::sky::SkyInputs {
              secs: 1.76e9,
              minute: 720.0,
-@@ -868,8 +1186,16 @@ mod tests {
+@@ -868,8 +1211,16 @@ mod tests {
              held: Some(1.0),
          };
          let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
@@ -4017,10 +4241,10 @@ index ec1dc9f..4a1e9bf 100644
      }
 diff --git a/crates/benilla-world/src/look/water_surface.rs b/crates/benilla-world/src/look/water_surface.rs
 new file mode 100644
-index 0000000..b0b7b6f
+index 0000000..1480fe5
 --- /dev/null
 +++ b/crates/benilla-world/src/look/water_surface.rs
-@@ -0,0 +1,706 @@
+@@ -0,0 +1,839 @@
 +//! The open water's moving surface under the wakes, benilla's own (no reference behaviour).
 +//!
 +//! Corey's reference pond (a retail lake seen from steeply above) moves as a sheet: a fine, even
@@ -4044,7 +4268,12 @@ index 0000000..b0b7b6f
 +//! 3. **read by the water** (`liquid.wgsl`): the short pair fades out where a pixel spans its
 +//!    wavelets and the long pair further off; what fades is handed to the sun's highlight as
 +//!    roughness (it widens and dims rather than flickering into specks); a slow, untiled swell
-+//!    over about 12 yd varies their strength so the tile never shows.
++//!    over about 12 yd varies their strength so the tile never shows;
++//! 4. **pale and moving** (the sixth round, against the fifth filming's dark, near-still lake):
++//!    the shallows take a milky in-scatter that veils the bed in pale green ([`tune::MILK`]), the
++//!    wavelets shade the whole of the water's light, the grain by its own share
++//!    ([`tune::SHADE_GRAIN`]), the bed bends under the grain too, and the sun shadow on the water
++//!    is feathered over a few yards at half strength ([`tune::SHADOW`]).
 +//!
 +//! `lookwater wakes 0`, `worldWater 0` and `worldLook 0` never bake it and draw the water as before.
 +
@@ -4075,10 +4304,15 @@ index 0000000..b0b7b6f
 +    pub const CELLS: [u32; 4] = [8, 20, 46, 128];
 +    /// Each layer's share of the slope: the long swells most, the fine grain least.
 +    pub const WEIGHT: [f32; 4] = [1.0, 0.8, 0.5, 0.3];
-+    /// How fast each layer drifts (yd/s) and how far it is turned off downwind (degrees): gentle,
-+    /// the short ones a little quicker, crossing each other.
-+    pub const SPEED_YD: [f32; 4] = [0.3, 0.4, 0.5, 0.6];
-+    pub const TURN_DEG: [f32; 4] = [0.0, 30.0, -40.0, 75.0];
++    /// How fast each layer drifts (yd/s) and how far it is turned off downwind (degrees), crossing
++    /// each other, the finest well across the wind, so the sheet never slides one way as a
++    /// conveyor. Sixth round: the fifth filming's lake changed about 14 times less from frame to
++    /// frame than the reference pond (0.11 against 1.52 of luminance at 30 fps), so the 0.56 and
++    /// 0.2 yd wavelets go at 1.1 and 1.0 yd/s (were 0.5 and 0.6), about a wave's own pace at that
++    /// length, and the longer two a little quicker (0.5 and 0.8, were 0.3 and 0.4); turned 0, 35,
++    /// -55 and 120 (were 0, 30, -40 and 75).
++    pub const SPEED_YD: [f32; 4] = [0.5, 0.8, 1.1, 1.0];
++    pub const TURN_DEG: [f32; 4] = [0.0, 35.0, -55.0, 120.0];
 +    /// The gradient noise's slope per cell, root mean square, per axis (measured: 0.625).
 +    pub const NOISE_RMS: f32 = 0.625;
 +    /// The wind's strength over which the drift runs from [`DRIFT_CALM`] to [`DRIFT_GUSTY`] of
@@ -4087,8 +4321,9 @@ index 0000000..b0b7b6f
 +    pub const DRIFT_GUSTY: f32 = 1.3;
 +    pub const STILL_DIR: [f32; 2] = [0.8, 0.6];
 +    /// The surface's root-mean-square slope as a share of the hour's ripple slope
-+    /// (`look::water::ripple_slope`: 0.05 calm, 0.13 a day's breeze): gentle, about 0.07 by day.
-+    pub const GAIN: f32 = 0.55;
++    /// (`look::water::ripple_slope`: 0.05 calm, 0.13 a day's breeze): about 0.1 by day (0.55,
++    /// about 0.07, was too faint to see on the fifth filming).
++    pub const GAIN: f32 = 0.8;
 +    /// The untiled swell: its scale (yd), drift (yd/s) and how far it varies the slope (0.7 to
 +    /// 1.3 of it), so the tile's repeat never shows and soft broad patches drift across.
 +    pub const SWELL_YD: f32 = 12.0;
@@ -4107,12 +4342,48 @@ index 0000000..b0b7b6f
 +    /// The short pair's share in the highlight's normal: the grain shades the water but its
 +    /// steepest tips do not each catch the sun.
 +    pub const GLINT_FINE: f32 = 0.5;
-+    /// The water's brightness varies with the wavelets: a facet turned toward the sun this much
-+    /// brighter (and away, darker) at twice the mean slope.
-+    pub const SHADE: f32 = 0.12;
++    /// The water's brightness varies with the wavelets, all of it (the bed seen through it too): a
++    /// facet turned toward the sun's bearing brighter (and away, darker), at twice its pair's mean
++    /// slope by this much, the long pair [`SHADE`] and the grain [`SHADE_GRAIN`]; half of it in
++    /// shade. The fifth filming's fine texture was 3.6 against the reference's 9.9 (and mostly the
++    /// bed's leaves): the grain now shows (was 0.12 of the body alone, the grain inside it).
++    pub const SHADE: f32 = 0.15;
++    pub const SHADE_GRAIN: f32 = 0.45;
 +    /// The bed's bend from the wavelets, a share of the wakes' (`look::water::tune::REFRACT`): the
-+    /// bed wobbles gently even when nobody swims; the long pair alone bends it.
-+    pub const BEND: f32 = 0.6;
++    /// bed wobbles even when nobody swims, under the long pair ([`BEND`], was 0.6) and the grain
++    /// ([`BEND_GRAIN`], was none).
++    pub const BEND: f32 = 1.1;
++    pub const BEND_GRAIN: f32 = 0.4;
++    /// The milky shallows: the fifth filming's lake was dark (about 50 of luminance) where the
++    /// reference pond is pale and milky green (about 127). Over the view's path through the water
++    /// the bed's light gives way to the water's own, at most [`MILK`] of it, coming in over
++    /// [`MILK_YD`] of path (none at the waterline); the shallow colour goes [`MILK_MIX`] of the way
++    /// to [`MILK_RGB`] (sRGB), a pale green a little warm, and turns to the deep from
++    /// [`DEEP_FROM`] to [`DEEP_AT`] (the classic surface's 1.2 to 3.5 drew a pale band down the
++    /// shelf's middle depths). A little more of the sky's mirror looking down ([`F0`], 0.04 else).
++    pub const MILK: f32 = 0.38;
++    pub const MILK_YD: f32 = 0.9;
++    pub const MILK_RGB: [f32; 3] = [0.4, 0.59, 0.5];
++    pub const MILK_MIX: f32 = 0.85;
++    pub const DEEP_FROM: f32 = 1.0;
++    pub const DEEP_AT: f32 = 5.0;
++    pub const F0: f32 = 0.07;
++    /// The sun shadow on the water: it takes [`SHADOW`] of the hour's shade (the in-scatter and the
++    /// sky still light it), feathered over a disc of [`SHADOW_YD`] ([`SHADOW_TAPS`] taps), a point
++    /// off a slice falling through to the next and a slice's last share blending into it, as the
++    /// ground's do. The fifth filming's straight diagonal seam was the shade's hand-over between
++    /// two slices (`lookwater show shadow` drew it, `lookshadow 0` took it away).
++    pub const SHADOW: f32 = 0.5;
++    pub const SHADOW_YD: f32 = 3.5;
++    pub const SHADOW_TAPS: u32 = 12;
++    /// The moving light on the shallow bed: this multiple of `lookwater caustics`' strength, at
++    /// this multiple of its pace.
++    pub const CAUSTICS: f32 = 1.6;
++    pub const CAUSTICS_PACE: f32 = 3.0;
++    /// The shore's pale haze: this share of it (the milk veils the shallows already), spread over
++    /// this multiple of its depth, so no pale band runs along the shore.
++    pub const HAZE: f32 = 0.4;
++    pub const HAZE_SPREAD: f32 = 2.0;
 +}
 +
 +/// The bake's uniform: two rows of the four layers' offsets (cells) and one of
@@ -4620,7 +4891,7 @@ index 0000000..b0b7b6f
 +            let n = Vec3::new(-(t.x + t.z) * s, 1.0, -(t.y + t.w) * s).normalize();
 +            let v = (cam - Vec3::new(p.x, 0.0, p.y)).normalize();
 +            let c = n.dot(v).clamp(0.0, 1.0);
-+            wt::F0 + (1.0 - wt::F0) * (1.0 - c).powi(5)
++            tune::F0 + (1.0 - tune::F0) * (1.0 - c).powi(5)
 +        };
 +        let steep = Vec3::new(0.0, 17.5, 4.0);
 +        let mut most = 0.0f32;
@@ -4628,13 +4899,108 @@ index 0000000..b0b7b6f
 +            let p = Vec2::new((k % 20) as f32 * 0.4 - 4.0, (k / 20) as f32 * 0.4 - 4.0);
 +            most = most.max(fresnel(steep, p));
 +        }
-+        assert!(most < 0.06, "steep {most}");
++        assert!(most < 0.1, "steep {most}");
 +        let grazing = Vec3::new(0.0, 2.0, 30.0);
 +        let mut least = 1.0f32;
 +        for k in 0..20 {
 +            least = least.min(fresnel(grazing, Vec2::new(k as f32 * 0.3, 0.0)));
 +        }
 +        assert!(least > 0.3, "grazing {least}");
++    }
++
++    /// `liquid.wgsl`'s `water_depth_smoothed` on the flat (no taps lost): the mean of the bed's
++    /// depth `bed` over the seam's taps round `p` turned by `spin`, none shallower than
++    /// `SEAM_FLOOR` of `p`'s own; `paired` the sixth round's opposite pairs, else the fifth's
++    /// eight taps of one spiral.
++    fn seam_mean(bed: &dyn Fn(Vec2) -> f32, p: Vec2, spin: f32, paired: bool) -> f32 {
++        use crate::look::water::tune as wt;
++        let d = bed(p);
++        let mut sum = 0.0;
++        for k in 0..wt::SEAM_TAPS {
++            let (ang, r) = if paired {
++                let j = k / 2;
++                (
++                    j as f32 * 2.399_963_2 + spin + std::f32::consts::PI * (k % 2) as f32,
++                    wt::SEAM_YD * ((j as f32 + 0.5) / (wt::SEAM_TAPS / 2) as f32).sqrt(),
++                )
++            } else {
++                (
++                    k as f32 * 2.399_963_2 + spin,
++                    wt::SEAM_YD * ((k as f32 + 0.5) / wt::SEAM_TAPS as f32).sqrt(),
++                )
++            };
++            sum += bed(p + Vec2::from_angle(ang) * r).max(wt::SEAM_FLOOR * d);
++        }
++        sum / wt::SEAM_TAPS as f32
++    }
++
++    /// `show clear`'s contours: on an even slope the fifth round's taps, whose centre lay off the
++    /// pixel, read a depth that wandered with their turn (which wanders over the surface), so
++    /// the clearness drew swirling contour lines; the opposite pairs read the pixel's own depth
++    /// whatever the turn.
++    #[test]
++    fn an_even_slope_draws_no_contours() {
++        // About a yard down every four across: no tap reads shallower than the floor.
++        let bed = |p: Vec2| 2.0 + 0.2 * p.x + 0.12 * p.y;
++        let p = Vec2::new(0.3, -0.7);
++        let (mut old, mut new) = (0.0f32, 0.0f32);
++        for s in 0..32 {
++            let spin = s as f32 * 0.196;
++            old = old.max((seam_mean(&bed, p, spin, false) - bed(p)).abs());
++            new = new.max((seam_mean(&bed, p, spin, true) - bed(p)).abs());
++        }
++        assert!(new < 1.0e-4, "paired taps: {new} yd off");
++        assert!(old > 0.02, "the fifth round's: {old} yd off");
++    }
++
++    /// `liquid.wgsl`'s brightness off the wavelets at `p` at time `t` (the drift from rest along
++    /// the still wind at `pace`), with the sun's bearing `bearing`, lit, a pixel of 0.02 yd: the
++    /// factor the water's colour is shaded by (`facet`).
++    fn facet_at(p: Vec2, drift: &SurfaceDrift, bearing: Vec2) -> f32 {
++        let t = bake_at((p / tune::TILE_YD).fract_gl(), drift);
++        let (coarse, fine, _) = fades(0.02);
++        let s = crate::look::water::tune::RIPPLE_BREEZE * tune::GAIN;
++        let w2: f32 = tune::WEIGHT.iter().map(|w| w * w).sum();
++        let share = (tune::WEIGHT[0].powi(2) + tune::WEIGHT[1].powi(2)) / w2;
++        let broad = Vec2::new(t.x, t.y) * s * coarse;
++        let grain = Vec2::new(t.z, t.w) * s * fine;
++        let long = -broad.dot(bearing) / (2.0 * s * share.sqrt());
++        let short = -grain.dot(bearing) / (2.0 * s * (1.0 - share).sqrt());
++        1.0 + tune::SHADE * long.clamp(-1.0, 1.0) + tune::SHADE_GRAIN * short.clamp(-1.0, 1.0)
++    }
++
++    /// The sheet's brightness visibly drifts and has a fine grain: over a patch of open water the
++    /// facet shading changes from one 30th of a second to the next by a few hundredths of the
++    /// water's light on the mean, its grain (the short pair) spreads it by about a tenth, and
++    /// nothing jumps (the fifth round's 0.12 on the body alone, at half the pace, moved the
++    /// brightness by well under a hundredth).
++    #[test]
++    fn the_sheet_drifts_with_a_visible_grain() {
++        let bearing = Vec2::new(0.6, 0.8);
++        let mut drift = SurfaceDrift::default();
++        let n = 48;
++        let at = |k: usize| Vec2::new((k % n) as f32 * 0.05 + 1.0, (k / n) as f32 * 0.05 + 2.0);
++        let mut prev: Vec<f32> = (0..n * n).map(|k| facet_at(at(k), &drift, bearing)).collect();
++        let (mut step, mut most, mut steps) = (0.0f32, 0.0f32, 0);
++        let mut spread = 0.0f32;
++        for _ in 0..8 {
++            advance(&mut drift, Vec2::ZERO, 1.0, 1.0 / 30.0);
++            let now: Vec<f32> = (0..n * n).map(|k| facet_at(at(k), &drift, bearing)).collect();
++            for (a, b) in now.iter().zip(&prev) {
++                step += (a - b).abs();
++                most = most.max((a - b).abs());
++                steps += 1;
++            }
++            let mean = now.iter().sum::<f32>() / now.len() as f32;
++            spread += (now.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / now.len() as f32)
++                .sqrt();
++            prev = now;
++        }
++        let step = step / steps as f32;
++        let spread = spread / 8.0;
++        assert!((0.012..0.06).contains(&step), "a 30th of a second's change {step}");
++        assert!(most < 0.25, "a jump of {most}");
++        assert!((0.08..0.25).contains(&spread), "the brightness spreads {spread}");
 +    }
 +
 +    /// The seam: across a sharp step in the bed (a shelf from 1.3 to 4 yd, on the diagonal) the
@@ -4652,16 +5018,7 @@ index 0000000..b0b7b6f
 +        };
 +        let smoothed = |p: Vec2, spin: f32| {
 +            let d = bed(p);
-+            let mut sum = 0.0;
-+            let mut n = 0.0;
-+            for k in 0..wt::SEAM_TAPS {
-+                let ang = k as f32 * 2.399_963_2 + spin;
-+                let r = wt::SEAM_YD * ((k as f32 + 0.5) / wt::SEAM_TAPS as f32).sqrt();
-+                let q = p + Vec2::from_angle(ang) * r;
-+                sum += bed(q).max(wt::SEAM_FLOOR * d);
-+                n += 1.0;
-+            }
-+            let ds = sum / n;
++            let ds = seam_mean(&bed, p, spin, true);
 +            let ss = |a: f32, b: f32, x: f32| {
 +                let t = ((x - a) / (b - a)).clamp(0.0, 1.0);
 +                t * t * (3.0 - 2.0 * t)
