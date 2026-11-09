@@ -37,6 +37,21 @@ gh pr list                              # what others are working on right now
   earlier in a long session; someone may have changed it since. Prefer small, exact edits over
   rewriting whole files.
 
+## Long sessions (agents)
+
+- An agent session that runs long (a coordinator or "POV" session: Desktop, Chandrian, cloud) plans,
+  designs and decides. It hands the heavy work to a fresh subagent with a self-contained brief:
+  filming and the visual check, lab runs, test sweeps and simulated-player reports, builds, rebases
+  and merges, log digging, and reading across many files.
+- Why: every action in a long session re-sends its whole history, so the same work costs many times
+  more there than in a fresh subagent.
+- The brief says the goal, the files, what's already decided, what done looks like, and the standing
+  rules (this file's). The subagent reports back briefly (a few hundred words), keeps screenshots
+  and image reads to what it needs, and the long session relays that report rather than re-reading
+  the subagent's files.
+- Routine subagent work can run on a cheaper model; design work keeps the strongest.
+- Design context lives in `docs/` and this file, so a fresh subagent works from the same vision.
+
 ## Branches, commits and pull requests
 
 - Branch from the latest `main`: `git switch -c <who>/<what>`, e.g. `claude/ledger-ui-tooltips`,

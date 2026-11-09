@@ -1,0 +1,42 @@
+# The cameraman's first film: the warrior against Captain Greenskin on the landing's deck, filmed
+# from outside the fight (docs/visual-check.md, "Filming a boss"). Dev setup: the deck is cleared,
+# the captain spawned and the warrior put before him, all before the video. From then on only the
+# warrior's own keys (.es in) play: lock on, swings, a sidestep, a guard. It shows the camera, not
+# the fight's balance.
+hero warrior
+camera duel Captain Greenskin
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes
+12 .es goto -70 -815 41.5 0
+13 .es spawn dm_greenskin
+13.5 .es goto -66 -815 41.5 0
+14 .es heal
+14.5 .es in lock
+15 video
+16 .es in a
+16.1 .es in au
+17.2 .es in a
+17.3 .es in au
+18.4 .es in a
+18.5 .es in au
+20 lua ActionDash(0.45, 6, "l")
+21.5 .es in a
+21.6 .es in au
+22.7 .es in a
+22.8 .es in au
+24 .es in g
+25.5 .es in gu
+26.5 .es in a
+26.6 .es in au
+27.7 .es in a
+27.8 .es in au
+29 lua ActionDash(0.45, 6, "r")
+30.5 .es in a
+30.6 .es in au
+31.7 .es in a
+31.8 .es in au
+16 shots fight 18 1.0
+36 end

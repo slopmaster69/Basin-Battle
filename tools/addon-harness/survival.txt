@@ -445,13 +445,16 @@ SG
 !table.insert(SAID, "siege gone: '" .. tostring(ElwynnSurvivalInfo.siege:GetText()) .. "'")
 WR	camp
 !SetGroundMarker = SetGroundMarker or function() end ClearGroundMarker = ClearGroundMarker or function() end
-!this = ElwynnSurvivalKeys.marks; ElwynnSurvivalKeys.marks:GetScript("OnClick")()
-!table.insert(SAID, "markers: " .. tostring(ElwynnSurvival.MarksOn()) .. " / " .. tostring(ElwynnSurvivalKeys.marks.label:GetText()))
+!ElwynnSurvivalSettings.noMarks = nil ElwynnSurvival.DrawKeys() assert(ElwynnSurvival.MarksOn() == false and ElwynnSurvivalKeys.marks.label:GetText() == "Hidden", "unset floor markers must start Hidden")
 MK	t1	1	2	3	2	1	0
-!table.insert(SAID, "a marker while off: " .. tostring(ElwynnSurvival.marksUp.mk["est1"]))
-!this = ElwynnSurvivalKeys.marks; ElwynnSurvivalKeys.marks:GetScript("OnClick")()
+!assert(ElwynnSurvival.marksUp.mk["est1"] == nil, "default must suppress floor markers") table.insert(SAID, "a marker while hidden by default: " .. tostring(ElwynnSurvival.marksUp.mk["est1"]))
+!this = ElwynnSurvivalKeys.marks; this:GetScript("OnClick")() assert(ElwynnSurvivalSettings.noMarks == false and ElwynnSurvival.MarksOn() == true and this.label:GetText() == "Shown", "Controls must save false to show floor markers")
 MK	t1	1	2	3	2	1	0
-!table.insert(SAID, "a marker while on: " .. tostring(ElwynnSurvival.marksUp.mk["est1"]))
+!assert(ElwynnSurvival.marksUp.mk["est1"] == 1, "shown floor markers must draw") table.insert(SAID, "a marker while shown: " .. tostring(ElwynnSurvival.marksUp.mk["est1"]))
+!FLOOR_OLD_CLEAR = ClearGroundMarker FLOOR_CLEARED = {} ClearGroundMarker = function(k) FLOOR_CLEARED[k] = true FLOOR_OLD_CLEAR(k) end
+!this = ElwynnSurvivalKeys.marks; this:GetScript("OnClick")() assert(ElwynnSurvivalSettings.noMarks == 1 and ElwynnSurvival.MarksOn() == false and this.label:GetText() == "Hidden", "Controls must save 1 to hide floor markers") assert(FLOOR_CLEARED["est1"] and ElwynnSurvival.marksUp.mk["est1"] == nil, "hiding must clear a drawn floor marker immediately") ClearGroundMarker = FLOOR_OLD_CLEAR FLOOR_OLD_CLEAR = nil FLOOR_CLEARED = nil
+MK	t1	1	2	3	2	1	0
+!assert(ElwynnSurvival.marksUp.mk["est1"] == nil, "hidden floor markers must stay suppressed") table.insert(SAID, "floor-marker default, Controls and clearing: passed")
 # The book with its dungeons (through Ledger.lua's dressing, which must pass them on).
 WR	camp
 BK	0		arena~The Proving Ring~0	siege~The Siege~Camps.	deadmines~The Deadmines~~1~1~3~1~~^stockade~The Stockade~INV_Misc_Key_04~0~1~2~1~A prison~The gate

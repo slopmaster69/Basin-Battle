@@ -1,0 +1,36 @@
+# Controlled mechanics demonstration, NOT an unassisted clear or a normal-health balance test.
+# Replaces every foe with a fresh Cookie at the authored kitchen, independent of dungeon saves.
+# First scoop succeeds; the second monster yell schedules one DEBUG damage hit to break posture.
+# All healing, debug damage, teleports and the final kill must be disclosed in the showcase.
+# Inspect native cauldron, hand/loading stand-in, fixed pour, one thinning patch, success steam,
+# spilled second scoop and four-second wound/cough stand-in. Exact particle coverage is unverified.
+hero warrior
+cam 0 -24 14
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es unbar all
+12 .es clearfoes cookie_probe_empty
+13 .es goto -71 -900 15 0
+14 lua CookieProbe = {n=0}; CookieProbe.f = CreateFrame("Frame"); CookieProbe.f:RegisterEvent("CHAT_MSG_MONSTER_YELL"); CookieProbe.f:SetScript("OnEvent", function() if arg1 and string.find(arg1, "one taste", 1, true) then CookieProbe.n=CookieProbe.n+1; if CookieProbe.n==2 then CookieProbe.due=GetTime()+1 end end end); CookieProbe.f:SetScript("OnUpdate", function() if CookieProbe.due and GetTime()>=CookieProbe.due then CookieProbe.due=nil; SendChatMessage(".es hurt 0.6 dm_cookie", "SAY") end end)
+15 .es spawn dm_cookie
+15.1 video
+16 .es hurt 0.8 dm_cookie
+17 shots first-cycle 36 0.5
+20 .es heal
+25 .es heal
+30 .es heal
+35 .es heal
+36 shots scoop-branches 60 0.5
+40 .es heal
+45 .es heal
+50 .es heal
+55 .es heal
+60 .es heal
+65 .es heal
+68 .es hurt 0 dm_cookie
+68.1 shots cleanup 10 0.3
+72 lua if CookieProbe and CookieProbe.f then CookieProbe.f:UnregisterAllEvents(); CookieProbe.f:SetScript("OnUpdate", nil) end
+73 .es clearfoes cookie_probe_empty
+74 end
