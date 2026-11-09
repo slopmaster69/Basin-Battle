@@ -59,12 +59,17 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
     for branch in ["Johnson's side gallery", "Sealed eastern niche", "Workshop rear cell", "Marisa's side room", "Pantry branch", "Smugglers' cache"] {
         assert!(props.iter().filter(|p| p.site == branch).count() >= 5, "{branch}");
     }
-    assert!(props.iter().any(|p| p.model == BOULDER && p.scale >= 2.4), "large seated cove masses");
+    assert!(props.iter().any(|p| p.site == "Juggernaut collapse basin" && p.scale >= 6.0), "large seated cove masses");
+    assert_eq!(props.iter().filter(|p| p.model == CAVE_IN).count(), 1, "native cave-in candidate stays in one site until inspected");
     assert!(!props.iter().any(covers_view), "inspection footings stay clear");
     assert!(!MODELS.iter().any(|m| matches!(m.display, 134 | 4315 | 4316)), "the native check rejected the luminous stone palette");
     for p in props {
         assert!((p.rotation.iter().map(|v| v*v).sum::<f32>()-1.0).abs() < 0.0001);
         assert!(p.pos.iter().all(|v| v.is_finite()) && p.scale > 0.0);
+        if p.model <= RUBBLE {
+            assert!(1.0-2.0*(p.rotation[0]*p.rotation[0]+p.rotation[1]*p.rotation[1]) > 0.99,
+                "terrain rocks keep their open ground-facing skirts underneath");
+        }
     }
 }
 
@@ -179,6 +184,10 @@ fn late_observers_receive_the_same_marker_and_solid_manifest() {
     for (_, _, fields) in &first[1..] {
         assert_eq!(fields[&idx::GAMEOBJECT_FLAGS], INERT, "no visual-only or no-hull flag on debris");
         assert_ne!(fields[&idx::GAMEOBJECT_DISPLAYID], 0);
+        if fields[&idx::GAMEOBJECT_DISPLAYID] == 2230 {
+            assert_eq!(fields[&idx::GAMEOBJECT_TYPE_ID], 10, "cave-in uses the native state animation driver");
+            assert_eq!(fields[&idx::GAMEOBJECT_STATE], 1, "cave-in holds its settled Closed pose");
+        }
     }
     assert_eq!(first.len(), game.aftermath.as_ref().unwrap().props.len()+1);
     let unique: std::collections::BTreeSet<_> = first.iter().map(|(g, _, _)| *g).collect();
