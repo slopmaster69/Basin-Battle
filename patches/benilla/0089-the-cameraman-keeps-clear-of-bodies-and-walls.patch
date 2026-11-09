@@ -1,0 +1,939 @@
+From 6f7951ff1718390bfba0837798bf7e73dcc0a743 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 9 Nov 2026 14:15:20 -0600
+Subject: [PATCH] The cameraman keeps out of bodies and the world, holds its
+ shots, and stops at the fight's end (patch 0089)
+
+Five faults from filming every Deadmines boss with `WOW_SPECTATE` (patch 0088) on Nov 9:
+
+- The camera went inside models (the Shredder's grind drove over its spot; Rhahk'Zor, Cookie,
+  Gilnid and VanCleef too). The eye now keeps out of every body's bounds (its model's Stand box:
+  half its diagonal from the selection ring's footprint, and its height) by 1.25 yd and four
+  tenths of its radius, the boss's, the hero's and anyone's near them, and out of where each
+  body's measured walk takes it in the next 0.9 s: a boss charging at the spot is a cut before it
+  arrives. The eye no longer pulls in among the bodies to see past one.
+- A solid teal frame (outside the world). Every position has solid ground below it, the world
+  loaded round it, and a clear line from the point it looks at; no ground under the eye for
+  0.15 s is a cut; a move that would sweep through the world between two positions is a cut
+  instead; and a teleport goes straight to the shot's pose rather than holding a stale spot.
+- Too many cuts in small rooms (20 in 32 s on Marisa). A position is held at least 3 s; before
+  that only a body about to cover the camera, the eye out of the world, or both of the two hidden
+  for 0.3 s moves it. One of them is hidden only when 3 of 5 points (low, chest, head, either
+  side) can't be seen, so a thin post or a crate in front doesn't count; a body in the way counts
+  by six tenths of its width, since limbs have gaps. A cut goes only to a clearly better
+  position, and a position with no room just now holds the eye where it is.
+- Foreground clutter. Positions are scored: points of the two hidden, the world across the near
+  part of the frame, an eye pulled in, then the shot's order; the clearest wins.
+- Dead footage. When the hero falls, or the subject (the last of its forms, `Cookie|Gorged`)
+  does, it logs `the fight is over: <name> fell` (the rig ends the video on it) and holds where it
+  is rather than following the hero to a lamp, until the hero has been up beside a living subject
+  for 5 s. Each log line carries its time (`t=12.3`).
+---
+ crates/benilla-app/src/player/spectator.rs | 690 ++++++++++++++++-----
+ 1 file changed, 548 insertions(+), 142 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
+index 8e3c77cf..f6a648f5 100644
+--- a/crates/benilla-app/src/player/spectator.rs
++++ b/crates/benilla-app/src/player/spectator.rs
+@@ -8,50 +8,108 @@
+ //! - `high`: 45 to 60 degrees up, so a ground hazard's edge shows.
+ //!
+ //! The distance grows past the shot's range only when both would not fit otherwise; where the
+-//! world is in the way the eye comes in along its line until both are in sight. When either is
+-//! hidden from the camera for more than [`BLOCKED_SECS`] (by the world, another body, or each
+-//! other), the camera cuts to the next position of the shot with a clear view of both (the other
+-//! side, then square to the side, then behind, then higher), or holds where it is when there's
+-//! none. Names match in any case; with several units of the subject's name, a living one nearest
+-//! the hero. With no subject (`,<hero>`) or none within [`SUBJECT_REACH`] of the hero, the hero
+-//! alone is framed, looking past them the way they face. The body left behind is hidden, and the
+-//! sound is heard at the camera (free-fly's listener).
++//! world is in the way the eye comes in along its line. The subject may name a boss's forms in
++//! turn, `Cookie|Gorged`: the living one nearest the hero is filmed.
++//!
++//! What the camera never does (patch 0089):
++//!
++//! - **Stand inside a body.** The eye keeps out of every body's bounds (its model's Stand box: the
++//!   boss's, the hero's, anyone's near them) by [`BODY_GAP`] and a share of its size, and out of
++//!   where each one's walk takes it in the next [`AHEAD`] seconds: a boss charging at the camera's
++//!   spot is a cut before it gets there.
++//! - **Stand outside the world.** Every position has solid ground below it, the world loaded
++//!   round it, and a clear line from the point it looks at; the eye never sweeps through a wall
++//!   between two positions, it cuts.
++//! - **Cut all the time.** Each position is held at least [`HOLD_SECS`]. Before that only a body
++//!   about to cover the camera, the eye out of the world, or both of the two hidden for more than
++//!   [`BLOCKED_SECS`] moves it. One of them is hidden only when most of its five points (low,
++//!   chest, head, either side) can't be seen, so a thin post or a crate in front doesn't count.
++//!   A cut goes only to a position that sees them clearly better.
++//! - **Film past the end.** When the hero falls, or the subject (the last of its forms) does, the
++//!   camera says so (`spectate: ... the fight is over: <name> fell`, which the rig ends the video
++//!   on) and holds where it is, rather than following the hero to a lamp. It films again if the
++//!   hero is back on their feet beside a living subject.
++//!
++//! Positions are chosen with the clearest picture: nothing hiding either of the two, nothing in
++//! the foreground, then the shot's own order (the other side, square to the side, behind, then
++//! higher). With no subject (`,<hero>`) or none within [`SUBJECT_REACH`] of the hero, the hero alone
++//! is framed, looking past them the way they face. The body left behind is hidden, and the sound
++//! is heard at the camera (free-fly's listener).
+ //!
+ //! It drives free-fly ([`Player::detached`]): the eye is written after `control` and the camera
+ //! shake, every frame, so a teleport of the body or a shake never moves it. With the hero gone
+ //! (a world change, a logout) for [`LOST_SECS`] the camera goes back to the body.
+ 
++use std::collections::HashMap;
++
+ use bevy::prelude::*;
+ 
++use benilla_assets::coords::bevy_to_wow;
+ use benilla_world::collision::WorldCollision;
+ 
+ use super::camera::FlyCam;
+ use super::{head_height, CameraControl, CameraPivot, Player};
++use crate::entities::StandBoxHeight;
+ use crate::names::NameCache;
+ use crate::net::{Guid, NetEntity, ObjectStore, SelfPlayer};
+-use benilla_protocol::EntityKind;
+ use crate::query_cache::Ask;
++use crate::target::SelectionRadius;
++use benilla_protocol::EntityKind;
+ 
+-/// A view blocked this long (seconds) moves the camera to its next position.
++/// Either of the two hidden this long (seconds) moves the camera, once it has held its position
++/// [`HOLD_SECS`]; both hidden this long moves it at once.
+ const BLOCKED_SECS: f32 = 0.3;
++/// The least a position is held (seconds), unless both are hidden, a body is about to cover the
++/// camera, or its spot leaves the world.
++const HOLD_SECS: f32 = 3.0;
++/// After a search found no clearer position, the next waits this long (seconds); one for a
++/// position that can't be kept, this long.
++const RETRY_SECS: f32 = 1.0;
++const RETRY_URGENT_SECS: f32 = 0.25;
+ /// The hero out of sight this long (seconds) gives the camera back to the body.
+ const LOST_SECS: f32 = 3.0;
++/// Once the fight is over, it's on again only with the hero up beside a living subject this long
++/// (seconds): a fallen hero rises for a moment where they fell before they're taken to a lamp.
++const RESUME_SECS: f32 = 5.0;
++/// No solid ground under the eye this long (seconds) is the eye out of the world.
++const OUTSIDE_SECS: f32 = 0.15;
+ /// How quickly the eye and the point it looks at follow the fight (time constants, seconds),
+ /// and the fight's axis turns (so the camera doesn't whip round as the two circle).
+ const EYE_LAG: f32 = 0.35;
+ const LOOK_LAG: f32 = 0.15;
+ const AXIS_LAG: f32 = 0.8;
++/// How quickly a body's measured walk follows its moves (a time constant, seconds).
++const WALK_LAG: f32 = 0.2;
+ /// The view's half-angles' tangents: `CAM_FOVY` (45 degrees) tall at 16:9, with a margin.
+ const TAN_HALF_TALL: f32 = 0.414 * 0.85;
+ const TAN_HALF_WIDE: f32 = 0.414 * 16.0 / 9.0 * 0.8;
+-/// An eye pulled in to less than this share of the shot's distance is a position only to fall
+-/// back on.
++/// An eye pulled in to less than this share of the shot's distance is a worse position.
+ const CLEAR_BOOM: f32 = 0.75;
+ /// A subject further than this from the hero (yd) isn't in the fight: the hero is filmed alone
+ /// (a hero fallen and back at a lamp).
+ const SUBJECT_REACH: f32 = 40.0;
++/// Bodies further than this from the hero (yd) can't come between the camera and the fight.
++const OTHERS_REACH: f32 = 60.0;
+ /// The eye's place jumping further than this at once (yd) is taken as a cut.
+ const JUMP: f32 = 25.0;
++/// When a body's walk is looked ahead to (seconds from now): one that will be on the camera's
++/// spot by then covers it now.
++const AHEAD: [f32; 4] = [0.0, 0.3, 0.6, 0.9];
++/// The eye keeps this far (yd) out of a body's bounds, and four tenths of its radius more; a position
++/// cut to keeps [`CHOOSE_GAP`] further still.
++const BODY_GAP: f32 = 1.25;
++const CHOOSE_GAP: f32 = 1.5;
++/// The eye keeps this far (yd) short of the world on its line from the point it looks at.
++const WALL_GAP: f32 = 0.8;
++/// The nearest the eye comes in (yd) to the point it looks at.
++const NEAREST: f32 = 2.5;
++/// Solid ground within this far (yd) below the eye, or it's outside the world.
++const GROUND: f32 = 40.0;
++/// One of the two is hidden when this many of its five points can't be seen.
++const HIDDEN_AT: usize = 3;
++/// A cut has to see the two this much better (in [`Scene::score`]'s points) than where the
++/// camera is.
++const BETTER_BY: f32 = 3.0;
+ 
+ /// The framing rules.
+ #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+@@ -94,27 +152,110 @@ impl Shot {
+ /// What to film, from `WOW_SPECTATE`.
+ #[derive(Resource, Clone, Debug, PartialEq)]
+ pub(crate) struct Spectate {
+-    subject: String,
++    /// The subject's names, its forms in turn (`Cookie|Gorged`); empty for the hero alone.
++    subject: Vec<String>,
+     hero: String,
+     shot: Shot,
+ }
+ 
+ impl Spectate {
+-    /// `<subject>,<hero>[,<shot>]`; the hero is needed, the subject may be empty.
++    /// `<subject>[|<next form>...],<hero>[,<shot>]`; the hero is needed, the subject may be empty.
+     fn parse(spec: &str) -> Option<Self> {
+         let mut parts = spec.split(',');
+-        let subject = parts.next()?.trim().to_string();
++        let subject = parts.next()?.split('|').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+         let hero = parts.next()?.trim().to_string();
+         let shot = Shot::parse(parts.next().unwrap_or(""))?;
+         (!hero.is_empty() && parts.next().is_none()).then_some(Self { subject, hero, shot })
+     }
++
++    fn is_subject(&self, name: &str) -> bool {
++        self.subject.iter().any(|s| s.eq_ignore_ascii_case(name))
++    }
++
++    /// Whether `name` is the subject's last form: its fall ends the fight.
++    fn is_last(&self, name: &str) -> bool {
++        self.subject.last().is_some_and(|s| s.eq_ignore_ascii_case(name))
++    }
++
++    fn subject_text(&self) -> String {
++        if self.subject.is_empty() {
++            "nothing".to_string()
++        } else {
++            self.subject.join(" then ")
++        }
++    }
+ }
+ 
+-/// One of the two in the picture: the point framed (its chest) and its height (yd).
++/// A body in the picture, or in the way: an upright cylinder from its feet, the size of its
++/// model's Stand box, and how it's moving (yd/s).
+ #[derive(Clone, Copy, Debug)]
+ struct Body {
+-    at: Vec3,
++    feet: Vec3,
+     tall: f32,
++    radius: f32,
++    walk: Vec3,
++}
++
++impl Body {
++    /// The point framed: its chest.
++    fn at(&self) -> Vec3 {
++        self.feet + Vec3::Y * self.tall * 0.6
++    }
++
++    /// Where it will be in `secs`, walking on as it is.
++    fn ahead(&self, secs: f32) -> Body {
++        Body { feet: self.feet + self.walk.with_y(0.0) * secs, ..*self }
++    }
++
++    /// How far `eye` is outside its bounds (yd); negative inside.
++    fn clearance(&self, eye: Vec3) -> f32 {
++        let flat = (eye - self.feet).with_y(0.0).length() - self.radius;
++        let vert = (eye.y - (self.feet.y + self.tall)).max(self.feet.y - eye.y);
++        if flat > 0.0 && vert > 0.0 {
++            flat.hypot(vert)
++        } else {
++            flat.max(vert)
++        }
++    }
++
++    /// Whether `eye` is in its bounds, with `gap` and four tenths of its radius round them (a big
++    /// body's arms and blades reach past its Stand box), now or within the next [`AHEAD`]
++    /// seconds of its walk.
++    fn covers(&self, eye: Vec3, gap: f32) -> bool {
++        let need = gap + self.radius * 0.4;
++        AHEAD.iter().any(|&s| self.ahead(s).clearance(eye) < need)
++    }
++
++    /// The points looked for from `eye`: low, chest and head on its middle, and either side of
++    /// its chest.
++    fn points(&self, eye: Vec3) -> [Vec3; 5] {
++        let at = self.at();
++        let side = (at - eye).with_y(0.0).normalize_or(Vec3::Z).cross(Vec3::Y) * (self.radius * 0.6).clamp(0.2, 1.5);
++        [self.feet + Vec3::Y * self.tall * 0.25, at, self.feet + Vec3::Y * self.tall * 0.9, at + side, at - side]
++    }
++
++    /// Whether the line from `eye` to `to` passes through it: its middle (six tenths of its
++    /// bounds, since limbs have gaps), between the two ends.
++    fn on_line(&self, eye: Vec3, to: Vec3) -> bool {
++        let line = to - eye;
++        let flat = line.with_y(0.0);
++        let len2 = flat.length_squared();
++        if len2 < 1e-4 || self.tall <= 0.0 {
++            return false;
++        }
++        let t = (self.feet - eye).with_y(0.0).dot(flat) / len2;
++        if !(0.02..0.95).contains(&t) {
++            return false;
++        }
++        let p = eye + line * t;
++        p.with_y(0.0).distance(self.feet.with_y(0.0)) < self.radius * 0.6 + 0.1 && p.y > self.feet.y && p.y < self.feet.y + self.tall * 0.95
++    }
++}
++
++/// A body's horizontal radius (yd) from its selection ring's footprint, `sqrt(0.5 · diagonal)` of
++/// the Stand box ([`SelectionRadius`]): half the box's diagonal, times its scale.
++fn radius_of(footprint: f32, scale: f32) -> f32 {
++    (footprint * footprint * scale).clamp(0.3, 15.0)
+ }
+ 
+ /// Where the camera stands for one position of a shot: the point it looks at, the way out from
+@@ -138,16 +279,16 @@ fn pose(shot: Shot, subject: Body, hero: Body, axis: f32, pick: usize) -> Pose {
+     let n = rule.sides.len();
+     let side = rule.sides[pick % n].to_radians();
+     let up = (rule.up + if pick >= n { rule.higher } else { 0.0 }).min(80.0).to_radians();
+-    let mut look = (subject.at + hero.at) * 0.5;
++    let mut look = (subject.at() + hero.at()) * 0.5;
+     if shot == Shot::High {
+         // The ground between them, so what's drawn on it fills the picture.
+-        look.y = look.y.min(subject.at.y.min(hero.at.y)) - 0.5;
++        look.y = look.y.min(subject.at().y.min(hero.at().y)) - 0.5;
+     }
+     let yaw = axis + side;
+     let out = Vec3::new(yaw.sin() * up.cos(), up.sin(), yaw.cos() * up.cos());
+     // Wide enough for both side by side (as far apart as they look from here), tall enough for
+     // the taller.
+-    let apart = (hero.at - subject.at).length() * 0.5 * side.sin().abs() + 1.2;
++    let apart = (hero.at() - subject.at()).length() * 0.5 * side.sin().abs() + 1.2;
+     let wide = apart / TAN_HALF_WIDE;
+     let tall = (subject.tall.max(hero.tall) * 0.6 + 0.5) / TAN_HALF_TALL;
+     let fit = wide.max(tall);
+@@ -166,6 +307,12 @@ fn turn(a: f32, b: f32) -> f32 {
+     (b - a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+ }
+ 
++/// Whether the camera leaves its position for a clearer one, hidden as it is: either of the two
++/// hidden `blocked` seconds once the position has been held `held`, or both hidden `both`.
++fn time_to_cut(blocked: f32, both: f32, held: f32) -> bool {
++    both > BLOCKED_SECS || (blocked > BLOCKED_SECS && held >= HOLD_SECS)
++}
++
+ /// The camera's state between frames.
+ #[derive(Default)]
+ struct Framing {
+@@ -174,124 +321,244 @@ struct Framing {
+     look: Vec3,
+     axis: f32,
+     pick: usize,
+-    /// How long the view of either has been blocked, and the hero been out of sight.
++    /// Seconds since filming began, for the log.
++    clock: f32,
++    /// How long the position has been held; either and both of the two been hidden; the hero
++    /// been out of sight; until the next search for a clearer position.
++    held: f32,
+     blocked: f32,
++    both: f32,
+     lost: f32,
+-}
+-
+-/// Whether the line from `eye` to `to` passes through one of `others`: within a body's girth (a
+-/// fifth of its height, and a little) of its chest, between the two.
+-fn hidden_by(others: &[Body], eye: Vec3, to: Vec3) -> bool {
+-    let line = to - eye;
+-    let len2 = line.length_squared().max(1e-4);
+-    others.iter().any(|b| {
+-        let t = (b.at - eye).dot(line) / len2;
+-        t > 0.02 && t < 0.92 && (eye + line * t).distance(b.at) < b.tall * 0.22 + 0.15
+-    })
++    retry: f32,
++    /// A search found nothing clearer while hidden, and said so.
++    told: bool,
++    /// The fight is over: the camera holds where it is; how long it has looked on again; how long
++    /// the eye has had no ground under it.
++    over: bool,
++    again: f32,
++    outside: f32,
++    /// Each body's last feet and measured walk, by guid.
++    walks: HashMap<u64, (Vec3, Vec3)>,
+ }
+ 
+ /// What the camera films this frame: the two, and every other body that can stand in the way.
+ struct Scene {
+     subject: Body,
++    /// The subject's name and whether it's alive; `None` for the point ahead of a hero alone.
++    named: Option<(String, bool)>,
+     hero: Body,
++    hero_alive: bool,
+     others: Vec<Body>,
+ }
+ 
++/// A position found for the shot: which, the eye, the point it looks at, and how good (lower is
++/// better).
++#[derive(Clone, Copy, Debug)]
++struct Spot {
++    pick: usize,
++    eye: Vec3,
++    look: Vec3,
++    score: f32,
++}
++
+ impl Scene {
+-    /// Both in sight from `eye`: no world between (stopping short of the body itself) and no
+-    /// other body, the two counting as each other's.
+-    fn in_sight(&self, collide: &WorldCollision, eye: Vec3) -> bool {
+-        let seen = |to: Body, other: Body| {
+-            let line = to.at - eye;
+-            let len = line.length();
+-            len < 1.0
+-                || (collide.cast_camera(eye, line * ((len - 0.6) / len), false).is_none()
+-                    && !hidden_by(&self.others, eye, to.at)
+-                    && !hidden_by(&[other], eye, to.at))
++    fn bodies(&self) -> impl Iterator<Item = &Body> {
++        [&self.subject, &self.hero].into_iter().chain(self.others.iter()).filter(|b| b.tall > 0.0)
++    }
++
++    /// Whether a body is on `eye`, or will be within [`AHEAD`].
++    fn covered(&self, eye: Vec3, gap: f32) -> bool {
++        self.bodies().any(|b| b.covers(eye, gap))
++    }
++
++    /// How many of the subject's and the hero's five points `eye` can't see: hidden by the world
++    /// or a body (the two by each other too).
++    fn hidden(&self, collide: &WorldCollision, eye: Vec3) -> (usize, usize) {
++        let count = |b: &Body, other: &Body| {
++            b.points(eye)
++                .into_iter()
++                .filter(|&to| {
++                    let line = to - eye;
++                    let len = line.length();
++                    len > 1.0
++                        && (collide.cast_camera(eye, line * ((len - 0.4) / len), false).is_some()
++                            || other.on_line(eye, to)
++                            || self.others.iter().any(|o| o.on_line(eye, to)))
++                })
++                .count()
+         };
+-        seen(self.subject, self.hero) && seen(self.hero, self.subject)
++        (count(&self.subject, &self.hero), count(&self.hero, &self.subject))
+     }
+-}
+ 
+-/// How good a position is: both in sight from as far out as the shot asks (or nearly), only
+-/// from nearer in, or from nowhere on its line.
+-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+-enum Sight {
+-    None,
+-    Near,
+-    Full,
+-}
++    /// How clear the picture from `eye` looking at `look` is (lower is better): each point of the
++    /// two hidden, and more for either hidden; the world in the foreground across the frame; an
++    /// eye pulled in; and the shot's order of positions.
++    fn score(&self, collide: &WorldCollision, eye: Vec3, look: Vec3, pick: usize, pulled: bool) -> f32 {
++        let (a, b) = self.hidden(collide, eye);
++        let mut s = 3.0 * (a + b) as f32 + foreground(collide, eye, look) as f32 + 0.25 * pick as f32;
++        if a >= HIDDEN_AT {
++            s += 40.0;
++        }
++        if b >= HIDDEN_AT {
++            s += 40.0;
++        }
++        if pulled {
++            s += 2.0;
++        }
++        s
++    }
+ 
+-/// The eye for a pose: as far out as the shot asks, or pulled in along its line (never through
+-/// the world) until both are in sight, and how good that is.
+-fn place(collide: &WorldCollision, scene: &Scene, p: Pose) -> (Vec3, Sight) {
+-    let reach = collide.cast_camera(p.look, p.out * p.dist, false).map_or(p.dist, |hit| (hit - 0.3).max(1.0));
+-    for share in [1.0, 0.8, 0.6, 0.45, 0.3] {
+-        let d = (p.dist * share).min(reach).max(2.5_f32.min(reach));
+-        let eye = p.look + p.out * d;
+-        if scene.in_sight(collide, eye) {
+-            return (eye, if d >= p.dist * CLEAR_BOOM { Sight::Full } else { Sight::Near });
++    /// The eye for a pose: as far out as the shot asks, or pulled in along its line short of the
++    /// world, where no body is or is about to be (with `gap`), above solid ground. Whether it was
++    /// pulled in past [`CLEAR_BOOM`] too.
++    fn place(&self, collide: &WorldCollision, p: Pose, gap: f32) -> Option<(Vec3, bool)> {
++        let reach = collide.cast_camera(p.look, p.out * p.dist, false).map_or(p.dist, |hit| hit - WALL_GAP);
++        let mut last = f32::INFINITY;
++        for share in [1.0, 0.85, 0.7, 0.55, 0.4] {
++            let d = (p.dist * share).min(reach);
++            if d < NEAREST {
++                break;
++            }
++            if (last - d).abs() < 0.3 {
++                continue;
++            }
++            last = d;
++            let eye = p.look + p.out * d;
++            if !self.covered(eye, gap) && grounded(collide, eye) {
++                return Some((eye, d < p.dist * CLEAR_BOOM));
++            }
+         }
++        None
++    }
++
++    /// The clearest of the shot's positions, `except` one, with a body-free spot to stand.
++    fn best(&self, collide: &WorldCollision, shot: Shot, axis: f32, except: Option<usize>) -> Option<Spot> {
++        (0..positions(&shot.rule()))
++            .filter(|&k| Some(k) != except)
++            .filter_map(|k| {
++                let p = pose(shot, self.subject, self.hero, axis, k);
++                let (eye, pulled) = self.place(collide, p, BODY_GAP + CHOOSE_GAP)?;
++                Some(Spot { pick: k, eye, look: p.look, score: self.score(collide, eye, p.look, k, pulled) })
++            })
++            .min_by(|a, b| a.score.total_cmp(&b.score))
++    }
++
++    /// Where the camera can go when a body is about to cover it and no position is free: straight
++    /// up over the bodies there, if the point it looks at still sees it.
++    fn over_them(&self, collide: &WorldCollision, eye: Vec3, look: Vec3) -> Option<Vec3> {
++        let top = self.bodies().filter(|b| b.covers(eye, BODY_GAP)).map(|b| b.feet.y + b.tall).fold(eye.y, f32::max);
++        let up = Vec3::new(eye.x, top + BODY_GAP + 1.5, eye.z);
++        (!self.covered(up, BODY_GAP) && sees(collide, look, up) && grounded(collide, up)).then_some(up)
+     }
+-    (p.look + p.out * reach, Sight::None)
+-}
+ 
+-/// The first of the shot's positions, in order from `from`, with the best sight there is.
+-fn best(collide: &WorldCollision, scene: &Scene, shot: Shot, axis: f32, from: usize) -> Option<(usize, Sight)> {
+-    let count = positions(&shot.rule());
+-    let mut found: Option<(usize, Sight)> = None;
+-    for k in (0..count).map(|k| (from + k) % count) {
+-        let (_, sight) = place(collide, scene, pose(shot, scene.subject, scene.hero, axis, k));
+-        if sight == Sight::Full {
+-            return Some((k, sight));
++    /// Whether the fight is over, and who fell: the hero, or the subject's last form.
++    fn ended(&self, spec: &Spectate) -> Option<String> {
++        if !self.hero_alive {
++            return Some(spec.hero.clone());
+         }
+-        if sight > found.map_or(Sight::None, |f| f.1) {
+-            found = Some((k, sight));
++        match &self.named {
++            Some((name, false)) if spec.is_last(name) => Some(name.clone()),
++            _ => None,
+         }
+     }
+-    found
+ }
+ 
+-/// The streamed bodies the camera reads: where, how tall, what, and whether drawn.
++/// Solid ground below `eye`, and the world loaded round it: not outside the world.
++fn grounded(collide: &WorldCollision, eye: Vec3) -> bool {
++    let w = bevy_to_wow(eye);
++    collide.terrain_resident([w[0] - 3.0, w[1] - 3.0], [w[0] + 3.0, w[1] + 3.0]) && collide.ray_body(eye, Dir3::NEG_Y, GROUND).is_some()
++}
++
++/// A clear line (the camera's sweep) from `from` to `eye`.
++fn sees(collide: &WorldCollision, from: Vec3, eye: Vec3) -> bool {
++    let line = eye - from;
++    let len = line.length();
++    len < 0.1 || collide.cast_camera(from, line, false).is_none_or(|hit| hit >= len - 0.05)
++}
++
++/// How much of the frame's foreground is the world: of eight lines across the picture from `eye`
++/// toward `look`, how many hit something in the near six tenths of the way.
++fn foreground(collide: &WorldCollision, eye: Vec3, look: Vec3) -> usize {
++    let line = look - eye;
++    let dist = line.length();
++    if dist < 1.0 {
++        return 0;
++    }
++    let ahead = line / dist;
++    let right = ahead.cross(Vec3::Y).normalize_or(Vec3::X);
++    let up = right.cross(ahead);
++    [(-0.6, -0.5), (0.0, -0.5), (0.6, -0.5), (-0.6, 0.0), (0.6, 0.0), (-0.6, 0.5), (0.0, 0.5), (0.6, 0.5)]
++        .into_iter()
++        .filter(|&(x, y): &(f32, f32)| {
++            let dir = (ahead + right * (x * TAN_HALF_WIDE) + up * (y * TAN_HALF_TALL)).normalize();
++            collide.cast_camera(eye, dir * dist * 0.6, false).is_some()
++        })
++        .count()
++}
++
++/// The streamed bodies the camera reads: where, how big, what, and whether drawn.
+ type Units<'w, 's> = Query<
+     'w,
+     's,
+-    (&'static Guid, &'static Transform, &'static ObjectStore, &'static NetEntity, Option<&'static CameraPivot>, Option<&'static InheritedVisibility>),
++    (
++        &'static Guid,
++        &'static Transform,
++        &'static ObjectStore,
++        &'static NetEntity,
++        Option<&'static CameraPivot>,
++        Option<&'static SelectionRadius>,
++        Option<&'static StandBoxHeight>,
++        Option<&'static InheritedVisibility>,
++    ),
+     (Without<FlyCam>, Without<SelfPlayer>),
+ >;
+ 
+ /// The units named in the spec, as a scene: the hero, the subject (a living one nearest the
+ /// hero, within [`SUBJECT_REACH`]; with none, a point ahead of the hero, so the camera looks past
+-/// them the way they face), and every other drawn body.
+-fn find(spec: &Spectate, names: &NameCache, units: &Units) -> Option<Scene> {
++/// them the way they face), and every other drawn body near. Each body's walk is measured from
++/// its last place in `walks`.
++fn find(spec: &Spectate, names: &NameCache, units: &Units, walks: &mut HashMap<u64, (Vec3, Vec3)>, dt: f32) -> Option<Scene> {
+     let mut hero = None;
+     let mut subjects = Vec::new();
+     let mut others = Vec::new();
+-    for (guid, t, store, net, pivot, shown) in units.iter() {
++    let mut seen = Vec::new();
++    for (guid, t, store, net, pivot, ring, stand, shown) in units.iter() {
+         if !matches!(net.kind, EntityKind::Player | EntityKind::Unit) {
+             continue;
+         }
+-        let tall = head_height(pivot, net.scale);
+-        let body = Body { at: t.translation + Vec3::Y * tall * 0.75, tall };
++        let feet = t.translation;
++        let walk = match walks.get(&guid.0) {
++            Some(&(last, walk)) if dt > 0.0 && last.distance(feet) < 10.0 => walk.lerp((feet - last) / dt, 1.0 - (-dt / WALK_LAG).exp()),
++            _ => Vec3::ZERO,
++        };
++        walks.insert(guid.0, (feet, walk));
++        seen.push(guid.0);
++        let tall = (stand.map_or(0.0, |h| h.0) * net.scale).max(head_height(pivot, net.scale) * 1.1);
++        let body = Body { feet, tall, radius: radius_of(ring.map_or(0.7, |r| r.0), net.scale), walk };
+         let name = names.resolve_unit(guid.0, Some(store), Ask::Read).unwrap_or("");
++        let alive = store.0.unit_health().is_none_or(|h| h > 0);
+         if name.eq_ignore_ascii_case(&spec.hero) {
+             let ahead = (t.rotation * Vec3::NEG_Z).with_y(0.0).normalize_or(Vec3::NEG_Z);
+-            hero = Some((body, ahead));
+-        } else if !spec.subject.is_empty() && name.eq_ignore_ascii_case(&spec.subject) {
+-            subjects.push((body, store.0.unit_health().is_none_or(|h| h > 0)));
++            hero = Some((body, ahead, alive));
++        } else if spec.is_subject(name) {
++            subjects.push((body, name.to_string(), alive));
+         } else if net.display_id.is_some() && shown.is_none_or(|v| v.get()) {
+             others.push(body);
+         }
+     }
+-    let (hero, ahead) = hero?;
+-    let nearest = |a: &(Body, bool), b: &(Body, bool)| {
+-        (!a.1, a.0.at.distance(hero.at)).partial_cmp(&(!b.1, b.0.at.distance(hero.at))).unwrap_or(std::cmp::Ordering::Equal)
++    walks.retain(|g, _| seen.contains(g));
++    let (hero, ahead, hero_alive) = hero?;
++    let key = |s: &(Body, String, bool)| (!s.2, s.0.feet.distance(hero.feet));
++    let near: Vec<_> = subjects.iter().filter(|s| s.0.feet.distance(hero.feet) <= SUBJECT_REACH).collect();
++    let chosen = near.iter().copied().min_by(|a, b| key(a).partial_cmp(&key(b)).unwrap_or(std::cmp::Ordering::Equal)).cloned();
++    // Another of the subject's names stands in the way like anyone else.
++    others.extend(subjects.iter().filter(|s| chosen.as_ref().is_none_or(|c| c.0.feet != s.0.feet)).map(|s| s.0));
++    others.retain(|b| b.feet.distance(hero.feet) <= OTHERS_REACH);
++    let (subject, named) = match chosen {
++        Some((body, name, alive)) => (body, Some((name, alive))),
++        None => (Body { feet: hero.feet + ahead * 5.0, tall: hero.tall, radius: 0.0, walk: Vec3::ZERO }, None),
+     };
+-    let subject = subjects.iter().copied().filter(|(b, _)| b.at.distance(hero.at) <= SUBJECT_REACH).min_by(nearest).map(|(b, _)| b);
+-    // Another of the subject's name stands in the way like anyone else.
+-    others.extend(subjects.into_iter().map(|(b, _)| b).filter(|b| subject.is_none_or(|s| s.at != b.at)));
+-    let subject = subject.unwrap_or(Body { at: hero.at + ahead * 5.0, tall: hero.tall });
+-    Some(Scene { subject, hero, others })
++    Some(Scene { subject, named, hero, hero_alive, others })
+ }
+ 
+ /// Films the fight: after `control` and the camera shake, so the eye written here is the one
+@@ -309,7 +576,8 @@ fn film(
+     mut state: Local<Framing>,
+ ) {
+     let dt = time.delta_secs().min(0.1);
+-    let found = if player.active { find(&spec, &names, &units) } else { None };
++    let state = &mut *state;
++    let found = if player.active { find(&spec, &names, &units, &mut state.walks, dt) } else { None };
+     let Some(scene) = found else {
+         state.lost += dt;
+         if state.eye.is_some() && (!player.active || state.lost > LOST_SECS) {
+@@ -323,56 +591,143 @@ fn film(
+     state.lost = 0.0;
+     let Ok((mut cam_t, mut cam)) = cams.single_mut() else { return };
+     let (subject, hero) = (scene.subject, scene.hero);
+-    let flat = (hero.at - subject.at).with_y(0.0);
++    let flat = (hero.at() - subject.at()).with_y(0.0);
+     let axis = if flat.length() > 0.3 { flat.x.atan2(flat.z) } else { state.axis };
+     let shot = spec.shot;
+     let Some(eye) = state.eye else {
+-        // The first frame: the best position, straight there.
+-        let pick = best(&collide, &scene, shot, axis, 0).map_or(0, |(k, _)| k);
+-        let p = pose(shot, subject, hero, axis, pick);
+-        let (eye, sight) = place(&collide, &scene, p);
+-        info!("spectate: filming {} and {} ({shot:?}), position {pick} ({sight:?})", if spec.subject.is_empty() { "nothing" } else { &spec.subject }, spec.hero);
+-        *state = Framing { eye: Some(eye), look: p.look, axis, pick, blocked: 0.0, lost: 0.0 };
++        // The first frame: the clearest position, straight there.
++        let spot = scene.best(&collide, shot, axis, None).unwrap_or_else(|| {
++            let p = pose(shot, subject, hero, axis, 0);
++            Spot { pick: 0, eye: p.look + p.out * p.dist, look: p.look, score: f32::INFINITY }
++        });
++        info!("spectate: t=0.0 filming {} and {} ({shot:?}), position {} (score {:.0})", spec.subject_text(), spec.hero, spot.pick, spot.score);
++        let walks = std::mem::take(&mut state.walks);
++        *state = Framing { eye: Some(spot.eye), look: spot.look, axis, pick: spot.pick, walks, ..default() };
+         player.detached = true;
+         rig.filming = true;
+-        write(&mut cam_t, &mut cam, eye, p.look);
++        write(&mut cam_t, &mut cam, spot.eye, spot.look);
+         return;
+     };
++    state.clock += dt;
++    let clock = state.clock;
++    player.detached = true;
++    rig.filming = true;
++    // The end of the fight: the camera holds where it is (never after the hero to a lamp), and
++    // films again only with the hero up beside a living subject.
++    match scene.ended(&spec) {
++        Some(who) if !state.over => {
++            info!("spectate: t={clock:.1} the fight is over: {who} fell; the camera holds");
++            state.over = true;
++        }
++        None if state.over && scene.named.as_ref().is_some_and(|n| n.1) => {
++            state.again += dt;
++            if state.again >= RESUME_SECS {
++                info!("spectate: t={clock:.1} the fight is on again");
++                state.over = false;
++                state.held = 0.0;
++            }
++        }
++        _ => state.again = 0.0,
++    }
++    if state.over {
++        write(&mut cam_t, &mut cam, eye, state.look);
++        return;
++    }
+     state.axis += turn(state.axis, axis) * (1.0 - (-dt / AXIS_LAG).exp());
+-    // Blocked: from where the camera is now, either one hidden by the world or another body.
+-    if scene.in_sight(&collide, eye) {
+-        state.blocked = 0.0;
++    state.held += dt;
++    state.retry -= dt;
++    // Hidden: from where the camera is now, most of either one's points out of sight.
++    let (a, b) = scene.hidden(&collide, eye);
++    let (sub_hidden, hero_hidden) = (a >= HIDDEN_AT, b >= HIDDEN_AT);
++    state.blocked = if sub_hidden || hero_hidden { state.blocked + dt } else { 0.0 };
++    state.both = if sub_hidden && hero_hidden { state.both + dt } else { 0.0 };
++    if state.blocked == 0.0 {
++        state.told = false;
++    }
++    let p = pose(shot, subject, hero, state.axis, state.pick);
++    let want = scene.place(&collide, p, BODY_GAP);
++    // What can't wait: a body on the camera's spot or about to be, or the eye out of the world.
++    // (A position with no room just now holds the eye where it is: being hidden moves it.)
++    state.outside = if grounded(&collide, eye) { 0.0 } else { state.outside + dt };
++    let urgent = if scene.covered(eye, BODY_GAP) {
++        Some("a body is on the camera's spot or coming")
++    } else if state.outside > OUTSIDE_SECS {
++        Some("no ground under the camera")
+     } else {
+-        state.blocked += dt;
+-    }
+-    let mut cut = false;
+-    if state.blocked > BLOCKED_SECS {
+-        let next = best(&collide, &scene, shot, state.axis, state.pick + 1).filter(|(k, _)| *k != state.pick);
+-        info!(
+-            "spectate: blocked {:.2} s at position {}; {}",
+-            state.blocked,
+-            state.pick,
+-            next.map_or("no clear position, holding".to_string(), |(k, sight)| format!("cut to position {k} ({sight:?})"))
+-        );
+-        if let Some((k, _)) = next {
+-            state.pick = k;
+-            cut = true;
++        None
++    };
++    let mut to = None;
++    if let Some(why) = urgent.filter(|_| state.retry <= 0.0) {
++        match scene.best(&collide, shot, state.axis, None) {
++            Some(spot) => {
++                info!("spectate: t={clock:.1} {why}: cut to position {} after {:.1} s (score {:.0})", spot.pick, state.held, spot.score);
++                to = Some(spot);
++            }
++            None => {
++                if let Some(up) = scene.over_them(&collide, eye, state.look) {
++                    info!("spectate: t={clock:.1} {why}, and no position is free: up over it");
++                    to = Some(Spot { pick: state.pick, eye: up, look: state.look, score: f32::INFINITY });
++                } else if eye.distance(p.look) > JUMP {
++                    // The fight gone somewhere else at once (a teleport) before the world there is
++                    // loaded round the camera: there anyway, the shot's own pose, short of the world.
++                    let reach = collide.cast_camera(p.look, p.out * p.dist, false).map_or(p.dist, |hit| (hit - WALL_GAP).max(1.0));
++                    info!("spectate: t={clock:.1} {why}, and no position is free yet: to where the fight went");
++                    to = Some(Spot { pick: state.pick, eye: p.look + p.out * reach, look: p.look, score: f32::INFINITY });
++                } else {
++                    if !state.told {
++                        info!("spectate: t={clock:.1} {why}, and no position is free: holding");
++                        state.told = true;
++                    }
++                    state.retry = RETRY_URGENT_SECS;
++                }
++            }
++        }
++    } else if urgent.is_none() && time_to_cut(state.blocked, state.both, state.held) && state.retry <= 0.0 {
++        let here = scene.score(&collide, eye, state.look, state.pick, want.is_some_and(|w| w.1));
++        let what = match (sub_hidden, hero_hidden) {
++            (true, true) => "both hidden",
++            (true, false) => "the subject hidden",
++            _ => "the hero hidden",
++        };
++        match scene.best(&collide, shot, state.axis, Some(state.pick)) {
++            Some(spot) if spot.score + BETTER_BY < here => {
++                info!(
++                    "spectate: t={clock:.1} {what} {:.2} s at position {} (held {:.1} s): cut to position {} (score {:.0} for {:.0})",
++                    state.blocked, state.pick, state.held, spot.pick, spot.score, here
++                );
++                to = Some(spot);
++            }
++            _ => {
++                if !state.told {
++                    info!("spectate: t={clock:.1} {what} {:.2} s at position {}: no clearer position, holding", state.blocked, state.pick);
++                    state.told = true;
++                }
++                state.retry = RETRY_SECS;
++            }
+         }
+-        state.blocked = 0.0;
+     }
+-    let p = pose(shot, subject, hero, state.axis, state.pick);
+-    let (want, _) = place(&collide, &scene, p);
+-    // A cut, or the fight gone somewhere else at once (a teleport, a fall and a lamp): straight
+-    // there, never a sweep through the world between.
+-    let (eye, look) = if cut || want.distance(eye) > JUMP {
+-        (want, p.look)
++    let (eye, look) = if let Some(spot) = to {
++        state.pick = spot.pick;
++        state.held = 0.0;
++        state.blocked = 0.0;
++        state.both = 0.0;
++        state.outside = 0.0;
++        state.told = false;
++        (spot.eye, spot.look)
++    } else if let Some((want, _)) = want {
++        // The fight gone somewhere else at once (a teleport), or the way there through the world:
++        // straight there, never a sweep through the world between.
++        let next = eye.lerp(want, 1.0 - (-dt / EYE_LAG).exp());
++        let next = if want.distance(eye) > JUMP || !sees(&collide, eye, next) { want } else { next };
++        (next, state.look.lerp(p.look, 1.0 - (-dt / LOOK_LAG).exp()))
++    } else if eye.distance(p.look) > JUMP {
++        let reach = collide.cast_camera(p.look, p.out * p.dist, false).map_or(p.dist, |hit| (hit - WALL_GAP).max(1.0));
++        (p.look + p.out * reach, p.look)
+     } else {
+-        (eye.lerp(want, 1.0 - (-dt / EYE_LAG).exp()), state.look.lerp(p.look, 1.0 - (-dt / LOOK_LAG).exp()))
++        (eye, state.look)
+     };
+     state.eye = Some(eye);
+     state.look = look;
+-    player.detached = true;
+-    rig.filming = true;
+     write(&mut cam_t, &mut cam, eye, look);
+ }
+ 
+@@ -406,21 +761,30 @@ mod tests {
+     use super::*;
+ 
+     fn body(x: f32, z: f32) -> Body {
+-        Body { at: Vec3::new(x, 1.5, z), tall: 2.0 }
++        Body { feet: Vec3::new(x, 0.0, z), tall: 2.5, radius: 0.5, walk: Vec3::ZERO }
+     }
+ 
+     #[test]
+     fn the_spec_names_a_subject_a_hero_and_a_shot() {
+         let s = Spectate::parse("Captain Greenskin, Vcwarrior, low").unwrap();
+-        assert_eq!((s.subject.as_str(), s.hero.as_str(), s.shot), ("Captain Greenskin", "Vcwarrior", Shot::Low));
++        assert_eq!((s.subject.clone(), s.hero.as_str(), s.shot), (vec!["Captain Greenskin".to_string()], "Vcwarrior", Shot::Low));
+         assert_eq!(Spectate::parse("Rhahk'Zor,Vcwarrior").unwrap().shot, Shot::Duel);
+-        assert_eq!(Spectate::parse(",Vcwarrior,high").unwrap().subject, "");
++        assert!(Spectate::parse(",Vcwarrior,high").unwrap().subject.is_empty());
+         assert!(Spectate::parse("Rhahk'Zor").is_none(), "no hero");
+         assert!(Spectate::parse("Rhahk'Zor,").is_none(), "an empty hero");
+         assert!(Spectate::parse("Rhahk'Zor,Vcwarrior,sideways").is_none(), "an unknown shot");
+         assert!(Spectate::parse("a,b,duel,more").is_none());
+     }
+ 
++    /// A boss's forms in turn: either is filmed, and only the last one's fall ends the fight.
++    #[test]
++    fn the_subject_may_be_a_boss_and_its_next_form() {
++        let s = Spectate::parse("Cookie | Gorged,Vcwarrior,high").unwrap();
++        assert!(s.is_subject("cookie") && s.is_subject("Gorged") && !s.is_subject("Smite"));
++        assert!(s.is_last("gorged") && !s.is_last("Cookie"));
++        assert_eq!(s.subject_text(), "Cookie then Gorged");
++    }
++
+     /// A duel's first position: three-quarter, from the hero's side, 10 to 14 yd out, a little up.
+     #[test]
+     fn a_duel_is_three_quarter_from_the_heros_side_10_to_14_yd_out() {
+@@ -429,7 +793,7 @@ mod tests {
+         let p = pose(Shot::Duel, subject, hero, axis, 0);
+         assert!((10.0..=14.0).contains(&p.dist), "{}", p.dist);
+         let eye = p.look + p.out * p.dist;
+-        assert!(eye.z > hero.at.z, "on the hero's side: {eye}");
++        assert!(eye.z > hero.at().z, "on the hero's side: {eye}");
+         let flat = p.out.with_y(0.0).normalize();
+         let off_axis = flat.z.acos().to_degrees();
+         assert!((40.0..=60.0).contains(&off_axis), "three-quarter: {off_axis}");
+@@ -448,7 +812,7 @@ mod tests {
+         let high = pose(Shot::High, subject, hero, 0.0, 0);
+         let up = high.out.y.asin().to_degrees();
+         assert!((45.0..=60.0).contains(&up), "{up}");
+-        assert!(high.look.y < subject.at.y, "it looks at the ground between them");
++        assert!(high.look.y < subject.at().y, "it looks at the ground between them");
+     }
+ 
+     /// The positions go round: the other side next, and the second round higher.
+@@ -463,18 +827,60 @@ mod tests {
+         assert!(pose(Shot::Duel, subject, hero, 0.0, n).out.y > a.out.y);
+     }
+ 
+-    /// A body between the camera and one of the two hides them; one beside the line, behind the
+-    /// camera or past the one filmed doesn't.
++    /// A body's bounds, with a gap round them: inside, beside, above.
++    #[test]
++    fn the_eye_keeps_out_of_a_bodys_bounds() {
++        let shredder = Body { feet: Vec3::ZERO, tall: 7.0, radius: 3.9, walk: Vec3::ZERO };
++        assert!(shredder.clearance(Vec3::new(1.0, 2.0, 0.0)) < 0.0, "inside");
++        assert!(shredder.covers(Vec3::new(5.0, 2.0, 0.0), BODY_GAP), "against its side");
++        assert!(!shredder.covers(Vec3::new(9.0, 2.0, 0.0), BODY_GAP), "clear of it");
++        assert!(!shredder.covers(Vec3::new(0.0, 10.0, 0.0), BODY_GAP), "well over its head");
++        assert!(shredder.covers(Vec3::new(0.0, 7.5, 0.0), BODY_GAP), "just over its head");
++    }
++
++    /// A boss charging at the camera's spot covers it before it gets there; one walking past, or
++    /// standing, doesn't.
++    #[test]
++    fn a_charging_body_covers_the_spot_before_it_arrives() {
++        let eye = Vec3::new(0.0, 2.0, 0.0);
++        let at = |walk: Vec3| Body { feet: Vec3::new(0.0, 0.0, 10.0), tall: 7.0, radius: 3.0, walk };
++        assert!(!at(Vec3::ZERO).covers(eye, BODY_GAP), "standing 10 yd off");
++        assert!(at(Vec3::new(0.0, 0.0, -9.0)).covers(eye, BODY_GAP), "charging at 9 yd/s");
++        assert!(!at(Vec3::new(9.0, 0.0, 0.0)).covers(eye, BODY_GAP), "crossing in front");
++        assert!(!at(Vec3::new(0.0, 0.0, 9.0)).covers(eye, BODY_GAP), "going away");
++    }
++
++    /// The ring's footprint is `sqrt(0.5 · diagonal)`: its square is half the box's diagonal.
++    #[test]
++    fn a_bodys_radius_is_half_its_boxs_diagonal() {
++        let diagonal: f32 = (6.0f32 * 6.0 + 5.0 * 5.0).sqrt();
++        let footprint = (0.5 * diagonal).sqrt();
++        assert!((radius_of(footprint, 1.0) - diagonal / 2.0).abs() < 1e-4);
++        assert!((radius_of(footprint, 2.0) - diagonal).abs() < 1e-3, "times its scale");
++        assert_eq!(radius_of(0.0, 1.0), 0.3, "a floor for a body with no box");
++    }
++
++    /// A body between the camera and one of the two hides them: through its middle, not past its
++    /// edge (limbs have gaps), not under or over it, not behind the camera or past the one filmed.
+     #[test]
+     fn a_body_on_the_line_hides_what_is_past_it() {
+         let (eye, to) = (Vec3::new(0.0, 1.5, 0.0), Vec3::new(0.0, 1.5, 10.0));
+-        let at = |x: f32, z: f32| [body(x, z)];
+-        assert!(hidden_by(&at(0.0, 5.0), eye, to));
+-        assert!(hidden_by(&at(0.4, 3.0), eye, to), "its girth");
+-        assert!(!hidden_by(&at(1.5, 5.0), eye, to), "beside the line");
+-        assert!(!hidden_by(&at(0.0, -2.0), eye, to), "behind the camera");
+-        assert!(!hidden_by(&at(0.0, 12.0), eye, to), "past the one filmed");
+-        assert!(!hidden_by(&[], eye, to));
++        assert!(body(0.0, 5.0).on_line(eye, to));
++        assert!(body(0.3, 3.0).on_line(eye, to), "its middle");
++        assert!(!body(1.0, 5.0).on_line(eye, to), "beside the line");
++        assert!(!body(0.0, -2.0).on_line(eye, to), "behind the camera");
++        assert!(!body(0.0, 12.0).on_line(eye, to), "past the one filmed");
++        let high = (Vec3::new(0.0, 12.0, 0.0), Vec3::new(0.0, 4.0, 10.0));
++        assert!(!body(0.0, 3.0).on_line(high.0, high.1), "the line passes over its head");
++    }
++
++    /// Hidden for a moment doesn't cut a position held under 3 s; both hidden does.
++    #[test]
++    fn a_position_is_held_3_s_unless_both_are_hidden() {
++        assert!(!time_to_cut(0.2, 0.0, 10.0), "a glimpse");
++        assert!(!time_to_cut(0.5, 0.0, 1.0), "one hidden, held 1 s");
++        assert!(time_to_cut(0.5, 0.0, 3.2), "one hidden, held 3 s");
++        assert!(time_to_cut(0.4, 0.4, 0.5), "both hidden");
+     }
+ 
+     #[test]
+-- 
+2.46.2.windows.1
+

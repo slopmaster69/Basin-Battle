@@ -62,6 +62,7 @@ $Defaults = [ordered]@{
     ffmpeg        = ""
     settle        = "6"
     login_timeout = "120"
+    tail          = "5"
 }
 $SettingsHelp = @(
     "# The visual check's settings (docs/visual-check.md). This file stays on this PC: it's gitignored.",
@@ -81,7 +82,9 @@ $SettingsHelp = @(
     "# video: screen (the game window's picture, by Desktop Duplication: the one that sees a Vulkan",
     "#   window's frames), title or desktop (GDI: they see only a few stale frames of benilla's window), or off.",
     "#   ffmpeg: ffmpeg.exe (empty: Documents\visual-check\ffmpeg).",
-    "# settle: seconds the world gets to load in before a scenario starts. login_timeout: seconds to log in."
+    "# settle: seconds the world gets to load in before a scenario starts. login_timeout: seconds to log in.",
+    "# tail: with a cameraman, seconds the video goes on once the fight is over (the hero or the boss fell);",
+    "#   off films to the scenario's end."
 )
 
 function Read-Settings {
@@ -551,6 +554,53 @@ function Get-OutputIdx([string]$ffmpeg, $screen) {
     return $null
 }
 
+# ffmpeg run with its input a pipe, so it can be told to stop early (`q`) and still finish its file;
+# what it says goes to a log, closed once it has quit (Finish).
+Add-Type @"
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+public static class VisualCheckRecorder {
+    static readonly Dictionary<int, StreamWriter> Logs = new Dictionary<int, StreamWriter>();
+    public static Process Start(string exe, string args, string log) {
+        var info = new ProcessStartInfo(exe, args);
+        info.UseShellExecute = false;
+        info.RedirectStandardInput = true;
+        info.RedirectStandardError = true;
+        info.CreateNoWindow = true;
+        var w = new StreamWriter(log, false);
+        w.AutoFlush = true;
+        var p = new Process();
+        p.StartInfo = info;
+        p.ErrorDataReceived += (s, e) => { if (e.Data != null) { lock (w) { w.WriteLine(e.Data); } } };
+        p.Start();
+        lock (Logs) { Logs[p.Id] = w; }
+        p.BeginErrorReadLine();
+        return p;
+    }
+    public static bool Stop(Process p) {
+        try { p.StandardInput.Write("q"); p.StandardInput.Flush(); return true; } catch { return false; }
+    }
+    public static void Finish(Process p) {
+        try { if (p.HasExited) p.WaitForExit(); } catch { }
+        StreamWriter w;
+        lock (Logs) { if (!Logs.TryGetValue(p.Id, out w)) return; Logs.Remove(p.Id); }
+        lock (w) { w.Close(); }
+    }
+}
+"@
+
+# How long a video is (seconds), from ffmpeg's reading of it; 0 when it can't tell.
+function Get-MediaSecs([string]$ffmpeg, [string]$file) {
+    $ErrorActionPreference = "Continue"
+    $said = & $ffmpeg -hide_banner -nostdin -i $file 2>&1 | Out-String
+    if ($said -match 'Duration: (\d+):(\d+):(\d+(?:\.\d+)?)') {
+        return [int]$Matches[1] * 3600 + [int]$Matches[2] * 60 + [double]::Parse($Matches[3], $Inv)
+    }
+    0
+}
+
 # ffmpeg recording the client's window ("benilla", the title benilla's lib.rs gives it) for
 # $v.Duration seconds into $v.Out. `screen` (the default) takes the window's picture (inside its
 # title bar and borders) by Desktop Duplication (ffmpeg's ddagrab), which sees every frame a Vulkan window presents; GDI's grabs
@@ -586,15 +636,34 @@ function Start-Video($v, $client, [string]$how) {
     } else {
         $grab += @("-i", "title=benilla")
     }
-    $all = @("-hide_banner", "-nostdin", "-loglevel", "warning", "-y") + $grab + @(
+    # Its input is the pipe Stop says `q` on (VisualCheckRecorder), so not -nostdin.
+    $all = @("-hide_banner", "-loglevel", "warning", "-y") + $grab + @(
         "-t", (Fmt $v.Duration), "-vf", $vf,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", $v.Out)
     $v.How = $how
     $v.Started = Get-Date
-    $rec = Start-Process -FilePath $v.Ffmpeg -ArgumentList (($all | ForEach-Object { Quote $_ }) -join " ") `
-        -NoNewWindow -PassThru -RedirectStandardError "$($v.Out).log"
-    $null = $rec.Handle  # held now, or Windows PowerShell never learns its exit code
-    $rec
+    [VisualCheckRecorder]::Start($v.Ffmpeg, (($all | ForEach-Object { Quote $_ }) -join " "), "$($v.Out).log")
+}
+
+# What a log file has grown by since the last look ($seen holds where each was read to), with the
+# last look's unfinished line in front, so a line written across two looks is whole in one.
+function Read-Grown($path, $seen) {
+    if (-not (Test-Path $path)) { return "" }
+    try {
+        $fs = [System.IO.File]::Open($path, "Open", "Read", "ReadWrite")
+    } catch { return "" }
+    try {
+        $from = [long]$seen[$path]
+        if ($fs.Length -lt $from) { $from = 0 }
+        [void]$fs.Seek($from, "Begin")
+        $buf = New-Object byte[] ([int]($fs.Length - $from))
+        $n = $fs.Read($buf, 0, $buf.Length)
+        $seen[$path] = $from + $n
+        $text = [string]$seen["$path tail"] + [System.Text.Encoding]::UTF8.GetString($buf, 0, $n)
+        $cut = $text.LastIndexOf("`n")
+        $seen["$path tail"] = if ($cut -ge 0) { $text.Substring($cut + 1) } else { $text }
+        $text
+    } finally { $fs.Close() }
 }
 
 # --- running the client --------------------------------------------------------------------------
@@ -650,8 +719,9 @@ function Close-ClientLog($log) {
 # output in $log. With $v (a video), recording starts when the cue shot lands in the screenshots
 # folder. Returns whether the client quit by itself. With $film (the cameraman's client, already
 # running) the video records that client's window instead, which is kept on its screen and muted
-# meanwhile too; $at is where this client's window goes then (beside it).
-function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null, $at = $null, $film = $null) {
+# meanwhile too; $at is where this client's window goes then (beside it), and $filmLog its log,
+# where it says the fight is over.
+function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null, $at = $null, $film = $null, $filmLog = $null) {
     Stop-Strays $s $(if ($film) { $film.Id } else { 0 })
     $spot = Get-WindowSpot $s $at
     $filmSpot = Get-WindowSpot $s $null
@@ -659,6 +729,12 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
     $rec = $null
     $shotsDir = Join-Path $chome "Screenshots"
     $muteNext = Get-Date
+    # With a cameraman, the end of the fight (it says when the hero or the boss fell) ends the video
+    # `tail` seconds later, and the run with it.
+    $tail = if ($filmLog -and $v -and [string]$s.tail -ne "off") { Num $(if ($s.tail) { $s.tail } else { "5" }) } else { -1 }
+    $seen = @{}
+    $overAt = $null
+    $lookNext = Get-Date
     # The outputs ddagrab sees are looked at now, not when the video is due.
     if ($v -and $s.video -eq "screen" -and $s.ffmpeg) { $null = Get-OutputIdx $s.ffmpeg ([System.Windows.Forms.Screen]::PrimaryScreen) }
     try {
@@ -693,22 +769,46 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
                 $v.Duration = [Math]::Max(1.0, $v.Duration - ((Get-Date) - $v.Started).TotalSeconds)
                 $rec = Start-Video $v $(if ($film) { $film } else { $p }) $(if ($v.How -eq "screen") { "title" } else { "desktop" })
             }
+            if ($tail -ge 0 -and $rec -and -not $overAt -and (Get-Date) -ge $lookNext) {
+                $lookNext = (Get-Date).AddMilliseconds(500)
+                foreach ($f in @("$filmLog.out", "$filmLog.err")) {
+                    if ((Read-Grown $f $seen) -match 'spectate: t=[\d.]+ the fight is over: (.+?) fell') {
+                        $overAt = Get-Date
+                        $v.Over = $Matches[1]
+                        Say "  the fight is over ($($v.Over) fell): the video ends $(Fmt $tail) s later"
+                        break
+                    }
+                }
+            }
+            if ($overAt -and $rec -and -not $rec.HasExited -and ((Get-Date) - $overAt).TotalSeconds -ge $tail) {
+                $v.Stopped = Get-Date
+                $v.OverAt = $overAt
+                [void][VisualCheckRecorder]::Stop($rec)
+                [void]$rec.WaitForExit(15000)
+                break
+            }
             # Quick while the window is still to be caught.
             Start-Sleep -Milliseconds $(if ($rec -or -not $spot) { 100 } else { 15 })
         }
         return $p.HasExited
     } finally {
         if ($p -and -not $p.HasExited) {
-            Say "  the client ran past $timeout s: closing it"
+            if ($v -and $v.Stopped) { Say "  the fight is over: closing the client" } else { Say "  the client ran past $timeout s: closing it" }
             Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
             $p.WaitForExit(10000) | Out-Null
         }
         if ($rec) {
             if ($rec.WaitForExit(15000)) {
                 # ffmpeg stops once it has the video's length: its first frame was that long
-                # before it quit (it starts some tenths of a second after it's asked to).
+                # before it quit (it starts some tenths of a second after it's asked to). Told to
+                # stop early, its last frame is when it was told, and the video's length before.
                 $v.First = $rec.ExitTime.AddSeconds(-$v.Duration)
+                if ($v.Stopped) {
+                    $secs = Get-MediaSecs $v.Ffmpeg $v.Out
+                    if ($secs -gt 0) { $v.First = $v.Stopped.AddSeconds(-$secs) }
+                }
             } else { Stop-Process -Id $rec.Id -Force -ErrorAction SilentlyContinue }
+            [VisualCheckRecorder]::Finish($rec)
             if ((Test-Path $v.Out) -and (Get-Item $v.Out).Length -gt 0) {
                 $v.Status = "video: $($v.Out) ($($v.How))"
                 Remove-Item "$($v.Out).log" -ErrorAction SilentlyContinue
@@ -961,7 +1061,7 @@ function Invoke-Scenario($s, $name, $out) {
         $vars.WOW_NOSOUND = "1"
     }
     try {
-        $quit = Invoke-Client $s $vars $timeout $chome $log $v $(if ($film) { $film.At }) $(if ($film) { $film.P })
+        $quit = Invoke-Client $s $vars $timeout $chome $log $v $(if ($film) { $film.At }) $(if ($film) { $film.P }) $(if ($film) { $film.Log })
     } finally {
         if ($film) {
             if (-not $film.P.HasExited) {
@@ -992,6 +1092,11 @@ function Invoke-Scenario($s, $name, $out) {
     }
     Remove-Item -Recurse -Force $chome -ErrorAction SilentlyContinue
     $done = (Test-Path $log) -and (Select-String -Path $log -Pattern 'visual-check: done' -Quiet)
+    # Ended by the end of the fight: finished, the video cut a tail after it.
+    if ($v -and $v.Stopped) {
+        $done = $true
+        $videoNote = "the fight is over ($($v.Over) fell) at $(Fmt ($v.OverAt - (Get-VideoStart $v)).TotalSeconds) s of the video, which ends $(Fmt (Num $s.tail)) s later; $videoNote"
+    }
     $msg = if ($shots -eq 0) {
         if (-not (Test-Path $log) -or -not (Select-String -Path $log -Pattern 'visual-check: in the world' -Quiet)) {
             "no stills: the client never got into the world (see client.log: the login, the realm or the hero $hero)"
