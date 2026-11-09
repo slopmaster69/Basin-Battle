@@ -1,0 +1,45 @@
+# The switch hitch (client 0081, #270's seventh round): the Brackwell pumpkin patch at 10:30, the
+# hero at WoW (-9803, -904) with the oaks behind him (yaw 45, pitched 10 up, 6 yd), worldLook
+# switched off and on three times and worldSky once, the fps journal on throughout. Take 310
+# found each worldLook 1 blocking 0.86 to 1.01 s with the logged spans adding up to only 126 ms;
+# the suspects were the residency window jumping from 13 to 39 chunks and about 290 lamp lights
+# made in that one frame. Now the held (waited-for, built-in-one-frame) window stays the farclip
+# CVar's under the new look, the look's longer reach ramps out over about 2 s ("terrain:
+# residency window" lines grow ring by ring) and streams one tile a frame, and #271 lights only
+# the 24 nearest lamps within 110 yd, six a frame. Each slow frame's "[look switch]" line now
+# gives the main frame's length by its own stamps beside the render pace, and its work notes
+# ("stream held wait", "stream placements", "lamps" ...) with their ms and counts.
+# Look for: no frame over about 50 ms in the CSV after each worldLook 1; the far hills filling in
+# over a second or two instead of at once. PLEASE send client.log's "[look switch]", "terrain:
+# residency window" and "[look lamps]" lines and the fps-journal CSV with the film.
+hero warrior
+cam 45 10 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 630")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("lookweather clear")
+5.0 lua SetCVar("fpsJournal", "1")
+5.5 video
+6.0 lua SetCVar("worldLook", "0")
+6.05 shots look-0-a 6 0.1
+9.0 lua SetCVar("worldLook", "1")
+9.05 shots look-1-a 12 0.1
+13.0 lua SetCVar("worldSky", "0")
+13.05 shots sky-0 6 0.1
+15.0 lua SetCVar("worldSky", "1")
+15.05 shots sky-1 6 0.1
+17.0 lua SetCVar("worldLook", "0")
+17.05 shots look-0-b 6 0.1
+20.0 lua SetCVar("worldLook", "1")
+20.05 shots look-1-b 12 0.1
+24.0 lua SetCVar("worldLook", "0")
+24.05 shots look-0-c 6 0.1
+27.0 lua SetCVar("worldLook", "1")
+27.05 shots look-1-c 12 0.1
+31.0 lua SetCVar("fpsJournal", "0")
+31.05 lua ConsoleExec("lookweather server")
+33 end

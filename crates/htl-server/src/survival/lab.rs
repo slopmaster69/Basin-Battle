@@ -963,7 +963,7 @@ fn shots_dir() -> Option<std::path::PathBuf> {
 }
 
 /// The game's Data folder, as the server was started with it (`--data`, or `WOW_DATA`).
-fn data_dir() -> Option<std::path::PathBuf> {
+pub(super) fn data_dir() -> Option<std::path::PathBuf> {
     let args: Vec<String> = std::env::args().collect();
     args.iter().position(|a| a == "--data").and_then(|i| args.get(i + 1)).map(std::path::PathBuf::from).or_else(|| std::env::var_os("WOW_DATA").map(std::path::PathBuf::from))
 }
@@ -1081,8 +1081,8 @@ mod tests {
         let scene = |name: &str| super::bestiary_scene(pirate.patterns.iter().find(|p| p.name == name).unwrap());
         assert_eq!(scene("two slashes"), "close");
         assert_eq!(scene("lunge"), "one");
-        let cookie = content.mobs.iter().find(|d| d.key == "dm_cookie").unwrap();
-        assert_eq!(super::bestiary_scene(cookie.patterns.iter().find(|p| p.name == "pot").unwrap()), "far");
+        let hunter = content.mobs.iter().find(|d| d.key == "shadowhunter").unwrap();
+        assert_eq!(super::bestiary_scene(hunter.patterns.iter().find(|p| p.name == "hex").unwrap()), "far");
     }
 
     #[test]

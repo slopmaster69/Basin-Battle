@@ -468,6 +468,9 @@ fn blows_of(s: &mut Survival, k: Id, p: Id, which: usize) -> usize {
 #[test]
 fn a_boss_stops_a_long_string_short_or_runs_it_one_longer_now_and_then() {
     let calm = |s: &mut Survival| {
+        let mut boss = s.content.mobs[s.content.mob("dm_vancleef_unbowed").unwrap()].clone();
+        boss.key = "tactics_test".into();
+        s.content.mobs.push(boss);
         s.content.ai.space = 0.0;
         s.content.ai.chain = 0.0;
         s.content.ai.hold = 0.0;
@@ -476,7 +479,7 @@ fn a_boss_stops_a_long_string_short_or_runs_it_one_longer_now_and_then() {
     calm(&mut s);
     s.content.ai.cut = 1.0;
     let p = sturdy(&mut s, "Ayla", ORIGIN);
-    let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
+    let k = boss(&mut s, "tactics_test", [2.0, 0.0, 0.0]);
     let string = pattern(&s, k, "string");
     assert_eq!(s.content.mobs[s.mobs[&k].def].patterns[string].steps.len(), 4);
     assert_eq!(blows_of(&mut s, k, p, string), 3, "one short of its four");
@@ -486,12 +489,12 @@ fn a_boss_stops_a_long_string_short_or_runs_it_one_longer_now_and_then() {
     s.content.ai.cut = 0.0;
     s.content.ai.extend = 1.0;
     // Its fourth blow light here: a heavy one knocks the hero down, and a knockdown ends a string.
-    let def = s.content.mob("dm_vancleef").unwrap();
+    let def = s.content.mob("tactics_test").unwrap();
     for step in s.content.mobs[def].patterns[string].steps.iter_mut() {
         step.heavy = Some(false);
     }
     let p = sturdy(&mut s, "Ayla", ORIGIN);
-    let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
+    let k = boss(&mut s, "tactics_test", [2.0, 0.0, 0.0]);
     assert_eq!(blows_of(&mut s, k, p, string), 5, "one past its four");
 
     let mut s = world();
@@ -499,7 +502,7 @@ fn a_boss_stops_a_long_string_short_or_runs_it_one_longer_now_and_then() {
     s.content.ai.cut = 0.0;
     s.content.ai.extend = 0.0;
     let p = sturdy(&mut s, "Ayla", ORIGIN);
-    let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
+    let k = boss(&mut s, "tactics_test", [2.0, 0.0, 0.0]);
     assert_eq!(blows_of(&mut s, k, p, string), 4, "as written, otherwise");
 }
 
@@ -527,13 +530,17 @@ fn a_boss_goes_straight_into_another_string_now_and_then() {
 fn a_boss_backed_off_too_long_ago_isnt_held_to_its_plan() {
     let mut s = world();
     let k = boss(&mut s, "dm_cookie_gorged", ORIGIN);
-    // Two blows from afar fit at 8 yards: the belly-flop and the spew.
-    let rush = pattern(&s, k, "belly-flop");
+    // Synthetic generic boss: Cookie's authored kitchen rhythm no longer uses this planner.
+    let def = s.mobs[&k].def;
+    let d = &mut s.content.mobs[def];
+    d.key = "test_planning_boss".into();
+    for p in &mut d.patterns { p.max_range = 12.0; }
+    let rush = pattern(&s, k, "slaps");
     s.content.ai.repeat = 1.0;
     let now = s.clock;
     // Its wait still on: the rush it backed off for.
     s.mobs.get_mut(&k).unwrap().space = Some((now + 1.0, rush));
-    assert!((0..50).all(|_| s.pick_pattern(k, 8.0, 0.4) == Some(rush)), "the planned belly-flop");
+    assert!((0..50).all(|_| s.pick_pattern(k, 8.0, 0.4) == Some(rush)), "the planned string");
     // Its wait out: it picks among what fits again.
     s.mobs.get_mut(&k).unwrap().space = Some((now - 0.1, rush));
     let other = (0..400).filter(|_| s.pick_pattern(k, 8.0, 0.4) != Some(rush)).count();

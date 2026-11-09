@@ -392,6 +392,9 @@ impl Survival {
                 hidden: false,
                 lost_at: None,
                 plan_to: None,
+                footing: self.land.footing(at),
+                floor_failures: 0,
+                floor_recovery: None,
                 form_of: None,
                 panic_stride: 0.0,
                 voiced: false,
@@ -612,8 +615,11 @@ impl Survival {
         if self.own_totem(mid, by) {
             return;
         }
+        if damage > 0 { self.perch_hurt(mid, by); }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
+        // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
+        let damage = self.boss_hold(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
         if m.health == 0 {
             return;
@@ -631,6 +637,8 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
+        if damage > 0 { self.arsenal_hurt(mid); }
+        self.machinery_hurt(mid, damage);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
         // weapons count more, and a blow in its recovery more again).
         if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 {
@@ -682,6 +690,7 @@ impl Survival {
 
     /// Whether a creature's next phase is due (below its share, and not had yet).
     pub(crate) fn due_enrage(&self, mid: Id) -> bool {
+        if self.has_arsenal(mid) { return false; }
         self.mobs.get(&mid).is_some_and(|m| {
             m.health > 0 && self.content.mobs[m.def].phases.get(m.phase).is_some_and(|e| m.health as f32 <= e.at * m.max_health as f32)
         })
@@ -697,7 +706,8 @@ impl Survival {
     /// in its fight as its health takes (0: it has none).
     pub fn posture_limit(&self, mid: Id) -> u32 {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
-        let limit = self.content.mobs[m.def].posture;
+        // Greed leaves Cookie's hands occupied. Ordinary light blows can spoil the scoop too.
+        let limit = if self.kitchen_scooping(mid) { 60 } else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }
@@ -733,6 +743,8 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
+        self.kitchen_broken(mid);
+        self.vancleef_broken(mid);
         // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
         // on the screen of the hero who broke it.
         self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
@@ -931,8 +943,15 @@ impl Survival {
 
     fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
+        self.drop_perch(mid);
+        self.remove_perch_crew(mid);
         self.death_mark_reset(mid);
         self.boss_gone(mid);
+        self.remove_arsenal(mid);
+        self.machinery_died(mid);
+        self.firing_died(mid);
+        self.remove_kitchen(mid);
+        self.remove_duel(mid);
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1067,6 +1086,7 @@ impl Survival {
             } else {
                 self.rise(s, killer, def);
             }
+            self.machinery_handoff(mid, s);
         }
         // A pack's creatures come back; one called up for testing doesn't. Below, they come
         // back when a hero rests (and a boss never does).
@@ -1174,6 +1194,13 @@ impl Survival {
     pub(crate) fn step_mobs(&mut self, dt: f32) {
         self.step_rises();
         self.step_boss_fires();
+        self.step_boss_collapse(dt);
+        self.clean_machinery();
+        self.clean_duels();
+        self.step_perch_crews();
+        self.clean_arsenals();
+        self.clean_firing_lines();
+        self.clean_kitchens();
         let now = self.clock;
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
@@ -1208,6 +1235,14 @@ impl Survival {
             if self.mobs[&id].state.foe().is_some() {
                 self.join_fight(id);
             }
+            // Perched engineers only finish scheduled throws. Falls follow their own spline,
+            // without a walker's floor projection snapping them down or back onto the ring.
+            if self.perch_controlled(id) {
+                if !self.disabled(id) && matches!(self.mobs[&id].state, MobState::Windup { .. }) {
+                    self.think(id, dt);
+                }
+                continue;
+            }
             // Far from every hero, a creature at rest sleeps (the land is wide).
             if heroes.iter().all(|p| dist2d(*p, self.mobs[&id].pos) > SLEEP_RANGE) {
                 let m = &self.mobs[&id];
@@ -1230,11 +1265,24 @@ impl Survival {
             if self.targets.get(&id).copied().unwrap_or(false) {
                 continue;
             }
+            if self.step_firing_gunner(id, dt) { continue; }
+            if self.step_machinery(id) {
+                continue;
+            }
+            if self.step_perch_valve(id) { continue; }
+            if self.step_arsenal(id) { continue; }
+            if self.step_firing_captain(id) { continue; }
+            if self.step_kitchen(id) { continue; }
+            if self.step_vancleef(id) { continue; }
             if self.disabled(id) {
                 continue;
             }
             // A boss on its run (`sim::bosses`): its run is its thinking.
             if self.step_boss_run(id) {
+                continue;
+            }
+            // A boss holding the line of its collapse: the route and the front set where it goes.
+            if self.step_boss_holdline(id) {
                 continue;
             }
             // A second wind that was due while it reeled comes once it stands again.
@@ -1250,8 +1298,19 @@ impl Survival {
 
     /// Move along the current path.
     fn walk(&mut self, id: Id, dt: f32) {
+        // A committed duel lunge retains its exact heading even at a path endpoint
+        // where floating-point rounding can make facing(next, next) turn to zero.
+        let committed = self.is_vancleef(id) && self.mobs.get(&id).is_some_and(|m| matches!(m.state, MobState::Windup { .. }));
         let below = self.is_below();
         let now = self.clock;
+        // A stopped walker can already be over a missing floor. Recover before the empty-path
+        // early return, rather than waiting for another path to fail from that airborne start.
+        if below && self.mobs.get(&id).is_some_and(|m| m.thrown_until <= now
+            && self.land.footing(m.pos).is_none()
+            && m.footing.is_none_or(|p| dist2d(p, m.pos) > 0.75)) {
+            self.recover_footing(id);
+            return;
+        }
         let Some(m) = self.mobs.get_mut(&id) else { return };
         if m.path.is_empty() || m.speed <= 0.0 {
             return;
@@ -1259,6 +1318,9 @@ impl Survival {
         // Thrown up: it goes along the ground under its arc, and is put back up on it after.
         m.pos[2] -= moves::loft_at(m.thrown_lift, m.thrown_until, now - dt);
         let start = m.pos;
+        if below {
+            if let Some(at) = self.land.footing(start) { m.footing = Some(at); }
+        }
         let mut left = m.speed * dt;
         while left > 0.0 && !m.path.is_empty() {
             let next = m.path[0];
@@ -1270,7 +1332,7 @@ impl Survival {
             } else {
                 let t = left / d;
                 m.pos = [m.pos[0] + (next[0] - m.pos[0]) * t, m.pos[1] + (next[1] - m.pos[1]) * t, m.pos[2]];
-                m.facing = facing(m.pos, next);
+                if !committed { m.facing = facing(m.pos, next); }
                 left = 0.0;
             }
         }
@@ -1307,9 +1369,41 @@ impl Survival {
         }
         // Below, fallen through its floor however it came to (more of a drop at once than any walk
         // or slide makes): back where it stood, in whatever fight it was in; on its way home, home.
-        if below && start[2] - z > FELL_THROUGH.max(FALL + SLIDE_SLOPE * walked) {
-            let to = if matches!(m.state, MobState::Return) { m.home } else { start };
-            self.set_back(id, to, "fell through the floor");
+        let unsupported = below && self.land.footing([x, y, z]).is_none()
+            && m.footing.is_none_or(|p| dist2d(p, [x, y, z]) > 0.75);
+        let lifted = z - start[2] > FELL_THROUGH.max(FALL + WALK_SLOPE * walked);
+        if below && (start[2] - z > FELL_THROUGH.max(FALL + SLIDE_SLOPE * walked) || lifted || unsupported) {
+            self.recover_footing(id);
+        } else if below {
+            if let Some(at) = self.land.footing([x, y, z]) {
+                let m = self.mobs.get_mut(&id).unwrap();
+                m.footing = Some(at);
+                if m.floor_recovery.is_some_and(|p| dist2d(p, at) >= 2.0) {
+                    m.floor_failures = 0;
+                    m.floor_recovery = None;
+                }
+            }
+        }
+    }
+
+    fn recover_footing(&mut self, id: Id) {
+        let m = &self.mobs[&id];
+        let fallback = self.boss_fight_home(id).unwrap_or(m.home);
+        let Some(at) = m.footing.and_then(|p| self.land.footing(p)).or_else(|| self.land.footing(fallback)) else {
+            self.halt(id);
+            self.mobs.get_mut(&id).unwrap().state = MobState::Return;
+            return;
+        };
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.floor_failures = m.floor_failures.saturating_add(1);
+        m.floor_recovery = Some(at);
+        if m.floor_failures >= 2 {
+            let home = self.land.footing(fallback).unwrap_or(at);
+            m.home = home;
+            m.state = MobState::Return;
+            self.set_back(id, home, "repeated floor failure: fight reset");
+        } else {
+            self.set_back(id, at, "fell through the floor");
         }
     }
 
@@ -1317,9 +1411,14 @@ impl Survival {
     /// down at `at` at once (everyone sees it there), its walk dropped and its fight kept. The log
     /// says so, so that the next time can be looked into.
     pub(crate) fn set_back(&mut self, id: Id, at: Vec3, why: &str) {
+        let Some(at) = self.land.footing(at) else {
+            self.halt(id);
+            return;
+        };
         let Some(m) = self.mobs.get_mut(&id) else { return };
         let was = m.pos;
         m.pos = at;
+        m.footing = Some(at);
         m.path.clear();
         m.speed = 0.0;
         m.sidle = None;
@@ -1350,6 +1449,11 @@ impl Survival {
         let speed = speed * self.speed_share(id);
         let Some(m) = self.mobs.get(&id) else { return };
         let from = m.pos;
+        if self.is_below() && self.land.footing(to).is_none() {
+            self.mobs.get_mut(&id).unwrap().lost_at.get_or_insert(self.clock);
+            self.halt(id);
+            return;
+        }
         // Straight only where a walker could: nothing solid in the way (a trunk, a wall) and no
         // slope too steep (a cliff); else round by the land's own way.
         // (A step away is straight too, but only on its own floor: a spot under the deck it stands
@@ -1692,6 +1796,7 @@ impl Survival {
     /// while to `face` (whoever threw it), so a knockback drives it back rather than turning it to
     /// run.
     pub(crate) fn throw_mob(&mut self, id: Id, to: Vec3, air: f32, face: Option<Id>, lift: f32) {
+        if self.perch_controlled(id) { return; }
         let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
         // (Thrown again while up: from the ground under it.)
@@ -1749,7 +1854,7 @@ impl Survival {
         }
     }
 
-    fn foe_pos(&self, foe: Foe) -> Option<Vec3> {
+    pub(crate) fn foe_pos(&self, foe: Foe) -> Option<Vec3> {
         match foe {
             Foe::Hero(h) => self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos),
             Foe::Obj(o) => self.objs.get(&o).filter(|o| matches!(o.kind, ObjKind::Station { damaged: false, .. })).map(|o| o.pos),
@@ -1758,7 +1863,7 @@ impl Survival {
 
     /// Whether another standing creature is within `r` of `at`.
     fn crowded(&self, id: Id, at: Vec3, r: f32) -> bool {
-        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && dist2d(m.pos, at) < r)
+        self.mobs.iter().any(|(o, m)| *o != id && m.health > 0 && !m.hidden && !self.duel_observer(*o) && dist2d(m.pos, at) < r)
     }
 
     /// Where to stand `r` from a foe at `foe`, coming from `from`: on its own side of them, or
@@ -1845,7 +1950,7 @@ impl Survival {
 
     /// A creature called up in a fight goes, out of the world: its wind-up's mark and what it
     /// had in the air with it.
-    fn dismiss(&mut self, id: Id) {
+    pub(crate) fn dismiss(&mut self, id: Id) {
         let Some(m) = self.mobs.remove(&id) else { return };
         if let MobState::Windup { mark: Some(mk), .. } = m.state {
             self.unmark(mk);
@@ -1899,7 +2004,7 @@ impl Survival {
         self.events.push(Event::React { id: mid, anim: DODGE_ANIM, from, lean: 0.0, hold: 0.0, fit: WHIFF_SECS });
     }
 
-    fn think(&mut self, id: Id, dt: f32) {
+    pub(crate) fn think(&mut self, id: Id, dt: f32) {
         let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return };
         if m.hidden {
@@ -1967,6 +2072,8 @@ impl Survival {
                     }
                     m.fighters = 1;
                     m.health = m.max_health;
+                    m.floor_failures = 0;
+                    m.floor_recovery = None;
                     // Whole again: its second wind and its posture with it, its voice too.
                     m.enraged = false;
                     m.phase = 0;
@@ -2030,7 +2137,8 @@ impl Survival {
                     self.set_back(id, home, "found no way to its foe nor home");
                     return;
                 }
-                if !raider && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
+                // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
+                if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
                     let gone = match foe {
@@ -2287,6 +2395,10 @@ impl Survival {
                     if let Some(mk) = mark {
                         self.unmark(mk);
                     }
+                    let released = self.mobs[&id].pattern;
+                    let completed = released.map(|(k, _)| k);
+                    // A hit can mercy-cancel the pattern; retain the step that actually released.
+                    let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
                     self.release(id, foe);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
@@ -2316,6 +2428,16 @@ impl Survival {
                             let cd = self.string_cooldown(a.cooldown * self.pace(id));
                             self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
                         }
+                    }
+                    if self.mobs[&id].pattern.is_none() {
+                        self.machinery_string_landed(id, completed, a.damage);
+                        self.kitchen_string_landed(id, released);
+                        self.vancleef_string_landed(id, completed);
+                    }
+                    // Install the authored opening after ordinary recovery/cooldown bookkeeping,
+                    // which must not shorten it. Earlier interrupted blows never reach this point.
+                    if !a.ranged && lodge > 0.0 {
+                        self.boss_weapon_lodges(id, lodge);
                     }
                 } else {
                     self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: t2, mark, shown };
@@ -2376,6 +2498,12 @@ impl Survival {
             (None, Some(s), true) => s.over(&d.attack),
             _ => d.attack.clone(),
         };
+        // These attacks lock at their first pose and keep that line as the target moves.
+        if self.machine_grind(id) || self.kitchen_committed(id)
+            || (a.ranged && (self.is_firing_captain(id) || d.key == "dm_deck_gunner")) {
+            a.turn_rate = 0.0;
+            a.lock = a.windup;
+        }
         // A blow held a beat (the delayed swing).
         a.windup += m.hold;
         // Quicker (and harder) in its later phases.
@@ -2434,6 +2562,9 @@ impl Survival {
 
     /// One of a creature's patterns that suits a foe `dist` off (`size` its body), weighted.
     pub(crate) fn pick_pattern(&mut self, id: Id, dist: f32, size: f32) -> Option<usize> {
+        if self.is_machine(id) { return self.machine_pattern(id, dist, size); }
+        if self.is_kitchen(id) { return self.kitchen_pattern(id, dist, size); }
+        if self.is_vancleef(id) { return self.vancleef_pattern(id, dist, size); }
         let m = self.mobs.get(&id)?;
         let d = &self.content.mobs[m.def];
         // A raised guard in front of it: it reaches for the blow no guard stops.
@@ -2449,7 +2580,8 @@ impl Survival {
             .patterns
             .iter()
             .enumerate()
-            .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32)
+            .filter(|(_, p)| p.weight > 0.0 && m.health as f32 <= p.below * m.max_health as f32
+                && self.arsenal_pattern_allowed(id, &p.name) && self.firing_pattern_allowed(id, &p.name))
             .filter_map(|(k, p)| {
                 let first = p.steps.first()?;
                 let reach = first.range.unwrap_or(d.attack.range) + size - 0.3 + first.lunge;
@@ -2479,6 +2611,7 @@ impl Survival {
     }
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
+        if self.vancleef_invitation(id, foe, to) { return; }
         // A spell lab body swings only when the lab asks it to.
         if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) && !self.lab_stringing(id) {
             return;
@@ -2518,7 +2651,8 @@ impl Survival {
             _ => None,
         };
         let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
-        let mark = if a.ranged {
+        let tele = if self.machine_grind(id) { Telegraph { reach: 7.5, width: 3.0, at: Some((pos, face)), ..tele } } else { tele };
+        let mark = if let Some(mark) = self.kitchen_pour_mark(id, tele) { Some(mark) } else if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked
             // through the whole wind-up and flight, so the ring is there to read and step out of,
@@ -2607,11 +2741,18 @@ impl Survival {
             self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery, blockable: a.blockable, from });
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
+        self.machinery_windup(id);
+        self.firing_windup(id, to);
+        self.kitchen_windup(id);
     }
 
     /// The blow lands (or the missile flies): every hero in the arc and in reach of the creature's
     /// committed facing, or a station in the way.
     fn release(&mut self, id: Id, foe: Foe) {
+        if self.firing_release(id) { return; }
+        // The moving saw hits along its actual swept path, once per hero, in machinery.
+        if self.machine_grind(id) { return; }
+        if self.kitchen_release(id) { return; }
         let now = self.clock;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
@@ -2623,7 +2764,7 @@ impl Survival {
                 // Thrown where it was marked at the wind-up's start, its ring still there.
                 Some((at, mark)) => (at, lob_flight(dist2d(pos, at), a.speed), mark),
                 None => {
-                    let Some(to) = self.foe_pos(foe) else { return };
+                    let Some(to) = self.machinery_shot(id).or_else(|| self.foe_pos(foe)) else { return };
                     let at = self.ground_near(to[0], to[1], to[2]);
                     let fly = dist2d(pos, at) / a.speed.max(1.0);
                     // A splash's ground warned by its spell's own look; a bolt's small ring as drawn.
@@ -2676,7 +2817,7 @@ impl Survival {
                 self.strike_fair(id, h, a.damage, pos, a.blockable, a.heavy, a.blockable, Blow::Light, area, combat::Follow::None);
             }
         }
-        // A boss's blow: burning ground where a heated weapon lands, a weapon that lodges.
+        // A boss's blow: burning ground where a heated weapon lands.
         self.boss_blow_lands(id, pos, f, a.range, a.arc, a.heavy);
         // A War Banner in the blow's way takes it, as hard as a hero would.
         let share = self.foe_blow_share(id);

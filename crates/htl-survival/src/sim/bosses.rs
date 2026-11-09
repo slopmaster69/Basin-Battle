@@ -17,6 +17,10 @@ use super::mobs::MobState;
 use super::*;
 use crate::content::BurnDef;
 
+#[cfg(test)]
+#[path = "bosses_tests.rs"]
+mod tests;
+
 /// The dust over a spot where rocks are about to come down, and where they land.
 const DUST: u32 = 7272;
 /// How long the dust shows before the rocks of a set piece fall, how wide they come down, and
@@ -39,6 +43,19 @@ const RUN_HASTE: f32 = 1.6;
 const LEG_SLACK: f32 = 2.5;
 /// Burning ground bites a hero standing in it this often.
 const BURN_TICK: f32 = 1.0;
+/// The collapse: how often it crushes a hero behind the front, brings rock down behind it (over
+/// the last this-many yards), drops a warning fall ahead, and raises dust at the front.
+const COLLAPSE_CRUSH_TICK: f32 = 0.5;
+const BURIED_EVERY: f32 = 0.35;
+const BURIED_SPAN: f32 = 12.0;
+const WARN_EVERY: f32 = 1.1;
+const DUST_EVERY: f32 = 0.6;
+/// A hero farther than this off the route is not on it (another floor, a side cave).
+const OFF_ROUTE: f32 = 20.0;
+/// Its hero this far past the warning band has run off: the boss holds the line, and hurls rock at
+/// them this often.
+const LINE_SLACK: f32 = 6.0;
+const HURL_EVERY: f32 = 4.0;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Bosses {
@@ -50,6 +67,41 @@ pub(crate) struct Bosses {
     burning: BTreeMap<Id, BurnDef>,
     /// Burning ground.
     fires: Vec<Fire>,
+    /// The place coming down behind the heroes, if a boss has brought it down.
+    collapse: Option<Collapse>,
+}
+
+/// A collapse under way (`[mob.phase.collapse]`).
+#[derive(Debug, Clone)]
+struct Collapse {
+    boss: Id,
+    route: Vec<Vec3>,
+    /// How far along the route each point is (yards).
+    along: Vec<f32>,
+    /// How far along the route the front has come.
+    front: f32,
+    speed: f32,
+    lead: f32,
+    crush: f32,
+    hold: f32,
+    end_text: String,
+    held_text: String,
+    /// It has reached the route's end: the last of the fight.
+    done: bool,
+    /// Its own beats: the next crush of the buried, rock behind the front, a warning fall ahead
+    /// of it, the dust at the front.
+    crush_at: f32,
+    buried_at: f32,
+    warn_at: f32,
+    dust_at: f32,
+    /// The boss was kept from falling before the end (said once).
+    held: bool,
+    /// When it next hurls rock at a hero who ran off ahead.
+    hurl_at: f32,
+    /// Next walking corner while holding the line. Kept in order through hairpins where
+    /// the same position occurs twice; a nearest-point projection alone can go backwards.
+    boss_leg: usize,
+    holding: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +148,51 @@ impl Survival {
                 self.rocks_fall(mid, *p, DEBRIS_RADIUS, DEBRIS_WARN, damage, true);
             }
         }
+        if e.rocks_round > 0.0 {
+            let at = self.mobs[&mid].pos;
+            let damage = self.boss_blow(mid, DEBRIS_SHARE);
+            for k in 0..6 {
+                let a = k as f32 * std::f32::consts::TAU / 6.0 + 0.4;
+                let p = [at[0] + a.cos() * e.rocks_round, at[1] + a.sin() * e.rocks_round, at[2]];
+                self.rocks_fall(mid, p, DEBRIS_RADIUS, DEBRIS_WARN, damage, true);
+            }
+        }
+        if let Some(c) = e.collapse.filter(|c| c.route.len() >= 2) {
+            let Some(route) = crate::land::walking_route(self.land.as_ref(), &c.route) else {
+                self.events.push(Event::Log(format!("{}: collapse route has no safe walk; phase stopped", self.content.mobs[def].name)));
+                return;
+            };
+            let now = self.clock;
+            self.bosses.began.entry(mid).or_insert(home);
+            let mut along = vec![0.0];
+            for w in route.windows(2) {
+                let d = dist3(w[0], w[1]);
+                along.push(along.last().unwrap() + d);
+            }
+            self.bosses.collapse = Some(Collapse {
+                boss: mid,
+                route,
+                along,
+                front: 0.0,
+                speed: c.speed.max(0.5),
+                lead: c.lead.max(0.0),
+                crush: c.crush.max(0.0),
+                hold: c.hold.clamp(0.0, 1.0),
+                end_text: c.end_text.clone(),
+                held_text: c.held_text.clone(),
+                done: false,
+                crush_at: now + COLLAPSE_CRUSH_TICK,
+                buried_at: now,
+                warn_at: now + 0.5,
+                dust_at: now,
+                held: false,
+                hurl_at: now,
+                boss_leg: 1,
+                holding: false,
+            });
+            let name = self.content.mobs[def].name.clone();
+            self.events.push(Event::Log(format!("{name} brings the place down: a collapse along {:.0} yd at {:.1} yd/s", self.bosses.collapse.as_ref().unwrap().along.last().copied().unwrap_or(0.0), c.speed)));
+        }
         if !e.run_to.is_empty() {
             let now = self.clock;
             self.bosses.began.entry(mid).or_insert(home);
@@ -125,6 +222,184 @@ impl Survival {
             }
             self.halt(mid);
         }
+    }
+
+    /// One step of a collapse: the front comes on along its route; behind it rock falls and the
+    /// buried are crushed; ahead of it dust and warning falls; the boss fights on through it,
+    /// leashed to nowhere. A fight lost puts everything back: the boss where its fight began.
+    pub(crate) fn step_boss_collapse(&mut self, dt: f32) {
+        let Some(c) = self.bosses.collapse.clone() else { return };
+        let now = self.clock;
+        let boss = c.boss;
+        let Some(m) = self.mobs.get(&boss) else {
+            self.bosses.collapse = None;
+            return;
+        };
+        if m.health == 0 {
+            self.bosses.collapse = None;
+            return;
+        }
+        // The fight lost (every hero down or gone): the collapse ends, and the boss goes back to
+        // where its fight began, to be whole again there.
+        if matches!(m.state, MobState::Return | MobState::Idle { .. }) {
+            self.bosses.collapse = None;
+            if let Some(at) = self.bosses.began.get(&boss).copied() {
+                self.mobs.get_mut(&boss).unwrap().home = at;
+                self.set_back(boss, at, "the collapse lost: back where the fight began");
+            }
+            return;
+        }
+        // Its leash runs from wherever it is while the place comes down round it.
+        if !c.done {
+            if let Some(pos) = self.land.footing(m.pos) {
+                self.mobs.get_mut(&boss).unwrap().home = pos;
+            }
+        }
+        let total = *c.along.last().unwrap();
+        let mut c = c;
+        if !c.done {
+            c.front = (c.front + c.speed * dt).min(total);
+            if c.front >= total {
+                c.done = true;
+                let name = self.content.mobs[self.mobs[&boss].def].name.clone();
+                self.events.push(Event::Log(format!("{name}'s collapse reached its end")));
+                self.yell(boss, c.end_text.clone());
+                let pos = self.mobs[&boss].pos;
+                self.mobs.get_mut(&boss).unwrap().home = pos;
+            }
+        }
+        if !c.done {
+            // Dust at the front.
+            if now >= c.dust_at {
+                c.dust_at = now + DUST_EVERY;
+                let at = route_point(&c.route, &c.along, c.front);
+                self.events.push(Event::Missile { caster: boss, spell: DUST, target: Target::Point(at) });
+            }
+            // Rock behind the front, everywhere: what the buried see.
+            if now >= c.buried_at {
+                c.buried_at = now + BURIED_EVERY;
+                let d = (c.front - self.rng.gen::<f32>() * BURIED_SPAN).max(0.0);
+                let at = route_point(&c.route, &c.along, d);
+                let damage = self.boss_blow(boss, DEBRIS_SHARE * 0.5);
+                self.rocks_fall(boss, at, DEBRIS_RADIUS, DEBRIS_WARN * 0.5, damage, true);
+            }
+            // A warning fall ahead of the front: keep moving.
+            if now >= c.warn_at && c.lead > 0.0 {
+                c.warn_at = now + WARN_EVERY;
+                let d = (c.front + self.rng.gen::<f32>() * c.lead).min(total);
+                let at = route_point(&c.route, &c.along, d);
+                let damage = self.boss_blow(boss, FALL_SHARE);
+                self.rocks_fall(boss, at, FALL_RADIUS, FALL_WARN, damage, false);
+            }
+            // The buried crushed; those close ahead of it warned.
+            if now >= c.crush_at {
+                c.crush_at = now + COLLAPSE_CRUSH_TICK;
+                let heroes: Vec<(Id, Vec3, u32)> = self.players.iter().filter(|(_, p)| p.health > 0).map(|(h, p)| (*h, p.pos, p.max_health)).collect();
+                for (h, pos, max) in heroes {
+                    let Some((along, off)) = route_progress(&c.route, &c.along, pos) else { continue };
+                    if off > OFF_ROUTE {
+                        continue;
+                    }
+                    if along < c.front - 1.0 {
+                        let damage = ((max as f32) * c.crush * COLLAPSE_CRUSH_TICK).round().max(1.0) as u32;
+                        self.hurt_player_by(h, damage, boss, "the falling mine");
+                    } else if along < c.front + c.lead {
+                        self.events.push(Event::Danger { player: h, secs: COLLAPSE_CRUSH_TICK * 2.0, from: None });
+                    }
+                }
+            }
+        }
+        self.bosses.collapse = Some(c);
+    }
+
+    /// A blow on a boss whose collapse is still coming down: it can't be brought below its hold
+    /// before the front reaches the end (the last of the fight is fought there).
+    pub(crate) fn boss_hold(&mut self, mid: Id, damage: u32) -> u32 {
+        let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == mid && !c.done && c.hold > 0.0) else { return damage };
+        let Some(m) = self.mobs.get(&mid) else { return damage };
+        let floor = (c.hold * m.max_health as f32).round() as u32;
+        let most = m.health.saturating_sub(floor);
+        if damage <= most {
+            return damage;
+        }
+        if !c.held {
+            let line = c.held_text.clone();
+            self.bosses.collapse.as_mut().unwrap().held = true;
+            self.yell(mid, line);
+        }
+        most
+    }
+
+    /// A boss whose collapse is coming down holds the line, in place of its thinking, when its
+    /// hero has run off ahead of the fight (past the warning band): it walks the route with the
+    /// front, smashing as it comes, and hurls rock down the tunnel at whoever ran. The collapse and
+    /// the boss set where the fight is, never the heroes. False when its hero is in reach of the
+    /// fight (it fights as ever) or for any other creature.
+    pub(crate) fn step_boss_holdline(&mut self, id: Id) -> bool {
+        let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == id && !c.done) else { return false };
+        let (front, lead, total) = (c.front, c.lead, *c.along.last().unwrap());
+        let (mut leg, holding) = (c.boss_leg, c.holding);
+        let Some(m) = self.mobs.get(&id) else { return false };
+        let Some(mobs::Foe::Hero(h)) = m.state.foe() else { return false };
+        let Some(hero) = self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos) else { return false };
+        let now = self.clock;
+        let (route, along) = (c.route.clone(), c.along.clone());
+        let Some((hero_at, hero_off)) = route_progress(&route, &along, hero) else { return false };
+        let line = (front + lead + LINE_SLACK).min(total);
+        let lost = m.lost_at.is_some_and(|t| now - t >= STUCK);
+        if hero_at <= line && hero_off <= OFF_ROUTE && !lost {
+            self.bosses.collapse.as_mut().unwrap().holding = false;
+            return false;
+        }
+        let def = m.def;
+        // Follow the next native corner, never the chord from the creature to a distant
+        // front. A hero on another floor doesn't pull it out of the route either.
+        let want = (front + lead * 0.5).min(total);
+        if !holding {
+            let start = leg.saturating_sub(1);
+            let (at, _) = route_progress(&route[start..], &along[start..], m.pos).unwrap();
+            leg = along.iter().position(|a| *a > at + 0.01).unwrap_or(route.len() - 1).max(1);
+        }
+        while leg + 1 < route.len() && dist3(m.pos, route[leg]) < 0.08 { leg += 1; }
+        let (boss_at, boss_off) = route_progress(&route[leg-1..=leg], &along[leg-1..=leg], m.pos).unwrap();
+        let to = if boss_off > 1.0 {
+            route_point(&route, &along, boss_at)
+        } else {
+            route_point(&route, &along, want.min(along[leg]).max(boss_at))
+        };
+        let c = self.bosses.collapse.as_mut().unwrap();
+        c.boss_leg = leg;
+        c.holding = true;
+        if let Some(to) = self.land.footing(to).filter(|_| boss_at < want || boss_off > 1.0) {
+            let speed = self.content.mobs[def].run_speed;
+            let end = self.mobs[&id].path.last().copied();
+            if end.is_none_or(|end| dist3(end, to) > 0.5) { self.go(id, to, speed); }
+        } else if !self.mobs[&id].path.is_empty() {
+            self.halt(id);
+        }
+        // Rock hurled down the tunnel at the hero who ran.
+        let c = self.bosses.collapse.as_mut().unwrap();
+        if now >= c.hurl_at {
+            c.hurl_at = now + HURL_EVERY;
+            let damage = self.boss_blow(id, DEBRIS_SHARE);
+            self.events.push(Event::Emote { id, emote: mobs::ROAR_EMOTE });
+            self.rocks_fall(id, hero, DEBRIS_RADIUS, DEBRIS_WARN, damage, true);
+        }
+        true
+    }
+
+    /// Whether a boss's collapse is still coming down: it chases its heroes however far they run.
+    pub(crate) fn boss_unleashed(&self, id: Id) -> bool {
+        self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id && !c.done)
+    }
+
+    pub(crate) fn boss_fight_home(&self, id: Id) -> Option<Vec3> {
+        self.bosses.began.get(&id).copied()
+    }
+
+    /// The collapse's front, as far along its route as it has come (for tests and the log).
+    pub(crate) fn collapse_front(&self) -> Option<(f32, bool)> {
+        self.bosses.collapse.as_ref().map(|c| (c.front, c.done))
     }
 
     /// Whether a boss is on its run (its phases wait until it has taken up the fight again).
@@ -249,10 +524,12 @@ impl Survival {
         self.bosses.runs.remove(&id);
         self.bosses.burning.remove(&id);
         self.bosses.began.remove(&id);
+        if self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id) {
+            self.bosses.collapse = None;
+        }
     }
 
-    /// A boss's blow has landed (melee): burning ground where a heavy one lands, and a weapon
-    /// that lodges where its blow says so.
+    /// A boss's melee blow leaves burning ground where a heated weapon lands.
     pub(crate) fn boss_blow_lands(&mut self, id: Id, pos: Vec3, facing: f32, range: f32, arc: f32, heavy: bool) {
         let now = self.clock;
         if heavy {
@@ -268,10 +545,19 @@ impl Survival {
                 self.bosses.fires.push(Fire { at, radius: b.radius, damage: b.damage, until: now + b.secs, bite_at: now + BURN_TICK * 0.5, owner: id, obj });
             }
         }
-        let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
-        if lodge > 0.0 {
-            self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
-            self.stagger_mob(id, lodge, false);
+    }
+
+    /// The released step's weapon lodges after its ordinary recovery has been recorded.
+    pub(crate) fn boss_weapon_lodges(&mut self, id: Id, secs: f32) {
+        let recovery = match self.mobs.get(&id).map(|m| &m.state) {
+            Some(MobState::Recover { until, .. }) => *until,
+            _ => self.clock,
+        };
+        self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+        self.stagger_mob(id, secs, false);
+        // A short lodge (the ordinary slam) must not shorten a longer normal recovery either.
+        if let Some(Mob { state: MobState::Recover { until, .. }, .. }) = self.mobs.get_mut(&id) {
+            *until = until.max(recovery);
         }
     }
 
@@ -356,6 +642,27 @@ impl Survival {
         Ok(format!("{name} is down to {}%.", (share * 100.0).round()))
     }
 
+    /// (Debug) Every creature below taken away but those whose name or key holds `keep`, for
+    /// filming one fight with nothing else in it. They're back at the next rest or reset.
+    pub fn dev_clear_foes(&mut self, keep: &str) -> Result<String, String> {
+        let keep = keep.to_lowercase();
+        let gone: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| !m.friendly && !self.content.mobs[m.def].inert())
+            .filter(|(_, m)| {
+                let d = &self.content.mobs[m.def];
+                keep.is_empty() || !(d.key.to_lowercase().contains(&keep) || d.name.to_lowercase().contains(&keep))
+            })
+            .map(|(id, _)| *id)
+            .collect();
+        for id in &gone {
+            self.mobs.remove(id);
+            self.events.push(Event::MobGone { id: *id });
+        }
+        Ok(format!("Took away {} creatures.", gone.len()))
+    }
+
     /// This share of the boss's own blow (as hard as its fight has grown).
     fn boss_blow(&self, id: Id, share: f32) -> u32 {
         let d = self.mobs.get(&id).map_or(0, |m| self.content.mobs[m.def].attack.damage);
@@ -375,4 +682,41 @@ impl Survival {
             self.events.push(Event::Danger { player: v, secs: warn, from: None });
         }
     }
+}
+
+fn dist3(a: Vec3, b: Vec3) -> f32 {
+    ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
+}
+
+/// The point `d` yards along a route (its points, and how far along each is).
+fn route_point(route: &[Vec3], along: &[f32], d: f32) -> Vec3 {
+    for i in 0..route.len().saturating_sub(1) {
+        if d <= along[i + 1] || i + 2 == route.len() {
+            let len = (along[i + 1] - along[i]).max(1.0e-3);
+            let t = ((d - along[i]) / len).clamp(0.0, 1.0);
+            let (a, b) = (route[i], route[i + 1]);
+            return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        }
+    }
+    route[0]
+}
+
+/// How far along a route a spot is (its nearest point on the route, by height too, so a floor
+/// above isn't taken for one below), and how far off the route it stands.
+fn route_progress(route: &[Vec3], along: &[f32], pos: Vec3) -> Option<(f32, f32)> {
+    let mut best: Option<(f32, f32)> = None;
+    for i in 0..route.len().saturating_sub(1) {
+        let (a, b) = (route[i], route[i + 1]);
+        let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let ap = [pos[0] - a[0], pos[1] - a[1], pos[2] - a[2]];
+        let len2 = (ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2]).max(1.0e-6);
+        let t = ((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / len2).clamp(0.0, 1.0);
+        let q = [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t];
+        let off = dist3(pos, q);
+        let at = along[i] + t * (along[i + 1] - along[i]);
+        if best.is_none_or(|(_, o)| off < o) {
+            best = Some((at, off));
+        }
+    }
+    best
 }
