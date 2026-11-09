@@ -385,6 +385,7 @@ impl SurvivalGame {
     }
 
     pub(crate) fn gameobject_query(&self, conn: ConnId, entry: u32) {
+        if self.aftermath_query(conn, entry) { return; }
         let found = self.go_entries.iter().find(|(_, e)| **e == entry).map(|(k, _)| k.clone());
         let p = match found {
             Some((display, name, kind)) => packets::gameobject_query_response(entry, kind, display, &name),
@@ -1098,6 +1099,11 @@ impl SurvivalGame {
         for id in others {
             let p = self.player_create(id, false);
             self.send(conn, p);
+        }
+        if self.aftermath.is_some() {
+            self.send_aftermath_to(conn);
+            self.aftermath_arrival(conn);
+            return;
         }
         // (Not an ambusher still lying in wait.)
         let mobs: Vec<Id> = self.sim.mobs.iter().filter(|(_, m)| !m.hidden)
