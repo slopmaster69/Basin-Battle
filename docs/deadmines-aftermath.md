@@ -86,8 +86,9 @@ come from the installed meshes, including the rotated bottom of tipped objects. 
 and collision still require the visual check; source bounds alone do not establish acceptance.
 
 One native `G_CaveIn` model is being inspected in the Foreman's chamber, visible from `mouth`.
-Its GOOBER type and ready state hold the Closed animation; it is not used elsewhere until its
-settled appearance and collision pass the native check.
+Its GOOBER type and ready state hold the Closed animation, with the composite origin at the
+floor and its lowest chunks buried. It is not used elsewhere until its settled appearance
+and collision pass the native check.
 
 The ship marker is generic game-object entry `500100`, display `0`, GUID
 `0xF11007A184FFFFFF`. It is sent before the ruin objects and destroyed on reset. Patch 0087

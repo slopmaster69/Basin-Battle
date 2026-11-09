@@ -265,4 +265,6 @@ fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     assert!(floor(&land, [-105.0,-821.0,37.9], false).is_none(), "captain's quarters really gone");
     assert!(floor(&land, [-62.0,-815.0,41.5], false).is_none(), "upper ship deck really gone");
     assert!(floor(&land, [-80.0,-820.0,-16.0], true).is_some(), "seabed remains under wreckage");
+    assert!(props.iter().any(|p| p.site == "Smite's ruined landing" && p.model == CANNON),
+        "the dock retains a grounded cannon wreck beside the inspection approach");
 }

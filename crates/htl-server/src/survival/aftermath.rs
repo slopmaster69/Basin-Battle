@@ -132,8 +132,13 @@ fn make_prop(site: &Site, model: usize, pos: [f32; 3], scale: f32, roll: f32, pi
     // Terrain rocks have open ground-facing skirts. Keep those buried instead of exposing
     // them by seating only their single lowest rotated vertex on the floor.
     let embed = if model <= RUBBLE { 0.4 } else { 0.08 };
+    // The cave-in's Closed pose is its bind pose, with chunks reaching 5.47 yd below its
+    // origin. Lifting that extremity to the floor left a suspended wall in the native view.
+    // Keep the composite's origin on the floor and let its lower chunks enter the ground.
+    let z = if model == CAVE_IN { pos[2]-0.08*scale }
+        else { pos[2] - bottom(model, rotation)*scale - embed*scale };
     Prop { region: site.region, site: site.name, model,
-        pos: [pos[0], pos[1], pos[2] - bottom(model, rotation)*scale - embed*scale],
+        pos: [pos[0], pos[1], z],
         scale, rotation, facing: yaw }
 }
 
@@ -219,7 +224,13 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
                 place(WOODPILE, [0.6, -4.0*hand], 1.3, 0.0, 0.0, 1.4);
             }
             Dressing::Cannon => {
-                place(CANNON, [-0.4, -1.8*hand], 0.7, 1.1, 0.15, 0.9);
+                if site.name == "Smite's ruined landing" {
+                    // The first native dock view was inside the large cannon's turned base.
+                    // Keep a grounded wreck beside the approach at a readable size and lean.
+                    place(CANNON, [3.5, -2.5*hand], 0.45, 0.55, 0.08, 0.9);
+                } else {
+                    place(CANNON, [-0.4, -1.8*hand], 0.7, 1.1, 0.15, 0.9);
+                }
                 place(BARREL, [2.8, -3.3*hand], 1.5, 0.2, 0.0, 2.4);
                 place(CRATE, [-2.4, -3.0*hand], 1.4, 0.0, 0.0, 1.0);
                 place(LUMBER, [0.0, -4.4*hand], 1.2, 0.0, 0.0, 2.8);
