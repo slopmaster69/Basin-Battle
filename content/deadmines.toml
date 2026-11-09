@@ -1118,7 +1118,7 @@ boss = "sneed"
 bars = [[-244.0, -468.0], [-244.0, -497.0]]
 text = "Sneed is beaten. The Mast Room's north door opens on the galleries."
 
-# Sneed in his shredder; he climbs out of the wreck.
+# Sneed in his shredder, cutting at a log with its back to the door; thrown out of the wreck.
 [[dungeon.pack]]
 key = "sneed"
 mob = "dm_shredder"
@@ -1426,8 +1426,9 @@ respawn = 0.0
   max_range = 2.6
   steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
 
-# Sneed's machine builds pressure from saws, then stamp/rake, then a straight grind and stall.
-# sim/machinery owns this cycle and the one repair, regardless of either form's health.
+# Sneed's machine (docs/shredder-encounter.md): saw sweep, stamp and rake, then the grind (a rev in
+# place, a straight drive) and a slumped stall. sim/machinery owns this cycle, the walk in, the break
+# and the one repair, regardless of either form's health. Its lines are said there, 2 sec apart.
 [[mob]]
 key = "dm_shredder"
 name = "Sneed's Shredder"
@@ -1438,12 +1439,14 @@ windup_sound = 0
 aggro_sound = 1982
 death_sound = 1980
 scale = 1.1
+# Its legs stand about 1.5 yd out from its middle (2.2 yd at its size): blows reach it from there,
+# and it stops with a hero outside them.
+girth = 1.5
 health = 950
 run_speed = 6.0
 walk_speed = 2.0
 aggro = 18.0
 aggro_text = "Clear the floor!"
-death_text = "No, no, not now!"
 leash = 30.0
 boss = true
 unparryable = true
@@ -1452,11 +1455,11 @@ posture = 320
 drops = {}
 respawn = 0.0
 then = "dm_sneed"
-then_text = "That was company property!"
   [mob.attack]
   windup = 1.0
   damage = 30
-  range = 3.4
+  # Reaches past its legs (was 3.4, inside them): it stops 4 yd from its hero.
+  range = 4.3
   arc = 140.0
   recovery = 1.2
   cooldown = 1.5
@@ -1465,19 +1468,23 @@ then_text = "That was company property!"
   blockable = true
   heavy = true
   sound = 1977
+  # The arm swings out to the side and the saw revs 1 sec, sparking. One vent puff after.
   [[mob.pattern]]
   name = "saws"
   steps = [ { clip = 16, take = 0, windup = 1.0, damage = 30, recovery = 1.4 } ]
+  # A foot rises and lands in dust (no guard stops it), then a blockable rake. Steam pours after.
   [[mob.pattern]]
   name = "stamp and rake"
-  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.2, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, kit = 356, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
-  # Locks as the engine revs, travels 6 yd in 0.9 sec, then stalls for 3.5 sec.
+  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.9, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
+  # Plants and churns its legs in place (its Run, held) as the engine races 1.4 sec, then drives
+  # 6 yd straight in 0.9 sec and stalls, slumped, for 3.5 sec.
   [[mob.pattern]]
   name = "grind"
   max_range = 8.0
-  steps = [ { clip = 16, take = 1, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, kit = 379, sound = 1982 } ]
+  steps = [ { clip = 5, take = 0, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, sound = 1982 } ]
 
-# Fragile on foot: a thrown wrench covers a scramble, a close flurry when cornered.
+# Fragile on foot: he keeps his distance, a wrench every 6 sec covering a scramble; cornered, three
+# blows and then he's open (hunched) 1.4 sec. sim/machinery moves him, and his one repair.
 [[mob]]
 key = "dm_sneed"
 name = "Sneed"

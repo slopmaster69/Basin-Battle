@@ -59,12 +59,16 @@ fn sneed_works_outside_the_native_wreck_and_can_be_hit_or_rebuild_at_its_center(
         let driver = live(&s, "dm_sneed").unwrap();
         let mut began = None;
         let mut previous = s.mobs[&driver].pos;
-        for _ in 0..300 {
+        for _ in 0..500 {
+            // Inside the collapsing machine, then thrown out of it: a flight, not a walk.
+            let flying = s.mobs[&driver].hidden || s.mobs[&driver].thrown_until > s.clock - DT;
             let ev = step(&mut s, hero);
             let pos = s.mobs[&driver].pos;
             assert!(s.land().footing(pos).is_some(), "dry supported driver: {pos:?}");
-            assert!(dist2d(previous, pos) <= 7.5 * DT + 0.002, "no teleport: {previous:?} -> {pos:?}");
-            assert!(s.land().walk_clear(previous, pos));
+            if !flying {
+                assert!(dist2d(previous, pos) <= 7.5 * DT + 0.002, "no teleport: {previous:?} -> {pos:?}");
+                assert!(s.land().walk_clear(previous, pos));
+            }
             previous = pos;
             if ev.iter().any(|e| matches!(e, Event::Cast { caster, spell: 2575, ms: 4000 } if *caster == driver)) {
                 let body = 0.5 * s.content.mobs[s.mobs[&driver].def].scale;
@@ -104,7 +108,7 @@ fn sneed_works_outside_the_native_wreck_and_can_be_hit_or_rebuild_at_its_center(
             s.input(hero, Input::Attack);
             for _ in 0..28 { step(&mut s, hero); }
             assert!(s.mobs[&driver].health < hp, "ordinary attack lands beside wreck");
-            assert!(!s.mobs.contains_key(&machine), "interruption removes retained wreck");
+            assert!(s.mobs.get(&machine).is_none_or(|m| m.health == 0 && matches!(m.state, htl_survival::mobs::MobState::Dead { gone_at } if gone_at.is_finite())), "interruption leaves a quiet body");
             for _ in 0..200 {
                 assert!(!step(&mut s, hero).iter().any(|e| matches!(e, Event::Cast { spell: 2575, .. })));
             }

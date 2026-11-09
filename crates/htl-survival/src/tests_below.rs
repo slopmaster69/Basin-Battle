@@ -518,6 +518,8 @@ fn a_machine_that_falls_lets_its_driver_out_and_comes_back_whole_if_he_wins() {
     s.hurt_mob(back, id, 1_000_000);
     s.step(DT);
     let sneed = find(&s, "dm_sneed").unwrap();
+    // (Thrown out of the wreck, he can be struck once he has landed: `sim::machinery`.)
+    run(&mut s, 3.5);
     s.hurt_mob(sneed, id, 1_000_000);
     s.step(DT);
     assert!(s.slain("boss"));

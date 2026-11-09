@@ -949,7 +949,7 @@ impl Survival {
             }
         };
         for (mid, m) in self.mobs.iter().filter(|(_, m)| m.health > 0) {
-            consider(where_(*mid, m.pos), 0.5 * self.content.mobs[m.def].scale);
+            consider(where_(*mid, m.pos), self.content.mobs[m.def].body());
         }
         if self.heroes_clash() {
             for (hid, h) in &self.players {
@@ -1477,7 +1477,7 @@ impl Survival {
                 continue;
             }
             let at = self.pos_at(mid, seen_at).unwrap_or(m.pos);
-            let size = 0.5 * self.content.mobs[m.def].scale;
+            let size = self.content.mobs[m.def].body();
             let d = dist2d(pos, at);
             if d > strike.range + size {
                 continue;
@@ -2809,7 +2809,7 @@ impl Survival {
                 continue;
             }
             let at = self.pos_at(mid, seen_at).unwrap_or(m.pos);
-            let size = 0.5 * self.content.mobs[m.def].scale;
+            let size = self.content.mobs[m.def].body();
             let dd = dist2d(pos, at);
             let off = angle_between(f, facing(pos, at));
             if dd > strike.range + size || (off > strike.arc / 2.0 && !(dd < size + 0.4 && off < 90.0)) || !clear_line(self.land.as_ref(), pos, at) {

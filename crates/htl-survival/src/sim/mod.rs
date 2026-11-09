@@ -2390,7 +2390,7 @@ impl Survival {
                 && angle_between(p.facing, facing(p.pos, at)) <= w.arc / 2.0
                 && crate::land::clear_line(self.land.as_ref(), p.pos, at)
         };
-        let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, 0.5 * self.content.mobs[m.def].scale)).count();
+        let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, self.content.mobs[m.def].body())).count();
         let heroes = if self.heroes_clash() {
             self.players.iter().filter(|(hid, h)| **hid != id && h.health > 0 && self.hostile(id, **hid) && reaches(h.pos, 0.4)).count()
         } else {

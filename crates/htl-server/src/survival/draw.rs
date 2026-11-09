@@ -1152,7 +1152,7 @@ impl SurvivalGame {
     }
 
     /// A creature's blow (or a hero's wind-up) for a client that draws it under the unit:
-    /// `TG\t<key>\t<guid>\t<wedge|ring|line>\t<reach>\t<arc>\t<seconds to the blow>\t<block|unblockable|friendly>\t<the parry's window>\t<meant for this hero>\t<a line's width>\t<the roll's window>`
+    /// `TG\t<key>\t<guid>\t<wedge|ring|line>\t<reach>\t<arc>\t<seconds to the blow>\t<block|unblockable|friendly>\t<the parry's window>\t<meant for this hero>\t<a line's width>\t<the roll's window>\t<1: its body tells it>`
     /// (`TG\t<key>` once it's gone). The window is this hero's own (their weapon's share in it). A
     /// client before the eighth round gets no lines, and no `friendly`. The roll's window: a dodge
     /// started up to this long before the blow lands evades it (`[dodge] evade_to`), which the
@@ -1182,13 +1182,15 @@ impl SurvivalGame {
             (if t.blockable { "block" } else { "unblockable" }, t.foe == Some(hero) || (ring && near) || p.is_some_and(|p| p.lock == Some(t.mob)))
         };
         Some(format!(
-            "TG\t{key}\t{g:#X}\t{shape}\t{:.2}\t{:.0}\t{:.2}\t{kind}\t{parry:.2}\t{}\t{:.2}\t{:.2}",
+            "TG\t{key}\t{g:#X}\t{shape}\t{:.2}\t{:.0}\t{:.2}\t{kind}\t{parry:.2}\t{}\t{:.2}\t{:.2}\t{}",
             t.reach,
             t.arc.min(360.0),
             t.secs,
             u8::from(focus),
             t.width,
-            c.dodge.evade_to
+            c.dodge.evade_to,
+            // Its body tells it (Sneed's Shredder: an arm out, a stamp, a rev): no glow over it.
+            u8::from(!t.hero && self.sim.tells_by_body(t.mob))
         ))
     }
 

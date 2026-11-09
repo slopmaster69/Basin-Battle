@@ -94,7 +94,7 @@
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
-//! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
+//! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>\t<a line's width>\t<the roll's window>\t<1: its body tells it, no glow>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
 //! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0030's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0036); a speed of their own in yards a second, uncapped (patch 0040; absent or 0: the spell's own).
 //! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0031's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
