@@ -60,7 +60,6 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
         assert!(props.iter().filter(|p| p.site == branch).count() >= 5, "{branch}");
     }
     assert!(props.iter().any(|p| p.site == "Juggernaut collapse basin" && p.scale >= 6.0), "large seated cove masses");
-    assert_eq!(props.iter().filter(|p| p.model == CAVE_IN).count(), 1, "native cave-in candidate stays in one site until inspected");
     assert!(!props.iter().any(covers_view), "inspection footings stay clear");
     assert!(!MODELS.iter().any(|m| matches!(m.display, 134 | 4315 | 4316)), "the native check rejected the luminous stone palette");
     for p in props {
@@ -184,10 +183,7 @@ fn late_observers_receive_the_same_marker_and_solid_manifest() {
     for (_, _, fields) in &first[1..] {
         assert_eq!(fields[&idx::GAMEOBJECT_FLAGS], INERT, "no visual-only or no-hull flag on debris");
         assert_ne!(fields[&idx::GAMEOBJECT_DISPLAYID], 0);
-        if fields[&idx::GAMEOBJECT_DISPLAYID] == 2230 {
-            assert_eq!(fields[&idx::GAMEOBJECT_TYPE_ID], 10, "cave-in uses the native state animation driver");
-            assert_eq!(fields[&idx::GAMEOBJECT_STATE], 1, "cave-in holds its settled Closed pose");
-        }
+        assert_eq!(fields[&idx::GAMEOBJECT_TYPE_ID], GENERIC, "ruins use static solid props");
     }
     assert_eq!(first.len(), game.aftermath.as_ref().unwrap().props.len()+1);
     let unique: std::collections::BTreeSet<_> = first.iter().map(|(g, _, _)| *g).collect();
@@ -267,4 +263,10 @@ fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     assert!(floor(&land, [-80.0,-820.0,-16.0], true).is_some(), "seabed remains under wreckage");
     assert!(props.iter().any(|p| p.site == "Smite's ruined landing" && p.model == CANNON),
         "the dock retains a grounded cannon wreck beside the inspection approach");
+    let foreman = props.iter().find(|p| p.site == "Foreman's chamber" && p.model == LOW_ROCK && p.scale > 2.0)
+        .expect("the entrance retains its broad primary collapse mass");
+    let ground = floor(&land, [foreman.pos[0], foreman.pos[1], 54.2], false).unwrap();
+    let base = foreman.pos[2] + bottom(foreman.model, foreman.rotation)*foreman.scale;
+    assert!(base <= ground && base >= ground-1.0, "the primary rock's skirt is seated just beneath the native floor");
+    assert!(!covers_view(foreman), "the seated entrance mass leaves the inspection capsule clear");
 }

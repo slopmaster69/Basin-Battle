@@ -83,7 +83,6 @@ const MACHINE: usize = 10;
 const CANNON: usize = 11;
 const BOAT: usize = 12;
 const SUPPORT: usize = 13;
-const CAVE_IN: usize = 14;
 
 const MODELS: &[Model] = &[
     // Native check: the Westfall sea boulders read as luminous pale mounds indoors.
@@ -102,7 +101,6 @@ const MODELS: &[Model] = &[
     Model { display: 245, name: "Overturned Cannon", min: [-4.72,-2.24,-0.01], max: [5.48,2.23,4.13] },
     Model { display: 223, name: "Shattered Boat", min: [-6.71,-1.77,-1.96], max: [2.79,2.24,2.32] },
     Model { display: 4651, name: "Fallen Support", min: [-0.28,-5.57,0.0], max: [0.22,5.82,2.29] },
-    Model { display: 2230, name: "Cave-in", min: [-5.73,-8.31,-5.47], max: [5.77,8.25,7.35] },
 ];
 
 fn rotation(roll: f32, pitch: f32, yaw: f32) -> [f32; 4] {
@@ -132,11 +130,7 @@ fn make_prop(site: &Site, model: usize, pos: [f32; 3], scale: f32, roll: f32, pi
     // Terrain rocks have open ground-facing skirts. Keep those buried instead of exposing
     // them by seating only their single lowest rotated vertex on the floor.
     let embed = if model <= RUBBLE { 0.4 } else { 0.08 };
-    // The cave-in's Closed pose is its bind pose, with chunks reaching 5.47 yd below its
-    // origin. Lifting that extremity to the floor left a suspended wall in the native view.
-    // Keep the composite's origin on the floor and let its lower chunks enter the ground.
-    let z = if model == CAVE_IN { pos[2]-0.08*scale }
-        else { pos[2] - bottom(model, rotation)*scale - embed*scale };
+    let z = pos[2] - bottom(model, rotation)*scale - embed*scale;
     Prop { region: site.region, site: site.name, model,
         pos: [pos[0], pos[1], z],
         scale, rotation, facing: yaw }
@@ -193,10 +187,7 @@ fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
             }
         };
         let (roll, pitch) = fallen_rock_pose(index);
-        if site.name == "Foreman's chamber" {
-            // One bounded native appearance test before using this animated cave-in widely.
-            place(CAVE_IN, [1.5, 1.3*hand], 0.9, 0.0, 0.0, 0.2);
-        } else if index % 3 == 0 {
+        if index % 3 == 0 {
             place(BOULDER, [1.5, 1.3*hand], 0.82, roll, pitch, 0.2);
         } else {
             place(LOW_ROCK, [1.5, 1.3*hand], 1.5+0.2*(index%3) as f32, roll, pitch, 0.2);
@@ -300,17 +291,11 @@ fn prop_guid(index: usize, model: usize) -> u64 {
     (0xF110_u64 << 48) | (u64::from(FIRST_ENTRY + model as u32) << 24) | (0x80_0000 + index as u64)
 }
 
-fn go_kind(display: u32) -> u32 {
-    // G_CaveIn has no Stand sequence. GOOBER's state1 holds Closed147 at creation; generic5
-    // only plays a loader idle. Both types keep their solid collider and cannot be used here.
-    if display == 2230 { 10 } else { GENERIC }
-}
-
 fn go_fields(guid: u64, entry: u32, display: u32, pos: [f32; 3], scale: f32, q: [f32; 4], facing: f32) -> Fields {
     let mut f = Fields::new();
     f.set_u64(idx::GUID, guid).set(idx::TYPE, fields::TYPEMASK_GAMEOBJECT).set(idx::ENTRY, entry)
         .set_f32(idx::SCALE_X, scale).set(idx::GAMEOBJECT_DISPLAYID, display)
-        .set(idx::GAMEOBJECT_FLAGS, INERT).set(idx::GAMEOBJECT_TYPE_ID, go_kind(display))
+        .set(idx::GAMEOBJECT_FLAGS, INERT).set(idx::GAMEOBJECT_TYPE_ID, GENERIC)
         .set(idx::GAMEOBJECT_STATE, 1).set(idx::GAMEOBJECT_FACTION, 35).set(idx::GAMEOBJECT_ANIMPROGRESS, 100)
         .set_f32(idx::GAMEOBJECT_FACING, facing);
     for (i, value) in pos.iter().enumerate() { f.set_f32(idx::GAMEOBJECT_POS_X + i as u16, *value); }
@@ -395,7 +380,7 @@ impl SurvivalGame {
         self.send(conn, packets::update_object(&[Create { guid: MARKER_GUID, object_type: packets::TYPE_GAMEOBJECT,
             is_self: false, placement: Placement::At { pos: [0.0; 3], facing: 0.0 }, fields: &f }], &[]));
         for (i, m) in MODELS.iter().enumerate() {
-            self.send(conn, packets::gameobject_query_response(FIRST_ENTRY+i as u32, go_kind(m.display), m.display, m.name));
+            self.send(conn, packets::gameobject_query_response(FIRST_ENTRY+i as u32, GENERIC, m.display, m.name));
         }
         for (chunk_index, chunk) in scene.props.chunks(BATCH).enumerate() {
             let fields: Vec<Fields> = chunk.iter().enumerate().map(|(i, p)| go_fields(prop_guid(chunk_index*BATCH+i, p.model),
@@ -474,7 +459,7 @@ impl SurvivalGame {
             return true;
         }
         if let Some(m) = entry.checked_sub(FIRST_ENTRY).and_then(|i| MODELS.get(i as usize)) {
-            self.send(conn, packets::gameobject_query_response(entry, go_kind(m.display), m.display, m.name));
+            self.send(conn, packets::gameobject_query_response(entry, GENERIC, m.display, m.name));
             return true;
         }
         false
