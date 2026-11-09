@@ -31,9 +31,11 @@ hero_health = 0.7
 # an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
 # same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
 hero_foes = 0.35
-# Out the front door (the mine's mouth), once Rhahk'Zor is down.
-exit = [-16.4, -383.1, 61.8]
+# Out once Rhahk'Zor is down: he brings the mine down on the front door (his gauntlet), so the way
+# out is the smugglers' tunnel at the landing, where the heroes came in.
+exit = [-110.0, -1003.0, 34.0]
 exit_radius = 5.0
+way_out = "The mine has come down on the front door. Out by the smugglers' tunnel at the landing"
 exit_boss = "rhahkzor"
 weapon_chance = 0.08
 armor_chance = 0.06
@@ -178,9 +180,9 @@ radius = 0.0
 count = 1
 
 # On the Juggernaut (off the way: up from the scaffold's south-west platform): Captain Greenskin
-# and his crew on the main deck, and Edwin VanCleef at the stern. Three fights in turn, not one:
-# the two deck hands, then the Evokers, then the captain on his quarterdeck (he calls his own
-# hands at half). Linked, the Evokers between them brought all five at once.
+# and his crew on the main deck, and Edwin VanCleef at the stern. Separate pulls keep the deck
+# hands and intervening packs out of the captain's finite firing line on the quarterdeck.
+# Linked, they used to bring the whole deck at once.
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-62.0, -797.0]
@@ -531,11 +533,11 @@ respawn = 0.0
   weight = 4.0
   steps = [ { clip = 17, take = 1, ranged = false, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6, sound = 0 } ]
 
-# Cookie, the Brotherhood's cook: an early lesson in reading a wind-up and a ring on the ground.
+# Cookie serves one cooling spill, then risks a scoop after three completed exchanges.
 [[mob]]
 key = "dm_cookie"
 name = "Cookie"
-temper = "erratic"
+temper = "bruiser"
 subname = "The Brotherhood's Cook"
 display = 1305
 windup_sound = 417
@@ -560,7 +562,10 @@ then_after = 3.5
 then_needs = "secret_ingredient"
 then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot and grows."
 then_kit = 356
-then_look = 10987
+# Geyser 10987 is an ice-hand effect, not stew; growth and the next breath carry the reveal.
+aggro_text = "Mrrgl! Cookie's kitchen!"
+slay_text = "More meat for the pot!"
+death_text = "...burnt."
   [mob.attack]
   windup = 0.7
   damage = 20
@@ -568,79 +573,33 @@ then_look = 10987
   arc = 110.0
   recovery = 0.9
   cooldown = 1.3
-  turn_rate = 200.0
-  lock = 0.3
+  turn_rate = 160.0
+  lock = 0.4
   blockable = true
-  # Three turns as he weakens: the ladle all round him, then pots of stew two at a time
-  # (each marked where it'll land), then the pot boiling over at his feet.
-  [[mob.phase]]
-  at = 0.75
-  speed = 0.95
-  pattern = "ladle spin"
-  text = "\"Mrgl! Hot! HOT!\""
-  look = 10987
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.9
-  might = 1.1
-  pattern = "two pots"
-  text = "\"Mmmrrrggglll! Stew's ready!\""
-  [[mob.phase]]
-  at = 0.2
-  speed = 0.8
-  might = 1.2
-  pattern = "boil over"
-  text = "\"Mrrgllll... it's... BOILING OVER!\""
-  shove = 5.0
-  look = 10987
-  # A cleaver string of two.
+  # Two small cuts, then a full second to answer. No random third cut or shortened recovery.
   [[mob.pattern]]
   name = "cleaver"
-  weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.65, damage = 18, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.5, damage = 20, recovery = 1.0 } ]
-  # The ladle swung wide and slow.
+  weight = 1.0
+  steps = [ { clip = 17, take = 0, windup = 0.8, damage = 16, recovery = 0.35 }, { clip = 17, take = 1, windup = 0.65, damage = 18, recovery = 1.2 } ]
+  # The broad ladle is slower and leaves the cook open longer than the cleaver.
   [[mob.pattern]]
   name = "ladle"
-  weight = 2.0
-  steps = [ { clip = 57, take = 0, windup = 1.1, damage = 26, arc = 170.0, heavy = true, recovery = 1.2, kit = 379 } ]
-  # A pot of stew thrown to where you stand: its ring is on the ground from the moment he
-  # raises it (his hand smoking), and it lobs, so near or far there's time to step out.
-  [[mob.pattern]]
-  name = "pot"
-  weight = 1.2
-  min_range = 6.0
-  max_range = 22.0
-  steps = [ { ranged = true, windup = 1.2, damage = 22, range = 22.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.2 } ]
-  [[mob.pattern]]
-  name = "two pots"
-  weight = 0.0
-  max_range = 30.0
-  # (Two pots, not three: Cookie is the lesson in a ring on the ground, one at a time.)
-  steps = [ { ranged = true, windup = 1.1, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.6 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.6 } ]
-  # From his first turn: the ladle swung all the way round him.
-  [[mob.pattern]]
-  name = "ladle spin"
-  weight = 1.5
-  below = 0.75
-  max_range = 3.5
-  steps = [ { clip = 16, take = 0, windup = 0.9, range = 4.2, arc = 360.0, damage = 22, heavy = true, recovery = 1.2, kit = 369 } ]
-  # At the last: stew splashed in rings about him, two at once, then one more where you stand.
-  [[mob.pattern]]
-  name = "boil over"
   weight = 1.0
-  below = 0.2
-  max_range = 30.0
-  # (The ring alone: the pot thrown after it, 0.2 s later, made two blows no guard stops back to back.)
-  steps = [ { clip = 58, take = 0, windup = 1.1, range = 5.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.4, kit = 356, look = 10987 } ]
+  steps = [ { clip = 57, take = 0, windup = 1.2, damage = 24, arc = 150.0, heavy = true, recovery = 1.6 } ]
+  # Kitchen owns the committed landing point, one 2 yd patch, and its cooling. No generic arc hit.
+  # 20 on contact, two 4-damage ticks, then 1.5 sec of harmless thinning steam.
   [[mob.pattern]]
-  name = "pots"
-  weight = 1.5
-  below = 0.5
-  min_range = 6.0
-  max_range = 24.0
-  steps = [ { ranged = true, windup = 1.0, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.35 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.4 } ]
+  name = "serve it hot"
+  weight = 1.0
+  max_range = 5.0
+  steps = [ { clip = 107, take = 0, windup = 1.8, range = 5.0, arc = 65.0, damage = 20, blockable = false, poise = true, recovery = 1.7 } ]
+  # Only a successful scoop chooses this: a short locked cone and a four-second cough.
+  [[mob.pattern]]
+  name = "steam"
+  weight = 0.0
+  steps = [ { clip = 32, take = 0, windup = 1.6, range = 5.0, arc = 65.0, damage = 24, blockable = false, poise = true, recovery = 4.0 } ]
 
-# Mr. Smite, the first mate: his tells change with his weapons.
+# Mr. Smite: three physical loadouts, earned by a run to his rack, never an arena stun.
 [[mob]]
 key = "dm_smite"
 name = "Mr. Smite"
@@ -648,96 +607,93 @@ temper = "bruiser"
 subname = "The Juggernaut's First Mate"
 display = 2026
 windup_sound = 1353
-clips_from = "TaurenFemale"
+clips_from = "TaurenMale"
 scale = 1.2
 health = 1100
 run_speed = 6.5
 walk_speed = 2.0
 aggro = 18.0
 leash = 36.0
-weapon = 2056
-grip = "2h"
+weapon = 679
+grip = "sword"
 boss = true
 posture = 260
 drops = { plunder = [20, 26] }
 trophy = { smite_hammer = 1 }
 gear = ["smite_hammer", "smite_breastplate"]
 respawn = 0.0
-# The alarm as he turns to fight, his line as he changes weapons.
 aggro_sound = 5775
-enrage_sound = 5778
+  [mob.arsenal]
+  # Native floor probe: (-2, -774, 9.55), 7 walking steps from the dock home.
+  rack = [0.0, -6.0]
+  display = 130
+  loadouts = [
+    { weapon = 679, grip = "sword", patterns = ["sweep", "delayed overhead"] },
+    { weapon = 2061, off_hand = 2061, grip = "1h", patterns = ["axe pair", "crosscut"] },
+    { weapon = 2056, grip = "hammer", patterns = ["hammer slam", "hoof stomp"] },
+  ]
   [mob.attack]
   windup = 0.95
-  damage = 40
+  damage = 36
   range = 3.6
   arc = 130.0
   recovery = 1.25
   cooldown = 1.5
-  turn_rate = 160.0
-  lock = 0.35
+  turn_rate = 105.0
+  lock = 0.5
   blockable = true
   heavy = true
-  # Two turns: at two thirds he stamps and changes his grip (the flurry and the charge come with
-  # it); at a third he stamps again and the hammer comes down like a maul, the floor cracking.
+  # These only request a loadout. Arsenal waits for the current string and recovery to finish.
   [[mob.phase]]
   at = 0.66
-  speed = 0.85
-  pattern = "stamp"
-  text = "\"You landlubbers are tougher than I thought! I'll have to improvise!\""
+  sound = 5778
+  text = "You landlubbers are tougher than I thought! I'll have to improvise!"
   [[mob.phase]]
   at = 0.33
-  speed = 0.75
-  might = 1.2
-  pattern = "stamp"
-  text = "\"D'ah! Now you're making me angry!\""
-  shove = 6.0
-  look = 26271
-  # A wide sweep.
+  sound = 5779
+  text = "D'ah! Now you're making me angry!"
+  # Sword: moderate sweep damage; the slower overhead rewards a miss with two seconds open.
   [[mob.pattern]]
   name = "sweep"
   weight = 3.0
-  steps = [ { from = "HumanFemale", clip = 18, take = 0, windup = 0.9, damage = 36, arc = 170.0, recovery = 1.1 } ]
-  # A delayed overhead: it waits out a panicked dodge.
+  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.95, damage = 36, arc = 170.0, recovery = 1.25 } ]
   [[mob.pattern]]
   name = "delayed overhead"
   weight = 2.0
-  steps = [ { from = "DwarfMale", clip = 58, take = 0, windup = 1.5, damage = 58, arc = 70.0, recovery = 1.5, kit = 379 } ]
-  # A stomp that throws down everyone close.
+  steps = [ { from = "TaurenMale", clip = 58, take = 0, windup = 1.5, damage = 54, arc = 65.0, recovery = 2.0, kit = 379 } ]
+  # Axes split damage across short cuts; longer final recoveries repay staying through the pair.
+  # Short advancing pairs. The crosscut waits a full beat after its second cut.
   [[mob.pattern]]
-  name = "stomp"
-  weight = 1.5
-  max_range = 3.2
-  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.8, range = 4.8, arc = 360.0, damage = 22, heavy = true, recovery = 1.0, kit = 356 } ]
+  name = "axe pair"
+  weight = 2.0
+  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.8, range = 2.8, lunge = 0.65, damage = 22, arc = 95.0, heavy = false, recovery = 0.2 }, { from = "TaurenMale", clip = 87, take = 0, windup = 0.65, range = 2.8, lunge = 0.65, damage = 24, arc = 95.0, heavy = false, recovery = 1.4 } ]
   [[mob.pattern]]
-  name = "stamp"
-  weight = 0.0
-  max_range = 40.0
-  steps = [ { from = "OrcMale", clip = 16, take = 0, windup = 1.3, range = 6.5, arc = 360.0, damage = 26, heavy = true, blockable = false, poise = true, recovery = 0.6, kit = 389 } ]
-  # Then: a flurry of four.
-  # At the last: the hammer brought down two-handed, and the floor cracks where it lands.
-  [[mob.pattern]]
-  name = "maul"
-  weight = 2.5
-  below = 0.33
-  steps = [ { from = "HumanMale", clip = 58, take = 0, windup = 1.25, range = 4.5, arc = 90.0, damage = 52, heavy = true, recovery = 0.4, kit = 379 }, { from = "TaurenFemale", clip = 57, take = 0, windup = 0.7, range = 5.5, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.6, look = 26271 } ]
-  [[mob.pattern]]
-  name = "flurry"
+  name = "crosscut"
   weight = 3.0
-  below = 0.66
-  steps = [ { from = "GnomeMale", clip = 18, take = 0, windup = 0.55, damage = 28, heavy = false, recovery = 0.12 }, { from = "OrcFemale", clip = 18, take = 1, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { from = "NightElfFemale", clip = 18, take = 0, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { from = "OrcMale", clip = 58, take = 0, windup = 0.75, damage = 44, recovery = 1.6 } ]
+  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.8, range = 2.8, lunge = 0.65, damage = 22, arc = 95.0, heavy = false, recovery = 0.2 }, { from = "TaurenMale", clip = 87, take = 0, windup = 0.65, range = 2.8, lunge = 0.65, damage = 22, arc = 95.0, heavy = false, recovery = 0.75 }, { from = "TaurenMale", clip = 57, take = 0, windup = 1.0, range = 3.0, damage = 36, arc = 150.0, recovery = 1.8 } ]
+  # Hammer trades a heavy slam for 2.6 sec open; the weaker circular hoof leaves 2.1 sec.
+  # Committed, unblockable arcs: move off the locked direction, then punish the long recovery.
   [[mob.pattern]]
-  name = "charge"
+  name = "hammer slam"
+  weight = 3.0
+  steps = [ { from = "TaurenMale", clip = 58, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379 } ]
+  [[mob.pattern]]
+  name = "hoof stomp"
   weight = 1.5
-  below = 0.66
-  min_range = 5.0
-  max_range = 12.0
-  steps = [ { from = "DwarfFemale", clip = 58, take = 0, windup = 1.0, lunge = 7.0, damage = 46, arc = 110.0, recovery = 1.4, kit = 379 } ]
+  max_range = 3.0
+  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, kit = 356 } ]
 
-# Captain Greenskin, on the main deck: an elite, gone for good once beaten.
+# Captain Greenskin: the finite firing line controls the opening and the reload windows.
+[[temper]]
+key = "quarterdeck"
+punish = true
+# The encounter owns the reload windows; random retreats would spend them walking away.
+retreat = 0.0
+
 [[mob]]
 key = "dm_greenskin"
 name = "Captain Greenskin"
-temper = "captain"
+temper = "quarterdeck"
 subname = "The Juggernaut's Captain"
 display = 7113
 windup_sound = 1409
@@ -745,64 +701,87 @@ scale = 1.5
 health = 520
 run_speed = 7.0
 walk_speed = 2.0
-# He holds his quarterdeck until you come up to it: at 16 he came down into the deck hands' fight.
 aggro = 12.0
 leash = 30.0
 weapon = 1853
 grip = "1h"
-evade = 0.2
+# His committed cuts and the firing line own his movement, without random backsteps.
+evade = 0.0
 posture = 150
 drops = { plunder = [14, 18] }
 gear = ["pirate_cutlass", "red_bandana", "greenskin_tricorne"]
 respawn = 0.0
+aggro_text = "Hold the quarterdeck!"
+slay_text = "Feed 'em to the fishes."
+death_text = "My ship..."
   [mob.attack]
-  windup = 0.5
+  windup = 0.95
   damage = 18
-  range = 2.8
-  arc = 110.0
-  recovery = 0.7
-  cooldown = 1.0
-  turn_rate = 240.0
-  lock = 0.25
+  range = 3.0
+  arc = 70.0
+  recovery = 1.2
+  cooldown = 0.8
+  turn_rate = 120.0
+  lock = 0.65
   blockable = true
   [[mob.pattern]]
-  name = "three cuts"
+  name = "committed thrust"
   weight = 3.0
-  steps = [ { clip = 57, take = 0, windup = 0.45, damage = 16, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 16, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.72, damage = 24, heavy = true, recovery = 1.0 } ]
+  max_range = 7.0
+  # A narrow committed step leaves his flank open for the recovery.
+  steps = [ { clip = 85, take = 0, windup = 1.05, lunge = 3.0, damage = 22, arc = 55.0, recovery = 1.4 } ]
   [[mob.pattern]]
-  name = "lunge"
+  name = "clearing cut"
   weight = 2.0
-  min_range = 3.5
-  max_range = 9.0
-  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 5.0, damage = 22, recovery = 0.9 } ]
-  # A cleave all round him when he's crowded.
+  max_range = 4.0
+  steps = [ { clip = 57, take = 0, windup = 1.25, range = 4.0, arc = 220.0, damage = 20, recovery = 1.6 } ]
+  # Crew death, never health, unlocks these. Both aim at the position held at the first pose.
   [[mob.pattern]]
-  name = "cleave"
-  weight = 1.5
-  max_range = 3.0
-  steps = [ { clip = 59, take = 0, windup = 0.75, range = 4.0, arc = 360.0, damage = 18, recovery = 1.1, kit = 369 } ]
-  # At half: all hands on deck; then a harpoon thrown at whoever keeps their distance.
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.9
-  pattern = "cleave"
-  text = "\"All hands! Repel boarders!\""
-  summon = ["dm_pirate", "dm_pirate"]
-  [[mob.phase]]
-  at = 0.2
-  speed = 0.8
-  might = 1.15
-  pattern = "harpoon"
-  text = "\"I'll have yer hide for a sail!\""
+  name = "pistol shot"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 28.0
+  # 1.12 has no pistol item model: a short native blunderbuss makes the draw visible.
+  steps = [ { ranged = true, windup = 2.4, damage = 23, range = 28.0, radius = 0.85, speed = 40.0, spell = 8682, sound = 1147, recovery = 1.8 } ]
   [[mob.pattern]]
   name = "harpoon"
-  weight = 2.0
-  below = 0.5
+  weight = 1.5
   min_range = 5.0
   max_range = 26.0
-  steps = [ { ranged = true, windup = 1.0, damage = 24, range = 26.0, radius = 2.0, speed = 24.0, spell = 23065, blockable = true, recovery = 1.0 } ]
+  # Borrow the native rope/net throw used by Reverse Grapple, with a fair hit-gated pull.
+  steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.85, speed = 24.0, spell = 6533, blockable = true, recovery = 2.0 } ]
 
-# Edwin VanCleef, at the Juggernaut's stern: a fight for when you're ready, early or late.
+# Exactly 2 spawn with the captain's pull, on reachable deck, and never get replacements.
+[[mob]]
+key = "dm_deck_gunner"
+name = "Defias Deck Gunner"
+temper = "quarterdeck"
+subname = "The Juggernaut's Crew"
+display = 2347
+health = 85
+run_speed = 5.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+bow = 21071
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 2.2
+  damage = 17
+  range = 32.0
+  arc = 20.0
+  recovery = 0.8
+  cooldown = 5.0
+  turn_rate = 0.0
+  lock = 2.2
+  blockable = true
+  radius = 0.85
+  speed = 40.0
+  spell = 8682
+  sound = 1147
+
+# Edwin VanCleef: two honest cuts, then an Invitation that can be waited out.
 [[mob]]
 key = "dm_vancleef"
 name = "Edwin VanCleef"
@@ -810,7 +789,7 @@ temper = "duelist"
 subname = "Defias Kingpin"
 display = 2029
 windup_sound = 1335
-clips_from = "OrcMale"
+clips_from = "HumanMale"
 scale = 1.2
 health = 1500
 run_speed = 7.5
@@ -820,94 +799,93 @@ leash = 30.0
 weapon = 1928
 off_hand = 2806
 grip = "1h"
-evade = 0.25
+# The authored retreat and advance own his footwork; no random backstep interrupts a tell.
+evade = 0.0
 boss = true
 posture = 300
 drops = { plunder = [40, 50] }
 trophy = { cruel_barb = 1, blackened_armor = 1 }
 gear = ["cruel_barb", "vancleef_pauldrons"]
 respawn = 0.0
-# Those who found his quarters (and read what he wrote there) find he isn't done.
 then = "dm_vancleef_unbowed"
 then_after = 4.0
 then_needs = "vancleef_quarters"
-then_text = "\"You think the Brotherhood dies with me? Stormwind will BURN!\""
+# A short, solitary handoff into Unbowed after his Blackguards have abandoned him.
+then_text = "The Brotherhood lives."
 then_kit = 218
-then_look = 24050
-# His own voice: "None may challenge the Brotherhood!" as he turns to fight, a health line at
-# his second wind, a gloat over a hero he fells.
 aggro_sound = 5780
-enrage_sound = 5782
 slay_sound = 5781
   [mob.attack]
-  windup = 0.45
+  windup = 0.7
   damage = 24
   range = 2.9
-  arc = 110.0
-  recovery = 0.6
-  cooldown = 0.9
-  turn_rate = 280.0
-  lock = 0.2
+  arc = 95.0
+  recovery = 1.6
+  cooldown = 1.2
+  # Every counter commits to the attacker it chose, leaving a sidestep answer.
+  turn_rate = 0.0
+  lock = 1.5
   blockable = true
-  # Three turns: two Blackguards from the shadows at two thirds; two more and quicker blades at
-  # a third; at the last, everything he has left.
-  [[mob.phase]]
-  at = 0.66
-  speed = 0.9
-  pattern = "blade storm"
-  text = "\"Lapdogs, all of you!\""
-  summon = ["dm_blackguard", "dm_blackguard"]
-  [[mob.phase]]
-  at = 0.33
-  speed = 0.8
-  might = 1.1
-  pattern = "blade storm"
-  text = "\"Fools! Our cause is righteous!\""
-  summon = ["dm_blackguard", "dm_blackguard"]
-  [[mob.phase]]
-  at = 0.12
-  speed = 0.7
-  might = 1.2
-  pattern = "thousand cuts"
-  text = "\"The Brotherhood shall prevail!\""
-  shove = 5.0
-  kit = 218
-  # Fast strings of four.
+  # Authored strings never gain or lose a random blow, nor skip their final recovery.
   [[mob.pattern]]
   name = "string"
   weight = 3.0
-  steps = [ { from = "DwarfMale", clip = 17, take = 0, windup = 0.42, damage = 20, recovery = 0.12 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.34, damage = 20, recovery = 0.12 }, { from = "TrollMale", clip = 17, take = 0, windup = 0.34, damage = 20, recovery = 0.12 }, { from = "ScourgeFemale", clip = 57, take = 0, windup = 0.62, damage = 30, heavy = true, recovery = 1.0 } ]
-  # A lunge from far off.
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.75, damage = 20, recovery = 0.22 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 24, recovery = 1.8 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
-  max_range = 10.0
-  steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.5, lunge = 6.0, damage = 28, recovery = 0.9 } ]
-  # A blade held back, glowing: dodge early and it finds you. His own body's special (a human man's
-  # clip 57, as his Unbowed string ends on): the dwarf woman's opens in a crouched leap, and on his
-  # long legs it folded his knees up under him in the air for half a second (Corey, Nov 8: "his legs
-  # tweak out during one of his special attacks"; the +4 run, 5:28 in).
+  max_range = 9.0
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 4.0, damage = 26, recovery = 1.8 } ]
+  # The module holds the native guard pose with both blades. This dummy step never fires.
   [[mob.pattern]]
-  name = "riposte stance"
-  weight = 1.5
-  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 1.4, damage = 40, arc = 140.0, heavy = true, recovery = 1.1, kit = 379 } ]
-  [[mob.pattern]]
-  name = "blade storm"
+  name = "invitation"
   weight = 0.0
-  max_range = 40.0
-  steps = [ { from = "NightElfFemale", clip = 16, take = 1, windup = 1.0, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "GnomeFemale", clip = 16, take = 0, windup = 0.45, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1 }, { from = "HumanMale", clip = 16, take = 1, windup = 0.45, range = 4.5, arc = 360.0, damage = 26, recovery = 1.6 } ]
-  # At the very last: a string that doesn't stop.
+  steps = [ { windup = 1.8, damage = 0, recovery = 1.2 } ]
+  # Keep Desktop's HumanMale 57 correction: no borrowed crouching/leaping special.
   [[mob.pattern]]
-  name = "thousand cuts"
-  weight = 1.5
-  below = 0.12
-  steps = [ { from = "NightElfFemale", clip = 17, take = 0, windup = 0.5, damage = 18, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "GnomeFemale", clip = 17, take = 0, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "OrcFemale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "GnomeMale", clip = 17, take = 0, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "HumanFemale", clip = 57, take = 0, windup = 0.7, damage = 34, heavy = true, recovery = 1.8 } ]
+  name = "riposte"
+  weight = 0.0
+  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.9, damage = 36, arc = 80.0, lunge = 2.0, heavy = true, recovery = 2.4, kit = 379 } ]
   [[mob.pattern]]
-  name = "storm"
-  weight = 1.5
-  below = 0.33
-  steps = [ { from = "GnomeMale", clip = 16, take = 0, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "HumanFemale", clip = 16, take = 1, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, recovery = 1.4 } ]
+  name = "advance"
+  weight = 0.0
+  max_range = 14.0
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 4.0, damage = 22, recovery = 0.25 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.7, lunge = 1.5, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 32, heavy = true, recovery = 2.5 } ]
+  [[mob.pattern]]
+  name = "last stand"
+  weight = 0.0
+  max_range = 30.0
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 3.0, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 36, heavy = true, recovery = 3.0 } ]
+
+# Finite spectators. They never aggro, attack, intercept hero hits, or drop loot.
+[[mob]]
+key = "dm_blackguard_observer"
+name = "Defias Blackguard"
+temper = "backstabber"
+subname = "Watching the Duel"
+display = 2357
+health = 1
+friendly = true
+aggro = 0.0
+leash = 0.0
+run_speed = 2.2
+walk_speed = 2.2
+weapon = 2699
+off_hand = 2635
+grip = "dagger"
+respawn = 0.0
+
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 1.0
+  turn_rate = 0.0
+  lock = 1.0
+  blockable = true
 
 # VanCleef's Blackguards: unseen until close, two daggers, a stab from behind.
 [[mob]]
@@ -1052,39 +1030,7 @@ z = 21.0
 radius = 0.0
 count = 1
 
-# The smelter's molten channels overflow while he fights.
-[[dungeon.hazard]]
-name = "molten iron"
-# Molten Metal: iron spilling over, warned by the ground heating first.
-spell = 5213
-at = [-198.0, -590.0, 21.0]
-radius = 3.0
-damage = 24
-every = 6.0
-phase = 0.0
-boss = "gilnid"
-
-[[dungeon.hazard]]
-name = "molten iron"
-# Molten Metal: iron spilling over, warned by the ground heating first.
-spell = 5213
-at = [-212.0, -572.0, 21.0]
-radius = 3.0
-damage = 24
-every = 6.0
-phase = 2.0
-boss = "gilnid"
-
-[[dungeon.hazard]]
-name = "molten iron"
-# Molten Metal: iron spilling over, warned by the ground heating first.
-spell = 5213
-at = [-205.0, -600.0, 21.0]
-radius = 3.0
-damage = 24
-every = 6.0
-phase = 4.0
-boss = "gilnid"
+# Gilnid's finite crew and valve own the foundry hazards (sim/perches.rs).
 
 # Blackguards on the ramp, engineers on the ring above.
 [[dungeon.pack]]
@@ -1353,6 +1299,66 @@ respawn = 0.0
   weight = 1.5
   steps = [ { clip = 17, take = 1, windup = 1.0, damage = 22, heavy = true, recovery = 1.1 } ]
 
+# This pair belongs to the encounter, never to a pack. The same engineer changes to
+# wrench fighting on landing; ambient engineers elsewhere retain their own behavior.
+[[mob]]
+key = "dm_perched_engineer"
+temper = "skirmisher"
+name = "Furnace Engineer"
+subname = "Gilnid's Crew"
+display = 7047
+health = 80
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 40.0
+weapon = 18575 # Native red dynamite; the grounded worker takes out his wrench.
+grip = "1h"
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.8
+  damage = 18
+  range = 26.0
+  arc = 0.0
+  recovery = 1.5
+  cooldown = 3.0
+  turn_rate = 180.0
+  lock = 0.7
+  blockable = false
+  speed = 10.0
+  # At least LOB_RADIUS (2.5): the landing is warned during the fuse and flight.
+  radius = 2.5
+  spell = 4062
+  look = 3204
+  sound = 6155 # Native fire-lighting precast; Heavy Dynamite's own ready/throw has no sound.
+
+[[mob]]
+key = "dm_ground_engineer"
+temper = "brawler"
+name = "Furnace Engineer"
+subname = "Gilnid's Crew"
+display = 7047
+windup_sound = 1409
+health = 80
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 40.0
+weapon = 1610
+grip = "1h"
+respawn = 0.0
+  [mob.attack]
+  windup = 0.75
+  damage = 9
+  range = 2.6
+  arc = 90.0
+  recovery = 1.1
+  cooldown = 1.8
+  turn_rate = 180.0
+  lock = 0.35
+  blockable = true
+
 # Gilnid, the Smelter: a wrench up close, molten iron thrown far, and the channels overflowing.
 [[mob]]
 key = "dm_gilnid"
@@ -1374,7 +1380,16 @@ posture = 260
 drops = { plunder = [26, 32] }
 trophy = { gilnid_wrench = 1 }
 gear = ["gilnid_wrench", "gilnid_pauldrons"]
+aggro_text = "Back to work! All of you!"
+death_text = "Who's... going to pay for this..."
 respawn = 0.0
+  [mob.perch_crew]
+  airborne = "dm_perched_engineer"
+  grounded = "dm_ground_engineer"
+  # Probed on the lower Foundry floor (~21 yd), not the upper ring.
+  spots = [[-6.0, 3.0], [6.0, 3.0]]
+  valve = [0.0, -6.0]
+  channel = [[-6.0, -3.0], [0.0, -3.0], [6.0, -3.0]]
   [mob.attack]
   windup = 0.6
   damage = 24
@@ -1385,121 +1400,76 @@ respawn = 0.0
   turn_rate = 210.0
   lock = 0.3
   blockable = true
-  # Turns: at two thirds his crew down from the ring and the iron poured three ladles at a time;
-  # at a third the crucible itself tipped out round him (and slag spat at whoever runs).
-  [[mob.phase]]
-  at = 0.66
-  speed = 0.85
-  pattern = "pour"
-  text = "\"My smelter! You'll be scrap by the time I'm done!\""
-  summon = ["dm_woodcutter", "dm_woodcutter"]
-  [[mob.phase]]
-  at = 0.33
-  speed = 0.75
-  might = 1.15
-  pattern = "crucible"
-  text = "\"Into the slag with you! ALL of you!\""
-  shove = 5.5
-  look = 3204
-  [[mob.pattern]]
-  name = "crucible"
-  weight = 1.5
-  below = 0.33
-  max_range = 30.0
-  steps = [ { clip = 57, take = 0, windup = 1.2, range = 5.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 1.4 } ]
   [[mob.pattern]]
   name = "two knocks"
+  # The last recovery leaves a solo hero space between crew explosives and hammer blows.
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 0.9 } ]
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 1.4 } ]
   # The spanner raised high and held: it waits out a panicked dodge.
   [[mob.pattern]]
   name = "overhead"
+  # Its longer recovery leaves a solo hero room after a missed overhead and crew explosives.
   weight = 2.0
-  steps = [ { clip = 17, take = 1, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.3, kit = 379 } ]
+  steps = [ { clip = 17, take = 1, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.8, kit = 379 } ]
   # Crowded, a kick that clears room.
   [[mob.pattern]]
   name = "kick"
   weight = 1.5
   max_range = 2.6
   steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
-  # A ladle of molten iron to where you stand.
-  [[mob.pattern]]
-  name = "ladle"
-  weight = 2.0
-  min_range = 5.0
-  max_range = 24.0
-  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 24.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.2 } ]
-  [[mob.pattern]]
-  name = "pour"
-  weight = 0.0
-  max_range = 30.0
-  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.5 } ]
-  # Then: three knocks and the overhead, quicker.
-  [[mob.pattern]]
-  name = "hammering"
-  weight = 3.0
-  below = 0.66
-  steps = [ { clip = 16, take = 1, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.8, damage = 36, heavy = true, recovery = 1.5 } ]
 
-# Sneed's Shredder: slow and heavy, its saws unstoppable; Sneed climbs out of the wreck.
+# Sneed's machine builds pressure from saws, then stamp/rake, then a straight grind and stall.
+# sim/machinery owns this cycle and the one repair, regardless of either form's health.
 [[mob]]
 key = "dm_shredder"
 name = "Sneed's Shredder"
 temper = "bruiser"
 subname = "Lumbermaster"
 display = 1269
-windup_sound = 1977
+windup_sound = 0
+aggro_sound = 1982
+death_sound = 1980
 scale = 1.1
 health = 950
 run_speed = 6.0
 walk_speed = 2.0
 aggro = 18.0
+aggro_text = "Clear the floor!"
+death_text = "No, no, not now!"
 leash = 30.0
 boss = true
-# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
 unparryable = true
 posture = 320
-drops = { plunder = [10, 14] }
+# All plunder stays with the driver, so repairing never creates a second reward.
+drops = {}
 respawn = 0.0
 then = "dm_sneed"
-then_text = "\"My shredder! Oh, you'll pay for that, you will!\""
-  # At half its engine screams: quicker saws, a grind all round as it turns.
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.8
-  pattern = "grind"
-  text = "The shredder's engine screams. Smoke pours out of it."
-  shove = 5.0
+then_text = "That was company property!"
   [mob.attack]
-  windup = 0.85
-  damage = 32
+  windup = 1.0
+  damage = 30
   range = 3.4
   arc = 140.0
-  recovery = 1.1
+  recovery = 1.2
   cooldown = 1.5
-  turn_rate = 150.0
-  lock = 0.35
+  turn_rate = 110.0
+  lock = 0.6
   blockable = true
   heavy = true
+  sound = 1977
   [[mob.pattern]]
   name = "saws"
-  weight = 3.0
-  steps = [ { clip = 16, take = 1, windup = 0.85, damage = 30, recovery = 0.25 }, { clip = 130, take = 0, windup = 0.6, damage = 32, recovery = 1.2 } ]
-  # The saws ground into the floor all round it: it throws you down.
+  steps = [ { clip = 16, take = 0, windup = 1.0, damage = 30, recovery = 1.4 } ]
+  [[mob.pattern]]
+  name = "stamp and rake"
+  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.2, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, kit = 356, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
+  # Locks as the engine revs, travels 6 yd in 0.9 sec, then stalls for 3.5 sec.
   [[mob.pattern]]
   name = "grind"
-  weight = 2.0
-  max_range = 4.0
-  steps = [ { clip = 130, take = 0, windup = 1.3, range = 4.8, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.4, kit = 356 } ]
-  # From far off it comes at you, saws first.
-  [[mob.pattern]]
-  name = "charge"
-  weight = 2.0
-  min_range = 5.0
-  max_range = 14.0
-  steps = [ { clip = 16, take = 0, windup = 1.0, lunge = 8.0, damage = 38, recovery = 1.6, kit = 379 } ]
+  max_range = 8.0
+  steps = [ { clip = 16, take = 1, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, kit = 379, sound = 1982 } ]
 
-# Sneed: out of the wreck, quick and dodging, the machete in strings.
+# Fragile on foot: a thrown wrench covers a scramble, a close flurry when cornered.
 [[mob]]
 key = "dm_sneed"
 name = "Sneed"
@@ -1507,64 +1477,42 @@ temper = "brawler"
 subname = "Lumbermaster"
 display = 7124
 windup_sound = 1409
-health = 700
+# Less than half the old 700: repairing preserves his remaining health.
+health = 340
 run_speed = 7.5
 walk_speed = 2.2
 aggro = 20.0
 leash = 30.0
 weapon = 1552
 grip = "1h"
-evade = 0.3
+evade = 0.15
 boss = true
-posture = 200
-drops = { plunder = [30, 36] }
+posture = 160
+drops = { plunder = [40, 50] }
 trophy = { sneed_machete = 1 }
 gear = ["sneed_machete", "sneed_leggings"]
 respawn = 0.0
   [mob.attack]
-  windup = 0.45
-  damage = 20
+  windup = 0.75
+  damage = 18
   range = 2.8
-  arc = 110.0
-  recovery = 0.65
-  cooldown = 0.9
-  turn_rate = 280.0
-  lock = 0.2
+  arc = 100.0
+  recovery = 0.8
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.35
   blockable = true
   [[mob.pattern]]
-  name = "three cuts"
+  name = "flurry"
   weight = 3.0
-  steps = [ { clip = 59, take = 0, windup = 0.45, damage = 18, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 18, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.7, damage = 28, heavy = true, recovery = 1.0 } ]
+  max_range = 3.4
+  steps = [ { clip = 59, take = 0, windup = 0.8, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.55, damage = 14, recovery = 0.3 }, { clip = 57, take = 0, windup = 0.85, damage = 22, heavy = true, recovery = 1.4 } ]
   [[mob.pattern]]
-  name = "lunge"
+  name = "wrench"
   weight = 2.0
-  min_range = 3.5
-  max_range = 10.0
-  steps = [ { clip = 17, take = 1, windup = 0.5, lunge = 6.0, damage = 24, recovery = 0.9 } ]
-  [[mob.pattern]]
-  name = "kick"
-  weight = 1.5
-  max_range = 2.6
-  steps = [ { clip = 16, take = 1, windup = 0.3, damage = 8, range = 2.8, arc = 90.0, recovery = 0.5 } ]
-  # The machete held back, glowing: dodge early and it finds you.
-  [[mob.pattern]]
-  name = "feint"
-  weight = 1.0
-  steps = [ { clip = 57, take = 0, windup = 1.1, damage = 26, recovery = 0.7, kit = 379 } ]
-  # At half: a bomb from his belt at his feet, and he goes for you like a mad thing.
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.8
-  might = 1.1
-  pattern = "frenzy"
-  text = "\"That shredder cost more than you'll ever see!\""
-  shove = 4.5
-  look = 3204
-  [[mob.pattern]]
-  name = "frenzy"
-  weight = 2.5
-  below = 0.5
-  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 57, take = 0, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.6, lunge = 3.0, damage = 26, heavy = true, recovery = 1.3 } ]
+  max_range = 16.0
+  # GoblinMale's measured throw is 107 ($CSR at 0.20 sec); it has no clip 61.
+  steps = [ { clip = 107, take = 0, ranged = true, windup = 1.0, range = 16.0, radius = 1.0, speed = 20.0, spell = 13398, damage = 16, recovery = 1.5 } ]
 
 [[goal]]
 title = "The Smelter"
@@ -2043,26 +1991,37 @@ death_text = "...VanCleef... never pay..."
   lock = 0.35
   blockable = true
   heavy = true
-  # Act 2: he brings the mouth's props down (rocks over the tunnel behind him), then runs back to
-  # the forge by the way the heroes came, and waits for them at the smelter.
+  # The gauntlet (Corey, Nov 8: "a continuous slow gauntlet back through the whole dungeon... a
+  # boulder chase scene from Indiana Jones until we're back at the ship"). At 70% he brings the
+  # mouth down, and the mine comes down behind the heroes all the way back: a front that runs the
+  # heroes' own way out (the galleries, the Mast Room, the workshop, the Foundry's ramp and pit, the
+  # Cannon Gallery, the ledge along the dry dock) to Smite's island before the Juggernaut, its points
+  # resolved through the land's native walking corners and floors: 1,018 yd at 4 yd/s,
+  # about 4 min 15 sec. Behind it rock falls everywhere and a hero there is crushed (a fifth of their health a second); ahead of it dust
+  # and warning falls. He fights them the whole way, unhurt by it, and can't be brought below 26%
+  # until it reaches the ship: the last of the fight is fought there.
   [[mob.phase]]
-  at = 0.65
+  at = 0.7
   speed = 0.95
-  text = "Nobody leave Rhahk'Zor's mine!"
+  text = "Rhahk'Zor bring whole mine down on you!"
   debris = [[-30.0, -388.0, 56.0], [-25.0, -381.0, 57.5], [-34.0, -379.0, 56.0]]
-  run_to = [[-70.0, -380.0, 54.2], [-112.5, -405.0, 59.9], [-140.0, -400.0, 58.2], [-190.0, -442.5, 53.6], [-190.0, -480.0, 54.0], [-244.0, -482.0, 48.9], [-288.0, -505.0, 50.0], [-290.3, -537.0, 49.4], [-300.0, -580.0, 47.2], [-250.0, -578.0, 51.1], [-240.0, -579.0, 51.2], [-178.0, -580.0, 45.6], [-186.0, -599.0, 37.4], [-205.0, -592.0, 21.0]]
-  run_falls = 3.0
-  wait_for = 24.0
-  arrive_text = "Mine now. Now you burn!"
-  arrive_kit = 38
-  burn = { radius = 3.0, damage = 9, secs = 7.0, look = 22191 }
-  # Act 3, a third: a slam brings the Foundry's ceiling down over three spots, a dry way between.
+  collapse = { route = [[-40.0, -385.0, 55.8], [-70.0, -380.0, 54.2], [-112.5, -405.0, 59.9], [-140.0, -400.0, 58.2], [-190.0, -442.5, 53.6], [-190.0, -480.0, 54.0], [-244.0, -482.0, 48.9], [-288.0, -505.0, 50.0], [-290.3, -537.0, 49.4], [-300.0, -580.0, 47.2], [-250.0, -578.0, 51.1], [-240.0, -579.0, 51.2], [-216.0, -561.0, 51.2], [-192.0, -563.0, 51.2], [-184.0, -575.0, 47.9], [-185.0, -587.0, 41.9], [-195.0, -598.0, 34.4], [-207.0, -600.0, 28.2], [-219.0, -595.0, 21.8], [-205.0, -592.0, 21.0], [-181.0, -583.0, 19.3], [-145.0, -583.0, 18.8], [-133.0, -591.0, 18.7], [-126.0, -615.0, 13.7], [-119.0, -639.0, 11.4], [-110.0, -650.0, 7.2], [-109.0, -691.0, 4.6], [-100.0, -692.0, 8.2], [-93.0, -716.0, 8.6], [-81.0, -726.0, 8.9], [-57.0, -728.0, 8.9], [-33.0, -731.0, 8.6], [-21.0, -742.0, 9.1], [-9.0, -754.0, 9.1], [-2.0, -768.0, 9.6]], speed = 4.0, lead = 14.0, crush = 0.2, hold = 0.26, held_text = "Rhahk'Zor not die in a hole!", end_text = "No more mine. Only Rhahk'Zor!" }
+  # On the way, wherever he is: the beams over him come down in a ring.
   [[mob.phase]]
-  at = 0.35
+  at = 0.45
+  speed = 0.9
+  text = "Rocks for everyone!"
+  rocks_round = 7.0
+  # At the ship, the last stand (held back until the collapse is done): his maul catches fire, and
+  # every heavy blow leaves burning iron.
+  [[mob.phase]]
+  at = 0.25
   speed = 0.85
   might = 1.1
   pattern = "slam"
   text = "RHAHK'ZOR... SMASH!"
+  kit = 38
+  burn = { radius = 3.0, damage = 9, secs = 7.0, look = 22191 }
   debris = [[-214.0, -584.0, 21.0], [-197.0, -600.0, 21.0], [-198.0, -578.0, 21.0]]
   # The last: he pounds the floor, and the maul sticks in it (`lodge`): haul it free he must.
   [[mob.phase]]
@@ -2119,7 +2078,7 @@ reward = { bronze = 6, leather = 4 }
 
 [[goal]]
 title = "Out into Moonbrook"
-text = "Walk out of the Deadmines by the front door. It stands open with Rhahk'Zor down."
+text = "Walk out of the Deadmines once Rhahk'Zor is down: by the smugglers' tunnel at the landing, the front door being buried."
 kind = "delve"
 # (Out of the Deadmines: `end` alone is any dungeon's way out.)
 what = "end:deadmines"
@@ -2568,11 +2527,13 @@ perks = [{ kind = "regen", amount = 0.003 }]
 [[mob]]
 key = "dm_cookie_gorged"
 name = "Cookie"
-temper = "erratic"
+temper = "bruiser"
 subname = "Gorged on the Stew"
 display = 1773
-windup_sound = 417
-scale = 0.85
+# Each string has its own voice so the inhale alert is not masked by an attack grunt.
+windup_sound = 0
+# Native display 1773 is 2x; 1.15 makes the secret form visibly larger than Cookie.
+scale = 1.15
 health = 820
 run_speed = 6.0
 walk_speed = 2.0
@@ -2583,54 +2544,32 @@ posture = 260
 drops = { plunder = [30, 40] }
 gear = ["gorged_apron"]
 respawn = 0.0
+slay_text = "More meat for the pot!"
+death_text = "...burnt."
   [mob.attack]
-  windup = 0.85
-  damage = 28
+  windup = 0.9
+  damage = 24
   range = 3.4
-  arc = 140.0
-  recovery = 1.0
-  cooldown = 1.4
-  turn_rate = 170.0
-  lock = 0.3
+  arc = 110.0
+  recovery = 1.3
+  cooldown = 1.5
+  turn_rate = 150.0
+  lock = 0.4
   blockable = true
   heavy = true
-  # Two slaps, then the belly.
+  # The slaps are the ordinary exchange; their final recovery is never shortened at low health.
   [[mob.pattern]]
   name = "slaps"
-  weight = 3.0
-  steps = [ { clip = 16, take = 1, windup = 0.7, damage = 24, recovery = 0.2 }, { clip = 17, take = 0, windup = 0.55, damage = 24, recovery = 0.2 }, { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 30, heavy = true, recovery = 1.3, kit = 356, look = 10987 } ]
-  # From far off: the belly-flop, and a splash where he lands.
+  weight = 1.0
+  steps = [ { clip = 16, take = 0, windup = 0.9, damage = 22, sound = 417, recovery = 0.4 }, { clip = 17, take = 0, windup = 0.8, damage = 24, recovery = 1.6 } ]
+  # A generous inhale locks at the first pose. Move beside him, then punish four seconds of cough.
   [[mob.pattern]]
-  name = "belly-flop"
-  weight = 2.0
-  min_range = 5.0
-  max_range = 16.0
-  steps = [ { clip = 54, windup = 1.2, lunge = 9.0, range = 4.5, arc = 360.0, damage = 38, heavy = true, blockable = false, recovery = 1.6, kit = 379, look = 10987 } ]
-  # Stew spewed in a line of splashes.
-  [[mob.pattern]]
-  name = "spew"
-  weight = 2.0
-  min_range = 6.0
-  max_range = 26.0
-  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.3 }, { ranged = true, windup = 0.8, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.3 }, { ranged = true, windup = 0.8, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.3 }, { ranged = true, windup = 0.8, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.5 } ]
-  # At half: his brood climb out of the pot.
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.85
-  might = 1.1
-  pattern = "spew"
-  text = "\"Mrrgl! Babies! Come to Cookie!\" Murlocs climb out of the stew."
-  summon = ["murloc_streamrunner", "murloc_streamrunner"]
-  [[mob.phase]]
-  at = 0.2
-  speed = 0.75
-  might = 1.2
-  pattern = "belly-flop"
-  text = "\"MMMRRRGGGLLL!\""
-  shove = 6.0
-  look = 10987
+  name = "belch"
+  weight = 1.0
+  max_range = 7.0
+  steps = [ { clip = 32, take = 0, windup = 2.2, range = 7.0, arc = 70.0, damage = 34, sound = 1109, blockable = false, poise = true, recovery = 4.0 } ]
 
-# --- Edwin VanCleef, unbowed: those who read his letter find he meant it ----------------------------
+# --- Edwin VanCleef, unbowed: longer commitments, greater punish windows ---------------------------
 
 [[mob]]
 key = "dm_vancleef_unbowed"
@@ -2639,7 +2578,7 @@ temper = "duelist"
 subname = "Unbowed"
 display = 2029
 windup_sound = 1335
-clips_from = "DwarfMale"
+clips_from = "HumanMale"
 scale = 1.3
 health = 1100
 run_speed = 8.0
@@ -2649,7 +2588,8 @@ leash = 40.0
 weapon = 1928
 off_hand = 2806
 grip = "1h"
-evade = 0.3
+# The authored retreat and advance own his footwork; no random backstep interrupts a tell.
+evade = 0.0
 boss = true
 posture = 320
 drops = { plunder = [60, 80] }
@@ -2658,50 +2598,44 @@ respawn = 0.0
 aggro_sound = 5780
 slay_sound = 5781
   [mob.attack]
-  windup = 0.4
+  windup = 0.7
   damage = 26
   range = 3.0
-  arc = 110.0
-  recovery = 0.55
-  cooldown = 0.8
-  turn_rate = 300.0
-  lock = 0.2
+  arc = 95.0
+  recovery = 2.2
+  cooldown = 1.0
+  # Every counter commits to the attacker it chose, leaving a sidestep answer.
+  turn_rate = 0.0
+  lock = 1.5
   blockable = true
   [[mob.pattern]]
   name = "string"
   weight = 3.0
-  steps = [ { from = "DwarfMale", clip = 17, take = 0, windup = 0.4, damage = 22, recovery = 0.1 }, { from = "DwarfFemale", clip = 17, take = 1, windup = 0.3, damage = 22, recovery = 0.1 }, { from = "TrollFemale", clip = 17, take = 0, windup = 0.3, damage = 22, recovery = 0.1 }, { from = "HumanMale", clip = 57, take = 0, windup = 0.6, damage = 32, heavy = true, recovery = 0.9 } ]
-  # Out of the shadows at you, and a burst of shadow where he lands.
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.8, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 32, heavy = true, recovery = 2.8 } ]
   [[mob.pattern]]
-  name = "shadowstep"
-  weight = 2.5
-  min_range = 4.0
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 10.0
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 5.0, damage = 28, recovery = 2.2 } ]
+  [[mob.pattern]]
+  name = "invitation"
+  weight = 0.0
+  steps = [ { windup = 1.8, damage = 0, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "riposte"
+  weight = 0.0
+  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.9, damage = 38, arc = 80.0, lunge = 2.0, heavy = true, recovery = 2.8, kit = 379 } ]
+  [[mob.pattern]]
+  name = "advance"
+  weight = 0.0
   max_range = 14.0
-  steps = [ { from = "ScourgeFemale", clip = 57, take = 0, windup = 0.6, lunge = 9.0, range = 3.5, arc = 360.0, damage = 30, heavy = true, recovery = 0.9, kit = 218, look = 24050 } ]
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 4.0, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 34, heavy = true, recovery = 3.0 } ]
   [[mob.pattern]]
-  name = "riposte stance"
-  weight = 1.5
-  steps = [ { from = "TrollMale", clip = 57, take = 0, windup = 1.3, damage = 44, arc = 140.0, heavy = true, recovery = 1.0, kit = 379 } ]
-  [[mob.pattern]]
-  name = "blade storm"
-  weight = 1.5
-  max_range = 4.0
-  steps = [ { from = "TrollMale", clip = 16, take = 0, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "NightElfMale", clip = 16, take = 1, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, heavy = false, recovery = 0.1 }, { from = "GnomeMale", clip = 16, take = 0, windup = 0.4, range = 4.5, arc = 360.0, damage = 28, recovery = 1.4, look = 24050 } ]
-  [[mob.phase]]
-  at = 0.5
-  speed = 0.8
-  pattern = "blade storm"
-  text = "\"To me, Brotherhood! One last time!\""
-  summon = ["dm_blackguard", "dm_blackguard"]
-  kit = 218
-  [[mob.phase]]
-  at = 0.2
-  speed = 0.7
-  might = 1.2
-  pattern = "shadowstep"
-  text = "\"I... will... not... BOW!\""
-  shove = 5.5
-  look = 24050
+  name = "last stand"
+  weight = 0.0
+  max_range = 40.0
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 3.0, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.1, damage = 38, heavy = true, recovery = 3.4 } ]
 
 # --- the rares ---------------------------------------------------------------------------------------
 

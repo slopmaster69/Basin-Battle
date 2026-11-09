@@ -32,6 +32,8 @@ pub(crate) fn in_strip(pos: Vec3, facing: f32, len: f32, half: f32, p: Vec3) -> 
 #[derive(Debug, Clone)]
 pub(crate) enum Follow {
     None,
+    /// An avoidable harpoon only pulls after the fair hit resolves, never through a guard.
+    Pull { yards: f32 },
     /// A hero's swing: a stagger if it lands on a wind-up, a throw if heavy.
     Swing { stagger: f32, heavy: bool, winding: bool },
     /// An ability's blow: its effects, the drain, Valor, if it lands.
@@ -1465,6 +1467,9 @@ impl Survival {
         // A War Banner in its arc takes the blow too (once a swing, as it first lands).
         if first && !strike.shove() {
             self.swing_on_banners(id, w, strike.damage, f, strike.range, strike.arc);
+            if strike.damage > 0.0 {
+                self.swing_on_perches(id, f, strike.range, strike.arc);
+            }
         }
         let mut hits: Vec<(f32, Id)> = Vec::new();
         for (&mid, m) in &self.mobs {
@@ -1670,6 +1675,7 @@ impl Survival {
             } else if standing {
                 self.events.push(Event::React { id: mid, anim: WOUND_ANIM, from: pos, lean: lean * 0.7, hold: 0.0, fit: 0.0 });
             }
+            if damage > 0 { self.vancleef_hit(mid, id, pos); }
             // Shield Wall's bash drives a creature back off the shield, still reeling.
             if standing && shoved && strike.wall_bash() {
                 let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: WALL_BASH.push, from_caster: true, ..Default::default() };
@@ -1923,6 +1929,12 @@ impl Survival {
         let out = self.strike_player(s.attacker, s.victim, s.damage, s.from, s.blockable, s.heavy, s.parryable, s.style);
         // What landed, on a hero striker's meter.
         let after = self.players.get(&s.victim).map_or(0, |p| p.health);
+        if let Follow::Pull { yards } = s.follow {
+            if matches!(out, Outcome::Hit | Outcome::GuardBroken) && after > 0 {
+                let effect = crate::content::AbilityEffect { kind: "pull".into(), amount: yards, from_caster: true, ..Default::default() };
+                self.displace(s.attacker, s.victim, &effect);
+            }
+        }
         if self.players.contains_key(&s.attacker) {
             let label = match s.follow {
                 Follow::Ability { ability, .. } => self.content.abilities[ability].name.clone(),
@@ -2476,6 +2488,8 @@ impl Survival {
         self.missiles = keep;
         for m in due {
             self.unmark(m.mark);
+            let follow = self.firing_follow(m.owner, m.land_at);
+            let firing = self.is_firing_captain(m.owner) || self.firing_sees_veil(m.owner);
             // A grounding totem near where it lands takes it.
             if self.grounded_at(m.at) {
                 continue;
@@ -2491,12 +2505,14 @@ impl Survival {
             let caught: Vec<Id> = self
                 .players
                 .iter()
-                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius)
+                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius
+                    && (!firing || (p.pos[2] - m.at[2]).abs() < 3.0))
                 .map(|(id, _)| *id)
                 .collect();
             for v in caught {
                 let area = Some(Area::Circle { at: m.at, radius: m.radius });
-                self.strike_fair(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, Follow::None);
+                let how = if firing { HitKind::Projectile } else { HitKind::Area };
+                self.strike_fair_as(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, follow.clone(), how);
             }
         }
     }

@@ -1,4 +1,4 @@
-From a2aeba3760787d7c1c6f191a6c810ab5412b0a9f Mon Sep 17 00:00:00 2001
+From b230dc13eecfe5a884aa6240630d8b32de899be6 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 15:18:13 -0700
 Subject: [PATCH] Sun shadows with shapes: heroes, creatures, buildings and
@@ -101,20 +101,30 @@ Revised after the fifth films (#269, take 291):
   knew. Each "[shadows near]" line now gives the mesh's place in WoW
   coordinates beside its distance, so a film can stand beside it.
 
+Seventh round (take 310):
+- Brackwell's jack-o'-lanterns logged "left out: hidden": they are game
+  objects, and the scene's election hides a body off screen, so one
+  beside or behind the camera cast nothing. The election now names the
+  bodies it hid only for being off screen with the camera outdoors
+  (exterior_cull::OffViewBodies), and the extract lets their meshes cast.
+- The extract asks each blended texture's path once (is it water?), not
+  every frame for every blended mesh.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
 ---
- crates/benilla-app/src/shaders.rs             |  14 +
- crates/benilla-app/src/world_console.rs       |  79 +-
- .../benilla-assets/src/shaders/terrain.wgsl   |  10 +-
- .../benilla-assets/src/shaders/wow_model.wgsl |  10 +-
- crates/benilla-world/src/look/shadow_pass.rs  | 965 +++++++++++++++++-
- crates/benilla-world/src/look/shadows.rs      | 130 ++-
- crates/benilla-world/src/shaders.rs           |   3 +-
- .../src/shaders/look_shadow_map.wgsl          |  59 ++
- .../benilla-world/src/shaders/static_gx.wgsl  |  10 +-
- .../src/shaders/world_shadow.wgsl             |  14 +-
- 10 files changed, 1232 insertions(+), 62 deletions(-)
+ crates/benilla-app/src/shaders.rs             |   14 +
+ crates/benilla-app/src/world_console.rs       |   79 +-
+ .../benilla-assets/src/shaders/terrain.wgsl   |   10 +-
+ .../benilla-assets/src/shaders/wow_model.wgsl |   10 +-
+ crates/benilla-world/src/exterior_cull.rs     |   22 +-
+ crates/benilla-world/src/look/shadow_pass.rs  | 1003 ++++++++++++++++-
+ crates/benilla-world/src/look/shadows.rs      |  133 ++-
+ crates/benilla-world/src/shaders.rs           |    3 +-
+ .../src/shaders/look_shadow_map.wgsl          |   59 +
+ .../benilla-world/src/shaders/static_gx.wgsl  |   10 +-
+ .../src/shaders/world_shadow.wgsl             |   14 +-
+ 11 files changed, 1291 insertions(+), 66 deletions(-)
  create mode 100644 crates/benilla-world/src/shaders/look_shadow_map.wgsl
 
 diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
@@ -312,17 +322,84 @@ index d51b27c..eb948e5 100644
          for (var i = 0u; i < SHADOW_SEARCH_TAPS; i = i + 1u) {
              let o = shadow_disk(i, SHADOW_SEARCH_TAPS, turn) * search;
              let s = textureLoad(shadow_map, clamp(vec2<i32>(t + o), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
+diff --git a/crates/benilla-world/src/exterior_cull.rs b/crates/benilla-world/src/exterior_cull.rs
+index d559dd4..9e8976c 100644
+--- a/crates/benilla-world/src/exterior_cull.rs
++++ b/crates/benilla-world/src/exterior_cull.rs
+@@ -75,6 +75,14 @@ pub struct ExteriorCullVerdict {
+     pub(crate) liquid_hidden: usize,
+ }
+ 
++/// The net bodies this frame's election hid only for being out of the camera's view, the camera
++/// outdoors (benilla's own, for the new look's sun shadows): such a body is still in the sunlit
++/// world, so its shadow can fall into view, where a body hidden by a building's windows or a
++/// sealed room's ceiling cannot be seen and casts nothing. Rebuilt every frame by
++/// [`apply_exterior_cull`]; the shadow pass's extract reads it (`look::shadow_pass`).
++#[derive(Resource, Default)]
++pub struct OffViewBodies(pub bevy::ecs::entity::EntityHashSet);
++
+ pub(crate) struct ExteriorCullPlugin;
+ 
+ impl Plugin for ExteriorCullPlugin {
+@@ -82,7 +90,9 @@ impl Plugin for ExteriorCullPlugin {
+         if std::env::var_os("WOW_CULL_TRACE").is_some() {
+             app.insert_resource(CullTrace);
+         }
+-        app.init_resource::<ExteriorCullVerdict>().add_systems(
++        app.init_resource::<ExteriorCullVerdict>()
++            .init_resource::<OffViewBodies>()
++            .add_systems(
+             PostUpdate,
+             apply_exterior_cull
+                 .in_set(ExteriorCullSet)
+@@ -278,6 +288,7 @@ fn apply_exterior_cull(
+     mut verdict: ResMut<ExteriorCullVerdict>,
+     trace: Option<Res<CullTrace>>,
+     mut no_election: Local<Option<bool>>,
++    mut off_view: Option<ResMut<OffViewBodies>>,
+ ) {
+     // `WOW_NO_DRAW_ELECTION=1` disables the frustum and room legs; the window leg stays.
+     let no_election =
+@@ -320,6 +331,9 @@ fn apply_exterior_cull(
+     }
+     // The body leg: one whole-object test per net body.
+     let (mut body_n, mut body_hidden) = (0usize, 0usize);
++    if let Some(set) = off_view.as_deref_mut() {
++        set.0.clear();
++    }
+     for (e, gt, body, room, mut vis) in &mut bodies {
+         let Some(bound) = body.bound.as_ref() else {
+             // No bound: not this cull's to decide. Traced, as no counter below sees it.
+@@ -356,6 +370,12 @@ fn apply_exterior_cull(
+             admitted,
+         );
+         body_hidden += usize::from(!admitted);
++        // Hidden only for being out of view, the camera outdoors: its shadow may still show.
++        if !admitted && !in_room && !no_election && matches!(gate, ExteriorGate::Open) {
++            if let Some(set) = off_view.as_deref_mut() {
++                set.0.insert(e);
++            }
++        }
+         set(
+             &mut vis,
+             if admitted {
 diff --git a/crates/benilla-world/src/look/shadow_pass.rs b/crates/benilla-world/src/look/shadow_pass.rs
-index bdeb415..95510a1 100644
+index bdeb415..a17bdc0 100644
 --- a/crates/benilla-world/src/look/shadow_pass.rs
 +++ b/crates/benilla-world/src/look/shadow_pass.rs
-@@ -10,10 +10,19 @@
+@@ -8,12 +8,23 @@
+ //!
+ //! Casters are culled per slice by their bounds against the slice's box, small ones dropped from
  //! the far slices ([`tune::SMALL_CASTER_RADIUS`]). An entity caster is gated on Bevy's
- //! `InheritedVisibility`, so a body the exterior-scene election hides (off screen) casts none; the
- //! static world and the terrain are culled here alone, so a tree behind the camera still shades
+-//! `InheritedVisibility`, so a body the exterior-scene election hides (off screen) casts none; the
+-//! static world and the terrain are culled here alone, so a tree behind the camera still shades
 -//! the road in front of it. Translucent, additive, depth-less and interior batches never cast, nor
 -//! ground clutter.
-+//! the road in front of it. Additive, multiply and test-less batches never cast, nor props inside
++//! `InheritedVisibility`, except a body the exterior-scene election hid only for being off screen
++//! with the camera outdoors (`exterior_cull::OffViewBodies`): take 310 found Brackwell's
++//! jack-o'-lanterns, game objects 12 yd behind the hero, `left out: hidden` there while the same
++//! one cast in view elsewhere. The static world and the terrain are culled here alone, so a tree
++//! behind the camera still shades the road in front of it. Additive, multiply and test-less batches never cast, nor props inside
 +//! a building, nor ground clutter; a building's interior groups do, as they hold its walls, and an
 +//! alpha-blended batch casts cut by its texture (a solid prop drawn blended), whether it writes
 +//! depth or not. A skinned body is bounded on its rig's origin (the palette, not its transform,
@@ -339,7 +416,7 @@ index bdeb415..95510a1 100644
  
  use bevy::camera::primitives::Aabb;
  use bevy::camera::visibility::RenderLayers;
-@@ -32,7 +41,7 @@ use bevy::render::render_graph::{
+@@ -32,7 +43,7 @@ use bevy::render::render_graph::{
      NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
  };
  use bevy::render::render_resource::binding_types::{
@@ -348,7 +425,7 @@ index bdeb415..95510a1 100644
  };
  use bevy::render::render_resource::*;
  use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
-@@ -89,19 +98,29 @@ struct Caster {
+@@ -89,19 +100,29 @@ struct Caster {
      cut: Option<AssetId<Image>>,
  }
  
@@ -385,7 +462,7 @@ index bdeb415..95510a1 100644
  pub fn caster_kind(mat: &WowModelMaterial) -> Option<Option<AssetId<Image>>> {
      let ext = &mat.extension;
      caster_law(
-@@ -121,24 +140,87 @@ fn caster_law(
+@@ -121,24 +142,87 @@ fn caster_law(
      model_flags: Vec4,
      sun_scale: Vec4,
  ) -> Option<Option<AssetId<Image>>> {
@@ -479,7 +556,7 @@ index bdeb415..95510a1 100644
  /// A caster's instance row: its world matrix's linear part as three rows (w 0) and its translation
  /// apart, `w` the rig slot (a float: exact far past 2047, and never a denormal).
  fn inst_rows(gt: &GlobalTransform, rig: u32) -> [[f32; 4]; 4] {
-@@ -164,6 +246,29 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
+@@ -164,7 +248,31 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
      (center, Vec3::from(aabb.half_extents).length() * s)
  }
  
@@ -507,9 +584,11 @@ index bdeb415..95510a1 100644
 +}
 +
  type ModelCaster = (
++    Entity,
      &'static Mesh3d,
      &'static MeshMaterial3d<WowModelMaterial>,
-@@ -172,6 +277,13 @@ type ModelCaster = (
+     &'static GlobalTransform,
+@@ -172,6 +280,13 @@ type ModelCaster = (
      &'static InheritedVisibility,
      Option<&'static MeshTag>,
      Option<&'static RenderLayers>,
@@ -523,12 +602,18 @@ index bdeb415..95510a1 100644
  );
  
  type TerrainCaster = (
-@@ -187,33 +299,119 @@ fn extract_casters(
+@@ -187,33 +302,148 @@ fn extract_casters(
      models: Extract<Query<ModelCaster>>,
      terrain: Extract<Query<TerrainCaster, With<MeshMaterial3d<TerrainMaterial>>>>,
      materials: Extract<Res<Assets<WowModelMaterial>>>,
 +    rigs: Extract<Option<Res<crate::rig_palette::RigPalettes>>>,
 +    asset_server: Extract<Option<Res<AssetServer>>>,
++    off_view: Extract<Option<Res<crate::exterior_cull::OffViewBodies>>>,
++    parents: Extract<Query<&ChildOf>>,
++    // Each blended texture's water verdict, asked of its path once: the path's lookup and its
++    // string every frame for every blended mesh were the extract's own allocations (Corey's
++    // desktop film found the look's frame CPU-bound).
++    mut liquid_of: Local<HashMap<AssetId<Image>, bool>>,
  ) {
      out.0.clear();
 +    out.1 = [0; 4];
@@ -546,7 +631,24 @@ index bdeb415..95510a1 100644
      };
      let world_layer = RenderLayers::default();
 -    for (mesh, mat, gt, aabb, vis, tag, layers) in &models {
-+    for (mesh, mat, gt, aabb, vis, tag, layers, skinned, part, object) in &models {
+-        if !vis.get() || layers.is_some_and(|l| !l.intersects(&world_layer)) {
++    // A mesh of a body the election hid only for being off screen: its root, a few parents up
++    // (the body, its mount, a rider, a piece of gear), is in the set.
++    let off_view = off_view.as_deref().filter(|s| !s.0.is_empty());
++    let hidden_off_view = |mut e: Entity| {
++        let Some(set) = off_view else { return false };
++        for _ in 0..tune::OFF_VIEW_DEPTH {
++            if set.0.contains(&e) {
++                return true;
++            }
++            let Ok(parent) = parents.get(e) else {
++                return false;
++            };
++            e = parent.parent();
++        }
++        set.0.contains(&e)
++    };
++    for (entity, mesh, mat, gt, aabb, vis, tag, layers, skinned, part, object) in &models {
 +        // The list's line for this mesh, if it is near the camera.
 +        let mut note = |verdict: &str, material: Option<&WowModelMaterial>| {
 +            let Some(list) = near.as_mut() else { return };
@@ -566,7 +668,9 @@ index bdeb415..95510a1 100644
 +                ));
 +            }
 +        };
-         if !vis.get() || layers.is_some_and(|l| !l.intersects(&world_layer)) {
++        if (!vis.get() && !hidden_off_view(entity))
++            || layers.is_some_and(|l| !l.intersects(&world_layer))
++        {
 +            out.1[0] += 1;
 +            note("left out: hidden", materials.get(&mat.0));
              continue;
@@ -626,9 +730,14 @@ index bdeb415..95510a1 100644
 +        // water. Its texture's name is the only thing that tells it from a solid prop drawn
 +        // blended, so the rule reads it.
 +        if blended
-+            && cut
-+                .and_then(|t| asset_server.as_deref().and_then(|a| a.get_path(t)))
-+                .is_some_and(|p| liquid_texture(&p.to_string()))
++            && cut.is_some_and(|t| {
++                *liquid_of.entry(t).or_insert_with(|| {
++                    asset_server
++                        .as_deref()
++                        .and_then(|a| a.get_path(t))
++                        .is_some_and(|p| liquid_texture(&p.to_string()))
++                })
++            })
 +        {
 +            out.1[3] += 1;
 +            note("left out: not casting (water)", material);
@@ -649,7 +758,7 @@ index bdeb415..95510a1 100644
          out.0.push(Caster {
              mesh: mesh.id(),
              inst: inst_rows(gt, rig),
-@@ -222,6 +420,17 @@ fn extract_casters(
+@@ -222,6 +452,17 @@ fn extract_casters(
              cut,
          });
      }
@@ -667,7 +776,7 @@ index bdeb415..95510a1 100644
      // The terrain's cells, whatever the exterior cull hid: a hill off screen still shades.
      for (mesh, gt, aabb) in &terrain {
          let Some(aabb) = aabb else { continue };
-@@ -712,20 +921,86 @@ impl ViewNode for LookShadowNode {
+@@ -712,20 +953,86 @@ impl ViewNode for LookShadowNode {
              span.end(&mut pass);
          }
          if stats {
@@ -758,7 +867,7 @@ index bdeb415..95510a1 100644
      static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
      let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
      if last.is_some_and(|t| t.elapsed().as_secs_f32() < 1.0) {
-@@ -742,9 +1017,183 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
+@@ -742,9 +1049,183 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
              frame.splits[i], frame.slices[i].texel
          );
      }
@@ -942,7 +1051,7 @@ index bdeb415..95510a1 100644
  /// The main-world half: the frame's extract; the render half in [`finish`].
  pub(super) fn build(app: &mut App) {
      app.add_plugins(ExtractResourcePlugin::<ShadowFrame>::default());
-@@ -759,12 +1208,12 @@ pub(super) fn finish(app: &mut App) {
+@@ -759,12 +1240,12 @@ pub(super) fn finish(app: &mut App) {
      render_app
          .init_resource::<ShadowCasters>()
          .init_resource::<ShadowGpu>()
@@ -957,7 +1066,7 @@ index bdeb415..95510a1 100644
                  prepare_shadow_binds.in_set(RenderSystems::PrepareBindGroups),
              ),
          )
-@@ -772,15 +1221,386 @@ pub(super) fn finish(app: &mut App) {
+@@ -772,15 +1253,386 @@ pub(super) fn finish(app: &mut App) {
          .add_render_graph_edges(
              Core3d,
              (Node3d::EndPrepasses, LookShadowLabel, Node3d::StartMainPass),
@@ -1346,7 +1455,7 @@ index bdeb415..95510a1 100644
      #[test]
      fn which_batches_cast() {
          let tex: AssetId<Image> = AssetId::default();
-@@ -799,10 +1619,39 @@ mod tests {
+@@ -799,10 +1651,39 @@ mod tests {
              law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 0.0, lit),
              Some(Some(tex))
          );
@@ -1359,7 +1468,8 @@ index bdeb415..95510a1 100644
 +        );
 +        assert_eq!(
 +            caster_law(AlphaMode::Blend, None, Vec4::ZERO, Vec4::ZERO, lit),
-+            None,
+             None,
+-            "translucent"
 +            "blended, untextured"
 +        );
 +        // 0080's third films: still `0 blended meshes cast` on every line. A blended batch that
@@ -1381,13 +1491,12 @@ index bdeb415..95510a1 100644
 +        let twin = Vec4::new(0.0, 1.0, 0.0, 0.0);
 +        assert_eq!(
 +            law(AlphaMode::Blend, 1, twin, 0.0, lit),
-             None,
--            "translucent"
++            None,
 +            "the fade twin of a depth-less batch casts as its source: nothing"
          );
          assert_eq!(
              law(AlphaMode::Add, 4, Vec4::ZERO, 0.0, lit),
-@@ -816,11 +1665,17 @@ mod tests {
+@@ -816,11 +1697,17 @@ mod tests {
                  "marker {m:#x}"
              );
          }
@@ -1408,7 +1517,7 @@ index bdeb415..95510a1 100644
          );
          assert_eq!(
              law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 1.0, lit),
-@@ -833,22 +1688,52 @@ mod tests {
+@@ -833,22 +1720,52 @@ mod tests {
              None,
              "glue rig lane"
          );
@@ -1467,7 +1576,7 @@ index bdeb415..95510a1 100644
                  | 0x100
                  | u32::from(crate::model_render::ZFILL_MARKER)
 diff --git a/crates/benilla-world/src/look/shadows.rs b/crates/benilla-world/src/look/shadows.rs
-index 0fe0dd4..2ab1ca3 100644
+index 0fe0dd4..e512da0 100644
 --- a/crates/benilla-world/src/look/shadows.rs
 +++ b/crates/benilla-world/src/look/shadows.rs
 @@ -72,8 +72,11 @@ pub mod tune {
@@ -1506,13 +1615,16 @@ index 0fe0dd4..2ab1ca3 100644
      pub const BLOCKER_SEARCH: f32 = 0.6;
      pub const PCF_MIN_TEXELS: f32 = 1.0;
      pub const PCF_MAX_TEXELS: f32 = 10.0;
-@@ -109,6 +117,16 @@ pub mod tune {
+@@ -109,6 +117,19 @@ pub mod tune {
      pub const SMALL_CASTER_SLICES: usize = 2;
      /// A skinned body's box is its bind pose's; this much more covers a swing or a stride.
      pub const SKINNED_MARGIN: f32 = 1.5;
 +    /// A skinned part with no box at all (gear and riders carry `NoFrustumCulling`, so Bevy gives
 +    /// them none) is held to a sphere this wide about its rig's origin: a hero and what they carry.
 +    pub const SKINNED_LOOSE_RADIUS: f32 = 3.0;
++    /// How many parents up a hidden mesh's body root is looked for in the election's off-screen
++    /// set: a body's part, its mount's, a rider's gear.
++    pub const OFF_VIEW_DEPTH: usize = 6;
 +    /// `lookshadow map`: the inset's side as a share of the view's height.
 +    pub const MAP_INSET: f32 = 0.5;
 +    /// `WOW_SHADOW_STATS`: the model meshes within this many yards of the camera are listed with
@@ -1523,7 +1635,7 @@ index 0fe0dd4..2ab1ca3 100644
      /// 1.12's blob under a unit fades out as the real shadow comes in: gone once a full shadow
      /// takes this much of the sun.
      pub const BLOB_GONE_AT: f32 = 0.5;
-@@ -129,12 +147,13 @@ pub const SHADOW_ROWS: usize = 6 + 2 * tune::MAP_LAYERS as usize;
+@@ -129,12 +150,13 @@ pub const SHADOW_ROWS: usize = 6 + 2 * tune::MAP_LAYERS as usize;
  
  /// `worldShadows` and the film's hold: `level` 0 off, 1 low, 2 high (inert under the classic
  /// look); `scale` holds the strength at a multiple of the hour's (`lookshadow <strength>`),
@@ -1538,7 +1650,7 @@ index 0fe0dd4..2ab1ca3 100644
  }
  
  impl Default for LookShadows {
-@@ -144,6 +163,7 @@ impl Default for LookShadows {
+@@ -144,6 +166,7 @@ impl Default for LookShadows {
              level: 1,
              scale: None,
              distance: None,
@@ -1546,7 +1658,7 @@ index 0fe0dd4..2ab1ca3 100644
          }
      }
  }
-@@ -204,6 +224,23 @@ impl LookShadows {
+@@ -204,6 +227,23 @@ impl LookShadows {
          };
          words.next().is_none().then_some((Some(scale), distance))
      }
@@ -1570,7 +1682,7 @@ index 0fe0dd4..2ab1ca3 100644
  }
  
  /// The shadows' light this frame: the direction it travels (Bevy space, downward), how much of the
-@@ -327,6 +364,10 @@ pub struct ShadowFrame {
+@@ -327,6 +367,10 @@ pub struct ShadowFrame {
      pub splits: [f32; 4],
      pub distance: f32,
      pub slices: [Cascade; 4],
@@ -1581,7 +1693,7 @@ index 0fe0dd4..2ab1ca3 100644
  }
  
  impl ShadowFrame {
-@@ -451,9 +492,29 @@ pub fn fit(
+@@ -451,9 +495,29 @@ pub fn fit(
          splits,
          distance,
          slices,
@@ -1611,7 +1723,7 @@ index 0fe0dd4..2ab1ca3 100644
  /// The shadow block's rows ([`SHADOW_ROWS`]); all zero, which every shader reads as none, for a
  /// frame with no shadows.
  pub fn pack_rows(f: &ShadowFrame) -> [[f32; 4]; SHADOW_ROWS] {
-@@ -537,7 +598,7 @@ impl ShadowInputs<'_, '_> {
+@@ -537,7 +601,7 @@ impl ShadowInputs<'_, '_> {
          if light.strength <= 0.0 {
              return ShadowFrame::default();
          }
@@ -1620,7 +1732,7 @@ index 0fe0dd4..2ab1ca3 100644
              cam.translation(),
              cam.forward().as_vec3(),
              p.fov,
-@@ -546,7 +607,14 @@ impl ShadowInputs<'_, '_> {
+@@ -546,7 +610,14 @@ impl ShadowInputs<'_, '_> {
              cascades,
              res,
              self.shadows.distance(),
@@ -1636,7 +1748,7 @@ index 0fe0dd4..2ab1ca3 100644
      }
  }
  
-@@ -726,6 +794,48 @@ mod tests {
+@@ -726,6 +797,48 @@ mod tests {
          assert_eq!(LookShadows { level: 0, ..low }.layout(), None);
      }
  
