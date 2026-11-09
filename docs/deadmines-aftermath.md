@@ -62,7 +62,9 @@ drop an arriving observer into the water.
 Movement during inspection belongs to the preview alone. Combat, inventory, progression and
 other gameplay inputs are blocked, and the world does not write its save. Turning the preview
 off removes its objects and ship marker, redraws the intact world and returns each hero to their
-original position. Disconnecting keeps the original hero position, too. The last inspector's
+original position. Ordinary movement resumes after the client acknowledges that return, so
+inspection packets already in flight cannot overwrite it. Disconnecting keeps the original
+hero position, too. The last inspector's
 departure restores the normal realm after finishing without a save write. A server restart starts
 with the intact world; there is no saved aftermath flag and no edit to a player's saved file.
 

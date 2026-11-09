@@ -355,7 +355,11 @@ impl SurvivalGame {
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }
         let viewers: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
-        for c in viewers { self.send_aftermath_to(c); self.aftermath_arrival(c); }
+        for c in viewers {
+            if let Some(w) = self.world_mut(c) { w.aftermath_return = None; }
+            self.send_aftermath_to(c);
+            self.aftermath_arrival(c);
+        }
         self.aftermath_command(conn, "status", "")
     }
 
@@ -405,14 +409,28 @@ impl SurvivalGame {
     }
 
     fn aftermath_teleport(&mut self, conn: ConnId, pos: [f32; 3], facing: f32) {
+        let returning = self.aftermath.is_none();
         let Some(w) = self.world_mut(conn) else { return };
         w.counter = w.counter.wrapping_add(1);
+        w.aftermath_return = returning.then_some(w.counter);
         w.fall_top = None;
         w.ground_z = pos[2];
         let (guid, counter) = (w.guid, w.counter);
         if let Some(a) = self.aftermath.as_mut() { a.positions.insert(conn, (pos, facing)); }
         self.send(conn, packets::teleport(guid, counter, pos, facing));
         self.broadcast_except(conn, &packets::heartbeat(guid, pos, facing));
+    }
+
+    pub(crate) fn aftermath_return_ack(&mut self, conn: ConnId, r: &mut Reader) -> std::io::Result<()> {
+        if self.world_of(conn).and_then(|w| w.aftermath_return).is_none() { return Ok(()); }
+        // The native client's reply is unpacked GUID, counter, client time (16 bytes).
+        let guid = r.u64()?;
+        let counter = r.u32()?;
+        let _time = r.u32()?;
+        if let Some(w) = self.world_mut(conn) {
+            if w.guid == guid && w.aftermath_return == Some(counter) { w.aftermath_return = None; }
+        }
+        Ok(())
     }
 
     pub(crate) fn aftermath_movement(&mut self, conn: ConnId, pos: [f32; 3], facing: f32) -> bool {

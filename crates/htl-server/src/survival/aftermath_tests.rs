@@ -119,7 +119,45 @@ fn on_off_and_inspection_movement_preserve_the_real_world_and_hero() {
     assert!(creates(&sent).iter().any(|(_, kind, _)| *kind == ObjectType::Unit), "intact mobs return");
     game.sim.debug = true;
     game.aftermath_start(1).unwrap();
+    assert_eq!(game.world_of(1).unwrap().aftermath_return, None, "a fresh preview supersedes an unacknowledged return");
     assert_eq!(game.aftermath.as_ref().unwrap().props, manifest, "on-off-on repeats exact composition");
+}
+
+#[test]
+fn aftermath_return_ignores_queued_movement_until_its_own_teleport_is_acknowledged() {
+    let mut game = game();
+    let (hero, _) = observer(&mut game, 1);
+    let (_, peer) = observer(&mut game, 2);
+    let before = game.sim.save(&game.offline);
+    let original = game.sim.players[&hero].pos;
+    game.aftermath_start(1).unwrap();
+    game.aftermath_command(1, "visit", "mouth").unwrap();
+    let old_counter = game.world_of(1).unwrap().counter;
+    game.aftermath_stop();
+    peer.try_iter().for_each(drop);
+    let w = game.world_of(1).unwrap();
+    let (guid, counter) = (w.guid, w.counter);
+    let ack = |guid, counter| benilla_protocol::messages::teleport_ack(guid, counter, 0);
+    game.packet(1, op::MSG_MOVE_TELEPORT_ACK.into(), &ack(guid, old_counter)).unwrap();
+    game.packet(1, op::MSG_MOVE_TELEPORT_ACK.into(), &ack(guid+1, counter)).unwrap();
+    assert_eq!(game.world_of(1).unwrap().aftermath_return, Some(counter), "stale or foreign ACK cannot end the handoff");
+    let mut queued = Body::new();
+    queued.u32(1).u32(0).vec3([-40.0,-385.0,55.8]).f32(0.6).u32(0);
+    game.movement(1, op::MSG_MOVE_FALL_LAND, &queued.into_vec()).unwrap();
+    assert_eq!(game.sim.save(&game.offline), before, "queued preview movement never reaches the restored hero");
+    assert!(peer.try_recv().is_err(), "queued movement is not relayed to peers");
+    game.packet(1, op::MSG_MOVE_TELEPORT_ACK.into(), &ack(guid, counter)).unwrap();
+    assert_eq!(game.world_of(1).unwrap().aftermath_return, None);
+    assert!(game.world_of(2).unwrap().aftermath_return.is_some(), "each inspector acknowledges their own return");
+    let moved = [original[0]+0.5, original[1], original[2]];
+    let mut movement = Body::new();
+    movement.u32(1).u32(0).vec3(moved).f32(0.4).u32(0);
+    game.movement(1, op::MSG_MOVE_HEARTBEAT, &movement.into_vec()).unwrap();
+    assert_eq!(game.sim.players[&hero].pos, moved, "ordinary movement resumes after the acknowledged return");
+    assert!(peer.try_recv().is_ok());
+    game.leave_world(2);
+    observer(&mut game, 2);
+    assert_eq!(game.world_of(2).unwrap().aftermath_return, None, "disconnect discards the old handoff");
 }
 
 #[test]

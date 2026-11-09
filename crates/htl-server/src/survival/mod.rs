@@ -176,6 +176,8 @@ pub(crate) struct InWorld {
     /// Come from the other world, the client is loading this one: it isn't drawn in until it
     /// says it's here.
     pub porting: bool,
+    /// Ignore inspection movement already in flight until the original position is acknowledged.
+    pub aftermath_return: Option<u32>,
 }
 
 impl InWorld {
@@ -200,6 +202,7 @@ impl InWorld {
             fall_top: None,
             ground_z: z,
             porting: false,
+            aftermath_return: None,
         }
     }
 }
@@ -645,6 +648,7 @@ impl SurvivalGame {
                 self.item_query(conn, entry);
             }
             op::MSG_MOVE_WORLDPORT_ACK => self.worldport_ack(conn),
+            op::MSG_MOVE_TELEPORT_ACK => self.aftermath_return_ack(conn, &mut r)?,
             op::CMSG_SET_ACTIVE_MOVER => {
                 if self.world_of(conn).is_some() {
                     self.send(conn, packets::tutorial_flags_all_seen());
@@ -995,7 +999,7 @@ impl SurvivalGame {
     }
 
     fn movement(&mut self, conn: ConnId, opcode: u16, body: &[u8]) -> std::io::Result<()> {
-        let Some(w) = self.world_of(conn).filter(|w| !w.porting) else { return Ok(()) };
+        let Some(w) = self.world_of(conn).filter(|w| !w.porting && w.aftermath_return.is_none()) else { return Ok(()) };
         let (guid, id) = (w.guid, w.id);
         let mut r = Reader::new(body);
         let flags = r.u32()?;
