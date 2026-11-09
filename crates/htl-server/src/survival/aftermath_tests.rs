@@ -24,7 +24,7 @@ fn observer(game: &mut SurvivalGame, conn: ConnId) -> (Id, crossbeam_channel::Re
     game.bind(id, guid);
     let (tx, rx) = crossbeam_channel::unbounded();
     game.sessions.insert(conn, Session { account: account.clone(), hero: account.clone(), out: tx,
-        world: Some(InWorld::new(guid, id, account, pos[2])) });
+        world: Some(InWorld::new(guid, id, account, pos[2])), watching: None });
     (id, rx)
 }
 
