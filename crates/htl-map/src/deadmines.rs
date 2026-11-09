@@ -15,6 +15,8 @@ use benilla_formats::{
 use crate::layers::{Layers, Sources};
 use crate::world::{placement_matrix, transform};
 
+mod aftermath;
+
 /// `v` turned by the quaternion `q` (x, y, z, w).
 fn quat_rotate(q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
     let (x, y, z, w) = (q[0], q[1], q[2], q[3]);
@@ -122,6 +124,16 @@ pub fn load_instance(data_dir: &Path, map_dir: &str) -> Result<LoadedDeadmines> 
 
 /// [`load_instance`] at another cell size, over part of the map only.
 pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32; 2], [f32; 2])>) -> Result<LoadedDeadmines> {
+    load_variant(data_dir, map_dir, cell, window, false)
+}
+
+/// The finished Deadmines: the Juggernaut, its cargo and its added gangway are absent.
+/// The client applies the same group mask in its aftermath WMO asset (patch 0087).
+pub fn load_aftermath(data_dir: &Path) -> Result<LoadedDeadmines> {
+    load_variant(data_dir, MAP_DIR, CELL, None, true)
+}
+
+fn load_variant(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32; 2], [f32; 2])>, aftermath: bool) -> Result<LoadedDeadmines> {
     let mut chain = Chain::open(data_dir)
         .with_context(|| format!("opening the game data in {}", data_dir.display()))?;
     let tiles = tiles_of(&mut chain, map_dir)?;
@@ -141,8 +153,12 @@ pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Opt
             if !seen.insert(w.unique_id) {
                 continue;
             }
-            let Ok(mesh) = load_wmo_collision_tris(&mut chain, &w.model) else {
-                continue;
+            let ship_removed = aftermath && aftermath::is_ship_root(&w.model);
+            let mesh = if ship_removed {
+                aftermath::collision(&mut chain, &w.model)?
+            } else {
+                let Ok(mesh) = load_wmo_collision_tris(&mut chain, &w.model) else { continue };
+                mesh
             };
             let m = placement_matrix(w.rotation);
             let world: Vec<[f32; 3]> = mesh
@@ -165,6 +181,9 @@ pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Opt
                     pick.sort_unstable();
                     pick.dedup();
                     for k in pick {
+                        if ship_removed && k < aftermath::SHIP_DOODADS {
+                            continue;
+                        }
                         let Some(d) = root.doodads().get(k) else { continue };
                         if d.model.is_empty() {
                             continue;
@@ -225,6 +244,9 @@ pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Opt
                 .unwrap_or(&root_path)
                 .to_string();
             for gi in 0..groups {
+                if ship_removed && aftermath::SHIP_GROUPS.contains(&gi) {
+                    continue;
+                }
                 let Ok(gb) = chain.read_file(&format!("{stem}_{gi:03}.wmo")) else {
                     continue;
                 };
@@ -253,7 +275,9 @@ pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Opt
         let mut placed = std::collections::HashSet::new();
         for t in &tiles {
             for d in &t.doodads {
-                if d.model.is_empty() || !placed.insert(d.unique_id) {
+                if d.model.is_empty() || !placed.insert(d.unique_id)
+                    || (aftermath && aftermath::SHIP_ADT_DOODADS.contains(&d.unique_id))
+                {
                     continue;
                 }
                 let hull = match hulls.get(&d.model) {
@@ -279,7 +303,7 @@ pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Opt
         }
     }
     // Our own pieces, where the data leaves a gap (`DEADMINES_BRIDGES`).
-    if map_dir == MAP_DIR {
+    if map_dir == MAP_DIR && !aftermath {
         solid.extend(DEADMINES_BRIDGES);
     }
     let (min, max) = window.unwrap_or(([lo[0] - MARGIN, lo[1] - MARGIN], [hi[0] + MARGIN, hi[1] + MARGIN]));
