@@ -26,8 +26,13 @@ pub(super) const SOUND_CREAK: [u32; 2] = [3078, 1650];
 const DUST_EVERY: f32 = 7.0;
 /// A beam creaks this often, give or take a half.
 const CREAK_EVERY: f32 = 16.0;
-/// No more than this many dust spots (each an unseen creature while the preview lasts).
-const MAX_DUST: usize = 90;
+/// No more than this many dust spots (each an unseen creature while the preview lasts): two at
+/// every pile. (The first take's 90 at three a pile left the cove and the landing without any.)
+const MAX_DUST: usize = 200;
+const PER_PILE: usize = 2;
+/// The cloud is cast this far over the floor: on it, never just under a floor the client draws a
+/// little higher than the server's map has it.
+const OVER_FLOOR: f32 = 0.3;
 /// The dust's stand-ins' own ids, clear of the rules' (which number up from 1).
 const FIRST_STAND_IN: u32 = 0x00E0_0000;
 /// The first puffs wait this long, for the stand-ins to be placed.
@@ -49,6 +54,8 @@ pub(crate) struct Air {
     /// (prop index, next creak), on beams.
     creaks: Vec<(usize, f32)>,
     count: u32,
+    /// Dust clouds cast so far (`.es aftermath status`).
+    pub(super) puffs: u32,
 }
 
 /// A fixed spread in [0, 1): the same every preview, different for each source and turn.
@@ -61,7 +68,7 @@ fn spread(a: usize, b: u32) -> f32 {
 }
 
 impl Air {
-    /// The sources of a composed ruin: up to three spots a pile, on its gravel (or its smallest
+    /// The sources of a composed ruin: up to two spots a pile, on its gravel (or its smallest
     /// stones) a couple of yards apart, on the dry floor there; and every pile's beams (the wrecked
     /// ship's mast too). The views' foreground raises none.
     pub(super) fn new(props: &[Prop], g: &Ground, started: Instant) -> Self {
@@ -73,18 +80,18 @@ impl Air {
             if !gravel || dust.len() >= MAX_DUST { continue; }
             let spots = per_site.entry(p.site).or_default();
             let apart = spots.iter().all(|s| (s[0] - p.pos[0]).hypot(s[1] - p.pos[1]) > 2.0);
-            if spots.len() >= 3 || !apart { continue; }
+            if spots.len() >= PER_PILE || !apart { continue; }
             let floor = floor_under(&*g.land, [p.pos[0], p.pos[1], p.pos[2] + 0.6]);
             let z = if floor.is_finite() && (floor - p.pos[2]).abs() < 2.0 { floor } else { p.pos[2] };
             if g.land.water_near(p.pos[0], p.pos[1], z + 0.5) { continue; }
-            let at = [p.pos[0], p.pos[1], z + 0.1];
+            let at = [p.pos[0], p.pos[1], z + OVER_FLOOR];
             spots.push(at);
             let guid = SurvivalGame::stand_in_guid(FIRST_STAND_IN + dust.len() as u32);
             dust.push(Spot { prop: i, at, guid, next: SETTLE + DUST_EVERY * spread(i, 0) });
         }
         let creaks = props.iter().enumerate().filter(|(_, p)| p.model == BEAM && p.site != "Rubble apron")
             .map(|(i, _)| (i, SETTLE + CREAK_EVERY * spread(i, 1))).collect();
-        Self { started, dust, creaks, count: 0 }
+        Self { started, dust, creaks, count: 0, puffs: 0 }
     }
 
     /// The unseen stand-ins, for an inspector arriving.
@@ -98,6 +105,7 @@ impl Air {
         for s in self.dust.iter_mut() {
             if s.next > now { continue; }
             self.count += 1;
+            self.puffs += 1;
             out.push(packets::spell_go(s.guid, SPELL_DUST, Aim::Point(s.at), &[], None));
             // About a third of the puffs come with the sound of grit landing.
             if spread(s.prop, self.count) < 0.35 {

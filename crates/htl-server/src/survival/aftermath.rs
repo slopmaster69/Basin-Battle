@@ -35,6 +35,8 @@ const FIRST_ENTRY: u32 = MARKER_ENTRY + 1;
 const INERT: u32 = 0x30;
 const GENERIC: u32 = 5;
 const BATCH: usize = 16;
+/// A cameraman is brought to the hero it films once this far off (yd), as in play.
+const WATCH_NEAR: f32 = 25.0;
 
 pub(crate) struct Aftermath {
     props: Vec<Prop>,
@@ -123,6 +125,9 @@ pub(super) const CARGO: usize = 10;
 pub(super) const MACHINE: usize = 11;
 pub(super) const CANNON: usize = 12;
 pub(super) const BOAT: usize = 13;
+/// Not placed (its pale cloth glowed green by a lantern on film); kept so the models' entries
+/// stay where clients cached them.
+#[allow(dead_code)]
 pub(super) const SACK: usize = 14;
 /// The Deadmines' own anchor.
 pub(super) const ANCHOR: usize = 15;
@@ -398,17 +403,28 @@ pub(super) fn floor_under(land: &dyn Land, v: V3) -> f32 {
 pub(super) fn covers_view(p: &Prop) -> bool {
     let views = layout::REGIONS.iter().map(|r| (r.view, r.facing))
         .chain(layout::CAMERAS.iter().map(|(at, deg)| (*at, deg.to_radians())));
-    // The footing, and the first yards it looks across.
+    // The footing, and the first yards it looks across; for timber further on at eye height (boards
+    // and a post filled the workshop's picture, a pole stood at the lens at Johnson's; the piles a
+    // camera is there to see stand 7 yd off and more, filling a passage); and the hero's own
+    // camera, up behind them.
+    let timber = matches!(p.model, BEAM | BOARD | LUMBER);
     views.into_iter().any(|(at, f)| {
         let ahead = |d: f32| [at[0] + d * f.cos(), at[1] + d * f.sin(), at[2]];
         covers(p, at, 1.2) || covers(p, ahead(2.0), 1.0) || covers(p, ahead(3.8), 0.7)
+            || timber && [5.2, 6.8, 8.5].iter().any(|d| covers_at(p, ahead(*d), 1.5, &[1.75, 2.6, 3.4]))
+            || covers_at(p, ahead(-2.5), 1.2, &[1.75, 2.6, 3.4]) || covers_at(p, ahead(-4.5), 1.2, &[2.6, 3.4])
     })
 }
 
 /// Whether a prop's box comes within `radius` of a body standing at `at` (feet to head).
 pub(super) fn covers(p: &Prop, at: V3, radius: f32) -> bool {
+    covers_at(p, at, radius, &[0.15, 0.95, 1.75])
+}
+
+/// Whether a prop's box comes within `radius` of any of `heights` over `at`.
+fn covers_at(p: &Prop, at: V3, radius: f32, heights: &[f32]) -> bool {
     let m = &MODELS[p.model];
-    [0.15, 0.95, 1.75].iter().any(|height| {
+    heights.iter().any(|height| {
         let local = p.local([at[0], at[1], at[2] + height]);
         let d2 = (0..3).map(|a| (local[a]-local[a].clamp(m.min[a], m.max[a])).powi(2)).sum::<f32>();
         d2 < (radius/p.scale).powi(2)
@@ -470,7 +486,7 @@ impl SurvivalGame {
             }
             "" | "status" => {
                 let text = self.aftermath.as_ref().map_or_else(|| "Aftermath preview is off.".into(), |a|
-                    format!("Aftermath preview is on. {} solid objects across {} regions. {} sites lack a matching floor. Use .es aftermath off to restore the dungeon.", a.props.len(), layout::REGIONS.len(), a.missing.len()));
+                    format!("Aftermath preview is on. {} solid objects across {} regions. {} sites lack a matching floor. {} dust spots, {} clouds raised so far. Use .es aftermath off to restore the dungeon.", a.props.len(), layout::REGIONS.len(), a.missing.len(), a.air.dust.len(), a.air.puffs));
                 self.say_to(conn, &text);
                 Ok(())
             }
@@ -482,7 +498,9 @@ impl SurvivalGame {
         if !self.sim.debug { return Err("Turn debug on first with .es debug quiet.".into()); }
         if self.realm != Realm::BELOW { return Err("Enter the Deadmines before starting its aftermath preview.".into()); }
         if self.aftermath.is_some() { return self.aftermath_command(conn, "status", ""); }
-        if self.lab.is_some() || !self.mark_at.is_empty() || !self.casting.is_empty() || !self.area_looks.is_empty() || !self.stand_ins.is_empty() {
+        // (What an ended fight left drawn doesn't count: a dead crossbowman's draw, a missile's
+        // stand-in. Only a lab scene, or danger still marked on the ground, holds it.)
+        if self.lab.is_some() || self.clear_fight_leftovers() > 0 {
             return Err("Finish the current fight or lab scene before starting the aftermath preview.".into());
         }
         if self.aftermath_land.is_none() {
@@ -499,6 +517,7 @@ impl SurvivalGame {
         }
         println!("[aftermath] {} solids in {:?}; {} sites unavailable: {}", props.len(), started.elapsed(), missing.len(), missing.join(", "));
         let air = air::Air::new(&props, self.aftermath_land.as_deref().unwrap(), Instant::now());
+        println!("[aftermath] {} dust spots (unseen stand-ins casting {}), {} creaking beams", air.dust.len(), air::SPELL_DUST, props.iter().filter(|p| p.model == BEAM).count());
         self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing, air });
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }
@@ -530,6 +549,34 @@ impl SurvivalGame {
             self.send(conn, packets::update_object(&creates, &[]));
         }
         for p in scene.air.stand_ins() { self.send(conn, p); }
+    }
+
+    /// The cameraman goes where the hero it films is inspecting. The rules stand still in the
+    /// preview (the hero's place in them never changes, and `keep_watchers_near` doesn't run), so
+    /// without this its client stayed at the landing: its world loaded there, it filmed the cove's
+    /// water and the void past the loaded ground wherever the hero went.
+    pub(crate) fn aftermath_keep_watchers_near(&mut self) {
+        let Some(a) = self.aftermath.as_ref() else { return };
+        let far: Vec<(ConnId, [f32; 3], f32)> = self.sessions.iter().filter_map(|(c, s)| {
+            let name = s.watching.as_deref()?;
+            if s.world.as_ref()?.porting { return None; }
+            let hero = self.in_world()
+                .find(|(_, hs, hw)| hs.watching.is_none() && !hw.porting && hw.name.eq_ignore_ascii_case(name))
+                .map(|(hc, _, _)| *hc)?;
+            let (at, facing) = *a.positions.get(&hero)?;
+            let far = a.positions.get(c).is_none_or(|(p, _)| (0..3).map(|i| (p[i] - at[i]).powi(2)).sum::<f32>().sqrt() > WATCH_NEAR);
+            far.then_some((*c, at, facing))
+        }).collect();
+        for (conn, at, facing) in far {
+            if let Some(a) = self.aftermath.as_mut() { a.positions.insert(conn, (at, facing)); }
+            let Some(w) = self.world_mut(conn) else { continue };
+            w.counter = w.counter.wrapping_add(1);
+            w.ground_z = at[2];
+            w.fall_top = None;
+            let (guid, counter) = (w.guid, w.counter);
+            // (Only to the watcher: no one else is told of it.)
+            self.send(conn, packets::teleport(guid, counter, at, facing));
+        }
     }
 
     pub(crate) fn aftermath_arrival(&mut self, conn: ConnId) {
