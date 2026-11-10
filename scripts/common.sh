@@ -44,11 +44,17 @@ patches_stamp() {
 }
 
 # The pinned client with this folder's patches on top, from a clean checkout of its sources
-# (anything an earlier patch changed or added in them is put back first).
+# (anything an earlier patch changed or added in them is put back first). That's every tracked
+# file, not only crates/: patches edit docs/ too, and a change left there from the last build
+# made the next one's patch fail to apply. What the player keeps (benilla-config/, target/) is
+# ignored by the client's git, so neither step touches it.
 apply_benilla_patches() {
-    local dir="$ROOT/benilla"
-    git -C "$dir" checkout -q -- crates
-    git -C "$dir" clean -q -f -- crates
+    local dir="$ROOT/benilla" tops
+    git -C "$dir" checkout -q -- .
+    # Files an earlier patch added, in the folders the patches reach.
+    tops="$(cat "$BENILLA_PATCHES"/*.patch 2>/dev/null | sed -n 's|^+++ b/\([^/]*\)/.*|\1|p' | sort -u)"
+    # shellcheck disable=SC2086 # one word a folder
+    [ -z "$tops" ] || git -C "$dir" clean -q -f -- $tops
     git -C "$dir" checkout -q "$BENILLA_REV"
     local p
     for p in "$BENILLA_PATCHES"/*.patch; do
