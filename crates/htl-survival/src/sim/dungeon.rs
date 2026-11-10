@@ -120,6 +120,8 @@ fn crosses(a: Vec3, b: Vec3, c: [f32; 2], d: [f32; 2]) -> bool {
 /// A rail holds back what moves within this height of the floor at it (a body thrown up over it
 /// too), and nothing on another floor above or below.
 const RAIL_REACH: f32 = 6.0;
+/// A hero held at a rail stands this far short of its line (the fence's half width and a body's).
+const RAIL_STOP: f32 = 0.4;
 /// A hazard's flames burn this long where it went off.
 const HAZARD_FLAME_SECS: f32 = 1.4;
 /// The veil's columns stand this far apart along what it bars.
@@ -888,16 +890,44 @@ impl Survival {
         }
     }
 
-    /// A walk from a to b goes through a shut door.
-    /// Whether the way from `a` to `b` crosses a rail (a ship's side): on its floor, never.
+    /// Whether the way from `a` to `b` goes over a rail (a ship's side) off its deck.
     pub(crate) fn through_rail(&self, a: Vec3, b: Vec3) -> bool {
-        let Some(d) = self.dungeon_def().filter(|_| self.is_below()) else { return false };
-        d.rails.iter().any(|r| r.points.windows(2).any(|w| crosses(a, b, [w[0][0], w[0][1]], [w[1][0], w[1][1]]) && {
-            let z = self.ground_near((w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0, (w[0][2] + w[1][2]) / 2.0)[2];
-            (a[2] - z).abs() < RAIL_REACH || (b[2] - z).abs() < RAIL_REACH
-        }))
+        self.rail_crossing(a, b).is_some()
     }
 
+    /// Where a way from `a` to `b` would leave the deck over a rail: the spot on it `RAIL_STOP`
+    /// short of the rail's line (no nearer `a` than `a` itself), at `a`'s height. A rail's points
+    /// run with its deck on their left; coming back aboard over it is free, and so is anything on
+    /// another floor.
+    pub(crate) fn rail_crossing(&self, a: Vec3, b: Vec3) -> Option<Vec3> {
+        let d = self.dungeon_def().filter(|_| self.is_below())?;
+        let cross = |u: [f32; 2], v: [f32; 2]| u[0] * v[1] - u[1] * v[0];
+        for r in &d.rails {
+            for w in r.points.windows(2) {
+                let (c, e) = ([w[0][0], w[0][1]], [w[1][0], w[1][1]]);
+                if !crosses(a, b, c, e) {
+                    continue;
+                }
+                let line = [e[0] - c[0], e[1] - c[1]];
+                // (On the deck's side: to the left of the line as it runs.)
+                if cross(line, [a[0] - c[0], a[1] - c[1]]) <= 0.0 {
+                    continue;
+                }
+                let z = self.ground_near((c[0] + e[0]) / 2.0, (c[1] + e[1]) / 2.0, (w[0][2] + w[1][2]) / 2.0)[2];
+                if (a[2] - z).abs() >= RAIL_REACH && (b[2] - z).abs() >= RAIL_REACH {
+                    continue;
+                }
+                let way = [b[0] - a[0], b[1] - a[1]];
+                let len = (way[0] * way[0] + way[1] * way[1]).sqrt().max(1e-4);
+                let t = cross([c[0] - a[0], c[1] - a[1]], line) / cross(way, line);
+                let k = ((t * len - RAIL_STOP) / len).clamp(0.0, 1.0);
+                return Some([a[0] + way[0] * k, a[1] + way[1] * k, a[2]]);
+            }
+        }
+        None
+    }
+
+    /// A walk from a to b goes through a shut door.
     pub(crate) fn through_shut_door(&self, a: Vec3, b: Vec3) -> bool {
         let (Some(below), Some(d)) = (self.below.as_ref(), self.dungeon_def()) else {
             return false;
@@ -1696,17 +1726,21 @@ impl Survival {
 
     /// A shut door in a hero's way: back to where they were.
     pub(crate) fn hold_at_doors(&mut self, id: Id, from: Vec3, to: Vec3) -> bool {
-        // (A rail along a ship's side holds them on the deck the same way: a walk, a roll, a jump
-        // over it as their own client moved them.)
-        if dist2d(from, to) > 12.0 || !(self.through_shut_door(from, to) || self.through_rail(from, to)) {
+        if dist2d(from, to) > 12.0 {
             return false;
         }
+        // A rail along a ship's side holds them on the deck: a walk, a roll, a jump over it as
+        // their own client moved them, stopped where they reached it (a step short of its line),
+        // at once, as a stop and not a jump back.
+        let Some(back) = (if self.through_shut_door(from, to) { Some(from) } else { self.rail_crossing(from, to) }) else {
+            return false;
+        };
         if let Some(p) = self.players.get_mut(&id) {
-            p.pos = from;
+            p.pos = back;
             let f = p.facing;
             self.events.push(Event::Teleport {
                 player: id,
-                pos: from,
+                pos: back,
                 facing: f,
             });
         }

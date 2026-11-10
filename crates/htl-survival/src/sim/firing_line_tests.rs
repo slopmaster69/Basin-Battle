@@ -922,8 +922,11 @@ fn a_walk_a_roll_or_a_jump_over_the_rail_is_put_back_on_the_deck() {
         let (mut s, h) = deck(from);
         s.events.clear();
         s.move_player(h, to, 0.0, Moving::default());
-        assert_eq!(s.players[&h].pos, from, "{from:?} -> {to:?}: back on the deck");
-        assert!(s.events.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == h)));
+        // Stopped where they reached it, a step short of its line on the deck, not sent back.
+        let (at, line) = (s.players[&h].pos, rail_y(&s, from[0]));
+        assert!(at[1] > line && at[1] - line <= 0.45, "{from:?} -> {to:?}: stopped at the rail, on the deck: {at:?}");
+        assert_eq!((at[0], at[2]), (from[0], from[2]));
+        assert!(s.events.iter().any(|e| matches!(e, Event::Teleport { player, pos, .. } if *player == h && *pos == at)));
     }
     // Along the deck, and up to it, nothing holds them.
     let (mut s, h) = deck([-62.0, -838.5, 0.0]);
@@ -987,4 +990,31 @@ fn a_pull_toward_the_edge_ends_on_the_deck() {
     s.strike_fair_as(boss, h, 1, s.mobs[&boss].pos, true, false, false, Blow::Light, None, combat::Follow::Pull { yards: 9.0 }, HitKind::Projectile);
     let yards = hop_yards(&s.events, h).expect("hauled");
     assert!(-826.0 - yards >= rail_y(&s, -62.0), "{yards:.2} yd");
+}
+
+#[test]
+fn the_server_never_carries_a_running_hero_over_the_rail_between_reports() {
+    // Take 370: carried over it between his client's reports, his next report (behind where he
+    // was carried) read as a crossing back, and he was held outside it.
+    let at = [-62.0, -837.0, 0.0];
+    let (mut s, h) = deck(at);
+    s.move_player(h, at, -std::f32::consts::FRAC_PI_2, Moving { forward: true, ..Moving::default() });
+    for _ in 0..30 {
+        s.step(DT);
+        assert!(s.players[&h].pos[1] > rail_y(&s, at[0]), "carried no farther than the rail: {:?}", s.players[&h].pos);
+    }
+    assert!(s.players[&h].last_safe[1] > rail_y(&s, at[0]), "its firm ground stays on the deck");
+    // Then his report from where his client got to, past it: stopped at the rail.
+    s.move_player(h, [-62.0, -842.0, 0.0], -std::f32::consts::FRAC_PI_2, Moving { forward: true, ..Moving::default() });
+    let y = s.players[&h].pos[1];
+    assert!(y > rail_y(&s, at[0]) && y - rail_y(&s, at[0]) <= 0.45, "{y}");
+}
+
+#[test]
+fn coming_back_aboard_over_the_rail_is_never_held() {
+    let (mut s, h) = deck([-62.0, -842.0, 0.0]);
+    s.events.clear();
+    s.move_player(h, [-62.0, -838.0, 0.0], 0.0, Moving::default());
+    assert_eq!(s.players[&h].pos, [-62.0, -838.0, 0.0]);
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Teleport { .. })));
 }

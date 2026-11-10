@@ -1890,7 +1890,10 @@ impl Survival {
             let dir = p.facing + rel;
             let step = speed * dt;
             let (x, y) = (p.pos[0] + dir.cos() * step, p.pos[1] + dir.sin() * step);
-            if self.land.blocked_near(x, y, p.pos[2]) {
+            // (Never over a rail or through a shut door: carried there, the next report would
+            // seem to come from the far side. Take 370: a walk through the Juggernaut's rail.)
+            let (from, to) = (p.pos, [x, y, p.pos[2]]);
+            if self.land.blocked_near(x, y, p.pos[2]) || (self.is_below() && (self.through_rail(from, to) || self.through_shut_door(from, to))) {
                 continue;
             }
             let p = self.players.get_mut(&id).unwrap();

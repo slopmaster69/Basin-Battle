@@ -117,14 +117,27 @@ from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the 
   heights under its two ends with its posts sunk in as modelled, so it follows the deck's curve
   and its rise toward the bow (38.9 to 43.1). The data has no ship's rail to place: its only
   railing (6157, CarnivalRailing) is 14 yd long and can't follow the curve.
-- **On the client:** each piece is an ordinary solid object, so the clients keep its hull and a
-  walk or a roll stops against it (as against Gilnid's planks).
-- **On the server:** nothing crosses its line (`through_rail`). A hero whose move would cross it
-  (a walk, the client's own roll, a jump over it, a step off falling) is put back where they were
-  that moment, as a shut fog door does (`hold_at_doors`): what a player sees is their body stopped
-  at the rail, or set back on the deck a step short of it if their client carried them past. A
+- **On the server:** nothing leaves the deck over its line (`rail_crossing`). The deck lies to the
+  left of the line as its points run; coming back aboard over it is free. A hero whose move would
+  take them over it (a walk, the client's own roll, a jump, a step off falling) is stopped where
+  they reached it, 0.4 yd short of the line on the deck, at the first report that crosses it
+  (`hold_at_doors`). What a player sees is their body set back to the rail, a step at most. A
   knockback, a pull (his harpoon) and the server's own hop back stop at it as at a wall
-  (`slide_end`), for heroes and creatures alike.
+  (`slide_end`), for heroes and creatures alike. The server's own carrying-on of a running hero
+  between their client's reports never takes them over it either (`reckon_players`).
+- **Take 370 (the rail filmed):** it looked right (on the deck, along the curve, no gaps), but a hero
+  walked straight through it, and the server set him down 3 yd past it, off the deck, seconds
+  later. The server had carried him on between his reports, over the rail; his next report, short
+  of where it had carried him, read as a crossing back aboard, and the rail then held him outside.
+  Both are fixed above, and the hop back's "You fell through the world" came from the same carrying
+  (it had moved his last firm ground past the rail). `rail_tests.rs` replays the walk through the
+  server's own movement packets.
+- **On the client: not solid yet.** Each piece's model has a collision hull (28 triangles, a closed
+  box over the whole piece, faces both ways; read from the data), the server sends it as a plain
+  solid object (type 5, state 1, flags 0x30: no "no hull" bit, as the aftermath's ruins), and the
+  client builds a static collider from such a hull. Yet in take 370 the hero walked through it.
+  The cause is in the client and wasn't found from its source: it needs a look with the client
+  running (the laptop can't run it). Until then the server's stop above is what holds the deck.
 - **The aftermath:** the preview hides every world object along with the ship's own groups and
   colliders (patch 0087), and the wrecked Juggernaut has no deck there, so the rail goes with the
   ship. Turning the preview off brings both back.
@@ -147,9 +160,12 @@ the harpoon waiting for 2 sec at 8 yd, its held pose, spear, throw, haul and cle
 sidestep or guard sparing the haul, party retarget, Vanish, the wipe putting the crew back at
 its posts, death clearing every shot, the floor checks, ranged input on a gunner, knockback, and
 the captain-first reward. The starboard rail: its pieces meet along the whole line and keep their
-hulls; a walk, a roll's dash, a jump and a falling step over it are put back on the deck; the
+hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
+server never carries a running hero over it, nor their firm ground; coming back aboard is free; the
 server's hop back, a knockback (a hero and a gunner) and a pull (even from beyond it) end on the
-deck; past its ends nothing changes. `a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain`
+deck; past its ends nothing changes. `crates/htl-server/src/survival/rail_tests.rs` runs a hero
+through it by movement packets, and `crates/htl-server/tests/rail_native.rs` (with WOW_DATA) on
+the real deck. `a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain`
 plays a warrior with the starting sword and their own health, reading only what the client is
 sent (the crew at its posts, a gun at the shoulder or the harpoon held back, his windups): they
 run to each gunner and cut him down, stepping out of each line as it fires and raising the guard
