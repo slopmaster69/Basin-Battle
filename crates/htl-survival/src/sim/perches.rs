@@ -82,8 +82,18 @@ const STRIPE_RADIUS: f32 = 1.5;
 const STRIPE_GAP: f32 = 0.25;
 const STRIPE_MOST: usize = 10;
 const STRIPE_BURN: f32 = 1.2;
-/// The finish: his spanner stuck in the floor, hunched over it (StandWound).
-const STUCK_CLIP: u16 = 8;
+/// The finish: his last blow is a two-handed chop (Attack2H's second take) that drives the
+/// spanner into the floor, and he's held there, bent double with both hands on it: the clip
+/// caught `STUCK_AT` after its impact (his head at half his height, both hands by the floor) and
+/// held still for the open window (`freeze_open_pose`). StandWound, before, stood him nearly
+/// upright (Nov 9 filming).
+const STUCK_AT: f32 = 0.2;
+/// The fire's band: a fill laid over each two sections as the first of them catches, lasting
+/// this long, and both its edges drawn the whole way from the start (`perch_run`).
+const BAND_SECS: f32 = 4.0;
+const BAND_FILL: &str = "FFB23A";
+const BAND_EDGE: &str = "FFF2C8";
+const BAND_EDGE_WIDTH: f32 = 0.3;
 /// His lines never come closer together than this (the pull line included).
 const LINE_GAP: f32 = 2.0;
 const MOLTEN: u32 = 5213;
@@ -122,6 +132,8 @@ struct Crew {
     timed: Vec<(Id, f32)>,
     /// Flames that come where the fire arrives: (when, where, display, scale, until).
     later: Vec<(f32, Vec3, u32, f32, f32)>,
+    /// The fire's band laid as it arrives: (when, from, yaw, length, width).
+    bands: Vec<(f32, Vec3, f32, f32, f32)>,
     began: Option<f32>,
     next_throw: f32,
     /// Live dynamite: thrown and not yet blown.
@@ -322,7 +334,7 @@ impl Survival {
         let stand = self.perch_floor(home, [near[0] - home[0], near[1] - home[1]]).unwrap_or(home);
         let furnace = [home[0] + d.furnace[0], home[1] + d.furnace[1], home[2] + d.furnace[2]];
         self.perches.crews.insert(owner, Crew {
-            home, workers, props, visuals: Vec::new(), timed: Vec::new(), later: Vec::new(), began: None, next_throw: 0.0,
+            home, workers, props, visuals: Vec::new(), timed: Vec::new(), later: Vec::new(), bands: Vec::new(), began: None, next_throw: 0.0,
             sticks: Vec::new(), legs: Vec::new(), first_blown: false, demo: None, valve, stand, furnace,
             stage: Stage::Crew, lines: VecDeque::new(), said_at: None, stuck_until: 0.0,
         });
@@ -384,6 +396,16 @@ impl Survival {
             })
             .collect();
         for (owner, (_, at, display, scale, until)) in due { self.perch_visual(owner, at, display, scale, 0.0, Some(until)); }
+        let bands: Vec<(f32, Vec3, f32, f32, f32)> = self.perches.crews.values_mut()
+            .flat_map(|c| {
+                let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut c.bands).into_iter().partition(|b| b.0 <= now);
+                c.bands = keep;
+                due
+            })
+            .collect();
+        for (_, at, yaw, reach, width) in bands {
+            self.events.push(Event::GroundBurst { at, yaw, shape: "line", reach, arc: 0.0, width, secs: BAND_SECS, colour: BAND_FILL.into() });
+        }
         let new: Vec<_> = self.mobs.iter().filter(|(id, m)| {
             m.health > 0 && !m.hidden && !matches!(m.state, MobState::Return)
                 && self.content.mobs[m.def].perch_crew.is_some() && !self.perches.crews.contains_key(id)
@@ -722,11 +744,28 @@ impl Survival {
             }
         }
         let n = points.len();
+        // Drawn whatever the floor markers: a solid band its true width, laid two sections at a
+        // time as the first of them catches (so it advances across the floor), and both its edges
+        // from now to the end, so the dry ground either side reads. (One line from the middle drew
+        // only its far half, and faded before the fire got there: Nov 9 filming saw a row of dots.)
         if let (Some(first), Some(last)) = (points.first(), points.last()) {
-            let len = dist2d(*first, *last);
-            let mid = [(first[0] + last[0]) / 2.0, (first[1] + last[1]) / 2.0, first[2]];
-            self.events.push(Event::GroundBurst { at: mid, yaw, shape: "line", reach: len / 2.0 + radius,
-                arc: 0.0, width: radius * 2.0, secs: start - now + n as f32 * gap + burn, colour: "FF5A14".into() });
+            let step = if n > 1 { dist2d(points[0], points[1]) } else { radius };
+            let half = step / 2.0 + 0.05;
+            let begin = along(*first, yaw, -half);
+            let len = dist2d(*first, *last) + 2.0 * half;
+            let side = yaw + std::f32::consts::FRAC_PI_2;
+            let secs = start - now + n as f32 * gap + burn + 0.4;
+            for edge in [radius, -radius] {
+                self.events.push(Event::GroundBurst { at: along(begin, side, edge), yaw, shape: "line", reach: len, arc: 0.0,
+                    width: BAND_EDGE_WIDTH, secs, colour: BAND_EDGE.into() });
+            }
+            if let Some(c) = self.perches.crews.get_mut(&owner) {
+                for k in (0..n).step_by(2) {
+                    let to = points[(k + 1).min(n - 1)];
+                    let from = along(points[k], yaw, -half);
+                    c.bands.push((start + k as f32 * gap, from, yaw, dist2d(points[k], to) + 2.0 * half, radius * 2.0));
+                }
+            }
         }
         n
     }
@@ -828,7 +867,10 @@ impl Survival {
         self.perches.crews.get_mut(&id).unwrap().stuck_until = until;
         self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
         self.events.push(Event::Sound { id, sound: 3720 });
-        self.events.push(Event::HoldPose { id, clip: STUCK_CLIP, secs, from: None });
+        // Bent double over the spanner in the floor, held still the whole window (a tenth of a
+        // second spare, so his next blow isn't held too), and no flinch stands him up.
+        self.freeze_open_pose(id, STUCK_AT, (secs - STUCK_AT - 0.1).max(0.1));
+        if let Some(m) = self.mobs.get_mut(&id) { m.posed_until = until; }
     }
 
     /// Debug damage never counts toward his or his crew's posture.
@@ -842,7 +884,10 @@ impl Survival {
         let Some(c) = self.perches.crews.remove(&owner) else { return };
         self.events.push(Event::CastEnd { caster: owner });
         // A held pose (the stuck spanner) lets go with him.
-        if c.stuck_until > self.clock { self.events.push(Event::HoldPose { id: owner, clip: 0, secs: 0.0, from: None }); }
+        if c.stuck_until > self.clock {
+            self.events.push(Event::HoldPose { id: owner, clip: 0, secs: 0.0, from: None });
+            self.freeze_open_pose(owner, 0.0, 0.0);
+        }
         for id in &c.workers {
             if let Some(m) = self.mobs.get(id) {
                 if let MobState::Windup { mark: Some(mark), .. } = m.state { self.unmark(mark); }

@@ -1436,12 +1436,12 @@ respawn = 0.0
   max_range = 2.6
   steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
   # The finish, once the valve is done, and then only this (`sim::perches`): three blows pressing
-  # forward, the last over-reaching into the floor. The spanner sticks there: he's open 2.5 sec,
-  # hunched over it.
+  # forward, the last a two-handed chop (Attack2H's second take) over-reaching into the floor. The
+  # spanner sticks there: he's open 2.5 sec, bent double over it, both hands on it.
   [[mob.pattern]]
   name = "flurry"
   weight = 1.0
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.4, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.8, damage = 30, arc = 80.0, heavy = true, lunge = 1.5, recovery = 2.5, kit = 379 } ]
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.4, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 18, take = 1, windup = 0.8, damage = 30, arc = 80.0, heavy = true, lunge = 1.5, recovery = 2.5, kit = 379 } ]
 
 # Sneed's machine (docs/shredder-encounter.md): saw sweep, stamp and rake, then the grind (a rev in
 # place, a straight drive) and a slumped stall. sim/machinery owns this cycle, the walk in, the break
