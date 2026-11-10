@@ -130,6 +130,15 @@ pub(super) const BOAT: usize = 13;
 /// stay where clients cached them.
 #[allow(dead_code)]
 pub(super) const SACK: usize = 14;
+/// The Deadmines' own anchor.
+pub(super) const ANCHOR: usize = 15;
+/// A barrel riding low in the water, as Azeroth's floating debris has it.
+pub(super) const DRIFT_BARREL: usize = 16;
+pub(super) const DRIFTWOOD: usize = 17;
+/// The floating stores of a sunken ship (crates, barrels, planks), the shipwreck fishing pool's.
+pub(super) const FLOTSAM: usize = 18;
+/// A plain wooden pole (Stormwind's flagpole, no flag): the wrecked ship's mast and its yard.
+pub(super) const MAST: usize = 19;
 
 pub(super) const MODELS: &[Model] = &[
     Model { display: 5741, name: "Fallen Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
@@ -147,6 +156,11 @@ pub(super) const MODELS: &[Model] = &[
     Model { display: 245, name: "Overturned Cannon", min: [-4.72,-2.24,-0.01], max: [5.48,2.23,4.13] },
     Model { display: 223, name: "Shattered Boat", min: [-6.71,-1.77,-1.96], max: [2.79,2.24,2.32] },
     Model { display: 5511, name: "Split Sack", min: [-0.36,-0.43,0.0], max: [0.31,0.54,0.27] },
+    Model { display: 4011, name: "Juggernaut's Anchor", min: [-0.11,-2.19,-0.05], max: [2.57,2.97,6.45] },
+    Model { display: 6366, name: "Floating Barrel", min: [-0.55,-0.47,-0.63], max: [0.55,0.53,0.55] },
+    Model { display: 627, name: "Driftwood", min: [-1.56,-1.78,-0.33], max: [1.26,2.24,1.18] },
+    Model { display: 6434, name: "Floating Wreckage", min: [-2.50,-2.76,-3.08], max: [1.91,2.71,0.43] },
+    Model { display: 625, name: "Broken Mast", min: [-0.55,-0.57,-0.08], max: [0.47,0.58,9.90] },
 ];
 
 /// Rock and soil: the masses a pile is made of. They may run into the mine's walls (a cave-in
@@ -460,7 +474,7 @@ fn covers_at(p: &Prop, at: V3, radius: f32, heights: &[f32]) -> bool {
 }
 
 /// The whole ruin fitted to the ground: the piles at every site, the close debris around each
-/// inspection view and the drowned cove.
+/// inspection view and the wrecked ship.
 pub(super) fn compose(ground: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
     piles::compose(ground)
 }

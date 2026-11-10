@@ -432,7 +432,9 @@ fn contact_failures(n: &Native, props: &[Prop]) -> Vec<String> {
             if let Some(v) = hit { out.push(format!("{name}: passes into the rock at {:.1},{:.1},{:.1}", v[0], v[1], v[2])); }
             if (0..props.len()).any(|j| j != i && in_rock(j, c)) { out.push(format!("{name}: swallowed by rock")); }
             for (j, q) in props.iter().enumerate() {
-                if j != i && !rocky(q.model) && q.obb(0.0).overlaps(&p.obb(0.0)) && w.iter().any(|v| q.obb(0.15).contains(*v)) {
+                // (The wrecked ship's mast stands through its broken hull.)
+                let stepped = p.site == "Juggernaut's mast" && q.site == "Juggernaut's broken hull";
+                if j != i && !stepped && !rocky(q.model) && q.obb(0.0).overlaps(&p.obb(0.0)) && w.iter().any(|v| q.obb(0.15).contains(*v)) {
                     out.push(format!("{name}: through {} {}", q.site, MODELS[q.model].name));
                 }
             }
@@ -494,7 +496,6 @@ fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     assert!(floor(land, [-62.0,-815.0,41.5], false).is_none(), "upper ship deck really gone");
     assert!(floor(land, [-80.0,-820.0,-16.0], true).is_some(), "seabed remains under wreckage");
     // (Smite's dock is kept clear for its cameras now: its cannon went to the shore.)
-    assert!(props.iter().any(|p| p.site == "Juggernaut collapse basin" && p.scale >= 6.0), "large seated cove masses");
     assert!(!props.iter().any(covers_view), "the views stay clear");
 }
 
@@ -518,6 +519,8 @@ fn native_way_from_the_entrance_to_the_cove_stays_open() {
             for k in 0..=steps {
                 let at = shapes::add(w[0], shapes::mul(shapes::sub(w[1], w[0]), k as f32 / steps as f32));
                 // Small stones, boards and the soil skirt are stepped over; what stands knee-high blocks.
+                // (Over deep water the way is swum, not walked.)
+                if walk.water_near(at[0], at[1], at[2]) { continue; }
                 let tall = |(_, top): &(&Prop, &f32)| **top > at[2] + 0.7;
                 if let Some((p, _)) = props.iter().zip(&tops).filter(tall).find(|(p, _)| covers(p, at, 0.45)) {
                     blocked.push(format!("{} to {}: {} {} at {:.1},{:.1}", a.name, b.name, p.site, MODELS[p.model].name, at[0], at[1]));
@@ -574,7 +577,7 @@ fn the_piles_raise_dust_and_grit_and_their_timber_creaks_while_the_preview_lasts
     assert_eq!(spots.len(), air.dust.len(), "a stand-in of its own for every spot");
     for s in &air.dust {
         let p = &props[s.prop];
-        assert!(p.site != "Rubble apron" && p.site != "Juggernaut collapse basin");
+        assert!(p.site != "Rubble apron");
         assert!(p.model == SKIRT || p.model == SCREE || (p.model == ROCK && p.scale < 0.3), "dust from the gravel");
         assert!((s.at[0] - p.pos[0]).hypot(s.at[1] - p.pos[1]) < 0.01 && (s.at[2] - p.pos[2]).abs() < 2.0, "on the floor at the gravel");
         assert!(!props.iter().enumerate().any(|(i, r)| prop_guid(i, r.model) == s.guid), "the stand-ins are no ruin's guid");
@@ -642,6 +645,83 @@ fn the_air_goes_out_to_inspectors_and_stops_with_the_preview() {
     assert!(stand_ins.iter().all(|g| gone.contains(g)), "the stand-ins go with the preview");
     game.tick();
     assert!(!rx.try_iter().any(|p| p.opcode == op::SMSG_SPELL_GO || p.opcode == op::SMSG_PLAY_OBJECT_SOUND), "silent once restored");
+}
+
+#[test]
+#[ignore = "requires the user's WoW 1.12.1 Data folder in WOW_DATA"]
+fn native_ship_is_wrecked_not_deleted() {
+    let n = native();
+    let ground = native_ground(&n);
+    let (props, _) = compose(&ground);
+    let land = &n.land;
+    let tops = |p: &Prop| world_tris(&n, p).iter().flatten().fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(v[2]), hi.max(v[2])));
+    let at = |site: &str| props.iter().filter(|p| p.site == site).collect::<Vec<_>>();
+    for p in &props { if p.site.contains("Juggernaut") || p.site.contains("Cannons") || p.site.contains("Wreckage") || p.site.contains("dock") || p.site.contains("anchor") { let (lo, hi) = tops(p); println!("  {} {} at {:.1},{:.1},{:.1}: {lo:.1}..{hi:.1}", p.site, MODELS[p.model].name, p.pos[0], p.pos[1], p.pos[2]); } }
+    let solids = &n.survey.solids;
+    let seen = |eye: V3, at: V3| { let d = shapes::sub(at, eye); solids.ray(eye, shapes::unit(d), shapes::len(d) - 0.5).is_none() };
+    // In the landing's picture: a clear line to it, and within its cameras' view (north).
+    let in_view = |v: V3| {
+        let d = [v[0] - piles::LANDING_EYE[0], v[1] - piles::LANDING_EYE[1]];
+        let off = (d[1].atan2(d[0]) - piles::LANDING_LOOK + 3.0 * PI).rem_euclid(2.0 * PI) - PI;
+        off.abs() < 0.6 && d[0].hypot(d[1]) < 140.0 && seen(piles::LANDING_EYE, v)
+    };
+    let top = |p: &Prop| world_tris(&n, p).iter().flatten().copied().max_by(|a, b| a[2].total_cmp(&b[2])).unwrap();
+    // The dock's cameras: the cove's view and the review's two beside it.
+    let dock: Vec<V3> = std::iter::once(layout::REGIONS[6].view)
+        .chain(layout::CAMERAS.iter().map(|(at, _)| *at).filter(|at| (at[0] - layout::REGIONS[6].view[0]).hypot(at[1] - layout::REGIONS[6].view[1]) < 15.0))
+        .collect();
+    assert!(dock.len() >= 3);
+    let clear_of_dock = |p: &Prop| world_tris(&n, p).iter().flatten().all(|v| dock.iter().all(|c| (v[0] - c[0]).hypot(v[1] - c[1]) > piles::DOCK_CLEAR));
+    // The hull, broken in two across the old berth: big, well out of the water, seen from the
+    // landing, and clear of the dock's cameras and the walk.
+    let hull = at("Juggernaut's broken hull");
+    assert_eq!(hull.len(), 1, "the bow half");
+    let (lo, hi) = tops(hull[0]);
+    assert!(hull[0].scale >= 7.5 && lo < -12.0 && hi > 20.0, "big, on the seabed, reared high out of the water: {} {lo}..{hi}", hull[0].scale);
+    let stern = at("Juggernaut's stern");
+    assert_eq!(stern.len(), 1, "the stern half");
+    assert!(stern[0].scale >= 4.5 && tops(stern[0]).1 > 8.0, "the stern half stands out of the water too");
+    for p in hull.iter().chain(&stern) {
+        let c = p.obb(0.0).c;
+        assert!((-130.0..=-2.0).contains(&c[0]) && (-860.0..=-780.0).contains(&c[1]), "in the berth: {c:?}");
+        assert!(in_view(top(p)), "{} seen from the landing", p.site);
+        assert!(clear_of_dock(p), "{} clear of the dock's cameras", p.site);
+        assert!(!ground.route().iter().any(|r| covers(p, *r, 0.6)), "{} clear of the walk", p.site);
+    }
+    // The mast out of the water, aslant, a plain wooden pole; its yard hanging into the water.
+    let mast = at("Juggernaut's mast");
+    assert_eq!(mast.len(), 2, "mast and yard");
+    assert!(mast.iter().all(|p| p.model == MAST));
+    let up = |p: &Prop| shapes::matrix(p.rotation)[2][2];
+    assert!(tops(mast[0]).1 > 40.0 && (0.6..0.97).contains(&up(mast[0])), "the mast stands aslant high out of the water");
+    assert!(tops(mast[0]).1 > tops(hull[0]).1 + 8.0, "the mast stands well over the reared bow (level with it, it read as a rib)");
+    assert!(tops(mast[1]).0 < piles::WATER && up(mast[1]) < 0.7, "the yard hangs into the water");
+    assert!(in_view(top(mast[0])) && clear_of_dock(mast[0]));
+    // Cannons at the water's edge under the landing (out of the water, in its view) and on the
+    // seabed; the anchor standing in the shallows beside them.
+    let shore = at("Cannons on the shore");
+    assert!(shore.len() >= 2 && shore.iter().all(|p| tops(p).1 > piles::WATER + 1.5), "{} on the shore", shore.len());
+    assert!(shore.iter().all(|p| in_view(top(p))), "the beached cannons are in the landing's view");
+    assert!(at("Cannons on the seabed").len() >= 2);
+    let anchor = at("The anchor");
+    assert!(anchor.len() == 1 && tops(anchor[0]).1 > piles::WATER + 3.0 && in_view(top(anchor[0])), "the anchor stands in the landing's view");
+    // Every piece of the ship stands with its pivot over the floor or seabed under it, none in it
+    // (on film the mast footed on the seabed and the anchor seated under the beach never showed).
+    for p in hull.iter().chain(&stern).chain(&mast).chain(&shore).chain(&anchor) {
+        let fl = floor_under(land, p.pos);
+        assert!(p.pos[2] > fl + 0.1, "{} {}: pivot {:.1} over the floor at {fl:.1}", p.site, MODELS[p.model].name, p.pos[2]);
+    }
+    // A field of floating wreckage from the hull to the dock, every piece across the waterline.
+    let drift = at("Wreckage drifting to the dock");
+    assert!(drift.len() >= 12, "{} pieces adrift", drift.len());
+    for p in &drift {
+        let (lo, hi) = tops(p);
+        assert!(lo < piles::WATER && hi > piles::WATER, "{} rides the water: {lo}..{hi}", MODELS[p.model].name);
+    }
+    // The dock's snapped planks: from the dry dock down under the water.
+    let planks = at("Smite's broken dock");
+    assert!(planks.len() >= 2, "{} snapped planks", planks.len());
+    for p in &planks { let (lo, hi) = tops(p); assert!(lo < piles::WATER && hi > 5.0, "{lo}..{hi}"); }
 }
 
 /// The cameraman follows the hero round the preview: its client is put where the hero inspects,

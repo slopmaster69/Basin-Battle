@@ -69,13 +69,13 @@ fn spread(a: usize, b: u32) -> f32 {
 
 impl Air {
     /// The sources of a composed ruin: up to two spots a pile, on its gravel (or its smallest
-    /// stones) a couple of yards apart, on the floor there; and every pile's beams. The views'
-    /// foreground and the drowned cove raise none.
+    /// stones) a couple of yards apart, on the dry floor there; and every pile's beams (the wrecked
+    /// ship's mast too). The views' foreground raises none.
     pub(super) fn new(props: &[Prop], g: &Ground, started: Instant) -> Self {
         let mut dust: Vec<Spot> = Vec::new();
         let mut per_site: BTreeMap<&str, Vec<[f32; 3]>> = BTreeMap::new();
         for (i, p) in props.iter().enumerate() {
-            if p.site == "Rubble apron" || p.site == "Juggernaut collapse basin" { continue; }
+            if p.site == "Rubble apron" { continue; }
             let gravel = p.model == SKIRT || p.model == SCREE || (p.model == ROCK && p.scale < 0.3);
             if !gravel || dust.len() >= MAX_DUST { continue; }
             let spots = per_site.entry(p.site).or_default();
@@ -83,6 +83,7 @@ impl Air {
             if spots.len() >= PER_PILE || !apart { continue; }
             let floor = floor_under(&*g.land, [p.pos[0], p.pos[1], p.pos[2] + 0.6]);
             let z = if floor.is_finite() && (floor - p.pos[2]).abs() < 2.0 { floor } else { p.pos[2] };
+            if g.land.water_near(p.pos[0], p.pos[1], z + 0.5) { continue; }
             let at = [p.pos[0], p.pos[1], z + OVER_FLOOR];
             spots.push(at);
             let guid = SurvivalGame::stand_in_guid(FIRST_STAND_IN + dust.len() as u32);

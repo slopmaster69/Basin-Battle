@@ -76,8 +76,30 @@ and their ramp, Marisa's side room, the Cannon Gallery and cove passages, the en
 the cove's stores tent, beach, landing and sea tunnel. A site says only where, how big and how
 the rock came down: `Slump` (a cave-in against a wall), `Seal` (a side passage filled to its
 lintel), `Lintel` (the Foundry's back door: the lintel down on a pile against one jamb) or
-`Spill` (loose rock and timber under a whole roof). The ship's former quarters and deck are a
-seabed-backed collapse basin, not props balanced on the old deck floor.
+`Spill` (loose rock and timber under a whole roof).
+
+The ship is wrecked, not just gone (change F). Its own WMO groups stay hidden by patch 0087 (the
+server can't tilt them), so the wreck is native props across its old berth (the intact map's deck
+ran from x -130 to -2 and y -780 to -860, over a flat seabed at -16): the bow half of the hull
+(the wrecked rowboat at 8.5 times its size, 81 yd long) along the west of the berth, its broken
+end on the seabed and its bow reared 32 yd out of the water, rolled with its broken open side
+toward the landing; the stern half (6.5 times) along the east of the berth, turned the other
+way, about 10 yd out; the mast (a plain wooden pole 48 yd long, Stormwind's flagpole without its
+flag) stepped in the bow half and standing square to its broken deck, so aslant, to 45 yd, well over
+the reared bow (at 31 yd, level with it, it read as one more of the hull's ribs), with a spar (its
+yard) hanging off it into the water; cannons on the seabed and
+three thrown up onto the first level ground of the beach under the landing; the Deadmines'
+anchor standing in the shallows there (the anchor the third film saw in a passage on the walk is
+the mine's own, at the Cannon Gallery's entrance); a field of floating wreckage (the shipwreck pool's
+floating stores, floating barrels, driftwood, boards, lumber and crates) in two drifts from the
+hull to Mr. Smite's dock, each riding the water; and the dock's planks snapped at its edge and
+hanging into the water. Every big piece keeps 40 yd from the dock's cameras (the first take's
+stern half filled the dock's view black) and off the walk, and the hull halves, the mast, the
+beached cannons and the anchor are each in the landing cameras' picture with nothing of the mine
+between. Every piece of the ship has its pivot over the floor or seabed under it, never in it:
+the second film never showed the mast footed on the seabed nor the anchor seated under the beach
+(the client finds a body's room straight down from its pivot). There is no smokestack model among the game objects (the ship's own stack is one of its
+hidden groups), so there is no smokestack, and no mast or yard model either.
 
 `aftermath_piles.rs` fits every pile to the installed map when the preview starts (the survey
 from `htl_map::deadmines::load_aftermath_survey`: the floors, every solid triangle, and the box of
@@ -187,9 +209,9 @@ map through `WOW_DATA` (`cargo test --release -p htl-server --tests -- --ignored
 - `native_the_entrance_pile_fills_its_view_as_the_old_dome_did`: the entrance's picture, column by
   column, taller than the old dome wherever it stood, and a third bigger in all.
 
-The installed-data check currently places 1908 solids with no rejected sites: 104 at the entrance,
+The installed-data check currently places 1938 solids with no rejected sites: 104 at the entrance,
 389 in the galleries, 100 in the Mast Room, 157 in the workshop, 314 in the Foundry, 313 in the
-Cannon Gallery, 345 in the cove and 186 at the landing and sea tunnel. Their rock against the old
+Cannon Gallery, 375 in the cove and 186 at the landing and sea tunnel. Their rock against the old
 layout's: entrance 10793 (4052), galleries 12459 (9487), Mast Room 7954 (5870), workshop 6987
 (4514), Foundry 11288 (8146), Cannon Gallery 9139 (6597), cove 15840 (13675), landing 5859 (4869).
 Fitting them takes about 0.65 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
