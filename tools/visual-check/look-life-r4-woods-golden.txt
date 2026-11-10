@@ -1,0 +1,34 @@
+# Motes in the sun (client 0083, #272's fourth round): the woods by Crystal Lake at 17:30 facing
+# the low sun (yaw 45, pitched 4 up), the grade's density then looklife 3; `looklife` answers with
+# how many motes are out and how many the sun reaches (send those lines).
+# Look for: specks of warm light drifting in the sunlit gaps and against the trunks, brightest
+# toward the sun, none in deep shade (take 273: none at all, even with 270 out).
+hero warrior
+cam 45 4 6
+include _look_setup
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+4.35 lua ConsoleExec("lookwind grade")
+10.0 video
+10.2 lua ConsoleExec("looklife grade")
+10.5 shots into-sun 24 0.25
+21.0 lua ConsoleExec("looklife 3")
+25.0 shots life-x3 16 0.25
+29.2 lua ConsoleExec("looklife 3")
+29.5 lua ConsoleExec("looklife grade")
+29.55 lua SetCVar("worldLife", "0")
+31.0 shots worldlife-0 2 0.5
+32.5 lua SetCVar("worldLife", "1")
+32.55 lua SetCVar("worldLook", "0")
+32.6 lua ClearWorldFog()
+34.0 shots classic 2 0.5
+35.5 lua SetCVar("worldLook", "1")
+35.55 lua ClearWorldFog()
+35.6 lua ConsoleExec("lookweather server")
+37 end

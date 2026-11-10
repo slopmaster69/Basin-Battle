@@ -1,4 +1,4 @@
-# Ambient life (client 0072): the woods by Crystal Lake at night (23:00), the camera turned from
+# Ambient life (client 0083): the woods by Crystal Lake at night (23:00), the camera turned from
 # the water toward the trees. Fireflies in the dark woods, and the hero sidestepping left then
 # right (the camera moving with them) to show that nothing pops; then worldLife 0 and worldLook 0.
 # Look for: fireflies glowing and blinking among the trunks and over the grass in the blue-black

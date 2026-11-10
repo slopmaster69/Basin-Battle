@@ -1,0 +1,30 @@
+# Amber fireflies (client 0083, #272's sixth round): the woods by Crystal Lake at 23:00, the camera
+# low facing the south shore (yaw 200, pitched 6 down, 6 yd), as take 291, which counted 9 to 12
+# glows in frame of 30 out, pale yellow, not amber. Their glow is amber now (red, then about half
+# as much green, a touch of blue), and so is the little light the nearest few cast. looklife 1,
+# looklife 2, worldLife 0. The video now starts before the first still, so it runs its length.
+# Look for: soft amber glows across the frame, warmer than take 291's; more at looklife 2; none at
+# worldLife 0.
+hero warrior
+cam 200 -6 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 1380")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+16.0 lua ConsoleExec("looklife grade")
+16.5 video
+17.0 shots night-2300 4 0.5
+19.5 lua ConsoleExec("looklife 2")
+30.0 lua ConsoleExec("looklife 2")
+30.5 shots looklife-2 3 0.5
+32.5 lua ConsoleExec("looklife grade")
+32.55 lua SetCVar("worldLife", "0")
+34.0 shots worldlife-0 2 0.5
+35.5 lua SetCVar("worldLife", "1")
+35.55 lua ConsoleExec("lookweather server")
+37 end

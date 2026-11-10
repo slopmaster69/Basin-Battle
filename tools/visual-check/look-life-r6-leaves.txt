@@ -1,0 +1,38 @@
+# Falling leaves (client 0083, #272's sixth round): first among the trees of the Eastvale Logging
+# Camp at noon, the hero at WoW (-9420, -1380), 17 yd clear of the camp's pack, facing south into
+# the camp's woods (yaw 180, level, 7 yd), lookwind 2; then Crystal Lake's north bank (take 291's
+# 24 crowns), the camera behind the hero under the bank's oaks looking out over the lake. Take 291 found 24 crowns keeping only 3 to 7 leaves out where their
+# rates want 20 to 40. A crown whose roll came up and whose spot had no ground under it, or less
+# than a yard, used to waste the roll; it now tries four spots. And "looklife" now says what
+# became of the leaves since it last ran: the rolls, the leaves born, the spots refused (no
+# ground, too low), and how each leaf ended (lay and went, blew out of reach, fell too long) and
+# its mean life, which says which limit holds. It runs at the start of each spot and 15 s on.
+# Look for: leaves drifting down and across the frame downwind in both woods, landing and
+# fading. PLEASE send client.log's "looklife" replies ("Trees near" and "Leaves since").
+hero warrior
+cam 180 0 7
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9420 -1380
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookwind 2")
+4.35 lua ConsoleExec("looklife grade")
+15.0 lua ConsoleExec("looklife grade")
+15.5 video
+16.0 shots eastvale-wind-2 6 0.5
+30.0 lua ConsoleExec("looklife grade")
+30.5 shots eastvale-later 4 0.5
+33.0 .es goto crystal_lake
+37.0 lua ConsoleExec("looklife grade")
+52.0 lua ConsoleExec("looklife grade")
+52.5 shots lake-wind-2 6 0.5
+56.0 lua SetCVar("worldLife", "0")
+57.0 shots lake-worldlife-0 2 0.5
+58.1 lua SetCVar("worldLife", "1")
+58.15 lua ConsoleExec("lookwind grade")
+58.2 lua ConsoleExec("lookweather server")
+60 end
