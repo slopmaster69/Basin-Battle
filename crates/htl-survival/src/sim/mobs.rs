@@ -379,6 +379,7 @@ impl Survival {
                 pack,
                 raider,
                 stagger_until: 0.0,
+                posed_until: 0.0,
                 thrown_until: 0.0,
                 thrown_lift: 0.0,
                 riposte: false,
@@ -1994,6 +1995,20 @@ impl Survival {
 
     /// A creature called up in a fight goes, out of the world: its wind-up's mark and what it
     /// had in the air with it.
+    /// A boss's open pose (a hunch, a stall, a stuck spanner) held `secs` (0: let go). Until it
+    /// ends, a hit's flinch is left out: on the clients a flinch replaces whatever pose is held,
+    /// so the first blow into a punish window used to stand the boss back up (Nov 9 filming).
+    pub(crate) fn hold_open_pose(&mut self, id: Id, clip: u16, secs: f32) {
+        let until = if secs > 0.0 { self.clock + secs } else { 0.0 };
+        if let Some(m) = self.mobs.get_mut(&id) { m.posed_until = until; }
+        self.events.push(Event::HoldPose { id, clip, secs, from: None });
+    }
+
+    /// Whether it's holding an open pose now (no flinch shown).
+    pub(crate) fn posed(&self, id: Id) -> bool {
+        self.mobs.get(&id).is_some_and(|m| m.posed_until > self.clock)
+    }
+
     pub(crate) fn dismiss(&mut self, id: Id) {
         let Some(m) = self.mobs.remove(&id) else { return };
         if let MobState::Windup { mark: Some(mk), .. } = m.state {

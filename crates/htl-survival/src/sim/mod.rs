@@ -912,6 +912,9 @@ pub struct Mob {
     pub raider: bool,
     /// Reeling (parried, or struck mid wind-up) until then: it does nothing, and takes more.
     pub stagger_until: f32,
+    /// Holding an open pose until then (a hunch, a stall, a stuck spanner: `hold_open_pose`): a
+    /// hit's flinch doesn't replace it, so a punish window still looks open while it's punished.
+    pub posed_until: f32,
     /// Thrown (knocked back or pulled) through the air until then: it lands where it was thrown,
     /// whatever else the blow did (a slow, a root or a stagger takes hold once it's down).
     pub thrown_until: f32,
