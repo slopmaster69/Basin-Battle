@@ -71,7 +71,7 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
     let (props, missing) = compose(&ground);
     assert_eq!((props.clone(), missing.clone()), compose(&ground));
     assert!(missing.is_empty(), "{missing:?}");
-    assert!((700..1500).contains(&props.len()), "{} props", props.len());
+    assert!((700..1800).contains(&props.len()), "{} props", props.len());
     for (region, _) in layout::REGIONS.iter().enumerate() {
         assert!(props.iter().filter(|p| p.region == region).count() >= 20, "region {region}");
         assert!(props.iter().filter(|p| p.region == region && p.site == "Rubble apron").count() >= 3,
@@ -104,13 +104,13 @@ fn pile_shortfalls(ground: &Ground, props: &[Prop]) -> Vec<String> {
         let rocks = |lo: f32, hi: f32| mine.iter().filter(|p| p.model == ROCK && !hanging(p) && p.scale >= lo && p.scale < hi).count();
         let mut miss = |ok: bool, what: &str| if !ok { out.push(format!("{}: {what}", site.name)); };
         miss(rocks(0.75, 9.0) >= 1 && rocks(0.3, 0.75) >= 2 && rocks(0.0, 0.3) >= 3, "three sizes of rock");
-        miss(mine.iter().any(|p| matches!(p.model, SKIRT | SCREE)), "a soil skirt");
+        miss(mine.iter().filter(|p| matches!(p.model, SKIRT | SCREE)).count() >= 3, "a gravel skirt");
         miss(mine.iter().filter(|p| matches!(p.model, BOARD | BEAM)).count() >= 3, "timber at its foot");
-        // Where the roof is out of sight (the cove's open cavern) there is no scar to show.
+        // Where the roof is out of sight (the cove's open cavern) there is no break to show. (The
+        // rock hung from the roof read as a smooth lump on film and is gone: the snapped beam is the
+        // break.)
         let fl = ground.land.height_near(site.at[0], site.at[1], site.at[2]);
         let roofed = ground.roof([site.at[0], site.at[1], fl]).is_some_and(|r| r - fl < 15.0);
-        // (At the Foundry's back door the lintel is what broke: it lies on the pile.)
-        miss(!roofed || site.fall == Fall::Lintel || mine.iter().any(|p| hanging(p)), "rock hanging from the broken roof");
         if site.fall == Fall::Slump {
             let lodged = |p: &&Prop| {
                 let top = p.world([0.0, 0.0, -5.77]);
@@ -495,8 +495,7 @@ fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     assert!(floor(land, [-105.0,-821.0,37.9], false).is_none(), "captain's quarters really gone");
     assert!(floor(land, [-62.0,-815.0,41.5], false).is_none(), "upper ship deck really gone");
     assert!(floor(land, [-80.0,-820.0,-16.0], true).is_some(), "seabed remains under wreckage");
-    assert!(props.iter().any(|p| p.site == "Smite's ruined landing" && p.model == CANNON),
-        "the dock retains a grounded cannon wreck beside the inspection approach");
+    // (Smite's dock is kept clear for its cameras now: its cannon went to the shore.)
     assert!(!props.iter().any(covers_view), "the views stay clear");
 }
 
@@ -536,33 +535,62 @@ fn native_way_from_the_entrance_to_the_cove_stays_open() {
 
 
 
+/// A packed guid from the front of `b`, and the bytes after it.
+fn packed_guid(b: &[u8]) -> (u64, &[u8]) {
+    let mask = b[0];
+    let (mut guid, mut k) = (0u64, 1);
+    for bit in 0..8 {
+        if mask & (1 << bit) != 0 { guid |= u64::from(b[k]) << (8 * bit); k += 1; }
+    }
+    (guid, &b[k..])
+}
+
 #[test]
 fn the_piles_raise_dust_and_grit_and_their_timber_creaks_while_the_preview_lasts() {
-    let (props, _) = compose(&authored_ground());
-    let mut air = air::Air::new(&props, std::time::Instant::now());
+    let g = authored_ground();
+    let (props, _) = compose(&g);
+    let mut air = air::Air::new(&props, &g, std::time::Instant::now());
+    let spots: BTreeMap<u64, [f32; 3]> = air.dust.iter().map(|s| (s.guid, s.at)).collect();
+    assert_eq!(spots.len(), air.dust.len(), "a stand-in of its own for every spot");
+    for s in &air.dust {
+        let p = &props[s.prop];
+        assert!(p.site != "Rubble apron");
+        assert!(p.model == SKIRT || p.model == SCREE || (p.model == ROCK && p.scale < 0.3), "dust from the gravel");
+        assert!((s.at[0] - p.pos[0]).hypot(s.at[1] - p.pos[1]) < 0.01 && (s.at[2] - p.pos[2]).abs() < 2.0, "on the floor at the gravel");
+        assert!(!props.iter().enumerate().any(|(i, r)| prop_guid(i, r.model) == s.guid), "the stand-ins are no ruin's guid");
+    }
+    let made = air.stand_ins();
+    assert_eq!(made.len(), air.dust.len());
+    assert!(made.iter().all(|p| p.opcode == op::SMSG_UPDATE_OBJECT));
     let mut sent: Vec<Packet> = Vec::new();
     for step in 1..=600 { sent.extend(air.due(&props, step as f32 * 0.1)); }
     let ruins: BTreeMap<u64, &Prop> = props.iter().enumerate().map(|(i, p)| (prop_guid(i, p.model), p)).collect();
     let (mut puffs, mut grit, mut creaks) = (BTreeMap::<u64, usize>::new(), 0, 0);
     for p in &sent {
-        let guid = u64::from_le_bytes(if p.opcode == op::SMSG_PLAY_SPELL_VISUAL { p.body[0..8].try_into().unwrap() } else { p.body[4..12].try_into().unwrap() });
-        let ruin = ruins.get(&guid).expect("every sound and puff comes from a ruin in the scene");
-        assert!(ruin.site != "Rubble apron");
-        if p.opcode == op::SMSG_PLAY_SPELL_VISUAL {
-            assert_eq!(u32::from_le_bytes(p.body[8..12].try_into().unwrap()), air::KIT_DUST);
-            assert!(ruin.model == SKIRT || (ruin.model == ROCK && ruin.scale < 0.3));
-            *puffs.entry(guid).or_default() += 1;
-        } else {
-            let sound = u32::from_le_bytes(p.body[0..4].try_into().unwrap());
-            match sound {
-                air::SOUND_GRIT => grit += 1,
-                s if air::SOUND_CREAK.contains(&s) => { creaks += 1; assert_eq!(ruin.model, BEAM, "timber creaks") }
-                s => panic!("an unknown sound {s}"),
-            }
+        if p.opcode == op::SMSG_SPELL_GO {
+            // Cast by the spot's stand-in, as a ground look at the spot, naming no one.
+            let (caster, rest) = packed_guid(&p.body);
+            let (_, rest) = packed_guid(rest);
+            let spot = spots.get(&caster).expect("dust comes from a spot's stand-in");
+            assert_eq!(u32::from_le_bytes(rest[0..4].try_into().unwrap()), air::SPELL_DUST);
+            assert_eq!(&rest[6..8], &[0, 0], "no one struck or missed");
+            let at: Vec<f32> = (0..3).map(|k| f32::from_le_bytes(rest[10 + 4 * k..14 + 4 * k].try_into().unwrap())).collect();
+            assert_eq!(at, spot.to_vec(), "on the spot's floor");
+            *puffs.entry(caster).or_default() += 1;
+            continue;
+        }
+        assert_eq!(p.opcode, op::SMSG_PLAY_OBJECT_SOUND);
+        let guid = u64::from_le_bytes(p.body[4..12].try_into().unwrap());
+        let ruin = ruins.get(&guid).expect("every sound comes from a ruin in the scene");
+        let sound = u32::from_le_bytes(p.body[0..4].try_into().unwrap());
+        match sound {
+            air::SOUND_GRIT => { grit += 1; assert!(ruin.model != BEAM, "grit from the gravel") }
+            s if air::SOUND_CREAK.contains(&s) => { creaks += 1; assert_eq!(ruin.model, BEAM, "timber creaks") }
+            s => panic!("an unknown sound {s}"),
         }
     }
-    // A minute: every source puffs now and then, never in a stream; some puffs bring grit.
-    assert!(puffs.len() >= 60, "{} dust sources", puffs.len());
+    // A minute: every spot puffs now and then, never in a stream; some puffs bring grit.
+    assert!(puffs.len() >= 60, "{} dust spots", puffs.len());
     assert!(puffs.values().all(|n| (5..=14).contains(n)), "{puffs:?}");
     let total: usize = puffs.values().sum();
     assert!(grit * 5 > total && grit * 2 < total, "{grit} of {total}");
@@ -575,16 +603,25 @@ fn the_air_goes_out_to_inspectors_and_stops_with_the_preview() {
     let (_, rx) = observer(&mut game, 1);
     game.aftermath_start(1).unwrap();
     rx.try_iter().for_each(drop);
-    game.aftermath.as_mut().unwrap().air = air::Air::new(&game.aftermath.as_ref().unwrap().props,
-        std::time::Instant::now() - std::time::Duration::from_secs(30));
+    let stand_ins: Vec<u64> = game.aftermath.as_ref().unwrap().air.dust.iter().map(|s| s.guid).collect();
+    assert!(!stand_ins.is_empty());
+    game.aftermath.as_mut().unwrap().air.started -= std::time::Duration::from_secs(30);
     game.tick();
     let sent: Vec<Packet> = rx.try_iter().collect();
-    assert!(sent.iter().any(|p| p.opcode == op::SMSG_PLAY_SPELL_VISUAL), "the dust reaches the inspector");
+    assert!(sent.iter().any(|p| p.opcode == op::SMSG_SPELL_GO && stand_ins.contains(&packed_guid(&p.body).0)), "the dust reaches the inspector");
     assert!(sent.iter().any(|p| p.opcode == op::SMSG_PLAY_OBJECT_SOUND));
+    // A newcomer is sent the stand-ins with the ruins.
+    let (_, late) = observer(&mut game, 2);
+    late.try_iter().for_each(drop);
+    game.send_aftermath_to(2);
+    let units = late.try_iter().filter(|p| p.opcode == op::SMSG_UPDATE_OBJECT).count();
+    assert!(units > stand_ins.len(), "{units} updates for {} stand-ins and the ruins", stand_ins.len());
     game.aftermath_command(1, "off", "").unwrap();
-    rx.try_iter().for_each(drop);
+    let gone: Vec<u64> = rx.try_iter().filter(|p| p.opcode == op::SMSG_DESTROY_OBJECT)
+        .map(|p| u64::from_le_bytes(p.body[0..8].try_into().unwrap())).collect();
+    assert!(stand_ins.iter().all(|g| gone.contains(g)), "the stand-ins go with the preview");
     game.tick();
-    assert!(!rx.try_iter().any(|p| p.opcode == op::SMSG_PLAY_SPELL_VISUAL || p.opcode == op::SMSG_PLAY_OBJECT_SOUND), "silent once restored");
+    assert!(!rx.try_iter().any(|p| p.opcode == op::SMSG_SPELL_GO || p.opcode == op::SMSG_PLAY_OBJECT_SOUND), "silent once restored");
 }
 
 #[test]
@@ -597,20 +634,53 @@ fn native_ship_is_wrecked_not_deleted() {
     let tops = |p: &Prop| world_tris(&n, p).iter().flatten().fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(v[2]), hi.max(v[2])));
     let at = |site: &str| props.iter().filter(|p| p.site == site).collect::<Vec<_>>();
     for p in &props { if p.site.contains("Juggernaut") || p.site.contains("Cannons") || p.site.contains("Wreckage") || p.site.contains("dock") || p.site.contains("anchor") { let (lo, hi) = tops(p); println!("  {} {} at {:.1},{:.1},{:.1}: {lo:.1}..{hi:.1}", p.site, MODELS[p.model].name, p.pos[0], p.pos[1], p.pos[2]); } }
-    // The hull, broken in two, on the seabed and well out of the water.
+    let solids = &n.survey.solids;
+    let seen = |eye: V3, at: V3| { let d = shapes::sub(at, eye); solids.ray(eye, shapes::unit(d), shapes::len(d) - 0.5).is_none() };
+    // In the landing's picture: a clear line to it, and within its cameras' view (north).
+    let in_view = |v: V3| {
+        let d = [v[0] - piles::LANDING_EYE[0], v[1] - piles::LANDING_EYE[1]];
+        let off = (d[1].atan2(d[0]) - piles::LANDING_LOOK + 3.0 * PI).rem_euclid(2.0 * PI) - PI;
+        off.abs() < 0.6 && d[0].hypot(d[1]) < 140.0 && seen(piles::LANDING_EYE, v)
+    };
+    let top = |p: &Prop| world_tris(&n, p).iter().flatten().copied().max_by(|a, b| a[2].total_cmp(&b[2])).unwrap();
+    // The dock's cameras: the cove's view and the review's two beside it.
+    let dock: Vec<V3> = std::iter::once(layout::REGIONS[6].view)
+        .chain(layout::CAMERAS.iter().map(|(at, _)| *at).filter(|at| (at[0] - layout::REGIONS[6].view[0]).hypot(at[1] - layout::REGIONS[6].view[1]) < 15.0))
+        .collect();
+    assert!(dock.len() >= 3);
+    let clear_of_dock = |p: &Prop| world_tris(&n, p).iter().flatten().all(|v| dock.iter().all(|c| (v[0] - c[0]).hypot(v[1] - c[1]) > piles::DOCK_CLEAR));
+    // The hull, broken in two across the old berth: big, well out of the water, seen from the
+    // landing, and clear of the dock's cameras and the walk.
     let hull = at("Juggernaut's broken hull");
     assert_eq!(hull.len(), 1, "the bow half");
     let (lo, hi) = tops(hull[0]);
-    assert!(lo < -12.0 && hi > 3.0, "on the seabed, half out of the water: {lo}..{hi}");
-    assert_eq!(at("Juggernaut's stern").len(), 1, "the stern half");
-    // The mast out of the water, aslant.
+    assert!(hull[0].scale >= 6.5 && lo < -12.0 && hi > 12.0, "big, on the seabed, high out of the water: {} {lo}..{hi}", hull[0].scale);
+    let stern = at("Juggernaut's stern");
+    assert_eq!(stern.len(), 1, "the stern half");
+    assert!(stern[0].scale >= 4.5 && tops(stern[0]).1 > 8.0, "the stern half stands out of the water too");
+    for p in hull.iter().chain(&stern) {
+        let c = p.obb(0.0).c;
+        assert!((-130.0..=-2.0).contains(&c[0]) && (-860.0..=-780.0).contains(&c[1]), "in the berth: {c:?}");
+        assert!(in_view(top(p)), "{} seen from the landing", p.site);
+        assert!(clear_of_dock(p), "{} clear of the dock's cameras", p.site);
+        assert!(!ground.route().iter().any(|r| covers(p, *r, 0.6)), "{} clear of the walk", p.site);
+    }
+    // The mast out of the water, aslant, a plain wooden pole; its yard hanging into the water.
     let mast = at("Juggernaut's mast");
-    assert_eq!(mast.len(), 1);
-    assert!(tops(mast[0]).1 > 5.0);
-    // Cannons on the shore (dry) and on the seabed.
+    assert_eq!(mast.len(), 2, "mast and yard");
+    assert!(mast.iter().all(|p| p.model == MAST));
+    let up = |p: &Prop| shapes::matrix(p.rotation)[2][2];
+    assert!(tops(mast[0]).1 > 15.0 && (0.6..0.97).contains(&up(mast[0])), "the mast stands aslant out of the water");
+    assert!(tops(mast[1]).0 < piles::WATER && up(mast[1]) < 0.7, "the yard hangs into the water");
+    assert!(in_view(top(mast[0])) && clear_of_dock(mast[0]));
+    // Cannons at the water's edge under the landing (out of the water, in its view) and on the
+    // seabed; the anchor standing in the shallows beside them.
     let shore = at("Cannons on the shore");
-    assert!(shore.len() >= 2 && shore.iter().all(|p| !land.water_near(p.pos[0], p.pos[1], p.pos[2] + 1.0)), "{} on the shore", shore.len());
+    assert!(shore.len() >= 2 && shore.iter().all(|p| tops(p).1 > piles::WATER + 1.5), "{} on the shore", shore.len());
+    assert!(shore.iter().all(|p| in_view(top(p))), "the beached cannons are in the landing's view");
     assert!(at("Cannons on the seabed").len() >= 2);
+    let anchor = at("The anchor");
+    assert!(anchor.len() == 1 && tops(anchor[0]).1 > piles::WATER + 3.0 && in_view(top(anchor[0])), "the anchor stands in the landing's view");
     // A field of floating wreckage from the hull to the dock, every piece across the waterline.
     let drift = at("Wreckage drifting to the dock");
     assert!(drift.len() >= 12, "{} pieces adrift", drift.len());

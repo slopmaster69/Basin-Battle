@@ -79,30 +79,40 @@ lintel), `Lintel` (the Foundry's back door: the lintel down on a pile against on
 `Spill` (loose rock and timber under a whole roof).
 
 The ship is wrecked, not just gone (change F). Its own WMO groups stay hidden by patch 0087 (the
-server can't tilt them), so the wreck is native props: the bow half of the hull (the wrecked
-rowboat at 5.2 times its size) on its side on the seabed, about 7 yd out of the water; the stern
-half beyond its broken end, deeper and turned the other way; the mast (the iron-shod pole, 27 yd)
-standing aslant out of the bow; cannons on the seabed and thrown up the west and south beaches;
-the Deadmines' anchor; a field of floating wreckage (the shipwreck pool's floating stores,
-floating barrels, driftwood, boards, lumber and crates) in two drifts from the hull to Mr. Smite's
-dock, each riding the water; and the dock's planks snapped at its edge and hanging into the water
-where it stands over the water. There is no smokestack model among the game objects (the ship's
-own stack is one of its hidden groups), so there is no smokestack.
+server can't tilt them), so the wreck is native props across its old berth (the intact map's deck
+ran from x -130 to -2 and y -780 to -860, over a flat seabed at -16): the bow half of the hull
+(the wrecked rowboat at 7.5 times its size, 71 yd long) along the west of the berth, rolled onto
+its side with its broken open side toward the landing and about 15 yd out of the water; the
+stern half (6.5 times) along the east of the berth, turned the other way, about 12 yd out; the
+mast (a plain wooden pole 40 yd long, Stormwind's flagpole without its flag) standing aslant out
+of the bow half, with a spar (its yard) hanging off it into the water; cannons on the seabed and
+three thrown up onto the first level ground of the beach under the landing; the Deadmines'
+anchor standing in the shallows there; a field of floating wreckage (the shipwreck pool's
+floating stores, floating barrels, driftwood, boards, lumber and crates) in two drifts from the
+hull to Mr. Smite's dock, each riding the water; and the dock's planks snapped at its edge and
+hanging into the water. Every big piece keeps 40 yd from the dock's cameras (the first take's
+stern half filled the dock's view black) and off the walk, and the hull halves, the mast, the
+beached cannons and the anchor are each in the landing cameras' picture with nothing of the mine
+between. There is no smokestack model among the game objects (the ship's own stack is one of its
+hidden groups), so there is no smokestack, and no mast or yard model either.
 
 `aftermath_piles.rs` fits every pile to the installed map when the preview starts (the survey
 from `htl_map::deadmines::load_aftermath_survey`: the floors, every solid triangle, and the box of
 every native doodad still standing). A pile slumps against the wall nearest it, or the one that
 leaves it farthest from the walk from the entrance to the cove. It is made of one rock mesh
 (Burning Steppes boulder 05, the dark ash rock of the mine's own rubble) in three sizes: a large
-mass with its flat cut face (model yaw -37 degrees) turned into the wall, pieces of a middle
-size as a shoulder and perched on it, and small stones across the floor. A soil skirt (Tirisfal's
-grave mound, Duskwood's dirt mound) spreads toward the path. Over it the roof is broken: rock
-turned over and hung with its open skirt inside the roof's rock, a beam (the iron-shod
-excavation pole) snapped out of the roof onto the pile, and a broken post leaning on it. Boards
+mass with its flat cut face (model yaw -37 degrees) turned into the wall, as large as the roof
+lets it stand (a collapse must read bigger than the rocks set down before it), a second large mass
+beside it, pieces of a middle size (a man's height or less) as a shoulder and in front, small
+stones across the floor, and a gravel skirt of the same dark rock toward the path. Over it the
+roof is broken: a beam (the iron-shod excavation pole) snapped out of the roof onto the pile or
+hanging from it, and a broken post leaning on the pile, never steeper than 45 degrees. Boards
 (the excavation plank) lie at its foot at angles of their own, one pinned under the mass and one
 leaning on it. Carts, barrows, machinery, cannons and the mine's own cargo boxes are knocked
-over and seated by their turned meshes. The tall 5737 boulder (read as a stalagmite) and the
-Dark Iron planks and woodpile (rendered gold) are gone.
+over and seated by their turned meshes. The Foundry's back door is stacked up toward its lintel.
+The first film (10 Nov) dropped three looks that read badly: the Tirisfal and Duskwood mounds read
+as green grass, the rock hung from the roof as a smooth lump floating under it, and the tall 5737
+boulder (a stalagmite) and the Dark Iron planks and woodpile (gold) were gone already.
 
 Every piece rests and passes through nothing, by construction: rocks are seated so their rim
 is under the floor or the rock below (or inside the wall), wood and iron touch the floor or rock
@@ -110,7 +120,8 @@ at both ends of their length (or both sides of a box), are lifted out of a stepp
 reach a wall, the roof, another piece of wood or a native doodad, and are never swallowed by
 rock. A rock may bury a native doodad whole, unless it gives light. Nothing knee-high stands on
 the walk from the entrance's view to the cove's. A piece that can't meet all of that is left
-out, so a few piles lack one part: the ignored native test lists them.
+out, so a few piles lack one part: the ignored native test lists them. The regions' views and the
+review's other cameras (`CAMERAS`) keep their footing and the yards in front of them clear.
 
 The cove stores tent (Codex's "pantry", view 13) is the medium tent on the cove's west beach at
 (-159, -907.6): the camera stood on the beach at (-146, -906), and the old pile swallowed the tent
@@ -119,16 +130,16 @@ spill now lies beside it. The two pale green circles on the workshop floor (view
 mine's own: they show in the same place in Codex's first palette trial, with no ruin there and
 no native doodad within 8 yd, so they belong to the floor itself.
 
-The air is native too (`aftermath_air.rs`): while the preview lasts, each pile raises a low cloud
-of dust now and then (spell visual kit 44, the dust a charge raises on landing) from its soil skirt
-and smallest stones, about a third of them with the clatter of grit landing (sound kit 1211), and
-its snapped beams and posts creak (the Deadmines' wooden door, 3078, and the haunted windmill's
-timber, 1650). Each source fires every 5 to 9 s (dust) or 8 to 24 s (creaks), fixed per preview.
-There is no lasting haze model in the data that reads as dust (the ground fogs are orange or
-green); the repeated settling clouds stand in for it.
+The air is native too (`aftermath_air.rs`): while the preview lasts, dust rises now and then at
+each pile's foot (Charge's landing dust, spell 22792 `DustCloud_Land`, cast as a ground look from
+an unseen stand-in on the spot, as Rhahk'Zor's falling mine shows its dust), about a third of the
+puffs with the clatter of grit landing (sound kit 1211), and the snapped beams and posts creak
+(the Deadmines' wooden door, 3078, and the haunted windmill's timber, 1650). Each source fires
+every 5 to 9 s (dust) or 8 to 24 s (creaks), fixed per preview. (A spell visual kit played on a
+game object showed nothing on film.) There is no lasting haze model in the data that reads as
+dust (the ground fogs are orange or green); the repeated settling clouds stand in for it.
 
-What the server can't do: open a real hole in the roof (the WMO's ceiling is one group; the
-hanging rock is the nearest look), topple or tip the mine's own cargo stacks, carts, barrows and
+What the server can't do: open a real hole in the roof (the WMO's ceiling is one group), topple or tip the mine's own cargo stacks, carts, barrows and
 lanterns (they are the WMO's doodads, views 3, 9 and 15), or put out or tilt a lantern. Each needs
 a client patch beside 0087 that hides those doodads by index while the marker stands.
 
@@ -154,8 +165,8 @@ map through `WOW_DATA` (`cargo test --release -p htl-server --tests -- --ignored
   listed), the ship's floors gone.
 - `native_way_from_the_entrance_to_the_cove_stays_open`: the walk between the views, mouth to cove.
 
-The installed-data check currently places 1214 solids with no rejected sites: 71 at the entrance,
-234 in the galleries, 71 in the Mast Room, 115 in the workshop, 192 in the Foundry, 228 in the
-Cannon Gallery, 194 in the cove and 109 at the landing and sea tunnel. Fitting them takes about
+The installed-data check currently places 1419 solids with no rejected sites: 71 at the entrance,
+267 in the galleries, 84 in the Mast Room, 125 in the workshop, 240 in the Foundry, 265 in the
+Cannon Gallery, 242 in the cove and 125 at the landing and sea tunnel. Fitting them takes about
 0.25 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
 -0.023 yd. These counts establish coverage, not visual approval.

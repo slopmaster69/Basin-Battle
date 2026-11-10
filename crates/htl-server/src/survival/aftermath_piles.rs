@@ -1,12 +1,12 @@
 //! The piles, fitted to the installed map when the preview starts. A pile slumps against the rock
 //! it came out of: one large mass with its flat cut face turned into the wall, a shoulder and
 //! perched pieces of a middle size, small stones and a soil skirt spread across the floor toward
-//! the path. Over it the roof is broken (rock hanging where it let go, a snapped beam), a post
+//! the path. Over it the roof is broken (a beam snapped out of it), a post
 //! leans on it and boards lie at its foot at mixed angles, some pinned under it. Sealed side
 //! passages fill to their lintels. Every piece is seated on the floor or on the rock below it, and
 //! a piece that would pass through a wall or one of the mine's own doodads is left out.
 
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 use super::shapes::{add, cross, frame, len, matrix, mul, sub, turn, unit, V3};
 use super::*;
@@ -19,7 +19,7 @@ const BEAM_LEN: f32 = 29.64;
 const BEAM_RADIUS: f32 = 1.0;
 /// The board model's length.
 const BOARD_LEN: f32 = 11.39;
-/// Roofs higher than this over a pile's floor are out of sight: no scar, no hanging beam.
+/// Roofs higher than this over a pile's floor are out of sight: no beam snapped out of them.
 const ROOF_REACH: f32 = 15.0;
 
 /// A small authored jitter in [-1, 1]: the same on every run, different at every site and piece.
@@ -187,7 +187,7 @@ impl Builder<'_> {
         self.props.iter().all(|q| {
             let o = q.obb(0.0);
             if (o.c[0] - whole.c[0]).hypot(o.c[1] - whole.c[1]) > r + len(o.h) || !o.overlaps(&whole) { return true; }
-            if self.through_hull && q.model == BOAT && q.scale > 2.0 { return true; }
+            if self.through_hull && ((q.model == BOAT && q.scale > 2.0) || q.model == MAST) { return true; }
             match (rock, rocky(q.model)) {
                 (false, false) => !points.iter().any(|v| q.obb(0.15).contains(*v)) && !self.g.points(q).iter().any(|v| p.obb(0.15).contains(*v)),
                 (false, true) => !self.g.holds(q, whole.c),
@@ -234,6 +234,10 @@ impl Builder<'_> {
     /// A rock seated on whatever is under its skirt: the skirt's rim stays buried wherever the
     /// floor (or the rock it lands on) is lowest, so its open underside never shows.
     fn rock(&mut self, at: [f32; 2], near: f32, scale: f32, yaw: f32) -> Option<usize> {
+        self.stone(ROCK, at, near, scale, yaw)
+    }
+
+    fn stone(&mut self, model: usize, at: [f32; 2], near: f32, scale: f32, yaw: f32) -> Option<usize> {
         let lean = [0.04 * self.jit(), 0.04 * self.jit()];
         let q = shapes::euler(lean[0], lean[1], yaw);
         let m = matrix(q);
@@ -249,7 +253,7 @@ impl Builder<'_> {
             }
         }
         if !sunk.is_finite() || self.floor_at(at[0], at[1], near).is_none() { return None; }
-        let p = self.prop(ROCK, [at[0], at[1], sunk - 0.25 * scale - 0.1], scale, q);
+        let p = self.prop(model, [at[0], at[1], sunk - 0.25 * scale - 0.1], scale, q);
         self.place(p)
     }
 
@@ -261,60 +265,24 @@ impl Builder<'_> {
         l > 0.05 && self.g.ray([from[0], from[1], from[2] + 0.8], unit(d), l).is_some()
     }
 
-    /// A hanging rock over the first of `spots` that the roof there takes, trying smaller ones.
-    fn hanging_at(&mut self, ax: Axes, spots: &[(f32, f32)], near: f32, scale: f32, yaw: f32) -> Option<usize> {
-        for f in [1.0, 0.75, 0.55, 0.4] {
-            for &(u, v) in spots {
-                if let Some(i) = self.hanging(ax.at(u, v), near, scale * f, yaw) { return Some(i); }
-            }
-        }
-        None
-    }
-
     /// A rock at the first of `spots` (along and across a pile's axes) where it fits.
     fn rock_at(&mut self, ax: Axes, spots: &[(f32, f32)], near: f32, scale: f32, yaw: f32) -> Option<usize> {
         // Smaller where none of the spots has room for it: still a piece of the middle size.
         [1.0, 0.85, 0.7].iter().find_map(|f| spots.iter().find_map(|&(u, v)| self.rock(ax.at(u, v), near, scale * f, yaw)))
     }
 
-    /// A rock hanging from the roof where the fall broke away: turned over, its open skirt up
-    /// inside the roof's rock, its rough dome hanging into the room.
-    fn hanging(&mut self, at: [f32; 2], near: f32, scale: f32, yaw: f32) -> Option<usize> {
-        let q = shapes::euler(PI, 0.0, yaw);
-        let m = matrix(q);
-        let (mut hi, mut lo) = (f32::MIN, f32::MAX);
-        for r in self.g.rim(ROCK).into_iter().chain([[-0.15, 0.2, 0.41]]) {
-            let w = turn(&m, mul(r, scale));
-            let (x, y) = (at[0] + w[0], at[1] + w[1]);
-            let fl = self.floor_at(x, y, near)?;
-            let roof = self.g.roof([x, y, fl])?;
-            // Each point of the rim (turned over, `w[2]` from the pivot) up inside the roof's rock.
-            hi = hi.max(roof - w[2]);
-            lo = lo.min(roof);
-        }
-        if hi - lo > 3.4 * scale || lo - near > ROOF_REACH { return None; }
-        let p = self.prop(ROCK, [at[0], at[1], hi + 0.2 * scale], scale, q);
-        let low = self.g.points(&p).iter().map(|v| v[2]).fold(f32::INFINITY, f32::min);
-        let hidden = self.g.rim(ROCK).iter().all(|r| {
-            let v = p.world(*r);
-            self.roof_over(v, low).is_some_and(|roof| v[2] >= roof + 0.05)
-        });
-        if !hidden { return None; }
-        self.place(p)
-    }
-
-    /// A soil mound sunk so only its crown shows.
+    /// Gravel spread across the floor round `at`: half a dozen small dark stones (`scale` the
+    /// spread's size), sunk to their crowns. The first stone, if any lay.
     fn mound(&mut self, model: usize, at: [f32; 2], near: f32, scale: f32, yaw: f32) -> Option<usize> {
-        let q = shapes::euler(0.0, 0.0, yaw);
-        let m = matrix(q);
-        let mut sunk = self.floor_at(at[0], at[1], near)?;
-        for r in self.g.rim(model) {
-            let w = turn(&m, mul(r, scale));
-            sunk = sunk.min(self.floor_at(at[0] + w[0], at[1] + w[1], near)? - w[2]);
+        let mut first = None;
+        for k in 0..if model == SKIRT { 4 } else { 3 } {
+            let a = yaw + k as f32 * 2.4;
+            let r = scale * (0.4 + 0.25 * k as f32) * (1.0 + 0.2 * self.jit());
+            let size = if model == SKIRT { 0.06 + 0.02 * (k % 3) as f32 } else { 0.1 + 0.03 * (k % 2) as f32 };
+            let p = self.stone(model, [at[0] + r * a.cos(), at[1] + r * a.sin()], near, size, a * 1.7);
+            first = first.or(p);
         }
-        let sink = if model == SKIRT { 0.25 } else { 0.08 };
-        let p = self.prop(model, [at[0], at[1], sunk - sink * scale], scale, q);
-        self.place(p)
+        first
     }
 
     /// A board whose underside runs from `a` to `b`, its broad face up and canted by `tilt`.
@@ -351,7 +319,7 @@ impl Builder<'_> {
         // The step below the angle that clears everything met the rock where along its length:
         // it rests there only if that was its upper part (a stone by its foot holds nothing up).
         let mut met = None;
-        for step in 0..64 {
+        for step in 0..40 {
             let a = (6.0 + step as f32).to_radians();
             let dir = [d[0] * a.cos(), d[1] * a.cos(), a.sin()];
             let mut hit = None;
@@ -456,7 +424,7 @@ impl Builder<'_> {
         let yaw0 = ax.angle();
         let mut down = 0;
         for j in 0..14 {
-            if down == 6 { break; }
+            if down == 5 { break; }
             let u = front - (0.6 + 1.1 * (j % 3) as f32 + 0.5 * self.jit()) * k;
             let v = (-3.2 + 1.3 * (j % 6) as f32 + 0.5 * self.jit()) * k * hand;
             let s = (0.12 + 0.05 * ((j * 7) % 3) as f32 + 0.02 * self.jit()) * k.min(1.3);
@@ -469,8 +437,6 @@ impl Builder<'_> {
         for (u, v, f) in [(0.4, 0.6, 1.0), (-0.6, -1.4, 0.85), (0.0, 2.4, 0.75), (-1.4, 0.0, 0.6)] {
             if self.mound(SKIRT, ax.at(front + u * k, v * h), z0, sk * f, yaw).is_some() { break; }
         }
-        let yaw = self.jit() * PI;
-        self.mound(SKIRT, ax.at(front + 1.4 * k, -2.8 * h), z0, 0.75 * sk, yaw);
         let yaw = yaw0 + 1.2 + 0.4 * self.jit();
         for (u, v) in [(-1.6, 2.2), (-2.4, -1.0), (-1.0, 3.2)] {
             if self.mound(SCREE, ax.at(front + u * k, v * h), z0, 1.1 * k.min(1.3), yaw).is_some() { break; }
@@ -510,17 +476,15 @@ impl Builder<'_> {
         }
     }
 
-    /// Where the rock fell from: rock hanging from the broken roof over the pile, a beam snapped
-    /// out of it, and a support post knocked over and leaning on the pile.
+    /// Where the rock fell from: a beam snapped out of the roof onto the pile (or hanging from it),
+    /// and a support post knocked over and leaning on the pile, no steeper than 45 degrees. (Rock
+    /// hung from the roof read on film as a smooth lump floating under it, and is gone.)
     fn broken_roof(&mut self, ax: Axes, z0: f32, um: f32, sl: f32, hand: f32, face: f32, main: Option<usize>) {
         let over = ax.at(um - 0.8 * sl, 0.3 * hand * sl);
         let Some(fl) = self.floor_at(over[0], over[1], z0) else { return };
         let Some(roof) = self.g.roof([over[0], over[1], fl]) else { return };
         if roof - fl > ROOF_REACH { return; }
-        let big = (0.42 * sl).clamp(0.35, 0.8);
-        let h = hand * sl;
-        self.hanging_at(ax, &[(um - 0.8 * sl, 0.3 * h), (um - 1.6 * sl, 0.3 * h), (um - 0.4 * sl, -1.2 * h), (um - 1.2 * sl, 1.6 * h), (um, 0.0)], z0, big, face + 1.0);
-        self.hanging_at(ax, &[(um - 2.2 * sl, -1.6 * h), (um - 2.4 * sl, 1.0 * h), (um - 1.8 * sl, -2.6 * h)], z0, 0.55 * big, face - 1.3);
+        let _ = face;
         // The beam: out of the roof beside the scar, down onto the pile.
         // (Beside the scar, from the first of a few places in the roof over the pile it fits.)
         for (du, dv) in [(-2.0, 1.7), (-1.2, -1.8), (-2.6, -0.4), (-0.6, 2.4)] {
@@ -532,7 +496,8 @@ impl Builder<'_> {
             let b = ax.at(um - 0.9 * sl, 0.9 * hand * sl);
             let fl = self.floor_at(b[0], b[1], z0).unwrap_or(z0);
             let rest = self.support(b[0], b[1], z0).filter(|s| *s > fl + 0.5).map(|s| [b[0], b[1], s + 0.1]);
-            if rest.is_some_and(|r| len(sub(top, r)) < 9.0 && self.beam(top, r).is_some()) { break; }
+            let shallow = |r: &V3| (top[2] - r[2]) < 2.1 * (top[0] - r[0]).hypot(top[1] - r[1]);
+            if rest.is_some_and(|r| len(sub(top, r)) < 9.0 && shallow(&r) && self.beam(top, r).is_some()) { break; }
             // Too far to reach the pile: a stub hanging from the roof, 30 degrees out.
             let d = unit([ax.f[0] * -0.5, ax.f[1] * -0.5, -0.87]);
             if self.beam(top, add(top, mul(d, 4.2))).is_some() { break; }
@@ -603,9 +568,11 @@ impl Builder<'_> {
     /// A cave-in slumped against the nearest wall.
     fn slump(&mut self, site: &Site, z0: f32, hand: f32) {
         let k = site.scale;
-        let mut sl = (1.25 * k).clamp(0.8, 2.2);
+        // A collapse is bigger than the rocks set down before it (the entrance's old dome was
+        // 2.4): as large as the roof lets it stand, nearly touching it.
+        let mut sl = (1.9 * k).clamp(1.0, 2.8);
         if let Some(r) = self.g.roof([site.at[0], site.at[1], z0]) {
-            sl = sl.min(((r - z0) - 1.6) / 3.0).max(0.6);
+            sl = sl.min(((r - z0) - 0.9) / 3.0).max(0.8);
         }
         let found = self.wall_off_the_way([site.at[0], site.at[1], z0], 9.0, sl);
         let (back, dw) = found.unwrap_or((site.yaw, 9.0));
@@ -616,16 +583,19 @@ impl Builder<'_> {
         let mut main = None;
         // Where the mine's own doodads stand in the way, it comes down a little to one side.
         for (du, dv, f) in [(0.0, 0.0, 1.0), (-1.0, 0.0, 0.85), (0.8, 0.0, 0.7), (0.0, 2.5, 0.8), (0.0, -2.5, 0.8),
-            (-1.5, 2.5, 0.7), (-1.5, -2.5, 0.7), (-2.0, 0.0, 0.6), (0.0, 0.0, 0.55), (-1.0, 1.2, 0.5)] {
+            (-1.5, 2.5, 0.7), (-1.5, -2.5, 0.7), (-2.0, 0.0, 0.6), (0.0, 0.0, 0.55), (-1.0, 1.2, 0.5), (0.0, 0.0, 0.42), (-1.0, -1.2, 0.38)] {
             main = self.rock(ax.at(um + du * k, (0.4 + dv) * hand * k), z0, sl * f, face);
             if main.is_some() { break; }
         }
-        // A shoulder and pieces of a middle size, each at the first of a few spots with room.
+        // A second large mass beside it, a shoulder and pieces of a middle size, each at the first
+        // of a few spots with room.
         let h = hand * sl;
+        self.rock_at(ax, &[(um - 0.6 * sl, -2.6 * h), (um - 0.4 * sl, 2.8 * h), (um - 1.4 * sl, -1.6 * h)], z0, 0.8 * sl, face - 0.4);
         self.rock_at(ax, &[(um - 0.9 * sl, 3.0 * h), (um - 1.6 * sl, -3.0 * h), (um - 2.4 * sl, 2.0 * h)], z0, 0.62 * sl, face + 0.5);
-        self.rock_at(ax, &[(um - 2.3 * sl, -2.3 * h), (um - 2.6 * sl, 1.2 * h), (um - 3.0 * sl, -0.6 * h)], z0, 0.42 * sl, face - 0.6);
-        self.rock_at(ax, &[(um - 1.2 * sl, -0.5 * h), (um - 1.4 * sl, 1.5 * h), (um - 2.0 * sl, -1.6 * h)], z0, 0.36 * sl, face + 1.9);
-        self.rock(ax.at(um - 0.2 * sl, 1.6 * h), z0, 0.3 * sl, face + 3.0);
+        // (The middle size is a size of its own, a man's height or less, however big the mass.)
+        self.rock_at(ax, &[(um - 2.3 * sl, -2.3 * h), (um - 2.6 * sl, 1.2 * h), (um - 3.0 * sl, -0.6 * h)], z0, (0.24 * sl).clamp(0.42, 0.7), face - 0.6);
+        self.rock_at(ax, &[(um - 1.2 * sl, -0.5 * h), (um - 1.4 * sl, 1.5 * h), (um - 2.0 * sl, -1.6 * h)], z0, (0.2 * sl).clamp(0.36, 0.6), face + 1.9);
+        self.rock(ax.at(um - 0.2 * sl, 1.6 * h), z0, (0.16 * sl).clamp(0.32, 0.5), face + 3.0);
         self.broken_roof(ax, z0, um, sl, hand, face, main);
         let front = um - 3.0 * sl;
         self.foot(ax, z0, front, main, k, hand);
@@ -633,7 +603,7 @@ impl Builder<'_> {
     }
 
     /// A side passage filled to its lintel: a row of large rocks across it, more stacked on them
-    /// until the stack meets the roof, rock hanging from the roof to close what's left and the
+    /// until the stack meets the roof, and the
     /// lintel's beam down across the front of the fill.
     fn seal(&mut self, site: &Site, z0: f32, hand: f32) {
         let at = [site.at[0], site.at[1], z0];
@@ -673,8 +643,6 @@ impl Builder<'_> {
         let h = hand * sb;
         self.rock_at(ax, &[(-1.2 * sb, mid + 1.4 * h), (-1.6 * sb, mid - 1.0 * h), (-0.8 * sb, mid)], z0, (0.5 * sb).clamp(0.35, 0.7), face + 2.0);
         self.rock_at(ax, &[(-1.8 * sb, mid - 1.8 * h), (-2.2 * sb, mid + 0.6 * h), (-1.4 * sb, mid + 2.2 * h)], z0, (0.38 * sb).clamp(0.32, 0.6), face - 1.6);
-        self.hanging_at(ax, &[(0.2, mid), (-0.6, mid + 0.2 * w), (-0.6, mid - 0.2 * w), (1.0, mid)], z0, (0.45 * sb).clamp(0.35, 0.8), face + 0.8);
-        self.hanging_at(ax, &[(-0.6, mid - 0.3 * w * hand), (-1.0, mid + 0.3 * w * hand)], z0, (0.3 * sb).clamp(0.3, 0.6), face - 0.9);
         // The lintel's beam, down across the face of the fill.
         let (p1, p2) = (ax.at(-1.4 * sb, mid - 0.36 * w), ax.at(-1.1 * sb, mid + 0.36 * w));
         let across = match (self.support(p1[0], p1[1], z0), self.support(p2[0], p2[1], z0)) {
@@ -722,12 +690,20 @@ impl Builder<'_> {
         }
         let face = along + hand * FRAC_PI_2 + FACE;
         let jamb_at = |du: f32| du + at_u;
+        // Stacked on toward the lintel, so the doorway is near full.
+        let mut s2 = 0.78 * sl;
+        for tier in 0..3 {
+            let c = ax.at(jamb_at(0.0), jamb - hand * 0.4 * sl);
+            let top = self.support(c[0], c[1], z0).unwrap_or(z0);
+            if top > lintel - 1.2 { break; }
+            let spot = ax.at(jamb_at(0.4 * tier as f32 - 0.4), jamb - hand * (0.6 + 0.7 * tier as f32) * sl);
+            self.rock(spot, z0, s2, face + 1.1 * tier as f32);
+            s2 *= 0.8;
+        }
         let j = |du: f32, dv: f32| (jamb_at(du * sl), jamb - hand * dv * sl);
         self.rock_at(ax, &[j(1.6, 1.2), j(2.2, 0.2), j(1.0, 1.8)], z0, (0.6 * sl).min(0.7), face + 0.8);
         self.rock_at(ax, &[j(-1.8, 0.6), j(-1.4, 1.4), j(-2.4, 0.0)], z0, (0.48 * sl).min(0.6), face - 0.7);
         self.rock_at(ax, &[j(-0.6, 0.4), j(-1.0, 1.0), j(0.6, 1.2)], z0, (0.34 * sl).max(0.32), face + 2.2);
-        self.hanging_at(ax, &[j(0.3, 0.0), j(-0.6, 0.0), (jamb_at(0.3 * sl), jamb - hand * 1.5), j(1.0, 0.0), j(0.0, 1.0),
-            j(0.0, -0.8), (jamb_at(0.0), mid), (jamb_at(-1.0), mid), (jamb_at(1.5), mid)], z0, (0.4 * sl).clamp(0.35, 0.7), face + 1.4);
         // The lintel: still lodged at the far jamb's top, its other end down on the pile.
         let far = ax.at(jamb_at(-0.3), mid - hand * (w * 0.5 - 0.4));
         let on = ax.at(jamb_at(-0.5 * sl), jamb - hand * 0.6 * sl);
@@ -808,48 +784,68 @@ pub(super) fn compose(g: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
 
 /// Native DeadminesInstance_33_32 MCLQ: all 42 water chunks have surface -0.023 yd.
 pub(super) const WATER: f32 = -0.023;
-/// Where the Juggernaut lay, and Mr. Smite's dock it was moored to (the cove's inspection view).
-const HULL_AT: [f32; 2] = [-72.0, -818.0];
+/// Where the Juggernaut lay (the middle of its berth: the intact map's deck ran from x -130 to
+/// -2 and y -780 to -860, over a flat seabed at -16), and Mr. Smite's dock it was moored to (the
+/// cove's inspection view).
+pub(super) const HULL_AT: [f32; 2] = [-72.0, -818.0];
 const DOCK_AT: [f32; 2] = [-2.0, -768.0];
+/// The landing's view, for what has to be seen from it: where it stands, and the way its
+/// cameras look (the review's two there face 85 and 89 degrees; the ship's old hull filled their
+/// picture from 56 to 113).
+pub(super) const LANDING_EYE: V3 = [-80.0, -936.0, 41.7];
+pub(super) const LANDING_LOOK: f32 = 1.5;
+/// The ship's big pieces keep this far from the dock's cameras (a hull half filled its view black).
+pub(super) const DOCK_CLEAR: f32 = 40.0;
+const MAST_LEN: f32 = 9.98;
 
-/// The Juggernaut wrecked (change F): its hull broken in two and tipped onto the seabed, half out
-/// of the water; its mast standing out of it aslant; cannons thrown up the shore and down onto the
-/// seabed; a field of wreckage drifting from the hull to the dock; and the dock's own planks snapped
-/// down into the water. The ship's WMO groups stay hidden by patch 0087 (they can't be tilted from
-/// the server): every piece is a native model, the hull a wrecked rowboat at the ship's size.
+/// The Juggernaut wrecked (change F): its hull broken in two across its berth, each half on the
+/// seabed rolled onto its side with its broken deck toward the landing, high out of the water;
+/// its mast standing out of the bow half aslant with its yard hanging off it into the water;
+/// cannons thrown up the beach under the landing and down onto the seabed; the anchor dragged up
+/// the beach; a field of wreckage drifting from the hull to the dock; and the dock's own planks
+/// snapped down into the water. The ship's WMO groups stay hidden by patch 0087 (they can't be
+/// tilted from the server): every piece is a native model, the hull halves the wrecked rowboat at
+/// the ship's size.
 fn wreck(b: &mut Builder) {
     (b.region, b.wet, b.seed, b.k, b.near) = (6, true, 2000, 0, -16.0);
-    // The broken hull: the bow half on its side, the stern half deeper and turned the other way.
+    // The bow half: the west two thirds of the berth, along the ship's line (the rowboat's long
+    // end runs 50 yd west of its pivot at this size, 21 east), rolled so its open side faces the
+    // landing; well clear of the dock.
     b.site = "Juggernaut's broken hull";
-    for (dx, dy, yaw) in [(0.0, 0.0, 0.62), (4.0, 3.0, 0.5), (-4.0, -3.0, 0.75), (6.0, -4.0, 0.62)] {
-        if b.sunk(BOAT, [HULL_AT[0] + dx, HULL_AT[1] + dy], 5.2, 0.55, 0.12, yaw, 3.0).is_some() { break; }
+    for (dx, dy, scale, roll) in [(-3.0, -2.0, 7.5, 0.5), (-6.0, 2.0, 7.5, 0.45), (0.0, -6.0, 7.0, 0.5), (-8.0, -4.0, 6.5, 0.55)] {
+        if b.sunk(BOAT, [HULL_AT[0] + dx, HULL_AT[1] + dy], scale, roll, 0.06, 0.08, 14.0).is_some() { break; }
     }
+    // The stern half: the berth's east end, turned the other way and rolled the same way round,
+    // its broken end toward the bow's and its far end still 60 yd short of the dock.
     b.site = "Juggernaut's stern";
-    // (Off the bow half's broken end along the ship's line, so the two halves lie apart: the
-    // rowboat's long end runs 35 yd one way from its pivot at this size, 15 the other.)
-    'stern: for (along, aside, yaw) in [(26.0, 0.0, 3.9), (30.0, 6.0, 4.1), (30.0, -8.0, 3.7), (36.0, -2.0, 3.9), (22.0, 12.0, 4.4)] {
-        let (s, c) = 0.62f32.sin_cos();
-        let at = [HULL_AT[0] + c * along - s * aside, HULL_AT[1] + s * along + c * aside];
-        for scale in [3.6, 4.4] {
-            if b.sunk(BOAT, at, scale, -0.7, -0.15, yaw, 1.0).is_some() { break 'stern; }
+    'stern: for (x, y, yaw) in [(-44.0, -852.0, PI + 0.35), (-40.0, -854.0, PI + 0.25), (-48.0, -850.0, PI + 0.45), (-36.0, -848.0, PI + 0.3)] {
+        for scale in [6.5, 6.0, 5.5] {
+            if b.sunk(BOAT, [x, y], scale, -0.55, -0.1, yaw, 9.0).is_some() { break 'stern; }
         }
     }
-    // The mast: its iron foot on the seabed by the hull, leaning out of the water.
+    // The mast: a plain wooden pole 40 yd long, its foot on the seabed in the bow half, standing
+    // out of the broken deck aslant toward the landing and away along the ship. A spar hangs off
+    // it into the water (the yard it carried): a mast and yard, not a spike.
     b.site = "Juggernaut's mast";
     // (A mast is stepped through its hull: it may stand in the hull's broken side.)
     b.through_hull = true;
-    for (dx, dy, lean_to) in [(-8.0, -9.0, 2.2f32), (-10.0, -4.0, 2.6), (-4.0, -12.0, 1.8), (-14.0, -10.0, 2.4)] {
+    let lean = unit([-0.32, -0.42, 0.85]);
+    for (dx, dy) in [(-22.0, -4.0), (-26.0, -2.0), (-18.0, -6.0), (-30.0, -4.0), (-14.0, -2.0)] {
         let at = [HULL_AT[0] + dx, HULL_AT[1] + dy];
         let Some(bed) = b.floor_at(at[0], at[1], -16.0) else { continue };
-        let tilt: f32 = 0.5;
-        let dir = [lean_to.cos() * tilt.sin(), lean_to.sin() * tilt.sin(), tilt.cos()];
         let foot = [at[0], at[1], bed + 0.3];
-        if b.beam(foot, add(foot, mul(dir, 27.0))).is_some() { break; }
+        if b.pole(foot, add(foot, mul(lean, 40.0))).is_none() { continue; }
+        // The yard, hanging from two thirds of the way up down to the water beside the hull.
+        let hang = add(foot, mul(lean, 27.0));
+        for (ox, oy) in [(9.0, -9.0), (12.0, -5.0), (-12.0, -8.0), (6.0, -12.0)] {
+            if b.pole(hang, [hang[0] + ox, hang[1] + oy, WATER - 2.0]).is_some() { break; }
+        }
+        break;
     }
     b.through_hull = false;
-    // Cannons down on the seabed round the hull.
+    // Cannons down on the seabed off the hull, on the landing's side.
     b.site = "Cannons on the seabed";
-    for (dx, dy, roll, yaw) in [(12.0, -14.0, 1.2, 0.4), (-16.0, 10.0, 1.6, 2.3), (6.0, 16.0, 0.9, 4.0)] {
+    for (dx, dy, roll, yaw) in [(-10.0, -42.0, 1.2, 0.4), (20.0, -44.0, 1.6, 2.3), (-34.0, -40.0, 0.9, 4.0), (6.0, -50.0, 1.4, 1.1)] {
         let at = [HULL_AT[0] + dx, HULL_AT[1] + dy];
         b.tipped(CANNON, at, -16.0, 0.6, roll, 0.15, yaw);
     }
@@ -922,29 +918,33 @@ fn wreck(b: &mut Builder) {
         if b.board([e[0] - dx * 0.3, e[1] - dy * 0.3, e[2] + 0.03], end, tilt).is_some() { snapped += 1; used.push(e); }
         b.wet = false;
     }
-    // Cannons thrown up the shore, and the anchor dragged onto it.
+    // Cannons thrown up the beach under the landing, in its view (and the dock's, far off), on
+    // the first level ground above the water (the beach climbs steeply from it); the anchor
+    // standing in the shallows below them, its flukes dug into the sand.
     b.site = "Cannons on the shore";
-    // (Each where the beach is level enough for it to lie along: a few spots, turned a few ways.)
-    for (x, y, z, roll) in [(-140.0, -872.0, 0.9, 1.5), (-130.0, -778.0, 0.3, 1.2), (-140.0, -902.0, 6.8, 1.6), (-64.0, -902.0, 15.5, 1.4), (-92.0, -748.0, 2.8, 1.3), (-67.0, -914.0, 17.7, 1.5)] {
-        'spot: for (ox, oy) in [(0.0, 0.0), (3.0, 0.0), (0.0, 3.0), (-3.0, 0.0), (0.0, -3.0), (5.0, 5.0), (-5.0, -5.0)] {
-            for k in 0..4 {
-                let yaw = roll * 2.0 + k as f32 * FRAC_PI_2;
-                if b.tipped(CANNON, [x + ox, y + oy], z, 0.45, roll, 0.0, yaw).is_some() { break 'spot; }
-            }
+    let mut used: Vec<[f32; 2]> = Vec::new();
+    for (k, (at, z)) in b.beach_spots(0.5, 24.0, true).iter().enumerate() {
+        if used.len() == 3 { break; }
+        if used.iter().any(|u| (u[0] - at[0]).hypot(u[1] - at[1]) < 7.0) { continue; }
+        let roll = 1.2 + 0.1 * (k % 4) as f32;
+        for turn in 0..8 {
+            if b.tipped(CANNON, *at, *z, 0.6, roll, 0.0, 0.7 * k as f32 + turn as f32 * FRAC_PI_4).is_some() { used.push(*at); break; }
         }
     }
     b.site = "The anchor";
-    'anchor: for (x, y, z) in [(-136.0, -866.0, 0.9), (-126.0, -782.0, 0.3), (-136.0, -896.0, 6.8), (-96.0, -752.0, 2.8)] {
-        for (ox, oy) in [(0.0, 0.0), (3.0, 0.0), (0.0, 3.0), (-3.0, 0.0), (0.0, -3.0)] {
-            for k in 0..4 {
-                if b.tipped(ANCHOR, [x + ox, y + oy], z, 1.2, 1.5, 0.0, k as f32 * FRAC_PI_2).is_some() { break 'anchor; }
-            }
+    b.wet = true;
+    'anchor: for (at, z) in b.beach_spots(-2.5, -0.8, false) {
+        for turn in 0..4 {
+            let q = shapes::euler(0.3, 0.2, 0.3 + turn as f32 * FRAC_PI_2);
+            let p = b.prop(ANCHOR, [at[0], at[1], z - 1.0 - b.g.low(ANCHOR, q) * 1.4], 1.4, q);
+            if b.place(p).is_some() { break 'anchor; }
         }
     }
-    // (Where no beach takes it, it lies on the seabed by the bow.)
+    b.wet = false;
+    // (Where no beach takes it, it lies on the seabed off the bow.)
     if !b.props.iter().any(|p| p.model == ANCHOR) {
         b.wet = true;
-        for (dx, dy) in [(-18.0, 14.0), (14.0, -18.0), (-22.0, -6.0)] {
+        for (dx, dy) in [(-18.0, -24.0), (14.0, -26.0), (-30.0, -26.0)] {
             if b.tipped(ANCHOR, [HULL_AT[0] + dx, HULL_AT[1] + dy], -16.0, 1.4, 1.5, 0.0, 0.9).is_some() { break; }
         }
         b.wet = false;
@@ -960,6 +960,49 @@ impl Builder<'_> {
         let top = self.g.points(&p).iter().map(|v| v[2]).fold(f32::MIN, f32::max);
         if top < WATER + above { return None; }
         self.place(p)
+    }
+
+    /// A plain pole from its foot at `a` to its end at `b` (the mast, the yard).
+    fn pole(&mut self, a: V3, b: V3) -> Option<usize> {
+        let d = unit(sub(b, a));
+        let side = if d[2].abs() > 0.97 { [1.0, 0.0, 0.0] } else { unit(cross([0.0, 0.0, 1.0], d)) };
+        let q = frame(side, cross(d, side));
+        let scale = len(sub(b, a)) / MAST_LEN;
+        let pos = sub(a, turn(&matrix(q), mul([0.0, 0.0, -0.08], scale)));
+        let p = self.prop(MAST, pos, scale, q);
+        self.place(p)
+    }
+
+    /// Spots on the south beach the landing looks down on (within its view, a clear line to
+    /// each) whose ground (or seabed) is between `low` and `high` (and slopes gently, if asked),
+    /// the lowest first.
+    fn beach_spots(&self, low: f32, high: f32, gentle: bool) -> Vec<([f32; 2], f32)> {
+        let mut out = Vec::new();
+        for i in 0..70 {
+            for j in 0..16 {
+                let (x, y) = (-150.0 + 2.0 * i as f32, -866.0 - 2.0 * j as f32);
+                let z = self.g.land.height_near(x, y, 30.0);
+                let d = [x - LANDING_EYE[0], y - LANDING_EYE[1]];
+                let off = (d[1].atan2(d[0]) - LANDING_LOOK + 3.0 * PI).rem_euclid(2.0 * PI) - PI;
+                // (Gently sloping for a few yards round: a cannon or the anchor lies along it.)
+                let gentle = !gentle || (0..8).all(|k| {
+                    let a = k as f32 * FRAC_PI_4;
+                    (self.g.land.height_near(x + 3.5 * a.cos(), y + 3.5 * a.sin(), z + 2.0) - z).abs() < 1.3
+                });
+                if (low..=high).contains(&z) && gentle && off.abs() < 0.6 && self.seen_from(LANDING_EYE, [x, y, z.max(WATER) + 1.0]) {
+                    out.push(([x, y], z));
+                }
+            }
+        }
+        // (The lowest first: by the water, where the sea threw them.)
+        out.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0[0].total_cmp(&b.0[0])));
+        out
+    }
+
+    /// Nothing of the mine between `eye` and `at`.
+    pub(super) fn seen_from(&self, eye: V3, at: V3) -> bool {
+        let d = sub(at, eye);
+        self.g.solids.as_ref().is_none_or(|s| s.ray(eye, unit(d), len(d) - 0.5).is_none())
     }
 
     /// A piece of wreckage afloat, `under` of its height under the surface.

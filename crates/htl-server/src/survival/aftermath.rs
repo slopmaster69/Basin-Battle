@@ -102,9 +102,10 @@ pub(super) struct Model {
 /// open skirt. Every size in a pile is this mesh, turned and scaled; the tall 5737 boulder read
 /// as a stalagmite and is gone (views 8, 10, 12).
 pub(super) const ROCK: usize = 0;
-/// Tirisfal's grave mound, dark soil on an open skirt: the gravel skirt a pile spreads.
+/// The gravel a pile spreads across the floor: the same dark rock, a hand or two across. (The
+/// grave and dirt mounds tried first read as green grass on film, and one glowed pale.)
 pub(super) const SKIRT: usize = 1;
-/// Duskwood's dirt mound: smaller scree.
+/// Scree: a little larger gravel.
 pub(super) const SCREE: usize = 2;
 /// The dwarven excavation pole, an iron-shod log: snapped beams and broken posts.
 pub(super) const BEAM: usize = 3;
@@ -130,11 +131,13 @@ pub(super) const DRIFT_BARREL: usize = 16;
 pub(super) const DRIFTWOOD: usize = 17;
 /// The floating stores of a sunken ship (crates, barrels, planks), the shipwreck fishing pool's.
 pub(super) const FLOTSAM: usize = 18;
+/// A plain wooden pole (Stormwind's flagpole, no flag): the wrecked ship's mast and its yard.
+pub(super) const MAST: usize = 19;
 
 pub(super) const MODELS: &[Model] = &[
     Model { display: 5741, name: "Fallen Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 49, name: "Rubble Skirt", min: [-2.17,-2.19,-0.55], max: [2.19,2.18,0.83] },
-    Model { display: 20, name: "Scree", min: [-1.69,-1.06,-0.01], max: [1.69,1.00,0.67] },
+    Model { display: 5741, name: "Gravel", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
+    Model { display: 5741, name: "Scree", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
     Model { display: 1508, name: "Snapped Beam", min: [-1.20,-1.24,-5.77], max: [1.15,1.45,23.87] },
     Model { display: 4651, name: "Broken Board", min: [-0.28,-5.57,0.0], max: [0.22,5.82,2.29] },
     Model { display: 1108, name: "Spilled Lumber", min: [-1.68,-0.65,0.0], max: [1.68,0.66,0.56] },
@@ -151,6 +154,7 @@ pub(super) const MODELS: &[Model] = &[
     Model { display: 6366, name: "Floating Barrel", min: [-0.55,-0.47,-0.63], max: [0.55,0.53,0.55] },
     Model { display: 627, name: "Driftwood", min: [-1.56,-1.78,-0.33], max: [1.26,2.24,1.18] },
     Model { display: 6434, name: "Floating Wreckage", min: [-2.50,-2.76,-3.08], max: [1.91,2.71,0.43] },
+    Model { display: 625, name: "Broken Mast", min: [-0.55,-0.57,-0.08], max: [0.47,0.58,9.90] },
 ];
 
 /// Rock and soil: the masses a pile is made of. They may run into the mine's walls (a cave-in
@@ -168,11 +172,8 @@ pub(super) fn bottom(model: usize, q: [f32; 4]) -> f32 {
 /// Where the fallen rock's open skirt meets the floor (its rim, model space), and the mounds':
 /// sampled round each mesh's footprint when the installed meshes aren't at hand.
 fn rim_samples(model: usize) -> Vec<V3> {
-    let (cx, cy, rx, ry, z) = match model {
-        ROCK => (-0.15, 0.2, 2.75, 3.85, 0.41),
-        SKIRT => (0.0, 0.0, 2.19, 2.19, -0.55),
-        _ => (0.0, -0.03, 1.69, 1.03, 0.0),
-    };
+    let _ = model;
+    let (cx, cy, rx, ry, z) = (-0.15, 0.2, 2.75, 3.85, 0.41);
     (0..12).map(|k| { let a = k as f32 * std::f32::consts::PI / 6.0; [cx + rx * 0.97 * a.cos(), cy + ry * 0.97 * a.sin(), z] }).collect()
 }
 
@@ -182,18 +183,6 @@ fn rock_top(x: f32, y: f32) -> Option<f32> {
     let (rx, ry) = ((x + 0.15) / 2.75, (y - 0.2) / 3.85);
     let r2 = rx*rx + ry*ry;
     (r2 < 1.0).then(|| 0.41 + 3.15 * (1.0 - r2).powf(0.4))
-}
-
-/// The soil mounds' tops without the installed meshes: Tirisfal's a low cone (its rim 0.55 under
-/// the pivot, its peak 0.83 over), Duskwood's a 0.64 yd hump.
-fn mound_top(model: usize, x: f32, y: f32) -> Option<f32> {
-    if model == SKIRT {
-        let r = (x*x + y*y).sqrt() / 2.19;
-        return (r < 1.0).then(|| 0.83 - 1.38*r);
-    }
-    let (rx, ry) = (x / 1.69, (y + 0.03) / 1.03);
-    let r2 = rx*rx + ry*ry;
-    (r2 < 1.0).then(|| 0.64 * (1.0 - r2).sqrt())
 }
 
 /// The highest point of a mesh straight over (x, y).
@@ -336,8 +325,7 @@ impl Ground {
     fn top_local(&self, model: usize, x: f32, y: f32) -> Option<f32> {
         match self.shape(model) {
             Some(s) => top_of(&s.tris, x, y),
-            None if model == ROCK => rock_top(x, y),
-            None => mound_top(model, x, y),
+            None => rock_top(x, y),
         }
     }
 
@@ -408,7 +396,13 @@ pub(super) fn floor_under(land: &dyn Land, v: V3) -> f32 {
 /// check showed that a model's enclosing sphere cleared enormous clean disks around views,
 /// even for a low plank or a tall rock whose solid body never reached the inspector.
 pub(super) fn covers_view(p: &Prop) -> bool {
-    layout::REGIONS.iter().any(|r| covers(p, r.view, 0.9))
+    let views = layout::REGIONS.iter().map(|r| (r.view, r.facing))
+        .chain(layout::CAMERAS.iter().map(|(at, deg)| (*at, deg.to_radians())));
+    // The footing, and the first yards it looks across.
+    views.into_iter().any(|(at, f)| {
+        let ahead = |d: f32| [at[0] + d * f.cos(), at[1] + d * f.sin(), at[2]];
+        covers(p, at, 1.2) || covers(p, ahead(2.0), 1.0) || covers(p, ahead(3.8), 0.7)
+    })
 }
 
 /// Whether a prop's box comes within `radius` of a body standing at `at` (feet to head).
@@ -504,7 +498,7 @@ impl SurvivalGame {
             return Err("The aftermath has an empty region. Check the installed map data before previewing it.".into());
         }
         println!("[aftermath] {} solids in {:?}; {} sites unavailable: {}", props.len(), started.elapsed(), missing.len(), missing.join(", "));
-        let air = air::Air::new(&props, Instant::now());
+        let air = air::Air::new(&props, self.aftermath_land.as_deref().unwrap(), Instant::now());
         self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing, air });
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }
@@ -535,6 +529,7 @@ impl SurvivalGame {
             }).collect();
             self.send(conn, packets::update_object(&creates, &[]));
         }
+        for p in scene.air.stand_ins() { self.send(conn, p); }
     }
 
     pub(crate) fn aftermath_arrival(&mut self, conn: ConnId) {
@@ -554,6 +549,7 @@ impl SurvivalGame {
         let Some(scene) = self.aftermath.take() else { return };
         for (i, p) in scene.props.iter().enumerate() { self.broadcast(&packets::destroy_object(prop_guid(i, p.model))); }
         self.broadcast(&packets::destroy_object(MARKER_GUID));
+        for s in &scene.air.dust { self.broadcast(&packets::destroy_object(s.guid)); }
         let viewers: Vec<(ConnId, Id)> = self.in_world().map(|(c, _, w)| (*c, w.id)).collect();
         for (conn, id) in viewers {
             if let Some(p) = self.sim.players.get(&id) { self.aftermath_teleport(conn, p.pos, p.facing); }
