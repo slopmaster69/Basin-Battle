@@ -20,7 +20,11 @@ is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (t
    held 1.4 sec, the engine racing and smoking): "That'll cut it!" Then it drives 6 yd straight in
    0.9 sec, its legs running, chips and sparks off the floor every 0.2 sec. Its 3 yd lane checks
    the swept path and hits each hero once; walls stop it. Step aside during the rev.
-5. **Stall,** 3.5 sec. Slumped (StandWound, held), smoking and sparking, facing the way it drove.
+5. **Stall,** 3.5 sec, facing the way it drove: its legs buckle and it slumps (JumpEnd's landing
+   crouch, caught 0.25 sec in with the body at half its height and tipped about 30°, and held
+   still), smoke pouring (a puff every 0.25 sec) and sparks flying (every 0.4 sec) the whole time,
+   the engine sputtering (its own clanks at uneven gaps). 0.45 sec before the end the engine
+   catches and it heaves itself up. Hits don't flinch it out of the slump.
    "C'mon, you heap of junk!" A posture break may lengthen it, never shorten it.
 6. **Break.** "No, no, not now!" The machine collapses (its Death lands at 2.5 sec). Then Sneed is
    thrown out (0.6 sec in the air) past the wreck's edge farthest from his foe and lands in dust.
@@ -32,7 +36,8 @@ is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (t
 8. **The repair, once.** No sooner than 6 sec after he lands, at a safe moment: "Just...
    one... bolt..." and he runs to the reachable edge of the wreck farthest from his foe (6 sec to
    get there, else he gives up). 4 sec of hammering (Mining) and sparks. Any hit, or a stagger,
-   stops it for good, and the wreck goes quiet: no more smoke, a body gone 6 sec later. Finished,
+   stops it for good, and the wreck goes quiet where it lies: no more smoke or sparks. It stays
+   until Sneed's body goes (4 sec after he falls) or a wipe clears the floor. Finished,
    the same wreck heaves back up (JumpEnd) in smoke and dust where it lay, facing the way it fell,
    at a third of its health. It says nothing and doesn't walk in; it waits 2 sec before its first
    blow.
@@ -55,7 +60,7 @@ fight only.
 
 | Shared fix | Here |
 | --- | --- |
-| Punish windows look like idling | The stall holds StandWound 3.5 sec; Sneed's open 1.4 sec holds GoblinMale's StandWound (`HoldPose` 8) |
+| Punish windows look like idling | The stall's slump: JumpEnd caught with the legs buckled and held still (`freeze_open_pose`, the add-on's `FZ`), smoke, sparks and a sputter the whole 3.5 sec; Sneed's open 1.4 sec holds GoblinMale's StandWound (`hold_open_pose` 8). Neither is flinched out of by the hits that punish it |
 | Debug damage counts as real | `machinery_debug`: debug damage builds no posture on either form and never stops the repair |
 | Second forms are instant swaps | Sneed hidden in the wreck until it lands, thrown out, a line, 2 sec before his first blow; the rebuilt machine heaves up and waits 2 sec |
 | Deaths lag | Either form sends `HoldPose` 0 as it falls, letting go of a held slump, rev or hunch |
@@ -71,8 +76,10 @@ before an unblockable blow, the floor mark with markers on).
 
 GoblinShredder (display 1269, `Creature\Goblin\GoblinShredder.m2`) has Stand, Walk (2.5 yd a
 second), Run (6.9), AttackUnarmed takes 0 and 1 (impact 1.00 and 0.83 sec), CreatureSpecial 130,
-StandWound, Death ($DTH at 2.50 sec), Walkbackwards, Swim and the jumps. No stun or kneel clip, so
-the stall is StandWound and the heave is JumpEnd. Sounds: GoblinShredderAttack 1977 (saw),
+StandWound, Death ($DTH at 2.50 sec), Walkbackwards, Swim and the jumps. No stun or kneel clip,
+and StandWound keeps the body at full height (measured on its bones: head and body never under
+0.95 of standing), so the stall is JumpEnd held at its landing crouch (0.18 to 0.34 sec in, the
+body at 0.49 to 0.55 of its height) and the heave is JumpEnd played through. Sounds: GoblinShredderAttack 1977 (saw),
 GoblinShredder 3700 (engine), GoblinShredderWoundCrit 1979 (stall), SteamGeyserVar1 4858 (vent
 hiss). Smoke is Vanish's puff (spell 1856), sparks the parry kit (555), dust 5649. Sneed's wrench
 is spell 13398 (`Spells\Missile_Wrench.mdx`, speed 20) on GoblinMale's AttackThrown 107.
@@ -84,6 +91,9 @@ Sneed's Shredder` for the machine, `camera duel Sneed` for him on foot. Start fr
 Sneed pack and a hero out of its sight near the Mast Room door, so the log work, the turn and the
 walk in are on camera. `tools/visual-check/shredder-pressure-repair.txt` is an older
 dev-command demonstration (forced breaks, repeated heals): it shows the moves, not a fight.
+
+Not yet filmed (Nov 10): the held slump, the pouring smoke and sparks and the sputter in the stall,
+and the quiet wreck staying after a stopped repair.
 
 ## Tests
 
