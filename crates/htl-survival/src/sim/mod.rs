@@ -1118,6 +1118,8 @@ pub struct Survival {
     pub storage: BTreeMap<usize, u32>,
     pub events: Vec<Event>,
     pub(crate) missiles: Vec<combat::Missile>,
+    /// Creatures' shots along a line in flight (Greenskin's crew's balls, his harpoon).
+    pub(crate) line_shots: Vec<combat::LineShot>,
     /// Heroes' projectiles in flight, ground marked to land, ground burning, totems standing.
     pub(crate) projectiles: Vec<abilities::Projectile>,
     pub(crate) grounds: Vec<abilities::GroundCast>,
@@ -1284,6 +1286,7 @@ impl Survival {
             storage: BTreeMap::new(),
             events: Vec::new(),
             missiles: Vec::new(),
+            line_shots: Vec::new(),
             projectiles: Vec::new(),
             landings: Vec::new(),
             lines: std::collections::VecDeque::new(),
@@ -1727,6 +1730,10 @@ impl Survival {
         let drop = if self.clock < p.landing_until { LANDING_FALL } else { FELL_THROUGH };
         if self.is_below() && pos.iter().all(|v| v.is_finite()) && self.hold_at_doors(id, was, pos)
         {
+            return;
+        }
+        // Over the ship's side in VanCleef's duel: back on the deck.
+        if self.hold_on_deck(id, pos) {
             return;
         }
         // Fallen through the world (the floor not there on arrival): back to the last firm ground.
