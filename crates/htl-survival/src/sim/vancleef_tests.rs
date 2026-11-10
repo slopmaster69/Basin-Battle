@@ -784,3 +784,67 @@ fn hits_into_the_hunch_leave_it_held() {
     s.clock = until + 0.1;
     assert!(!s.posed(id), "the pose is over with the hunch");
 }
+
+/// A deck 6 yd either side of the keel line, the sea 12 yd under it beyond.
+struct Ship;
+
+impl Land for Ship {
+    fn height(&self, _x: f32, y: f32) -> f32 {
+        if y.abs() <= 6.0 { 0.0 } else { -12.0 }
+    }
+    fn water(&self, _x: f32, y: f32) -> bool {
+        y.abs() > 6.0
+    }
+}
+
+fn on_ship(key: &str) -> (Survival, Id, Id) {
+    let mut s = Survival::bare(Content::dev(), Box::new(Ship), 7, 0.0);
+    s.content.pvp = Default::default();
+    let hero = s.join("hero", "Hero", None);
+    s.move_player(hero, [2.0, 4.0, 0.0], std::f32::consts::PI, Moving::default());
+    let p = s.players.get_mut(&hero).unwrap();
+    p.health = 100_000;
+    p.max_health = 100_000;
+    p.last_safe = [2.0, 4.0, 0.0];
+    let id = s.spawn_mob(s.content.mob(key).unwrap(), [0.0; 3], None, false);
+    s.engage(id, Foe::Hero(hero));
+    s.clean_duels();
+    s.vancleef.duels.get_mut(&id).unwrap().entered = true;
+    (s, hero, id)
+}
+
+#[test]
+fn a_roll_over_the_rail_mid_duel_sets_the_hero_back_on_the_deck_and_the_fight_goes_on() {
+    for key in ["dm_vancleef", "dm_vancleef_unbowed"] {
+        let (mut s, hero, id) = on_ship(key);
+        run(&mut s, 0.2);
+        let firm = s.players[&hero].last_safe;
+        assert!(firm[1].abs() <= 6.0 && firm[2].abs() < 0.01, "{key}: firm on the deck: {firm:?}");
+        s.events.clear();
+        // The roll carries them 3 yd past the rail, still at the deck's height (in the air).
+        s.move_player(hero, [2.0, 9.0, 0.0], std::f32::consts::PI, Moving::default());
+        let at = s.players[&hero].pos;
+        assert!(at[1].abs() <= 6.0 && at[2] >= 0.0, "{key}: back on the deck: {at:?}");
+        assert!(s.events.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == hero)), "{key}: their client is told");
+        // And already falling, the next report under the deck: still back on it.
+        s.move_player(hero, [2.0, 9.5, -5.0], std::f32::consts::PI, Moving::default());
+        assert!(s.players[&hero].pos[1].abs() <= 6.0, "{key}");
+        run(&mut s, 1.0);
+        assert_eq!(s.mobs[&id].state.foe(), Some(Foe::Hero(hero)), "{key}: the duel goes on");
+        // Across the deck it's an ordinary step.
+        s.events.clear();
+        s.move_player(hero, [3.0, -5.0, 0.0], std::f32::consts::PI, Moving::default());
+        assert_eq!(s.players[&hero].pos, [3.0, -5.0, 0.0], "{key}");
+        assert!(!s.events.iter().any(|e| matches!(e, Event::Teleport { .. })), "{key}");
+    }
+}
+
+#[test]
+fn out_of_his_fight_the_ships_side_is_an_ordinary_fall() {
+    let (mut s, hero, id) = on_ship("dm_vancleef");
+    s.remove_duel(id);
+    s.mobs.remove(&id);
+    run(&mut s, 0.2);
+    s.move_player(hero, [2.0, 9.0, 0.0], std::f32::consts::PI, Moving::default());
+    assert_eq!(s.players[&hero].pos, [2.0, 9.0, 0.0]);
+}
