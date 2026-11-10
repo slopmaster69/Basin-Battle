@@ -1009,7 +1009,7 @@ fn gorged_always_turns_on_the_hero_after_the_gulp_wherever_they_stand() {
             assert!(s.clock - done < 8.0, "at {spot:?} he came for the hero {:.1} s after his wait", s.clock - done);
         } else {
             // He can't reach them: he waits for them, still in the fight, not home.
-            for _ in 0..(12.0 / DT) as usize {
+            for _ in 0..(8.0 / DT) as usize {
                 s.step(DT);
                 assert!(!matches!(s.mobs[&next].state, MobState::Return | MobState::Idle { .. }), "behind the pot at {:.1}: {:?}", s.clock, s.mobs[&next].state);
             }
@@ -1017,5 +1017,42 @@ fn gorged_always_turns_on_the_hero_after_the_gulp_wherever_they_stand() {
             until(&mut s, next, 8.0, |s, n| matches!(s.mobs[&n].state, MobState::Windup { .. }));
         }
         assert!(s.kitchen.cooks.contains_key(&next));
+    }
+}
+
+#[test]
+fn waiting_where_he_cannot_walk_he_evades_every_blow_and_after_10_s_he_goes_home() {
+    for come_back in [false, true] {
+        let (mut s, band, id) = fight(GORGED, 1);
+        s.land = Box::new(Fenced);
+        let h = band[0];
+        // Behind the pot, out of his reach, where nothing walks.
+        s.move_player(h, [0.0, 9.0, 0.0], 0.0, Moving::default());
+        until(&mut s, id, 5.0, |s, id| s.mobs[&id].lost_at.is_some());
+        let lost = s.mobs[&id].lost_at.unwrap();
+        until(&mut s, id, 2.0, |s, id| s.kitchen_evading(id));
+        assert!(s.clock - lost >= EVADE_AFTER - DT);
+        assert!(s.evading(id, h));
+        // A shot from up there finds nothing, and he's seen to slip it: no word, no "Miss".
+        let hp = s.mobs[&id].health;
+        let shot = s.content.ability("fireball").unwrap();
+        s.content.abilities[shot].effects.clear();
+        s.ability_on_mob(h, id, shot, 1.0, 50.0, s.players[&h].pos, crate::sim::abilities::HitKind::Projectile, 133);
+        let ev = s.step(DT);
+        assert_eq!(s.mobs[&id].health, hp, "nothing reaches him while he waits");
+        assert!(ev.iter().any(|e| matches!(e, Event::React { id: who, anim: 30, .. } if *who == id)), "he slips it, as on the way home");
+        assert!(!ev.iter().any(|e| matches!(e, Event::Swing { victim: Some(v), .. } if *v == id)));
+        assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })));
+        if come_back {
+            // Stepping down where he can reach ends it: he comes, and can be hit again.
+            s.move_player(h, [3.0, 0.0, 0.0], 0.0, Moving::default());
+            until(&mut s, id, 6.0, |s, id| matches!(s.mobs[&id].state, MobState::Windup { .. }));
+            assert!(!s.kitchen_evading(id) && !s.evading(id, h));
+        } else {
+            // No way opens: after 10 s he gives up and goes home, as the old rule did.
+            until(&mut s, id, HOLD_ON + 1.0, |s, id| matches!(s.mobs[&id].state, MobState::Return));
+            assert!(s.clock - lost >= HOLD_ON - DT, "he waited {:.1} s", s.clock - lost);
+            assert!(!s.kitchen_evading(id));
+        }
     }
 }

@@ -75,8 +75,11 @@ in it, as every creature does. Two takes lost Gorged. In 341 the kitchen had its
 of height from his post, and the cove climbs 8 yd in the 12 east of it, so a hero who dodged up the
 slope sent him home. In 348 he stopped by the pot after a belch: a creature that finds no way to
 its hero for 4 sec gives up and goes home, and the hero stood where he couldn't walk. Cookie and
-Gorged no longer give up that way while the hero is still in their fight (`kitchen_holds_on`); they
-wait, and come for them as soon as there is a way.
+Gorged now wait up to 10 sec for a hero still in their fight (`kitchen_holds_on`), and come for
+them as soon as there is a way. While they wait, nothing reaches them: blows and shots find nothing
+and they're seen to slip them (`kitchen_evading`, the dodge clip a creature walking home past its
+leash uses), so standing where they can't walk buys no free hits. If no way opens in 10 sec they
+give up and go home, as any creature does.
 
 **The open look.** The murloc has no StandWound or kneel. His openings (the knocked pot, the
 steam's recovery, the belch's cough) hold CombatWound (clip 9) for their whole length (`HoldPose`),
@@ -106,23 +109,24 @@ the same body compares like with like whatever the client does with it. His slap
 ## Verification
 
 `crates/htl-survival/src/sim/kitchen_tests.rs` covers each beat: the pull's two bangs with the
-tankard; any released blow counting once and an unreleased one never (both forms, with and
-without network delay); a hero staggered by every first slap still seeing the belch; the rhythm
-and fighting on while the puddle cools; scoops after 3, 4 and 5 exchanges; the swap, the held
-lift, where the pour lands (on the hero, pushed out to 4 yd), its ring from the first moment, the
-arc's 3 legs and 0.3 sec or more in the air, the splash and the edge puffs; the puddle burning just
-inside its edge and never just outside, until the last puff drops one by one; a broken-off pour
-leaving nothing; the scoop side-on with repeated dips and slurps; two jabs not breaking it, about
-2 sec of blows or one heavy blow breaking it; the knock's splash, steam dropping, 5.5 sec reel
-and health falling through it; the gulp, heal, cone drawn and filled, the steam's short opening,
-the pot emptying after two gulps and never scooped again; the cone hitting inside and missing
-outside its drawn edge; control delaying the gulp; waiting out every scoop still winnable; the
-blocked pot; the pot staying through death and a wipe and going with a reset; the dungeon wipe;
-Gorged lying 2 sec, walking, gulping the pot empty, swelling past Cookie, "MORE STEW!" and waiting
-2 sec; the belch's drawn length, pulse, hit and cough, a broken-off belch letting go of its
-pulse, both forms staying on a hero who dodged up a slope like the cove's until they die, and
-Gorged turning on the hero after his gulp wherever they stand: beside the pot either side, up
-close, far off, and behind it where he can't walk (he waits, then comes when they step out).
+tankard; any released blow counting once and an unreleased one never (both forms, with and without
+network delay); a hero staggered by every first slap still seeing the belch; the rhythm and
+fighting on while the puddle cools; scoops after 3, 4 and 5 exchanges; the swap, the held lift,
+where the pour lands (on the hero, pushed out to 4 yd), its ring from the first moment, the arc's 3
+legs and 0.3 sec or more in the air, the splash and the edge puffs; the puddle burning just inside
+its edge and never just outside, until the last puff drops one by one; a broken-off pour leaving
+nothing; the scoop side-on with repeated dips and slurps; two jabs not breaking it, about 2 sec of
+blows or one heavy blow breaking it; the knock's splash, steam dropping, 5.5 sec reel and health
+falling through it; the gulp, heal, cone drawn and filled, the steam's short opening, the pot
+emptying after two gulps and never scooped again; the cone hitting inside and missing outside its
+drawn edge; control delaying the gulp; waiting out every scoop still winnable; the blocked pot; the
+pot staying through death and a wipe and going with a reset; the dungeon wipe; Gorged lying 2 sec,
+walking, gulping the pot empty, swelling past Cookie, "MORE STEW!" and waiting 2 sec; the belch's
+drawn length, pulse, hit and cough, a broken-off belch letting go of its pulse, both forms staying
+on a hero who dodged up a slope like the cove's until they die, and Gorged turning on the hero
+after his gulp wherever they stand: beside the pot either side, up close, far off, and behind it
+where he can't walk (he waits, then comes when they step out); and, waiting there, evading a shot
+with the slip and no word, then going home after 10 sec.
 
 `a_lone_hero_playing_by_the_tells_clears_cookie_and_gorged` plays both forms with a warrior on the
 starting weapon and their own health, reading only what the client shows with a 0.3 sec reaction:

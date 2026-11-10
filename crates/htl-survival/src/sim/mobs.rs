@@ -2073,7 +2073,9 @@ impl Survival {
     /// find nothing (it evades, as 1.12's do) until it's home or they come back within it.
     pub(crate) fn evading(&self, mid: Id, by: Id) -> bool {
         let (Some(m), Some(p)) = (self.mobs.get(&mid), self.players.get(&by)) else { return false };
-        !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK
+        // (Cookie and Gorged waiting for a hero they can find no way to evade too: `sim::kitchen`.)
+        self.kitchen_evading(mid)
+            || (!m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK)
     }
 
     /// An evading creature slips a blow from `from`: the dodge's clip on it, and no word over it

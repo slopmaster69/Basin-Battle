@@ -93,6 +93,9 @@ const GORGED_GULP: f32 = 1.8;
 const SWELL: f32 = 1.5;
 /// The swell runs past his full size by this much, then settles back: a gulp's heave.
 const SWELL_OVER: f32 = 0.08;
+/// How long a cook waits for a hero he can find no way to, and how soon he evades meanwhile.
+const HOLD_ON: f32 = 10.0;
+const EVADE_AFTER: f32 = 1.0;
 /// The belch's swelling pulse at its fullest.
 const PULSE: f32 = 0.1;
 
@@ -513,10 +516,20 @@ impl Survival {
     }
 
     /// A cook keeps to a hero still in his fight even when he can find no way to them (a dock,
-    /// behind the pot): he waits for them rather than going home (take 348).
+    /// behind the pot): he waits for them rather than going home (take 348), for `HOLD_ON`; then
+    /// he gives up and goes home as any creature does.
     pub(crate) fn kitchen_holds_on(&self, id: Id, foe: Foe) -> bool {
         let (Some(m), Foe::Hero(h)) = (self.mobs.get(&id), foe) else { return false };
         self.kitchen.cooks.contains_key(&id) && self.in_fight_of(m, h)
+            && m.lost_at.is_some_and(|t| self.clock - t < HOLD_ON)
+    }
+
+    /// While he waits with no way to his hero, nothing reaches him: blows and shots find nothing
+    /// and he's seen to slip them, as a creature evades on its way home past its leash. Standing
+    /// where he can't walk buys no free hits.
+    pub(crate) fn kitchen_evading(&self, id: Id) -> bool {
+        self.kitchen.cooks.contains_key(&id) && self.mobs.get(&id).is_some_and(|m| m.health > 0
+            && matches!(m.state, MobState::Chase { .. }) && m.lost_at.is_some_and(|t| self.clock - t >= EVADE_AFTER))
     }
 
     /// What his hand should hold now, sent as it changes.
