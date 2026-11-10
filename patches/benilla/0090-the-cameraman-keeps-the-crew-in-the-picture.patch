@@ -1,0 +1,628 @@
+From 406fac587cc6d84f96d4c162e556977e03b35e30 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 9 Nov 2026 19:04:24 -0600
+Subject: [PATCH] The cameraman keeps the crew in the picture, has a wide shot,
+ and stays on the fight through a setup's teleports (patch 0090)
+
+Three faults from filming the rebuilt Deadmines bosses with `WOW_SPECTATE` (patches 0088, 0089) on
+Nov 9:
+
+- No shot ever showed Gilnid's engineers on their planks, 8.6 and 9.7 yd over the pit. The spec
+  takes a crew now, `<subject>,<hero>,<shot>,<crew>|<crew>`: each living one within 15 yd of the
+  subject or the hero (along the ground, so overhead counts) is kept in the picture with the two,
+  from every shot: the camera looks at the middle of them all, feet to heads, and stands back (to
+  50 yd) until every one fits; a position where the world hides one scores worse.
+- A `wide` shot: 20 to 25 yd out and 30 degrees up, for the arena (the crew on their planks, the
+  valve's fire stripe across the pit). `high` was too close and too steep in the Foundry (whole
+  stretches of bare orange floor): 15 to 22 yd at 45 degrees, from 12 to 18 at 52.
+- A clip cut to 5 s, and a camera on the wrong spot for the video's first second and a half. The
+  hero fell in a setup (pirates at the landing), was teleported and healed before the video, and
+  the camera held where he fell. Now a hero moved at once (`.es goto`, more than 12 yd in a frame)
+  gets a position picked afresh there, straight away, and for 2.5 s after the camera looks again
+  every quarter second as the world there loads in. A fight over is on again at once when the
+  hero, up, is moved beside a living subject 3 s or more after the fall (sooner is a fallen hero
+  sent to a lamp, which still holds). The hero falls only once down for 0.3 s. (The rig, in Basin
+  Battle, ends the video only on a fall after the video started.)
+---
+ crates/benilla-app/src/player/spectator.rs | 343 ++++++++++++++++++---
+ 1 file changed, 302 insertions(+), 41 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
+index f6a648f5..1c730f19 100644
+--- a/crates/benilla-app/src/player/spectator.rs
++++ b/crates/benilla-app/src/player/spectator.rs
+@@ -1,16 +1,23 @@
+-//! `WOW_SPECTATE=<subject>,<hero>[,<shot>]`: the cameraman, Basin Battle's spectator camera for
+-//! filming a fight honestly. This client plays no part in the fight (its server keeps its body
+-//! out of the rules and unseen, `.es watch`); its camera leaves the body and holds the named
+-//! creature (`subject`, a boss) and player (`hero`) in view, framed by the shot's rules:
++//! `WOW_SPECTATE=<subject>,<hero>[,<shot>[,<crew>]]`: the cameraman, Basin Battle's spectator
++//! camera for filming a fight honestly. This client plays no part in the fight (its server keeps
++//! its body out of the rules and unseen, `.es watch`); its camera leaves the body and holds the
++//! named creature (`subject`, a boss) and player (`hero`) in view, framed by the shot's rules:
+ //!
+ //! - `duel` (the default): a three-quarter side view from the hero's side, 10 to 14 yd out.
+ //! - `low`: 20 yd out and low, for a big body (the Shredder).
+-//! - `high`: 45 to 60 degrees up, so a ground hazard's edge shows.
++//! - `high`: 45 to 60 degrees up (45 first), 15 to 22 yd out, so a ground hazard's edge shows.
++//! - `wide` (patch 0090): 20 to 25 yd out and 30 degrees up, for the arena: a crew on their
++//!   planks, a stripe of fire across the floor.
+ //!
+ //! The distance grows past the shot's range only when both would not fit otherwise; where the
+ //! world is in the way the eye comes in along its line. The subject may name a boss's forms in
+ //! turn, `Cookie|Gorged`: the living one nearest the hero is filmed.
+ //!
++//! The crew (patch 0090), `Furnace Engineer|Defias Blackguard`: creatures that are part of the
++//! fight (a boss's crew, his adds). Each living one within [`CREW_REACH`] of the subject or the
++//! hero is kept in the picture too, wherever it stands, overhead included: the camera looks at
++//! the middle of them all and stands back (to [`CREW_FAR`]) until every one fits.
++//!
+ //! What the camera never does (patch 0089):
+ //!
+ //! - **Stand inside a body.** The eye keeps out of every body's bounds (its model's Stand box: the
+@@ -28,7 +35,14 @@
+ //! - **Film past the end.** When the hero falls, or the subject (the last of its forms) does, the
+ //!   camera says so (`spectate: ... the fight is over: <name> fell`, which the rig ends the video
+ //!   on) and holds where it is, rather than following the hero to a lamp. It films again if the
+-//!   hero is back on their feet beside a living subject.
++//!   hero is back on their feet beside a living subject. A hero only falls who has read as down
++//!   for [`FALL_SECS`]. (The rig ends the video only on a fall after the video started: a fall in
++//!   the setup before it doesn't count.)
++//! - **Stay where the fight was** (patch 0090). When the hero is moved at once (a setup's
++//!   `.es goto`, a lamp), the camera picks its position afresh there, straight away, and for
++//!   [`SETTLE_SECS`] after looks again every [`RETRY_URGENT_SECS`] as the world there loads in,
++//!   so it's on the fight from the video's first frame. A fight over (the hero fell in the setup)
++//!   is on again at once when the hero, up, is moved beside a living subject.
+ //!
+ //! Positions are chosen with the clearest picture: nothing hiding either of the two, nothing in
+ //! the foreground, then the shot's own order (the other side, square to the side, behind, then
+@@ -110,6 +124,24 @@ const HIDDEN_AT: usize = 3;
+ /// A cut has to see the two this much better (in [`Scene::score`]'s points) than where the
+ /// camera is.
+ const BETTER_BY: f32 = 3.0;
++/// A crew member this near (yd, along the ground) the subject or the hero is kept in the picture.
++const CREW_REACH: f32 = 15.0;
++/// The furthest the camera stands back (yd) to fit the two, and with a crew, them all.
++const FAR: f32 = 45.0;
++const CREW_FAR: f32 = 50.0;
++/// A crew member hidden from a position (by the world, at its chest) costs it this much in
++/// [`Scene::score`]'s points.
++const CREW_HIDDEN: f32 = 2.0;
++/// The hero moved further than this (yd) between two frames was moved at once: a teleport.
++const TELEPORT: f32 = 12.0;
++/// After the hero is moved at once, how long (seconds) the camera keeps looking for its position
++/// there as the world loads in, every [`RETRY_URGENT_SECS`].
++const SETTLE_SECS: f32 = 2.5;
++/// A fight over is on again at once when the hero, up, is moved beside a living subject this long
++/// (seconds) after the fall or more: sooner, it's a fallen hero sent to a lamp.
++const MOVED_ON_SECS: f32 = 3.0;
++/// The hero reads as down this long (seconds) before the camera says they fell.
++const FALL_SECS: f32 = 0.3;
+ 
+ /// The framing rules.
+ #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+@@ -117,6 +149,7 @@ pub(crate) enum Shot {
+     Duel,
+     Low,
+     High,
++    Wide,
+ }
+ 
+ /// A shot's distances (yd), elevation (degrees up), and the azimuths it tries in order (degrees
+@@ -136,6 +169,7 @@ impl Shot {
+             "" | "duel" => Some(Self::Duel),
+             "low" => Some(Self::Low),
+             "high" => Some(Self::High),
++            "wide" => Some(Self::Wide),
+             _ => None,
+         }
+     }
+@@ -144,7 +178,10 @@ impl Shot {
+         match self {
+             Self::Duel => ShotRule { near: 10.0, far: 14.0, up: 15.0, higher: 25.0, sides: &[50.0, -50.0, 90.0, -90.0, 130.0, -130.0, 20.0, -20.0] },
+             Self::Low => ShotRule { near: 20.0, far: 20.0, up: 4.0, higher: 20.0, sides: &[70.0, -70.0, 110.0, -110.0, 30.0, -30.0, 150.0, -150.0] },
+-            Self::High => ShotRule { near: 12.0, far: 18.0, up: 52.0, higher: 8.0, sides: &[40.0, -40.0, 100.0, -100.0, 160.0, -160.0, 0.0] },
++            // 0089's 12 to 18 yd at 52 degrees filled the Foundry's frame with floor (Nov 9): further
++            // out and at the shallow end of its range, so the two and what's round them show.
++            Self::High => ShotRule { near: 15.0, far: 22.0, up: 45.0, higher: 12.0, sides: &[40.0, -40.0, 100.0, -100.0, 160.0, -160.0, 0.0] },
++            Self::Wide => ShotRule { near: 20.0, far: 25.0, up: 30.0, higher: 15.0, sides: &[55.0, -55.0, 95.0, -95.0, 25.0, -25.0, 135.0, -135.0] },
+         }
+     }
+ }
+@@ -156,22 +193,31 @@ pub(crate) struct Spectate {
+     subject: Vec<String>,
+     hero: String,
+     shot: Shot,
++    /// The names of creatures in the fight kept in the picture too (patch 0090); may be empty.
++    crew: Vec<String>,
+ }
+ 
+ impl Spectate {
+-    /// `<subject>[|<next form>...],<hero>[,<shot>]`; the hero is needed, the subject may be empty.
++    /// `<subject>[|<next form>...],<hero>[,<shot>[,<crew>[|<crew>...]]]`; the hero is needed, the
++    /// subject and the crew may be empty.
+     fn parse(spec: &str) -> Option<Self> {
++        let names = |s: &str| s.split('|').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect::<Vec<_>>();
+         let mut parts = spec.split(',');
+-        let subject = parts.next()?.split('|').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
++        let subject = names(parts.next()?);
+         let hero = parts.next()?.trim().to_string();
+         let shot = Shot::parse(parts.next().unwrap_or(""))?;
+-        (!hero.is_empty() && parts.next().is_none()).then_some(Self { subject, hero, shot })
++        let crew = names(parts.next().unwrap_or(""));
++        (!hero.is_empty() && parts.next().is_none()).then_some(Self { subject, hero, shot, crew })
+     }
+ 
+     fn is_subject(&self, name: &str) -> bool {
+         self.subject.iter().any(|s| s.eq_ignore_ascii_case(name))
+     }
+ 
++    fn is_crew(&self, name: &str) -> bool {
++        self.crew.iter().any(|s| s.eq_ignore_ascii_case(name))
++    }
++
+     /// Whether `name` is the subject's last form: its fall ends the fight.
+     fn is_last(&self, name: &str) -> bool {
+         self.subject.last().is_some_and(|s| s.eq_ignore_ascii_case(name))
+@@ -184,6 +230,14 @@ impl Spectate {
+             self.subject.join(" then ")
+         }
+     }
++
++    fn crew_text(&self) -> String {
++        if self.crew.is_empty() {
++            String::new()
++        } else {
++            format!(", with {} in the picture", self.crew.join(" and "))
++        }
++    }
+ }
+ 
+ /// A body in the picture, or in the way: an upright cylinder from its feet, the size of its
+@@ -272,9 +326,9 @@ fn positions(rule: &ShotRule) -> usize {
+     rule.sides.len() * 2
+ }
+ 
+-/// Position `pick` of the shot, framing `subject` and `hero` with the fight's axis at `axis` (a
+-/// yaw: the direction from the subject to the hero, `(sin, 0, cos)`).
+-fn pose(shot: Shot, subject: Body, hero: Body, axis: f32, pick: usize) -> Pose {
++/// Position `pick` of the shot, framing `subject` and `hero` (and the `crew` near them) with the
++/// fight's axis at `axis` (a yaw: the direction from the subject to the hero, `(sin, 0, cos)`).
++fn pose(shot: Shot, subject: Body, hero: Body, crew: &[Body], axis: f32, pick: usize) -> Pose {
+     let rule = shot.rule();
+     let n = rule.sides.len();
+     let side = rule.sides[pick % n].to_radians();
+@@ -292,10 +346,33 @@ fn pose(shot: Shot, subject: Body, hero: Body, axis: f32, pick: usize) -> Pose {
+     let wide = apart / TAN_HALF_WIDE;
+     let tall = (subject.tall.max(hero.tall) * 0.6 + 0.5) / TAN_HALF_TALL;
+     let fit = wide.max(tall);
+-    let dist = if fit > rule.far { fit.min(45.0) } else { fit.clamp(rule.near, rule.far) };
++    let mut dist = if fit > rule.far { fit.min(FAR) } else { fit.clamp(rule.near, rule.far) };
++    if !crew.is_empty() {
++        // The crew too: the middle of them all, feet to heads, and back until every one fits.
++        let ends: Vec<Vec3> = [subject, hero].iter().chain(crew).filter(|b| b.tall > 0.0).flat_map(|b| [b.feet, b.feet + Vec3::Y * b.tall]).collect();
++        let (lo, hi) = ends.iter().fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(lo, hi), &p| (lo.min(p), hi.max(p)));
++        look = (lo + hi) * 0.5;
++        dist = dist.max(fit_all(look, out, &ends).min(CREW_FAR));
++    }
+     Pose { look, out, dist }
+ }
+ 
++/// How far out along `out` from `look` the eye has to stand for every one of `points` to be in
++/// the picture (inside the view's half-angles, with their margins).
++fn fit_all(look: Vec3, out: Vec3, points: &[Vec3]) -> f32 {
++    let ahead = -out;
++    let right = ahead.cross(Vec3::Y).normalize_or(Vec3::X);
++    let up = right.cross(ahead);
++    points
++        .iter()
++        .map(|&p| {
++            let v = p - look;
++            // Its depth from the eye is `d + v·ahead`; across and up it's `v·right`, `v·up`.
++            (v.dot(right).abs() / TAN_HALF_WIDE).max(v.dot(up).abs() / TAN_HALF_TALL) - v.dot(ahead)
++        })
++        .fold(0.0, f32::max)
++}
++
+ /// The yaw and pitch (radians, [`FlyCam`]'s) that look from `eye` at `look`.
+ fn aim(eye: Vec3, look: Vec3) -> (f32, f32) {
+     let d = (look - eye).normalize_or(Vec3::NEG_Z);
+@@ -339,6 +416,15 @@ struct Framing {
+     outside: f32,
+     /// Each body's last feet and measured walk, by guid.
+     walks: HashMap<u64, (Vec3, Vec3)>,
++    /// The hero's feet last frame, and whether up then (a move at once is a teleport); how long the
++    /// hero has read as down; how long the fight has been over; how long the camera has yet to
++    /// settle after a teleport.
++    hero_last: Option<(Vec3, bool)>,
++    down: f32,
++    over_for: f32,
++    settle: f32,
++    /// The last teleport moved the hero up, to up, long enough after a fall to be the fight moved.
++    moved_up: bool,
+ }
+ 
+ /// What the camera films this frame: the two, and every other body that can stand in the way.
+@@ -348,6 +434,9 @@ struct Scene {
+     named: Option<(String, bool)>,
+     hero: Body,
+     hero_alive: bool,
++    /// The crew near the fight (patch 0090), kept in the picture; they stand in the way like
++    /// anyone else, so they're among `others` too.
++    crew: Vec<Body>,
+     others: Vec<Body>,
+ }
+ 
+@@ -405,7 +494,22 @@ impl Scene {
+         if pulled {
+             s += 2.0;
+         }
+-        s
++        // A crew member the world hides (a plank seen through the ramp) is a worse picture.
++        s + CREW_HIDDEN
++            * self
++                .crew
++                .iter()
++                .filter(|c| {
++                    let line = c.at() - eye;
++                    let len = line.length();
++                    len > 1.0 && collide.cast_camera(eye, line * ((len - 0.4) / len), false).is_some()
++                })
++                .count() as f32
++    }
++
++    /// The shot's position `pick` here.
++    fn pose(&self, shot: Shot, axis: f32, pick: usize) -> Pose {
++        pose(shot, self.subject, self.hero, &self.crew, axis, pick)
+     }
+ 
+     /// The eye for a pose: as far out as the shot asks, or pulled in along its line short of the
+@@ -436,7 +540,7 @@ impl Scene {
+         (0..positions(&shot.rule()))
+             .filter(|&k| Some(k) != except)
+             .filter_map(|k| {
+-                let p = pose(shot, self.subject, self.hero, axis, k);
++                let p = self.pose(shot, axis, k);
+                 let (eye, pulled) = self.place(collide, p, BODY_GAP + CHOOSE_GAP)?;
+                 Some(Spot { pick: k, eye, look: p.look, score: self.score(collide, eye, p.look, k, pulled) })
+             })
+@@ -451,9 +555,10 @@ impl Scene {
+         (!self.covered(up, BODY_GAP) && sees(collide, look, up) && grounded(collide, up)).then_some(up)
+     }
+ 
+-    /// Whether the fight is over, and who fell: the hero, or the subject's last form.
+-    fn ended(&self, spec: &Spectate) -> Option<String> {
+-        if !self.hero_alive {
++    /// Whether the fight is over, and who fell: the hero (down for [`FALL_SECS`], `down` seconds
++    /// so far), or the subject's last form.
++    fn ended(&self, spec: &Spectate, down: f32) -> Option<String> {
++        if !self.hero_alive && down >= FALL_SECS {
+             return Some(spec.hero.clone());
+         }
+         match &self.named {
+@@ -521,6 +626,7 @@ fn find(spec: &Spectate, names: &NameCache, units: &Units, walks: &mut HashMap<u
+     let mut hero = None;
+     let mut subjects = Vec::new();
+     let mut others = Vec::new();
++    let mut crew = Vec::new();
+     let mut seen = Vec::new();
+     for (guid, t, store, net, pivot, ring, stand, shown) in units.iter() {
+         if !matches!(net.kind, EntityKind::Player | EntityKind::Unit) {
+@@ -543,6 +649,9 @@ fn find(spec: &Spectate, names: &NameCache, units: &Units, walks: &mut HashMap<u
+         } else if spec.is_subject(name) {
+             subjects.push((body, name.to_string(), alive));
+         } else if net.display_id.is_some() && shown.is_none_or(|v| v.get()) {
++            if alive && spec.is_crew(name) {
++                crew.push(body);
++            }
+             others.push(body);
+         }
+     }
+@@ -558,7 +667,10 @@ fn find(spec: &Spectate, names: &NameCache, units: &Units, walks: &mut HashMap<u
+         Some((body, name, alive)) => (body, Some((name, alive))),
+         None => (Body { feet: hero.feet + ahead * 5.0, tall: hero.tall, radius: 0.0, walk: Vec3::ZERO }, None),
+     };
+-    Some(Scene { subject, named, hero, hero_alive, others })
++    // The crew near the fight: along the ground from either of the two, overhead or not.
++    let near_fight = |b: &Body| [subject.feet, hero.feet].iter().any(|f| (b.feet - *f).with_y(0.0).length() <= CREW_REACH);
++    crew.retain(near_fight);
++    Some(Scene { subject, named, hero, hero_alive, crew, others })
+ }
+ 
+ /// Films the fight: after `control` and the camera shake, so the eye written here is the one
+@@ -596,13 +708,18 @@ fn film(
+     let shot = spec.shot;
+     let Some(eye) = state.eye else {
+         // The first frame: the clearest position, straight there.
+-        let spot = scene.best(&collide, shot, axis, None).unwrap_or_else(|| {
+-            let p = pose(shot, subject, hero, axis, 0);
+-            Spot { pick: 0, eye: p.look + p.out * p.dist, look: p.look, score: f32::INFINITY }
+-        });
+-        info!("spectate: t=0.0 filming {} and {} ({shot:?}), position {} (score {:.0})", spec.subject_text(), spec.hero, spot.pick, spot.score);
++        let spot = first_spot(&collide, &scene, shot, axis);
++        info!(
++            "spectate: t=0.0 filming {} and {}{} ({shot:?}), position {} (score {:.0})",
++            spec.subject_text(),
++            spec.hero,
++            spec.crew_text(),
++            spot.pick,
++            spot.score
++        );
+         let walks = std::mem::take(&mut state.walks);
+-        *state = Framing { eye: Some(spot.eye), look: spot.look, axis, pick: spot.pick, walks, ..default() };
++        let hero_last = Some((hero.feet, scene.hero_alive));
++        *state = Framing { eye: Some(spot.eye), look: spot.look, axis, pick: spot.pick, walks, hero_last, settle: SETTLE_SECS, ..default() };
+         player.detached = true;
+         rig.filming = true;
+         write(&mut cam_t, &mut cam, spot.eye, spot.look);
+@@ -612,19 +729,40 @@ fn film(
+     let clock = state.clock;
+     player.detached = true;
+     rig.filming = true;
++    // A teleport: the hero moved at once (a setup's `.es goto`, a lamp). Moved while up, and
++    // still up, it's the fight moved, not a fall: one way a fight over is on again.
++    let moved = state.hero_last.map(|(f, _)| f.distance(hero.feet)).filter(|&d| d > TELEPORT);
++    let was_up = state.hero_last.is_some_and(|(_, up)| up);
++    state.hero_last = Some((hero.feet, scene.hero_alive));
++    state.down = if scene.hero_alive { 0.0 } else { state.down + dt };
++    state.settle = (state.settle - dt).max(0.0);
++    if state.over {
++        state.over_for += dt;
++    }
++    if let Some(d) = moved {
++        info!("spectate: t={clock:.1} {} was moved {d:.0} yd at once", spec.hero);
++        state.settle = SETTLE_SECS;
++        state.moved_up = was_up && scene.hero_alive && (!state.over || state.over_for >= MOVED_ON_SECS);
++    }
+     // The end of the fight: the camera holds where it is (never after the hero to a lamp), and
+-    // films again only with the hero up beside a living subject.
+-    match scene.ended(&spec) {
++    // films again only with the hero up beside a living subject: for 5 s, or at once when moved
++    // there (a setup's teleport after a fall in it).
++    let mut resumed = false;
++    match scene.ended(&spec, state.down) {
+         Some(who) if !state.over => {
+             info!("spectate: t={clock:.1} the fight is over: {who} fell; the camera holds");
+             state.over = true;
++            state.over_for = 0.0;
++            state.moved_up = false;
+         }
+-        None if state.over && scene.named.as_ref().is_some_and(|n| n.1) => {
++        None if state.over && scene.hero_alive && scene.named.as_ref().is_some_and(|n| n.1) => {
+             state.again += dt;
+-            if state.again >= RESUME_SECS {
+-                info!("spectate: t={clock:.1} the fight is on again");
++            let moved_on = state.settle > 0.0 && state.moved_up;
++            if moved_on || state.again >= RESUME_SECS {
++                info!("spectate: t={clock:.1} the fight is on again{}", if moved_on { ": the hero was moved up beside it" } else { "" });
+                 state.over = false;
+                 state.held = 0.0;
++                resumed = true;
+             }
+         }
+         _ => state.again = 0.0,
+@@ -633,6 +771,24 @@ fn film(
+         write(&mut cam_t, &mut cam, eye, state.look);
+         return;
+     }
++    // Moved, or on again: the position picked afresh where the fight is now, straight there.
++    if moved.is_some() || resumed {
++        let spot = first_spot(&collide, &scene, shot, axis);
++        info!("spectate: t={clock:.1} a fresh position where the fight is: position {} (score {:.0})", spot.pick, spot.score);
++        state.axis = axis;
++        state.pick = spot.pick;
++        state.held = 0.0;
++        state.blocked = 0.0;
++        state.both = 0.0;
++        state.outside = 0.0;
++        state.told = false;
++        state.retry = RETRY_URGENT_SECS;
++        state.settle = SETTLE_SECS;
++        state.eye = Some(spot.eye);
++        state.look = spot.look;
++        write(&mut cam_t, &mut cam, spot.eye, spot.look);
++        return;
++    }
+     state.axis += turn(state.axis, axis) * (1.0 - (-dt / AXIS_LAG).exp());
+     state.held += dt;
+     state.retry -= dt;
+@@ -644,7 +800,7 @@ fn film(
+     if state.blocked == 0.0 {
+         state.told = false;
+     }
+-    let p = pose(shot, subject, hero, state.axis, state.pick);
++    let p = scene.pose(shot, state.axis, state.pick);
+     let want = scene.place(&collide, p, BODY_GAP);
+     // What can't wait: a body on the camera's spot or about to be, or the eye out of the world.
+     // (A position with no room just now holds the eye where it is: being hidden moves it.)
+@@ -682,6 +838,14 @@ fn film(
+                 }
+             }
+         }
++    } else if urgent.is_none() && state.settle > 0.0 && state.retry <= 0.0 {
++        // Just moved: as the world there loads in, a clearer position at once, held or not.
++        let here = scene.score(&collide, eye, state.look, state.pick, want.is_some_and(|w| w.1));
++        if let Some(spot) = scene.best(&collide, shot, state.axis, None).filter(|s| s.score + BETTER_BY < here) {
++            info!("spectate: t={clock:.1} settling where the fight is: cut to position {} (score {:.0} for {:.0})", spot.pick, spot.score, here);
++            to = Some(spot);
++        }
++        state.retry = RETRY_URGENT_SECS;
+     } else if urgent.is_none() && time_to_cut(state.blocked, state.both, state.held) && state.retry <= 0.0 {
+         let here = scene.score(&collide, eye, state.look, state.pick, want.is_some_and(|w| w.1));
+         let what = match (sub_hidden, hero_hidden) {
+@@ -731,6 +895,16 @@ fn film(
+     write(&mut cam_t, &mut cam, eye, look);
+ }
+ 
++/// The clearest of the shot's positions to start from; with none free yet (the world there not
++/// loaded in), its first pose, short of the world on its line.
++fn first_spot(collide: &WorldCollision, scene: &Scene, shot: Shot, axis: f32) -> Spot {
++    scene.best(collide, shot, axis, None).unwrap_or_else(|| {
++        let p = scene.pose(shot, axis, 0);
++        let reach = collide.cast_camera(p.look, p.out * p.dist, false).map_or(p.dist, |hit| (hit - WALL_GAP).max(1.0));
++        Spot { pick: 0, eye: p.look + p.out * reach, look: p.look, score: f32::INFINITY }
++    })
++}
++
+ /// The camera at `eye`, looking at `look`, and the free-fly rig agreeing with it.
+ fn write(cam_t: &mut Transform, cam: &mut FlyCam, eye: Vec3, look: Vec3) {
+     let (yaw, pitch) = aim(eye, look);
+@@ -743,7 +917,7 @@ fn write(cam_t: &mut Transform, cam: &mut FlyCam, eye: Vec3, look: Vec3) {
+ pub(super) fn plugin(app: &mut App) {
+     let Ok(raw) = std::env::var("WOW_SPECTATE") else { return };
+     let Some(spec) = Spectate::parse(&raw) else {
+-        warn!("spectate: WOW_SPECTATE={raw:?} isn't <subject>,<hero>[,duel|low|high] — inert");
++        warn!("spectate: WOW_SPECTATE={raw:?} isn't <subject>,<hero>[,duel|low|high|wide[,<crew>]] — inert");
+         return;
+     };
+     info!("spectate: will film {spec:?}");
+@@ -773,7 +947,18 @@ mod tests {
+         assert!(Spectate::parse("Rhahk'Zor").is_none(), "no hero");
+         assert!(Spectate::parse("Rhahk'Zor,").is_none(), "an empty hero");
+         assert!(Spectate::parse("Rhahk'Zor,Vcwarrior,sideways").is_none(), "an unknown shot");
+-        assert!(Spectate::parse("a,b,duel,more").is_none());
++        assert!(Spectate::parse("a,b,duel,more,again").is_none());
++    }
++
++    /// A crew kept in the picture: a fourth part, its names apart by `|`; none by default.
++    #[test]
++    fn the_spec_may_name_a_crew() {
++        let s = Spectate::parse("Gilnid,Vcwarrior,wide,Furnace Engineer | Defias Blackguard").unwrap();
++        assert_eq!(s.shot, Shot::Wide);
++        assert!(s.is_crew("furnace engineer") && s.is_crew("Defias Blackguard") && !s.is_crew("Gilnid"));
++        assert!(Spectate::parse("Gilnid,Vcwarrior,high").unwrap().crew.is_empty());
++        assert!(Spectate::parse("Gilnid,Vcwarrior,high,").unwrap().crew.is_empty());
++        assert_eq!(s.crew_text(), ", with Furnace Engineer and Defias Blackguard in the picture");
+     }
+ 
+     /// A boss's forms in turn: either is filmed, and only the last one's fall ends the fight.
+@@ -790,7 +975,7 @@ mod tests {
+     fn a_duel_is_three_quarter_from_the_heros_side_10_to_14_yd_out() {
+         let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
+         let axis = 0.0; // subject to hero is +z
+-        let p = pose(Shot::Duel, subject, hero, axis, 0);
++        let p = pose(Shot::Duel, subject, hero, &[], axis, 0);
+         assert!((10.0..=14.0).contains(&p.dist), "{}", p.dist);
+         let eye = p.look + p.out * p.dist;
+         assert!(eye.z > hero.at().z, "on the hero's side: {eye}");
+@@ -799,17 +984,17 @@ mod tests {
+         assert!((40.0..=60.0).contains(&off_axis), "three-quarter: {off_axis}");
+         assert!(p.out.y > 0.1 && p.out.y < 0.5, "a little above them: {}", p.out.y);
+         // Far apart, it stands back past 14 yd rather than lose either.
+-        let wide = pose(Shot::Duel, subject, body(0.0, 30.0), axis, 0);
++        let wide = pose(Shot::Duel, subject, body(0.0, 30.0), &[], axis, 0);
+         assert!(wide.dist > 14.0);
+     }
+ 
+     #[test]
+     fn low_is_20_yd_and_high_is_45_to_60_degrees_up() {
+         let (subject, hero) = (body(0.0, 0.0), body(4.0, 0.0));
+-        let low = pose(Shot::Low, subject, hero, 0.0, 0);
++        let low = pose(Shot::Low, subject, hero, &[], 0.0, 0);
+         assert_eq!(low.dist, 20.0);
+         assert!(low.out.y.asin().to_degrees() < 10.0);
+-        let high = pose(Shot::High, subject, hero, 0.0, 0);
++        let high = pose(Shot::High, subject, hero, &[], 0.0, 0);
+         let up = high.out.y.asin().to_degrees();
+         assert!((45.0..=60.0).contains(&up), "{up}");
+         assert!(high.look.y < subject.at().y, "it looks at the ground between them");
+@@ -819,12 +1004,12 @@ mod tests {
+     #[test]
+     fn the_next_position_is_the_other_side_then_higher() {
+         let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
+-        let a = pose(Shot::Duel, subject, hero, 0.0, 0);
+-        let b = pose(Shot::Duel, subject, hero, 0.0, 1);
++        let a = pose(Shot::Duel, subject, hero, &[], 0.0, 0);
++        let b = pose(Shot::Duel, subject, hero, &[], 0.0, 1);
+         assert!(a.out.x * b.out.x < 0.0, "the other side");
+         let n = Shot::Duel.rule().sides.len();
+         assert_eq!(positions(&Shot::Duel.rule()), n * 2);
+-        assert!(pose(Shot::Duel, subject, hero, 0.0, n).out.y > a.out.y);
++        assert!(pose(Shot::Duel, subject, hero, &[], 0.0, n).out.y > a.out.y);
+     }
+ 
+     /// A body's bounds, with a gap round them: inside, beside, above.
+@@ -892,4 +1077,80 @@ mod tests {
+         }
+         assert!((turn(3.0, -3.0) - (std::f32::consts::TAU - 6.0)).abs() < 1e-5, "the short way round");
+     }
++
++    /// Whether `p` is in the picture from the pose's eye.
++    fn in_frame(pose: &Pose, p: Vec3) -> bool {
++        let eye = pose.look + pose.out * pose.dist;
++        let ahead = -pose.out;
++        let right = ahead.cross(Vec3::Y).normalize();
++        let up = right.cross(ahead);
++        let v = p - eye;
++        let depth = v.dot(ahead);
++        depth > 0.0 && v.dot(right).abs() <= depth * TAN_HALF_WIDE + 1e-3 && v.dot(up).abs() <= depth * TAN_HALF_TALL + 1e-3
++    }
++
++    /// The wide shot: 20 to 25 yd out, 30 degrees up; high stands 15 yd out or more now.
++    #[test]
++    fn wide_is_20_to_25_yd_out_and_moderately_high() {
++        let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
++        let wide = pose(Shot::Wide, subject, hero, &[], 0.0, 0);
++        assert!((20.0..=25.0).contains(&wide.dist), "{}", wide.dist);
++        let up = wide.out.y.asin().to_degrees();
++        assert!((25.0..=35.0).contains(&up), "{up}");
++        assert!(pose(Shot::High, subject, hero, &[], 0.0, 0).dist >= 15.0);
++    }
++
++    /// A crew overhead (Gilnid's engineers on their planks, 9 yd up and 10 off) is in the picture
++    /// with the two, from every position of every shot, feet to heads.
++    #[test]
++    fn a_crew_overhead_is_kept_in_the_picture() {
++        let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
++        let crew = [
++            Body { feet: Vec3::new(10.0, 8.6, -4.0), tall: 1.6, radius: 0.5, walk: Vec3::ZERO },
++            Body { feet: Vec3::new(7.0, 9.7, 6.0), tall: 1.6, radius: 0.5, walk: Vec3::ZERO },
++        ];
++        for shot in [Shot::Duel, Shot::Low, Shot::High, Shot::Wide] {
++            for k in 0..positions(&shot.rule()) {
++                for axis in [0.0, 1.0, 2.5, -2.0] {
++                    let p = pose(shot, subject, hero, &crew, axis, k);
++                    for b in crew.iter().chain([&subject, &hero]) {
++                        for at in [b.feet, b.feet + Vec3::Y * b.tall] {
++                            assert!(in_frame(&p, at), "{shot:?} position {k} axis {axis}: {at} out of the picture");
++                        }
++                    }
++                    assert!(p.dist <= CREW_FAR);
++                }
++            }
++        }
++        // It stands back further than for the two alone.
++        assert!(pose(Shot::Duel, subject, hero, &crew, 0.0, 0).dist > pose(Shot::Duel, subject, hero, &[], 0.0, 0).dist);
++    }
++
++    /// The distance that fits a set of points: nothing to fit is no distance; a point beside the
++    /// look point needs the eye back by its offset over the view's half-angle.
++    #[test]
++    fn fit_all_stands_back_until_the_points_fit() {
++        let out = Vec3::Z;
++        assert_eq!(fit_all(Vec3::ZERO, out, &[Vec3::ZERO]), 0.0);
++        let d = fit_all(Vec3::ZERO, out, &[Vec3::new(5.0, 0.0, 0.0)]);
++        assert!((d - 5.0 / TAN_HALF_WIDE).abs() < 1e-3, "{d}");
++        let d = fit_all(Vec3::ZERO, out, &[Vec3::new(0.0, 5.0, 0.0)]);
++        assert!((d - 5.0 / TAN_HALF_TALL).abs() < 1e-3, "{d}");
++    }
++
++    fn scene(hero_alive: bool) -> Scene {
++        Scene { subject: body(0.0, 0.0), named: Some(("Gilnid".into(), true)), hero: body(0.0, 3.0), hero_alive, crew: Vec::new(), others: Vec::new() }
++    }
++
++    /// The hero falls only once down for a moment; the subject's last form falls at once.
++    #[test]
++    fn a_fall_is_down_for_a_moment() {
++        let spec = Spectate::parse("Gilnid,Vcwarrior,duel").unwrap();
++        assert_eq!(scene(true).ended(&spec, 0.0), None);
++        assert_eq!(scene(false).ended(&spec, 0.1), None, "a glimpse of no health");
++        assert_eq!(scene(false).ended(&spec, FALL_SECS).as_deref(), Some("Vcwarrior"));
++        let mut gone = scene(true);
++        gone.named = Some(("Gilnid".into(), false));
++        assert_eq!(gone.ended(&spec, 0.0).as_deref(), Some("Gilnid"));
++    }
+ }
+-- 
+2.46.2.windows.1
+

@@ -173,14 +173,23 @@ the first client, as in any scenario. One line in the scenario asks for it:
 hero warrior
 camera duel Rhahk'Zor          # camera <shot> <the subject's name, as the game shows it>
 camera high Cookie|Gorged      # a boss and the form it comes back as, in turn
+camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the picture
 ```
 
 - **The shots**: `duel` is a three-quarter side view from the hero's side, 10 to 14 yd out (a
-  duel); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up, so a ground
-  hazard's edge shows. The camera stands further back than that only when the two wouldn't fit.
+  duel); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up and 15 to 22 yd
+  out, so a ground hazard's edge shows; `wide` is 20 to 25 yd out and 30 degrees up, for the
+  arena (a crew on their planks, a stripe of fire across the floor). The camera stands further
+  back than that only when the two wouldn't fit.
   With no name (`camera duel`) it films the hero alone, looking past them the way they face.
   With a boss's forms named in turn (`Cookie|Gorged`, `Sneed's Shredder|Sneed`), the living one
   nearest the hero is filmed.
+- **The crew**: after a `+`, the names of creatures that are part of the fight (a boss's crew,
+  his adds), apart by `|`: `camera wide Gilnid + Furnace Engineer`,
+  `camera duel Edwin VanCleef + Defias Blackguard`. Each living one within 15 yd of the boss or
+  the hero (along the ground: overhead counts) is kept in the picture with the two, whatever the
+  shot: the camera looks at the middle of them all and stands back (to 50 yd at most) until every
+  one fits, and prefers positions that see them past the world.
 - **Never inside a body, never outside the world**: the camera keeps out of every body's bounds
   (the boss's, the hero's and anyone's near them) by more than a yard, and out of where a body's
   walk takes it in the next second, so it cuts before a charging boss reaches its spot. Each
@@ -193,10 +202,17 @@ camera high Cookie|Gorged      # a boss and the form it comes back as, in turn
   then the other side, square to the side, behind, then the same higher up. Both hidden for more
   than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
   (`camera: spectate: t=12.3 ...`).
-- **The end of the fight**: when the hero falls, or the subject does (the last of its forms), the
-  camera holds where it is (it doesn't follow the hero to a lamp) and the video ends `tail`
-  seconds later (5), with the run. `run.txt` and the summary say when (`the fight is over
-  (Vcwarrior fell) at 40.6 s of the video`).
+- **The end of the fight**: when the hero falls (down for 0.3 s), or the subject does (the last of
+  its forms), the camera holds where it is (it doesn't follow the hero to a lamp) and the video
+  ends `tail` seconds later (5), with the run. `run.txt` and the summary say when (`the fight is
+  over (Vcwarrior fell) at 40.6 s of the video`). Only a fall after the video starts counts: a
+  hero caught in the setup (by the pirates at the landing, say) and then teleported and healed
+  doesn't end the clip, and the camera films again at once when the hero, up, is teleported
+  beside a living subject.
+- **A teleport** (a setup's `.es goto`): the camera picks its position afresh where the hero is
+  now, straight away, and for 2.5 s looks again every quarter second as the world there loads
+  in, so it's on the fight from the video's first frame. Give it that long between the last
+  `.es goto` and the `video` line if you can.
 - **What it films**: `<scenario>.mp4` is the cameraman's window from the scenario's video time to
   its end, with sound (below). The stills (`<burst>-NN.jpg`) are frames of that video at the
   bursts' times, within a few tenths of a second; the hero's client takes none. `run.txt` has the
@@ -219,7 +235,7 @@ camera high Cookie|Gorged      # a boss and the form it comes back as, in turn
 landing's deck.
 
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
-cameraman's own body), the cameraman hero (`setup` makes it), and a screen wide enough for both
+cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), the cameraman hero (`setup` makes it), and a screen wide enough for both
 windows side by side: the cameraman's (`resolution`) and the hero's (`hero_resolution`) on the
 `monitor` screen. The run stops with an error rather than put one over the other.
 
@@ -232,7 +248,7 @@ How it works:
   dungeon) and stays near them, so the world around the fight is loaded. `.es watch off` makes it
   a hero again; logging out ends it too. It needs debug on (`.es debug quiet`), like the other
   dev commands.
-- benilla's `WOW_SPECTATE=<subject>,<hero>,<shot>` (client patch 0088) takes the camera off the
+- benilla's `WOW_SPECTATE=<subject>,<hero>,<shot>[,<crew>]` (client patches 0088 to 0090) takes the camera off the
   cameraman's body (free-fly, the body hidden) and frames the two each frame. The rig sets it, the
   cameraman's driver (it hides the interface and names, and says `.es watch`) and `WOW_MIX_TAP`.
 - Then the hero's client starts beside it, and the scenario plays as any other; the video records
