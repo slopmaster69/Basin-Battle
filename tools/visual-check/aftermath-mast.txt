@@ -5,7 +5,9 @@
 # view. The preview's own `visit` puts the hero back on the same spot and facing for the second
 # half (its arrival first sends everyone to the landing).
 # With client patch 0091 (round 30) the Mast Room's neat cargo lies toppled, its kegs and barrels
-# rolled, the netted cargo on its side, the large lumber pile spilled and the ore cart tipped.
+# rolled, the netted cargo on its side, the large lumber pile spilled and the ore cart tipped. From
+# the view's own spot the hero turns to each: the cargo 11 yd off at 241 degrees, then the cart
+# and the netted cargo 9 yd off at 38 degrees.
 hero warrior
 camera duel
 0 .es debug quiet
@@ -13,11 +15,15 @@ camera duel
 10 .es debug quiet
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 11 .es clearfoes
-12 .es goto -244.0 -482.0 49.4 3.5
+12 .es goto -244.0 -482.0 49.4 4.21
 14 video
-16 shots before 4 1.0
-21 .es aftermath on
-24 .es aftermath visit mast
-29 shots after 4 1.0
-34 .es aftermath off
-37 end
+16 shots before-cargo 3 1.0
+19 .es goto -244.0 -482.0 49.4 0.66
+21 shots before-cart 3 1.0
+24 .es aftermath on
+27 .es aftermath point -244.0 -482.0 49.4 4.21
+32 shots after-cargo 3 1.0
+35 .es aftermath point -244.0 -482.0 49.4 0.66
+37 shots after-cart 3 1.0
+41 .es aftermath off
+44 end

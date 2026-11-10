@@ -1,7 +1,7 @@
 # The aftermath, the buried front door (the 9 Nov review's view 15): the intact mine and then its
 # collapse, from the review's camera there (x -59, y -363, facing 105 degrees). With client patch
 # 0091 (round 30) the barrow lies upside down, the stacked lumber spilled and its bucket kicked
-# over, and the lantern that hung over the fall is down on the rock, its light out.
+# over, and the lantern that hung over the fall is gone with the roof, its light out.
 # Dev setup as the region scenarios: the preview's `point` puts the hero back on the same spot and
 # facing for the second half.
 hero warrior

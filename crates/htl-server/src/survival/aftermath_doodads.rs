@@ -10,12 +10,13 @@
 //!
 //! The lanterns: the walk from the entrance to the cove stays lit, and so do the mine's own
 //! lanterns on the way in from the portal; a third of the rest go out. Those right over a pile
-//! came down with the roof (the entrance's, view 1, and the buried front door's, view 15) and lie
-//! on the rock under them; those in the dead ends (Johnson's gallery, the eastern side tunnel,
-//! the passages off the workshop, the corner by the entrance, the Shredder's loft and the lower
-//! Foundry's far bays) hang askew and dark, lie knocked over, or are gone. Some on the walk hang
-//! askew and still burn, the eastern niche's among them (view 9: the review found it too dark to
-//! read already).
+//! came down with the roof (the entrance's, view 1, and the buried front door's, view 15), and
+//! those in the dead ends (Johnson's gallery, the eastern side tunnel, the passages off the
+//! workshop, the corner by the entrance, the Shredder's loft and the lower Foundry's far bays) are
+//! gone. A put-out lantern leaves no copy: every lantern model in the data has the same glowing
+//! yellow glass, and the one first laid on the front door's rock read lit on film (10 Nov). Some
+//! on the walk hang askew and still burn, the eastern niche's among them (view 9: the review found
+//! it too dark to read already).
 
 use super::*;
 
@@ -30,11 +31,8 @@ pub(super) enum Fate {
     Over(usize, f32, f32),
     /// Hung askew from its own hook, as `model`, its light still burning.
     Askew(usize),
-    /// Hung askew, its light out.
-    Dark(usize),
-    /// Down on the floor or on the rock under it, its light out.
-    Fallen(usize),
-    /// A lantern gone: buried in the fall or smashed, its light out.
+    /// A lantern gone: buried in the fall or smashed, its light out. (No dark copy: the data's
+    /// lanterns all have glowing glass, and a fallen one read lit on film.)
     Gone,
     /// Gone under the fall (a sack that leaned on a lumber pile that spilled).
     Buried,
@@ -55,25 +53,25 @@ pub(super) const PLAN: &[(u32, Fate)] = &[
     (92, Over(LUMBER, 1.15, 0.0)),
     (93, Over(BUCKET, FRAC_PI_2, 0.2)),
     // The eastern side tunnel, a dead end.
-    (98, Dark(LANTERN)),
-    (101, Dark(LANTERN)),
+    (98, Gone),
+    (101, Gone),
     // The buried front door (view 15): the barrow upside down, the stacked lumber spilled, its
-    // bucket kicked over, and the lantern over the fall down on the rock.
+    // bucket kicked over, and the lantern over the fall gone with the roof.
     (103, Over(BARROW, PI, 0.15)),
     (104, Over(LUMBER, 1.15, 0.0)),
     (105, Over(BUCKET, FRAC_PI_2, -0.2)),
-    (106, Fallen(LANTERN)),
+    (106, Gone),
     // Johnson's gallery, a dead end.
-    (108, Fallen(FLOOR_LANTERN)),
-    (120, Dark(LANTERN)),
+    (108, Gone),
+    (120, Gone),
     // The west gallery's throat, on the walk.
     (141, Askew(LANTERN)),
     // The corner south of the entrance, a dead end.
-    (162, Dark(LANTERN)),
-    // The entrance (view 1): the lantern over the Foreman's pile down on it, the next one on askew;
-    // the floor lantern of the eastern approach's dead end knocked over.
-    (184, Fallen(LANTERN)),
-    (185, Fallen(FLOOR_LANTERN)),
+    (162, Gone),
+    // The entrance (view 1): the lantern over the Foreman's pile gone with the roof, the next one
+    // on askew; the floor lantern of the eastern approach's dead end gone.
+    (184, Gone),
+    (185, Gone),
     (186, Askew(LANTERN)),
     // The north gallery's high lanterns, off the walk.
     (220, Gone),
@@ -91,11 +89,11 @@ pub(super) const PLAN: &[(u32, Fate)] = &[
     // The Cannon Gallery's top, on the walk.
     (264, Askew(LANTERN)),
     // The cannon approach's side recess.
-    (283, Fallen(FLOOR_LANTERN)),
+    (283, Gone),
     // The workshop's side passage and rear cell, and its bench's floor lantern.
-    (331, Dark(LANTERN)),
-    (332, Fallen(FLOOR_LANTERN)),
-    (333, Fallen(FLOOR_LANTERN)),
+    (331, Gone),
+    (332, Gone),
+    (333, Gone),
     (342, Askew(LANTERN)),
     // The Foundry's far bays, upper and lower.
     (381, Gone),
@@ -108,7 +106,8 @@ pub(super) const PLAN: &[(u32, Fate)] = &[
 ];
 
 /// Whether a fate puts the doodad's light out.
-pub(super) fn dark(f: Fate) -> bool { matches!(f, Dark(_) | Fallen(_) | Gone) }
+#[cfg(test)]
+pub(super) fn dark(f: Fate) -> bool { matches!(f, Gone) }
 
 pub(super) fn fate(index: u32) -> Option<Fate> {
     PLAN.iter().find(|(i, _)| *i == index).map(|(_, f)| *f)
@@ -119,8 +118,6 @@ pub(super) fn site(f: Fate) -> &'static str {
     match f {
         Over(..) => "The mine's own, knocked over",
         Askew(_) => "The mine's own lantern, askew",
-        Dark(_) => "The mine's own lantern, askew and out",
-        Fallen(_) => "The mine's own lantern, fallen",
         Gone | Buried => "",
     }
 }

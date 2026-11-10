@@ -147,7 +147,9 @@ pub(super) const MAST: usize = 19;
 // The mine's own doodads, set down where the collapse left them (`aftermath_doodads.rs`).
 /// The mine's hanging lantern (patch 0091's own display).
 pub(super) const LANTERN: usize = 20;
-/// The lantern the mine stands on its floors.
+/// The lantern the mine stands on its floors. Not placed (its glass read lit lying on the rock on
+/// film); kept so the entries after it stay where clients cached them.
+#[allow(dead_code)]
 pub(super) const FLOOR_LANTERN: usize = 21;
 /// The mine's ore cart (patch 0091's own display).
 pub(super) const MINE_CART: usize = 22;

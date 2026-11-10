@@ -943,7 +943,7 @@ fn the_plan_is_patch_0091s_list_of_the_mines_own_doodads() {
     }
     // A lantern's fate is a lantern's; the rest are knocked over or buried.
     for (i, f) in doodads::PLAN {
-        if let doodads::Fate::Askew(m) | doodads::Fate::Dark(m) = f { assert_eq!(*m, LANTERN, "{i}"); }
+        if let doodads::Fate::Askew(m) = f { assert_eq!(*m, LANTERN, "{i}"); }
         if let doodads::Fate::Over(m, ..) = f { assert!(![LANTERN, FLOOR_LANTERN].contains(m), "{i}"); }
     }
 }

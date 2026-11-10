@@ -199,15 +199,19 @@ askew by its own hook where the mine's lantern hung.
   that leaned on it gone under the seal. Its lantern hangs askew and still burns: the review found
   the niche too dark to read already.
 - The buried front door (view 15): the barrow upside down, the stacked lumber spilled, its bucket
-  kicked over, and the lantern over the fall down on the rock, out.
-- The lanterns: 20 of the mine's 70 lit ones go out (the entrance's over the Foreman's pile, view 1,
-  and the front door's are down on the rock; the dead ends' hang askew and dark, lie knocked over or
-  are gone: Johnson's gallery, the eastern side tunnel, the corner south of the entrance, the
-  workshop's side passage and rear cell, the cannon approach's recess, the Foundry's far bays and
-  the Shredder's loft). None within 5 yd of the walk from the entrance to the cove goes out, nor
+  kicked over, and the lantern over the fall gone with the roof, its light out.
+- The lanterns: 20 of the mine's 70 lit ones go out and are gone (the entrance's over the
+  Foreman's pile, view 1, the front door's, and the dead ends': Johnson's gallery, the eastern side
+  tunnel, the corner south of the entrance, the workshop's side passage and rear cell, the cannon
+  approach's recess, the Foundry's far bays and the Shredder's loft). A put-out lantern leaves no
+  copy: every lantern model in the data has the same glowing yellow glass, and the first film
+  (10 Nov) showed the one laid on the front door's rock reading lit. None within 5 yd of the walk from the entrance to the cove goes out, nor
   any on the way in from the portal. Six hang askew and still burn (the entrance's second, view
   1, and the eastern niche's among them). The walls keep the warm light baked into them (MOCV) where a lantern
   went out: only its light on props and heroes goes.
+
+Filmed on 10 Nov (client `doodadsA`): the originals gone with no doubles, the copies seated with
+nothing floating or clipping, Johnson's and Marisa's dead ends dark, and the restore exact.
 
 `.es aftermath status` counts the copies. The extra displays the copies need (the hanging lantern
 60005, the ore cart 60006, the netted cargo 60007) are patch 0091's own. The ignored data tests

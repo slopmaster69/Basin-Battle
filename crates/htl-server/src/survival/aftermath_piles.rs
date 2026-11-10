@@ -968,22 +968,6 @@ impl Builder<'_> {
                 None
             }
             Askew(model) => self.askew(h, model, scale, yaw),
-            // A dark lantern with no room to hang askew has come down.
-            Dark(model) => self.askew(h, model, scale, yaw).or_else(|| self.knock(h, Fallen(model))),
-            Fallen(model) => {
-                // Down from where it hung (or stood) onto the floor under it, or the pile there.
-                let fl = floor_under(&*self.g.land, h.origin);
-                if !fl.is_finite() { return None; }
-                for spot in &spots {
-                    for turn in [0.5, -0.9, 1.7] {
-                        let q = shapes::euler(FRAC_PI_2, 0.0, yaw + turn);
-                        let Some(s) = self.support(spot[0], spot[1], fl) else { continue };
-                        let p = self.prop(model, [spot[0], spot[1], s - self.g.low(model, q) * scale - 0.03], scale, q);
-                        if let Some(i) = self.place(p) { return Some(i); }
-                    }
-                }
-                None
-            }
             Gone | Buried => None,
         }
     }
