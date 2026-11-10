@@ -106,6 +106,24 @@ impl Obb {
         (0..3).all(|i| dot(d, self.a[i]).abs() <= self.h[i])
     }
 
+    /// Whether the segment from `from` to `to` passes through the box (slab test).
+    pub fn cuts(&self, from: V3, to: V3) -> bool {
+        let (o, d) = (sub(from, self.c), sub(to, from));
+        let (mut lo, mut hi) = (0.0f32, 1.0f32);
+        for i in 0..3 {
+            let (p, q) = (dot(o, self.a[i]), dot(d, self.a[i]));
+            if q.abs() < 1e-6 {
+                if p.abs() > self.h[i] { return false; }
+                continue;
+            }
+            let (t1, t2) = ((-self.h[i] - p) / q, (self.h[i] - p) / q);
+            lo = lo.max(t1.min(t2));
+            hi = hi.min(t1.max(t2));
+            if lo > hi { return false; }
+        }
+        true
+    }
+
     /// Separating-axis test of two boxes.
     pub fn overlaps(&self, o: &Obb) -> bool {
         let t = sub(o.c, self.c);

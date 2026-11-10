@@ -656,6 +656,51 @@ impl Builder<'_> {
         self.under_roof = false;
     }
 
+    /// How tall the rock stands across region `r`'s view ([`picture_rock`]).
+    pub(super) fn view_rock(&self, r: &Region) -> [f32; COLUMNS] {
+        let pts: Vec<Vec<V3>> = self.props.iter().filter(|p| rocky(p.model)).map(|p| self.g.points(p)).collect();
+        let natives: Vec<Obb> = self.g.natives().iter().map(|(_, o)| o.clone()).collect();
+        picture_rock(view_eye(r), r.facing, pts.iter().map(|v| v.as_slice()), &*self.g.land, self.g.solids.as_ref(), &natives)
+    }
+
+    /// Rock heaped where a region's view sees it until in every column of its picture the rock
+    /// stands at least as tall as the old layout's did there (`old`): large pieces at the columns
+    /// most short, each kept only if it makes up some of that (the entrance's pile was one narrow
+    /// cone where the dome it replaced rose to the beam and spread right to the cart). Each is put
+    /// to the site nearest it.
+    fn fill_view(&mut self, region: usize, old: &[f32; COLUMNS]) {
+        let r = &layout::REGIONS[region];
+        let short = |bins: &[f32; COLUMNS]| -> f32 { bins.iter().zip(old).map(|(n, o)| (o - n).max(0.0)).sum() };
+        let mut have = short(&self.view_rock(r));
+        if have < 0.5 { return; }
+        let eye = view_eye(r);
+        self.under_roof = true;
+        let mut added = 0;
+        for _ in 0..3 {
+            let bins = self.view_rock(r);
+            // The columns most short first.
+            let mut cols: Vec<usize> = (0..COLUMNS).filter(|c| old[*c] - bins[*c] > 0.5).collect();
+            cols.sort_by(|a, b| (old[*b] - bins[*b]).total_cmp(&(old[*a] - bins[*a])));
+            for c in cols {
+                for size in [1.6, 1.25, 0.95] {
+                    for dist in [16.0, 20.0, 24.0, 28.0, 12.0, 32.0] {
+                        if added == 14 { break; }
+                        let off = (-30.0 + 4.0 * c as f32).to_radians();
+                        let (x, y) = (eye[0] + dist * (r.facing + off).cos(), eye[1] + dist * (r.facing + off).sin());
+                        let site = layout::SITES.iter().filter(|s| s.region == region)
+                            .min_by(|a, b| (a.at[0] - x).hypot(a.at[1] - y).total_cmp(&(b.at[0] - x).hypot(b.at[1] - y))).unwrap();
+                        let Some(z0) = self.floor_at(x, y, eye[2] - 1.9) else { continue };
+                        (self.region, self.site, self.near) = (region, site.name, z0);
+                        if self.rock([x, y], z0, size, off * 7.0 + size).is_none() { continue; }
+                        let now = short(&self.view_rock(r));
+                        if now < have - 0.3 { have = now; added += 1; } else { self.props.pop(); }
+                    }
+                }
+            }
+        }
+        self.under_roof = false;
+    }
+
     /// A side passage filled to its lintel: a row of large rocks across it, more stacked on them
     /// until the stack meets the roof, and the
     /// lintel's beam down across the front of the fill.
@@ -856,6 +901,12 @@ pub(super) fn compose(g: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
                 heap_at(&mut b, i, now + each * (1.0 + 0.5 * round as f32));
             }
         }
+    }
+    // And where a view's pile still reads smaller than the old one did from there, more rock where
+    // that view sees it.
+    for region in 0..layout::REGIONS.len() {
+        (b.wet, b.seed, b.k) = (false, 1500 + region, 0);
+        b.fill_view(region, &layout::view_target(region));
     }
     for (region, r) in layout::REGIONS.iter().enumerate() {
         (b.region, b.site, b.wet, b.seed, b.k, b.near) = (region, "Rubble apron", false, 1000 + region, 0, r.view[2]);

@@ -103,7 +103,13 @@ rebuilt pile one smooth cone smaller than the dome it replaced. Several large pi
 over and against each pile's first mass, then smaller ones, each seated on whatever is under its
 rim and kept under the roof; where a pile can't take its share (the walk runs by it, the shore
 drops into the water), the other piles of its region take more, until every region holds at
-least a fifth more rock than the old layout's.
+least a fifth more rock than the old layout's. That measure still passed a pile that read smaller
+on film (the entrance's, one narrow cone where the dome rose to the beam and spread right to the
+cart: rock behind or beside its camera counted). So each view's picture is measured too
+(`picture_rock`): in each 4-degree column of it, out to 45 yd, the most any rock the eye can see
+(past the mine's own posts and walls) stands over the floor under it. Where a column is shorter
+than the old layout's was (`OLD_VIEW_ROCK`, measured with the old rocks' own meshes), large pieces
+are set where that view sees them; the entrance's view is held to a third more than its dome.
 The first film (10 Nov) dropped three looks that read badly: the Tirisfal and Duskwood mounds read
 as green grass, the rock hung from the roof as a smooth lump floating under it, and the tall 5737
 boulder (a stalagmite) and the Dark Iron planks and woodpile (gold) were gone already.
@@ -116,11 +122,15 @@ rock. A rock may bury a native doodad whole, unless it gives light. Nothing knee
 the walk from the entrance's view to the cove's. A piece that can't meet all of that is left
 out, so a few piles lack one part: the ignored native test lists them. The regions' views and the
 review's other cameras (`CAMERAS`) keep their footing and the yards in front of them clear, no
-timber stands in the first 9 yd of their picture at eye height (a pole stood at the lens at
+timber lies or stands round their footing or in the first 9 yd of their picture (a pole stood at the lens at
 Johnson's, boards and a post filled the workshop's picture), and the hero's own camera, up behind
 them, is clear.
 
-The preview takes the cameraman (`.es watch`) where the hero it films inspects: the rules stand
+An inspector standing where the ruined mine has ground stays there when the preview starts (only
+one who might have logged out on the old ship is sent to the landing), and a cameraman stays by
+its hero: sent to the landing and back, its client took ten seconds to load the ground again and
+filmed the void. The preview takes the cameraman (`.es watch`) where the hero it films inspects,
+within 12 yd: the rules stand
 still in the preview, so it was never moved, stayed at the landing and filmed the cove's water and
 the void past its loaded ground wherever the hero went (no dust, cyan and black frames on the
 walk). And it starts after a finished fight: what an ended fight left drawn (a cast whose creature
@@ -161,11 +171,13 @@ map through `WOW_DATA` (`cargo test --release -p htl-server --tests -- --ignored
 - `native_way_from_the_entrance_to_the_cove_stays_open`: the walk between the views, mouth to cove.
 - `native_every_region_has_at_least_the_old_layouts_rock`: each region's rock, by the review's
   measure, at least the old layout's (main at e6eb2081, less the drowned ship's basin).
+- `native_the_entrance_pile_fills_its_view_as_the_old_dome_did`: the entrance's picture, column by
+  column, taller than the old dome wherever it stood, and a third bigger in all.
 
-The installed-data check currently places 1903 solids with no rejected sites: 94 at the entrance,
-385 in the galleries, 101 in the Mast Room, 158 in the workshop, 315 in the Foundry, 312 in the
-Cannon Gallery, 348 in the cove and 190 at the landing and sea tunnel. Their rock against the old
-layout's: entrance 5024 (4052), galleries 11603 (9487), Mast Room 7730 (5870), workshop 6724
-(4514), Foundry 11050 (8146), Cannon Gallery 8841 (6597), cove 15840 (13675), landing 5859 (4869).
-Fitting them takes about 0.4 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
+The installed-data check currently places 1908 solids with no rejected sites: 104 at the entrance,
+389 in the galleries, 100 in the Mast Room, 157 in the workshop, 314 in the Foundry, 313 in the
+Cannon Gallery, 345 in the cove and 186 at the landing and sea tunnel. Their rock against the old
+layout's: entrance 10793 (4052), galleries 12459 (9487), Mast Room 7954 (5870), workshop 6987
+(4514), Foundry 11288 (8146), Cannon Gallery 9139 (6597), cove 15840 (13675), landing 5859 (4869).
+Fitting them takes about 0.65 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
 -0.023 yd. These counts establish coverage, not visual approval.
