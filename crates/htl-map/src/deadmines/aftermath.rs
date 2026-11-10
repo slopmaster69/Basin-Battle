@@ -29,11 +29,32 @@ pub(super) const SHIP_ADT_DOODADS: &[u32] = &[
 ];
 const SHIP_ROOT: &str = "world/wmo/dungeon/az_deadmines/az_deadmines_b.wmo";
 
+// Keep in step with the client's benilla-assets aftermath module (Basin Battle patch 0091) and the
+// server's plan for each (`aftermath_doodads.rs`, whose tests hold them to the same).
+/// The mine's own doodads hidden while the aftermath preview's marker stands, by their place in
+/// its WMO (MODD): the neat cargo stacks, carts and barrows the collapse knocked over, and the
+/// lanterns it put out or left hanging askew. The server sets its own copies where they stood.
+pub const MINE_DOODADS: &[u32] = &[
+    67, 88, 89, 92, 93, 98, 101, 103, 104, 105, 106, 108, 120, 141, 162, 184, 185, 186, 220, 221,
+    251, 252, 253, 254, 255, 256, 257, 259, 264, 283, 331, 332, 333, 342, 381, 386, 387, 502, 503,
+    513,
+];
+/// Of those, the lanterns whose light goes out with them: the client puts out every light of
+/// the mine's own (MOLT) within [`LANTERN_REACH`] of each.
+pub const DARK_LANTERNS: &[u32] = &[
+    98, 101, 106, 108, 120, 162, 184, 185, 220, 221, 283, 331, 332, 333, 381, 386, 387, 502, 503,
+    513,
+];
+/// How far from a put-out lantern its own light hangs (yd): the mine's lanterns carry theirs 0.4
+/// to 1 yd from their pivot, and no two lanterns' lights are this close to each other.
+pub const LANTERN_REACH: f32 = 1.6;
+
 /// What [`super::load_aftermath_survey`] keeps while it loads.
 #[derive(Default)]
 pub(super) struct Kept {
     pub(super) solid: Vec<Tri>,
     pub(super) standing: Vec<Standing>,
+    pub(super) hidden: Vec<Standing>,
     pub(super) box_: ([f32; 2], [f32; 2]),
     bounds: HashMap<String, Option<([f32; 3], [f32; 3])>>,
 }
@@ -56,12 +77,15 @@ pub struct Survey {
     pub loaded: super::LoadedDeadmines,
     pub solids: Solids,
     pub standing: Vec<Standing>,
+    /// The mine's own doodads hidden in this survey ([`MINE_DOODADS`], an open survey's only),
+    /// where they stood.
+    pub hidden: Vec<Standing>,
 }
 
 impl Survey {
     pub(super) fn new(loaded: super::LoadedDeadmines, kept: Kept) -> Self {
         let (min, max) = kept.box_;
-        Self { loaded, solids: Solids::build(min, max, 4.0, kept.solid), standing: kept.standing }
+        Self { loaded, solids: Solids::build(min, max, 4.0, kept.solid), standing: kept.standing, hidden: kept.hidden }
     }
 }
 
@@ -74,10 +98,13 @@ pub struct Standing {
     pub origin: [f32; 3],
     pub axes: [[f32; 3]; 3],
     pub bounds: Option<([f32; 3], [f32; 3])>,
+    /// Its place among the mine's own doodads (its WMO's MODD), when it is one of them.
+    pub index: Option<u32>,
 }
 
 impl Standing {
-    pub(super) fn in_wmo(model: &str, bounds: Option<([f32; 3], [f32; 3])>, m: &[[f32; 3]; 3], wmo_at: [f32; 3], q: [f32; 4], at: [f32; 3], scale: f32) -> Self {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn in_wmo(model: &str, bounds: Option<([f32; 3], [f32; 3])>, m: &[[f32; 3]; 3], wmo_at: [f32; 3], q: [f32; 4], at: [f32; 3], scale: f32, index: Option<u32>) -> Self {
         let origin = transform(m, wmo_at, at);
         let column = |c: usize| {
             let mut e = [0.0; 3];
@@ -85,7 +112,7 @@ impl Standing {
             let turned = super::quat_rotate(q, e);
             transform(m, [0.0; 3], turned)
         };
-        Self::from_columns(model, bounds, origin, [column(0), column(1), column(2)])
+        Self { index, ..Self::from_columns(model, bounds, origin, [column(0), column(1), column(2)]) }
     }
 
     pub(super) fn on_terrain(model: &str, bounds: Option<([f32; 3], [f32; 3])>, m: &[[f32; 3]; 3], at: [f32; 3], scale: f32) -> Self {
@@ -99,7 +126,7 @@ impl Standing {
 
     fn from_columns(model: &str, bounds: Option<([f32; 3], [f32; 3])>, origin: [f32; 3], cols: [[f32; 3]; 3]) -> Self {
         let axes = [[cols[0][0], cols[1][0], cols[2][0]], [cols[0][1], cols[1][1], cols[2][1]], [cols[0][2], cols[1][2], cols[2][2]]];
-        Self { model: model.to_string(), origin, axes, bounds }
+        Self { model: model.to_string(), origin, axes, bounds, index: None }
     }
 
     /// A point of the model's own space, in the world.
@@ -132,8 +159,17 @@ pub fn display_triangles(chain: &mut Chain, display: u32) -> Result<Vec<Tri>> {
 
 /// Several displays' model triangles, read from the player's data folder.
 pub fn display_shapes(data_dir: &std::path::Path, displays: &[u32]) -> Result<Vec<Vec<Tri>>> {
+    display_shapes_with(data_dir, displays, &[])
+}
+
+/// [`display_shapes`], with displays the data has no row for (a client patch's own, placing a
+/// doodad's model as an object) read from their model's path.
+pub fn display_shapes_with(data_dir: &std::path::Path, displays: &[u32], extra: &[(u32, &str)]) -> Result<Vec<Vec<Tri>>> {
     let mut chain = Chain::open(data_dir).with_context(|| format!("opening the game data in {}", data_dir.display()))?;
-    displays.iter().map(|d| display_triangles(&mut chain, *d)).collect()
+    displays.iter().map(|d| match extra.iter().find(|(id, _)| id == d) {
+        Some((_, path)) => model_triangles(&mut chain, path),
+        None => display_triangles(&mut chain, *d),
+    }).collect()
 }
 
 fn bounds_of(tris: &[Tri]) -> Option<([f32; 3], [f32; 3])> {
@@ -180,6 +216,64 @@ mod tests {
             assert!(!SHIP_GROUPS.contains(&keep));
         }
         assert_eq!(SHIP_GROUPS.len(), 15);
+    }
+
+    #[test]
+    fn the_hidden_doodads_are_the_mines_own_and_the_dark_lanterns_among_them() {
+        assert!(MINE_DOODADS.windows(2).all(|w| w[0] < w[1]), "sorted, each once");
+        assert!(MINE_DOODADS.iter().all(|&i| i as usize >= SHIP_DOODADS), "none of the ship's (patch 0087 has those)");
+        assert!(DARK_LANTERNS.windows(2).all(|w| w[0] < w[1]));
+        assert!(DARK_LANTERNS.iter().all(|i| MINE_DOODADS.contains(i)));
+    }
+
+    /// The lanterns patch 0091 puts out: each carries a light of the mine's own within reach and
+    /// puts out no other lantern's, and they are about a third of the mine's lit lanterns. The open
+    /// survey lacks exactly the hidden doodads, and nothing of the mine's own stands on one of them.
+    #[test]
+    #[ignore = "requires the player's installed WoW data"]
+    fn native_a_third_of_the_lit_lanterns_go_out_each_with_its_own_light() {
+        let data = std::env::var("WOW_DATA").expect("set WOW_DATA");
+        let mut chain = Chain::open(std::path::Path::new(&data)).unwrap();
+        let bytes = chain.read_file(&SHIP_ROOT.replace('/', "\\")).unwrap();
+        let root = parse_wmo_root(&bytes).unwrap();
+        let lights: Vec<_> = benilla_formats::parse_wmo_lights(&bytes).into_iter().filter(|l| l.is_omni() && l.intensity > 0.0).collect();
+        let doodads = root.doodads();
+        let near = |a: [f32; 3], b: [f32; 3]| (0..3).map(|i| (a[i] - b[i]).powi(2)).sum::<f32>() < LANTERN_REACH * LANTERN_REACH;
+        let lantern = |k: usize| doodads[k].model.to_ascii_lowercase().contains("lantern");
+        let lit: Vec<usize> = (SHIP_DOODADS..doodads.len())
+            .filter(|&k| lantern(k) && lights.iter().any(|l| near(l.position, doodads[k].position)))
+            .collect();
+        for &k in DARK_LANTERNS {
+            assert!(lit.contains(&(k as usize)), "doodad {k} is a lantern with a light of its own");
+        }
+        for l in lights.iter().filter(|l| DARK_LANTERNS.iter().any(|&k| near(l.position, doodads[k as usize].position))) {
+            let kept: Vec<_> = lit.iter().filter(|&&k| !DARK_LANTERNS.contains(&(k as u32)) && near(l.position, doodads[k].position)).collect();
+            assert!(kept.is_empty(), "a put-out lantern's light is also lantern {kept:?}'s");
+        }
+        let share = DARK_LANTERNS.len() as f32 / lit.len() as f32;
+        eprintln!("{} of {} lit lanterns out ({:.0}%)", DARK_LANTERNS.len(), lit.len(), 100.0 * share);
+        assert!((0.25..=0.4).contains(&share), "about a third of the lit lanterns go out");
+
+        let open = super::super::load_aftermath_open_survey(std::path::Path::new(&data)).unwrap();
+        let mut hidden: Vec<u32> = open.hidden.iter().filter_map(|h| h.index).collect();
+        hidden.sort_unstable();
+        assert_eq!(hidden, MINE_DOODADS, "every hidden doodad is one the mine places");
+        assert!(open.standing.iter().all(|s| s.index.is_none_or(|i| !MINE_DOODADS.contains(&i))));
+        let corners = |s: &Standing| -> Vec<[f32; 3]> {
+            let Some((lo, hi)) = s.bounds else { return Vec::new() };
+            (0..8).map(|c| s.world([if c & 1 == 0 { lo[0] } else { hi[0] }, if c & 2 == 0 { lo[1] } else { hi[1] }, if c & 4 == 0 { lo[2] } else { hi[2] }])).collect()
+        };
+        for h in &open.hidden {
+            let box_ = corners(h);
+            let Some(top) = box_.iter().map(|p| p[2]).reduce(f32::max) else { continue };
+            let (x0, x1) = box_.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p[0]), b.max(p[0])));
+            let (y0, y1) = box_.iter().fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p[1]), b.max(p[1])));
+            for s in &open.standing {
+                let Some(low) = corners(s).iter().map(|p| p[2]).reduce(f32::min) else { continue };
+                let on = (x0..=x1).contains(&s.origin[0]) && (y0..=y1).contains(&s.origin[1]) && (top - 0.4..=top + 0.3).contains(&low);
+                assert!(!on, "{} stands on hidden doodad {:?} ({})", s.model, h.index, h.model);
+            }
+        }
     }
 
     #[test]

@@ -4,6 +4,9 @@
 # Dev setup, all before the video: travel, debug in the dungeon, foes cleared, the hero put at the
 # view. The preview's own `visit` puts the hero back on the same spot and facing for the second
 # half (its arrival first sends everyone to the landing).
+# With client patch 0091 (round 30) the lantern over the Foreman's pile is gone with the roof, its
+# light out, and the next one along hangs askew, still lit: the second camera (the review's footing
+# at x -49, y -372) looks at both, the pile 22 yd off.
 hero warrior
 camera duel
 0 .es debug quiet
@@ -14,8 +17,12 @@ camera duel
 12 .es goto -40.0 -385.0 55.8 3.1
 14 video
 16 shots before 4 1.0
-21 .es aftermath on
-24 .es aftermath visit mouth
-29 shots after 4 1.0
-34 .es aftermath off
-37 end
+20 .es goto -49.0 -372.0 55.4 3.69
+22 shots before-lantern 3 1.0
+25 .es aftermath on
+28 .es aftermath visit mouth
+33 shots after 4 1.0
+37 .es aftermath point -49.0 -372.0 55.4 3.69
+39 shots after-lantern 3 1.0
+43 .es aftermath off
+46 end

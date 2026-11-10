@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 63
+local VERSION = 64
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -7140,7 +7140,10 @@ events:SetScript("OnEvent", function()
     -- ac27: the shoulders turned to the aim (SetAimTurn) while the bow is drawn.
     -- ac28: a heal on a friend floats green over their head (the server sends the heal log).
     -- ac29: the legs walk under a swing (a cast's body "auto", ActionDash's "legs").
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 29 then
+    -- ac30: the collapsed Deadmines' own doodads hidden for the server's knocked-over copies.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 30 then
+      Say(".es hello " .. VERSION .. " ac30")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 29 then
       Say(".es hello " .. VERSION .. " ac29")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 28 then
       Say(".es hello " .. VERSION .. " ac28")

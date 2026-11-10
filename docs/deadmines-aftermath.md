@@ -179,9 +179,46 @@ film. The second film showed no clouds either: its cameraman never left the land
 piles' branch now fixes.) There is no lasting haze model in the data that reads as
 dust (the ground fogs are orange or green); the repeated settling clouds stand in for it.
 
-What the server can't do: open a real hole in the roof (the WMO's ceiling is one group), topple or tip the mine's own cargo stacks, carts, barrows and
-lanterns (they are the WMO's doodads, views 3, 9 and 15), or put out or tilt a lantern. Each needs
-a client patch beside 0087 that hides those doodads by index while the marker stands.
+What the server can't do: open a real hole in the roof (the WMO's ceiling is one group).
+
+The mine's own doodads (`aftermath_doodads.rs`, client patch 0091): the cargo stacks, carts,
+barrows and lanterns are the WMO's doodads, so the server can't move them. While the marker stands,
+a client of round 30 (patch 0091, `.es hello <version> ac30`) hides those in
+`htl_map::deadmines::aftermath::MINE_DOODADS` by their place in the WMO, as 0087 hides the ship's,
+and puts out the mine's own light (MOLT) within 1.6 yd of each in `DARK_LANTERNS`. The server sets
+its own copies where they stood, to that client alone: an older one keeps the mine's own doodads
+and is sent none, so nothing stands twice. A client whose hello comes after the preview began gets
+them with its hello. The copies are fitted to the mine without the hidden doodads (the open survey,
+`load_aftermath_open_survey`, read once beside the full one), among the piles, which are still
+fitted to the mine with them, as an older client shows it. Each passes the contact check, or hangs
+askew by its own hook where the mine's lantern hung.
+
+- The Mast Room (view 3): the neat cargo toppled, its kegs and barrels rolled, the netted cargo on
+  its side, the large lumber pile spilled and the ore cart tipped.
+- The eastern niche (view 9): the stacked lumber spilled, the bucket on it kicked over, the sack
+  that leaned on it gone under the seal. Its lantern hangs askew and still burns: the review found
+  the niche too dark to read already.
+- The buried front door (view 15): the barrow upside down, the stacked lumber spilled, its bucket
+  kicked over, and the lantern over the fall gone with the roof, its light out.
+- The lanterns: 20 of the mine's 70 lit ones go out and are gone (the entrance's over the
+  Foreman's pile, view 1, the front door's, and the dead ends': Johnson's gallery, the eastern side
+  tunnel, the corner south of the entrance, the workshop's side passage and rear cell, the cannon
+  approach's recess, the Foundry's far bays and the Shredder's loft). A put-out lantern leaves no
+  copy: every lantern model in the data has the same glowing yellow glass, and the first film
+  (10 Nov) showed the one laid on the front door's rock reading lit. None within 5 yd of the walk from the entrance to the cove goes out, nor
+  any on the way in from the portal. Six hang askew and still burn (the entrance's second, view
+  1, and the eastern niche's among them). The walls keep the warm light baked into them (MOCV) where a lantern
+  went out: only its light on props and heroes goes.
+
+Filmed on 10 Nov (client `doodadsA`): the originals gone with no doubles, the copies seated with
+nothing floating or clipping, Johnson's and Marisa's dead ends dark, and the restore exact.
+
+`.es aftermath status` counts the copies. The extra displays the copies need (the hanging lantern
+60005, the ore cart 60006, the netted cargo 60007) are patch 0091's own. The ignored data tests
+`native_the_mines_own_doodads_rest_or_hang_where_they_stood` (htl-server) and
+`native_a_third_of_the_lit_lanterns_go_out_each_with_its_own_light` (htl-map) check them on the
+installed map; `dmdoodads <Data> [word...]` (htl-map's examples) lists the mine's doodads by index
+with their lights, for choosing more.
 
 The ship marker is generic game-object entry `500100`, display `0`, GUID
 `0xF11007A184FFFFFF`. It is sent before the ruin objects and destroyed on reset. Patch 0087
