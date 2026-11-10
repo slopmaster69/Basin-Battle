@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 62
+local VERSION = 63
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -492,16 +492,19 @@ local function After(secs, fn)
 end
 function ES.RunTimers()
   local now = GetTime()
-  local keep = {}
-  for i = 1, table.getn(ES.timers) do
-    local t = ES.timers[i]
+  -- A fresh list before any runs: a timer set from inside one (a held pose renewing its hold, `FZ`)
+  -- goes into it and is kept. Swapped in after the run, it was dropped, and the pose let go at
+  -- once (Nov 10 filming).
+  local due = ES.timers
+  ES.timers = {}
+  for i = 1, table.getn(due) do
+    local t = due[i]
     if now >= t.at then
       t.fn()
     else
-      table.insert(keep, t)
+      table.insert(ES.timers, t)
     end
   end
-  ES.timers = keep
 end
 
 local function Woosh(weight)
