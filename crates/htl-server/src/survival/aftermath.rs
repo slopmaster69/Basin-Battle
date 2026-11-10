@@ -33,6 +33,8 @@ const FIRST_ENTRY: u32 = MARKER_ENTRY + 1;
 const INERT: u32 = 0x30;
 const GENERIC: u32 = 5;
 const BATCH: usize = 16;
+/// A cameraman is brought to the hero it films once this far off (yd), as in play.
+const WATCH_NEAR: f32 = 25.0;
 
 pub(crate) struct Aftermath {
     props: Vec<Prop>,
@@ -464,7 +466,9 @@ impl SurvivalGame {
         if !self.sim.debug { return Err("Turn debug on first with .es debug quiet.".into()); }
         if self.realm != Realm::BELOW { return Err("Enter the Deadmines before starting its aftermath preview.".into()); }
         if self.aftermath.is_some() { return self.aftermath_command(conn, "status", ""); }
-        if self.lab.is_some() || !self.mark_at.is_empty() || !self.casting.is_empty() || !self.area_looks.is_empty() || !self.stand_ins.is_empty() {
+        // (What an ended fight left drawn doesn't count: a dead crossbowman's draw, a missile's
+        // stand-in. Only a lab scene, or danger still marked on the ground, holds it.)
+        if self.lab.is_some() || self.clear_fight_leftovers() > 0 {
             return Err("Finish the current fight or lab scene before starting the aftermath preview.".into());
         }
         if self.aftermath_land.is_none() {
@@ -509,6 +513,34 @@ impl SurvivalGame {
                 placement: Placement::At { pos: p.pos, facing: p.facing }, fields: &fields[i],
             }).collect();
             self.send(conn, packets::update_object(&creates, &[]));
+        }
+    }
+
+    /// The cameraman goes where the hero it films is inspecting. The rules stand still in the
+    /// preview (the hero's place in them never changes, and `keep_watchers_near` doesn't run), so
+    /// without this its client stayed at the landing: its world loaded there, it filmed the cove's
+    /// water and the void past the loaded ground wherever the hero went.
+    pub(crate) fn aftermath_keep_watchers_near(&mut self) {
+        let Some(a) = self.aftermath.as_ref() else { return };
+        let far: Vec<(ConnId, [f32; 3], f32)> = self.sessions.iter().filter_map(|(c, s)| {
+            let name = s.watching.as_deref()?;
+            if s.world.as_ref()?.porting { return None; }
+            let hero = self.in_world()
+                .find(|(_, hs, hw)| hs.watching.is_none() && !hw.porting && hw.name.eq_ignore_ascii_case(name))
+                .map(|(hc, _, _)| *hc)?;
+            let (at, facing) = *a.positions.get(&hero)?;
+            let far = a.positions.get(c).is_none_or(|(p, _)| (0..3).map(|i| (p[i] - at[i]).powi(2)).sum::<f32>().sqrt() > WATCH_NEAR);
+            far.then_some((*c, at, facing))
+        }).collect();
+        for (conn, at, facing) in far {
+            if let Some(a) = self.aftermath.as_mut() { a.positions.insert(conn, (at, facing)); }
+            let Some(w) = self.world_mut(conn) else { continue };
+            w.counter = w.counter.wrapping_add(1);
+            w.ground_z = at[2];
+            w.fall_top = None;
+            let (guid, counter) = (w.guid, w.counter);
+            // (Only to the watcher: no one else is told of it.)
+            self.send(conn, packets::teleport(guid, counter, at, facing));
         }
     }
 
