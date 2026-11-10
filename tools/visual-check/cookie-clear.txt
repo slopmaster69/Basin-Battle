@@ -1,0 +1,39 @@
+# An unassisted solo clear of Cookie and Gorged (docs/cookie-encounter.md), filmed by the cameraman
+# high over the fight (camera high), markers off, so the puddle's edge and the cones show. Dev setup,
+# all before the video: travel, the cove cleared but for Cookie, the secret ingredient in the bags
+# so Gorged rises, the warrior healed and put 9 yd west of Cookie's post, where he sees them. From
+# the video on, no debug command: only the warrior's own keys (.es in), pressed by a small player in
+# the interface (CB below) that reads only what the client shows: a quick windup (AN under 1.4 s:
+# raise the guard as it lands, then one hit back), a long one (AN 1.5 s or more: the pour or a
+# breath, strafe left out from under it), the open look held (WP clip 9: hit him), and his scoop
+# (the yell "one taste": step in and hit until the pot is knocked).
+hero warrior
+cam off
+camera high Cookie|Gorged
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes cookie
+11.5 .es give secret_ingredient 1
+12 .es goto -72 -900 15 0
+12.6 .es heal
+12.2 lua CB = { q = {}, open = 0, nextHit = 0, anAt = 0, scoopEnd = 0, on = false }
+12.2 lua function CB.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function CB.after(d, f) table.insert(CB.q, { GetTime() + d, f }) end
+12.2 lua function CB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+12.2 lua function CB.hit(why) CB.log(why .. " hp " .. UnitHealth("player")) CB.say(".es in a") CB.after(0.08, function() CB.say(".es in au") end) end
+12.2 lua function CB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.2 lua function CB.strafe(d) CB.log("strafe out hp " .. UnitHealth("player")) StrafeLeftStart() CB.after(d, function() StrafeLeftStop() end) end
+12.2 lua function CB.react(w) local now = GetTime() local seen = now CB.anAt = now CB.open = 0 if w >= 1.5 then CB.after(0.3, function() if CB.anAt == seen then CB.strafe(0.7) end end) else local d = math.max(0, w - 0.15) CB.after(d, function() if CB.anAt == seen then CB.say(".es in g") end end) CB.after(d + 0.35, function() CB.say(".es in gu") end) CB.after(w + 0.4, function() if CB.anAt == seen then CB.hit("hit back") end end) end end
+12.2 lua function CB.line(l) local f = CB.split(l) local v, now = f[1], GetTime() if v == "WP" and f[5] ~= "1" then local c, s = tonumber(f[3]), tonumber(f[4]) or 0 if c == 9 then if s > 0 then CB.openAt = now + 0.3 CB.open = now + s CB.log("open " .. s) else CB.open = 0 end end elseif v == "AN" and f[11] == "mob" then CB.react(tonumber(f[4]) or 0) end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) CB.line(l) return old(l) end
+12.2 lua CB.y = CreateFrame("Frame") CB.y:RegisterEvent("CHAT_MSG_MONSTER_YELL") CB.y:SetScript("OnEvent", function() if CB.on and arg1 and string.find(arg1, "one taste", 1, true) then CB.log("scoop seen") CB.scoopEnd = GetTime() + 4.0 MoveForwardStart() CB.after(0.45, function() MoveForwardStop() end) end end)
+12.2 lua CB.f = CreateFrame("Frame") CB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(CB.q) do local a = CB.q[i] if now >= a[1] then table.remove(CB.q, i) a[2]() else i = i + 1 end end if not CB.on then return end if now >= (CB.openAt or 0) and now < CB.open - 0.35 and now >= CB.nextHit then CB.nextHit = now + 0.75 CB.hit("hit the open look") end if now < CB.scoopEnd and now >= CB.nextHit then CB.nextHit = now + 0.55 CB.hit("hit the scoop") end end)
+13.2 video
+13.6 lua CB.on = true
+14 .es in lock
+14 shots pull 8 1.0
+22 shots cookie 90 4.0
+112 shots gorged 90 4.0
+240 end

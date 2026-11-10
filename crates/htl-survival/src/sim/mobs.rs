@@ -671,6 +671,8 @@ impl Survival {
             let heft = heft * self.vancleef_posture_share(mid, label);
             // Gilnid's and his crew's (`sim::perches`): debug damage never counts.
             let heft = heft * self.perch_posture_share(mid, label);
+            // Cookie's (`sim::kitchen`): a heavy blow knocks his pot as he scoops.
+            let heft = heft * self.kitchen_posture_share(mid, by, label);
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
@@ -730,8 +732,9 @@ impl Survival {
     /// in its fight as its health takes (0: it has none).
     pub fn posture_limit(&self, mid: Id) -> u32 {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
-        // Greed leaves Cookie's hands occupied. Ordinary light blows can spoil the scoop too.
-        let limit = if self.kitchen_scooping(mid) { 60 } else { self.content.mobs[m.def].posture };
+        // Greed leaves Cookie's hands occupied: about 2 s of a hero's blows, or one heavy blow,
+        // spoils the scoop (`sim::kitchen`).
+        let limit = if self.kitchen_scooping(mid) { super::kitchen::SCOOP_POSTURE } else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }
@@ -940,8 +943,9 @@ impl Survival {
             self.events.push(Event::Missile { caster: s, spell: of.then_look, target: Target::Point(at) });
         }
         self.yell(s, of.then_text.clone());
-        // (VanCleef's Unbowed kneels first and roars as he stands: `sim::vancleef`.)
-        if of.then_after > 0.0 && !self.is_vancleef(s) {
+        // (VanCleef's Unbowed kneels first and roars as he stands: `sim::vancleef`. Gorged roars
+        // once he has emptied the pot and swollen: `sim::kitchen`.)
+        if of.then_after > 0.0 && !self.is_vancleef(s) && !self.is_kitchen(s) {
             self.events.push(Event::Emote { id: s, emote: ROAR_EMOTE });
             let sound = self.content.mobs[nd].aggro_sound;
             if sound != 0 {
@@ -964,6 +968,7 @@ impl Survival {
             }
         }
         self.vancleef_risen(s);
+        self.kitchen_risen(s);
     }
 
     /// Secret forms whose time has come rise.
@@ -2455,6 +2460,7 @@ impl Survival {
                     // A hit can mercy-cancel the pattern; retain the step that actually released.
                     let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
                     self.release(id, foe);
+                    self.kitchen_blow_released(id, released);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
                     let steps = pat.map_or(0, |p| p.steps.len());
