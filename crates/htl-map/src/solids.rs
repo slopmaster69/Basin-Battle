@@ -78,6 +78,29 @@ impl Solids {
         self.tris.is_empty()
     }
 
+    /// Every triangle whose bounding box meets the box from `min` to `max`, each once.
+    pub fn within(&self, min: [f32; 3], max: [f32; 3]) -> Vec<&Tri> {
+        let mut out: Vec<u32> = Vec::new();
+        if self.tris.is_empty() {
+            return Vec::new();
+        }
+        let i = |v: f32, o: f32, n: usize| (((v - o) / self.cell).floor().max(0.0) as usize).min(n - 1);
+        let (i0, i1) = (i(min[0], self.min[0], self.dims.0), i(max[0], self.min[0], self.dims.0));
+        let (j0, j1) = (i(min[1], self.min[1], self.dims.1), i(max[1], self.min[1], self.dims.1));
+        for a in i0..=i1 {
+            for b in j0..=j1 {
+                let k = a * self.dims.1 + b;
+                out.extend_from_slice(&self.items[self.starts[k] as usize..self.starts[k + 1] as usize]);
+            }
+        }
+        out.sort_unstable();
+        out.dedup();
+        out.into_iter()
+            .map(|n| &self.tris[n as usize])
+            .filter(|t| (0..3).all(|a| t.iter().any(|p| p[a] >= min[a]) && t.iter().any(|p| p[a] <= max[a])))
+            .collect()
+    }
+
     /// How far along the line from `from` (`dir` a unit vector) the first triangle lies, within
     /// `max`: the cells it crosses in order, nearest first, each cell's triangles tested.
     pub fn ray(&self, from: [f32; 3], dir: [f32; 3], max: f32) -> Option<f32> {

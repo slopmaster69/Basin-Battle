@@ -2,16 +2,27 @@
 //! presentation of the world: the rules, their clock, hero positions and saves stay intact.
 //! Every visible ruin is a native, solid game object. The display-less marker asks client
 //! patch 0087 to remove the ship's render groups AND colliders for this map only.
+//!
+//! The ruins are fitted to the installed map when the preview starts (`aftermath_piles.rs`): each
+//! pile slumps against the rock it fell from, under the broken roof, and every piece rests on the
+//! floor or on rock without passing through the mine's walls or its own doodads.
 
 use std::collections::BTreeMap;
 
+use htl_map::deadmines::aftermath::Survey;
+use htl_map::solids::Solids;
 use htl_survival::Land;
 
 use super::*;
 use crate::packets::{Create, Placement};
+use shapes::{matrix, unturn, Obb, V3};
 
 #[path = "aftermath_layout.rs"]
 mod layout;
+#[path = "aftermath_piles.rs"]
+mod piles;
+#[path = "aftermath_shapes.rs"]
+mod shapes;
 #[cfg(test)]
 #[path = "aftermath_tests.rs"]
 mod tests;
@@ -37,8 +48,22 @@ pub(super) struct Region {
     facing: f32,
 }
 
-#[derive(Clone, Copy)]
+/// What each site's wreckage is made of besides rock and timber.
+#[derive(Clone, Copy, PartialEq)]
 pub(super) enum Dressing { Tunnel, Timber, Minecart, Machine, Cannon, Cargo, Shore }
+
+/// How a site's rock came down.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum Fall {
+    /// A cave-in slumped against the nearest wall, under the broken roof it fell from.
+    Slump,
+    /// A side passage or doorway filled to its lintel.
+    Seal,
+    /// The Foundry's back door: the lintel down on a pile against one jamb, the way through kept.
+    Lintel,
+    /// Loose rock and timber spread across the floor, the roof whole.
+    Spill,
+}
 
 pub(super) struct Site {
     region: usize,
@@ -46,245 +71,345 @@ pub(super) struct Site {
     at: [f32; 3],
     yaw: f32,
     scale: f32,
+    fall: Fall,
     dressing: Dressing,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Prop {
-    region: usize,
-    site: &'static str,
-    model: usize,
-    pos: [f32; 3],
-    scale: f32,
-    rotation: [f32; 4],
-    facing: f32,
+pub(super) struct Prop {
+    pub(super) region: usize,
+    pub(super) site: &'static str,
+    pub(super) model: usize,
+    pub(super) pos: [f32; 3],
+    pub(super) scale: f32,
+    pub(super) rotation: [f32; 4],
+    pub(super) facing: f32,
 }
 
-/// Bounds measured from the installed native meshes. For tipped machinery, the transformed
-/// eight corners determine the bottom; putting its original pivot on the floor would bury it.
-struct Model {
-    display: u32,
+/// Bounds measured from the installed native meshes (`godisp <Data> <display>`).
+pub(super) struct Model {
+    pub(super) display: u32,
     name: &'static str,
-    min: [f32; 3],
-    max: [f32; 3],
+    pub(super) min: [f32; 3],
+    pub(super) max: [f32; 3],
 }
 
-const BOULDER: usize = 0;
-const LOW_ROCK: usize = 1;
-const DARK_ROCK: usize = 2;
-const RUBBLE: usize = 3;
-const LUMBER: usize = 4;
-const WOODPILE: usize = 5;
-const PLANK: usize = 6;
-const CART: usize = 7;
-const BARREL: usize = 8;
-const CRATE: usize = 9;
-const MACHINE: usize = 10;
-const CANNON: usize = 11;
-const BOAT: usize = 12;
-const SUPPORT: usize = 13;
+/// The one rock: Burning Steppes boulder 05, dark ash rock (the mine rubble's own texture) on an
+/// open skirt. Every size in a pile is this mesh, turned and scaled; the tall 5737 boulder read
+/// as a stalagmite and is gone (views 8, 10, 12).
+pub(super) const ROCK: usize = 0;
+/// Tirisfal's grave mound, dark soil on an open skirt: the gravel skirt a pile spreads.
+pub(super) const SKIRT: usize = 1;
+/// Duskwood's dirt mound: smaller scree.
+pub(super) const SCREE: usize = 2;
+/// The dwarven excavation pole, an iron-shod log: snapped beams and broken posts.
+pub(super) const BEAM: usize = 3;
+/// The excavation barrier plank: broken boards. (The Dark Iron planks and woodpile rendered
+/// bright gold in the mine's light, views 3 and 5.)
+pub(super) const BOARD: usize = 4;
+/// The Deadmines' own small lumber pile, spilled.
+pub(super) const LUMBER: usize = 5;
+pub(super) const CART: usize = 6;
+pub(super) const BARROW: usize = 7;
+pub(super) const BARREL: usize = 8;
+pub(super) const CRATE: usize = 9;
+/// The Deadmines' cargo boxes (the model of its neat stacks), toppled.
+pub(super) const CARGO: usize = 10;
+pub(super) const MACHINE: usize = 11;
+pub(super) const CANNON: usize = 12;
+pub(super) const BOAT: usize = 13;
+pub(super) const SACK: usize = 14;
 
-const MODELS: &[Model] = &[
-    // Native check: the Westfall sea boulders read as luminous pale mounds indoors.
-    // These rough dark meshes share the mine rubble's ashrock04 texture instead.
-    Model { display: 5737, name: "Fallen Boulder", min: [-4.04,-4.73,-0.10], max: [4.08,4.31,9.42] },
-    Model { display: 5741, name: "Broken Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 5741, name: "Cave Rubble", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 5741, name: "Stone Fragments", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 1109, name: "Broken Timbers", min: [-1.68,-0.91,0.0], max: [1.70,0.86,1.67] },
-    Model { display: 6193, name: "Splintered Timber", min: [-3.0,-2.12,-0.02], max: [1.76,2.39,1.19] },
-    Model { display: 6481, name: "Broken Plank", min: [-1.69,-0.32,-0.01], max: [0.87,0.80,0.22] },
+pub(super) const MODELS: &[Model] = &[
+    Model { display: 5741, name: "Fallen Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
+    Model { display: 49, name: "Rubble Skirt", min: [-2.17,-2.19,-0.55], max: [2.19,2.18,0.83] },
+    Model { display: 20, name: "Scree", min: [-1.69,-1.06,-0.01], max: [1.69,1.00,0.67] },
+    Model { display: 1508, name: "Snapped Beam", min: [-1.20,-1.24,-5.77], max: [1.15,1.45,23.87] },
+    Model { display: 4651, name: "Broken Board", min: [-0.28,-5.57,0.0], max: [0.22,5.82,2.29] },
+    Model { display: 1108, name: "Spilled Lumber", min: [-1.68,-0.65,0.0], max: [1.68,0.66,0.56] },
     Model { display: 1887, name: "Wrecked Mine Cart", min: [-0.82,-1.06,-0.10], max: [1.25,1.05,1.60] },
+    Model { display: 215, name: "Overturned Barrow", min: [-1.73,-0.79,-0.01], max: [1.16,0.80,1.23] },
     Model { display: 9, name: "Broken Barrel", min: [-1.23,-0.58,-0.04], max: [0.43,0.82,1.02] },
     Model { display: 3791, name: "Broken Crate", min: [-0.89,-1.05,-0.02], max: [1.25,0.85,1.31] },
+    Model { display: 36, name: "Toppled Cargo", min: [-1.28,-1.14,-0.02], max: [1.29,1.12,1.76] },
     Model { display: 2029, name: "Toppled Machinery", min: [-1.30,-1.77,-0.02], max: [1.30,1.77,2.11] },
     Model { display: 245, name: "Overturned Cannon", min: [-4.72,-2.24,-0.01], max: [5.48,2.23,4.13] },
     Model { display: 223, name: "Shattered Boat", min: [-6.71,-1.77,-1.96], max: [2.79,2.24,2.32] },
-    Model { display: 4651, name: "Fallen Support", min: [-0.28,-5.57,0.0], max: [0.22,5.82,2.29] },
+    Model { display: 5511, name: "Split Sack", min: [-0.36,-0.43,0.0], max: [0.31,0.54,0.27] },
 ];
 
-fn rotation(roll: f32, pitch: f32, yaw: f32) -> [f32; 4] {
-    let (sr, cr) = (roll * 0.5).sin_cos();
-    let (sp, cp) = (pitch * 0.5).sin_cos();
-    let (sy, cy) = (yaw * 0.5).sin_cos();
-    [sr*cp*cy-cr*sp*sy, cr*sp*cy+sr*cp*sy, cr*cp*sy-sr*sp*cy, cr*cp*cy+sr*sp*sy]
-}
+/// Rock and soil: the masses a pile is made of. They may run into the mine's walls (a cave-in
+/// enters the rock it came from) and into each other; wood and iron may not.
+pub(super) fn rocky(model: usize) -> bool { matches!(model, ROCK | SKIRT | SCREE) }
 
-fn bottom(model: usize, q: [f32; 4]) -> f32 {
+/// The lowest point of a model's turned box, relative to its pivot (unscaled).
+pub(super) fn bottom(model: usize, q: [f32; 4]) -> f32 {
     let m = &MODELS[model];
-    let [x, y, z, w] = q;
-    let row = [2.0*(x*z-y*w), 2.0*(y*z+x*w), 1.0-2.0*(x*x+y*y)];
+    let row = matrix(q)[2];
     (0..8).map(|i| (0..3).map(|a| row[a] * if i & (1 << a) == 0 { m.min[a] } else { m.max[a] }).sum::<f32>())
         .fold(f32::INFINITY, f32::min)
 }
 
-fn floor(land: &dyn Land, at: [f32; 3], wet: bool) -> Option<f32> {
+/// Where the fallen rock's open skirt meets the floor (its rim, model space), and the mounds':
+/// sampled round each mesh's footprint when the installed meshes aren't at hand.
+fn rim_samples(model: usize) -> Vec<V3> {
+    let (cx, cy, rx, ry, z) = match model {
+        ROCK => (-0.15, 0.2, 2.75, 3.85, 0.41),
+        SKIRT => (0.0, 0.0, 2.19, 2.19, -0.55),
+        _ => (0.0, -0.03, 1.69, 1.03, 0.0),
+    };
+    (0..12).map(|k| { let a = k as f32 * std::f32::consts::PI / 6.0; [cx + rx * 0.97 * a.cos(), cy + ry * 0.97 * a.sin(), z] }).collect()
+}
+
+/// The fallen rock's top over its own (x, y) without the installed mesh: a slumped dome on an open
+/// skirt fitted to it (peak 3.6 near (-0.15, 0.2), the rim at 0.41 on an ellipse 2.75 by 3.85).
+fn rock_top(x: f32, y: f32) -> Option<f32> {
+    let (rx, ry) = ((x + 0.15) / 2.75, (y - 0.2) / 3.85);
+    let r2 = rx*rx + ry*ry;
+    (r2 < 1.0).then(|| 0.41 + 3.15 * (1.0 - r2).powf(0.4))
+}
+
+/// The soil mounds' tops without the installed meshes: Tirisfal's a low cone (its rim 0.55 under
+/// the pivot, its peak 0.83 over), Duskwood's a 0.64 yd hump.
+fn mound_top(model: usize, x: f32, y: f32) -> Option<f32> {
+    if model == SKIRT {
+        let r = (x*x + y*y).sqrt() / 2.19;
+        return (r < 1.0).then(|| 0.83 - 1.38*r);
+    }
+    let (rx, ry) = (x / 1.69, (y + 0.03) / 1.03);
+    let r2 = rx*rx + ry*ry;
+    (r2 < 1.0).then(|| 0.64 * (1.0 - r2).sqrt())
+}
+
+/// The highest point of a mesh straight over (x, y).
+pub(super) fn top_of(tris: &[[V3; 3]], x: f32, y: f32) -> Option<f32> {
+    let mut top: Option<f32> = None;
+    for t in tris {
+        let (a, b, c) = (t[0], t[1], t[2]);
+        let det = (b[1]-c[1])*(a[0]-c[0]) + (c[0]-b[0])*(a[1]-c[1]);
+        if det.abs() < 1e-9 { continue; }
+        let l1 = ((b[1]-c[1])*(x-c[0]) + (c[0]-b[0])*(y-c[1])) / det;
+        let l2 = ((c[1]-a[1])*(x-c[0]) + (a[0]-c[0])*(y-c[1])) / det;
+        let l3 = 1.0 - l1 - l2;
+        if l1 >= -1e-4 && l2 >= -1e-4 && l3 >= -1e-4 {
+            let z = l1*a[2] + l2*b[2] + l3*c[2];
+            top = Some(top.map_or(z, |t| t.max(z)));
+        }
+    }
+    top
+}
+
+impl Prop {
+    pub(super) fn obb(&self, shrink: f32) -> Obb {
+        let m = &MODELS[self.model];
+        Obb::new(m.min, m.max, self.pos, self.scale, self.rotation, shrink)
+    }
+
+    /// A world point in the model's own space (unscaled).
+    pub(super) fn local(&self, p: V3) -> V3 {
+        shapes::mul(unturn(&matrix(self.rotation), shapes::sub(p, self.pos)), 1.0 / self.scale)
+    }
+
+    pub(super) fn world(&self, v: V3) -> V3 {
+        shapes::add(self.pos, shapes::turn(&matrix(self.rotation), shapes::mul(v, self.scale)))
+    }
+
+    /// Turned over and hung from the roof.
+    pub(super) fn hangs(&self) -> bool { matrix(self.rotation)[2][2] < -0.9 }
+}
+
+/// A model as the installed data has it: its triangles, its points and its skirt's rim.
+struct Shape {
+    tris: Vec<[V3; 3]>,
+    points: Vec<V3>,
+    rim: Vec<V3>,
+}
+
+/// What the ruins are fitted to: the collapsed map's floors and, from the installed data, the rock
+/// over and beside them, the doodads the mine already holds and the ruins' own meshes. The authored
+/// tests' flat world has floors and the roof they give it, and measures the models by their boxes.
+pub(crate) struct Ground {
+    pub(crate) land: Box<dyn Land>,
+    solids: Option<Solids>,
+    /// The mine's own doodads' boxes (cobwebs left out: a rock may cover a web).
+    natives: Vec<(String, Obb)>,
+    shapes: Vec<Shape>,
+    /// The walk from the mine's entrance to the cove, every half yard: kept open.
+    route: Vec<V3>,
+}
+
+impl Ground {
+    #[cfg(test)]
+    pub(crate) fn with_solids(land: Box<dyn Land>, solids: Solids) -> Self {
+        Self { land, solids: Some(solids), natives: Vec::new(), shapes: Vec::new(), route: Vec::new() }
+    }
+
+    /// The surveyed map, and each of [`MODELS`]' triangles in its own space.
+    pub(crate) fn surveyed(survey: Survey, meshes: Vec<Vec<[V3; 3]>>) -> Self {
+        let natives = survey.standing.iter()
+            .filter(|s| !s.model.to_ascii_lowercase().contains("web"))
+            .filter_map(|s| s.bounds.map(|(lo, hi)| (s.model.clone(), Obb::native(s.origin, &s.axes, lo, hi, 0.1))))
+            .collect();
+        let shapes = meshes.into_iter().enumerate().map(|(model, tris)| {
+            // Each corner once (a mesh repeats a corner for every face that meets there).
+            let mut points: Vec<V3> = tris.iter().flatten().copied().collect();
+            points.sort_by(|a, b| a.iter().zip(b).map(|(x, y)| x.total_cmp(y)).find(|o| o.is_ne()).unwrap_or(std::cmp::Ordering::Equal));
+            points.dedup_by(|a, b| (0..3).all(|i| (a[i] - b[i]).abs() < 1e-4));
+            let rim = if rocky(model) {
+                let low = points.iter().map(|p| p[2]).fold(f32::INFINITY, f32::min);
+                points.iter().filter(|p| p[2] < low + 0.04).copied().collect()
+            } else { Vec::new() };
+            Shape { tris, points, rim }
+        }).collect();
+        let land = super::land::DeadminesLand::new(survey.loaded);
+        let route = Self::walk(&land);
+        Self { land: Box::new(land), solids: Some(survey.solids), natives, shapes, route }
+    }
+
+    /// The way from the entrance's view to the cove's, view to view, every half yard. (The landing
+    /// is across the water now the ship is gone.)
+    fn walk(land: &super::land::DeadminesLand) -> Vec<V3> {
+        let mut out = Vec::new();
+        for leg in layout::REGIONS[..7].windows(2) {
+            let ends = [&leg[0], &leg[1]].map(|r| floor(land, r.view, false).map(|z| [r.view[0], r.view[1], z]));
+            let [Some(a), Some(b)] = ends else { continue };
+            for w in land.walk(a, b).unwrap_or_default().windows(2) {
+                let steps = (shapes::len(shapes::sub(w[1], w[0])) / 0.5).ceil().max(1.0) as usize;
+                out.extend((0..steps).map(|k| shapes::add(w[0], shapes::mul(shapes::sub(w[1], w[0]), k as f32 / steps as f32))));
+            }
+        }
+        out
+    }
+
+    pub(super) fn route(&self) -> &[V3] { &self.route }
+
+    /// A prop's points in the world: its mesh's, or its box's when the meshes aren't at hand.
+    pub(super) fn points(&self, p: &Prop) -> Vec<V3> {
+        match self.shape(p.model) {
+            Some(s) => s.points.iter().map(|v| p.world(*v)).collect(),
+            None => p.obb(0.0).samples(),
+        }
+    }
+
+    fn shape(&self, model: usize) -> Option<&Shape> { self.shapes.get(model).filter(|s| !s.tris.is_empty()) }
+
+    /// How far a line from `from` along `dir` (unit) runs before solid rock, within `max`.
+    pub(super) fn ray(&self, from: V3, dir: V3, max: f32) -> Option<f32> {
+        self.solids.as_ref()?.ray(from, dir, max)
+    }
+
+    /// The height of the roof over a floor point, if there is one within 40 yd.
+    pub(super) fn roof(&self, at: V3) -> Option<f32> {
+        self.ray([at[0], at[1], at[2] + 0.5], [0.0, 0.0, 1.0], 40.0).map(|d| at[2] + 0.5 + d)
+    }
+
+    pub(super) fn natives(&self) -> &[(String, Obb)] { &self.natives }
+
+    /// The rim of a rock's or mound's open skirt, model space.
+    pub(super) fn rim(&self, model: usize) -> Vec<V3> {
+        self.shape(model).map_or_else(|| rim_samples(model), |s| s.rim.clone())
+    }
+
+    /// The lowest point of a model turned by `q`, relative to its pivot (unscaled).
+    pub(super) fn low(&self, model: usize, q: [f32; 4]) -> f32 {
+        let Some(s) = self.shape(model) else { return bottom(model, q) };
+        let row = matrix(q)[2];
+        s.points.iter().map(|p| shapes::dot(row, *p)).fold(f32::INFINITY, f32::min)
+    }
+
+    /// A rock's or mound's top over its own (x, y), model space.
+    fn top_local(&self, model: usize, x: f32, y: f32) -> Option<f32> {
+        match self.shape(model) {
+            Some(s) => top_of(&s.tris, x, y),
+            None if model == ROCK => rock_top(x, y),
+            None => mound_top(model, x, y),
+        }
+    }
+
+    /// Whether a world point lies inside a rock or mound (never, for wood and iron).
+    pub(super) fn holds(&self, p: &Prop, at: V3) -> bool { self.holds_within(p, at, 0.0) }
+
+    /// [`Ground::holds`], counting points within `margin` yards over its surface as inside.
+    pub(super) fn holds_within(&self, p: &Prop, at: V3, margin: f32) -> bool {
+        if !rocky(p.model) { return false; }
+        let [x, y, z] = p.local(at);
+        let floor = MODELS[p.model].min[2];
+        let m = margin / p.scale;
+        [(0.0, 0.0), (m, 0.0), (-m, 0.0), (0.0, m), (0.0, -m)].iter()
+            .any(|(dx, dy)| self.top_local(p.model, x + dx, y + dy).is_some_and(|t| z >= floor - m && z <= t + m))
+    }
+
+    /// The height of a rock's or mound's upper surface over a world (x, y), where it stands
+    /// upright (a rock hanging from the roof holds nothing up).
+    pub(super) fn top_at(&self, p: &Prop, x: f32, y: f32) -> Option<f32> {
+        if !rocky(p.model) || p.hangs() || matrix(p.rotation)[2][2] < 0.9 { return None; }
+        // Straight down the world's vertical: on a leaning rock that line crosses its own space
+        // aslant, so the point under (x, y) is found again at the height the surface is met.
+        let mut z = p.pos[2];
+        let mut top = None;
+        for _ in 0..4 {
+            let [lx, ly, _] = p.local([x, y, z]);
+            let t = self.top_local(p.model, lx, ly)?;
+            let w = p.world([lx, ly, t]);
+            top = Some(w[2]);
+            if (w[2] - z).abs() < 0.01 { break; }
+            z = w[2];
+        }
+        top
+    }
+}
+
+pub(super) fn floor(land: &dyn Land, at: [f32; 3], wet: bool) -> Option<f32> {
     let z = land.height_near(at[0], at[1], at[2]);
     // Never jump to the outdoor roof (~300 yd) or another Foundry floor. Blocked cells are
     // permitted for a cave-in's edge to enter a wall, but water is reserved for the cove.
     (z.is_finite() && (z-at[2]).abs() <= 3.0 && (wet || !land.water_near(at[0], at[1], z))).then_some(z)
 }
 
-fn make_prop(site: &Site, model: usize, pos: [f32; 3], scale: f32, roll: f32, pitch: f32, yaw: f32) -> Prop {
-    let rotation = rotation(roll, pitch, yaw);
-    // Terrain rocks have open ground-facing skirts. Keep those buried instead of exposing
-    // them by seating only their single lowest rotated vertex on the floor.
-    let embed = if model <= RUBBLE { 0.4 } else { 0.08 };
-    let z = pos[2] - bottom(model, rotation)*scale - embed*scale;
-    Prop { region: site.region, site: site.name, model,
-        pos: [pos[0], pos[1], z],
-        scale, rotation, facing: yaw }
+/// Whether a rock passes through one of the mine's own doodads: part of it inside the rock and
+/// part out. A doodad wholly inside is buried by the fall and can't be seen, unless it gives light
+/// (a buried lantern would still light the rock round it).
+/// `margin` grows the doodad's box for the "wholly inside" half of that (the builder leaves room
+/// for the meshes' own corners; the check measures the box as it is).
+pub(super) fn rock_through(model: &str, b: &Obb, margin: f32, inside: impl Fn(V3) -> bool) -> bool {
+    let lit = ["lantern", "torch", "candle", "brazier", "lamp"].iter().any(|w| model.to_ascii_lowercase().contains(w));
+    if !b.samples().iter().any(|s| inside(*s)) { return false; }
+    let grown = Obb { h: b.h.map(|h| h * margin), ..*b };
+    lit || !grown.samples().iter().all(|s| inside(*s))
+}
+
+/// The floor under a point, or over it where the point is buried just under a floor (a skirt's
+/// rim, a board's end under a step): never the next floor down.
+pub(super) fn floor_under(land: &dyn Land, v: V3) -> f32 {
+    let below = land.height_near(v[0], v[1], v[2] + 0.5);
+    if v[2] - below > 1.5 {
+        let over = land.height_near(v[0], v[1], v[2] + 2.5);
+        if over > v[2] - 0.3 && over < v[2] + 3.0 { return over; }
+    }
+    below
 }
 
 /// Test a 0.9 yd standing capsule against the actual oriented model box. The first native
 /// check showed that a model's enclosing sphere cleared enormous clean disks around views,
 /// even for a low plank or a tall rock whose solid body never reached the inspector.
-fn covers_view(p: &Prop) -> bool {
+pub(super) fn covers_view(p: &Prop) -> bool {
+    layout::REGIONS.iter().any(|r| covers(p, r.view, 0.9))
+}
+
+/// Whether a prop's box comes within `radius` of a body standing at `at` (feet to head).
+pub(super) fn covers(p: &Prop, at: V3, radius: f32) -> bool {
     let m = &MODELS[p.model];
-    let [qx,qy,qz,w] = p.rotation;
-    let [x,y,z] = [-qx,-qy,-qz];
-    layout::REGIONS.iter().any(|r| {
-        [0.15,0.95,1.75].iter().any(|height| {
-            let v = [(r.view[0]-p.pos[0])/p.scale, (r.view[1]-p.pos[1])/p.scale,
-                (r.view[2]+height-p.pos[2])/p.scale];
-            let t = [2.0*(y*v[2]-z*v[1]), 2.0*(z*v[0]-x*v[2]), 2.0*(x*v[1]-y*v[0])];
-            let local = [v[0]+w*t[0]+y*t[2]-z*t[1], v[1]+w*t[1]+z*t[0]-x*t[2], v[2]+w*t[2]+x*t[1]-y*t[0]];
-            let d2 = (0..3).map(|a| (local[a]-local[a].clamp(m.min[a],m.max[a])).powi(2)).sum::<f32>();
-            d2 < (0.9/p.scale).powi(2)
-        })
+    [0.15, 0.95, 1.75].iter().any(|height| {
+        let local = p.local([at[0], at[1], at[2] + height]);
+        let d2 = (0..3).map(|a| (local[a]-local[a].clamp(m.min[a], m.max[a])).powi(2)).sum::<f32>();
+        d2 < (radius/p.scale).powi(2)
     })
 }
 
-fn fallen_rock_pose(index: usize) -> (f32, f32) {
-    // Native inspection showed that steep rotations expose these models' open undersides.
-    // Small leans fit within the buried skirt; broader pieces vary the pile's silhouette.
-    match index % 5 {
-        0 => (0.0, 0.0),
-        1 => (0.0, 0.04),
-        2 => (0.04, 0.0),
-        3 => (0.0, -0.04),
-        _ => (-0.03, 0.03),
-    }
-}
-
-/// A site has a tall main fall, a lower shoulder, an apron, and room-specific wreckage.
-/// The changing yaw, handedness and size are authored, never seeded randomly at load time.
-fn compose(land: &dyn Land) -> (Vec<Prop>, Vec<&'static str>) {
-    let mut props = Vec::new();
-    let mut missing = Vec::new();
-    for (index, site) in layout::SITES.iter().enumerate() {
-        let Some(z) = floor(land, site.at, matches!(site.dressing, Dressing::Shore)) else {
-            missing.push(site.name);
-            continue;
-        };
-        let hand = if index % 2 == 0 { 1.0 } else { -1.0 };
-        let (s, c) = site.yaw.sin_cos();
-        let mut place = |model, offset: [f32; 2], scale, roll, pitch, yaw| {
-            let at = [site.at[0] + (c*offset[0]-s*offset[1])*site.scale,
-                site.at[1] + (s*offset[0]+c*offset[1])*site.scale, z];
-            if let Some(z) = floor(land, at, matches!(site.dressing, Dressing::Shore)) {
-                props.push(make_prop(site, model, [at[0], at[1], z], scale*site.scale, roll, pitch, site.yaw+yaw));
-            }
-        };
-        let (roll, pitch) = fallen_rock_pose(index);
-        if index % 3 == 0 {
-            place(BOULDER, [1.5, 1.3*hand], 0.82, roll, pitch, 0.2);
-        } else {
-            place(LOW_ROCK, [1.5, 1.3*hand], 1.5+0.2*(index%3) as f32, roll, pitch, 0.2);
-        }
-        place(LOW_ROCK, [-2.5, 0.9*hand], 0.95, 0.0, -0.03, 1.7);
-        place(DARK_ROCK, [0.0, -2.5*hand], 0.65, 0.0, 0.03, 2.8);
-        place(RUBBLE, [2.6, -2.1*hand], 0.3, 0.0, 0.0, 0.6);
-        match site.dressing {
-            Dressing::Tunnel | Dressing::Timber => {
-                place(SUPPORT, [-0.8, -0.8*hand], 0.85, 0.12, 1.38, 0.5);
-                place(LUMBER, [2.2, -2.8*hand], 1.25, 0.0, 0.15, 1.9);
-                place(WOODPILE, [-2.8, -2.5*hand], 1.1, 0.0, 0.0, 0.0);
-                place(PLANK, [0.5, -4.0*hand], 1.8, 0.09, 0.16, 2.5);
-            }
-            Dressing::Minecart => {
-                place(CART, [-1.2, -2.0*hand], 1.5, 0.18, 0.12, 1.6);
-                place(LUMBER, [2.2, -2.5*hand], 1.1, 0.0, 0.2, 2.4);
-                place(WOODPILE, [-3.5, -1.0*hand], 1.0, 0.0, 0.0, 1.2);
-                place(CRATE, [0.8, -4.0*hand], 1.4, 0.0, 0.0, 0.6);
-            }
-            Dressing::Machine => {
-                place(MACHINE, [-2.2, -3.0*hand], 1.05, 1.32, 0.2, 0.8);
-                place(CART, [2.5, -2.5*hand], 1.3, 0.2, 0.0, 2.0);
-                place(SUPPORT, [-2.5, -1.5*hand], 0.9, 0.2, 1.5, 2.5);
-                place(WOODPILE, [0.6, -4.0*hand], 1.3, 0.0, 0.0, 1.4);
-            }
-            Dressing::Cannon => {
-                if site.name == "Smite's ruined landing" {
-                    // The first native dock view was inside the large cannon's turned base.
-                    // Keep a grounded wreck beside the approach at a readable size and lean.
-                    place(CANNON, [3.5, -2.5*hand], 0.45, 0.55, 0.08, 0.9);
-                } else {
-                    place(CANNON, [-0.4, -1.8*hand], 0.7, 1.1, 0.15, 0.9);
-                }
-                place(BARREL, [2.8, -3.3*hand], 1.5, 0.2, 0.0, 2.4);
-                place(CRATE, [-2.4, -3.0*hand], 1.4, 0.0, 0.0, 1.0);
-                place(LUMBER, [0.0, -4.4*hand], 1.2, 0.0, 0.0, 2.8);
-            }
-            Dressing::Cargo => {
-                place(CRATE, [-1.2, -2.0*hand], 1.8, 0.0, 0.1, 0.8);
-                place(CRATE, [2.1, -2.7*hand], 1.3, 0.16, 0.0, 2.1);
-                place(BARREL, [0.0, -4.0*hand], 1.6, 0.2, 0.0, 1.5);
-                place(WOODPILE, [-3.4, -1.5*hand], 1.25, 0.0, 0.0, 2.8);
-            }
-            Dressing::Shore => {
-                place(BOAT, [-1.0, -3.0*hand], 0.6, 0.2, 0.12, 1.1);
-                place(SUPPORT, [2.0, -2.0*hand], 1.0, 0.12, 1.5, 2.4);
-                place(WOODPILE, [-3.0, -2.0*hand], 1.8, 0.0, 0.0, 0.5);
-                place(CRATE, [0.5, -4.5*hand], 1.5, 0.0, 0.2, 2.8);
-            }
-        }
-    }
-    // The damage runs into the foreground: shallow aprons between the original support
-    // bases, with only the inspector's exact footing kept clear. No clean circular stage.
-    for (region, r) in layout::REGIONS.iter().enumerate() {
-        let apron = Site { region, name: "Rubble apron", at: r.view, yaw: r.facing, scale: 1.0, dressing: Dressing::Timber };
-        let (s,c) = r.facing.sin_cos();
-        for &(model, [dx,dy], scale, yaw) in layout::APRONS[region] {
-            let at = [r.view[0]+c*dx-s*dy, r.view[1]+s*dx+c*dy, r.view[2]];
-            if let Some(z) = floor(land, at, false) {
-                props.push(make_prop(&apron, model, [at[0],at[1],z], scale, 0.0, 0.0, r.facing+yaw));
-            }
-        }
-    }
-    // The ship's old footprint is water over a seabed at -16 yd. These masses are seated
-    // on that bottom and rise 17–25 yd above it; they are not floating on vanished decks.
-    let crater = Site { region: 6, name: "Juggernaut collapse basin", at: [0.0; 3], yaw: 0.0, scale: 1.0, dressing: Dressing::Shore };
-    for (at, scale, yaw) in [([-80.0,-820.0,-16.0], 8.8, 0.5), ([-60.0,-850.0,-16.0], 7.5, 2.3),
-        ([-100.0,-850.0,-16.0], 7.1, 4.1), ([-60.0,-800.0,-16.0], 6.3, 1.2),
-        ([-105.0,-821.0,-16.0], 8.1, 3.8)] {
-        if let Some(z) = floor(land, at, true) {
-            props.push(make_prop(&crater, LOW_ROCK, [at[0], at[1], z], scale, 0.0, 0.0, yaw));
-            props.push(make_prop(&crater, LOW_ROCK, [at[0]+5.0, at[1]+3.0, z], scale*0.55, 0.0, 0.0, yaw+1.5));
-        }
-    }
-    // Native DeadminesInstance_33_32 MCLQ: all 42 water chunks have surface -0.023 yd.
-    // A sparse trail occupies the vanished decks and stores. These are floating fragments,
-    // deliberately partly submerged, not a replacement walkable ship or a hidden old hull.
-    const WATER: f32 = -0.023;
-    for (name, x, y, yaw) in [
-        ("East scaffold drift", -24.0, -832.0, 1.4),
-        ("East stores drift", -34.0, -846.0, 3.2),
-        ("Broken bow timbers", -51.0, -806.0, 0.8),
-        ("Stern wreck trail", -88.0, -861.0, 4.1),
-        ("Quartermaster's scattered cargo", -103.0, -828.0, 2.4),
-    ] {
-        if !land.water_near(x, y, -16.0) { continue; }
-        let drift = Site { region: 6, name, at: [x,y,WATER], yaw, scale: 1.0, dressing: Dressing::Shore };
-        let mut boat = make_prop(&drift, BOAT, [x,y,WATER-1.25], 1.1, 0.25, 0.12, yaw);
-        boat.pos[2] -= 0.15;
-        props.push(boat);
-        props.push(make_prop(&drift, WOODPILE, [x+4.0,y-2.0,WATER-0.6], 1.4, 0.05, 0.0, yaw+1.2));
-        props.push(make_prop(&drift, PLANK, [x-4.0,y+2.0,WATER-0.18], 2.3, 0.08, 0.0, yaw-0.4));
-        props.push(make_prop(&drift, CRATE, [x+2.0,y+3.0,WATER-0.7], 1.1, 0.4, 0.15, yaw+2.0));
-    }
-    props.retain(|p| !covers_view(p));
-    (props, missing)
+/// The whole ruin fitted to the ground: the piles at every site, the close debris around each
+/// inspection view and the drowned cove.
+pub(super) fn compose(ground: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
+    piles::compose(ground)
 }
 
 fn prop_guid(index: usize, model: usize) -> u64 {
@@ -311,8 +436,8 @@ impl SurvivalGame {
             "visit" => {
                 if self.aftermath.is_none() { return Err("Start the preview with .es aftermath on.".into()); }
                 let region = layout::REGIONS.iter().find(|r| r.key == target).ok_or("Choose a region with .es aftermath list.")?;
-                let land = self.aftermath_land.as_deref().ok_or("The aftermath ground is unavailable.")?;
-                let z = floor(land, region.view, false).ok_or("This view has no floor after the collapse.")?;
+                let ground = self.aftermath_land.as_deref().ok_or("The aftermath ground is unavailable.")?;
+                let z = floor(&*ground.land, region.view, false).ok_or("This view has no floor after the collapse.")?;
                 self.aftermath_teleport(conn, [region.view[0], region.view[1], z+0.2], region.facing);
                 self.say_to(conn, region.name);
                 Ok(())
@@ -325,7 +450,7 @@ impl SurvivalGame {
                     return Err("Use .es aftermath point <x> <y> <z> [facing].".into());
                 }
                 let at = [values[0], values[1], values[2]];
-                let z = floor(self.aftermath_land.as_deref().unwrap(), at, false)
+                let z = floor(&*self.aftermath_land.as_deref().unwrap().land, at, false)
                     .ok_or("That point has no dry floor after the collapse.")?;
                 self.aftermath_teleport(conn, [at[0], at[1], z+0.2], values.get(3).copied().unwrap_or(0.0));
                 Ok(())
@@ -353,14 +478,17 @@ impl SurvivalGame {
         }
         if self.aftermath_land.is_none() {
             let data = super::lab::data_dir().ok_or("Start the server with --data or WOW_DATA to inspect the aftermath.")?;
-            let loaded = htl_map::deadmines::load_aftermath(&data).map_err(|e| format!("Couldn't load the collapsed Deadmines. {e}"))?;
-            self.aftermath_land = Some(Box::new(super::land::DeadminesLand::new(loaded)));
+            let survey = htl_map::deadmines::load_aftermath_survey(&data).map_err(|e| format!("Couldn't load the collapsed Deadmines. {e}"))?;
+            let displays: Vec<u32> = MODELS.iter().map(|m| m.display).collect();
+            let meshes = htl_map::deadmines::aftermath::display_shapes(&data, &displays).map_err(|e| format!("Couldn't load the ruins' models. {e}"))?;
+            self.aftermath_land = Some(Box::new(Ground::surveyed(survey, meshes)));
         }
+        let started = Instant::now();
         let (props, missing) = compose(self.aftermath_land.as_deref().unwrap());
         if layout::REGIONS.iter().enumerate().any(|(r, _)| !props.iter().any(|p| p.region == r)) {
             return Err("The aftermath has an empty region. Check the installed map data before previewing it.".into());
         }
-        println!("[aftermath] {} solids; {} sites unavailable: {}", props.len(), missing.len(), missing.join(", "));
+        println!("[aftermath] {} solids in {:?}; {} sites unavailable: {}", props.len(), started.elapsed(), missing.len(), missing.join(", "));
         self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing });
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }

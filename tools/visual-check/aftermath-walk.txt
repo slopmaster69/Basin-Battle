@@ -1,0 +1,202 @@
+# The aftermath, the whole walk from the mine's entrance to Ironclad Cove, for the 9 Nov review's
+# change G: one take down the way a player walks it, the cameraman's duel shot following the hero.
+# Running can't be scripted (the move keys don't move the hero under the watcher), so the hero is
+# set down every 9 yd along the walk the server keeps open (the preview's `point`, facing the
+# next) and dashes ahead between them. Dev setup before the video: travel, debug, the preview on,
+# the hero at the entrance's view.
+hero warrior
+camera duel
+0 .es debug quiet
+1 .es travel landing
+5 .es debug quiet
+6 .es aftermath on
+8 .es aftermath point -40.0 -385.0 55.8 3.10
+9 video
+9.2 lua ActionDash(0.6, 7, "f")
+10.0 .es aftermath point -50.5 -383.0 55.3 3.09
+10.2 lua ActionDash(1.6, 7, "f")
+12.0 .es aftermath point -61.0 -381.1 54.9 3.09
+12.2 lua ActionDash(1.6, 7, "f")
+14.0 .es aftermath point -71.4 -379.1 54.4 3.09
+14.2 lua ActionDash(1.6, 7, "f")
+16.0 .es aftermath point -80.7 -378.6 56.2 3.09
+16.2 lua ActionDash(1.6, 7, "f")
+18.0 .es aftermath point -90.0 -378.1 58.0 3.76
+18.2 lua ActionDash(1.6, 7, "f")
+20.0 .es aftermath point -97.5 -383.5 58.9 4.09
+20.2 lua ActionDash(1.6, 7, "f")
+22.0 .es aftermath point -102.8 -390.9 59.0 4.11
+22.2 lua ActionDash(1.6, 7, "f")
+24.0 .es aftermath point -108.1 -398.6 59.5 3.78
+24.2 lua ActionDash(1.6, 7, "f")
+26.0 .es aftermath point -119.4 -407.1 59.1 3.09
+26.2 lua ActionDash(1.6, 7, "f")
+28.0 .es aftermath point -128.7 -406.6 58.9 3.09
+28.2 lua ActionDash(1.6, 7, "f")
+30.0 .es aftermath point -138.0 -406.1 58.6 3.06
+30.2 lua ActionDash(1.6, 7, "f")
+32.0 .es aftermath point -147.2 -405.3 58.6 3.02
+32.2 lua ActionDash(1.6, 7, "f")
+34.0 .es aftermath point -156.5 -404.2 58.7 3.21
+34.2 lua ActionDash(1.6, 7, "f")
+36.0 .es aftermath point -165.5 -404.8 57.9 3.87
+36.2 lua ActionDash(1.6, 7, "f")
+38.0 .es aftermath point -172.3 -410.9 56.4 3.93
+38.2 lua ActionDash(1.6, 7, "f")
+40.0 .es aftermath point -178.8 -417.4 55.2 4.39
+40.2 lua ActionDash(1.6, 7, "f")
+42.0 .es aftermath point -181.8 -426.3 54.9 4.53
+42.2 lua ActionDash(1.6, 7, "f")
+44.0 .es aftermath point -183.5 -435.5 54.8 4.53
+44.2 lua ActionDash(1.6, 7, "f")
+46.0 .es aftermath point -185.2 -444.8 54.7 4.38
+46.2 lua ActionDash(1.6, 7, "f")
+48.0 .es aftermath point -188.3 -453.6 54.5 4.51
+48.2 lua ActionDash(1.6, 7, "f")
+50.0 .es aftermath point -190.2 -462.9 54.3 4.61
+50.2 lua ActionDash(1.6, 7, "f")
+52.0 .es aftermath point -191.1 -472.1 54.1 4.57
+52.2 lua ActionDash(1.6, 7, "f")
+54.0 .es aftermath point -192.5 -481.4 53.7 4.55
+54.2 lua ActionDash(1.6, 7, "f")
+56.0 .es aftermath point -194.0 -490.7 53.2 4.49
+56.2 lua ActionDash(1.6, 7, "f")
+58.0 .es aftermath point -196.1 -499.7 53.0 3.32
+58.2 lua ActionDash(1.6, 7, "f")
+60.0 .es aftermath point -205.3 -501.4 52.1 3.06
+60.2 lua ActionDash(1.6, 7, "f")
+62.0 .es aftermath point -214.6 -500.6 50.6 2.85
+62.2 lua ActionDash(1.6, 7, "f")
+64.0 .es aftermath point -223.5 -498.0 49.4 2.36
+64.2 lua ActionDash(1.6, 7, "f")
+66.0 .es aftermath point -230.1 -491.4 49.2 2.36
+66.2 lua ActionDash(1.6, 7, "f")
+68.0 .es aftermath point -236.7 -484.8 49.0 2.76
+68.2 lua ActionDash(1.6, 7, "f")
+70.0 .es aftermath point -245.1 -481.4 48.9 3.20
+70.2 lua ActionDash(1.6, 7, "f")
+72.0 .es aftermath point -254.2 -481.9 49.1 3.24
+72.2 lua ActionDash(1.6, 7, "f")
+74.0 .es aftermath point -263.5 -482.9 49.3 3.67
+74.2 lua ActionDash(1.6, 7, "f")
+76.0 .es aftermath point -271.4 -487.6 49.3 3.84
+76.2 lua ActionDash(1.6, 7, "f")
+78.0 .es aftermath point -278.6 -493.5 49.3 4.47
+78.2 lua ActionDash(1.6, 7, "f")
+80.0 .es aftermath point -280.7 -502.4 49.2 4.67
+80.2 lua ActionDash(1.6, 7, "f")
+82.0 .es aftermath point -281.1 -511.7 49.0 4.68
+82.2 lua ActionDash(1.6, 7, "f")
+84.0 .es aftermath point -281.4 -520.9 48.8 4.44
+84.2 lua ActionDash(1.6, 7, "f")
+86.0 .es aftermath point -284.0 -530.0 49.1 4.16
+86.2 lua ActionDash(1.6, 7, "f")
+88.0 .es aftermath point -289.0 -538.0 49.4 4.54
+88.2 lua ActionDash(1.6, 7, "f")
+90.0 .es aftermath point -290.6 -547.2 49.4 4.51
+90.2 lua ActionDash(1.6, 7, "f")
+92.0 .es aftermath point -299.4 -590.1 48.1 5.82
+92.2 lua ActionDash(1.6, 7, "f")
+94.0 .es aftermath point -291.4 -594.1 49.2 0.15
+94.2 lua ActionDash(1.6, 7, "f")
+96.0 .es aftermath point -282.3 -592.7 50.4 0.50
+96.2 lua ActionDash(1.6, 7, "f")
+98.0 .es aftermath point -274.1 -588.2 50.5 0.54
+98.2 lua ActionDash(1.6, 7, "f")
+100.0 .es aftermath point -266.2 -583.5 50.3 0.32
+100.2 lua ActionDash(1.6, 7, "f")
+102.0 .es aftermath point -257.4 -580.6 50.9 0.17
+102.2 lua ActionDash(1.6, 7, "f")
+104.0 .es aftermath point -231.4 -576.1 51.2 0.79
+104.2 lua ActionDash(1.6, 7, "f")
+106.0 .es aftermath point -224.7 -569.4 51.2 0.72
+106.2 lua ActionDash(1.6, 7, "f")
+108.0 .es aftermath point -217.7 -563.2 51.2 0.46
+108.2 lua ActionDash(1.6, 7, "f")
+110.0 .es aftermath point -209.2 -558.9 51.2 6.24
+110.2 lua ActionDash(1.6, 7, "f")
+112.0 .es aftermath point -199.9 -559.4 51.2 5.74
+112.2 lua ActionDash(1.6, 7, "f")
+114.0 .es aftermath point -191.8 -564.2 51.2 5.47
+114.2 lua ActionDash(1.6, 7, "f")
+116.0 .es aftermath point -185.5 -570.9 50.0 4.85
+116.2 lua ActionDash(1.6, 7, "f")
+118.0 .es aftermath point -184.4 -578.8 46.0 4.65
+118.2 lua ActionDash(1.6, 7, "f")
+120.0 .es aftermath point -184.9 -587.1 42.0 4.06
+120.2 lua ActionDash(1.6, 7, "f")
+122.0 .es aftermath point -189.9 -593.6 37.9 3.79
+122.2 lua ActionDash(1.6, 7, "f")
+124.0 .es aftermath point -196.6 -598.7 33.7 3.31
+124.2 lua ActionDash(1.6, 7, "f")
+126.0 .es aftermath point -204.8 -600.1 29.5 3.09
+126.2 lua ActionDash(1.6, 7, "f")
+128.0 .es aftermath point -213.0 -599.7 25.5 2.51
+128.2 lua ActionDash(1.6, 7, "f")
+130.0 .es aftermath point -219.7 -594.8 21.6 0.83
+130.2 lua ActionDash(1.6, 7, "f")
+132.0 .es aftermath point -213.6 -588.1 21.0 0.24
+132.2 lua ActionDash(1.6, 7, "f")
+134.0 .es aftermath point -204.3 -585.8 20.9 0.24
+134.2 lua ActionDash(1.6, 7, "f")
+136.0 .es aftermath point -195.1 -583.5 20.8 0.24
+136.2 lua ActionDash(1.6, 7, "f")
+138.0 .es aftermath point -185.9 -581.2 20.8 6.25
+138.2 lua ActionDash(1.6, 7, "f")
+140.0 .es aftermath point -176.5 -581.5 20.3 6.24
+140.2 lua ActionDash(1.6, 7, "f")
+142.0 .es aftermath point -167.1 -581.9 19.9 6.24
+142.2 lua ActionDash(1.6, 7, "f")
+144.0 .es aftermath point -157.7 -582.3 19.4 6.24
+144.2 lua ActionDash(1.6, 7, "f")
+146.0 .es aftermath point -148.4 -582.7 19.0 6.03
+146.2 lua ActionDash(1.6, 7, "f")
+148.0 .es aftermath point -139.3 -585.0 18.6 5.04
+148.2 lua ActionDash(1.6, 7, "f")
+150.0 .es aftermath point -125.4 -626.1 13.3 5.34
+150.2 lua ActionDash(1.6, 7, "f")
+152.0 .es aftermath point -120.1 -633.4 12.9 5.15
+152.2 lua ActionDash(1.6, 7, "f")
+154.0 .es aftermath point -116.3 -641.6 10.7 5.14
+154.2 lua ActionDash(1.6, 7, "f")
+156.0 .es aftermath point -112.4 -650.1 9.2 5.18
+156.2 lua ActionDash(1.6, 7, "f")
+158.0 .es aftermath point -108.2 -658.5 8.4 5.18
+158.2 lua ActionDash(1.6, 7, "f")
+160.0 .es aftermath point -104.0 -666.9 7.7 5.05
+160.2 lua ActionDash(1.6, 7, "f")
+162.0 .es aftermath point -100.9 -675.8 7.6 4.98
+162.2 lua ActionDash(1.6, 7, "f")
+164.0 .es aftermath point -98.4 -684.9 7.8 4.98
+164.2 lua ActionDash(1.6, 7, "f")
+166.0 .es aftermath point -95.9 -694.1 8.0 4.98
+166.2 lua ActionDash(1.6, 7, "f")
+168.0 .es aftermath point -93.5 -703.2 8.3 4.98
+168.2 lua ActionDash(1.6, 7, "f")
+170.0 .es aftermath point -91.0 -712.3 8.5 5.00
+170.2 lua ActionDash(1.6, 7, "f")
+172.0 .es aftermath point -88.4 -721.1 8.6 5.83
+172.2 lua ActionDash(1.6, 7, "f")
+174.0 .es aftermath point -80.1 -725.1 8.7 6.09
+174.2 lua ActionDash(1.6, 7, "f")
+176.0 .es aftermath point -70.8 -727.0 8.4 6.13
+176.2 lua ActionDash(1.6, 7, "f")
+178.0 .es aftermath point -61.5 -728.4 8.3 6.19
+178.2 lua ActionDash(1.6, 7, "f")
+180.0 .es aftermath point -52.1 -729.3 8.4 6.19
+180.2 lua ActionDash(1.6, 7, "f")
+182.0 .es aftermath point -42.8 -730.2 8.5 6.19
+182.2 lua ActionDash(1.6, 7, "f")
+184.0 .es aftermath point -33.4 -731.1 8.6 5.58
+184.2 lua ActionDash(1.6, 7, "f")
+186.0 .es aftermath point -26.5 -736.9 8.5 5.50
+186.2 lua ActionDash(1.6, 7, "f")
+188.0 .es aftermath point -19.8 -743.6 8.6 5.50
+188.2 lua ActionDash(1.6, 7, "f")
+190.0 .es aftermath point -13.1 -750.4 8.8 5.50
+190.2 lua ActionDash(1.6, 7, "f")
+192.0 .es aftermath point -6.4 -757.1 9.0 5.10
+192.2 lua ActionDash(1.6, 7, "f")
+12 shots walk 18 10
+197.0 .es aftermath off
+200.0 end

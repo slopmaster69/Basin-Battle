@@ -286,7 +286,8 @@ pub struct SurvivalGame {
     pub(crate) watchers: BTreeMap<Id, htl_survival::Player>,
     /// A temporary finished dungeon, independent of simulation and saved progression.
     pub(crate) aftermath: Option<aftermath::Aftermath>,
-    pub(crate) aftermath_land: Option<Box<dyn htl_survival::Land>>,
+    /// The collapsed map the aftermath is fitted to, read once from the installed data.
+    pub(crate) aftermath_land: Option<Box<aftermath::Ground>>,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
