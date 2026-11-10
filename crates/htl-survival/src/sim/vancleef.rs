@@ -59,8 +59,13 @@ const LINE_GAP: f32 = 2.0;
 /// "Go on, then." again only after this long.
 const INVITE_LINE_AGAIN: f32 = 20.0;
 const WATCHER: &str = "dm_blackguard_observer";
-/// The open look: hunched (StandWound), or the kneel (EmoteKneel) for the last opening.
-pub(crate) const HUNCH_CLIP: u16 = 8;
+/// The open look: hunched low (StealthStand, bent well forward with the blades down, looping as
+/// he breathes), or the kneel (EmoteKneel) for the last opening. Lower than any wind-up of his,
+/// which all rise (Nov 9 filming: StandWound stood nearly upright, and read weaker than his old
+/// crouching wind-ups, so "hunched means hit" was back to front on screen). Measured on the human
+/// male's bones: the head at 0.77 of its standing height and the back 35 degrees forward, where
+/// StandWound held 0.96 and 11.
+pub(crate) const HUNCH_CLIP: u16 = 120;
 pub(crate) const KNEEL_CLIP: u16 = 75;
 /// A Blackguard shakes his head (`ONESHOT_NO`).
 const EMOTE_NO: u32 = 274;
@@ -181,7 +186,8 @@ impl Survival {
         let until = self.clock + secs;
         if let Some(duel) = self.vancleef.duels.get_mut(&id) { duel.open_until = until; }
         let clip = if kneel { KNEEL_CLIP } else { HUNCH_CLIP };
-        self.events.push(Event::HoldPose { id, clip, secs, from: None });
+        // Held through the hits that punish it: no flinch stands him up.
+        self.hold_open_pose(id, clip, secs);
     }
 
     /// Whether VanCleef is hunched (or kneeling) open now.
@@ -213,6 +219,9 @@ impl Survival {
             self.vancleef.duels.entry(id).or_default().invite_next = true;
         }
         let kneel = self.duel_pattern_is(id, pattern, "last stand");
+        // The last stand's kneel faces the hero it was fought against, so it's seen from the
+        // front, not over his back (Nov 9 filming).
+        if kneel { self.duel_face_foe(id); }
         if self.duel_pattern_is(id, pattern, "riposte") {
             if let Some(duel) = self.vancleef.duels.get_mut(&id) { duel.riposte = None; }
         }
@@ -220,6 +229,17 @@ impl Survival {
         let gap = self.duel_gap(id);
         let m = self.mobs.get_mut(&id).unwrap();
         m.ready_at = m.ready_at.max(until + gap);
+    }
+
+    /// He turns to face the hero he's fighting, where he stands.
+    fn duel_face_foe(&mut self, id: Id) {
+        let Some(m) = self.mobs.get(&id) else { return };
+        let Some(at) = m.state.target().and_then(|h| self.players.get(&h)).map(|p| p.pos) else { return };
+        let pos = m.pos;
+        if dist2d(pos, at) < 0.1 { return; }
+        let face = facing(pos, at);
+        self.mobs.get_mut(&id).unwrap().facing = face;
+        self.events.push(Event::MobStop { id, pos, facing: face });
     }
 
     fn duel_gap(&self, id: Id) -> f32 {
@@ -343,6 +363,8 @@ impl Survival {
         duel.beat = Beat::Broken;
         duel.open_until = 0.0;
         duel.riposte = None;
+        // The reel replaces the hunch; hits show again.
+        if let Some(m) = self.mobs.get_mut(&id) { m.posed_until = 0.0; }
         self.duel_say(id, "You've learned something.");
         self.events.push(Event::Sound { id, sound: 5782 });
     }
@@ -426,7 +448,7 @@ impl Survival {
         let Some(duel) = self.vancleef.duels.remove(&id) else { return };
         self.lower_invitation(id);
         // Whatever pose he holds ends now: a death plays at once.
-        self.events.push(Event::HoldPose { id, clip: HUNCH_CLIP, secs: 0.0, from: None });
+        self.hold_open_pose(id, HUNCH_CLIP, 0.0);
         for (watcher, _) in duel.watchers {
             self.remove_watcher(watcher);
         }
