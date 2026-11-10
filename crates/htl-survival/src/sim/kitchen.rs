@@ -3,7 +3,7 @@
 //! leaves. The cauldron stands all fight and after his death; Gorged rises beside it, empties it,
 //! and swells before his first slap.
 
-use super::mobs::{Foe, MobState, HAZARD_COLOUR, IMPACT_BURST_SECS, ROAR_EMOTE, SECOND_FORM_WAIT};
+use super::mobs::{Foe, MobState, HAZARD_COLOUR, ROAR_EMOTE, SECOND_FORM_WAIT};
 use super::*;
 use crate::land::clear_line;
 
@@ -37,7 +37,12 @@ const HELPINGS: u8 = 2;
 const HOT: f32 = 3.0;
 const FADE: f32 = 1.2;
 const RADIUS: f32 = 2.0;
-const EDGE_PUFFS: usize = 8;
+/// Steam puffs on its edge, and their size: big and close enough to read as a rim from a duel
+/// camera (take 341: eight small ones barely showed from above).
+const EDGE_PUFFS: usize = 12;
+const EDGE_PUFF_SCALE: f32 = 1.5;
+/// The splash: a tan ring at the puddle's true edge, held long enough to be seen.
+const SPLASH_SECS: f32 = 1.2;
 /// Where the pour lands: on the hero's spot, never nearer than this or farther than that.
 const POUR_NEAR: f32 = 4.0;
 const POUR_FAR: f32 = 8.0;
@@ -79,7 +84,7 @@ const HISS: u32 = 4858;
 const WOUND: u32 = 418;
 const AGGRO: u32 = 416;
 /// Stew and steam, drawn on the ground (markers off); the danger is `HAZARD_COLOUR`.
-const STEW_COLOUR: &str = "B07A3C";
+const STEW_COLOUR: &str = "D9A35B";
 const STEAM_COLOUR: &str = "F2F2F2";
 
 /// Gorged walks to the pot, gulps it empty, and swells over this long.
@@ -591,11 +596,11 @@ impl Survival {
             let at = patch.at;
             self.events.push(Event::Sound { id, sound: SPLASH });
             self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0, width: 0.0,
-                secs: IMPACT_BURST_SECS, colour: STEW_COLOUR.into() });
+                secs: SPLASH_SECS, colour: STEW_COLOUR.into() });
             for k in 0..EDGE_PUFFS {
                 let a = k as f32 / EDGE_PUFFS as f32 * std::f32::consts::TAU;
                 let p = self.ground_near(at[0] + a.cos() * (RADIUS - 0.2), at[1] + a.sin() * (RADIUS - 0.2), at[2]);
-                patch.props.push(self.kitchen_prop(p, STEAM, 0.9));
+                patch.props.push(self.kitchen_prop(p, STEAM, EDGE_PUFF_SCALE));
             }
         }
         // Cooling: the edge puffs drop away one by one, the last as it's safe.
@@ -711,9 +716,13 @@ impl Survival {
         let now = self.clock;
         let m = &self.mobs[&id];
         let Some(foe) = m.state.foe() else { return false };
-        let target = self.players.iter().filter(|(_, p)| p.health > 0
-            && dist2d(p.pos, m.home) <= self.content.mobs[m.def].leash && (p.pos[2] - m.home[2]).abs() < 6.0)
-            .min_by(|a, b| dist2d(a.1.pos, m.pos).total_cmp(&dist2d(b.1.pos, m.pos))).map(|(h, _)| *h);
+        // The hero he's on while they're in his fight (the engine's own rule, as every creature's),
+        // else the next in it. (A filter of its own, 6 yd of height from his post, sent Gorged home
+        // mid-fight when a hero dodged up the cove's slope: take 341.)
+        let target = match foe {
+            Foe::Hero(h) if self.in_fight_of(m, h) => Some(h),
+            _ => self.next_in_fight(id),
+        };
         let Some(hero) = target else {
             self.remove_kitchen(id);
             self.halt(id);

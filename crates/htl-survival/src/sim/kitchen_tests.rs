@@ -291,7 +291,7 @@ fn serve_it_hot_lifts_a_tankard_and_throws_it_in_a_visible_arc_onto_where_the_he
         assert!(legs[0][2] > at[2] + HAND + 0.5, "up first");
         assert_eq!(*legs.last().unwrap(), at, "and down onto the spot");
         assert_eq!(sounded(&ev, id, SPLASH), 1, "a splash as it lands");
-        assert!(bursts(&ev, STEW_COLOUR).iter().any(|b| dist2d(b.0, at) < 0.01));
+        assert!(bursts(&ev, STEW_COLOUR).iter().any(|b| dist2d(b.0, at) < 0.01 && (b.3 - RADIUS).abs() < 0.01 && b.5 >= 1.0), "a tan ring at its true edge, held over a second");
         let patch = s.kitchen.cooks[&id].patch.as_ref().unwrap();
         assert_eq!(patch.props.len(), EDGE_PUFFS);
         assert!(patch.props.iter().all(|p| (dist2d(s.objs[p].pos, at) - (RADIUS - 0.2)).abs() < 0.05), "puffs along the edge, none in the middle");
@@ -938,3 +938,37 @@ fn a_lone_hero_playing_by_the_tells_clears_cookie_and_gorged() {
     }
 }
 
+
+/// The cove east of Cookie's post: the ground climbs 8 yd in 12 (the real map's slope there).
+struct Slope;
+impl Land for Slope {
+    fn height(&self, x: f32, _: f32) -> f32 { (x - 3.0).max(0.0) * 0.8 }
+}
+
+#[test]
+fn gorged_stays_on_a_hero_who_dodged_up_the_slope_until_he_dies() {
+    for gorged in [false, true] {
+        let (mut s, band, id) = fight(if gorged { GORGED } else { COOKIE }, 1);
+        s.land = Box::new(Slope);
+        let h = band[0];
+        let max = s.mobs[&id].max_health;
+        let mut hits = 0;
+        // The hero rolls 12 yd up the slope (over 7 yd above his post), then fights him there.
+        let up = [12.0, 0.0, Slope.height(12.0, 0.0)];
+        s.move_player(h, up, std::f32::consts::PI, Moving::default());
+        while s.mobs[&id].health > 0 && s.clock < 120.0 {
+            let m = &s.mobs[&id];
+            assert!(!matches!(m.state, MobState::Return | MobState::Idle { .. }), "{}: home mid-fight at {:.1}: {:?}", if gorged { "Gorged" } else { "Cookie" }, s.clock, m.state);
+            assert!(s.kitchen.cooks.contains_key(&id));
+            // Every 2 s a blow from the hero, wherever the fight has got to.
+            if (s.clock / 2.0).floor() as u32 > hits {
+                hits += 1;
+                s.hurt_mob_as(id, h, max / 20 + 1, "Melee");
+                let p = s.players[&h].pos;
+                s.move_player(h, [p[0], p[1], Slope.height(p[0], p[1])], facing(p, s.mobs[&id].pos), Moving::default());
+            }
+            s.step(DT);
+        }
+        assert_eq!(s.mobs[&id].health, 0, "engaged until he died");
+    }
+}
