@@ -180,7 +180,8 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   duel); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up and 15 to 22 yd
   out, so a ground hazard's edge shows; `wide` is 20 to 25 yd out and 30 degrees up, for the
   arena (a crew on their planks, a stripe of fire across the floor). The camera stands further
-  back than that only when the two wouldn't fit.
+  back than that only when the two wouldn't fit. Under a low roof (the Foundry's cave) a shot's
+  positions are tried 12 and then 24 degrees lower before the camera comes in along its line.
   With no name (`camera duel`) it films the hero alone, looking past them the way they face.
   With a boss's forms named in turn (`Cookie|Gorged`, `Sneed's Shredder|Sneed`), the living one
   nearest the hero is filmed.
@@ -209,10 +210,12 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   hero caught in the setup (by the pirates at the landing, say) and then teleported and healed
   doesn't end the clip, and the camera films again at once when the hero, up, is teleported
   beside a living subject.
-- **A teleport** (a setup's `.es goto`): the camera picks its position afresh where the hero is
-  now, straight away, and for 2.5 s looks again every quarter second as the world there loads
-  in, so it's on the fight from the video's first frame. Give it that long between the last
-  `.es goto` and the `video` line if you can.
+- **A teleport** (a setup's `.es goto`: the hero 15 yd or more away within half a second): the
+  camera picks its position afresh where the hero is now, straight away, and for 2.5 s looks
+  again every quarter second as the world there loads in, so it's on the fight from the video's
+  first frame. Until the world there is in, it waits 6 yd from the fight rather than inside a
+  rock that isn't solid yet; a far teleport (across the Deadmines) can take 3 or 4 s, so give the
+  last `.es goto` that long before the `video` line if you can.
 - **What it films**: `<scenario>.mp4` is the cameraman's window from the scenario's video time to
   its end, with sound (below). The stills (`<burst>-NN.jpg`) are frames of that video at the
   bursts' times, within a few tenths of a second; the hero's client takes none. `run.txt` has the
