@@ -1,0 +1,38 @@
+# Lamps in the mist (client 0084, #273's sixth round): Goldshire at 23:30, the camera on the road
+# 10 yd behind the hero facing the lamps (yaw 150, pitched 12 down), as take 291, which found the
+# cart lantern glowing in mist 3 and the street lamp not (its area 24.5 with the fog on and off).
+# The cause was #271's: Goldshire's lamp posts had no light at all, so nothing glowed. Under the
+# new look each lamp prop now gets a stock torch's light (#271, client 0082), which the fog's lamp
+# glow takes up like any other. lookmist 3 with worldFog 1, then worldFog 0, lookfog 2,
+# worldLook 0. looklights runs at the start.
+# Look for: the street lamp with a soft warm glow over a few yards in mist-3, as the cart lantern;
+# the frame brighter round it than in worldfog-0. PLEASE send the "[look lamps]" lines.
+hero warrior
+cam 150 -12 10
+include _look_setup
+include _look_r5_hide
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookfog grade")
+4.35 lua ConsoleExec("lookmist 3")
+4.4 lua ConsoleExec("looklights tuned")
+5.5 video
+6.0 shots mist-3 3 0.5
+8.0 lua SetCVar("worldFog", "0")
+9.0 shots worldfog-0 2 0.5
+10.5 lua SetCVar("worldFog", "1")
+10.55 lua ConsoleExec("lookfog 2")
+11.5 shots lookfog-2 2 0.5
+13.0 lua ConsoleExec("lookfog grade")
+13.05 lua SetCVar("worldLook", "0")
+13.1 lua ClearWorldFog()
+14.5 shots classic 2 0.5
+16.0 lua SetCVar("worldLook", "1")
+16.05 lua ClearWorldFog()
+16.1 lua ConsoleExec("lookmist grade")
+16.15 lua ConsoleExec("lookweather server")
+18 end

@@ -1,0 +1,37 @@
+# The hero in the fog (client 0084, #273's fourth round): Goldshire at 23:30 in mist, the camera
+# on the road 10 yd behind the hero facing the lamps (yaw 150, pitched 12 down), lookmist 3 with
+# worldFog 1, then worldFog 0, then the night's own mist, lookfog 2, worldLook 0.
+# Look for: the hero solid in mist-3, as solid as in worldfog-0 (take 275: a translucent ghost
+# with the fog on); the lamps behind him glowing round him, his figure dark against the glow, not
+# washed over by it; each lamp a soft warm glow over a few yards, not a white wash.
+hero warrior
+cam 150 -12 10
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookfog grade")
+4.35 lua ConsoleExec("lookmist 3")
+6.0 video
+6.5 shots mist-3 3 0.5
+8.5 lua SetCVar("worldFog", "0")
+9.5 shots worldfog-0 2 0.5
+11.0 lua SetCVar("worldFog", "1")
+11.05 lua ConsoleExec("lookmist grade")
+12.0 shots night-mist 2 0.5
+13.5 lua ConsoleExec("lookmist 3")
+13.55 lua ConsoleExec("lookfog 2")
+14.5 shots lookfog-2 2 0.5
+16.0 lua ConsoleExec("lookfog grade")
+16.05 lua SetCVar("worldLook", "0")
+16.1 lua ClearWorldFog()
+17.5 shots classic 2 0.5
+19.0 lua SetCVar("worldLook", "1")
+19.05 lua ClearWorldFog()
+19.1 lua ConsoleExec("lookmist grade")
+19.15 lua ConsoleExec("lookweather server")
+21 end

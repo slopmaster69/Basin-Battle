@@ -1,0 +1,39 @@
+# The air (client 0084, #273's fourth round; the first take never ran: the window closed after login): the sharpen up close on Goldshire's cobbles, the inn's timbers and its
+# stone at noon (12:00), the camera 4 yd off and pitched 25 degrees down: looksharpen 0 (none), the
+# default (worldSharpen 0.4) and looksharpen 1, then worldLook 0. Then a 2 s sidestep at the default
+# with the trees behind the inn in frame, to watch for crawling on the leaves.
+# Crop 1:1 a patch of cobbles and a patch of timber (about 300 px square) from each for the
+# comparison.
+# Look for: the cobbles' joints and the wood grain crisper at 0.4 than at 0, crisper still at 1;
+# no bright or dark rim along an edge (the roof against the sky, a post against the wall), no
+# grainy noise on flat colour; far leaves not crawling or sparkling more than at 0 while moving.
+hero warrior
+cam 0 -25 4
+include _look_setup
+1.0 .es goto goldshire
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSharpen", "0.4")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looksharpen 0")
+5.5 shots sharpen-0 2 0.5
+7.0 lua ConsoleExec("looksharpen grade")
+8.0 shots sharpen-default 2 0.5
+9.5 lua ConsoleExec("looksharpen 1")
+10.5 shots sharpen-1 2 0.5
+12.0 lua ConsoleExec("looksharpen grade")
+12.05 lua SetCVar("worldLook", "0")
+12.1 lua ClearWorldFog()
+13.5 shots classic 2 0.5
+15.0 lua SetCVar("worldLook", "1")
+15.05 lua ClearWorldFog()
+16.0 video
+16.5 lua ActionDash(2, 3, "r")
+16.6 shots moving-default 12 0.15
+19.0 lua ConsoleExec("looksharpen 0")
+19.5 lua ActionDash(2, 3, "l")
+19.6 shots moving-0 12 0.15
+22.0 lua ConsoleExec("looksharpen grade")
+23 end

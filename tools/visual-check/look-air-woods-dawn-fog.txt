@@ -1,4 +1,4 @@
-# The air (client 0073): volumetric fog in the woods by Crystal Lake at dawn (07:00, the sun a few
+# The air (client 0084): volumetric fog in the woods by Crystal Lake at dawn (07:00, the sun a few
 # degrees up at yaw 45) on a fog day, the camera facing the sun and pitched a little up, so the low
 # sun comes through the trunks and crowns. First the mist held at 3.5 times the hour's (lookmist
 # 3.5), then a real fog day (lookmist day 20765, 3.35 times), then lookfog 0 and 2 (the volumetric

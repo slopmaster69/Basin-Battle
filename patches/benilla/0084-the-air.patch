@@ -1,0 +1,3590 @@
+From f8985a5c192c07fb5e620c54e080fec8e9b1f441 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 18:19:25 -0700
+Subject: [PATCH] Shafts of sun in the mist, a sharper picture and far lit
+ windows under the new look
+
+The last of the WoW Forever effects, three parts with a switch each.
+
+Volumetric fog. The mist of the day (the hour's, the day's roll, a fog
+day, an event, the weather, lookmist) keeps its closed form for how thick
+it is, and a low-resolution pass now carves it: along each view ray it
+asks the sun-shadow map at a few jittered points how much of the mist the
+sun reaches, each stretch weighted by the share of the mist it holds, so
+trunks and crowns cut dark lanes and the gaps between them fill with
+shafts. The look pass then lights the mist toward the sun only by that
+share (a Henyey-Greenstein glow, g 0.6, with a floor so a shaft seen
+side-on still reads), over a share of the sky too. The look's lamps and
+torches glow in the mist: each one's halo is integrated along the ray in
+closed form, so it is smooth at any step count. The jitter settles in a
+depth-aware resolve blended with last frame's, reprojected and clamped
+to the neighbourhood; the fog is upsampled by depth so it never bleeds
+round a silhouette. worldFog 0 draws the analytic mist exactly as before.
+worldFogQuality 1/2/3: a sample every 4 px with 6 steps, every 4 with
+12 (the default), every 2 with 16. lookfog <0-3> holds the mist's
+density at a multiple of the day's, lookfog quality <1-3>, lookfog grade.
+
+A sharper picture. A contrast-adaptive sharpen (after AMD's CAS) at the
+head of the look pass, on geometry only: each pixel pushed from its four
+neighbours, less where they already span the range (no halos) and less
+with distance (35% past 120 yd), where alpha-tested leaves would crawl.
+worldSharpen 0-1, default 0.4; looksharpen <0-1> | grade.
+
+Lit windows from afar. As each building loads, its window batches (the
+MOMT SIDN ones 1.12 lights at night) are pooled into points, one a
+window. From 60 yd out (full by 150, gone by 1500) the nearest 64 on
+screen are drawn as a soft warm core and halo over the fog, which the
+bloom picks up, hidden behind anything more than 5 yd in front of the
+window, dimmed by half the mist between, on the windows' own night track
+(20:30-21:30 in, 06:00-07:00 out). lookwindows <0-2>.
+
+worldLook 0 has none of it.
+
+Revised after the first films (#273, take 275):
+
+- The hero went see-through at Goldshire at 23:30 in lookmist 3 with the
+  fog on, solid with worldFog 0. The march and the look pass read the
+  view's own depth buffer, not a copy, inside the look node after the main
+  opaque, transmissive and transparent passes, and skinned bodies write it
+  (their pipelines keep depth writes on; only a batch with M2 flag 0x10
+  skips, and fade twins force it on). What the fog adds that the plain
+  mist does not is the lamps' glow, and three things let it veil a hero as
+  brightly as the street behind him: the glow had no ceiling (about 0.8
+  linear past a Goldshire lamp in lookmist 3), the quarter-resolution glow
+  of a texel that marched past a near pixel (the street behind an arm) was
+  taken whole, and every light got a torch's halo. The glow now eases off
+  past 0.6 (glow / (1 + luma / 0.6)), a texel that marched further than its
+  pixel gives only the share the pixel's ray holds, and the halo follows
+  the light (below). A test stands a hero between the camera and a lamp:
+  his ray's glow is under a tenth of the street's.
+- A firefly light had a green halo 400 px across. A light's halo now
+  follows its reach and strength: a torch's 10 yd and brighter whole, a
+  smaller light's core shrunk with it and its strength by its reach's share
+  squared, none under a peak of 0.3, full by 1.5. A firefly's (2.5 yd, 0.6)
+  is under a thousandth of a torch's.
+- Dawn fog showed no shafts and read less golden than worldFog 0's mist.
+  The sun's light in the fog now takes 1.6 times the mist's where the sun
+  reaches and keeps 0.3 of it in shade, so half lit it is at least as rich
+  as the mist it replaces, and a shaft stands three times out of its shade.
+  (The shadow map holds the sun at 10 degrees until about 07:30, so the
+  dawn film moves to 07:45.)
+
+Revised after the fourth films (#273, take 280):
+
+- The far windows were two white blobs about 35 px wide that mist did
+  not dim: the 64 nearest window points all lay in one or two buildings
+  (up to 48 a window batch), and their halos piled up. No two glows are
+  within 3 yd now, each is small (a 0.5 yd core, a 1.2 yd halo at 0.15),
+  dimmer (0.9, was 1.6) and taken halfway to lamplight, and the mist
+  takes 0.9 of its dimming (was 0.5).
+- The street lamp had no glow in the mist while the cart lantern did: a
+  light's glow went by its strength from 0.3 to 1.5, and a whitish lamp
+  (about 0.6) took a fifth of it. The band is 0.15 to 0.8; a firefly's
+  light stays near nothing by its 2.5 yd reach.
+- The dawn fog was darker than worldFog 0's plain mist and had no
+  shafts. The plain mist leaves the sky alone and the fog veiled it with
+  the mist's darker dawn colour: the veil takes 0.3 of the sky (was
+  0.5), and the shade under the crowns takes more of the sun (floor 0.4,
+  gain 1.8, were 0.3 and 1.6), a shaft still two and a half times its
+  shade. The film had the sun out of frame; the next faces it.
+- The noon cobbles blew out (11.7% of the frame over 230 against 3.0%
+  under 1.12): the noon grade's contrast, the bloom and the sharpen each
+  lift a bright stone texel past white, where it clipped flat. The look
+  pass ends on a soft shoulder over linear 0.6, so near-white keeps its
+  texture.
+
+Revised after the fifth films (#273, take 291):
+
+- The far windows drew over a nearer oak's trunk: a pixel of anything
+  nearer than a window now takes none of its glow.
+- One glow sat on a roof edge beside its window: a pane round a corner,
+  pooled with its neighbour, put the point inside the building, and a
+  roof less than 5 yd in front did not hide it. A window's points keep
+  to one wall now, and hide behind anything 2 yd in front.
+- They were white, not warm: they're taken 0.85 (was 0.5) toward a
+  deeper amber and a little dimmer (0.7, was 0.9), so the cores no longer
+  pass the highlight shoulder to white.
+- Mist 3 didn't dim them: they now take all of the mist's dimming (was
+  0.9 of it) and their halo spreads in it.
+- lookwindows gave the count from before the change: it picks them again
+  at the new setting, and says how much light the mist lets through from
+  the nearest.
+- The street lamp had no glow in the mist: Goldshire's lamp posts had no
+  light (#271's fix gives them one).
+- Noon cobbles: 10.9% of the frame over 230. The noon grade's contrast is
+  1.0 (was 1.06) and its bloom 0.08 (was 0.15).
+- The fps journal put the look's passes in gpu_other: a gpu_look column
+  now holds them (the shadow slices, the contact shadows, the fog, the
+  water's copy and the look pass).
+
+Seventh round (take 310):
+- Far windows: a window on a wall facing away from the camera is left
+  out (its pane's normal, faced out of its batch's middle or its
+  placement's origin): seen past its own roof's edge by the occlusion
+  taps, it was the glow on the roof. The glows are added after the grade
+  and the shoulder, screened on: drawn before them, the night grade's lost
+  saturation turned their amber pale pink. As the mist spreads a halo it
+  no longer gathers more light than the mist takes (the colour keeps the
+  light of the clear-air shape). Take 310's mist 3 letting more through
+  was that day's own mist being thicker than 3.
+- Noon cobbles: the last shoulder now rolls from 0.5 toward 0.85 (was 0.6
+  toward 1), so only what comes in over about 0.93 passes 230.
+- Dawn shafts: a sunlit stretch of mist is five times its shade (the
+  fog's sun gain 2.2 and shade floor 0.2, were 1.8 and 0.4).
+- The far windows are picked again only when the view, their weight or
+  the town's buildings change, not every frame.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/cvars/mod.rs           |   28 +
+ crates/benilla-app/src/cvars/table.rs         |   25 +
+ crates/benilla-app/src/perf/journal.rs        |   34 +-
+ crates/benilla-app/src/shaders.rs             |   17 +
+ crates/benilla-app/src/video.rs               |   22 +-
+ crates/benilla-app/src/world_console.rs       |  143 ++
+ .../src/lighting/global_light.rs              |    2 +-
+ crates/benilla-world/src/lighting/mod.rs      |    8 +
+ crates/benilla-world/src/look/air.rs          | 1210 +++++++++++++++++
+ crates/benilla-world/src/look/fog_pass.rs     |  619 +++++++++
+ crates/benilla-world/src/look/grade.rs        |    6 +-
+ crates/benilla-world/src/look/mod.rs          |    8 +-
+ crates/benilla-world/src/look/pass.rs         |  197 ++-
+ crates/benilla-world/src/shaders.rs           |    3 +-
+ .../benilla-world/src/shaders/world_fog.wgsl  |  290 ++++
+ .../benilla-world/src/shaders/world_look.wgsl |  216 ++-
+ crates/benilla-world/src/static_gx/cull.rs    |    2 +
+ crates/benilla-world/src/static_gx/mod.rs     |   28 +
+ 18 files changed, 2821 insertions(+), 37 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/air.rs
+ create mode 100644 crates/benilla-world/src/look/fog_pass.rs
+ create mode 100644 crates/benilla-world/src/shaders/world_fog.wgsl
+
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 5b8b07c..babf5b2 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1805,6 +1805,33 @@ mod tests {
+         assert!(res::<LookLife>(&app).on);
+     }
+ 
++    /// `worldFog`, `worldFogQuality` and `worldSharpen` (benilla's own) set the new look's air on
++    /// their own, registered to match `LookAir`'s defaults.
++    #[test]
++    fn the_air_switches_alone() {
++        use benilla_world::look::{LookAir, LookLife, WorldLook};
++        let mut app = cvar_app();
++        assert_eq!(
++            *res::<LookAir>(&app),
++            LookAir::default(),
++            "registered defaults"
++        );
++        assert_eq!(apply(&mut app, "worldFog", "0"), SetOutcome::Changed);
++        assert!(!res::<LookAir>(&app).fog);
++        assert!(res::<LookLife>(&app).on, "the life stays");
++        assert_eq!(
++            *res::<WorldLook>(&app),
++            WorldLook::NEW,
++            "the rest of the look stays"
++        );
++        apply(&mut app, "worldFogQuality", "3");
++        assert_eq!(res::<LookAir>(&app).fog_quality, 3);
++        apply(&mut app, "worldSharpen", "0.8");
++        assert_eq!(res::<LookAir>(&app).sharpen, 0.8);
++        apply(&mut app, "worldFog", "1");
++        assert!(res::<LookAir>(&app).fog);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2933,6 +2960,7 @@ mod tests {
+             .init_resource::<benilla_world::look::LookSky>()
+             .init_resource::<benilla_world::look::LookWeather>()
+             .init_resource::<benilla_world::look::LookLife>()
++            .init_resource::<benilla_world::look::LookAir>()
+             // Literal, not Default: RenderScale::default() reads $WOW_RENDER_SCALE.
+             .insert_resource(RenderScale(1.0))
+             // Literal: `Realmlist::default()` reads `$WOW_HOST`.
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index c8c4a0b..a8c890e 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -962,6 +962,31 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — 1.12's world has no fireflies, leaves or motes; this turns the new \
+          look's ambient life off on its own",
+     ),
++    // benilla's own: the new look's volumetric fog (shafts of sun in the mist, lamps glowing in
++    // it), "0" for the plain mist under the rest of the new look. The knob is
++    // `benilla_world::look::LookAir::fog`, set by `video::on_cvar`; inert under `worldLook 0`.
++    ours(
++        "worldFog",
++        "1",
++        "benilla's own — 1.12 has only its distance fog; this turns the new look's volumetric fog \
++         (light shafts in the mist) off on its own",
++    ),
++    // benilla's own: the volumetric fog's quality step, "1" low (a sample every 4 pixels, 6
++    // steps), "2" medium (every 4, 12 steps), "3" high (every 2, 16 steps). The knob is
++    // `benilla_world::look::LookAir::fog_quality`.
++    ours(
++        "worldFogQuality",
++        "2",
++        "benilla's own — the new look's volumetric fog quality: 1 low, 2 medium, 3 high",
++    ),
++    // benilla's own: the new look's sharpen of 1.12's soft textures, 0 (none) to 1. The knob is
++    // `benilla_world::look::LookAir::sharpen`; inert under `worldLook 0`.
++    ours(
++        "worldSharpen",
++        "0.4",
++        "benilla's own — 1.12 draws its textures soft; this sharpens the new look's picture, 0 \
++         none to 1",
++    ),
+     // benilla's own: `/console fpsJournal 1` appends a per-second row of position, frame cost and
+     // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
+     // [`crate::perf::FpsJournalSetting`].
+diff --git a/crates/benilla-app/src/perf/journal.rs b/crates/benilla-app/src/perf/journal.rs
+index 5d3c0ba..5ccfcb5 100644
+--- a/crates/benilla-app/src/perf/journal.rs
++++ b/crates/benilla-app/src/perf/journal.rs
+@@ -32,7 +32,7 @@ pub(crate) struct FpsJournalSetting(pub(crate) bool);
+ const JOURNAL_HEADER: &str = "t,x,y,z,mean_ms,p95_ms,streamed,entities,cpu_ms,mats,meshes,images,\
+                               m2,uv,tint,pmat,emat,skin,cmat,tex,cgeo,evicted,fx,fy,fz,main_ms,\
+                               gpu_ms,gpu_opaque,gpu_static,gpu_transp,gpu_glow,gpu_post,gpu_ui,\
+-                              gpu_other\n";
++                              gpu_other,gpu_look\n";
+ 
+ /// The `fpsJournal` change callback: a flag, int-parsed and `!= 0`.
+ pub(crate) fn on_cvar(ev: On<crate::cvars::CvarChanged>, mut journal: ResMut<FpsJournalSetting>) {
+@@ -101,9 +101,13 @@ enum GpuBucket {
+     Ui,
+     /// Every span this file does not name, counted, never dropped.
+     Other,
++    /// The new look's own passes (`benilla_world::look`): its sun-shadow slices, the contact
++    /// shadows and their blur, the volumetric fog's march and resolve, the water's scene copy and
++    /// the look pass itself. Take 291's cost run found them all in [`Self::Other`].
++    Look,
+ }
+ 
+-const GPU_BUCKETS: usize = 7;
++const GPU_BUCKETS: usize = 8;
+ 
+ /// Which column a diagnostics path lands in; `None` for anything but a top-level GPU span (a
+ /// nested span's parent already carries it).
+@@ -121,6 +125,10 @@ fn gpu_bucket(path: &str) -> Option<GpuBucket> {
+         "main_opaque_pass_2d" | "main_transparent_pass_2d" | "ui" | "ui_gamma_decode" => {
+             GpuBucket::Ui
+         }
++        "world_look" => GpuBucket::Look,
++        p if p.starts_with("world_ao") || p.starts_with("world_fog") || p.starts_with("look_") => {
++            GpuBucket::Look
++        }
+         _ => GpuBucket::Other,
+     })
+ }
+@@ -425,6 +433,19 @@ mod tests {
+             b("render/early_mesh_preprocessing/elapsed_gpu"),
+             Some(Other)
+         );
++        // The new look's passes (take 291: all in gpu_other).
++        for pass in [
++            "world_look",
++            "world_ao",
++            "world_ao_blur_x",
++            "world_fog",
++            "world_fog_resolve",
++            "look_shadow_0",
++            "look_shadow_3",
++            "look_water_copy",
++        ] {
++            assert_eq!(b(&format!("render/{pass}/elapsed_gpu")), Some(Look), "{pass}");
++        }
+         // CPU spans, non-render diagnostics and nested spans are not GPU cells.
+         assert_eq!(b("render/main_opaque_pass_3d/elapsed_cpu"), None);
+         assert_eq!(b("fps"), None);
+@@ -480,9 +501,9 @@ mod tests {
+         assert_eq!(acc.frames, 2);
+         let cols = acc.columns();
+         // gpu_ms = (2 + 3 + 0.8 + 4) / 2; opaque (2 + 4) / 2; static 3 / 2; post 0.8 / 2.
+-        assert_eq!(cols, ",4.90,3.00,1.50,0.00,0.00,0.40,0.00,0.00");
++        assert_eq!(cols, ",4.90,3.00,1.50,0.00,0.00,0.40,0.00,0.00,0.00");
+         // The reset: a second with nothing read writes empty cells, one per column.
+-        assert_eq!(acc.columns(), ",,,,,,,,");
++        assert_eq!(acc.columns(), ",,,,,,,,,");
+         // And a later frame is still read after the reset.
+         push(
+             &mut store,
+@@ -491,7 +512,7 @@ mod tests {
+             1.0,
+         );
+         acc.fold(&store);
+-        assert_eq!(acc.columns(), ",1.00,1.00,0.00,0.00,0.00,0.00,0.00,0.00");
++        assert_eq!(acc.columns(), ",1.00,1.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00");
+     }
+ 
+     #[test]
+@@ -508,7 +529,8 @@ mod tests {
+                 "gpu_glow",
+                 "gpu_post",
+                 "gpu_ui",
+-                "gpu_other"
++                "gpu_other",
++                "gpu_look"
+             ]
+         );
+         // An empty second writes exactly one cell per GPU column.
+diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
+index 0140559..eb68538 100644
+--- a/crates/benilla-app/src/shaders.rs
++++ b/crates/benilla-app/src/shaders.rs
+@@ -151,6 +151,23 @@ mod tests {
+         }
+     }
+ 
++    /// The new look's volumetric fog (`benilla_world::look::fog_pass`): its march and resolve
++    /// entry points, composed with each def set its pipelines specialise on, validated and
++    /// translated.
++    #[test]
++    fn the_world_fog_shader_composes_and_translates() {
++        let (mut cache, ids) = embedded_shader_cache();
++        let id = *ids
++            .get("benilla_world/shaders/world_fog.wgsl")
++            .expect("world_fog.wgsl is embedded");
++        for defs in benilla_world::look::fog_pass::shader_def_sets() {
++            let module = cache
++                .get(&(), 0, id, &defs)
++                .unwrap_or_else(|e| panic!("{defs:?}: world_fog.wgsl does not compose: {e:?}"));
++            validate_and_translate(&module, &format!("{defs:?}: world_fog.wgsl"));
++        }
++    }
++
+     /// The new look's sun-shadow casters (`benilla_world::look::shadow_pass`): every def set its
+     /// pipelines specialise on, composed, validated and translated.
+     #[test]
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 7d232e2..ba445e7 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -321,6 +321,7 @@ type LookSwitches<'w> = (
+     Option<ResMut<'w, benilla_world::look::LookSky>>,
+     Option<ResMut<'w, benilla_world::look::LookWeather>>,
+     Option<ResMut<'w, benilla_world::look::LookLife>>,
++    Option<ResMut<'w, benilla_world::look::LookAir>>,
+ );
+ 
+ /// The change callbacks of the reference's video-options registration block (`0x688470`); each
+@@ -341,7 +342,7 @@ pub(crate) fn on_cvar(
+     mut look: ResMut<benilla_world::look::WorldLook>,
+     // The new look's own switches: its contact shadows, its sun shadows, its water, its wind and
+     // its sky.
+-    (ao, shadows, water, wind, sky, look_weather, life): LookSwitches,
++    (ao, shadows, water, wind, sky, look_weather, life, air): LookSwitches,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+     use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+@@ -401,6 +402,25 @@ pub(crate) fn on_cvar(
+         }
+         // benilla's own: the new look's painted sky on its own, read every frame.
+         // benilla's own: the new look's weather on its own, read every frame.
++        // benilla's own: the new look's volumetric fog on its own, its quality step, and its
++        // sharpen, each read every frame.
++        "worldfog" | "worldfogquality" | "worldsharpen" => {
++            if let Some(mut air) = air {
++                match ev.key().as_str() {
++                    "worldfog" => air.fog = ev.flag(),
++                    "worldfogquality" => {
++                        air.fog_quality = benilla_world::look::LookAir::quality_of(v)
++                    }
++                    _ => air.sharpen = benilla_world::look::LookAir::sharpen_of(v),
++                }
++                info!(
++                    "video: the new look's fog {} (quality {}), sharpen {}",
++                    if air.fog { "on" } else { "off" },
++                    air.fog_quality,
++                    air.sharpen
++                );
++            }
++        }
+         // benilla's own: the new look's ambient life on its own, read every frame.
+         "worldlife" => {
+             if let Some(mut life) = life {
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index dd20a3f..5e4aaaa 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -148,6 +148,15 @@ impl Plugin for WorldConsolePlugin {
+         );
+         // benilla's own: the new look's ambient life scaled for tuning on film.
+         app.console_command("looklife", GRAPHICS, Some("<0-3> | grade"), look_life);
++        // benilla's own: the new look's volumetric fog, sharpen and far windows tuned on film.
++        app.console_command(
++            "lookfog",
++            GRAPHICS,
++            Some("<density 0-3> | quality <1-3> | grade"),
++            look_fog,
++        );
++        app.console_command("looksharpen", GRAPHICS, Some("<0-1> | grade"), look_sharpen);
++        app.console_command("lookwindows", GRAPHICS, Some("<0-2>"), look_windows);
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -667,6 +676,92 @@ fn look_life(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++/// `lookfog <density>`, benilla's own (1.12 has no such command): holds the volumetric fog's mist
++/// at a multiple (0 to 3) of the day's (`benilla_world::look::air`), for tuning on film; `lookfog
++/// quality <1-3>` sets its quality step (as `worldFogQuality`); `lookfog grade`, or no argument,
++/// follows the day again. `worldFog 0` and the classic look (`worldLook 0`) have none.
++fn look_fog(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::air::FogCommand;
++    use benilla_world::look::{LookAir, WorldLook};
++    let Some(cmd) = LookAir::parse_fog(args) else {
++        return vec!["Usage: lookfog <density 0-3> | quality <1-3> | grade".to_string()];
++    };
++    let on = {
++        let mut air = world.get_resource_or_init::<LookAir>();
++        match cmd {
++            FogCommand::Density(d) => air.fog_density = d,
++            FogCommand::Quality(q) => air.fog_quality = q,
++        }
++        air.fog
++    };
++    let mut lines = vec![match cmd {
++        FogCommand::Density(None) => "Fog follows the day's mist.".to_string(),
++        FogCommand::Density(Some(d)) => format!("Fog held at {d} times the day's mist."),
++        FogCommand::Quality(q) => {
++            let l = benilla_world::look::air::fog_quality(q);
++            format!(
++                "Fog quality {q}: one sample every {} pixels, {} steps a ray.",
++                l.scale, l.steps
++            )
++        }
++    }];
++    if !on {
++        lines.push("worldFog is 0: the plain mist, no shafts.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has no fog.".to_string());
++    }
++    lines
++}
++
++/// `looksharpen <0-1>`, benilla's own: holds the new look's sharpen (`worldSharpen`'s value is
++/// kept underneath), for comparing on film; `looksharpen grade`, or no argument, lets go.
++fn look_sharpen(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookAir, WorldLook};
++    let Some(held) = LookAir::parse_sharpen(args) else {
++        return vec!["Usage: looksharpen <0-1> | grade".to_string()];
++    };
++    let base = {
++        let mut air = world.get_resource_or_init::<LookAir>();
++        air.sharpen_held = held;
++        air.sharpen
++    };
++    let mut lines = vec![match held {
++        None => format!("Sharpen follows worldSharpen ({base})."),
++        Some(s) => format!("Sharpen held at {s}."),
++    }];
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) is not sharpened.".to_string());
++    }
++    lines
++}
++
++/// `lookwindows <0-2>`, benilla's own: scales the far lit windows' glow at night (0 none, 1 as
++/// tuned, 2 twice).
++fn look_windows(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookAir, WorldLook};
++    let Some(scale) = LookAir::parse_windows(args) else {
++        return vec!["Usage: lookwindows <0-2>".to_string()];
++    };
++    world.get_resource_or_init::<LookAir>().windows = scale;
++    let mut lines = vec![format!("Far windows at {scale} times.")];
++    // Picked again at the new scale, not last frame's list (take 291: the count from before).
++    if let Some((n, nearest)) = benilla_world::look::air::windows_now(world, scale) {
++        lines.push(match nearest {
++            Some((d, keep)) => format!(
++                "Glowing now: {n}; the nearest {d:.0} yd off, {:.0}% of its light through the \
++                 mist.",
++                keep * 100.0
++            ),
++            None => format!("Glowing now: {n}."),
++        });
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has no far windows.".to_string());
++    }
++    lines
++}
++
+ fn look_sky(world: &mut World, args: &str) -> Vec<String> {
+     use benilla_world::look::{LookSky, WorldLook};
+     let Some(clouds) = LookSky::parse(args) else {
+@@ -1413,6 +1508,54 @@ mod tests {
+         assert_eq!(lines[1], "worldLife is 0: no ambient life.");
+     }
+ 
++    /// `lookfog`, `looksharpen` and `lookwindows`: each holds its value, `grade` lets go, and
++    /// anything out of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_air_holds_and_lets_go() {
++        use benilla_world::look::{LookAir, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let air = |app: &mut App| *app.world_mut().get_resource_or_init::<LookAir>();
++        assert_eq!(
++            run(&mut app, "lookfog 2"),
++            ["Fog held at 2 times the day's mist."]
++        );
++        assert_eq!(air(&mut app).fog_density, Some(2.0));
++        assert_eq!(
++            run(&mut app, "lookfog 9"),
++            ["Usage: lookfog <density 0-3> | quality <1-3> | grade"]
++        );
++        assert_eq!(
++            air(&mut app).fog_density,
++            Some(2.0),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "lookfog quality 3"),
++            ["Fog quality 3: one sample every 2 pixels, 16 steps a ray."]
++        );
++        assert_eq!(air(&mut app).fog_quality, 3);
++        assert_eq!(
++            run(&mut app, "lookfog grade"),
++            ["Fog follows the day's mist."]
++        );
++        assert_eq!(air(&mut app).fog_density, None);
++        assert_eq!(run(&mut app, "looksharpen 1"), ["Sharpen held at 1."]);
++        assert_eq!(air(&mut app).sharpness(), 1.0);
++        assert_eq!(
++            run(&mut app, "looksharpen grade"),
++            ["Sharpen follows worldSharpen (0.4)."]
++        );
++        assert_eq!(run(&mut app, "lookwindows 3"), ["Usage: lookwindows <0-2>"]);
++        assert_eq!(run(&mut app, "lookwindows 2")[0], "Far windows at 2 times.");
++        assert_eq!(air(&mut app).windows, 2.0);
++        app.world_mut().resource_mut::<LookAir>().fog = false;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        let lines = run(&mut app, "lookfog 1");
++        assert_eq!(lines.len(), 3, "{lines:?}");
++        assert_eq!(lines[1], "worldFog is 0: the plain mist, no shafts.");
++    }
++
+     /// `looksky`: `clouds <cover>` holds the cover, `grade` or nothing lets go, and anything out
+     /// of range leaves it as it was with the usage line.
+     #[test]
+diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
+index 1a75eab..610d7b1 100644
+--- a/crates/benilla-world/src/lighting/global_light.rs
++++ b/crates/benilla-world/src/lighting/global_light.rs
+@@ -103,7 +103,7 @@ pub fn commit_raw(rgb: [f32; 3]) -> [f32; 3] {
+ 
+ /// Capacity of the point-light table, fixed in the WGSL mirror structs (keep in sync); past it
+ /// [`build_light_data`] keeps the lights nearest the camera.
+-pub(super) const MAX_POINT_LIGHTS: usize = 256;
++pub(crate) const MAX_POINT_LIGHTS: usize = 256;
+ 
+ /// Lights are packed only within this camera distance (yd): a light's effect ends at its 48 yd
+ /// range, a pool past 300 yd is sub-pixel and fogged, and the cap bounds the per-vertex walk.
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index e64177e..6e31736 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -15,6 +15,9 @@ mod resolve; // the per-frame time-of-day resolve and the interior-fog crossfade
+ mod sh; // the model SH probe fold
+ pub use blob::LightBlob;
+ pub use global_light::{new_shared_light_buffer, LightRooms, SharedLightBuffer, WorldPointLight};
++// The shared light's layout, which the look's fog pass mirrors (`look::fog_pass`).
++#[cfg(test)]
++pub(crate) use global_light::{LIGHT_HEADER_ROWS, MAX_POINT_LIGHTS};
+ pub use prop_probes::{PropProbeSlot, PropProbes, MAX_PROP_PROBES};
+ // The std430 layout stays in the crate: off-world producers state values through `LightBlob`,
+ // never a row index.
+@@ -327,6 +330,11 @@ mod ordering_tests {
+                 "scan_crowns, step_life and light_fireflies join LightingConsumeSet where \
+                  look/mod.rs adds them",
+             ),
++            (
++                "look/air.rs",
++                "publish_windows is chained after publish_frame in LightingConsumeSet, where \
++                 look/pass.rs adds it",
++            ),
+         ];
+         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+         let mut offenders = Vec::new();
+diff --git a/crates/benilla-world/src/look/air.rs b/crates/benilla-world/src/look/air.rs
+new file mode 100644
+index 0000000..5a94bc3
+--- /dev/null
++++ b/crates/benilla-world/src/look/air.rs
+@@ -0,0 +1,1210 @@
++//! The air, the new look's own (no reference behaviour): volumetric fog with light shafts, a
++//! sharper picture, and lit windows glowing from afar. WoW Forever's last touches: a misty morning
++//! in the woods fills with shafts of sun between the trunks, the lamps glow in the night mist,
++//! 1.12's soft textures read crisper, and Goldshire seen from the hill at night is a cluster of
++//! warm windows.
++//!
++//! - **Fog** (`worldFog`, [`LookAir::fog`]): the mist of the day (0054's analytic height mist,
++//!   already scaled by the day's roll, a fog day, an event and the weather: `look::mist`) keeps its
++//!   closed form for how thick it is and what colour, and a low-resolution pass
++//!   (`look::fog_pass`, `world_fog.wgsl`) carves it: along each view ray it asks the sun-shadow
++//!   map (0065/0080) at a few jittered points how much of the mist's in-scattering the sun reaches
++//!   ([`lit_share`], each segment weighted by the exact share of the mist it holds), so trees and
++//!   buildings cut shafts out of it; and each of the look's lamps and torches (0057) glows in it, a
++//!   halo integrated along the ray in closed form ([`halo`]). The jitter settles over a few frames
++//!   in a depth-aware, reprojected resolve. The look pass lights the mist by the sun only where the
++//!   share says so ([`phase`] toward the sun). `worldFogQuality` 1–3 trades resolution and steps
++//!   for cost ([`fog_quality`]); with the fog off the analytic mist is drawn exactly as before.
++//! - **Sharpen** (`worldSharpen`, 0–1): a contrast-adaptive sharpen of the frame at the head of the
++//!   look pass ([`cas`], after AMD's CAS): a pixel is pushed away from its four neighbours, less
++//!   where they already differ a lot (no halos), and less with distance, where alpha-tested leaves
++//!   would crawl ([`sharpen_at`]).
++//! - **Windows** (`lookwindows <0-2>`): the WMO window batches 1.12 lights at night (MOMT SIDN,
++//!   `0x10`) are gathered into points as their buildings load ([`window_points`]); from about
++//!   [`tune::WINDOW_NEAR_START`] out, where the windows themselves shrink to a pixel and the fog
++//!   closes over them, each is drawn as a soft warm glow over the fog, faded in with the windows'
++//!   own night track (SIDN: 20:30 to 21:30, out 06:00 to 07:00) and out at great distance, and
++//!   hidden behind a hill or a nearer house ([`WindowGlows`]).
++//!
++//! Every tunable is in [`tune`]. `lookfog <density 0-3> | quality <1-3> | grade`, `looksharpen
++//! <0-1> | grade` and `lookwindows <0-2>` tune them live for film; `worldLook 0` has none of it.
++
++use bevy::prelude::*;
++use bevy::render::extract_resource::ExtractResource;
++
++use super::WorldLook;
++
++/// Every tunable of the air, in one place. A first pass, to tune on film. Lengths are yards.
++pub mod tune {
++    /// A sky pixel's ray reaches this far into the mist: shafts against the sky between the
++    /// trunks, and a fog day's veil over the horizon.
++    pub const FOG_SKY_REACH: f32 = 120.0;
++    /// How much of that veil the sky takes, so a fog day dims the sky without erasing it (the
++    /// analytic mist leaves the sky alone).
++    /// 0.3, was 0.5: take 280's dawn fog was darker than `worldFog 0`'s plain mist (a frame mean
++    /// of 91.7 against 97.5). The analytic mist leaves the sky alone, and at dawn the mist's colour
++    /// is darker than the sky it veiled.
++    pub const FOG_SKY_SHARE: f32 = 0.3;
++    /// The sun's light in the mist toward it: Henyey–Greenstein's asymmetry (0.6 a forward glow
++    /// about as narrow as the analytic mist's `μ⁸`), and the share every direction gets, so a
++    /// shaft seen side-on still reads.
++    pub const FOG_PHASE_G: f32 = 0.6;
++    pub const FOG_PHASE_ISO: f32 = 0.15;
++    /// The sun's light in the fog against the analytic mist's: the lit stretches take this many
++    /// times it and the shade keeps this share (`world_look.wgsl`). The first dawn film (take 275,
++    /// 07:00, a fog day) found the fog an even haze, less hazy and less golden than `worldFog 0`'s
++    /// mist from the same spot: under the crowns the lit share is low, and with no floor and no
++    /// gain the fog came out dimmer on average than the mist it replaced.
++    /// 1.8 and 0.4, were 1.6 and 0.3: the shade under the crowns took less than the mist it
++    /// replaced (take 280); a shaft is still two and a half times its shade.
++    /// 2.2 and 0.2: take 310's dawn fog was as bright as the plain mist (120 against 118) but
++    /// showed no shafts, two and a half times its shade being lost in the mist's own colour. A
++    /// shaft is now five times its shade, and half-lit fog a little brighter than before.
++    pub const FOG_SUN_GAIN: f32 = 2.2;
++    pub const FOG_SHADE_FLOOR: f32 = 0.2;
++    /// The lamps' glow over the frame eases off past this (linear, `glow / (1 + luma / knee)`):
++    /// in `lookmist 3` at Goldshire's lamps the glow veiled a hero as brightly as the street
++    /// behind him (take 275's see-through hero).
++    pub const FOG_GLOW_KNEE: f32 = 0.6;
++    /// How much of last frame's lit share each frame keeps: the jitter settles in about five
++    /// frames.
++    pub const FOG_HISTORY: f32 = 0.85;
++    /// A camera that moves further than this in a frame (a goto, a cut) starts its history over.
++    pub const FOG_RESET_JUMP: f32 = 8.0;
++    /// The resolve's depth tolerance: a neighbour whose depth differs by this share counts half.
++    pub const FOG_EDGE: f32 = 20.0;
++    /// The lamps' and torches' glow in the mist: the in-scattering of a light's committed colour,
++    /// its halo's bright core (yd), and the least density a halo sees, so a lamp on a clear night
++    /// still has a faint one.
++    pub const LIGHT_SCATTER: f32 = 6.0;
++    pub const LIGHT_CORE: f32 = 1.5;
++    pub const LIGHT_AIR: f32 = 0.0015;
++    /// A light's halo by its size and strength (`world_fog.wgsl`): a torch's pool (its reach,
++    /// `look::lights::tune::TORCH_RADIUS`) and brighter takes the whole halo; a smaller light's
++    /// halo shrinks with it, its core by its reach's share and its strength by that share squared;
++    /// a light under the first peak (its brightest channel) has none, full at the second. The
++    /// first air films found a green glow 400 px across round one of 0083's firefly lights
++    /// (2.5 yd, 0.6).
++    pub const HALO_REF_RADIUS: f32 = 10.0;
++    /// 0.15 and 0.8, were 0.3 and 1.5: take 280 found the cart lantern glowing in the mist and the
++    /// street lamp not. A whitish lamp commits a peak of about 0.6, which took a fifth of a halo;
++    /// a lantern's 2.9 took all of it. A firefly's light stays near nothing by its 2.5 yd reach.
++    pub const HALO_PEAK_FROM: f32 = 0.15;
++    pub const HALO_PEAK_TO: f32 = 0.8;
++    /// The most `lookfog` scales the mist's density by.
++    pub const DENSITY_MAX: f32 = 3.0;
++    /// The quality steps (`worldFogQuality`): full-resolution pixels per fog texel each way, and
++    /// march steps per ray. 1 low, 2 medium (the default), 3 high.
++    pub const QUALITY: [(u32, u32); 3] = [(4, 6), (4, 12), (2, 16)];
++    pub const QUALITY_DEFAULT: u8 = 2;
++
++    /// `worldSharpen`'s default: a gentle lift.
++    pub const SHARPEN_DEFAULT: f32 = 0.4;
++    /// The lobe weight at sharpness 1: AMD's CAS at its sharpest (−1/5).
++    pub const SHARPEN_LOBE: f32 = 0.2;
++    /// The sharpen fades with planar eye depth from the first to the second, down to the share
++    /// beyond: far foliage's alpha-tested edges are what would crawl.
++    pub const SHARPEN_NEAR: f32 = 25.0;
++    pub const SHARPEN_FAR: f32 = 120.0;
++    pub const SHARPEN_FAR_KEEP: f32 = 0.35;
++    /// A soft shoulder over the graded frame's highlights, from this linear value up (about 203 of
++    /// 255) toward white, so near-white keeps its texture. Take 280's noon cobbles blew out under
++    /// the new look (11.7% of the frame over 230 against 3.0% in 1.12's): the noon grade's
++    /// contrast (1.06 about mid-grey), the bloom and the sharpen each lift a bright stone texel,
++    /// and past 1.0 it clipped flat white.
++    /// 0.5 toward 0.85, was 0.6 toward 1: take 310 still found 9.2% of the noon frame over 230
++    /// (2.65% under 1.12): rolled off toward white, anything over 0.81 still passed 230. Now only
++    /// what comes in over about 0.93 does, and nothing goes past [`HIGHLIGHT_WHITE`] (236).
++    pub const HIGHLIGHT_KNEE: f32 = 0.5;
++    pub const HIGHLIGHT_WHITE: f32 = 0.85;
++
++    /// Window points: a window batch's triangles are pooled in cubes this wide, and a pool
++    /// smaller than the area (yd²) is dropped; at most so many points a batch, the largest first.
++    pub const WINDOW_CELL: f32 = 2.5;
++    pub const WINDOW_MIN_AREA: f32 = 0.15;
++    pub const WINDOW_PER_BATCH: usize = 48;
++    /// A window whose SIDN colour is dimmer than this (peak byte) glows not at all.
++    pub const WINDOW_MIN_SIDN: u8 = 24;
++    /// A pool of this area (yd²) glows at full strength; others by the square root, within
++    /// half and one and a half.
++    pub const WINDOW_REF_AREA: f32 = 1.5;
++    /// The most glows drawn a frame, nearest first (`world_look.wgsl`'s `glows` holds two rows
++    /// each), none within [`WINDOW_SPACING`] of a nearer one: take 280 saw Goldshire from 300 yd
++    /// as two white blobs about 35 px wide, as the 64 nearest points all lay in one or two
++    /// buildings (up to 48 a window batch) and their halos piled up. Thinned, each glow is a
++    /// window a few pixels apart from the next, and the 64 reach across the town.
++    pub const WINDOW_MAX: usize = 64;
++    pub const WINDOW_SPACING: f32 = 3.0;
++    /// The glow fades in from the first distance to the second (where the window itself is a
++    /// pixel or two), and out from the third to the fourth.
++    pub const WINDOW_NEAR_START: f32 = 60.0;
++    pub const WINDOW_NEAR_FULL: f32 = 150.0;
++    pub const WINDOW_FAR_START: f32 = 1000.0;
++    pub const WINDOW_FAR_END: f32 = 1500.0;
++    /// A glow's bright core and its soft halo, yards across a sigma, and the fewest pixels each
++    /// is drawn at so a far window stays a point of light; the halo's share of the core's
++    /// brightness.
++    /// Smaller and softer than the first pass (0.9, 3.0, 0.25 were core, halo and its share):
++    /// small warm points, never discs.
++    pub const WINDOW_CORE_YD: f32 = 0.5;
++    pub const WINDOW_HALO_YD: f32 = 1.2;
++    pub const WINDOW_CORE_MIN_PX: f32 = 0.9;
++    pub const WINDOW_HALO_MIN_PX: f32 = 2.0;
++    pub const WINDOW_HALO: f32 = 0.15;
++    /// A glow's brightness (linear, before the grade), enough to pass the bloom's prefilter: 0.9,
++    /// was 1.6, which with the piled halos read pure white. 0.7, was 0.9: take 291 still found
++    /// the points white, their cores past the highlight shoulder, where every channel goes to
++    /// white and a dimming in the mist doesn't show.
++    pub const WINDOW_INTENSITY: f32 = 0.7;
++    /// A glow's colour is its window's SIDN colour taken this share toward [`WINDOW_WARM`]
++    /// (linear), so a far window reads as lamplight, not white. 0.85 toward a deeper amber
++    /// (was 0.5 toward 1.0, 0.55, 0.22): take 291 found them white, not warm. Take 310 found
++    /// them pale pink (150, 122, 114): drawn before the night grade, which takes a quarter of the
++    /// saturation and rolls the highlights toward white. They're added after it now
++    /// (`world_look.wgsl`), screened on, so the amber is the amber drawn.
++    pub const WINDOW_WARM: [f32; 3] = [1.0, 0.48, 0.16];
++    pub const WINDOW_WARMTH: f32 = 0.85;
++    /// A glow hides behind anything nearer than its window by this much (its own wall is not).
++    /// 2, was 5: take 291 found a glow on a roof edge beside its lit window, as a pane round the
++    /// corner pooled with it put the point inside the building, and a roof under 5 yd in front of
++    /// it did not hide it. The pools now keep to one wall ([`super::window_points`]), so the
++    /// point sits on its wall, and anything 2 yd in front hides it.
++    pub const WINDOW_OCCLUDE_TOL: f32 = 2.0;
++    /// How much of the mist's dimming a glow takes: 0.9, was 0.5, as take 280 found `lookmist 3`
++    /// did not dim them. 1, all of it, and in mist the glow's halo spreads by up to
++    /// [`WINDOW_MIST_SPREAD`] (its share of the light the mist scatters): take 291 found mist 3
++    /// still not dimming them, the cores past white whatever the dimming.
++    /// Take 310 found mist 3 still not dimming them: the spread halo kept its share at the
++    /// wider sigma, gathering more light than the mist took; the light is now kept as it spreads
++    /// ([`super::spread_keep`]).
++    pub const WINDOW_MIST_KEEP: f32 = 1.0;
++    pub const WINDOW_MIST_SPREAD: f32 = 1.5;
++    /// A window whose wall faces away from the camera by more than this (the cosine) glows not
++    /// at all; its batch's middle must be this far (yd, level) from it to tell its outside.
++    pub const WINDOW_BACK_TOL: f32 = 0.1;
++    pub const WINDOW_FACING_MIN: f32 = 1.0;
++    /// The most `lookwindows` scales the glows by.
++    pub const WINDOWS_MAX_SCALE: f32 = 2.0;
++}
++
++/// The air's switches and the film's holds: `fog` is `worldFog` and `fog_quality`
++/// `worldFogQuality`; `fog_density` holds the mist's density at a multiple of the day's
++/// (`lookfog <d>`); `sharpen` is `worldSharpen` and `sharpen_held` `looksharpen`'s hold; `windows`
++/// scales the far windows (`lookwindows`, 0 none). Inert under the classic look.
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookAir {
++    pub fog: bool,
++    pub fog_quality: u8,
++    pub fog_density: Option<f32>,
++    pub sharpen: f32,
++    pub sharpen_held: Option<f32>,
++    pub windows: f32,
++}
++
++impl Default for LookAir {
++    fn default() -> Self {
++        Self {
++            fog: true,
++            fog_quality: tune::QUALITY_DEFAULT,
++            fog_density: None,
++            sharpen: tune::SHARPEN_DEFAULT,
++            sharpen_held: None,
++            windows: 1.0,
++        }
++    }
++}
++
++/// One `lookfog` command.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub enum FogCommand {
++    /// Hold the density at a multiple of the day's, or (`None`) follow the day again.
++    Density(Option<f32>),
++    /// The quality step, 1 to 3.
++    Quality(u8),
++}
++
++impl LookAir {
++    /// The quality step for a `worldFogQuality` value: rounded and held to 1–3.
++    pub fn quality_of(v: f32) -> u8 {
++        if v.is_finite() {
++            v.round().clamp(1.0, 3.0) as u8
++        } else {
++            tune::QUALITY_DEFAULT
++        }
++    }
++
++    /// The sharpness for a `worldSharpen` value: held to 0–1.
++    pub fn sharpen_of(v: f32) -> f32 {
++        if v.is_finite() {
++            v.clamp(0.0, 1.0)
++        } else {
++            tune::SHARPEN_DEFAULT
++        }
++    }
++
++    /// The mist's density scale under the volumetric fog: the held one, else 1.
++    pub fn density(&self) -> f32 {
++        self.fog_density.unwrap_or(1.0)
++    }
++
++    /// The sharpness this frame: the held one, else `worldSharpen`'s.
++    pub fn sharpness(&self) -> f32 {
++        Self::sharpen_of(self.sharpen_held.unwrap_or(self.sharpen))
++    }
++
++    /// `lookfog`'s arguments: a density from 0 to [`tune::DENSITY_MAX`], `quality <1-3>`, or
++    /// nothing (or `grade`) to follow the day again; `None` for anything else.
++    pub fn parse_fog(args: &str) -> Option<FogCommand> {
++        let words: Vec<&str> = args.split_whitespace().collect();
++        match words.as_slice() {
++            [] => Some(FogCommand::Density(None)),
++            [w] if w.eq_ignore_ascii_case("grade") => Some(FogCommand::Density(None)),
++            [w, q] if w.eq_ignore_ascii_case("quality") => q
++                .parse::<u8>()
++                .ok()
++                .filter(|q| (1..=3).contains(q))
++                .map(FogCommand::Quality),
++            [w] => w
++                .parse::<f32>()
++                .ok()
++                .filter(|v| (0.0..=tune::DENSITY_MAX).contains(v))
++                .map(|v| FogCommand::Density(Some(v))),
++            _ => None,
++        }
++    }
++
++    /// `looksharpen`'s argument: a sharpness from 0 to 1, or nothing (or `grade`) to follow
++    /// `worldSharpen` again; `None` for anything else.
++    pub fn parse_sharpen(args: &str) -> Option<Option<f32>> {
++        let words: Vec<&str> = args.split_whitespace().collect();
++        match words.as_slice() {
++            [] => Some(None),
++            [w] if w.eq_ignore_ascii_case("grade") => Some(None),
++            [w] => w
++                .parse::<f32>()
++                .ok()
++                .filter(|v| (0.0..=1.0).contains(v))
++                .map(Some),
++            _ => None,
++        }
++    }
++
++    /// `lookwindows`'s argument: a scale from 0 to [`tune::WINDOWS_MAX_SCALE`]; `None` for
++    /// anything else.
++    pub fn parse_windows(args: &str) -> Option<f32> {
++        let words: Vec<&str> = args.split_whitespace().collect();
++        match words.as_slice() {
++            [w] => w
++                .parse::<f32>()
++                .ok()
++                .filter(|v| (0.0..=tune::WINDOWS_MAX_SCALE).contains(v)),
++            _ => None,
++        }
++    }
++}
++
++/// A quality step's layout: full-resolution pixels per fog texel each way, and march steps.
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
++pub struct FogQuality {
++    pub scale: u32,
++    pub steps: u32,
++}
++
++/// Quality step `level` (1–3, held there).
++pub fn fog_quality(level: u8) -> FogQuality {
++    let (scale, steps) = tune::QUALITY[usize::from(level.clamp(1, 3)) - 1];
++    FogQuality { scale, steps }
++}
++
++/// What the look pass needs of the air this frame (`look::pass::LookFrame::air`).
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub struct AirFrame {
++    /// The volumetric fog's layout, `None` with it off (the analytic mist then).
++    pub fog: Option<FogQuality>,
++    /// The sharpness, 0 none.
++    pub sharpen: f32,
++}
++
++impl AirFrame {
++    /// This frame's air from the switches, under the look `on`.
++    pub fn new(on: bool, air: &LookAir) -> Self {
++        if !on {
++            return Self::default();
++        }
++        Self {
++            fog: air.fog.then(|| fog_quality(air.fog_quality)),
++            sharpen: air.sharpness(),
++        }
++    }
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++// ---------------------------------------------------------------- the fog, on the CPU
++
++/// The share of the mist's in-scattering along a ray that the sun reaches, as `world_fog.wgsl`'s
++/// `fs_march` takes it (keep the two in step): the ray's first `march` yards cut into `steps`
++/// segments spaced by the square, each weighted by the in-scattering it holds (`tr(t₀) − tr(t₁)`,
++/// `tr` the mist's transmittance from the camera), each asking `reaches` at a point `jitter` of
++/// the way along it; the rest of the ray, to `len`, all lit. 1 with no mist.
++pub fn lit_share(
++    tr: impl Fn(f32) -> f32,
++    reaches: impl Fn(f32) -> f32,
++    march: f32,
++    len: f32,
++    steps: u32,
++    jitter: f32,
++) -> f32 {
++    let total = 1.0 - tr(len);
++    if total < 1e-5 {
++        return 1.0;
++    }
++    let march = march.min(len);
++    let steps = steps.max(1);
++    let (mut lit, mut t_prev, mut tr_prev) = (0.0, 0.0, 1.0);
++    for i in 0..steps {
++        let f = (i + 1) as f32 / steps as f32;
++        let t_next = march * f * f;
++        let tr_next = tr(t_next);
++        let w = tr_prev - tr_next;
++        if w > 1e-6 {
++            lit += w * reaches(t_prev + (t_next - t_prev) * jitter);
++        }
++        t_prev = t_next;
++        tr_prev = tr_next;
++    }
++    lit += tr_prev - (1.0 - total);
++    (lit / total).clamp(0.0, 1.0)
++}
++
++/// A light's halo along a ray, the closed form `world_fog.wgsl`'s `halos` takes (keep them in
++/// step): `∫₀^len dt / (1 + ((t − t0)² + h²) / c²)` for a light whose foot on the ray is `t0`
++/// yards along it and `h` yards off it, `c` the halo's core.
++pub fn halo(t0: f32, h: f32, len: f32, c: f32) -> f32 {
++    let k = (c * c + h * h).sqrt();
++    c * c / k * (((len - t0) / k).atan() - (-t0 / k).atan())
++}
++
++/// How much of a halo a light of `radius` (yd) and brightest channel `peak` takes, and its core
++/// scale (`world_fog.wgsl`'s `halos`): `(strength, core)`.
++pub fn halo_scale(radius: f32, peak: f32) -> (f32, f32) {
++    let size = (radius / tune::HALO_REF_RADIUS).clamp(0.0, 1.0);
++    let strong = smoothstep(tune::HALO_PEAK_FROM, tune::HALO_PEAK_TO, peak);
++    (size * size * strong, size)
++}
++
++/// The highlight shoulder the look pass ends on (`world_look.wgsl`'s `shoulder`): linear values up
++/// to [`tune::HIGHLIGHT_KNEE`] pass, those above roll off toward [`tune::HIGHLIGHT_WHITE`] and
++/// never reach it.
++pub fn shoulder(x: f32) -> f32 {
++    let (k, w) = (tune::HIGHLIGHT_KNEE, tune::HIGHLIGHT_WHITE);
++    if x <= k {
++        x
++    } else {
++        k + (w - k) * ((x - k) / (w - k)).tanh()
++    }
++}
++
++/// The lamps' glow as the look pass adds it: eased off past [`tune::FOG_GLOW_KNEE`].
++pub fn glow_knee(g: [f32; 3]) -> [f32; 3] {
++    let luma = 0.2126 * g[0] + 0.7152 * g[1] + 0.0722 * g[2];
++    g.map(|c| c / (1.0 + luma / tune::FOG_GLOW_KNEE))
++}
++
++/// The sun's light in the mist at cosine `mu` between the view ray and the sun (the look pass's
++/// `fog_phase`): Henyey–Greenstein over its own peak, over a floor every direction gets. 1
++/// straight at the sun.
++pub fn phase(mu: f32) -> f32 {
++    let g = tune::FOG_PHASE_G;
++    let hg = ((1.0 - g) * (1.0 - g) / (1.0 + g * g - 2.0 * g * mu.clamp(-1.0, 1.0))).powf(1.5);
++    tune::FOG_PHASE_ISO + (1.0 - tune::FOG_PHASE_ISO) * hg
++}
++
++// ---------------------------------------------------------------- the sharpen, on the CPU
++
++/// The contrast-adaptive sharpen of gamma pixel `c` from its four neighbours at sharpness `s`
++/// (`world_look.wgsl`'s `cas`; keep them in step): per channel, the lobe `−amp · s ·`
++/// [`tune::SHARPEN_LOBE`], `amp = √(min(lo, 1 − hi) / hi)` over the five, so a pixel whose
++/// neighbours already span the range (an edge) is pushed least.
++pub fn cas(c: [f32; 3], n: [[f32; 3]; 4], s: f32) -> [f32; 3] {
++    std::array::from_fn(|i| {
++        let lo = n.iter().fold(c[i], |m, p| m.min(p[i]));
++        let hi = n.iter().fold(c[i], |m, p| m.max(p[i]));
++        let amp = ((lo.min(1.0 - hi)) / hi.max(1e-4)).clamp(0.0, 1.0).sqrt();
++        let w = -amp * s * tune::SHARPEN_LOBE;
++        let sum: f32 = n.iter().map(|p| p[i]).sum();
++        ((c[i] + w * sum) / (1.0 + 4.0 * w)).clamp(0.0, 1.0)
++    })
++}
++
++/// The sharpness left at planar eye depth `z` of `s`: all of it near, [`tune::SHARPEN_FAR_KEEP`]
++/// of it far.
++pub fn sharpen_at(s: f32, z: f32) -> f32 {
++    let t = smoothstep(tune::SHARPEN_NEAR, tune::SHARPEN_FAR, z);
++    s * (1.0 + (tune::SHARPEN_FAR_KEEP - 1.0) * t)
++}
++
++// ---------------------------------------------------------------- the windows
++
++/// One lit window from afar: where it is (Bevy space), its glow's colour (linear, its hue at
++/// a peak of 1, times its size's weight) and the way its wall faces out (unit; zero when its
++/// batch could not tell, which is never culled).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct WindowPoint {
++    pub pos: Vec3,
++    pub color: [f32; 3],
++    pub facing: Vec3,
++}
++
++fn srgb_to_linear(c: f32) -> f32 {
++    super::pass::srgb_to_linear(c)
++}
++
++/// A WMO window batch's points: its triangles (`positions` model-local, `transform` the
++/// placement's) pooled in [`tune::WINDOW_CELL`] cubes, each pool an area-weighted centre, in the
++/// batch's SIDN colour (`sidn`, gamma bytes) at a weight by its area. Pools under
++/// [`tune::WINDOW_MIN_AREA`] are dropped, the largest [`tune::WINDOW_PER_BATCH`] kept; a batch
++/// whose SIDN colour is near black has none.
++pub fn window_points(
++    positions: &[[f32; 3]],
++    indices: &[u32],
++    transform: &Transform,
++    sidn: [u8; 3],
++) -> Vec<WindowPoint> {
++    let peak = sidn.iter().copied().max().unwrap_or(0);
++    if peak < tune::WINDOW_MIN_SIDN {
++        return Vec::new();
++    }
++    let lin = sidn.map(|c| srgb_to_linear(f32::from(c) / 255.0));
++    let top = lin.iter().copied().fold(0.0f32, f32::max).max(1e-6);
++    let bright = f32::from(peak) / 255.0;
++    let hue = lin.map(|c| c / top * bright);
++    // Pooled by cube and by the wall a triangle lies on (its normal's main axis and side): take
++    // 291 found a glow on a roof edge, where a pane round a corner, pooled with its neighbour,
++    // put the point inside the building.
++    let mut pools: Vec<WallPool> = Vec::new();
++    // The batch's middle (area-weighted), which a wall's outside faces away from.
++    let (mut mid_sum, mut mid_area) = (Vec3::ZERO, 0.0f32);
++    let at = |i: u32| {
++        positions
++            .get(i as usize)
++            .map(|p| transform.transform_point(Vec3::from_array(*p)))
++    };
++    for &[i0, i1, i2] in indices.as_chunks::<3>().0 {
++        let (Some(a), Some(b), Some(c)) = (at(i0), at(i1), at(i2)) else {
++            continue;
++        };
++        let normal = (b - a).cross(c - a);
++        let area = 0.5 * normal.length();
++        // Also refuses a NaN from a degenerate vertex.
++        if area.is_nan() || area <= 0.0 {
++            continue;
++        }
++        let centre = (a + b + c) / 3.0;
++        mid_sum += centre * area;
++        mid_area += area;
++        let key = (centre / tune::WINDOW_CELL).floor().as_ivec3();
++        let key = (key.x, key.y, key.z, wall_of(normal));
++        match pools.iter_mut().find(|p| p.0 == key) {
++            Some(p) => {
++                p.1 += centre * area;
++                p.2 += area;
++                p.3 += normal;
++            }
++            None => pools.push((key, centre * area, area, normal)),
++        }
++    }
++    let mid = mid_sum / mid_area.max(1e-6);
++    pools.retain(|p| p.2 >= tune::WINDOW_MIN_AREA);
++    pools.sort_by(|a, b| b.2.total_cmp(&a.2));
++    pools.truncate(tune::WINDOW_PER_BATCH);
++    pools
++        .into_iter()
++        .map(|(_, sum, area, normal)| {
++            let w = (area / tune::WINDOW_REF_AREA).sqrt().clamp(0.5, 1.5);
++            let pos = sum / area;
++            WindowPoint {
++                pos,
++                color: hue.map(|c| c * w),
++                facing: outward(normal, pos, mid, transform.translation),
++            }
++        })
++        .collect()
++}
++
++/// A window pool: its cube and wall ([`wall_of`]), its area-weighted centre's sum, its area and
++/// its triangles' normals' sum (each as long as twice its area).
++type WallPool = ((i32, i32, i32, u8), Vec3, f32, Vec3);
++
++/// The way a window at `pos` faces out of its building, from its panes' normal (which a batch
++/// may wind either way): away from its batch's middle `mid`, or, for a window at that middle
++/// (a batch of one), away from the placement's origin `origin`; zero when neither tells.
++fn outward(normal: Vec3, pos: Vec3, mid: Vec3, origin: Vec3) -> Vec3 {
++    let n = normal.normalize_or_zero();
++    let flat = |v: Vec3| Vec3::new(v.x, 0.0, v.z);
++    // The first of the two that lies off the window's wall, not along it.
++    [pos - mid, pos - origin]
++        .into_iter()
++        .map(flat)
++        .find(|v| {
++            v.length() >= tune::WINDOW_FACING_MIN && n.dot(v.normalize_or_zero()).abs() > 0.2
++        })
++        .map_or(Vec3::ZERO, |v| n * n.dot(v).signum())
++}
++
++/// The wall a triangle lies on, by its normal: the main axis (0, 1, 2) and its side.
++fn wall_of(n: Vec3) -> u8 {
++    let a = n.abs();
++    let (axis, v) = if a.x >= a.y && a.x >= a.z {
++        (0, n.x)
++    } else if a.y >= a.z {
++        (1, n.y)
++    } else {
++        (2, n.z)
++    };
++    2 * axis + u8::from(v < 0.0)
++}
++
++/// A window's glow at distance `d` from the camera, 0..1: in from [`tune::WINDOW_NEAR_START`] to
++/// [`tune::WINDOW_NEAR_FULL`], out from [`tune::WINDOW_FAR_START`] to [`tune::WINDOW_FAR_END`].
++pub fn window_band(d: f32) -> f32 {
++    smoothstep(tune::WINDOW_NEAR_START, tune::WINDOW_NEAR_FULL, d)
++        * (1.0 - smoothstep(tune::WINDOW_FAR_START, tune::WINDOW_FAR_END, d))
++}
++
++/// This frame's far windows, nearest first, at most [`tune::WINDOW_MAX`]: where each is and its
++/// glow's colour, already times the hour, the distance band and `lookwindows`. Empty by day,
++/// under the classic look and with `lookwindows 0`.
++#[derive(Resource, Clone, Debug, Default, PartialEq, ExtractResource)]
++pub struct WindowGlows {
++    pub glows: Vec<WindowPoint>,
++}
++
++/// Picks [`WindowGlows`] from every loaded building's window points: those in the band, in front
++/// of the camera and on screen, nearest first.
++pub fn pick_windows<'a>(
++    points: impl Iterator<Item = &'a WindowPoint>,
++    clip_from_world: Mat4,
++    cam: Vec3,
++    weight: f32,
++) -> Vec<WindowPoint> {
++    if weight <= 0.0 {
++        return Vec::new();
++    }
++    let mut out: Vec<(f32, WindowPoint)> = points
++        .filter_map(|p| {
++            let d = p.pos.distance(cam);
++            let band = window_band(d);
++            if band <= 0.0 {
++                return None;
++            }
++            // A window on a wall facing away is behind its own building: take 310's glow on a
++            // roof edge was one, seen past the building's silhouette by the occlusion taps.
++            if p.facing.dot(cam - p.pos) < -tune::WINDOW_BACK_TOL * d {
++                return None;
++            }
++            let clip = clip_from_world * p.pos.extend(1.0);
++            if clip.w <= 1e-4 {
++                return None;
++            }
++            let ndc = clip.truncate() / clip.w;
++            if ndc.x.abs() > 1.05 || ndc.y.abs() > 1.05 {
++                return None;
++            }
++            let k = band * weight * tune::WINDOW_INTENSITY;
++            // Toward lamplight, keeping the window's own brightness (its peak channel).
++            let peak = p.color.iter().copied().fold(0.0f32, f32::max);
++            let color: [f32; 3] = std::array::from_fn(|i| {
++                let warm = tune::WINDOW_WARM[i] * peak;
++                (p.color[i] + (warm - p.color[i]) * tune::WINDOW_WARMTH) * k
++            });
++            Some((
++                d,
++                WindowPoint {
++                    pos: p.pos,
++                    color,
++                    facing: p.facing,
++                },
++            ))
++        })
++        .collect();
++    out.sort_by(|a, b| a.0.total_cmp(&b.0));
++    // Nearest first, none within the spacing of one already kept.
++    let mut kept: Vec<WindowPoint> = Vec::with_capacity(tune::WINDOW_MAX);
++    let gap2 = tune::WINDOW_SPACING * tune::WINDOW_SPACING;
++    for (_, p) in out {
++        if kept.len() >= tune::WINDOW_MAX {
++            break;
++        }
++        if kept.iter().all(|k| k.pos.distance_squared(p.pos) >= gap2) {
++            kept.push(p);
++        }
++    }
++    kept
++}
++
++/// Publishes [`WindowGlows`] for this frame from the static world's window points, under the
++/// windows' own night track (`WowLighting::sidn_night`, 1.12's SIDN fraction).
++pub(crate) fn publish_windows(
++    look: Res<WorldLook>,
++    air: Option<Res<LookAir>>,
++    lighting: Res<crate::lighting::WowLighting>,
++    gx: Option<Res<crate::static_gx::StaticGx>>,
++    cam: Query<(&GlobalTransform, &Projection), With<crate::view::WorldCamera>>,
++    mut out: ResMut<WindowGlows>,
++    mut last: Local<Option<WindowPick>>,
++) {
++    let scale = air.map_or(1.0, |a| a.windows);
++    let weight = if look.on {
++        lighting.sidn_night * scale
++    } else {
++        0.0
++    };
++    let next = match (gx, cam.iter().next()) {
++        (Some(gx), Some((t, proj))) if weight > 0.0 => {
++            let clip_from_world = proj.get_clip_from_view() * t.to_matrix().inverse();
++            // Picked again only when the view, the light or the town changed: every window
++            // point of every loaded building projected, sorted and thinned each frame was a
++            // night frame's CPU for nothing while the camera stood still.
++            let pick = WindowPick {
++                clip_from_world,
++                weight,
++                points: gx.window_point_count(),
++            };
++            if last.as_ref().is_some_and(|l| l.same(&pick)) {
++                return;
++            }
++            *last = Some(pick);
++            pick_windows(gx.window_points(), clip_from_world, t.translation(), weight)
++        }
++        _ => {
++            *last = None;
++            Vec::new()
++        }
++    };
++    if out.glows != next {
++        out.glows = next;
++    }
++}
++
++/// What the far windows were last picked for: the view, the windows' weight and how many
++/// window points the town had.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct WindowPick {
++    pub clip_from_world: Mat4,
++    pub weight: f32,
++    pub points: usize,
++}
++
++impl WindowPick {
++    /// The same pick: the view moved by under a ten-thousandth of its matrix, the weight by
++    /// under 1%, and no building came or went.
++    pub fn same(&self, o: &WindowPick) -> bool {
++        self.points == o.points
++            && (self.weight - o.weight).abs() <= 0.01 * self.weight.max(o.weight)
++            && self
++                .clip_from_world
++                .abs_diff_eq(o.clip_from_world, 1e-4)
++    }
++}
++
++/// The glows' rows in the look pass's uniform (`world_look.wgsl`'s `glows`): per glow its screen
++/// UV, its core's and halo's sigma as a share of the screen's height, then its colour (dimmed by
++/// half the mist between, `mist` the mist's optical depth to a point) and the depth (reverse-Z)
++/// a nearer occluder must pass to hide it. Returns how many are written.
++pub fn glow_rows(
++    glows: &[WindowPoint],
++    clip_from_world: Mat4,
++    cam: Vec3,
++    up: Vec3,
++    mist: impl Fn(Vec3) -> f32,
++    rows: &mut [[f32; 4]],
++) -> usize {
++    let project = |p: Vec3| {
++        let c = clip_from_world * p.extend(1.0);
++        (c.w > 1e-4).then(|| (c.truncate() / c.w, c.w))
++    };
++    let mut n = 0;
++    for g in glows.iter().take(tune::WINDOW_MAX) {
++        if 2 * n + 1 >= rows.len() {
++            break;
++        }
++        let (Some((ndc, _)), Some((above, _))) = (project(g.pos), project(g.pos + up)) else {
++            continue;
++        };
++        let to = g.pos - cam;
++        let d = to.length();
++        let nearer = cam + to * ((d - tune::WINDOW_OCCLUDE_TOL).max(0.5) / d.max(1e-3));
++        let occl = project(nearer).map_or(1.0, |(c, _)| c.z);
++        // One yard up, as a share of the screen's height (NDC spans 2).
++        let yard = ((above.y - ndc.y) * 0.5).abs();
++        let scattered = 1.0 - (-mist(g.pos)).exp();
++        let spread = 1.0 + tune::WINDOW_MIST_SPREAD * scattered;
++        // The light kept, and no more of it as the halo spreads: take 310 found mist 3 not
++        // dimming a glow, as the wider halo at its full share gathered more light than the mist
++        // took.
++        let keep = (1.0 - tune::WINDOW_MIST_KEEP * scattered) * spread_keep(spread);
++        rows[2 * n] = [
++            ndc.x * 0.5 + 0.5,
++            0.5 - ndc.y * 0.5,
++            tune::WINDOW_CORE_YD * yard,
++            tune::WINDOW_HALO_YD * yard * spread,
++        ];
++        rows[2 * n + 1] = [
++            g.color[0] * keep,
++            g.color[1] * keep,
++            g.color[2] * keep,
++            occl,
++        ];
++        n += 1;
++    }
++    n
++}
++
++/// The share of a glow's colour that holds its light (core plus halo, each a gaussian of its
++/// sigma squared) as it was with the halo `spread` times wider.
++pub fn spread_keep(spread: f32) -> f32 {
++    let (c, h, k) = (tune::WINDOW_CORE_YD, tune::WINDOW_HALO_YD, tune::WINDOW_HALO);
++    (c * c + k * h * h) / (c * c + k * (h * spread) * (h * spread))
++}
++
++/// What `lookwindows` says: how many far windows glow with the windows at `scale` (picked now,
++/// not last frame's: take 291 found the reply giving the count from before the change), and the
++/// nearest one's distance (yd) and the share of its light the mist lets through.
++pub fn windows_now(world: &mut World, scale: f32) -> Option<(usize, Option<(f32, f32)>)> {
++    let mut cams = world
++        .query_filtered::<(&GlobalTransform, &Projection), With<crate::view::WorldCamera>>();
++    let (t, proj) = cams.iter(world).next()?;
++    let (cam, clip_from_world) = (
++        t.translation(),
++        proj.get_clip_from_view() * t.to_matrix().inverse(),
++    );
++    let on = world.get_resource::<WorldLook>().is_some_and(|l| l.on);
++    let night = world.get_resource::<crate::lighting::WowLighting>()?.sidn_night;
++    let gx = world.get_resource::<crate::static_gx::StaticGx>()?;
++    let weight = if on { night * scale } else { 0.0 };
++    let picked = pick_windows(gx.window_points(), clip_from_world, cam, weight);
++    let frame = world.get_resource::<super::LookFrame>()?;
++    let density = frame.post.height_fog * super::rays::MIST_DENSITY;
++    let base = super::rays::mist_base(frame.feet_y, cam.y);
++    let nearest = picked.first().map(|g| {
++        let d = g.pos.distance(cam);
++        let od = super::rays::mist_optical_depth(
++            density,
++            base,
++            super::rays::MIST_FALLOFF,
++            cam.y,
++            g.pos.y,
++            d,
++        );
++        let scattered = 1.0 - (-od).exp();
++        let spread = 1.0 + tune::WINDOW_MIST_SPREAD * scattered;
++        (
++            d,
++            (1.0 - tune::WINDOW_MIST_KEEP * scattered) * spread_keep(spread),
++        )
++    });
++    Some((picked.len(), nearest))
++}
++
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookAir>()
++        .init_resource::<WindowGlows>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_switches_parse() {
++        assert_eq!(LookAir::parse_fog(""), Some(FogCommand::Density(None)));
++        assert_eq!(LookAir::parse_fog("grade"), Some(FogCommand::Density(None)));
++        assert_eq!(
++            LookAir::parse_fog("2.5"),
++            Some(FogCommand::Density(Some(2.5)))
++        );
++        assert_eq!(
++            LookAir::parse_fog("quality 3"),
++            Some(FogCommand::Quality(3))
++        );
++        assert_eq!(LookAir::parse_fog("quality 4"), None);
++        assert_eq!(LookAir::parse_fog("4"), None);
++        assert_eq!(LookAir::parse_fog("thick"), None);
++        assert_eq!(LookAir::parse_fog("1 2"), None);
++        assert_eq!(LookAir::parse_sharpen(""), Some(None));
++        assert_eq!(LookAir::parse_sharpen("grade"), Some(None));
++        assert_eq!(LookAir::parse_sharpen("0.7"), Some(Some(0.7)));
++        assert_eq!(LookAir::parse_sharpen("1.5"), None);
++        assert_eq!(LookAir::parse_windows("2"), Some(2.0));
++        assert_eq!(LookAir::parse_windows(""), None);
++        assert_eq!(LookAir::parse_windows("3"), None);
++        assert_eq!(LookAir::quality_of(0.0), 1);
++        assert_eq!(LookAir::quality_of(2.4), 2);
++        assert_eq!(LookAir::quality_of(9.0), 3);
++        assert_eq!(LookAir::sharpen_of(3.0), 1.0);
++    }
++
++    /// The defaults: fog on at medium, sharpen 0.4, windows at 1; none of it under the classic
++    /// look; a held sharpness wins over `worldSharpen` and lets go to it again.
++    #[test]
++    fn the_frame_follows_the_switches() {
++        let mut air = LookAir::default();
++        let f = AirFrame::new(true, &air);
++        assert_eq!(
++            f.fog,
++            Some(FogQuality {
++                scale: 4,
++                steps: 12
++            })
++        );
++        assert_eq!(f.sharpen, 0.4);
++        assert_eq!(AirFrame::new(false, &air), AirFrame::default());
++        air.sharpen_held = Some(1.0);
++        assert_eq!(AirFrame::new(true, &air).sharpen, 1.0);
++        air.sharpen_held = None;
++        air.fog = false;
++        assert_eq!(AirFrame::new(true, &air).fog, None);
++        assert_eq!(fog_quality(1), FogQuality { scale: 4, steps: 6 });
++        assert_eq!(
++            fog_quality(3),
++            FogQuality {
++                scale: 2,
++                steps: 16
++            }
++        );
++        assert_eq!(fog_quality(0), fog_quality(1));
++    }
++
++    fn mist_tr(density: f32) -> impl Fn(f32) -> f32 {
++        move |t: f32| (-density * t).exp()
++    }
++
++    /// With nothing in the sun's way the whole mist is lit; with all of it shadowed none is
++    /// within the march and all of it past; a shadow over the near half takes about the near
++    /// half's share of the in-scattering, whatever the step count.
++    #[test]
++    fn the_lit_share_weights_each_segment_by_its_mist() {
++        let tr = mist_tr(0.01);
++        assert!((lit_share(&tr, |_| 1.0, 100.0, 100.0, 12, 0.5) - 1.0).abs() < 1e-5);
++        assert!(lit_share(&tr, |_| 0.0, 100.0, 100.0, 12, 0.5) < 1e-5);
++        // Shadowed out to 100 yd of a 300 yd ray: the rest is lit.
++        let past = lit_share(&tr, |_| 0.0, 100.0, 300.0, 12, 0.5);
++        let want = (tr(100.0) - tr(300.0)) / (1.0 - tr(300.0));
++        assert!((past - want).abs() < 1e-4, "{past} vs {want}");
++        // A shadow over the first 50 yd: the near share, within a step's error.
++        let want = (1.0 - tr(50.0)) / (1.0 - tr(100.0));
++        for steps in [6, 12, 16] {
++            let mean: f32 = (0..64)
++                .map(|j| {
++                    let jit = (j as f32 + 0.5) / 64.0;
++                    lit_share(
++                        &tr,
++                        |t| if t < 50.0 { 0.0 } else { 1.0 },
++                        100.0,
++                        100.0,
++                        steps,
++                        jit,
++                    )
++                })
++                .sum::<f32>()
++                / 64.0;
++            assert!(
++                ((1.0 - mean) - want).abs() < 0.03,
++                "{steps} steps: {} vs {want}",
++                1.0 - mean
++            );
++        }
++        // No mist: lit.
++        assert_eq!(lit_share(|_| 1.0, |_| 0.0, 100.0, 100.0, 12, 0.5), 1.0);
++    }
++
++    /// The halo's closed form against a midpoint sum along the ray.
++    #[test]
++    fn the_halo_matches_a_numeric_one() {
++        for (t0, h, len) in [
++            (20.0, 0.5, 60.0),
++            (5.0, 3.0, 8.0),
++            (-2.0, 1.0, 40.0),
++            (50.0, 0.0, 30.0),
++        ] {
++            let c = tune::LIGHT_CORE;
++            let n = 20_000;
++            let dt = len / n as f32;
++            let numeric: f32 = (0..n)
++                .map(|i| {
++                    let t = (i as f32 + 0.5) * dt;
++                    dt / (1.0 + ((t - t0) * (t - t0) + h * h) / (c * c))
++                })
++                .sum();
++            let closed = halo(t0, h, len, c);
++            assert!(
++                (closed - numeric).abs() < 1e-3 * numeric.max(1.0),
++                "{t0} {h} {len}: {closed} vs {numeric}"
++            );
++        }
++        // Passing right by a light sees more of it than passing wide.
++        assert!(halo(20.0, 0.2, 60.0, 1.5) > 3.0 * halo(20.0, 4.0, 60.0, 1.5));
++    }
++
++    /// The first air films: a green glow 400 px across round one of 0083's firefly lights. A
++    /// firefly's light (2.5 yd, 0.6) takes almost none of a torch's halo (10 yd, 2.1), passing as
++    /// near; a lamp keeps it whole.
++    #[test]
++    fn a_firefly_gets_almost_no_halo_and_a_lamp_its_glow() {
++        let lit = |radius: f32, peak: f32| {
++            let (k, core) = halo_scale(radius, peak);
++            k * peak * halo(3.0, 0.3, 30.0, tune::LIGHT_CORE * core)
++        };
++        let torch = lit(10.0, 2.1);
++        let fly = lit(2.5, 0.6);
++        assert_eq!(halo_scale(10.0, 2.1), (1.0, 1.0));
++        assert!(fly < 0.005 * torch, "firefly {fly} against a torch {torch}");
++        assert_eq!(halo_scale(2.5, 0.1).0, 0.0, "a dim light: none");
++        // Take 280's street lamp, a whitish 10 yd light committing about 0.63: most of a halo.
++        assert!(halo_scale(10.0, 0.63).0 > 0.75);
++    }
++
++    /// Take 275's see-through hero at Goldshire in `lookmist 3`: the march and the look pass read
++    /// the view's own depth buffer (after the main passes, which skinned bodies write), so a hero
++    /// standing between the camera and a lamp ends his ray short of the lamp's halo and shows dark
++    /// against the glowing street; the knee keeps a dense glow from washing over everything.
++    /// Here, a hero 8 yd out, a lamp 16 yd out and a yard off the line: the glow on his ray is a
++    /// small share of the street's past him, and after the knee no glow passes the knee's scale.
++    #[test]
++    fn a_hero_in_front_of_a_lamp_stands_out_of_its_glow() {
++        let core = tune::LIGHT_CORE;
++        let rho = 3.0 * crate::look::rays::MIST_DENSITY;
++        let rgb = 2.1;
++        let glow = |len: f32| tune::LIGHT_SCATTER * rgb * rho * halo(16.0, 1.0, len, core);
++        let hero = glow(8.0);
++        let street = glow(30.0);
++        assert!(hero < 0.1 * street, "hero {hero}, street {street}");
++        let kneed = glow_knee([street; 3]);
++        assert!(kneed[0] < tune::FOG_GLOW_KNEE && kneed[0] < street);
++        // The shader mirrors these numbers.
++        let look = include_str!("../shaders/world_look.wgsl");
++        let fog = include_str!("../shaders/world_fog.wgsl");
++        let has = |src: &str, name: &str, v: f32| {
++            assert!(
++                src.lines().any(|l| l.starts_with(&format!("const {name}: f32 = "))
++                    && l.split('=').nth(1).unwrap().trim().trim_end_matches(';').parse::<f32>()
++                        == Ok(v)),
++                "{name} = {v}"
++            );
++        };
++        has(look, "FOG_SUN_GAIN", tune::FOG_SUN_GAIN);
++        has(look, "FOG_SHADE_FLOOR", tune::FOG_SHADE_FLOOR);
++        has(look, "FOG_GLOW_KNEE", tune::FOG_GLOW_KNEE);
++        has(look, "HIGHLIGHT_KNEE", tune::HIGHLIGHT_KNEE);
++        has(look, "HIGHLIGHT_WHITE", tune::HIGHLIGHT_WHITE);
++        has(fog, "HALO_REF_RADIUS", tune::HALO_REF_RADIUS);
++        has(fog, "HALO_PEAK_FROM", tune::HALO_PEAK_FROM);
++        has(fog, "HALO_PEAK_TO", tune::HALO_PEAK_TO);
++        assert_eq!(
++            tune::HALO_REF_RADIUS,
++            crate::look::lights::tune::TORCH_RADIUS
++        );
++    }
++
++    /// The first dawn film found the fog less golden than the analytic mist it replaces. Facing
++    /// the sun, with half the mist lit (shafts and shade), the fog's sun light is at least the
++    /// mist's (`μ⁸`), and a shaft stands well out of the shade beside it.
++    #[test]
++    fn the_fog_is_as_rich_as_the_mist_and_its_shafts_read() {
++        let sun = |mu: f32, lit: f32| {
++            tune::FOG_SUN_GAIN
++                * phase(mu)
++                * (tune::FOG_SHADE_FLOOR + (1.0 - tune::FOG_SHADE_FLOOR) * lit)
++        };
++        for deg in [0.0f32, 10.0, 20.0, 35.0] {
++            let mu = deg.to_radians().cos();
++            let half = 0.5 * (sun(mu, 1.0) + sun(mu, 0.0));
++            assert!(half >= mu.powi(8) - 1e-4, "{deg}°: {half} against {}", mu.powi(8));
++        }
++        assert!(sun(1.0, 1.0) > 4.5 * sun(1.0, 0.0), "a shaft against its shade");
++    }
++
++    /// Take 280's noon cobbles: what clipped flat white keeps its texture, what is under the
++    /// knee is untouched, and nothing reaches white.
++    #[test]
++    fn the_highlights_roll_off_and_the_rest_is_untouched() {
++        assert_eq!(shoulder(0.3), 0.3);
++        assert_eq!(shoulder(tune::HIGHLIGHT_KNEE), tune::HIGHLIGHT_KNEE);
++        assert!(shoulder(1.0) < tune::HIGHLIGHT_WHITE && shoulder(1.0) > 0.78);
++        assert!(shoulder(1.3) > shoulder(1.0) && shoulder(2.0) < tune::HIGHLIGHT_WHITE);
++        // Take 310's noon cobbles: only what comes in well over 0.9 passes 230 (0.791 linear).
++        assert!(shoulder(0.9) < 0.791, "{}", shoulder(0.9));
++        assert!(shoulder(0.45) == 0.45, "mid-tones untouched");
++        // Smooth at the knee: its slope there is 1.
++        let k = tune::HIGHLIGHT_KNEE;
++        assert!(((shoulder(k + 1e-3) - k) / 1e-3 - 1.0).abs() < 1e-2);
++    }
++
++    #[test]
++    fn the_phase_peaks_at_the_sun_and_never_drops_to_nothing() {
++        assert!((phase(1.0) - 1.0).abs() < 1e-6);
++        assert!(phase(0.9) < phase(0.99));
++        assert!(phase(-1.0) >= tune::FOG_PHASE_ISO);
++        assert!(phase(0.0) < 0.25);
++    }
++
++    /// A flat field is untouched; a dot on it is lifted (pushed from its neighbours), never past
++    /// 0..1; a pixel already at an edge is pushed less than one in a gentle ramp.
++    #[test]
++    fn the_sharpen_lifts_detail_without_halos() {
++        let flat = [0.4; 3];
++        assert!(cas(flat, [flat; 4], 1.0)
++            .iter()
++            .all(|c| (c - 0.4).abs() < 1e-6));
++        let dot = cas([0.5; 3], [[0.4; 3]; 4], 0.4);
++        assert!(dot[0] > 0.5, "{dot:?}");
++        let dark = cas([0.3; 3], [[0.4; 3]; 4], 0.4);
++        assert!(dark[0] < 0.3, "{dark:?}");
++        assert_eq!(cas([0.5; 3], [[0.4; 3]; 4], 0.0), [0.5; 3]);
++        let hard = cas([1.0; 3], [[0.0; 3]; 4], 1.0);
++        assert!(hard.iter().all(|c| (0.0..=1.0).contains(c)));
++        // The push is gentler where the neighbours already span the range.
++        let soft = cas([0.55; 3], [[0.45; 3]; 4], 1.0)[0] - 0.55;
++        let edge = cas([0.95; 3], [[0.05; 3]; 4], 1.0)[0] - 0.95;
++        assert!(soft > 0.0 && edge.abs() < soft * 2.0, "{soft} {edge}");
++        assert_eq!(sharpen_at(0.4, 10.0), 0.4);
++        assert!((sharpen_at(0.4, 500.0) - 0.4 * tune::SHARPEN_FAR_KEEP).abs() < 1e-6);
++    }
++
++    /// A building's window panes: two windows a wall apart become two points, each at its pane's
++    /// centre; a dark SIDN colour has none; the placement's transform moves them.
++    #[test]
++    fn window_batches_become_points() {
++        // Two 1×1.2 yd panes on the wall x = 0, ten yards apart along z, two triangles each.
++        let pane = |z: f32| {
++            [
++                [0.0, 1.0, z],
++                [0.0, 1.0, z + 1.0],
++                [0.0, 2.2, z + 1.0],
++                [0.0, 2.2, z],
++            ]
++        };
++        let mut positions = Vec::new();
++        let mut indices = Vec::new();
++        for z in [0.2, 10.2] {
++            let base = positions.len() as u32;
++            positions.extend(pane(z));
++            indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
++        }
++        let t = Transform::from_xyz(100.0, 50.0, -20.0);
++        let pts = window_points(&positions, &indices, &t, [255, 200, 120]);
++        assert_eq!(pts.len(), 2, "{pts:?}");
++        let mut zs: Vec<f32> = pts.iter().map(|p| p.pos.z).collect();
++        zs.sort_by(f32::total_cmp);
++        assert!((zs[0] - (-20.0 + 0.7)).abs() < 1e-4, "{zs:?}");
++        assert!((zs[1] - (-20.0 + 10.7)).abs() < 1e-4, "{zs:?}");
++        assert!((pts[0].pos.x - 100.0).abs() < 1e-4 && (pts[0].pos.y - 51.6).abs() < 1e-4);
++        // Warm: red over blue, red at the size's weight.
++        assert!(pts[0].color[0] > pts[0].color[2]);
++        assert!(window_points(&positions, &indices, &t, [10, 10, 12]).is_empty());
++        // Two panes round a corner in one cube are two points, each on its own wall (take 291:
++        // pooled, the point sat inside the building and glowed on its roof edge).
++        let corner = [
++            [0.0, 0.0, 0.0],
++            [1.0, 0.0, 0.0],
++            [1.0, 1.0, 0.0],
++            [0.0, 0.0, 0.0],
++            [0.0, 0.0, 1.0],
++            [0.0, 1.0, 1.0],
++        ];
++        let two = window_points(&corner, &[0, 1, 2, 3, 4, 5], &Transform::IDENTITY, [255; 3]);
++        assert_eq!(two.len(), 2, "{two:?}");
++        assert!(two.iter().any(|p| p.pos.z.abs() < 1e-5));
++        assert!(two.iter().any(|p| p.pos.x.abs() < 1e-5));
++        // Both panes lie on one wall, as does the placement's origin: no side told.
++        assert!(pts.iter().all(|p| p.facing == Vec3::ZERO), "{pts:?}");
++        // Out of the batch's middle, else out of the placement's origin, else unknown.
++        let o = Vec3::ZERO;
++        assert_eq!(outward(Vec3::X, o, Vec3::new(-3.0, 0.0, 0.0), o), Vec3::X);
++        assert_eq!(outward(Vec3::X, o, Vec3::new(3.0, 0.0, 0.0), o), Vec3::NEG_X);
++        assert_eq!(outward(Vec3::X, o, Vec3::Z * 3.0, Vec3::new(4.0, 0.0, 1.0)), Vec3::NEG_X);
++        assert_eq!(outward(Vec3::X, o, o, o), Vec3::ZERO);
++        // A stray index is skipped, not a panic.
++        assert!(window_points(&positions, &[0, 1, 99], &t, [255; 3]).is_empty());
++    }
++
++    /// The far windows: none near (the window itself shows), none behind the camera or off
++    /// screen, the nearest first, at most the cap, and none by day.
++    #[test]
++    fn the_far_windows_are_picked_by_distance_and_screen() {
++        let proj =
++            Mat4::perspective_infinite_reverse_rh(std::f32::consts::FRAC_PI_3, 16.0 / 9.0, 0.1);
++        let cam = Vec3::new(0.0, 60.0, 0.0);
++        let clip_from_world = proj * Mat4::look_to_rh(cam, Vec3::NEG_Z, Vec3::Y);
++        let at = |x: f32, z: f32| WindowPoint {
++            pos: Vec3::new(x, 55.0, z),
++            color: [1.0, 0.7, 0.4],
++            facing: Vec3::ZERO,
++        };
++        let mut pts = vec![at(0.0, -30.0), at(0.0, 300.0), at(900.0, -100.0)];
++        for i in 0..100 {
++            pts.push(at(4.0 * (i as f32 - 50.0), -300.0 - 4.0 * i as f32));
++        }
++        // A window a yard from another is one glow (take 280: a building's points piled up).
++        pts.push(at(-200.0, -301.0));
++        let picked = pick_windows(pts.iter(), clip_from_world, cam, 1.0);
++        assert_eq!(picked.len(), tune::WINDOW_MAX);
++        assert!(
++            picked.iter().all(|p| p.pos.z <= -300.0),
++            "near, behind and off screen out"
++        );
++        assert_eq!(picked[0].pos.z, -300.0, "nearest first");
++        assert!(pick_windows(pts.iter(), clip_from_world, cam, 0.0).is_empty());
++        assert_eq!(window_band(30.0), 0.0);
++        assert_eq!(window_band(400.0), 1.0);
++        assert_eq!(window_band(2000.0), 0.0);
++        // Their rows: on screen, a few pixels across at 300 yd, the occluder's depth nearer
++        // (larger, reverse-Z) than the window's own.
++        let mut rows = vec![[0.0; 4]; 2 * tune::WINDOW_MAX];
++        let n = glow_rows(&picked, clip_from_world, cam, Vec3::Y, |_| 0.0, &mut rows);
++        assert_eq!(n, tune::WINDOW_MAX);
++        let [u, v, core, halo] = rows[0];
++        assert!((0.0..=1.0).contains(&u) && (0.0..=1.0).contains(&v));
++        assert!(
++            core > 0.0 && halo > core && halo * 1080.0 < 20.0,
++            "{core} {halo}"
++        );
++        let own = clip_from_world * picked[0].pos.extend(1.0);
++        assert!(rows[1][3] > own.z / own.w);
++        assert_eq!(rows[1][0], picked[0].color[0], "no mist: undimmed");
++        let halo_clear = rows[0][3];
++        let misty = glow_rows(&picked, clip_from_world, cam, Vec3::Y, |_| 1.0, &mut rows);
++        assert_eq!(misty, n);
++        assert!(rows[0][3] > 1.5 * halo_clear, "the mist spreads the halo");
++        assert!(rows[1][0] < 0.5 * picked[0].color[0] && rows[1][0] > 0.05 * picked[0].color[0]);
++        // The glow's whole light (core plus halo) is never more than in clear air.
++        let light = |c: f32, h: f32, col: f32| col * (c * c + tune::WINDOW_HALO * h * h);
++        assert!(
++            light(rows[0][2], rows[0][3], rows[1][0])
++                < light(rows[0][2], halo_clear, picked[0].color[0]),
++            "the mist dims the light it spreads"
++        );
++        // A window on a wall facing away from the camera is behind its building.
++        let back = WindowPoint {
++            facing: Vec3::NEG_Z,
++            ..at(0.0, -400.0)
++        };
++        let front = WindowPoint {
++            facing: Vec3::Z,
++            ..at(0.0, -400.0)
++        };
++        assert!(pick_windows([back].iter(), clip_from_world, cam, 1.0).is_empty());
++        assert_eq!(pick_windows([front].iter(), clip_from_world, cam, 1.0).len(), 1);
++        assert!(
++            !picked.iter().any(|p| p.pos == Vec3::new(-200.0, 55.0, -301.0)),
++            "thinned"
++        );
++        // Warm: red over green over blue.
++        let c = picked[0].color;
++        assert!(c[0] > c[1] && c[1] > c[2], "{c:?}");
++    }
++}
+diff --git a/crates/benilla-world/src/look/fog_pass.rs b/crates/benilla-world/src/look/fog_pass.rs
+new file mode 100644
+index 0000000..867797d
+--- /dev/null
++++ b/crates/benilla-world/src/look/fog_pass.rs
+@@ -0,0 +1,619 @@
++//! The volumetric fog's render half (`look::air` holds the why and the tunables): two low-
++//! resolution full-screen passes run inside the look node, before its own pass, on the depth
++//! buffer it already samples, the shared light buffer (the look lights' table and the sun-shadow
++//! block) and the sun-shadow map:
++//! 1. **march** (`world_fog.wgsl`'s `fs_march`): per fog texel, the lit share of the mist along
++//!    its ray and the lamps' glow, with this frame's jitter;
++//! 2. **resolve** (`fs_resolve`): a depth-aware 3×3 of the march, blended with last frame's
++//!    resolve reprojected through last frame's camera and clamped to the neighbourhood.
++//!
++//! The two resolve targets swap each frame, and each view keeps its own, so the history is never
++//! another view's. The look pass reads this frame's resolve and upsamples it by depth.
++
++use bevy::core_pipeline::FullscreenShader;
++use bevy::prelude::*;
++use bevy::render::diagnostic::RecordDiagnostics;
++use bevy::render::render_asset::RenderAssets;
++use bevy::render::render_resource::binding_types::{
++    storage_buffer_read_only_sized, texture_2d, texture_2d_array, texture_depth_2d,
++    texture_depth_2d_multisampled, uniform_buffer_sized,
++};
++use bevy::render::render_resource::*;
++use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
++use bevy::render::texture::GpuImage;
++use bevy::render::view::{ExtractedView, Msaa, ViewDepthTexture, ViewTarget};
++
++use super::air::{tune, FogQuality};
++use super::pass::{LookFrame, LookView};
++
++/// The fog passes' uniform, `world_fog.wgsl`'s `Fog`, field for field.
++#[repr(C)]
++#[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
++pub struct FogUniform {
++    pub world_from_clip: [[f32; 4]; 4],
++    pub prev_clip_from_world: [[f32; 4]; 4],
++    /// The camera and this frame's jitter.
++    pub camera: [f32; 4],
++    /// The camera's forward and the full-resolution pixels per fog texel.
++    pub fwd: [f32; 4],
++    /// The mist's density at its base (per yd), its base, its falloff and the march's steps.
++    pub mist: [f32; 4],
++    /// The reach into the sky, the history's weight, the lamps' in-scattering, the halo's core.
++    pub reach: [f32; 4],
++    /// The least density a halo sees, the resolve's depth tolerance, 0, 0.
++    pub misc: [f32; 4],
++}
++
++impl FogUniform {
++    /// One view's uniform from this frame's look, its camera and last frame's (`prev`), the
++    /// layout `q`, the jitter and the history's weight (0 to start over).
++    #[allow(clippy::too_many_arguments)]
++    pub fn new(
++        frame: &LookFrame,
++        q: FogQuality,
++        clip_from_world: Mat4,
++        cam_pos: Vec3,
++        cam_fwd: Vec3,
++        prev: Mat4,
++        jitter: f32,
++        keep: f32,
++    ) -> Self {
++        use super::rays;
++        Self {
++            world_from_clip: clip_from_world.inverse().to_cols_array_2d(),
++            prev_clip_from_world: prev.to_cols_array_2d(),
++            camera: cam_pos.extend(jitter).to_array(),
++            fwd: cam_fwd.extend(q.scale as f32).to_array(),
++            mist: [
++                frame.post.height_fog * rays::MIST_DENSITY,
++                rays::mist_base(frame.feet_y, cam_pos.y),
++                rays::MIST_FALLOFF,
++                q.steps as f32,
++            ],
++            reach: [
++                tune::FOG_SKY_REACH,
++                keep,
++                tune::LIGHT_SCATTER,
++                tune::LIGHT_CORE,
++            ],
++            misc: [tune::LIGHT_AIR, tune::FOG_EDGE, 0.0, 0.0],
++        }
++    }
++}
++
++const UNIFORM_BYTES: u64 = std::mem::size_of::<FogUniform>() as u64;
++
++/// The fog targets: the lamps' glow (linear) in rgb, the mist's lit share in alpha.
++pub(crate) const FOG_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
++
++#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
++pub(crate) enum FogStage {
++    March,
++    Resolve,
++}
++
++#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
++pub(crate) struct FogKey {
++    stage: FogStage,
++    /// The view's depth buffer is multisampled (`gxMultisample`): both read sample 0.
++    msaa: bool,
++}
++
++fn shader_defs(msaa: bool) -> Vec<bevy::shader::ShaderDefVal> {
++    if msaa {
++        vec!["MSAA".into()]
++    } else {
++        vec![]
++    }
++}
++
++/// Every def set `world_fog.wgsl` is specialised on, for the app's shader translation test.
++pub fn shader_def_sets() -> Vec<Vec<bevy::shader::ShaderDefVal>> {
++    vec![shader_defs(false), shader_defs(true)]
++}
++
++#[derive(Resource)]
++pub(crate) struct FogPipeline {
++    /// The march's and the resolve's layouts with a single-sampled and a multisampled depth.
++    layouts: [BindGroupLayoutDescriptor; 4],
++    shader: Handle<Shader>,
++    fullscreen: FullscreenShader,
++    /// A one-texel, one-layer depth array the march binds before the sun-shadow map exists (its
++    /// rows then say none, so it is never read).
++    empty_shadow: TextureView,
++    /// A one-texel fog target (all zero) the look pass binds with the fog off.
++    pub(crate) empty: TextureView,
++}
++
++impl FogPipeline {
++    fn layout(&self, key: FogKey) -> &BindGroupLayoutDescriptor {
++        let i = match key.stage {
++            FogStage::March => 0,
++            FogStage::Resolve => 2,
++        } + usize::from(key.msaa);
++        &self.layouts[i]
++    }
++}
++
++impl SpecializedRenderPipeline for FogPipeline {
++    type Key = FogKey;
++
++    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
++        let (label, entry) = match key.stage {
++            FogStage::March => ("world_fog", "fs_march"),
++            FogStage::Resolve => ("world_fog_resolve", "fs_resolve"),
++        };
++        RenderPipelineDescriptor {
++            label: Some(label.into()),
++            layout: vec![self.layout(key).clone()],
++            vertex: self.fullscreen.to_vertex_state(),
++            fragment: Some(FragmentState {
++                shader: self.shader.clone(),
++                shader_defs: shader_defs(key.msaa),
++                entry_point: Some(entry.into()),
++                targets: vec![Some(ColorTargetState {
++                    format: FOG_FORMAT,
++                    blend: None,
++                    write_mask: ColorWrites::ALL,
++                })],
++            }),
++            ..default()
++        }
++    }
++}
++
++fn one_texel(
++    device: &RenderDevice,
++    label: &'static str,
++    format: TextureFormat,
++    dimension: Option<TextureViewDimension>,
++) -> TextureView {
++    // Created zeroed, never written.
++    device
++        .create_texture(&TextureDescriptor {
++            label: Some(label),
++            size: Extent3d {
++                width: 1,
++                height: 1,
++                depth_or_array_layers: 1,
++            },
++            mip_level_count: 1,
++            sample_count: 1,
++            dimension: TextureDimension::D2,
++            format,
++            usage: TextureUsages::TEXTURE_BINDING,
++            view_formats: &[],
++        })
++        .create_view(&TextureViewDescriptor {
++            dimension,
++            ..default()
++        })
++}
++
++pub(crate) fn init_pipeline(
++    mut commands: Commands,
++    device: Res<RenderDevice>,
++    fullscreen: Res<FullscreenShader>,
++    asset_server: Res<AssetServer>,
++) {
++    let uniform = || uniform_buffer_sized(false, std::num::NonZero::new(UNIFORM_BYTES));
++    let march = |label: &'static str, depth: BindGroupLayoutEntryBuilder| {
++        BindGroupLayoutDescriptor::new(
++            label,
++            &BindGroupLayoutEntries::sequential(
++                ShaderStages::FRAGMENT,
++                (
++                    depth,
++                    uniform(),
++                    storage_buffer_read_only_sized(false, None),
++                    texture_2d_array(TextureSampleType::Depth),
++                ),
++            ),
++        )
++    };
++    let resolve = |label: &'static str, depth: BindGroupLayoutEntryBuilder| {
++        BindGroupLayoutDescriptor::new(
++            label,
++            &BindGroupLayoutEntries::with_indices(
++                ShaderStages::FRAGMENT,
++                (
++                    (0, depth),
++                    (1, uniform()),
++                    (
++                        4,
++                        texture_2d(TextureSampleType::Float { filterable: false }),
++                    ),
++                    (
++                        5,
++                        texture_2d(TextureSampleType::Float { filterable: false }),
++                    ),
++                ),
++            ),
++        )
++    };
++    commands.insert_resource(FogPipeline {
++        layouts: [
++            march("world_fog_layout", texture_depth_2d()),
++            march("world_fog_layout_msaa", texture_depth_2d_multisampled()),
++            resolve("world_fog_resolve_layout", texture_depth_2d()),
++            resolve(
++                "world_fog_resolve_layout_msaa",
++                texture_depth_2d_multisampled(),
++            ),
++        ],
++        shader: asset_server.load("embedded://benilla_world/shaders/world_fog.wgsl"),
++        fullscreen: fullscreen.clone(),
++        empty_shadow: one_texel(
++            &device,
++            "world_fog_empty_shadow",
++            TextureFormat::Depth16Unorm,
++            Some(TextureViewDimension::D2Array),
++        ),
++        empty: one_texel(&device, "world_fog_empty", FOG_FORMAT, None),
++    });
++}
++
++/// One view's fog targets: this frame's march and the two resolves that swap.
++struct FogTargets {
++    size: Extent3d,
++    march: TextureView,
++    resolve: [TextureView; 2],
++}
++
++/// One look view's fog: its pipelines, its uniform, its targets (none while the fog is off), and
++/// what the next frame needs to reproject: this frame's camera and which resolve it wrote.
++#[derive(Component)]
++pub(crate) struct LookFogGpu {
++    pipelines: [CachedRenderPipelineId; 2],
++    msaa: bool,
++    uniform: Buffer,
++    targets: Option<FogTargets>,
++    /// The resolve this frame writes (the other is last frame's).
++    write: usize,
++    frame: u32,
++    /// Last frame's camera, `None` with no history to reproject.
++    prev: Option<(Mat4, Vec3)>,
++}
++
++/// Whether the fog runs this frame: the look grading, the fog on, and some mist.
++pub(crate) fn wanted(frame: &LookFrame) -> Option<FogQuality> {
++    frame
++        .air
++        .fog
++        .filter(|_| frame.grades() && frame.post.height_fog > 0.0)
++}
++
++/// The history's weight this frame: none with no history or after a jump of the camera.
++pub fn history_weight(prev_cam: Option<Vec3>, cam: Vec3) -> f32 {
++    match prev_cam {
++        Some(p) if p.distance(cam) <= tune::FOG_RESET_JUMP => tune::FOG_HISTORY,
++        _ => 0.0,
++    }
++}
++
++/// The golden-ratio sequence: each frame's jitter well apart from the last few.
++pub fn frame_jitter(frame: u32) -> f32 {
++    (frame as f32 * 0.618_034).fract()
++}
++
++/// The fog's size for a frame `width × height` at `scale` pixels a texel.
++pub fn fog_size(width: u32, height: u32, scale: u32) -> Extent3d {
++    Extent3d {
++        width: width.div_ceil(scale.max(1)).max(1),
++        height: height.div_ceil(scale.max(1)).max(1),
++        depth_or_array_layers: 1,
++    }
++}
++
++/// A look view as [`prepare_fog_views`] reads it.
++type FogViewItem = (
++    Entity,
++    &'static ExtractedView,
++    &'static ViewTarget,
++    &'static Msaa,
++    Option<&'static mut LookFogGpu>,
++);
++
++#[allow(clippy::too_many_arguments)]
++pub(crate) fn prepare_fog_views(
++    mut commands: Commands,
++    device: Res<RenderDevice>,
++    queue: Res<RenderQueue>,
++    cache: Res<PipelineCache>,
++    pipeline: Res<FogPipeline>,
++    mut pipelines: ResMut<SpecializedRenderPipelines<FogPipeline>>,
++    frame: Res<LookFrame>,
++    mut views: Query<FogViewItem, With<LookView>>,
++) {
++    let want = wanted(&frame);
++    for (entity, view, target, msaa, existing) in &mut views {
++        let msaa = msaa.samples() > 1;
++        // A new view's (or a changed one's) state is built here and inserted below; an existing
++        // one is edited in place.
++        let mut fresh: Option<LookFogGpu> = None;
++        let gpu: &mut LookFogGpu = match existing {
++            Some(gpu) if gpu.msaa == msaa => gpu.into_inner(),
++            _ => {
++                let mut id =
++                    |stage| pipelines.specialize(&cache, &pipeline, FogKey { stage, msaa });
++                fresh.insert(LookFogGpu {
++                    pipelines: [id(FogStage::March), id(FogStage::Resolve)],
++                    msaa,
++                    uniform: device.create_buffer(&BufferDescriptor {
++                        label: Some("world_fog_uniform"),
++                        size: UNIFORM_BYTES,
++                        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
++                        mapped_at_creation: false,
++                    }),
++                    targets: None,
++                    write: 0,
++                    frame: 0,
++                    prev: None,
++                })
++            }
++        };
++        if let Some(q) = want {
++            step_view(gpu, &device, &queue, &frame, q, view, target);
++        } else {
++            // Off: free the targets, forget the history.
++            gpu.targets = None;
++            gpu.prev = None;
++        }
++        if let Some(fresh) = fresh {
++            commands.entity(entity).insert(fresh);
++        }
++    }
++}
++
++/// One frame of one view's fog with the fog on: its targets sized to the view, and this frame's
++/// uniform with last frame's camera to reproject through.
++fn step_view(
++    gpu: &mut LookFogGpu,
++    device: &RenderDevice,
++    queue: &RenderQueue,
++    frame: &LookFrame,
++    q: FogQuality,
++    view: &ExtractedView,
++    target: &ViewTarget,
++) {
++    let full = target.main_texture().size();
++    let size = fog_size(full.width, full.height, q.scale);
++    if gpu.targets.as_ref().is_none_or(|t| t.size != size) {
++        let make = |label: &'static str| {
++            device
++                .create_texture(&TextureDescriptor {
++                    label: Some(label),
++                    size,
++                    mip_level_count: 1,
++                    sample_count: 1,
++                    dimension: TextureDimension::D2,
++                    format: FOG_FORMAT,
++                    usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
++                    view_formats: &[],
++                })
++                .create_view(&TextureViewDescriptor::default())
++        };
++        gpu.targets = Some(FogTargets {
++            size,
++            march: make("world_fog_march"),
++            resolve: [make("world_fog_resolve_a"), make("world_fog_resolve_b")],
++        });
++        gpu.prev = None;
++    }
++    let world_from_view = view.world_from_view;
++    let clip_from_world = view
++        .clip_from_world
++        .unwrap_or_else(|| view.clip_from_view * Mat4::from(world_from_view.affine().inverse()));
++    let cam = world_from_view.translation();
++    let keep = history_weight(gpu.prev.map(|p| p.1), cam);
++    let uniform = FogUniform::new(
++        frame,
++        q,
++        clip_from_world,
++        cam,
++        world_from_view.forward().into(),
++        gpu.prev.map_or(clip_from_world, |p| p.0),
++        frame_jitter(gpu.frame),
++        keep,
++    );
++    queue.write_buffer(&gpu.uniform, 0, bytemuck::bytes_of(&uniform));
++    gpu.prev = Some((clip_from_world, cam));
++    gpu.frame = gpu.frame.wrapping_add(1);
++    gpu.write ^= 1;
++}
++
++/// One full-screen draw into `target` from `bind`.
++fn draw(
++    render_context: &mut RenderContext,
++    label: &'static str,
++    pipeline: &RenderPipeline,
++    bind: &BindGroup,
++    target: &TextureView,
++) {
++    let diagnostics = render_context.diagnostic_recorder();
++    let mut pass = render_context
++        .command_encoder()
++        .begin_render_pass(&RenderPassDescriptor {
++            label: Some(label),
++            color_attachments: &[Some(RenderPassColorAttachment {
++                view: target,
++                depth_slice: None,
++                resolve_target: None,
++                ops: Operations {
++                    load: LoadOp::Clear(Default::default()),
++                    store: StoreOp::Store,
++                },
++            })],
++            depth_stencil_attachment: None,
++            timestamp_writes: None,
++            occlusion_query_set: None,
++        });
++    let span = diagnostics.pass_span(&mut pass, label);
++    pass.set_pipeline(pipeline);
++    pass.set_bind_group(0, bind, &[]);
++    pass.draw(0..3, 0..1);
++    span.end(&mut pass);
++}
++
++/// Runs the march and the resolve for one view, ahead of the look pass, and returns the resolve
++/// the look pass reads and its pixels per texel; `None` (the look pass then draws the analytic
++/// mist) while the fog is off, its pipelines still compile, or the shared light is not up.
++pub(crate) fn encode(
++    render_context: &mut RenderContext,
++    world: &World,
++    frame: &LookFrame,
++    depth: &ViewDepthTexture,
++    gpu: Option<&LookFogGpu>,
++) -> Option<(TextureView, u32)> {
++    let q = wanted(frame)?;
++    let gpu = gpu?;
++    let targets = gpu.targets.as_ref()?;
++    let cache = world.resource::<PipelineCache>();
++    let [march, resolve] = gpu.pipelines.map(|id| cache.get_render_pipeline(id));
++    let (march, resolve) = (march?, resolve?);
++    let light = world.get_resource::<crate::lighting::SharedLightBuffer>()?;
++    let fog_pipeline = world.resource::<FogPipeline>();
++    let images = world.resource::<RenderAssets<GpuImage>>();
++    let shadow = images
++        .get(benilla_assets::materials::SHADOW_MAP.id())
++        .map_or(&fog_pipeline.empty_shadow, |i| &i.texture_view);
++    let device = render_context.render_device().clone();
++    let layout = |stage| {
++        cache.get_bind_group_layout(fog_pipeline.layout(FogKey {
++            stage,
++            msaa: gpu.msaa,
++        }))
++    };
++    let march_bind = device.create_bind_group(
++        "world_fog",
++        &layout(FogStage::March),
++        &BindGroupEntries::sequential((
++            depth.view(),
++            gpu.uniform.as_entire_binding(),
++            light.0.as_entire_binding(),
++            shadow,
++        )),
++    );
++    let (write, read) = (&targets.resolve[gpu.write], &targets.resolve[gpu.write ^ 1]);
++    let resolve_bind = device.create_bind_group(
++        "world_fog_resolve",
++        &layout(FogStage::Resolve),
++        &BindGroupEntries::with_indices((
++            (0, depth.view()),
++            (1, gpu.uniform.as_entire_binding()),
++            (4, &targets.march),
++            (5, read),
++        )),
++    );
++    draw(
++        render_context,
++        "world_fog",
++        march,
++        &march_bind,
++        &targets.march,
++    );
++    draw(
++        render_context,
++        "world_fog_resolve",
++        resolve,
++        &resolve_bind,
++        write,
++    );
++    Some((write.clone(), q.scale))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::look::air::{fog_quality, AirFrame};
++    use crate::look::PostLook;
++
++    /// `world_fog.wgsl`'s `Fog`: two `mat4x4<f32>` then five `vec4<f32>` rows, 208 bytes.
++    #[test]
++    fn the_uniform_layout_matches_the_shader() {
++        assert_eq!(UNIFORM_BYTES, 2 * 64 + 5 * 16);
++        assert_eq!(std::mem::offset_of!(FogUniform, camera), 128);
++        assert_eq!(std::mem::offset_of!(FogUniform, misc), 192);
++    }
++
++    /// The shader's view of the shared light buffer: 21 header rows, the point table and the
++    /// look's lights, then the shadow block, as `global_light` packs them.
++    #[test]
++    fn the_light_prefix_matches_the_packer() {
++        use crate::lighting::{LIGHT_HEADER_ROWS, MAX_POINT_LIGHTS};
++        assert_eq!(LIGHT_HEADER_ROWS, 21);
++        assert_eq!(2 * MAX_POINT_LIGHTS, 512);
++        assert_eq!(crate::look::lights::LOOK_LIGHT_ROWS, 48);
++        assert_eq!(crate::look::shadows::SHADOW_ROWS, 14);
++    }
++
++    fn frame(height_fog: f32) -> LookFrame {
++        LookFrame {
++            on: true,
++            post: PostLook {
++                height_fog,
++                saturation: 1.1,
++                ..PostLook::NEUTRAL
++            },
++            feet_y: Some(40.0),
++            air: AirFrame {
++                fog: Some(fog_quality(2)),
++                sharpen: 0.0,
++            },
++            ..default()
++        }
++    }
++
++    /// The uniform carries the mist the look pass draws (the same density, base and falloff) and
++    /// the quality's layout; the fog runs only while there is mist to carve.
++    #[test]
++    fn a_view_uniform_carries_the_mist() {
++        let f = frame(0.7);
++        let q = fog_quality(2);
++        let proj =
++            Mat4::perspective_infinite_reverse_rh(std::f32::consts::FRAC_PI_4, 16.0 / 9.0, 0.1);
++        let cam = Vec3::new(0.0, 45.0, 0.0);
++        let clip_from_world = proj * Mat4::look_to_rh(cam, Vec3::NEG_Z, Vec3::Y);
++        let u = FogUniform::new(
++            &f,
++            q,
++            clip_from_world,
++            cam,
++            Vec3::NEG_Z,
++            clip_from_world,
++            0.3,
++            0.85,
++        );
++        assert!((u.mist[0] - 0.7 * super::super::rays::MIST_DENSITY).abs() < 1e-9);
++        assert_eq!(u.mist[1], 42.0, "two yards over the feet");
++        assert_eq!(u.mist[3], 12.0);
++        assert_eq!(u.fwd[3], 4.0);
++        assert_eq!(u.camera[3], 0.3);
++        assert_eq!(u.reach[1], 0.85);
++        assert_eq!(wanted(&f), Some(q));
++        assert_eq!(wanted(&frame(0.0)), None, "no mist: no fog pass");
++        assert_eq!(wanted(&LookFrame { on: false, ..f }), None);
++        let off = LookFrame {
++            air: AirFrame::default(),
++            ..f
++        };
++        assert_eq!(wanted(&off), None);
++    }
++
++    #[test]
++    fn the_history_starts_over_after_a_jump() {
++        let p = Vec3::new(10.0, 50.0, 10.0);
++        assert_eq!(history_weight(None, p), 0.0);
++        assert_eq!(history_weight(Some(p), p + Vec3::X), tune::FOG_HISTORY);
++        assert_eq!(history_weight(Some(p), p + Vec3::X * 50.0), 0.0);
++        // The jitter walks the unit interval without repeating soon.
++        let j: Vec<f32> = (0..8).map(frame_jitter).collect();
++        for a in 0..8 {
++            for b in (a + 1)..8 {
++                assert!((j[a] - j[b]).abs() > 0.05, "{j:?}");
++            }
++        }
++        let s = fog_size(1281, 720, 4);
++        assert_eq!((s.width, s.height), (321, 180));
++    }
++}
+diff --git a/crates/benilla-world/src/look/grade.rs b/crates/benilla-world/src/look/grade.rs
+index da2fa86..7dfecec 100644
+--- a/crates/benilla-world/src/look/grade.rs
++++ b/crates/benilla-world/src/look/grade.rs
+@@ -274,7 +274,11 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.78, 0.86, 0.96, 0.20),
+         Tint::new(0.45, 0.65, 0.98, 0.20),
+         2.5,
+-        [0.95, 1.06, -0.10, 0.15, 0.05, 0.3],
++        // Contrast 1.0 and bloom 0.08, were 1.06 and 0.15: take 291's noon cobbles were still
++        // pale cream under the new look, 10.9% of the frame over 230 against 2.6% under 1.12's.
++        // The contrast about mid-grey lifted a stone texel at 0.8 to 0.88 before the shoulder,
++        // and the bloom added on top; the noon light is clear without either.
++        [0.95, 1.0, -0.10, 0.08, 0.05, 0.3],
+         // The weakest contact shadows of the day: the sun fills them; the coolest. 1.2: x2 of the first pass: at 1x the first films (#262) could not find it.
+         [1.2, 0.8],
+     ),
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index f6e61a9..1a0af64 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -6,7 +6,9 @@
+ //! ([`water`]), one wind sways the trees and the grass ([`wind`]), the sky is painted, its
+ //! clouds drifting in that wind ([`sky`]), and the server's weather shows: grey skies, lit rain,
+ //! wet ground and lightning ([`weather`]), and the woods are lived in: fireflies at night,
+-//! falling leaves, motes in the sun's shafts and butterflies by day ([`life`]). One switch,
++//! falling leaves, motes in the sun's shafts and butterflies by day ([`life`]), and the air holds
++//! shafts of sun in the mist with the lamps glowing in it, the picture is sharpened, and far lit
++//! windows glow through the night ([`air`]). One switch,
+ //! [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look is then
+ //! exactly the reference's.
+ 
+@@ -17,7 +19,9 @@ use std::collections::HashMap;
+ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
+ use benilla_formats::{AreaTableCatalog, Atmosphere};
+ 
++pub mod air;
+ pub mod ao;
++pub mod fog_pass;
+ pub mod grade;
+ pub mod lamps;
+ pub mod life;
+@@ -33,6 +37,7 @@ pub mod water;
+ pub mod water_pass;
+ pub mod weather;
+ pub mod wind;
++pub use air::{LookAir, WindowGlows};
+ pub use ao::LookAo;
+ pub use grade::{GradeKey, PostLook, Tint};
+ pub use life::LookLife;
+@@ -250,6 +255,7 @@ pub(crate) fn init_resources(app: &mut App) {
+     sky::init_resources(app);
+     weather::init_resources(app);
+     life::init_resources(app);
++    air::init_resources(app);
+ }
+ 
+ /// The new look's world side: its resources, the area table its zone lookup reads, and the
+diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
+index 7e0b069..5a6d9ea 100644
+--- a/crates/benilla-world/src/look/pass.rs
++++ b/crates/benilla-world/src/look/pass.rs
+@@ -1,6 +1,8 @@
+ //! The new look's full-screen pass and bloom, benilla's own (no reference behaviour): contact
+-//! shadows from the depth buffer ([`super::ao`]), god rays toward the sun and a morning mist in the
+-//! hollows ([`super::rays`]), then a colour grade in
++//! shadows from the depth buffer ([`super::ao`]), a gentle sharpen, god rays toward the sun and a
++//! morning mist in the hollows ([`super::rays`]), carved into shafts by the volumetric fog with
++//! the lamps glowing in it, and far lit windows glowing over it ([`super::air`]), then a colour
++//! grade in
+ //! linear light (white balance, contrast, saturation), all from the zone grade's current values
+ //! ([`super::LookGrade`]), and Bevy's own `Bloom` on the world camera, all on the camera marked
+ //! [`LookView`] and only under the new look.
+@@ -30,7 +32,9 @@ use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
+ use bevy::render::view::{ExtractedView, Msaa, ViewDepthTexture, ViewTarget};
+ use bevy::render::{Render, RenderApp, RenderStartup, RenderSystems};
+ 
++use super::air::{AirFrame, LookAir, WindowGlows, WindowPoint};
+ use super::ao::{self, AoLight, LookAo, LookAoGpu};
++use super::fog_pass::{self, LookFogGpu};
+ use super::{LookGrade, PostLook, WorldLook};
+ 
+ /// The camera the new look's pass and bloom run on: the game's world camera.
+@@ -56,6 +60,8 @@ pub struct LookFrame {
+     /// What the ambient occlusion needs of the light besides the grade (`post.ao` is its strength,
+     /// already `worldAO` and `lookao`'s).
+     pub ao: AoLight,
++    /// The volumetric fog's layout and the sharpness (`look::air`).
++    pub air: AirFrame,
+ }
+ 
+ impl LookFrame {
+@@ -85,13 +91,21 @@ fn publish_frame(
+     viewer: Res<crate::view::Viewer>,
+     sky: Option<Res<super::SkyFrame>>,
+     weather: Option<Res<super::WeatherLook>>,
++    air: Option<Res<LookAir>>,
+     mut frame: ResMut<LookFrame>,
+ ) {
++    let air_switches = air.map(|a| *a).unwrap_or_default();
++    let air = AirFrame::new(look.on, &air_switches);
+     let next = LookFrame {
+         on: look.on,
+         post: if look.on {
+             let mut post = grade.post;
+             post.height_fog *= mist.scale;
++            // `lookfog <density>` scales the mist the volumetric fog carves; the analytic mist
++            // (`worldFog 0`) keeps the day's.
++            if air.fog.is_some() {
++                post.height_fog *= air_switches.density();
++            }
+             post.ao = ao.strength(post.ao);
+             // A cloud over the sun takes its rays (`look::sky`; 1 with the painted sky off).
+             post.rays *= sky.map_or(1.0, |s| s.sun_clear);
+@@ -115,6 +129,7 @@ fn publish_frame(
+             fog_start: lighting.fog_start,
+             fog_end: lighting.fog_end,
+         },
++        air,
+     };
+     if *frame != next {
+         *frame = next;
+@@ -247,10 +262,10 @@ pub fn srgb_to_linear(c: f32) -> f32 {
+ 
+ // ---------------------------------------------------------------- render world
+ 
+-/// The pass's uniform, `world_look.wgsl`'s `Look`, field for field (each row a `vec4<f32>`, the
+-/// matrix last).
++/// The pass's uniform, `world_look.wgsl`'s `Look`, field for field (each row a `vec4<f32>`, then
++/// the matrix, then the far windows' table).
+ #[repr(C)]
+-#[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
++#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+ pub struct LookUniform {
+     /// `(saturation, contrast, warmth, 0)`.
+     pub grade: [f32; 4],
+@@ -272,20 +287,43 @@ pub struct LookUniform {
+     /// The camera's forward (unit), for planar eye depth, and the brightness the shade eases off
+     /// above.
+     pub ao_fwd: [f32; 4],
++    /// The volumetric fog: 1 to read its target (0: the analytic mist alone), its pixels per
++    /// texel, the sky's reach into the mist and its share of it.
++    pub fog: [f32; 4],
++    /// The sharpen: its strength (0 none), the planar depths it fades over, the share it keeps
++    /// beyond.
++    pub sharpen: [f32; 4],
++    /// The far windows: how many, the fewest pixels a core and a halo are drawn at, the halo's
++    /// share.
++    pub windows: [f32; 4],
+     /// Clip space back to world space, for the mist's per-pixel position.
+     pub world_from_clip: [[f32; 4]; 4],
++    /// Two rows a far window (`look::air::glow_rows`).
++    pub glows: [[f32; 4]; 2 * super::air::tune::WINDOW_MAX],
++}
++
++impl Default for LookUniform {
++    fn default() -> Self {
++        bytemuck::Zeroable::zeroed()
++    }
+ }
+ 
+ impl LookUniform {
+     /// One view's uniform from this frame's look and the view's camera; `ao` the occlusion ran
+-    /// this frame and its target is bound.
++    /// this frame and its target is bound, `fog` the volumetric fog's pixels per texel when its
++    /// target is bound, `glows` this frame's far windows and `cam_up` the camera's up.
++    #[allow(clippy::too_many_arguments)]
+     pub fn new(
+         frame: &LookFrame,
+         clip_from_world: Mat4,
+         cam_pos: Vec3,
+         cam_fwd: Vec3,
++        cam_up: Vec3,
+         ao: bool,
++        fog: Option<u32>,
++        glows: &[WindowPoint],
+     ) -> Self {
++        use super::air::tune as air;
+         use super::rays;
+         let p = frame.post;
+         let (sun_uv, visibility) =
+@@ -293,7 +331,7 @@ impl LookUniform {
+         let [r, g, b] = frame.sun_color;
+         let [fr, fg, fb] = frame.fog_color;
+         let base = rays::mist_base(frame.feet_y, cam_pos.y);
+-        Self {
++        let mut u = Self {
+             grade: [p.saturation, p.contrast, p.warmth, 0.0],
+             sun: [sun_uv.x, sun_uv.y, visibility, p.rays],
+             sun_color: [r, g, b, p.height_fog * rays::MIST_DENSITY],
+@@ -314,8 +352,48 @@ impl LookUniform {
+                 frame.ao.fog_end,
+             ],
+             ao_fwd: cam_fwd.extend(ao::tune::BRIGHT_KNEE).to_array(),
++            fog: [
++                if fog.is_some() { 1.0 } else { 0.0 },
++                fog.unwrap_or(1) as f32,
++                air::FOG_SKY_REACH,
++                air::FOG_SKY_SHARE,
++            ],
++            sharpen: [
++                frame.air.sharpen,
++                air::SHARPEN_NEAR,
++                air::SHARPEN_FAR,
++                air::SHARPEN_FAR_KEEP,
++            ],
++            windows: [
++                0.0,
++                air::WINDOW_CORE_MIN_PX,
++                air::WINDOW_HALO_MIN_PX,
++                air::WINDOW_HALO,
++            ],
+             world_from_clip: clip_from_world.inverse().to_cols_array_2d(),
+-        }
++            glows: [[0.0; 4]; 2 * air::WINDOW_MAX],
++        };
++        // The far windows, dimmed by half the mist between (the same mist the pass draws).
++        let density = p.height_fog * rays::MIST_DENSITY;
++        let n = super::air::glow_rows(
++            glows,
++            clip_from_world,
++            cam_pos,
++            cam_up,
++            |q| {
++                rays::mist_optical_depth(
++                    density,
++                    base,
++                    rays::MIST_FALLOFF,
++                    cam_pos.y,
++                    q.y,
++                    q.distance(cam_pos),
++                )
++            },
++            &mut u.glows,
++        );
++        u.windows[0] = n as f32;
++        u
+     }
+ }
+ 
+@@ -428,6 +506,8 @@ fn init_pipeline(
+                     depth,
+                     // The ambient occlusion's half-resolution shade (`ao::AO_FORMAT`).
+                     texture_2d(TextureSampleType::Float { filterable: false }),
++                    // The volumetric fog's resolve (`fog_pass::FOG_FORMAT`).
++                    texture_2d(TextureSampleType::Float { filterable: false }),
+                 ),
+             ),
+         )
+@@ -489,13 +569,14 @@ impl ViewNode for LookNode {
+         &'static ExtractedView,
+         &'static ViewDepthTexture,
+         Option<&'static LookAoGpu>,
++        Option<&'static LookFogGpu>,
+     );
+ 
+     fn run<'w>(
+         &self,
+         _graph: &mut RenderGraphContext,
+         render_context: &mut RenderContext<'w>,
+-        (view_target, gpu, view, depth, ao_gpu): QueryItem<'w, '_, Self::ViewQuery>,
++        (view_target, gpu, view, depth, ao_gpu, fog_gpu): QueryItem<'w, '_, Self::ViewQuery>,
+         world: &'w World,
+     ) -> Result<(), NodeRunError> {
+         let frame = *world.resource::<LookFrame>();
+@@ -519,6 +600,8 @@ impl ViewNode for LookNode {
+             cache.get_bind_group_layout(world.resource::<LookPipeline>().layout(gpu.key.msaa));
+         // The contact shadows first, from the same depth buffer, at half resolution.
+         let ao_view = ao::encode(render_context, world, &frame, view, depth, ao_gpu);
++        // The volumetric fog's shafts and glow, at a quarter or half resolution.
++        let fog = fog_pass::encode(render_context, world, &frame, depth, fog_gpu);
+         let world_from_view = view.world_from_view;
+         let clip_from_world = view.clip_from_world.unwrap_or_else(|| {
+             view.clip_from_view * Mat4::from(world_from_view.affine().inverse())
+@@ -528,13 +611,19 @@ impl ViewNode for LookNode {
+             clip_from_world,
+             world_from_view.translation(),
+             world_from_view.forward().into(),
++            world_from_view.up().into(),
+             ao_view.is_some(),
++            fog.as_ref().map(|f| f.1),
++            world
++                .get_resource::<WindowGlows>()
++                .map_or(&[][..], |w| &w.glows),
+         );
+         uniform.set_glare(world.get_resource::<super::LookGlare>());
+         world
+             .resource::<RenderQueue>()
+             .write_buffer(&gpu.uniform, 0, bytemuck::bytes_of(&uniform));
+         let empty = &world.resource::<ao::AoPipeline>().empty;
++        let fog_empty = &world.resource::<fog_pass::FogPipeline>().empty;
+         let post = view_target.post_process_write();
+         let bind = render_context.render_device().create_bind_group(
+             "world_look",
+@@ -544,6 +633,7 @@ impl ViewNode for LookNode {
+                 gpu.uniform.as_entire_binding(),
+                 depth.view(),
+                 ao_view.as_ref().unwrap_or(empty),
++                fog.as_ref().map_or(fog_empty, |f| &f.0),
+             )),
+         );
+         let diagnostics = render_context.diagnostic_recorder();
+@@ -580,13 +670,14 @@ pub(super) fn build(app: &mut App) {
+         .add_plugins((
+             ExtractComponentPlugin::<LookView>::default(),
+             ExtractResourcePlugin::<LookFrame>::default(),
++            ExtractResourcePlugin::<WindowGlows>::default(),
+         ))
+         .add_systems(
+             Update,
+             (
+                 super::mist::resolve_mist,
+                 publish_frame,
+-                (sync_bloom, sync_depth_binding),
++                (sync_bloom, sync_depth_binding, super::air::publish_windows),
+             )
+                 .chain()
+                 .after(super::sky::SkyPublish)
+@@ -602,10 +693,19 @@ pub(super) fn finish(app: &mut App) {
+     render_app
+         .init_resource::<SpecializedRenderPipelines<LookPipeline>>()
+         .init_resource::<SpecializedRenderPipelines<ao::AoPipeline>>()
+-        .add_systems(RenderStartup, (init_pipeline, ao::init_pipeline))
++        .init_resource::<SpecializedRenderPipelines<fog_pass::FogPipeline>>()
++        .add_systems(
++            RenderStartup,
++            (init_pipeline, ao::init_pipeline, fog_pass::init_pipeline),
++        )
+         .add_systems(
+             Render,
+-            (prepare_look_views, ao::prepare_ao_views).in_set(RenderSystems::PrepareResources),
++            (
++                prepare_look_views,
++                ao::prepare_ao_views,
++                fog_pass::prepare_fog_views,
++            )
++                .in_set(RenderSystems::PrepareResources),
+         )
+         .add_render_graph_node::<ViewNodeRunner<LookNode>>(Core3d, LookLabel)
+         .add_render_graph_edges(
+@@ -690,13 +790,14 @@ mod tests {
+         assert!(grade_linear([0.05; 3], &c)[0] < 0.05);
+     }
+ 
+-    /// `world_look.wgsl`'s `Look`: nine `vec4<f32>` rows then a `mat4x4<f32>`, 208 bytes, the
+-    /// matrix at a 16-byte boundary.
++    /// `world_look.wgsl`'s `Look`: twelve `vec4<f32>` rows, a `mat4x4<f32>` and the far windows'
++    /// 128 rows, the matrix at a 16-byte boundary.
+     #[test]
+     fn the_uniform_layout_matches_the_shader() {
+-        assert_eq!(UNIFORM_BYTES, 9 * 16 + 64);
++        assert_eq!(UNIFORM_BYTES, 12 * 16 + 64 + 128 * 16);
+         assert_eq!(UNIFORM_BYTES % 16, 0);
+-        assert_eq!(std::mem::offset_of!(LookUniform, world_from_clip), 144);
++        assert_eq!(std::mem::offset_of!(LookUniform, world_from_clip), 192);
++        assert_eq!(std::mem::offset_of!(LookUniform, glows), 256);
+         assert_eq!(
+             std::mem::align_of::<LookUniform>(),
+             4,
+@@ -728,8 +829,22 @@ mod tests {
+                 fog_end: 400.0,
+                 ..default()
+             },
++            air: AirFrame {
++                fog: Some(super::super::air::fog_quality(2)),
++                sharpen: 0.4,
++            },
+         };
+-        let u = LookUniform::new(&frame, clip_from_world, cam, Vec3::NEG_Z, true);
++        let up = Vec3::Y;
++        let u = LookUniform::new(
++            &frame,
++            clip_from_world,
++            cam,
++            Vec3::NEG_Z,
++            up,
++            true,
++            None,
++            &[],
++        );
+         assert_eq!(u.grade, [1.1, 1.05, 0.2, 0.0]);
+         assert!(
+             (u.sun[0] - 0.5).abs() < 1e-3 && u.sun[1] < 0.5,
+@@ -742,7 +857,17 @@ mod tests {
+         assert_eq!(u.ao, [1.0, 0.0, 120.0, 400.0]);
+         assert_eq!(u.ao_fwd, [0.0, 0.0, -1.0, ao::tune::BRIGHT_KNEE]);
+         assert_eq!(
+-            LookUniform::new(&frame, clip_from_world, cam, Vec3::NEG_Z, false).ao[0],
++            LookUniform::new(
++                &frame,
++                clip_from_world,
++                cam,
++                Vec3::NEG_Z,
++                up,
++                false,
++                None,
++                &[]
++            )
++            .ao[0],
+             0.0,
+             "no occlusion this frame: none applied"
+         );
+@@ -757,9 +882,43 @@ mod tests {
+             ..frame
+         };
+         assert_eq!(
+-            LookUniform::new(&calm, clip_from_world, cam, Vec3::NEG_Z, false).sun[3],
++            LookUniform::new(
++                &calm,
++                clip_from_world,
++                cam,
++                Vec3::NEG_Z,
++                up,
++                false,
++                None,
++                &[]
++            )
++            .sun[3],
+             0.0
+         );
++        // The air: no fog target bound, the analytic mist; one bound, its texel size; the
++        // sharpness; a far window on screen, one row pair.
++        assert_eq!(u.fog[0], 0.0);
++        assert_eq!(u.sharpen[0], 0.4);
++        assert_eq!(u.windows[0], 0.0);
++        let window = WindowPoint {
++            pos: Vec3::new(0.0, 50.0, -400.0),
++            color: [1.0, 0.7, 0.4],
++            facing: Vec3::ZERO,
++        };
++        let lit = LookUniform::new(
++            &frame,
++            clip_from_world,
++            cam,
++            Vec3::NEG_Z,
++            up,
++            false,
++            Some(4),
++            &[window],
++        );
++        assert_eq!(&lit.fog[..2], &[1.0, 4.0]);
++        assert_eq!(lit.windows[0], 1.0);
++        assert!((lit.glows[0][0] - 0.5).abs() < 1e-3, "{:?}", lit.glows[0]);
++        assert!(lit.glows[1][0] < 1.0, "dimmed by the mist between");
+     }
+ 
+     /// The pipeline's two depth variants, single-sampled and multisampled.
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index 9b73b4a..9f53ed0 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -19,6 +19,7 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/static_gx.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_look.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_ao.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/world_fog.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_shadow.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/look_shadow_map.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_water.wgsl");
+@@ -64,6 +65,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 14, "the engine's shader set changed size");
++        assert_eq!(found, 15, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/world_fog.wgsl b/crates/benilla-world/src/shaders/world_fog.wgsl
+new file mode 100644
+index 0000000..e60c644
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/world_fog.wgsl
+@@ -0,0 +1,290 @@
++// The new look's volumetric fog, benilla's own (`look::air`, `look::fog_pass`): how much of the
++// mist along each view ray the sun reaches, and the glow of the look's lamps and torches in it, at a
++// quarter or half of the frame's resolution. The look pass (`world_look.wgsl`) keeps the mist's own
++// closed form for how thick it is and what colour; this pass only carves it:
++//   fs_march   = the ray from the camera to the scene (or a fixed reach into the sky) cut into
++//                segments, each weighted by the exact share of the in-scattering it holds (the
++//                mist's transmittance at its ends, `look::air::segment_weights`), each asking the
++//                sun-shadow map (0065/0080) at a jittered point whether the sun reaches it; and each
++//                look light's halo integrated along the ray in closed form (`look::air::halo`).
++//                Writes (lamp glow rgb, the lit share of the mist).
++//   fs_resolve = a depth-aware 3×3 of this frame's march, blended with last frame's, reprojected
++//                through last frame's camera and clamped to the neighbourhood, so the jitter's
++//                noise settles over a few frames and never smears. Writes the same layout.
++// Every read is a `textureLoad`: no sampler. `MSAA` reads sample 0 of a multisampled depth buffer.
++
++#import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
++
++#ifdef MSAA
++@group(0) @binding(0) var depth_tex: texture_depth_multisampled_2d;
++#else
++@group(0) @binding(0) var depth_tex: texture_depth_2d;
++#endif
++
++struct Fog {
++    world_from_clip: mat4x4<f32>,
++    prev_clip_from_world: mat4x4<f32>,
++    // xyz = the camera, w = this frame's jitter (0..1).
++    camera: vec4<f32>,
++    // xyz = the camera's forward (unit), w = full-resolution pixels per fog texel.
++    fwd: vec4<f32>,
++    // x = the mist's density at its base (per yd), y = its base height, z = its falloff (yd),
++    // w = march steps.
++    mist: vec4<f32>,
++    // x = the reach into the sky (yd), y = the history's weight (0: start over), z = the lamps'
++    // in-scattering, w = the halo's core (yd).
++    reach: vec4<f32>,
++    // x = the least density a lamp's halo sees (per yd), y = the depth tolerance of the resolve's
++    // neighbourhood, zw unused.
++    misc: vec4<f32>,
++}
++@group(0) @binding(1) var<uniform> fog: Fog;
++
++// The shared light buffer's prefix (`lighting::global_light`): 21 header rows, the point table,
++// then the look's light table and its sun-shadow block. Only rows 1 (splits), the table and the
++// block are read; row 20 `.y` is the look light count.
++struct WowLight {
++    rows: array<vec4<f32>, 21>,
++    points: array<vec4<f32>, 512>,
++    look_lights: array<vec4<f32>, 48>,
++    shadow: array<vec4<f32>, 14>,
++}
++@group(0) @binding(2) var<storage, read> wow_light: WowLight;
++@group(0) @binding(3) var shadow_map: texture_depth_2d_array;
++
++// The resolve's inputs: this frame's march and last frame's resolve.
++@group(0) @binding(4) var cur_tex: texture_2d<f32>;
++@group(0) @binding(5) var hist_tex: texture_2d<f32>;
++
++// The density exponent's clamp (`look::rays::MIST_EXP_LIMIT`).
++const MIST_EXP_LIMIT: f32 = 30.0;
++// A light's halo by its size and strength (`look::air::tune::HALO_REF_RADIUS`, `HALO_PEAK_FROM`,
++// `HALO_PEAK_TO`): a torch's or a lamp's pool (10 yd) and brighter gets the whole halo; a smaller
++// light a halo shrunk with it, core and strength (its reach's share, squared); a light under the
++// first peak none, full at the second. 0083's fireflies (2.5 yd, 0.6) get almost none: the first
++// air films found a green glow 400 px across round one of them.
++const HALO_REF_RADIUS: f32 = 10.0;
++const HALO_PEAK_FROM: f32 = 0.15;
++const HALO_PEAK_TO: f32 = 0.8;
++
++fn load_depth(px: vec2<i32>) -> f32 {
++    let top = vec2<i32>(textureDimensions(depth_tex)) - vec2<i32>(1);
++    return textureLoad(depth_tex, clamp(px, vec2<i32>(0), top), 0);
++}
++
++// The full-resolution pixel a fog texel stands for: the middle of its block.
++fn source_px(k: vec2<i32>) -> vec2<i32> {
++    let s = i32(fog.fwd.w);
++    return k * s + vec2<i32>(s / 2);
++}
++
++// The view ray through full-resolution pixel `px` and its length to what the pixel shows; a sky
++// pixel (reverse-Z clear, depth 0) reaches `fog.reach.x` into it. `.xyz` the unit direction.
++fn view_ray(px: vec2<i32>, depth: f32) -> vec4<f32> {
++    let dims = vec2<f32>(textureDimensions(depth_tex));
++    let uv = (vec2<f32>(px) + vec2<f32>(0.5)) / dims;
++    let ndc_xy = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
++    let near4 = fog.world_from_clip * vec4<f32>(ndc_xy, 1.0, 1.0);
++    let dir = normalize(near4.xyz / near4.w - fog.camera.xyz);
++    if depth <= 0.0 {
++        return vec4<f32>(dir, fog.reach.x);
++    }
++    let w4 = fog.world_from_clip * vec4<f32>(ndc_xy, depth, 1.0);
++    return vec4<f32>(dir, length(w4.xyz / w4.w - fog.camera.xyz));
++}
++
++// The mist's optical depth from the camera `t` yards along unit `dir` (`look::rays`).
++fn optical_depth(dir: vec3<f32>, t: f32) -> f32 {
++    let y0 = fog.camera.y;
++    let k = fog.mist.x * exp(min(-(y0 - fog.mist.y) / fog.mist.z, MIST_EXP_LIMIT));
++    let a = dir.y * t / fog.mist.z;
++    if abs(a) < 1e-4 {
++        return k * t;
++    }
++    return k * t * (1.0 - exp(min(-a, MIST_EXP_LIMIT))) / a;
++}
++
++// Interleaved gradient noise (Jimenez 2014), shifted by the frame's jitter.
++fn jitter(px: vec2<i32>) -> f32 {
++    let p = vec2<f32>(px);
++    return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))) + fog.camera.w);
++}
++
++// Whether the sun reaches world point `p`, eye depth `z`: 1 lit, down to 1 − strength in full
++// shadow; 1 with no shadows this frame or past their reach. One compare a step: the jitter and the
++// resolve soften it. `look::shadows::caster_texel`'s convention (0 at a slice's near face).
++fn sun_reaches(p: vec3<f32>, z: f32) -> f32 {
++    let head = wow_light.shadow[0];
++    if head.x < 0.5 || z >= head.w {
++        return 1.0;
++    }
++    let count = u32(head.x);
++    var c = 0u;
++    for (var i = 0u; i + 1u < count; i = i + 1u) {
++        if z > wow_light.shadow[1][i] {
++            c = i + 1u;
++        }
++    }
++    let res = wow_light.shadow[2].w;
++    for (var tries = 0u; tries < 2u; tries = tries + 1u) {
++        if c >= count {
++            break;
++        }
++        let centre = wow_light.shadow[6u + 2u * c];
++        let depth = wow_light.shadow[7u + 2u * c]; // near, 1/range, texel (yd), blend start
++        let d = p - centre.xyz;
++        let uv = vec2<f32>(dot(d, wow_light.shadow[2].xyz), -dot(d, wow_light.shadow[3].xyz))
++            * (0.5 * centre.w) + vec2<f32>(0.5);
++        if all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0)) {
++            let zr = (dot(d, wow_light.shadow[4].xyz) - depth.x) * depth.y
++                - depth.z * wow_light.shadow[5].w * depth.y;
++            let lim = i32(res) - 1;
++            let t = clamp(vec2<i32>(uv * res), vec2<i32>(0), vec2<i32>(lim));
++            var lit = select(0.0, 1.0, zr <= textureLoad(shadow_map, t, i32(c), 0));
++            lit = mix(lit, 1.0, smoothstep(head.z, head.w, z));
++            return 1.0 - head.y * (1.0 - lit);
++        }
++        c = c + 1u;
++    }
++    return 1.0;
++}
++
++// A look light's halo along the ray from the camera (unit `dir`, `len` yards): the closed form of
++// `∫ 1 / (1 + ((t − t0)² + h²) / c²) dt` over the ray, `t0` the light's foot on it and `h` its
++// distance off, times the light's window at `h` (none past its radius), the mist's density at the
++// light (at least the air's) and the transmittance to the light's foot (`look::air::halo`).
++fn halos(dir: vec3<f32>, len: f32) -> vec3<f32> {
++    let count = u32(wow_light.rows[20].y);
++    let c = fog.reach.w;
++    var sum = vec3<f32>(0.0);
++    for (var i = 0u; i < count; i = i + 1u) {
++        let pos_radius = wow_light.look_lights[2u * i];
++        let rgb = wow_light.look_lights[2u * i + 1u].rgb;
++        let size = clamp(pos_radius.w / HALO_REF_RADIUS, 0.0, 1.0);
++        let strong = smoothstep(HALO_PEAK_FROM, HALO_PEAK_TO, max(rgb.r, max(rgb.g, rgb.b)));
++        let scale = size * size * strong;
++        if scale <= 0.0 {
++            continue;
++        }
++        let cs = max(c * size, 1e-3);
++        let to = pos_radius.xyz - fog.camera.xyz;
++        let t0 = dot(to, dir);
++        let h2 = max(dot(to, to) - t0 * t0, 0.0);
++        let r2 = pos_radius.w * pos_radius.w;
++        if h2 >= r2 || t0 < -pos_radius.w || t0 - len > pos_radius.w {
++            continue;
++        }
++        let x2 = h2 / r2;
++        let window = (1.0 - x2) * (1.0 - x2);
++        let k = sqrt(cs * cs + h2);
++        let along = cs * cs / k * (atan((len - t0) / k) - atan(-t0 / k));
++        let rho = max(
++            fog.mist.x * exp(min(-(pos_radius.y - fog.mist.y) / fog.mist.z, MIST_EXP_LIMIT)),
++            fog.misc.x
++        );
++        let trans = exp(-optical_depth(dir, clamp(t0, 0.0, len)));
++        sum += rgb * (window * along * rho * trans * scale);
++    }
++    return sum * fog.reach.z;
++}
++
++@fragment
++fn fs_march(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
++    let k = vec2<i32>(in.position.xy);
++    let px = source_px(k);
++    let depth = load_depth(px);
++    let ray = view_ray(px, depth);
++    let dir = ray.xyz;
++    let len = ray.w;
++    let glow = halos(dir, len);
++
++    // The lit share: 1 with no mist or no shadows to carve it.
++    let head = wow_light.shadow[0];
++    let total = 1.0 - exp(-optical_depth(dir, len));
++    if fog.mist.x <= 0.0 || head.x < 0.5 || total < 1e-5 {
++        return vec4<f32>(glow, 1.0);
++    }
++    let march = min(len, head.w);
++    let steps = max(u32(fog.mist.w), 1u);
++    let cos_fwd = dot(dir, fog.fwd.xyz);
++    let j = jitter(k);
++    var lit = 0.0;
++    var t_prev = 0.0;
++    var tr_prev = 1.0;
++    for (var i = 0u; i < steps; i = i + 1u) {
++        // Segments grow with distance (squared spacing): fine near, where shafts are sharp.
++        let f = f32(i + 1u) / f32(steps);
++        let t_next = march * f * f;
++        let tr_next = exp(-optical_depth(dir, t_next));
++        let w = tr_prev - tr_next;
++        if w > 1e-6 {
++            let t = mix(t_prev, t_next, j);
++            lit += w * sun_reaches(fog.camera.xyz + dir * t, t * cos_fwd);
++        }
++        t_prev = t_next;
++        tr_prev = tr_next;
++    }
++    // Past the shadows' reach the sun reaches everything.
++    lit += tr_prev - (1.0 - total);
++    return vec4<f32>(glow, clamp(lit / total, 0.0, 1.0));
++}
++
++// Last frame's resolve at fog-texel position `p` (texel units, centres at +0.5), bilinear.
++fn history_at(p: vec2<f32>) -> vec4<f32> {
++    let top = vec2<i32>(textureDimensions(hist_tex)) - vec2<i32>(1);
++    let f = p - vec2<f32>(0.5);
++    let i = floor(f);
++    let w = f - i;
++    let c = vec2<i32>(i);
++    let a = textureLoad(hist_tex, clamp(c, vec2<i32>(0), top), 0);
++    let b = textureLoad(hist_tex, clamp(c + vec2<i32>(1, 0), vec2<i32>(0), top), 0);
++    let d = textureLoad(hist_tex, clamp(c + vec2<i32>(0, 1), vec2<i32>(0), top), 0);
++    let e = textureLoad(hist_tex, clamp(c + vec2<i32>(1, 1), vec2<i32>(0), top), 0);
++    return mix(mix(a, b, w.x), mix(d, e, w.x), w.y);
++}
++
++@fragment
++fn fs_resolve(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
++    let k = vec2<i32>(in.position.xy);
++    let top = vec2<i32>(textureDimensions(cur_tex)) - vec2<i32>(1);
++    let here = textureLoad(cur_tex, k, 0);
++    let d0 = load_depth(source_px(k));
++    // A depth-aware 3×3: neighbours across a silhouette (a trunk against the far wood) count for
++    // little, so a shaft's edge stays on its own side.
++    var sum = 0.0;
++    var weight = 0.0;
++    var lo = here.a;
++    var hi = here.a;
++    for (var y = -1; y <= 1; y++) {
++        for (var x = -1; x <= 1; x++) {
++            let q = clamp(k + vec2<i32>(x, y), vec2<i32>(0), top);
++            let s = textureLoad(cur_tex, q, 0).a;
++            let dq = load_depth(source_px(q));
++            let rel = abs(dq - d0) / max(max(dq, d0), 1e-7);
++            let w = 1.0 / (1.0 + rel * fog.misc.y);
++            sum += s * w;
++            weight += w;
++            lo = min(lo, s);
++            hi = max(hi, s);
++        }
++    }
++    let filtered = sum / weight;
++    // Where this texel's point was last frame.
++    let ray = view_ray(source_px(k), d0);
++    let p = fog.camera.xyz + ray.xyz * ray.w;
++    let clip = fog.prev_clip_from_world * vec4<f32>(p, 1.0);
++    var keep = fog.reach.y;
++    var prev = filtered;
++    if clip.w > 1e-4 && keep > 0.0 {
++        let ndc = clip.xy / clip.w;
++        let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
++        if all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0)) {
++            prev = clamp(history_at(uv * vec2<f32>(textureDimensions(hist_tex))).a, lo, hi);
++        } else {
++            keep = 0.0;
++        }
++    } else {
++        keep = 0.0;
++    }
++    return vec4<f32>(here.rgb, mix(filtered, prev, keep));
++}
+diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
+index 8aad35f..10e6f53 100644
+--- a/crates/benilla-world/src/shaders/world_look.wgsl
++++ b/crates/benilla-world/src/shaders/world_look.wgsl
+@@ -1,16 +1,25 @@
+ // The new look's full-screen pass, benilla's own (`look::pass`): the world camera's frame, still
+ // the gamma bytes here (its decode is the FFXGlow combine, after this), given its contact shadows,
+-// decoded to linear, given its god rays and morning mist, graded and encoded back. Off under the
+-// classic look: the node does not run at all.
++// sharpened, decoded to linear, given its god rays and morning mist (carved into shafts by the
++// volumetric fog, the lamps glowing in it), its far lit windows, graded and encoded back. Off under
++// the classic look: the node does not run at all.
++//   sharpen = a contrast-adaptive sharpen of the gamma frame from its four neighbours (after AMD's
++//           CAS), less with distance (`look::air::cas`, `sharpen_at`)
+ //   ao    = the half-resolution occlusion (`world_ao.wgsl`) upsampled by depth and applied to the
+ //           lit part of the gamma frame under 1.12's fog (`look::ao::darken`)
+ //   rays  = screen-space light shafts toward the sun (GPU Gems 3 ch. 13): a march over the depth
+ //           buffer, where a sky sample (reverse-Z far, depth 0) lets the sun through
+-//   mist  = exponential height fog integrated along the view ray in closed form (`look::rays`)
++//   mist  = exponential height fog integrated along the view ray in closed form (`look::rays`);
++//           with the volumetric fog on, lit by the sun only by the share its march found the sun
++//           reaches (`world_fog.wgsl`, upsampled by depth), toward the sun by `fog_phase`, over the
++//           sky too, and the lamps' glow added (`look::air`)
++//   windows = far lit windows as soft glows over the fog, hidden behind nearer things
++//           (`look::air::glow_rows`)
+ //   grade = white balance (warm highlights, cool shadows) → contrast around mid-grey in log space
+ //           → saturation around luminance
+-// `grade` mirrors `look::pass::grade_linear`, `mist_depth` `look::rays::mist_optical_depth` and
+-// `apply_ao` `look::ao::darken`; keep each pair in step. `MSAA` reads sample 0 of a multisampled depth buffer.
++// `grade` mirrors `look::pass::grade_linear`, `mist_depth` `look::rays::mist_optical_depth`,
++// `apply_ao` `look::ao::darken`, `cas` `look::air::cas` and `fog_phase` `look::air::phase`; keep
++// each pair in step. `MSAA` reads sample 0 of a multisampled depth buffer.
+ 
+ #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
+ 
+@@ -35,7 +44,17 @@ struct Look {
+     ao: vec4<f32>,
+     // xyz = the camera's forward, unit; w = the brightness (gamma luma) the shade eases off above.
+     ao_fwd: vec4<f32>,
++    // x = 1 to read the volumetric fog, y = full-resolution pixels per fog texel, z = the sky's
++    // reach into the mist (yd), w = the sky's share of it.
++    fog: vec4<f32>,
++    // x = the sharpness (0 none), y..z = the planar depths it fades over, w = the share beyond.
++    sharpen: vec4<f32>,
++    // x = the far windows' count, y = a core's fewest pixels, z = a halo's, w = the halo's share.
++    windows: vec4<f32>,
+     world_from_clip: mat4x4<f32>,
++    // Two rows a far window: (uv, core and halo sigma as shares of the screen's height), then
++    // (linear colour, the reverse-Z depth a nearer occluder passes to hide it).
++    glows: array<vec4<f32>, 128>,
+ }
+ @group(0) @binding(1) var<uniform> look: Look;
+ #ifdef MSAA
+@@ -45,6 +64,9 @@ struct Look {
+ #endif
+ // The occlusion: (darkening, planar eye depth) at half resolution; a 1×1 of zeros when off.
+ @group(0) @binding(3) var ao_tex: texture_2d<f32>;
++// The volumetric fog: (lamp glow, the mist's lit share) at a quarter or half resolution; a 1×1 of
++// zeros when off.
++@group(0) @binding(4) var fog_tex: texture_2d<f32>;
+ 
+ const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
+ const MID_GREY: f32 = 0.18;
+@@ -68,6 +90,24 @@ const RAY_RADIUS: f32 = 0.8;
+ const RAY_SKY_SHARE: f32 = 0.35;
+ // The density exponent's clamp (`look::rays::MIST_EXP_LIMIT`).
+ const MIST_EXP_LIMIT: f32 = 30.0;
++// The sharpen's lobe at sharpness 1 (`look::air::tune::SHARPEN_LOBE`).
++const SHARPEN_LOBE: f32 = 0.2;
++// The sun's light in the volumetric mist (`look::air::tune::FOG_PHASE_G`, `FOG_PHASE_ISO`).
++const FOG_PHASE_G: f32 = 0.6;
++const FOG_PHASE_ISO: f32 = 0.15;
++// The sun's light in the volumetric mist, against the analytic mist's (`FOG_SUN_GAIN`,
++// `FOG_SHADE_FLOOR`): lit stretches take this many times its light and the shade under the crowns
++// keeps this share, so the fog is at least as golden on average as the mist it replaces, and the
++// shafts stand out of it. And the lamps' glow over the frame eases off past this much
++// (`FOG_GLOW_KNEE`), so dense mist round the lamps veils a hero or a wall, never erases it.
++const FOG_SUN_GAIN: f32 = 2.2;
++const FOG_SHADE_FLOOR: f32 = 0.2;
++// The highlight shoulder the pass ends on (`look::air::tune::HIGHLIGHT_KNEE`, `look::air::shoulder`):
++// linear values over the knee roll off toward `HIGHLIGHT_WHITE`, so near-white keeps its texture
++// and a bright stone texel stays under it (`look::air::tune::HIGHLIGHT_WHITE`).
++const HIGHLIGHT_KNEE: f32 = 0.5;
++const HIGHLIGHT_WHITE: f32 = 0.85;
++const FOG_GLOW_KNEE: f32 = 0.6;
+ 
+ fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
+     let lo = c / 12.92;
+@@ -89,6 +129,116 @@ fn load_depth(px: vec2<i32>) -> f32 {
+ #endif
+ }
+ 
++fn load_depth_clamped(px: vec2<i32>) -> f32 {
++    let top = vec2<i32>(textureDimensions(depth_tex)) - vec2<i32>(1);
++    return load_depth(clamp(px, vec2<i32>(0), top));
++}
++
++fn load_scene(px: vec2<i32>) -> vec3<f32> {
++    let top = vec2<i32>(textureDimensions(scene_tex)) - vec2<i32>(1);
++    return clamp(textureLoad(scene_tex, clamp(px, vec2<i32>(0), top), 0).rgb, vec3<f32>(0.0),
++        vec3<f32>(1.0));
++}
++
++// The contrast-adaptive sharpen of gamma pixel `c` at `px` (sharpness `s`): per channel a negative
++// lobe on the four neighbours, smaller where the five already span the range (`look::air::cas`).
++fn cas(px: vec2<i32>, c: vec3<f32>, s: f32) -> vec3<f32> {
++    let n = load_scene(px + vec2<i32>(0, -1));
++    let so = load_scene(px + vec2<i32>(0, 1));
++    let e = load_scene(px + vec2<i32>(1, 0));
++    let w = load_scene(px + vec2<i32>(-1, 0));
++    let lo = min(c, min(min(n, so), min(e, w)));
++    let hi = max(c, max(max(n, so), max(e, w)));
++    let amp = sqrt(clamp(min(lo, vec3<f32>(1.0) - hi) / max(hi, vec3<f32>(1e-4)), vec3<f32>(0.0),
++        vec3<f32>(1.0)));
++    let lobe = -amp * (s * SHARPEN_LOBE);
++    return clamp((c + lobe * (n + so + e + w)) / (vec3<f32>(1.0) + 4.0 * lobe), vec3<f32>(0.0),
++        vec3<f32>(1.0));
++}
++
++// The sun's light in the volumetric mist at cosine `mu` to the sun (`look::air::phase`).
++fn fog_phase(mu: f32) -> f32 {
++    let g = FOG_PHASE_G;
++    let hg = pow((1.0 - g) * (1.0 - g) / (1.0 + g * g - 2.0 * g * clamp(mu, -1.0, 1.0)), 1.5);
++    return FOG_PHASE_ISO + (1.0 - FOG_PHASE_ISO) * hg;
++}
++
++// The volumetric fog at full-resolution pixel `px` (reverse-Z `depth`): the four nearest fog
++// texels (texel `k` stands for pixel `k·s + s/2`), each by its bilinear weight and by how close
++// the depth it marched is to this pixel's, so a shaft never crosses a silhouette.
++fn fog_at(px: vec2<i32>, depth: f32) -> vec4<f32> {
++    let s = i32(look.fog.y);
++    let top = vec2<i32>(textureDimensions(fog_tex)) - vec2<i32>(1);
++    let f = (vec2<f32>(px) - vec2<f32>(f32(s / 2))) / f32(s);
++    let base = vec2<i32>(floor(f));
++    let t = f - floor(f);
++    var sum = vec4<f32>(0.0);
++    var weight = 0.0;
++    for (var j = 0; j < 2; j++) {
++        for (var i = 0; i < 2; i++) {
++            let k = clamp(base + vec2<i32>(i, j), vec2<i32>(0), top);
++            let v = textureLoad(fog_tex, k, 0);
++            let dk = load_depth_clamped(k * s + vec2<i32>(s / 2));
++            let rel = abs(dk - depth) / max(max(dk, depth), 1e-7);
++            let bx = select(1.0 - t.x, t.x, i == 1);
++            let by = select(1.0 - t.y, t.y, j == 1);
++            let w = (bx * by + 1e-4) / (1e-3 + rel);
++            // A texel that marched past this pixel (a fog texel on the street behind a hero's
++            // arm or a post): its lamps' glow runs that much further than this pixel's ray does,
++            // so it takes only the share this pixel's length holds (reverse-Z: length goes as
++            // 1/depth).
++            var g = v.rgb;
++            if depth > dk && depth > 0.0 {
++                g *= dk / depth;
++            }
++            sum += vec4<f32>(g, v.a) * w;
++            weight += w;
++        }
++    }
++    return sum / max(weight, 1e-6);
++}
++
++// How much of far window `i`'s glow at `c` (pixels, `r` its core) is not hidden: five depth taps
++// about it, each clear while the scene there is no nearer than the window less a tolerance.
++fn window_seen(c: vec2<f32>, r: f32, occl: f32) -> f32 {
++    let o = max(1.0, r);
++    let p = vec2<i32>(c);
++    let oi = i32(o);
++    var seen = 0.0;
++    seen += select(0.0, 1.0, load_depth_clamped(p) <= occl);
++    seen += select(0.0, 1.0, load_depth_clamped(p + vec2<i32>(oi, 0)) <= occl);
++    seen += select(0.0, 1.0, load_depth_clamped(p - vec2<i32>(oi, 0)) <= occl);
++    seen += select(0.0, 1.0, load_depth_clamped(p + vec2<i32>(0, oi)) <= occl);
++    seen += select(0.0, 1.0, load_depth_clamped(p - vec2<i32>(0, oi)) <= occl);
++    return seen / 5.0;
++}
++
++// The far windows' glow at pixel centre `q` of a frame `dims` (linear), whose own scene depth is
++// `depth` (reverse-Z): a pixel of something nearer than a window (a trunk before it) takes none of
++// its glow, so the halo never paints over it (take 291: drawn over a nearer oak's trunk).
++fn windows_at(q: vec2<f32>, dims: vec2<f32>, depth: f32) -> vec3<f32> {
++    let count = u32(look.windows.x);
++    var sum = vec3<f32>(0.0);
++    for (var i = 0u; i < count; i = i + 1u) {
++        let a = look.glows[2u * i];
++        let c = a.xy * dims;
++        let halo = max(a.w * dims.y, look.windows.z);
++        let d = q - c;
++        let d2 = dot(d, d);
++        if d2 > 9.0 * halo * halo {
++            continue;
++        }
++        let b = look.glows[2u * i + 1u];
++        if depth > b.w {
++            continue;
++        }
++        let core = max(a.z * dims.y, look.windows.y);
++        let shape = exp(-d2 / (2.0 * core * core)) + look.windows.w * exp(-d2 / (2.0 * halo * halo));
++        sum += b.rgb * (shape * window_seen(c, core, b.w));
++    }
++    return sum;
++}
++
+ fn grade(c: vec3<f32>, saturation: f32, contrast: f32, warmth: f32) -> vec3<f32> {
+     // White balance: the tint runs from the cool shadow target to the warm highlight one, split at
+     // mid-grey; each target is divided by its own luminance, so the shift keeps brightness.
+@@ -101,6 +251,15 @@ fn grade(c: vec3<f32>, saturation: f32, contrast: f32, warmth: f32) -> vec3<f32>
+     return max(mix(vec3<f32>(l2), con, saturation), vec3<f32>(0.0));
+ }
+ 
++// The highlight shoulder (`look::air::shoulder`): under the knee untouched, over it rolled off
++// toward 1 (tanh), its slope 1 at the knee.
++fn shoulder(c: vec3<f32>) -> vec3<f32> {
++    let k = HIGHLIGHT_KNEE;
++    let w = HIGHLIGHT_WHITE;
++    let over = max(c - vec3<f32>(k), vec3<f32>(0.0)) / (w - k);
++    return select(c, vec3<f32>(k) + (w - k) * tanh(over), c > vec3<f32>(k));
++}
++
+ // How much open sky lies between this pixel and the sun, decayed with distance along the march:
+ // 0 in full shadow, about 0.5 with nothing in the way.
+ fn shafts(uv: vec2<f32>, dims: vec2<f32>) -> f32 {
+@@ -184,6 +343,13 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+         world = w4.xyz / w4.w;
+     }
+ 
++    // The sharpen, on geometry only (the sky has no detail to lift), less with distance.
++    if look.sharpen.x > 0.0 && depth > 0.0 {
++        let z = dot(world - look.camera.xyz, look.ao_fwd.xyz);
++        let s = look.sharpen.x * mix(1.0, look.sharpen.w, smoothstep(look.sharpen.y, look.sharpen.z, z));
++        gamma = cas(px, gamma, s);
++    }
++
+     // Contact shadows, on geometry only, before anything is added over the frame.
+     if look.ao.x > 0.0 && depth > 0.0 {
+         let z = dot(world - look.camera.xyz, look.ao_fwd.xyz);
+@@ -195,7 +361,7 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+     var lin = srgb_to_linear(gamma);
+ 
+     // Mist, on geometry only: the sky keeps its own dome.
+-    if look.sun_color.w > 0.0 && depth > 0.0 {
++    if look.sun_color.w > 0.0 && depth > 0.0 && look.fog.x <= 0.0 {
+         let ray = world - look.camera.xyz;
+         let dist = length(ray);
+         let od = mist_depth(
+@@ -208,6 +374,35 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+         lin = mix(lin, mist, amount);
+     }
+ 
++    // The volumetric fog: the same mist, lit by the sun only where its march found the sun
++    // reaches, over the sky too (a share of it, out to a reach), and the lamps' glow in it.
++    if look.sun_color.w > 0.0 && look.fog.x > 0.0 {
++        var dir = vec3<f32>(0.0);
++        var dist = look.fog.z;
++        var share = look.fog.w;
++        if depth > 0.0 {
++            let ray = world - look.camera.xyz;
++            dist = length(ray);
++            dir = ray / max(dist, 1e-3);
++            share = 1.0;
++        } else {
++            let near4 = look.world_from_clip * vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
++            dir = normalize(near4.xyz / near4.w - look.camera.xyz);
++        }
++        let od = mist_depth(
++            look.sun_color.w, look.fog_color.w, look.mist.x, look.camera.y,
++            look.camera.y + dir.y * dist, dist
++        );
++        let amount = min(1.0 - exp(-od), look.mist.y) * share;
++        let f = fog_at(px, depth);
++        let mu = dot(dir, look.sun_dir.xyz);
++        let sunlit = FOG_SHADE_FLOOR + (1.0 - FOG_SHADE_FLOOR) * clamp(f.a, 0.0, 1.0);
++        let mist = look.fog_color.rgb
++            + look.sun_color.rgb * (FOG_SUN_GAIN * fog_phase(mu) * look.mist.z * sunlit);
++        let glow = max(f.rgb, vec3<f32>(0.0));
++        lin = mix(lin, mist, amount) + glow / (1.0 + dot(glow, LUMA) / FOG_GLOW_KNEE);
++    }
++
+     // God rays toward the sun, fading with distance from it on screen (in screen heights).
+     let strength = look.sun.z * look.sun.w;
+     if strength > 0.0 {
+@@ -219,7 +414,14 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+         }
+     }
+ 
+-    let graded = grade(lin, look.grade.x, look.grade.y, look.grade.z);
++    var graded = shoulder(grade(lin, look.grade.x, look.grade.y, look.grade.z));
++    // The far lit windows, over the fog and after the grade, screened on: drawn before it, the
++    // night grade's lost saturation and the shoulder turned their amber pale pink (take 310).
++    if look.windows.x > 0.0 {
++        let w = max(windows_at(in.position.xy, dims, depth), vec3<f32>(0.0));
++        graded = graded + w * (vec3<f32>(1.0) - min(graded, vec3<f32>(1.0)));
++    }
++
+     let encoded = linear_to_srgb(clamp(graded, vec3<f32>(0.0), vec3<f32>(1.0)));
+     return vec4<f32>(sun_glare(encoded, uv, dims), scene.a);
+ }
+diff --git a/crates/benilla-world/src/static_gx/cull.rs b/crates/benilla-world/src/static_gx/cull.rs
+index 2c3bf8b..a5d4010 100644
+--- a/crates/benilla-world/src/static_gx/cull.rs
++++ b/crates/benilla-world/src/static_gx/cull.rs
+@@ -165,11 +165,13 @@ pub(super) fn cull_cells(
+         props,
+         world,
+         fade_events,
++        windows: lit_windows,
+         ..
+     } = &mut *gx;
+     // Reap regions whose instance died with its placement; a WMO placement never changes owner
+     // tile (the straddler handoff is M2-only).
+     wmos.retain(|e, _| instances.contains(*e));
++    lit_windows.retain(|e, _| instances.contains(*e));
+     world.wmos.retain(|e, _| instances.contains(*e));
+     props.retain(|e, _| instances.contains(*e));
+     world.props.retain(|e, _| instances.contains(*e));
+diff --git a/crates/benilla-world/src/static_gx/mod.rs b/crates/benilla-world/src/static_gx/mod.rs
+index 4e0cce0..5e62f03 100644
+--- a/crates/benilla-world/src/static_gx/mod.rs
++++ b/crates/benilla-world/src/static_gx/mod.rs
+@@ -308,6 +308,10 @@ pub struct StaticGx {
+     fade_events: [u32; 3],
+     /// [`StaticGx::flush_now`]'s request, cleared by the next flush.
+     flush_now: bool,
++    /// The lit windows of each WMO placement (its SIDN batches, `look::air::window_points`), for
++    /// the new look's far window glows; reaped with the placement.
++    pub(crate) windows:
++        bevy::platform::collections::HashMap<Entity, Vec<crate::look::air::WindowPoint>>,
+ }
+ 
+ /// The divert hook's per-call facts, gathered at `assemble.rs`'s gate.
+@@ -442,6 +446,18 @@ impl StaticGx {
+         )
+     }
+ 
++    /// Every loaded building's lit-window points (`look::air`).
++    pub fn window_points(&self) -> impl Iterator<Item = &crate::look::air::WindowPoint> {
++        self.windows.values().flatten()
++    }
++
++    /// A key that changes as buildings with lit windows come and go: their count and their
++    /// points' (`look::air`'s pick is redone on a change).
++    pub fn window_point_count(&self) -> usize {
++        let points: usize = self.windows.values().map(Vec::len).sum();
++        points.wrapping_add(self.windows.len().wrapping_mul(1_000_003))
++    }
++
+     /// Bake every dirty region on the next flush, quiet or not: the reveal gate's end of a load.
+     pub(crate) fn flush_now(&mut self) {
+         self.flush_now = true;
+@@ -477,6 +493,18 @@ impl StaticGx {
+             }
+         };
+         let wmo_key = b.wmo.as_ref().map(|w| w.instance);
++        // A window batch's lit panes, for the new look's far window glows.
++        if let (Some(instance), Some(sidn)) = (wmo_key, b.wmo.as_ref().and_then(|w| w.sidn)) {
++            let points = crate::look::air::window_points(
++                &b.geometry.positions,
++                &b.geometry.indices,
++                &b.transform,
++                sidn,
++            );
++            if !points.is_empty() {
++                self.windows.entry(instance).or_default().extend(points);
++            }
++        }
+         let wmo = b.wmo.map(|w| GxItemWmo {
+             group: w.group,
+             interior: w.interior,
+-- 
+2.43.0
+

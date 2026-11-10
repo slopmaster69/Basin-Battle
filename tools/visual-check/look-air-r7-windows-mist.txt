@@ -1,0 +1,41 @@
+# Far lit windows in the mist (client 0084, #273's seventh round): Goldshire's windows at 23:30
+# from the east, take 291's far spot (WoW -9440, -260, about 310 yd), facing Goldshire (yaw 94),
+# the camera 6 yd back and nearly level, at lookmist 0 and then 3. Take 310 found the near glow
+# on a roof edge, pale pink (150, 122, 114), mist 3 not dimming it, and lookwindows saying more
+# light got through at mist 3: that day's own mist was thicker than 3, so 3 thinned it. Now a
+# window on a wall facing away from the camera is left out (seen past its own roof's edge, it was
+# the glow on the roof); the glows are added after the night grade, so their amber stays amber;
+# and as the mist spreads a halo it no longer gathers more light than the mist takes. Each
+# lookwindows reply comes a second after its lookmist, once the mist has settled.
+# Look for: small amber points on the walls facing the camera, none on a roof edge; at mist 3
+# plainly dimmer and softer than at mist 0; the lookwindows reply's share let through lower at 3
+# than at 0. PLEASE send the "lookwindows" replies from client.log.
+hero warrior
+cam 94 -3 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9440 -260
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookmist 0")
+5.3 lua ConsoleExec("lookwindows 1")
+5.5 video
+6.0 shots mist-0 3 0.5
+8.0 lua ConsoleExec("lookmist 3")
+9.0 lua ConsoleExec("lookwindows 1")
+9.5 shots mist-3 3 0.5
+11.5 lua ConsoleExec("lookmist 0")
+11.55 lua ConsoleExec("lookwindows 0")
+12.5 shots lookwindows-0 2 0.5
+14.0 lua ConsoleExec("lookwindows 1")
+14.05 lua SetCVar("worldLook", "0")
+14.1 lua ClearWorldFog()
+15.0 shots classic 2 0.5
+16.5 lua SetCVar("worldLook", "1")
+16.55 lua ClearWorldFog()
+16.6 lua ConsoleExec("lookmist grade")
+16.65 lua ConsoleExec("lookweather server")
+18 end
