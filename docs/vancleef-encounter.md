@@ -2,7 +2,9 @@
 
 Corey's revised design (Nov 8, "Deadmines bosses: review and redesign"). The rule a hero learns:
 **hunched means hit, blades up means wait.** Every completed combination ends in a hunch
-(StandWound held for its whole recovery; a kneel for the last one), and only a hunch is open.
+(StealthStand held for its whole recovery: bent well forward, blades down, breathing; a kneel
+for the last one), and only a hunch is open. Every wind-up rises instead, blades up and back over
+the head, so the lowest he ever stands is open (see "How it reads" below).
 The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `content/deadmines.toml`.
 
 ## The nine beats
@@ -53,6 +55,28 @@ random string cuts and extensions, held beats, extra chains, tactical retreats a
 the visible exchange stays honest. The ordinary lunge still closes distance without spending the
 next Invitation. Reset, return, wipe, death and the handoff remove his poses and the Blackguards.
 
+## How it reads
+
+The Nov 9 filming (sword hero) found "hunched means hit" back to front on screen: the hunch was
+StandWound, nearly upright, while his cut wind-ups (the human man's Attack1H and spinning
+Special1H, held at their coil) were a deep crouch. Measured on the models' bones at the pose a
+wind-up holds (its coil, about half way to the blow) and over the hunch's loop:
+
+| Pose | Head (share of standing) | Back forward | Weapon hand over the head |
+| --- | --- | --- | --- |
+| The hunch now, StealthStand 120 | 0.77 | 35° | -0.33 (down) |
+| The hunch before, StandWound 8 | 0.96 | 11° | -0.43 |
+| Old cut wind-ups, HumanMale 17 takes 0 / 1, 57 | 0.90 / 0.84 / 0.78 | 8° / 31° / 31° | about level |
+| New cut wind-ups, ScourgeMale 17 takes 2 / 0, 18 | 0.89 / 0.97 / 0.91 * | leaning back * | +0.27 / +0.21 / +0.26 (up) |
+| The riposte's thrust, HumanMale 85 (kept; its red glow is its tell) | 0.92 | 16° | -0.35 |
+
+\* On the Undead man's own bones, which stand at 0.85 and 31° forward: each new wind-up rises
+and leans back from his stance. The 12% kneel turns him to face the hero he was fighting.
+
+The hunch also used to last only until the first blow into it: on the clients a hit's flinch
+replaces any held pose, so punishing him stood him back up. The hunch and the kneel are now held
+with `hold_open_pose`, which leaves out the flinch until the pose ends.
+
 ## The shared fixes, done here for VanCleef alone
 
 Corey's table of shared fixes belongs to another session, which builds them engine-wide. These
@@ -60,7 +84,7 @@ are the VanCleef and Unbowed versions, for it to fold in:
 
 | Shared fix | Here |
 | --- | --- |
-| Punish windows look like idling | The hunch (`HoldPose` StandWound 8) for every final recovery, and the kneel (EmoteKneel 75) for the last stand. `vancleef_string_landed`, `duel_open` |
+| Punish windows look like idling | The hunch (`HoldPose` StealthStand 120) for every final recovery, and the kneel (EmoteKneel 75) for the last stand. `vancleef_string_landed`, `duel_open` |
 | Debug damage counts as real | `vancleef_posture_share` gives "debug" damage no posture (`hurt_mob_as`) |
 | Second forms are instant swaps | Unbowed kneels, roars, then waits 2.5 sec (`vancleef_risen`, called from `rise`; the generic roar there skips him) |
 | Things outlive their boss | The Blackguards leave on their own at 30% and are removed with the duel on death or reset |
@@ -98,7 +122,7 @@ the open deck, from the first exchange and after 15 sec of fighting.
 cameraman (`camera duel Edwin VanCleef`) with markers off. Setup before the video: the deck
 cleared, the quarters secret found, the warrior healed 14 yd from the cabin door. From the
 video on, only the warrior's own keys play (`.es in`), pressed by a small player in the
-interface that reads only what the client shows: the hunch or kneel held (`WP` clip 8 or 75: hit,
+interface that reads only what the client shows: the hunch or kneel held (`WP` clip 120 or 75: hit,
 0.3 sec after it shows), a windup (`AN`: guard the first blow as it lands, roll from a string's
 follow-up), the red glow (`WG`: roll aside). It hits into every other Invitation to draw the
 riposte and waits out the rest. `vancleef-late.txt` is the same from 33% (dev setup: a `.es hurt`
@@ -120,3 +144,7 @@ VanCleef alight for most of the fight (a sword hero should be filmed), and the B
 walk off the ship, small at the back of the duel shot. The red riposte glow and the scrape and
 scuff sounds need someone to watch and listen. The duel camera sometimes pulls in close where the
 deck's masts, cabin and rails crowd it.
+
+Not yet filmed (Nov 10): the StealthStand hunch, the Undead man's rising cuts and overhead on
+VanCleef's body, and the 12% kneel turned to the hero. The pose numbers above are from the
+models' bones, not the screen.

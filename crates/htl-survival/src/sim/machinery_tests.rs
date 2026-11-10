@@ -113,11 +113,17 @@ fn shredder_executes_pressure_cycle_at_full_and_low_health_then_grinds_a_fixed_s
         assert!(ev.iter().filter(|e| matches!(e, Event::Visual { id: who, .. } if *who == id)).count() >= 3, "chips and sparks fly as it drives");
         assert_eq!(s.machinery.pressure[&id], 0);
         assert!(ev.iter().any(|e| matches!(e, Event::Yell { id: who, text } if *who == id && text.contains("heap of junk"))));
-        assert!(ev.iter().any(|e| matches!(e, Event::React { id: who, anim: SLUMP_CLIP, hold, .. } if *who == id && *hold >= STALL)), "slumped, held for the stall");
+        assert!(ev.iter().any(|e| matches!(e, Event::React { id: who, anim: SLUMP_CLIP, .. } if *who == id)), "its legs buckle");
+        let held = STALL - SLUMP_AT - SLUMP_RISE;
+        assert!(ev.iter().any(|e| matches!(e, Event::Freeze { id: who, after, secs } if *who == id && *after == SLUMP_AT && (*secs - held).abs() < 1e-4)), "slumped, held still for the stall");
+        assert!(s.posed(id), "no flinch stands it up");
         assert!(matches!(s.mobs[&id].state, MobState::Recover { until, .. } if until - s.clock > 3.2));
         let ev = run(&mut s, 3.0);
         assert!(!ev.iter().any(|e| matches!(e, Event::MobWindup { id: who, .. } if *who == id)), "stall is a real punish window");
-        assert!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, spell: SMOKE, .. } if *caster == id)).count() >= 2, "it smokes as it stalls");
+        // Smoke pours and sparks fly the whole stall, and the engine sputters.
+        assert!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, spell: SMOKE, .. } if *caster == id)).count() >= 10, "smoke pours");
+        assert!(ev.iter().filter(|e| matches!(e, Event::Visual { id: who, kit: combat::KIT_PARRY, .. } if *who == id)).count() >= 6, "sparks fly");
+        assert!(ev.iter().filter(|e| matches!(e, Event::Sound { id: who, sound: SPUTTER_SOUND } if *who == id)).count() >= 4, "the engine sputters");
         assert!(!s.mobs[&id].enraged && s.mobs[&id].phase == 0);
     }
 }
@@ -333,13 +339,21 @@ fn shredder_repair_is_interrupted_by_an_ordinary_melee_swing_without_a_loadout()
     assert!(s.mobs[&driver].health < hp, "the ordinary swing landed");
     assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
     assert!(s.machinery.drivers[&driver].wreck.is_none());
-    // The wreck goes quiet: no more smoke, a body for a while.
+    // The wreck goes quiet where it lies: no more smoke or sparks, and it stays.
     let quiet = ev.iter().rposition(|e| matches!(e, Event::CastEnd { caster } if *caster == driver)).unwrap();
     assert!(!ev[quiet..].iter().any(|e| matches!(e, Event::Missile { caster, spell: SMOKE, .. } if *caster == machine)));
+    let at = s.mobs[&machine].pos;
     let ev = run(&mut s, 18.0);
-    assert!(!s.mobs.contains_key(&machine));
+    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_infinite()), "the wreck stays");
+    assert_eq!(s.mobs[&machine].pos, at, "where it lay");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } | Event::Visual { id: caster, .. } | Event::MobGone { id: caster } if *caster == machine)), "quiet: no smoke, no sparks");
     assert!(!ev.iter().any(|e| matches!(e, Event::Cast { spell: WORK, .. })));
     assert!(live(&s, MACHINE).is_none() && !s.slain("sneed"));
+    // Sneed down, the wreck goes with his body.
+    s.hurt_mob(driver, h, u32::MAX);
+    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_finite()));
+    run(&mut s, BODY_SECS + 1.0);
+    assert!(!s.mobs.contains_key(&machine) && !s.mobs.contains_key(&driver), "no ghost wreck");
 }
 
 #[test]
@@ -404,7 +418,8 @@ fn shredder_unreachable_wreck_has_a_bounded_attempt_and_no_teleport() {
     run(&mut s, SEEK_LIMIT + 0.1);
     assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
     assert!(dist2d(s.mobs[&driver].pos, away) < 0.1);
-    assert!(s.mobs.get(&machine).is_none_or(|m| matches!(m.state, MobState::Dead { gone_at } if gone_at.is_finite())));
+    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_infinite()), "the wreck stays, quiet");
+    assert_eq!(s.machinery.drivers[&driver].quiet, Some(machine));
     assert!(live(&s, MACHINE).is_none());
 }
 
@@ -434,7 +449,8 @@ fn shredder_uses_another_edge_when_the_farthest_is_blocked_and_never_falls_back_
     assert!(s.step_machinery(driver));
     assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
     assert_eq!(s.mobs[&driver].pos, before);
-    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_finite()), "the wreck is a body now");
+    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_infinite()), "the wreck stays, quiet");
+    assert_eq!(s.machinery.drivers[&driver].quiet, Some(machine));
 }
 
 #[test]
@@ -511,4 +527,29 @@ fn shredder_death_lets_go_of_any_held_pose() {
     let before = s.events.len();
     s.hurt_mob(driver, band[0], u32::MAX);
     assert!(s.events[before..].iter().any(|e| matches!(e, Event::HoldPose { id, secs, .. } if *id == driver && *secs == 0.0)));
+}
+
+/// A blow into the stall leaves its slump held (no flinch), and a break in the stall lets go of
+/// the held pose so the machine's fall plays.
+#[test]
+fn shredder_stall_holds_through_hits_and_lets_go_as_it_breaks() {
+    let (mut s, band, id) = fight(1, 21);
+    let h = band[0];
+    let foe = Foe::Hero(h);
+    let now = s.clock;
+    s.mobs.get_mut(&id).unwrap().state = MobState::Recover { foe, until: now + STALL };
+    s.machinery.grinds.insert(id, Grind { last: s.mobs[&id].pos, facing: 0.0, until: now, damage: 0, hit: BTreeSet::new(), fx_at: now, fx: 0 });
+    let ev = run(&mut s, 0.1);
+    assert!(ev.iter().any(|e| matches!(e, Event::Freeze { id: who, .. } if *who == id)));
+    assert!(s.posed(id));
+    let pos = s.mobs[&id].pos;
+    s.move_player(h, [pos[0] + 3.0, pos[1], pos[2]], std::f32::consts::PI, Moving::default());
+    let hp = s.mobs[&id].health;
+    s.input(h, Input::Attack);
+    let ev = run(&mut s, 0.8);
+    assert!(s.mobs[&id].health < hp, "the blow landed");
+    assert!(!ev.iter().any(|e| matches!(e, Event::React { id: who, hold, fit, .. } if *who == id && *hold == 0.0 && *fit == 0.0)), "no flinch in the stall");
+    s.events.clear();
+    s.hurt_mob(id, h, u32::MAX);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Freeze { id: who, secs, .. } if *who == id && *secs == 0.0)), "the held slump lets go as it breaks");
 }

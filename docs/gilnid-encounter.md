@@ -64,12 +64,16 @@ fallback when a ledge can't be placed are kept.
    advances across the pit from his feet: up to 10 sections 1.6 yd apart, 3 yd wide, one every
    0.25 sec, each burning (30, then 15 once more 1.2 sec later). It runs at his foe where the pit
    floor carries it that way, else straight out from the furnace; it stops at a wall, a step or a
-   drop. Both sides are dry. It's drawn as a line on the floor whatever the floor markers. Step
-   aside, or stagger him first.
+   drop. Both sides are dry. It's drawn whatever the floor markers as a solid band its true width
+   (3 yd): both edges at once, pale lines the whole length, so the dry ground either side reads;
+   the amber fill laid two sections at a time as the fire reaches them, so it advances across the
+   pit, each lasting 4 sec. Step aside, or stagger him first.
 7. **Finish.** "Then we'll melt the lot!" From now his only string is a flurry: three blows, each
-   stepping in (lunge), the last a heavy one that over-reaches into the floor. The spanner sticks
-   there and he's open 2.5 sec, hunched over it (StandWound held), dust at his feet. It repeats
-   until he falls: "Who's... going to pay for this..."
+   stepping in (lunge), the last a heavy two-handed chop (Attack2H's second take) that over-reaches
+   into the floor. The spanner sticks there and he's open 2.5 sec, bent double over it with both
+   hands on it (the chop caught 0.2 sec after it lands, his head at half his height and both hands
+   by the floor, and held still the whole window), dust at his feet. Hits don't flinch him out of
+   it. It repeats until he falls: "Who's... going to pay for this..."
 
 His lines never come closer than 2 sec together: one due sooner waits its turn.
 
@@ -87,7 +91,7 @@ are Gilnid's versions, for it to fold in:
 | Long windups freeze | The 3 sec fuse is Heavy Dynamite's own ready pose with the lit stick; the throw frame plays on release |
 | Things outlive their boss | Death, reset or a wipe takes the crew, planks, poles, sticks, flames, steam, the fire still to come and every mark |
 | Deaths lag | Death lets go of the stuck pose (`HoldPose` 0) and the valve's cast |
-| Punish windows look like idling | The stuck spanner: StandWound held 2.5 sec; a landed engineer sits, then gets up, instead of the stagger's reel |
+| Punish windows look like idling | The stuck spanner: the chop into the floor caught bent double and held 2.5 sec (`freeze_open_pose`, the add-on's `FZ`), no flinch meanwhile; a landed engineer sits, then gets up, instead of the stagger's reel |
 | Yells collide | `perch_say` keeps his lines 2 sec apart, the pull line included |
 
 ## Tests
@@ -106,6 +110,13 @@ their pieces on the real ramp and pit; the first stick and the furnace's lesson,
 the pit floor; the valve and a 17 yd stripe on his floor.
 
 ## Not yet seen in the client
+
+Nov 10, not yet filmed: the stripe's band and edges on the Foundry floor (the Nov 9 footage saw a
+row of glowing dots: the one line drawn from the stripe's middle covered only its far half and had
+faded before the fire reached it), and Gilnid bent double over his spanner (the Nov 9 footage saw
+him nearly upright in StandWound). Measured on GoblinMale's bones, 0.1 to 0.3 sec after Attack2H's
+second take lands his head is at 0.50 to 0.54 of standing height and both hands are within a fifth
+of it of the floor, 0.2 to 0.3 yd apart.
 
 Nothing here has been filmed. `tools/visual-check/gilnid-ledges.txt` and `gilnid-valve.txt` are
 the takes to film (dev setup: debug heals, and debug kills for the valve take). To look for: the

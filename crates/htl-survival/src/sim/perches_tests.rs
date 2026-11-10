@@ -319,6 +319,32 @@ fn the_valve_follows_the_workforce_and_its_fire_runs_in_a_stripe_with_dry_ground
         assert!(angle_between(facing(w[0].0, w[1].0), yaw) < 0.05);
     }
     assert!(stripe[0].1 - s.clock >= VENT_SECS - 0.1, "steam first, then fire");
+    // Drawn as a band its true width: both edges at once, the whole way, 3 yd apart, either side
+    // of the sections' line, and the fill laid two sections at a time as the fire arrives.
+    let edges: Vec<(Vec3, f32)> = s.events.iter().filter_map(|e| match e {
+        Event::GroundBurst { at, shape: "line", width, reach, colour, .. } if *width < 0.5 && colour == BAND_EDGE => Some((*at, *reach)),
+        _ => None,
+    }).collect();
+    assert_eq!(edges.len(), 2, "both edges");
+    assert!((dist2d(edges[0].0, edges[1].0) - 2.0 * STRIPE_RADIUS).abs() < 0.05, "3 yd apart");
+    let run = dist2d(stripe[0].0, stripe[stripe.len() - 1].0);
+    assert!(edges.iter().all(|e| e.1 >= run + STRIPE_STEP - 0.01), "the whole way, past the end sections");
+    let mut fills: Vec<(f32, Vec3, f32)> = Vec::new();
+    let t0 = s.clock;
+    while s.clock < t0 + VENT_SECS + 3.5 {
+        let ev = s.step(0.05);
+        for e in &ev {
+            if let Event::GroundBurst { at, shape: "line", width, reach, .. } = e {
+                if (*width - 2.0 * STRIPE_RADIUS).abs() < 0.01 { fills.push((s.clock, *at, *reach)); }
+            }
+        }
+    }
+    assert_eq!(fills.len(), stripe.len().div_ceil(2), "a fill each two sections");
+    for (k, f) in fills.iter().enumerate() {
+        assert!((f.0 - stripe[2 * k].1).abs() < 0.06, "laid as its first section catches");
+        assert!(dist2d(f.1, stripe[2 * k].0) <= STRIPE_STEP / 2.0 + 0.1, "starting at it");
+    }
+    assert!(fills.windows(2).all(|w| w[1].0 > w[0].0), "it advances");
     assert!(until(&mut s, 8.0, |s| matches!(s.perches.crews[&boss].stage, Stage::Finished)));
     assert!(s.players[&hero].health < before.0, "standing in its path takes it");
     assert_eq!(s.players[&dry].health, before.1, "the dry side is dry");
@@ -387,7 +413,14 @@ fn the_finish_is_a_flurry_that_sticks_his_spanner_in_the_floor_open_two_and_a_ha
     s.mobs.get_mut(&boss).unwrap().state = MobState::Recover { foe, until: until_at };
     s.events.clear();
     s.perch_string_landed(boss, Some(flurry));
-    assert!(s.events.iter().any(|e| matches!(e, Event::HoldPose { id, clip: STUCK_CLIP, secs, .. } if *id == boss && (*secs - 2.5).abs() < 0.01)));
+    // The last blow is the two-handed chop into the floor, and he's caught bent over it, held.
+    let last = &patterns[flurry].steps[2];
+    assert_eq!((last.clip, last.take), (Some(18), 1), "Attack2H's chop to the floor");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Freeze { id, after, secs } if *id == boss && *after == STUCK_AT && (*secs - (2.5 - STUCK_AT - 0.1)).abs() < 0.01)));
+    assert!(s.posed(boss), "no flinch stands him up");
+    s.clock = until_at - 0.05;
+    assert!(s.posed(boss), "held the full 2.5 sec");
+    s.clock = until_at - 2.5;
     assert!(s.events.iter().any(|e| matches!(e, Event::Visual { id, kit: combat::KIT_DUST, .. } if *id == boss)));
     // Another string doesn't stick.
     s.events.clear();
@@ -397,6 +430,7 @@ fn the_finish_is_a_flurry_that_sticks_his_spanner_in_the_floor_open_two_and_a_ha
     s.events.clear();
     s.remove_perch_crew(boss);
     assert!(s.events.iter().any(|e| matches!(e, Event::HoldPose { id, clip: 0, .. } if *id == boss)));
+    assert!(s.events.iter().any(|e| matches!(e, Event::Freeze { id, secs, .. } if *id == boss && *secs == 0.0)));
 }
 
 #[test]

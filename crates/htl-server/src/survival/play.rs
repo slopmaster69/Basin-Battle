@@ -504,6 +504,16 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("WP\t{g:#X}\t{clip}\t{secs:.2}\t{own}\t{}", from.as_deref().unwrap_or("")));
                 }
             }
+            Event::Freeze { id, after, secs } => {
+                // A pose caught part way through a clip and held (`FZ guid after secs`; secs 0:
+                // let go), for every client that plays clips.
+                let Some(g) = self.guid_of(id) else { return };
+                let line = format!("FZ	{g:#X}	{after:.2}	{secs:.2}");
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::StaffHeavy { player, lo, hi } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_line(c, &format!("SH	{lo:.2}	{hi:.2}"));

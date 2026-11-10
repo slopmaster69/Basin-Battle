@@ -452,10 +452,24 @@ fn last_stand_waits_for_recovery_ends_in_a_kneel_and_death_stops_the_pose() {
         let steps = s.content.mobs[s.mobs[&id].def].patterns[s.duel_pattern_named(id, "last stand").unwrap()].steps.len();
         let mut blows = 0;
         let mut kneel = None;
+        let mut moved = false;
         for _ in 0..400 {
             let ev = s.step(DT);
             blows += windups(&ev, id);
-            if let Some(secs) = poses(&ev, id).iter().find(|(c, _)| *c == KNEEL_CLIP).map(|p| p.1) { kneel = Some(secs); break; }
+            // The hero steps aside under the last blow: the kneel turns to them.
+            if blows == steps && !moved {
+                moved = true;
+                let at = s.mobs[&id].pos;
+                s.players.get_mut(&band[0]).unwrap().pos = [at[0] - 3.0, at[1] + 3.0, at[2]];
+            }
+            if let Some(secs) = poses(&ev, id).iter().find(|(c, _)| *c == KNEEL_CLIP).map(|p| p.1) {
+                kneel = Some(secs);
+                let want = facing(s.mobs[&id].pos, s.players[&band[0]].pos);
+                let turned = ev.iter().any(|e| matches!(e, Event::MobStop { id: who, facing: f, .. } if *who == id && angle_between(*f, want) < 1.0));
+                assert!(turned, "{key}: he kneels facing the hero");
+                assert!(angle_between(s.mobs[&id].facing, want) < 1.0, "{key}: and stays so");
+                break;
+            }
         }
         assert_eq!(blows, steps);
         assert!(kneel.is_some_and(|k| k >= 2.9), "{key}: the last opening is a kneel: {kneel:?}");
@@ -729,4 +743,44 @@ fn a_lone_sword_hero_playing_by_the_tells_clears_both_forms() {
             if key == "dm_vancleef" && provoke { assert!(out.ripostes >= 1); }
         }
     }
+}
+
+/// His wind-ups rise, blades up and back over the head (the Undead man's overheads), and only his
+/// hunch is low: none of his blows plays the human man's crouching cuts or spinning special
+/// (Nov 9 filming: a wind-up crouch read as more of a hunch than the hunch did).
+#[test]
+fn his_wind_ups_rise_and_only_the_hunch_is_low() {
+    assert_eq!(HUNCH_CLIP, 120, "StealthStand: bent well forward, blades down");
+    let content = Content::dev();
+    for key in ["dm_vancleef", "dm_vancleef_unbowed"] {
+        let d = &content.mobs[content.mob(key).unwrap()];
+        for p in d.patterns.iter().filter(|p| p.name != "riposte" && p.name != "invitation") {
+            for st in &p.steps {
+                assert_eq!(st.from.as_deref(), Some("ScourgeMale"), "{key} {}: a rising take", p.name);
+                assert!(matches!((st.clip, st.take), (Some(17), 0 | 2) | (Some(18), 0)), "{key} {}: {:?} take {}", p.name, st.clip, st.take);
+            }
+        }
+    }
+}
+
+/// A hit into his hunch doesn't flinch him out of it: the pose holds through the punish (a
+/// flinch replaces any held pose on the clients). Outside the hunch, hits flinch him as ever.
+#[test]
+fn hits_into_the_hunch_leave_it_held() {
+    let (mut s, band, id) = fight("dm_vancleef", 1);
+    let until = s.clock + 1.8;
+    s.mobs.get_mut(&id).unwrap().state = MobState::Recover { foe: Foe::Hero(band[0]), until };
+    s.vancleef_string_landed(id, s.duel_pattern_named(id, "string"));
+    assert!(s.vancleef_open(id) && s.posed(id));
+    assert!(poses(&s.events, id).contains(&(HUNCH_CLIP, 1.8)));
+    let flinches = |ev: &[Event]| ev.iter().filter(|e| matches!(e, Event::React { id: who, hold, fit, .. } if *who == id && *hold == 0.0 && *fit == 0.0)).count();
+    let pos = s.mobs[&id].pos;
+    s.move_player(band[0], [pos[0] + 1.5, pos[1], pos[2]], std::f32::consts::PI, Moving::default());
+    s.events.clear();
+    s.input(band[0], Input::Attack);
+    let ev = run(&mut s, 0.8);
+    assert!(s.mobs[&id].health < s.mobs[&id].max_health, "the hit landed");
+    assert_eq!(flinches(&ev), 0, "no flinch in the hunch");
+    s.clock = until + 0.1;
+    assert!(!s.posed(id), "the pose is over with the hunch");
 }
