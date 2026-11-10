@@ -2676,7 +2676,7 @@ impl Survival {
             if !beat.is_empty() {
                 self.events.push(Event::Beat { player: owner, beat, on: Some(mid) });
             }
-        } else if self.mobs.get(&mid).is_some_and(|m| m.stagger_until <= now) {
+        } else if self.mobs.get(&mid).is_some_and(|m| m.stagger_until <= now) && !self.posed(mid) {
             // A flinch; the heavy blow's reel from a shot that goes through (a look alone: no
             // stagger time comes of it).
             let (anim, lean) = if through {

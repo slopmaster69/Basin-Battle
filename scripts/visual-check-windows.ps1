@@ -212,14 +212,17 @@ function Read-Scenario($name, $depth = 0) {
         if ($line -match '^hero\s+(\S+)$') { $sc.Hero = $Matches[1].ToLower(); continue }
         # `cam off`: the camera isn't held (a scenario that turns it itself, as the god-ray circles do).
         if ($line -match '^cam\s+off$') { $sc.Cam = "off"; continue }
-        # `camera <duel|low|high> [<subject's name>]`: a second client, the cameraman, films it
+        # `camera <duel|low|high|wide> [<subject's name>] [+ <crew>|<crew>...]`: a second client,
+        # the cameraman, films it, the crew near the fight kept in the picture too
         # (docs/visual-check.md, "Filming a boss").
         if ($line -match '^camera\s+(\S+)(?:\s+(.+))?$') {
             $shot = $Matches[1].ToLower()
-            if ($shot -notin @("duel", "low", "high")) { throw "$($where): the camera's shot is duel, low or high, not $shot" }
-            $subject = "$($Matches[2])".Trim()
-            if ($subject.Contains(",")) { throw "$($where): a name with a comma can't be filmed" }
-            $sc.Camera = @{ Shot = $shot; Subject = $subject }
+            if ($shot -notin @("duel", "low", "high", "wide")) { throw "$($where): the camera's shot is duel, low, high or wide, not $shot" }
+            $who = "$($Matches[2])" -split '\+', 2
+            $subject = $who[0].Trim()
+            $crew = if ($who.Count -gt 1) { (($who[1] -split '\|') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join '|' } else { "" }
+            if ($subject.Contains(",") -or $crew.Contains(",")) { throw "$($where): a name with a comma can't be filmed" }
+            $sc.Camera = @{ Shot = $shot; Subject = $subject; Crew = $crew }
             continue
         }
         if ($line -match '^cam\s+(\S+)\s+(\S+)\s+(\S+)$') {
@@ -761,6 +764,9 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
                     $v.CueAt = $cue.CreationTime
                     $rec = Start-Video $v $(if ($film) { $film } else { $p }) $s.video
                     if (-not $rec) { $v.Status = "no video: the game window wasn't found" }
+                    # Only a fall from here on ends the fight: one in the setup before the video
+                    # (the hero caught on the way, then teleported and healed) doesn't count.
+                    if ($tail -ge 0) { foreach ($f in @("$filmLog.out", "$filmLog.err")) { $null = Read-Grown $f $seen } }
                 }
             }
             # Desktop Duplication refused (an ffmpeg without it, a locked screen), or the window's
@@ -874,9 +880,9 @@ function Start-Cameraman($s, $sc, $hero, $out, [int]$timeout) {
     $wav = Join-Path $out "sound.wav"
     $vars = @{
         WOW_CHAR = $name; WOW_PROBE_LUA = (Build-CameraLua $hero); WOW_PROBE_LUA_AT = "1"
-        WOW_SPECTATE = "$($sc.Camera.Subject),$hero,$($sc.Camera.Shot)"; WOW_MIX_TAP = $wav
+        WOW_SPECTATE = "$($sc.Camera.Subject),$hero,$($sc.Camera.Shot)$(if ($sc.Camera.Crew) { ",$($sc.Camera.Crew)" })"; WOW_MIX_TAP = $wav
     }
-    Say "  the cameraman $name films $(if ($sc.Camera.Subject) { "$($sc.Camera.Subject) and " })$hero ($($sc.Camera.Shot))"
+    Say "  the cameraman $name films $(if ($sc.Camera.Subject) { "$($sc.Camera.Subject) and " })$hero ($($sc.Camera.Shot))$(if ($sc.Camera.Crew) { ", with $($sc.Camera.Crew -replace '\|', ' and ') in the picture" })"
     $p = Start-Client $s $vars $timeout $chome $log
     $null = $p.Handle  # held now, or Windows PowerShell never learns its exit code
     $spot = Get-WindowSpot $s $null

@@ -56,7 +56,8 @@ fn ai_runs_to_the_rack_and_equips_in_order_solo_and_duo() {
         assert!(s.clock >= axe_at + AXE_SHOWING);
         assert_eq!(s.arsenal_loadout(boss).unwrap().off_hand, 0);
         assert_eq!(s.arsenal_loadout(boss).unwrap().grip, "hammer");
-        assert_eq!(s.events.iter().filter(|e| matches!(e, Event::MobGear { id } if *id == boss)).count(), 2);
+        // Each change: hands emptied as he kneels, the new weapon up as he stands.
+        assert_eq!(s.events.iter().filter(|e| matches!(e, Event::MobGear { id } if *id == boss)).count(), 4);
     }
 }
 
@@ -239,7 +240,59 @@ fn ordinary_melee_inputs_complete_scaled_solo_and_duo_fights() {
         // Relentless tanking can kill him during a change. No invulnerability is introduced
         // just to force the last weapon; every completed change must still be ordered.
         let seen: Vec<_> = stages.keys().copied().collect();
-        assert!(seen == vec![0, 1] || seen == vec![0, 1, 2]);
+        // (A duo pressing him at the rack, where he kneels open, can fell him there: Nov 9.)
+        assert!([vec![0], vec![0, 1], vec![0, 1, 2]].contains(&seen), "{seen:?}");
         assert!(s.arsenal.racks.is_empty());
     }
+}
+
+fn lying(s: &Survival, display: u32) -> bool {
+    s.objs.values().any(|o| matches!(o.kind, ObjKind::Prop { display: d, .. } if d == display))
+}
+
+#[test]
+fn he_kneels_empty_handed_at_the_rack_and_stands_with_the_new_weapon_roaring() {
+    let (mut s, h, boss, _) = fight(false);
+    assert!(lying(&s, HAMMER_WAITING), "the hammer waits at the rack from the pull");
+    assert!(!lying(&s, SWORD_LEFT));
+    hurt_to(&mut s, h, boss, 0.6);
+    let until = s.clock + 20.0;
+    while !s.arsenal_hands_empty(boss) && s.clock < until { tick(&mut s, 0.05); }
+    assert!(s.arsenal_hands_empty(boss), "his hands empty at the rack");
+    assert!(s.events.iter().any(|e| matches!(e, Event::HoldPose { id, clip: KNEEL_CLIP, secs, .. } if *id == boss && *secs >= FIT_WEAPON)), "down on one knee");
+    assert!(lying(&s, SWORD_LEFT), "the sword put down at the rack");
+    assert_eq!(s.arsenal_posture_share(boss), KNEEL_POSTURE, "open while he kneels");
+    s.events.clear();
+    wait_stage(&mut s, boss, 1, 10.0);
+    assert!(!s.arsenal_hands_empty(boss));
+    assert_eq!(s.arsenal_posture_share(boss), 1.0);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Emote { id, emote } if *id == boss && *emote == super::mobs::ROAR_EMOTE)), "he roars as he stands");
+    assert!(s.events.iter().any(|e| matches!(e, Event::HoldPose { id, clip: 0, .. } if *id == boss)), "and lets go of the kneel");
+    hurt_to(&mut s, h, boss, 0.3);
+    wait_stage(&mut s, boss, 2, 30.0);
+    assert!(!lying(&s, HAMMER_WAITING), "the hammer taken up");
+    assert!(lying(&s, SWORD_LEFT), "the sword still lies there");
+    let health = s.mobs[&boss].health;
+    s.hurt_mob(boss, h, health);
+    assert!(!lying(&s, SWORD_LEFT) && !lying(&s, HAMMER_WAITING), "the rack and what lies there go with him");
+}
+
+#[test]
+fn hits_while_he_kneels_dont_keep_him_at_the_rack() {
+    let (mut s, h, boss, _) = fight(false);
+    hurt_to(&mut s, h, boss, 0.6);
+    let until = s.clock + 20.0;
+    while !s.arsenal_hands_empty(boss) && s.clock < until { tick(&mut s, 0.05); }
+    assert!(s.arsenal_hands_empty(boss));
+    let knelt = s.clock;
+    let mut next = s.clock;
+    while s.arsenal_hands_empty(boss) && s.clock < knelt + 6.0 {
+        if s.clock >= next {
+            s.hurt_mob(boss, h, 5);
+            next = s.clock + 0.3;
+        }
+        tick(&mut s, 0.05);
+    }
+    assert!(!s.arsenal_hands_empty(boss), "up with the new weapon");
+    assert!(s.clock <= knelt + FIT_WEAPON + 0.2, "hits held him at the rack until {:.2} s after he knelt", s.clock - knelt);
 }

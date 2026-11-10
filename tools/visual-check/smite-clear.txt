@@ -1,0 +1,52 @@
+# An unassisted solo clear of Mr. Smite and his rack (PR #326), filmed by the cameraman (camera
+# duel), markers off. Dev setup, all before the video: travel, the dock cleared and Smite raised at
+# his home, the warrior healed and put 12 yd east of his home, on his level, facing him (12 yd west is the
+# foot of a steep ramp 4.5 yd below him, from where he never saw the hero). From the
+# video on, no debug command: only the warrior's own keys (.es in, ActionDash), pressed by a small
+# player in the interface (SB below) that reads only what the client shows: a windup (AN: guard
+# the sword and axe cuts as they land; roll from the overhead, the hammer slam and the hoof
+# stomp), his kneel at the rack (WP clip 115: close in and hit him, then let him arm), and its own blows landing
+# (HT: when none has landed for a while he's away, so it dashes after him).
+hero warrior
+# No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to him.
+cam off
+camera duel Mr. Smite
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes
+12.2 lua SB = { q = {}, on = false, busy = 0, kneel = 0, rack = 0, chase = 0, nextHit = 0, nextDash = 0, nextLock = 0, lastHT = 0, hits = 0, dealt = 0, sawLO = false, locked = false }
+12.2 lua function SB.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function SB.after(d, f) table.insert(SB.q, { GetTime() + d, f }) end
+12.2 lua function SB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t .. " hp " .. UnitHealth("player")) end end
+12.2 lua function SB.hit() SB.say(".es in a") SB.after(0.08, function() SB.say(".es in au") end) end
+12.2 lua function SB.dash(why) SB.nextDash = GetTime() + 0.55 ActionDash(0.4, 7, "f") SB.log(why) end
+12.2 lua function SB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+# A cut is guarded from 0.13 s before it lands to 0.07 s after: up for a parry, and down long enough
+# (0.6 s) before an axe string's next cut that it parries too.
+12.2 lua function SB.an(c, land) local now = GetTime() SB.chase = 0 if c == 58 or c == 18 or c == 181 then SB.busy = land + 0.45 SB.after(math.max(0, land - 0.18 - now), function() SB.say(".es in d") SB.log("roll from " .. c) end) SB.after(math.max(0, land + 0.4 - now), function() SB.dash("back in after the roll") end) else SB.busy = land + 0.3 local d = math.max(0, land - 0.13 - now) SB.after(d, function() SB.say(".es in g") end) SB.after(d + 0.2, function() SB.say(".es in gu") end) SB.log("guard " .. c) end end
+12.2 lua function SB.line(l) local f = SB.split(l) local v, now = f[1], GetTime() if v == "AN" and f[11] == "mob" then SB.an(tonumber(f[3]) or 0, now + (tonumber(f[4]) or 0)) elseif v == "WP" and f[5] ~= "1" then local c, s = tonumber(f[3]) or 0, tonumber(f[4]) or 0 if c == 115 and s > 0 then if SB.rack < now - 20 then SB.rack = now end SB.kneel = now + s SB.chase = 0 SB.log("he kneels " .. s) elseif SB.kneel > now then SB.kneel = 0 SB.log("he stands") end elseif v == "HT" then SB.lastHT = now SB.hits = SB.hits + 1 SB.dealt = SB.dealt + (tonumber(f[2]) or 0) if math.mod(SB.hits, 10) == 0 then SB.log("hits " .. SB.hits .. " dealt " .. SB.dealt) end elseif v == "IM" and f[7] == "1" then SB.log("struck: " .. tostring(f[4]) .. " " .. tostring(f[5])) elseif v == "LO" then SB.sawLO = true SB.locked = f[2] ~= nil and f[2] ~= "" and f[2] ~= "0x0" and f[2] ~= "0X0" and f[2] ~= "0" end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) SB.line(l) return old(l) end
+# At the rack it hits him for 2.5 s from the first kneel it sees (in any 20 s; at 33% he came
+# back within 16 s, so in take 331 it let him arm at once), then lets him arm: every blow there
+# restarts his fitting (posture 1.5 times), so hitting on held him kneeling to the 14 s limit
+# and left the hammer only seconds (take 329).
+# His yell at 66% and 33% starts his run to the rack: go after him until he kneels or swings.
+12.2 lua SB.y = CreateFrame("Frame") SB.y:RegisterEvent("CHAT_MSG_MONSTER_YELL") SB.y:SetScript("OnEvent", function() if SB.on then SB.chase = GetTime() + 5 SB.log("he yells: " .. tostring(arg1)) end end)
+12.2 lua SB.f = CreateFrame("Frame") SB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(SB.q) do local a = SB.q[i] if now >= a[1] then table.remove(SB.q, i) a[2]() else i = i + 1 end end if not SB.on then return end if SB.sawLO and not SB.locked and now >= SB.nextLock then SB.nextLock = now + 2 SB.say(".es in lock") SB.log("lock on again") end if now < SB.busy then return end local kneeling = now < SB.kneel if kneeling and now > SB.rack + 2.5 then if not SB.waits then SB.waits = true SB.log("let him arm") end return end SB.waits = false if now >= SB.nextHit then SB.nextHit = now + (kneeling and 0.55 or 0.75) SB.hit() end local wait = 2.0 if kneeling then wait = 0.8 elseif now < SB.chase then wait = 0.6 end if now - SB.lastHT > wait and now >= SB.nextDash then SB.dash(kneeling and "close in on the kneel" or (now < SB.chase and "run after him" or "after him")) end end)
+# He never comes back once beaten (respawn 0), so every foe is cleared and a fresh Smite raised 8 yd
+# ahead of a hero standing 8 yd north of his home: his home (and so his rack, 9 yd south of it) is
+# the dungeon's own. The hero then steps 12 yd east of him, on his level, facing him.
+12.4 .es goto -2 -760 9.3 4.712389
+12.6 .es heal
+12.8 .es spawn dm_smite
+13 .es goto 10 -768 9.3 3.141593
+13.2 video
+13.6 lua SB.lastHT = GetTime() SB.on = true
+14 .es in lock
+14 shots pull 10 1.0
+25 shots early 20 2.0
+65 shots middle 40 3.0
+185 shots late 40 3.0
+315 end

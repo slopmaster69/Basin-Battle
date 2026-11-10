@@ -293,6 +293,9 @@ impl SurvivalGame {
         match v.kind {
             ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) || self.sim.is_perch_visual_prop(v.id) || self.sim.is_kitchen_prop(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            // The falling mine's rock and timbers: there at once, moved in place as they fall,
+            // and no hull (the heroes and the boss go on through them, as before they showed).
+            ObjKind::Prop { .. } if self.sim.collapse_piece_tilt(v.id).is_some() => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             _ => (kind, flags),
         }
     }
@@ -710,7 +713,13 @@ impl SurvivalGame {
 
     /// Equipment slots are updated on the existing unit, without destroying/recreating it.
     pub(crate) fn mob_gear_fields(&self, id: Id, f: &mut Fields) {
-        if let Some(g) = self.sim.arsenal_loadout(id) {
+        if self.sim.arsenal_hands_empty(id) {
+            // Kneeling at his rack between weapons: nothing in either hand.
+            for k in 0..3u16 {
+                f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + k, 0).set(idx::UNIT_VIRTUAL_ITEM_INFO + 2 * k, 0).set(idx::UNIT_VIRTUAL_ITEM_INFO + 2 * k + 1, 0);
+            }
+            f.set(idx::UNIT_BYTES_2, 0);
+        } else if let Some(g) = self.sim.arsenal_loadout(id) {
             arsenal_gear_fields(g, f);
         } else if let Some(m) = self.sim.mobs.get(&id) {
             mob_def_gear_fields(&self.sim.content.mobs[m.def], f);
@@ -946,8 +955,12 @@ impl SurvivalGame {
         let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
         // The arrow glows white (patch 0039's flag) so it can be found in the grass; a client
         // without the patch ignores the bit.
-        let (display, scale, tilt, flags) =
-            if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW) } else { (v.display, v.scale, 0.0, flags) };
+        // A piece of the falling mine is tipped as it falls and lies (a beam swinging down).
+        let (display, scale, tilt, flags) = if arrow {
+            (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW)
+        } else {
+            (v.display, v.scale, self.sim.collapse_piece_tilt(v.id).unwrap_or(0.0), flags)
+        };
         let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
