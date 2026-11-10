@@ -581,3 +581,37 @@ fn the_cameraman_is_taken_where_the_hero_inspects() {
     game.tick();
     assert!(!cam.try_iter().any(|p| p.opcode == op::MSG_MOVE_TELEPORT_ACK));
 }
+
+/// A region's rock, measured as the review measures a pile: each rock's footprint (its model's
+/// box across, scaled) times how far its turned box stands over the floor under it.
+fn rock_volumes(land: &dyn Land, props: &[Prop]) -> Vec<f32> {
+    let mut out = vec![0.0; layout::REGIONS.len()];
+    for p in props.iter().filter(|p| rocky(p.model) && p.site != "Juggernaut collapse basin") {
+        let m = &MODELS[p.model];
+        let b = p.obb(0.0);
+        let top = b.c[2] + (0..3).map(|i| b.a[i][2].abs() * b.h[i]).sum::<f32>();
+        let fl = floor(land, [p.pos[0], p.pos[1], p.pos[2] + 1.0], true).unwrap_or(p.pos[2]);
+        out[p.region] += (m.max[0] - m.min[0]) * (m.max[1] - m.min[1]) * p.scale * p.scale * (top - fl).max(0.0);
+    }
+    out
+}
+
+/// Every region's collapse reads at least as big as the old layout's in the same views (the
+/// first rebuild's entrance was one cone smaller than the dome it replaced). The old layout
+/// (main at e6eb2081, its boulders and rubble less the drowned ship's basin), measured the same
+/// way on the installed map.
+#[test]
+#[ignore = "requires the user's WoW 1.12.1 Data folder in WOW_DATA"]
+fn native_every_region_has_at_least_the_old_layouts_rock() {
+    const OLD: [f32; 8] = [4052.0, 9487.0, 5870.0, 4514.0, 8146.0, 6597.0, 13675.0, 4869.0];
+    let n = native();
+    let ground = native_ground(&n);
+    let (props, _) = compose(&ground);
+    let new = rock_volumes(&n.land, &props);
+    let mut short = Vec::new();
+    for (i, r) in layout::REGIONS.iter().enumerate() {
+        println!("{}: {:.0} (old {:.0})", r.name, new[i], OLD[i]);
+        if new[i] < OLD[i] { short.push(r.name); }
+    }
+    assert!(short.is_empty(), "less rock than before in {short:?}");
+}

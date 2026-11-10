@@ -121,6 +121,9 @@ pub(super) const CARGO: usize = 10;
 pub(super) const MACHINE: usize = 11;
 pub(super) const CANNON: usize = 12;
 pub(super) const BOAT: usize = 13;
+/// Not placed (its pale cloth glowed green by a lantern on film); kept so the models' entries
+/// stay where clients cached them.
+#[allow(dead_code)]
 pub(super) const SACK: usize = 14;
 
 pub(super) const MODELS: &[Model] = &[
@@ -382,17 +385,28 @@ pub(super) fn floor_under(land: &dyn Land, v: V3) -> f32 {
 pub(super) fn covers_view(p: &Prop) -> bool {
     let views = layout::REGIONS.iter().map(|r| (r.view, r.facing))
         .chain(layout::CAMERAS.iter().map(|(at, deg)| (*at, deg.to_radians())));
-    // The footing, and the first yards it looks across.
+    // The footing, and the first yards it looks across; for timber further on at eye height (boards
+    // and a post filled the workshop's picture, a pole stood at the lens at Johnson's; the piles a
+    // camera is there to see stand 7 yd off and more, filling a passage); and the hero's own
+    // camera, up behind them.
+    let timber = matches!(p.model, BEAM | BOARD | LUMBER);
     views.into_iter().any(|(at, f)| {
         let ahead = |d: f32| [at[0] + d * f.cos(), at[1] + d * f.sin(), at[2]];
         covers(p, at, 1.2) || covers(p, ahead(2.0), 1.0) || covers(p, ahead(3.8), 0.7)
+            || timber && [5.2, 6.8, 8.5].iter().any(|d| covers_at(p, ahead(*d), 1.5, &[1.75, 2.6, 3.4]))
+            || covers_at(p, ahead(-2.5), 1.2, &[1.75, 2.6, 3.4]) || covers_at(p, ahead(-4.5), 1.2, &[2.6, 3.4])
     })
 }
 
 /// Whether a prop's box comes within `radius` of a body standing at `at` (feet to head).
 pub(super) fn covers(p: &Prop, at: V3, radius: f32) -> bool {
+    covers_at(p, at, radius, &[0.15, 0.95, 1.75])
+}
+
+/// Whether a prop's box comes within `radius` of any of `heights` over `at`.
+fn covers_at(p: &Prop, at: V3, radius: f32, heights: &[f32]) -> bool {
     let m = &MODELS[p.model];
-    [0.15, 0.95, 1.75].iter().any(|height| {
+    heights.iter().any(|height| {
         let local = p.local([at[0], at[1], at[2] + height]);
         let d2 = (0..3).map(|a| (local[a]-local[a].clamp(m.min[a], m.max[a])).powi(2)).sum::<f32>();
         d2 < (radius/p.scale).powi(2)

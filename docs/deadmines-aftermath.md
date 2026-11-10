@@ -88,11 +88,22 @@ mass with its flat cut face (model yaw -37 degrees) turned into the wall, as lar
 lets it stand (a collapse must read bigger than the rocks set down before it), a second large mass
 beside it, pieces of a middle size (a man's height or less) as a shoulder and in front, small
 stones across the floor, and a gravel skirt of the same dark rock toward the path. Over it the
-roof is broken: a beam (the iron-shod excavation pole) snapped out of the roof onto the pile or
-hanging from it, and a broken post leaning on the pile, never steeper than 45 degrees. Boards
+roof is broken: a beam (the iron-shod excavation pole) snapped out of the roof down onto the pile
+(never a stub left hanging from the roof, which read as a pole floating in the air), and a broken
+post leaning on the pile, never steeper than 45 degrees. Boards
 (the excavation plank) lie at its foot at angles of their own, one pinned under the mass and one
 leaning on it. Carts, barrows, machinery, cannons and the mine's own cargo boxes are knocked
-over and seated by their turned meshes. The Foundry's back door is stacked up toward its lintel.
+over and seated by their turned meshes. The Foundry's back door is stacked up toward its lintel. (No split sacks: their pale cloth glowed
+green by the workshop rear cell's own lantern on film.)
+
+Then rock is heaped on every pile until it holds more than the old layout had there
+(`aftermath_layout::OLD_ROCK`, measured as the review measures a pile: each rock's footprint times
+how far it stands over the floor, on the installed map). The second film found the entrance's
+rebuilt pile one smooth cone smaller than the dome it replaced. Several large pieces are jumbled
+over and against each pile's first mass, then smaller ones, each seated on whatever is under its
+rim and kept under the roof; where a pile can't take its share (the walk runs by it, the shore
+drops into the water), the other piles of its region take more, until every region holds at
+least a fifth more rock than the old layout's.
 The first film (10 Nov) dropped three looks that read badly: the Tirisfal and Duskwood mounds read
 as green grass, the rock hung from the roof as a smooth lump floating under it, and the tall 5737
 boulder (a stalagmite) and the Dark Iron planks and woodpile (gold) were gone already.
@@ -104,7 +115,17 @@ reach a wall, the roof, another piece of wood or a native doodad, and are never 
 rock. A rock may bury a native doodad whole, unless it gives light. Nothing knee-high stands on
 the walk from the entrance's view to the cove's. A piece that can't meet all of that is left
 out, so a few piles lack one part: the ignored native test lists them. The regions' views and the
-review's other cameras (`CAMERAS`) keep their footing and the yards in front of them clear.
+review's other cameras (`CAMERAS`) keep their footing and the yards in front of them clear, no
+timber stands in the first 9 yd of their picture at eye height (a pole stood at the lens at
+Johnson's, boards and a post filled the workshop's picture), and the hero's own camera, up behind
+them, is clear.
+
+The preview takes the cameraman (`.es watch`) where the hero it films inspects: the rules stand
+still in the preview, so it was never moved, stayed at the landing and filmed the cove's water and
+the void past its loaded ground wherever the hero went (no dust, cyan and black frames on the
+walk). And it starts after a finished fight: what an ended fight left drawn (a cast whose creature
+is gone, a missile's stand-in) no longer refuses it; only a lab scene or danger still marked on
+the ground does.
 
 The cove stores tent (Codex's "pantry", view 13) is the medium tent on the cove's west beach at
 (-159, -907.6): the camera stood on the beach at (-146, -906), and the old pile swallowed the tent
@@ -138,9 +159,13 @@ map through `WOW_DATA` (`cargo test --release -p htl-server --tests -- --ignored
   view, every large pile's main mass, change A and B's parts on every pile (a handful may lack one,
   listed), the ship's floors gone.
 - `native_way_from_the_entrance_to_the_cove_stays_open`: the walk between the views, mouth to cove.
+- `native_every_region_has_at_least_the_old_layouts_rock`: each region's rock, by the review's
+  measure, at least the old layout's (main at e6eb2081, less the drowned ship's basin).
 
-The installed-data check currently places 1387 solids with no rejected sites: 71 at the entrance,
-267 in the galleries, 84 in the Mast Room, 125 in the workshop, 240 in the Foundry, 265 in the
-Cannon Gallery, 210 in the cove and 125 at the landing and sea tunnel. Fitting them takes about
-0.25 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
+The installed-data check currently places 1903 solids with no rejected sites: 94 at the entrance,
+385 in the galleries, 101 in the Mast Room, 158 in the workshop, 315 in the Foundry, 312 in the
+Cannon Gallery, 348 in the cove and 190 at the landing and sea tunnel. Their rock against the old
+layout's: entrance 5024 (4052), galleries 11603 (9487), Mast Room 7730 (5870), workshop 6724
+(4514), Foundry 11050 (8146), Cannon Gallery 8841 (6597), cove 15840 (13675), landing 5859 (4869).
+Fitting them takes about 0.4 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
 -0.023 yd. These counts establish coverage, not visual approval.
