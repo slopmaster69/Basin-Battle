@@ -44,12 +44,12 @@ fn spread(a: usize, b: u32) -> f32 {
 
 impl Air {
     /// The sources of a composed ruin: every pile's soil skirts and its smallest stones (up to three
-    /// a pile), and every pile's beams. The views' foreground and the drowned cove raise none.
+    /// a pile), and every pile's beams (the wrecked ship's mast too). The views' foreground raises none.
     pub(super) fn new(props: &[Prop], started: Instant) -> Self {
         let mut dust = Vec::new();
         let mut per_site: BTreeMap<&str, usize> = BTreeMap::new();
         for (i, p) in props.iter().enumerate() {
-            if p.site == "Rubble apron" || p.site == "Juggernaut collapse basin" { continue; }
+            if p.site == "Rubble apron" { continue; }
             let small_stone = p.model == ROCK && !p.hangs() && p.scale < 0.3;
             if p.model != SKIRT && !small_stone { continue; }
             let n = per_site.entry(p.site).or_default();

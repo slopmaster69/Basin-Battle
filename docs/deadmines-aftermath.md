@@ -76,8 +76,18 @@ and their ramp, Marisa's side room, the Cannon Gallery and cove passages, the en
 the cove's stores tent, beach, landing and sea tunnel. A site says only where, how big and how
 the rock came down: `Slump` (a cave-in against a wall), `Seal` (a side passage filled to its
 lintel), `Lintel` (the Foundry's back door: the lintel down on a pile against one jamb) or
-`Spill` (loose rock and timber under a whole roof). The ship's former quarters and deck are a
-seabed-backed collapse basin, not props balanced on the old deck floor.
+`Spill` (loose rock and timber under a whole roof).
+
+The ship is wrecked, not just gone (change F). Its own WMO groups stay hidden by patch 0087 (the
+server can't tilt them), so the wreck is native props: the bow half of the hull (the wrecked
+rowboat at 5.2 times its size) on its side on the seabed, about 7 yd out of the water; the stern
+half beyond its broken end, deeper and turned the other way; the mast (the iron-shod pole, 27 yd)
+standing aslant out of the bow; cannons on the seabed and thrown up the west and south beaches;
+the Deadmines' anchor; a field of floating wreckage (the shipwreck pool's floating stores,
+floating barrels, driftwood, boards, lumber and crates) in two drifts from the hull to Mr. Smite's
+dock, each riding the water; and the dock's planks snapped at its edge and hanging into the water
+where it stands over the water. There is no smokestack model among the game objects (the ship's
+own stack is one of its hidden groups), so there is no smokestack.
 
 `aftermath_piles.rs` fits every pile to the installed map when the preview starts (the survey
 from `htl_map::deadmines::load_aftermath_survey`: the floors, every solid triangle, and the box of
@@ -144,8 +154,8 @@ map through `WOW_DATA` (`cargo test --release -p htl-server --tests -- --ignored
   listed), the ship's floors gone.
 - `native_way_from_the_entrance_to_the_cove_stays_open`: the walk between the views, mouth to cove.
 
-The installed-data check currently places 1190 solids with no rejected sites: 71 at the entrance,
+The installed-data check currently places 1214 solids with no rejected sites: 71 at the entrance,
 234 in the galleries, 71 in the Mast Room, 115 in the workshop, 192 in the Foundry, 228 in the
-Cannon Gallery, 170 in the cove and 109 at the landing and sea tunnel. Fitting them takes about
+Cannon Gallery, 194 in the cove and 109 at the landing and sea tunnel. Fitting them takes about
 0.25 s after a 1 s survey of the map. Floating wreckage uses the measured native water surface at
 -0.023 yd. These counts establish coverage, not visual approval.
