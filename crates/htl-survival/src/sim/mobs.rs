@@ -672,6 +672,8 @@ impl Survival {
             let heft = heft * self.vancleef_posture_share(mid, label);
             // Gilnid's and his crew's (`sim::perches`): debug damage never counts.
             let heft = heft * self.perch_posture_share(mid, label);
+            // Smite's (`sim::arsenal`): struck kneeling at his rack, more.
+            let heft = heft * self.arsenal_posture_share(mid);
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
