@@ -109,6 +109,14 @@ spill now lies beside it. The two pale green circles on the workshop floor (view
 mine's own: they show in the same place in Codex's first palette trial, with no ruin there and
 no native doodad within 8 yd, so they belong to the floor itself.
 
+The air is native too (`aftermath_air.rs`): while the preview lasts, each pile raises a low cloud
+of dust now and then (spell visual kit 44, the dust a charge raises on landing) from its soil skirt
+and smallest stones, about a third of them with the clatter of grit landing (sound kit 1211), and
+its snapped beams and posts creak (the Deadmines' wooden door, 3078, and the haunted windmill's
+timber, 1650). Each source fires every 5 to 9 s (dust) or 8 to 24 s (creaks), fixed per preview.
+There is no lasting haze model in the data that reads as dust (the ground fogs are orange or
+green); the repeated settling clouds stand in for it.
+
 What the server can't do: open a real hole in the roof (the WMO's ceiling is one group; the
 hanging rock is the nearest look), topple or tip the mine's own cargo stacks, carts, barrows and
 lanterns (they are the WMO's doodads, views 3, 9 and 15), or put out or tilt a lantern. Each needs

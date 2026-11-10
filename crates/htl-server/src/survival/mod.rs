@@ -419,7 +419,10 @@ impl SurvivalGame {
     /// One tick: the rules step, their events play out, the add-ons hear what changed, and the
     /// world is saved now and then.
     pub(crate) fn tick(&mut self) {
-                if self.aftermath.is_some() { return; }
+                if self.aftermath.is_some() {
+                    self.aftermath_air();
+                    return;
+                }
                 self.lab_queue();
                 self.lab_steps();
                 let events = self.sim.step(TICK.as_secs_f32());

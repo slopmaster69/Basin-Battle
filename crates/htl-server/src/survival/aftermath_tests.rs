@@ -532,3 +532,54 @@ fn native_way_from_the_entrance_to_the_cove_stays_open() {
 }
 
 
+
+#[test]
+fn the_piles_raise_dust_and_grit_and_their_timber_creaks_while_the_preview_lasts() {
+    let (props, _) = compose(&authored_ground());
+    let mut air = air::Air::new(&props, std::time::Instant::now());
+    let mut sent: Vec<Packet> = Vec::new();
+    for step in 1..=600 { sent.extend(air.due(&props, step as f32 * 0.1)); }
+    let ruins: BTreeMap<u64, &Prop> = props.iter().enumerate().map(|(i, p)| (prop_guid(i, p.model), p)).collect();
+    let (mut puffs, mut grit, mut creaks) = (BTreeMap::<u64, usize>::new(), 0, 0);
+    for p in &sent {
+        let guid = u64::from_le_bytes(if p.opcode == op::SMSG_PLAY_SPELL_VISUAL { p.body[0..8].try_into().unwrap() } else { p.body[4..12].try_into().unwrap() });
+        let ruin = ruins.get(&guid).expect("every sound and puff comes from a ruin in the scene");
+        assert!(ruin.site != "Rubble apron" && ruin.site != "Juggernaut collapse basin");
+        if p.opcode == op::SMSG_PLAY_SPELL_VISUAL {
+            assert_eq!(u32::from_le_bytes(p.body[8..12].try_into().unwrap()), air::KIT_DUST);
+            assert!(ruin.model == SKIRT || (ruin.model == ROCK && ruin.scale < 0.3));
+            *puffs.entry(guid).or_default() += 1;
+        } else {
+            let sound = u32::from_le_bytes(p.body[0..4].try_into().unwrap());
+            match sound {
+                air::SOUND_GRIT => grit += 1,
+                s if air::SOUND_CREAK.contains(&s) => { creaks += 1; assert_eq!(ruin.model, BEAM, "timber creaks") }
+                s => panic!("an unknown sound {s}"),
+            }
+        }
+    }
+    // A minute: every source puffs now and then, never in a stream; some puffs bring grit.
+    assert!(puffs.len() >= 60, "{} dust sources", puffs.len());
+    assert!(puffs.values().all(|n| (5..=14).contains(n)), "{puffs:?}");
+    let total: usize = puffs.values().sum();
+    assert!(grit * 5 > total && grit * 2 < total, "{grit} of {total}");
+    assert!(creaks >= 20, "{creaks} creaks");
+}
+
+#[test]
+fn the_air_goes_out_to_inspectors_and_stops_with_the_preview() {
+    let mut game = game();
+    let (_, rx) = observer(&mut game, 1);
+    game.aftermath_start(1).unwrap();
+    rx.try_iter().for_each(drop);
+    game.aftermath.as_mut().unwrap().air = air::Air::new(&game.aftermath.as_ref().unwrap().props,
+        std::time::Instant::now() - std::time::Duration::from_secs(30));
+    game.tick();
+    let sent: Vec<Packet> = rx.try_iter().collect();
+    assert!(sent.iter().any(|p| p.opcode == op::SMSG_PLAY_SPELL_VISUAL), "the dust reaches the inspector");
+    assert!(sent.iter().any(|p| p.opcode == op::SMSG_PLAY_OBJECT_SOUND));
+    game.aftermath_command(1, "off", "").unwrap();
+    rx.try_iter().for_each(drop);
+    game.tick();
+    assert!(!rx.try_iter().any(|p| p.opcode == op::SMSG_PLAY_SPELL_VISUAL || p.opcode == op::SMSG_PLAY_OBJECT_SOUND), "silent once restored");
+}

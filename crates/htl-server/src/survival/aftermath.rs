@@ -17,6 +17,8 @@ use super::*;
 use crate::packets::{Create, Placement};
 use shapes::{matrix, unturn, Obb, V3};
 
+#[path = "aftermath_air.rs"]
+mod air;
 #[path = "aftermath_layout.rs"]
 mod layout;
 #[path = "aftermath_piles.rs"]
@@ -39,6 +41,8 @@ pub(crate) struct Aftermath {
     /// Inspectors move only here, never in the saved simulation.
     positions: BTreeMap<ConnId, ([f32; 3], f32)>,
     missing: Vec<&'static str>,
+    /// Dust settling and timber creaking (`aftermath_air.rs`).
+    air: air::Air,
 }
 
 pub(super) struct Region {
@@ -489,7 +493,8 @@ impl SurvivalGame {
             return Err("The aftermath has an empty region. Check the installed map data before previewing it.".into());
         }
         println!("[aftermath] {} solids in {:?}; {} sites unavailable: {}", props.len(), started.elapsed(), missing.len(), missing.join(", "));
-        self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing });
+        let air = air::Air::new(&props, Instant::now());
+        self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing, air });
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }
         let viewers: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
