@@ -1,0 +1,57 @@
+# An unassisted solo clear of Captain Greenskin (docs/greenskin-encounter.md) that breaks the
+# firing line first, filmed by the cameraman (camera duel), markers off. Dev setup, all before the
+# video: travel, the deck cleared but for the captain (his crew is posted afresh at their posts),
+# the warrior healed and put at (-58, -831) facing +y: the east gunner (-58, -824.5) 6.5 yd
+# straight ahead, the west gunner (-58, -806.5) 24.5 yd ahead on the same line, the captain 16.5 yd
+# off, out of his reach. The deck's east side (y -841) has no rail in the map's collision, so the
+# player never rolls (a roll with no keys is a step back, toward that side: takes 346 and 347);
+# its sidesteps strafe along x.
+# From the video on, no debug command: only the warrior's own keys (.es in, ActionDash; the rig's
+# walk keys don't move the hero), pressed by a small player in the interface (GS below) that reads
+# only what the client shows:
+# - his windup (AN mob, his guid): the guard faces the lock, so it cycles the lock to him (.es in
+#   lock again, until LO names him), raises the guard as the blow lands, then cycles back to its
+#   gunner;
+# - a gun at the shoulder or the harpoon held back (AN cast, clip 48 or 108): a strafe, alternating
+#   sides, just before it fires;
+# - its gunner falling (the lock moves on by itself, or he can't be found again).
+# It cuts down the east gunner, dashes 17 yd up the deck along x -58 to the west gunner (stopping
+# about 3 yd short: the cannons stand at the west rail, y -801 to -807), cuts him down, then duels
+# the captain, two hits after each blow it guards.
+hero warrior
+# No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to the target.
+cam off
+# `camera duel Captain Greenskin + Defias Deck Gunner` keeps the gunners in the picture too, but
+# needs a client with patch 0090 (#328); the rig's smiteA client stops at 0089.
+camera duel Captain Greenskin
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes greenskin
+12 .es goto -58 -831 41.5 1.570796
+12.6 .es heal
+12.2 lua GS = { q = {}, on = false, side = 1, pending = 0, nextHit = 0, phase = "east", tries = 0 }
+12.2 lua function GS.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function GS.after(d, f) table.insert(GS.q, { GetTime() + d, f }) end
+12.2 lua function GS.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+12.2 lua function GS.none(g) return g == nil or g == "" or g == "0x0" or g == "0X0" or g == "0" end
+12.2 lua function GS.hit(why) if GS.phase == "run" or GS.want then return end GS.log(why .. " hp " .. UnitHealth("player")) GS.say(".es in a") GS.after(0.08, function() GS.say(".es in au") end) end
+12.2 lua function GS.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.2 lua function GS.switch(to) if GS.none(to) or GS.cur == to then return end GS.want = to GS.tries = 0 GS.say(".es in lock") end
+12.2 lua function GS.aside(t) GS.after(math.max(0.3, t - 0.4), function() if GS.phase == "run" then return end GS.side = -GS.side GS.log("step off the line hp " .. UnitHealth("player")) ActionDash(0.35, 7, GS.side > 0 and "l" or "r") end) end
+12.2 lua function GS.blow(t, who) GS.cap = who GS.pending = GetTime() + t if GS.phase == "run" then return end GS.switch(who) GS.after(math.max(0.3, t - 0.15), function() GS.log("guard hp " .. UnitHealth("player")) GS.say(".es in g") end) GS.after(t + 0.2, function() GS.say(".es in gu") end) if GS.phase == "duel" then GS.after(t + 0.45, function() GS.hit("punish") end) GS.after(t + 1.1, function() GS.hit("punish") end) else GS.after(t + 0.3, function() if GS.phase ~= "run" then GS.switch(GS.gun) end end) end end
+12.2 lua function GS.run() GS.phase = "run" GS.gun = nil GS.want = nil GS.log("the east gunner is down: run up the deck") GS.say(".es in unlock") GS.after(0.15, function() ActionDash(2.4, 7, "f") end) GS.after(2.7, function() GS.phase = "west" GS.say(".es in lock") end) GS.after(2.9, function() ActionDash(0.2, 7, "f") end) end
+12.2 lua function GS.down() if GS.phase == "east" then GS.run() elseif GS.phase == "west" then GS.phase = "duel" GS.gun = nil GS.log("the west gunner is down: the captain") GS.switch(GS.cap) end end
+12.2 lua function GS.lock(g) GS.cur = (not GS.none(g)) and g or nil if GS.want then if g == GS.want then GS.want = nil return end GS.tries = GS.tries + 1 if GS.tries < 4 then GS.say(".es in lock") else local lost = GS.want == GS.gun GS.want = nil if lost then GS.down() end end return end if GS.phase ~= "east" and GS.phase ~= "west" then return end if not GS.gun then if GS.cur and GS.cur ~= GS.cap then GS.gun = GS.cur GS.log("locked on a gunner") elseif GS.cur and GS.tries < 3 then GS.tries = GS.tries + 1 GS.say(".es in lock") end return end if g ~= GS.gun then GS.down() end end
+12.2 lua function GS.line(l) local f = GS.split(l) if not GS.on then return end if f[1] == "LO" then GS.lock(f[2]) return end if f[1] ~= "AN" then return end local clip, t = tonumber(f[3]), tonumber(f[4]) or 0 if f[11] == "cast" and (clip == 48 or clip == 108) then GS.aside(t) elseif f[11] == "mob" and f[7] ~= "1" then GS.blow(t, f[2]) end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) GS.line(l) return old(l) end
+12.2 lua GS.f = CreateFrame("Frame") GS.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(GS.q) do local a = GS.q[i] if now >= a[1] then table.remove(GS.q, i) a[2]() else i = i + 1 end end if GS.on and GS.cur and not GS.want and GS.phase ~= "run" and now > GS.pending + 0.3 and now >= GS.nextHit then GS.nextHit = now + 0.9 GS.hit("press") end end)
+13.2 video
+13.6 lua GS.on = true
+14 .es in lock
+14.3 lua ActionDash(0.65, 7, "f")
+14 shots pull 10 1.0
+30 shots duel 30 4.0
+150 shots late 20 4.0
+240 end

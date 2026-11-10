@@ -568,6 +568,7 @@ impl Survival {
                 continue;
             }
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
+            let mut say = None;
             if (matches!(mob.state, MobState::Idle { .. } | MobState::Return) || m == mid)
                 && !matches!(mob.state, MobState::Windup { .. } | MobState::Recover { .. })
             {
@@ -589,12 +590,15 @@ impl Survival {
                         self.events.push(Event::Sound { id: m, sound });
                     }
                     if !line.is_empty() {
-                        self.events.push(Event::Log(format!("{}: {line}", self.content.mobs[mob.def].name)));
-                        self.events.push(Event::Yell { id: m, text: line.clone() });
+                        say = Some(line.clone());
                     }
                 }
             }
             let (pos, link) = (mob.pos, mob.pack.map_or(0.0, |k| self.content.packs[k].link));
+            // Through the line queue, so the next line nearby waits its turn (Greenskin's order).
+            if let Some(text) = say {
+                self.yell(m, text);
+            }
             if link <= 0.0 {
                 continue;
             }
@@ -2027,6 +2031,7 @@ impl Survival {
         }
         let marks: Vec<Id> = self.missiles.iter().filter(|x| x.owner == id && x.mark != 0).map(|x| x.mark).collect();
         self.missiles.retain(|x| x.owner != id);
+        self.line_shots.retain(|x| x.owner != id);
         for mk in marks {
             self.unmark(mk);
         }
@@ -2037,6 +2042,7 @@ impl Survival {
     fn spend_missiles(&mut self, id: Id) {
         let marks: Vec<Id> = self.missiles.iter().filter(|x| x.owner == id && x.mark != 0).map(|x| x.mark).collect();
         self.missiles.retain(|x| x.owner != id);
+        self.line_shots.retain(|x| x.owner != id);
         for mk in marks {
             self.unmark(mk);
         }
@@ -2586,6 +2592,10 @@ impl Survival {
             a.turn_rate = 0.0;
             a.lock = a.windup;
         }
+        // Greenskin alone: no pause between his attacks (`sim::firing_line`).
+        if self.firing_alone(id) {
+            a.cooldown = 0.0;
+        }
         // A blow held a beat (the delayed swing).
         a.windup += m.hold;
         // Quicker (and harder) in its later phases.
@@ -2736,7 +2746,10 @@ impl Survival {
         let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
         let tele = if self.machine_grind(id) { Telegraph { reach: 7.5, width: 3.0, at: Some((pos, face)), ..tele } } else { tele };
         let mark = if let Some(mark) = self.kitchen_pour_mark(id, tele) { Some(mark) } else if a.ranged {
-            self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
+            // (Greenskin's guns and harpoon play their own load, aim and hold: `sim::firing_line`.)
+            if !self.firing_shooter(id) {
+                self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
+            }
             // A lobbed throw that splashes: where it will come down is chosen now and marked
             // through the whole wind-up and flight, so the ring is there to read and step out of,
             // however near the thrower stands.

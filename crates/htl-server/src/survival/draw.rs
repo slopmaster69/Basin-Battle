@@ -730,6 +730,13 @@ impl SurvivalGame {
                 .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
                 .set(idx::UNIT_BYTES_2, 2);
         }
+        // Greenskin's harpoon, in his hand through its held throw.
+        if let Some(spear) = self.sim.firing_line_spear(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, spear)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO, grip_info("polearm"))
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, 1)
+                .set(idx::UNIT_BYTES_2, 1);
+        }
     }
 
     // --- creatures ---------------------------------------------------------------------------------
