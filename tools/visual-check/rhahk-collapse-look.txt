@@ -1,5 +1,6 @@
 # DEV SETUP, a look at the falling mine, not a fight: `.es hurt` brings on the collapse (70%) and
-# later the ring of beams (45%), and `.es goto` turns the hero at the route's corners. Floor
+# later the ring of beams (45%), `.es goto` turns the hero at the route's corners, and `.es heal`
+# keeps the hero up. Floor
 # markers off. What to look for: rock dropping from overhead and lying where it lands, a big rock
 # down at the front every few yards, a timber cracking and swinging down across the tunnel every
 # ~14 yd, the tunnel behind buried, dust rolling ahead of the front and its dusty line on the
@@ -33,11 +34,30 @@ camera duel Rhahk'Zor
 25.5 lua ActionDash(1.5, 6, "f")
 27.7 lua ActionDash(1.5, 6, "f")
 29.9 lua ActionDash(1.5, 6, "f")
+# The hero stays by him 3 s for the ring of beams (stepping on at once took the camera away
+# from it, take 343).
 32 .es hurt 0.44 rhahk
-32.1 .es goto -112.5 -405 59.9 2.96
 32.2 shots ring 12 0.25
-34.5 lua ActionDash(1.5, 6, "f")
+35 .es goto -112.5 -405 59.9 2.96
+35.2 lua ActionDash(1.5, 6, "f")
 36.7 lua ActionDash(1.5, 6, "f")
 38 shots buried 10 0.5
 39 lua ActionDash(1.5, 6, "f")
+# Dev setup too: the hero healed every 2 s, so Rhahk'Zor's blows at the mouth (he struck the
+# hero down 2.5 s into the collapse, take 342) don't end the film before the front has run.
+16.2 .es heal
+17.4 .es heal
+18.6 .es heal
+19.8 .es heal
+21.4 .es heal
+23 .es heal
+25 .es heal
+27 .es heal
+29 .es heal
+31 .es heal
+33 .es heal
+35 .es heal
+37 .es heal
+39 .es heal
+41 .es heal
 44 end
