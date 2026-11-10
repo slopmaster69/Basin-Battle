@@ -1043,6 +1043,14 @@ impl Survival {
         // A client that runs its own dodge gets no throw; others hop back with no keys held.
         let local = self.players[&id].local_moves;
         let (speed, lift) = if dash || local { (0.0, 0.0) } else { (c.back_step[0], c.back_step[1]) };
+        // The hop back goes no farther than the land lets a body slide: short of a wall, a rail
+        // or a drop behind (a knockback's own limit), never over a ship's side.
+        let speed = if speed > 0.0 {
+            let (pos, air) = (self.players[&id].pos, super::moves::airtime(lift));
+            dist2d(pos, self.slide_end(pos, dir, speed * air)) / air
+        } else {
+            speed
+        };
         // Forward (or forward and to a side) it tumbles; to a side it sways aside; back, a step.
         let style = if !dash {
             "back"

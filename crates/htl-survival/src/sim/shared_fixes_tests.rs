@@ -135,3 +135,37 @@ fn a_small_lobbed_splash_is_drawn_with_the_markers_off() {
     assert!(s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, .. } if (*reach - 3.0).abs() < 1e-3)),
         "its true size drawn on the ground");
 }
+
+/// A dodge with no keys held is a hop back. On a client that doesn't run its own dodges the
+/// server throws it, and the throw stops where a body would: short of a drop behind (the
+/// Juggernaut's open side, take 346 and 347) or a wall, never over them.
+#[test]
+fn a_hop_back_stops_short_of_a_drop_or_a_wall_behind() {
+    struct Deck;
+    impl crate::land::Land for Deck {
+        // The deck ends 1 yd behind a hero at the origin facing +x; below it, the water.
+        fn height(&self, x: f32, _: f32) -> f32 { if x < -1.0 { -16.0 } else { 0.0 } }
+    }
+    let hop = |s: &mut Survival, h: Id| -> f32 {
+        s.players.get_mut(&h).unwrap().stamina = 100.0;
+        s.events.clear();
+        s.input(h, Input::Dodge);
+        s.events.iter().find_map(|e| match e { Event::Hop { player, speed, .. } if *player == h => Some(*speed), _ => None }).expect("a hop")
+    };
+    let (mut s, h) = world();
+    s.set_local_moves(h, false);
+    s.move_player(h, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    let open = hop(&mut s, h);
+    assert!((open - s.content.dodge.back_step[0]).abs() < 1e-3, "on open ground, the whole step back");
+    run_to(&mut s, 2.0);
+    s.land = Box::new(Deck);
+    let edge = hop(&mut s, h);
+    let air = super::moves::airtime(s.content.dodge.back_step[1]);
+    assert!(edge * air <= 1.0 + 1e-3, "no farther than the deck's edge: {:.2} yd", edge * air);
+}
+
+fn run_to(s: &mut Survival, secs: f32) {
+    for _ in 0..(secs / DT).round() as usize {
+        s.step(DT);
+    }
+}

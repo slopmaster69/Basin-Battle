@@ -101,6 +101,18 @@ The rail at (-59, -805) can't be reached, and (-52, -815) is the raised deck at 
 below is at -16.1. Runtime placement still rejects water, a different floor, a blocked post or a
 missing walk or path, with a checked spot beside him on the same side for custom test arenas.
 
+**The ship's sides (takes 346 and 347, where the hero went into the water).** The west rail has
+collision (blocked cells at y -801 to -803, the cannons behind them). The east side has none: the
+deck (41.4) runs to y -841 and stops, with the next floor 9 yd below (32.8) and the water at -16.1,
+and no blocked cell at deck height. So any body can walk off it, in the client and in the server's
+land alike; that is the map, not a dodge bug. A roll with no keys held is a step back, so a hero
+facing away from that side steps off it. On the clients that run their own dodges (action combat,
+as the rig's), the step is the client's own walk, stopped only by the client's collision. On
+older clients the server throws the step, and that throw used to fly its full distance whatever was
+behind; it now stops short of a wall or a drop as a knockback does (`start_dodge`, tested by
+`a_hop_back_stops_short_of_a_drop_or_a_wall_behind`). Giving the east side a rail would need an
+invisible wall along it (a change to the world, Corey's call).
+
 ## Verification
 
 `crates/htl-survival/src/sim/firing_line_tests.rs` covers each beat: the crew at its posts before
@@ -130,10 +142,16 @@ time as the volleys do, so both ways wear him down at about 25 health a sec. Mak
 longer as well needs a lever outside health and damage (his guard up while a shot is due, say),
 which is a design call.
 
-`tools/visual-check/greenskin-clear.txt` is the unassisted solo clear for the cameraman
-(`camera duel Captain Greenskin + Defias Deck Gunner`, markers off): setup before the video, then only the warrior's
-own keys (`ActionDash`; the rig's walk keys don't move the hero), pressed by a small player in the
-interface that reads the same tells. It breaks the line: the east gunner first (straight ahead of
-its start at (-58, -831)), then a 17 yd dash up the deck along x -58 to the west gunner, stopping
-about 3 yd short of his post (the cannons stand at the west rail, y -801 to -807: `dmprobe`), then
-the captain.
+Two unassisted solo clears for the cameraman (`camera duel Captain Greenskin`, markers off;
+`+ Defias Deck Gunner` keeps the gunners in the picture too, on a client with patch 0090): setup
+before the video, then only the warrior's own keys (`ActionDash`; the rig's walk keys don't move
+the hero), pressed by a small player in the interface that reads the same tells. Neither rolls,
+and their sidesteps strafe and alternate.
+
+- `tools/visual-check/greenskin-clear.txt` breaks the line. The east gunner first (straight ahead
+  of its start at (-58, -831)), then a 17 yd dash up the deck along x -58 to the west gunner,
+  stopping about 3 yd short of his post (the cannons stand at the west rail, y -801 to -807:
+  `dmprobe`), then the captain. A guard faces the lock, so on each of his windups it cycles the
+  lock to him (`.es in lock` again until the LO line names him), guards, and cycles back.
+- `tools/visual-check/greenskin-duel.txt` duels him straight through the volleys, locked on him
+  from a start mid-deck at (-74.5, -816).
