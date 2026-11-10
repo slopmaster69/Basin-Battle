@@ -107,16 +107,23 @@ map: the deck runs to y -840 (x -76 to -60) and stops, curving in to -834 toward
 bow, with the next floor 9 yd below and the water beyond, and no blocked cell at deck height. A
 hero walked or rolled straight off it (a roll with no keys held is a step back).
 
-**The starboard rail** (Corey, 10 Nov) now runs 0.6 yd inside that lip for the stretch his fight
+**The starboard rail** (Corey, 10 Nov) now runs 0.9 yd inside that lip for the stretch his fight
 can reach, from x -92 by VanCleef's cabin to x -44 by the bow, each point on the deck and walkable
 from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the ship is as it was.
 
 - **What it looks like:** ElwynnWoodFence01 (display 6151, the dungeons' own dark wood, posts and
-  rails, 4.3 yd a piece and 1.9 yd tall), at 0.75: pieces of 3.2 yd, 1.4 yd high, laid end to end
-  along the line (overlapping a little, so they meet), each seated at the lower of the deck's
-  heights under its two ends with its posts sunk in as modelled, so it follows the deck's curve
-  and its rise toward the bow (38.9 to 43.1). The data has no ship's rail to place: its only
-  railing (6157, CarnivalRailing) is 14 yd long and can't follow the curve.
+  rails, 4.3 yd a piece; its collision hull from 0.56 below its origin to 1.80 above), at 0.9:
+  pieces of 3.9 yd laid end to end along the line (overlapping a little, so they meet). Each stands
+  0.1 over the deck under its higher end, so its posts still sink in at its lower end and it
+  follows the deck's curve and its rise toward the bow (38.9 to 43.1). Its top stands 1.72 to 2.0
+  yd over the deck: chest to shoulder high. The data has no ship's rail to place: its only railing
+  (6157, CarnivalRailing) is 14 yd long and can't follow the curve.
+- **Why that tall (take 375):** at 0.75, seated under its lower end, its top stood 1 yd over the
+  deck where the deck rose, and a hero rolling back went over it: the client's own roll is a dash
+  at 16 yd/s along the ground, and the client lets a body step up 1 yd. Now its top clears that
+  step up and the server's own hop back (older clients: 0.23 yd at its peak) by half a yard. A
+  jump (1.6 yd) still clears it on the client; the server's stop below holds that.
+- **On the client:** walking, a dash roll and a run into it stop against it (take 375).
 - **On the server:** nothing leaves the deck over its line (`rail_crossing`). The deck lies to the
   left of the line as its points run; coming back aboard over it is free. A hero whose move would
   take them over it (a walk, the client's own roll, a jump, a step off falling) is stopped where
@@ -132,12 +139,10 @@ from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the 
   Both are fixed above, and the hop back's "You fell through the world" came from the same carrying
   (it had moved his last firm ground past the rail). `rail_tests.rs` replays the walk through the
   server's own movement packets.
-- **On the client: not solid yet.** Each piece's model has a collision hull (28 triangles, a closed
-  box over the whole piece, faces both ways; read from the data), the server sends it as a plain
-  solid object (type 5, state 1, flags 0x30: no "no hull" bit, as the aftermath's ruins), and the
-  client builds a static collider from such a hull. Yet in take 370 the hero walked through it.
-  The cause is in the client and wasn't found from its source: it needs a look with the client
-  running (the laptop can't run it). Until then the server's stop above is what holds the deck.
+- **The client's collision** with each piece is its model's hull (28 triangles, a closed box over
+  the whole piece, faces both ways); the server sends it as a plain solid object (type 5, state 1,
+  flags 0x30, as the aftermath's ruins). Take 370's walk-through was the server's wrong-way snap
+  above, not the hull: take 375 shows the client stopping at it.
 - **The aftermath:** the preview hides every world object along with the ship's own groups and
   colliders (patch 0087), and the wrecked Juggernaut has no deck there, so the rail goes with the
   ship. Turning the preview off brings both back.

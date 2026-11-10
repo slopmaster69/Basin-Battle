@@ -906,6 +906,12 @@ fn the_starboard_rail_runs_along_the_open_side_in_pieces_that_meet() {
             assert!(covered, "a gap in the rail at {p:?}");
         }
     }
+    // Tall enough everywhere: its hull (ElwynnWoodFence01's, 0.56 below its origin to 1.80 above)
+    // tops a hero's 1 yd step up and the hop back's 0.23 yd with half a yard to spare.
+    for o in &pieces {
+        let top = o.pos[2] + 1.80 * r.scale;
+        assert!(top - s.ground_near(o.pos[0], o.pos[1], o.pos[2])[2] >= 1.7, "a piece's top {top}");
+    }
     // A solid piece: the clients keep its hull (it isn't one of the passable props).
     let id = *s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Prop { display: FENCE, .. })).unwrap().0;
     assert!(!s.is_trap_obj(id) && !s.is_perch_visual_prop(id) && !s.is_kitchen_prop(id) && s.collapse_piece_tilt(id).is_none());

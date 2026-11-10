@@ -1648,6 +1648,10 @@ pub struct RailDef {
     #[serde(default = "rail_scale")]
     pub scale: f32,
     pub length: f32,
+    /// How far above the floor under its higher end each piece stands (its posts still sink in at
+    /// its lower end): its top clear of a step up and a hop.
+    #[serde(default)]
+    pub raise: f32,
 }
 
 fn rail_scale() -> f32 {

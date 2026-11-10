@@ -219,8 +219,9 @@ impl Survival {
             }
         }
         // The rails along open edges: a fence piece at a time along each stretch of the line,
-        // evenly spaced (overlapping a little) so the pieces meet, each seated at the lower of
-        // the floor under its two ends so neither end floats.
+        // evenly spaced (overlapping a little) so the pieces meet, each standing on the floor
+        // under its higher end (and `raise` over it), so its top is never low where the deck
+        // rises; its posts, sunk into the floor as modelled, still reach it at its lower end.
         for r in &d.rails {
             let len = r.length * r.scale;
             if len <= 0.0 {
@@ -237,7 +238,7 @@ impl Survival {
                     let (ex, ey) = (ax + (bx - ax) * t, ay + (by - ay) * t);
                     let (sx, sy) = (ex - f.cos() * len.min(span), ey - f.sin() * len.min(span));
                     let hint = az + (bz - az) * t;
-                    let z = self.ground_near(ex, ey, hint)[2].min(self.ground_near(sx, sy, hint)[2]);
+                    let z = self.ground_near(ex, ey, hint)[2].max(self.ground_near(sx, sy, hint)[2]) + r.raise;
                     let id = self.alloc();
                     self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos: [ex, ey, z], facing: f });
                 }
