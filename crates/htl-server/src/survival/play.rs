@@ -87,6 +87,33 @@ impl SurvivalGame {
         }
     }
 
+    /// What a fight leaves drawn once it's over, cleared: casts whose caster is gone, stand-ins
+    /// (each only a missile's launcher, never a fight in itself), and marks the rules no longer
+    /// hold. The marks still on the ground: a fight still going.
+    pub(crate) fn clear_fight_leftovers(&mut self) -> usize {
+        let gone: Vec<(Id, u32)> = self.casting.iter()
+            .filter(|(c, _)| !self.sim.mobs.contains_key(c) && !self.sim.players.contains_key(c))
+            .map(|(c, s)| (*c, *s)).collect();
+        for (c, spell) in gone {
+            self.casting.remove(&c);
+            if let Some(g) = self.guid_of(c) { self.broadcast(&packets::spell_failed_other(g, spell)); }
+        }
+        let stand_ins: Vec<(Id, u64)> = self.stand_ins.iter().map(|(id, s)| (*id, s.guid)).collect();
+        for (id, guid) in stand_ins {
+            self.stand_ins.remove(&id);
+            self.unbind(id);
+            self.broadcast(&packets::destroy_object(guid));
+        }
+        let stale: Vec<Id> = self.mark_at.keys().chain(self.area_looks.keys()).copied()
+            .filter(|id| self.sim.mark_left(*id) <= 0.0).collect();
+        for id in stale {
+            self.mark_at.remove(&id);
+            if let Some(g) = self.area_looks.remove(&id) { self.broadcast(&packets::destroy_object(g)); }
+            if let Some(g) = self.unbind(id) { self.broadcast(&packets::destroy_object(g)); }
+        }
+        self.mark_at.len() + self.area_looks.len()
+    }
+
     /// Each tick: the stand-ins made last tick cast their missiles, and those done with go.
     fn step_stand_ins(&mut self) {
         let mut cast = Vec::new();
@@ -129,6 +156,9 @@ impl SurvivalGame {
                 }
             }
             Event::MobGone { id } => {
+                // Its cast goes with it (taken away mid-draw, by `.es clearfoes` or a reset, it
+                // never ends one).
+                self.casting.remove(&id);
                 if let Some(g) = self.unbind(id) {
                     self.broadcast(&packets::destroy_object(g));
                 }

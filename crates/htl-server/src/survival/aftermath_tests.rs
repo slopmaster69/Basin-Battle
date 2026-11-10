@@ -530,7 +530,30 @@ fn native_way_from_the_entrance_to_the_cove_stays_open() {
     assert!(blocked.is_empty(), "the way through is blocked in {} places", blocked.len());
 }
 
+/// A fight that's over doesn't hold the preview: a crossbowman taken away mid-draw left its cast
+/// on the books, and Cookie's thrown pots their stand-ins, and either refused it till a restart.
+#[test]
+fn an_ended_fight_leaves_nothing_that_refuses_the_preview() {
+    for key in ["dm_crossbowman", "dm_cookie", "dm_squallshaper"] {
+        let mut game = game();
+        let (id, rx) = observer(&mut game, 1);
+        game.sim.summon(id, key).unwrap();
+        for _ in 0..300 { game.tick(); rx.try_iter().for_each(drop); }
+        game.sim.dev_clear_foes("").unwrap();
+        for _ in 0..20 { game.tick(); rx.try_iter().for_each(drop); }
+        assert!(game.casting.keys().all(|c| game.sim.players.contains_key(c)), "{key}: a gone creature's cast is let go");
+        game.aftermath_start(1).unwrap_or_else(|e| panic!("{key}: {e}"));
+        assert!(game.aftermath.is_some() && game.stand_ins.is_empty() && game.casting.is_empty());
+        game.aftermath_command(1, "off", "").unwrap();
+    }
+}
 
+/// A guid packed as the wire packs it.
+fn packed(guid: u64) -> Vec<u8> {
+    let bytes = guid.to_le_bytes();
+    let mask = (0..8).filter(|i| bytes[*i] != 0).fold(0u8, |m, i| m | (1 << i));
+    std::iter::once(mask).chain(bytes.iter().copied().filter(|b| *b != 0)).collect()
+}
 
 /// A packed guid from the front of `b`, and the bytes after it.
 fn packed_guid(b: &[u8]) -> (u64, &[u8]) {
@@ -619,4 +642,103 @@ fn the_air_goes_out_to_inspectors_and_stops_with_the_preview() {
     assert!(stand_ins.iter().all(|g| gone.contains(g)), "the stand-ins go with the preview");
     game.tick();
     assert!(!rx.try_iter().any(|p| p.opcode == op::SMSG_SPELL_GO || p.opcode == op::SMSG_PLAY_OBJECT_SOUND), "silent once restored");
+}
+
+/// The cameraman follows the hero round the preview: its client is put where the hero inspects,
+/// so its world is loaded there (it stayed at the landing and filmed the cove's water).
+#[test]
+fn the_cameraman_is_taken_where_the_hero_inspects() {
+    let mut game = game();
+    let (_, hero) = observer(&mut game, 1);
+    let (_, cam) = observer(&mut game, 2);
+    game.watch_command(2, "observer1").unwrap();
+    game.aftermath_start(1).unwrap();
+    game.aftermath_command(1, "visit", "mouth").unwrap();
+    hero.try_iter().for_each(drop);
+    cam.try_iter().for_each(drop);
+    game.tick();
+    let mouth = layout::REGIONS[0].view;
+    let me = packed(game.world_of(2).unwrap().guid);
+    let moved = cam.try_iter().filter(|p| p.opcode == op::MSG_MOVE_TELEPORT_ACK).any(|p| {
+        let at = me.len() + 12;
+        let pos: Vec<f32> = (0..3).map(|k| f32::from_le_bytes(p.body[at + 4 * k..at + 4 * k + 4].try_into().unwrap())).collect();
+        p.body.starts_with(&me) && (pos[0] - mouth[0]).hypot(pos[1] - mouth[1]) < 3.0
+    });
+    assert!(moved, "the cameraman goes to the mouth with the hero");
+    assert!(!hero.try_iter().any(|p| p.opcode == op::MSG_MOVE_HEARTBEAT), "no one is shown it");
+    // Once there, it stays put while the hero looks round.
+    game.tick();
+    assert!(!cam.try_iter().any(|p| p.opcode == op::MSG_MOVE_TELEPORT_ACK));
+}
+
+/// A region's rock, measured as the review measures a pile: each rock's footprint (its model's
+/// box across, scaled) times how far its turned box stands over the floor under it.
+fn rock_volumes(land: &dyn Land, props: &[Prop]) -> Vec<f32> {
+    let mut out = vec![0.0; layout::REGIONS.len()];
+    for p in props.iter().filter(|p| rocky(p.model) && p.site != "Juggernaut collapse basin") {
+        let m = &MODELS[p.model];
+        let b = p.obb(0.0);
+        let top = b.c[2] + (0..3).map(|i| b.a[i][2].abs() * b.h[i]).sum::<f32>();
+        let fl = floor(land, [p.pos[0], p.pos[1], p.pos[2] + 1.0], true).unwrap_or(p.pos[2]);
+        out[p.region] += (m.max[0] - m.min[0]) * (m.max[1] - m.min[1]) * p.scale * p.scale * (top - fl).max(0.0);
+    }
+    out
+}
+
+/// Every region's collapse reads at least as big as the old layout's in the same views (the
+/// first rebuild's entrance was one cone smaller than the dome it replaced). The old layout
+/// (main at e6eb2081, its boulders and rubble less the drowned ship's basin), measured the same
+/// way on the installed map.
+#[test]
+#[ignore = "requires the user's WoW 1.12.1 Data folder in WOW_DATA"]
+fn native_every_region_has_at_least_the_old_layouts_rock() {
+    const OLD: [f32; 8] = [4052.0, 9487.0, 5870.0, 4514.0, 8146.0, 6597.0, 13675.0, 4869.0];
+    let n = native();
+    let ground = native_ground(&n);
+    let (props, _) = compose(&ground);
+    let new = rock_volumes(&n.land, &props);
+    let mut short = Vec::new();
+    for (i, r) in layout::REGIONS.iter().enumerate() {
+        println!("{}: {:.0} (old {:.0})", r.name, new[i], OLD[i]);
+        if new[i] < OLD[i] { short.push(r.name); }
+    }
+    assert!(short.is_empty(), "less rock than before in {short:?}");
+}
+
+/// The dust reaches whoever is looking, where they look: the hero and the cameraman following
+/// them are both sent the stand-ins and, at the pile in front of the entrance's view, their
+/// clouds (none showed on the second film: the cameraman never left the landing).
+#[test]
+fn the_dust_goes_out_where_the_hero_and_the_cameraman_look() {
+    let mut game = game();
+    let (_, hero) = observer(&mut game, 1);
+    let (_, cam) = observer(&mut game, 2);
+    game.watch_command(2, "observer1").unwrap();
+    hero.try_iter().for_each(drop);
+    cam.try_iter().for_each(drop);
+    game.aftermath_start(1).unwrap();
+    game.aftermath_command(1, "visit", "mouth").unwrap();
+    let a = game.aftermath.as_ref().unwrap();
+    let mouth = layout::REGIONS[0].view;
+    let near: BTreeMap<u64, [f32; 3]> = a.air.dust.iter().filter(|s| (s.at[0] - mouth[0]).hypot(s.at[1] - mouth[1]) < 35.0).map(|s| (s.guid, s.at)).collect();
+    assert!(near.len() >= 3, "{} dust spots by the entrance", near.len());
+    // Every pile has its dust, the cove's and the landing's too.
+    for r in 0..layout::REGIONS.len() {
+        assert!(a.air.dust.iter().any(|s| a.props[s.prop].region == r), "dust in {}", layout::REGIONS[r].name);
+    }
+    game.aftermath.as_mut().unwrap().air.started -= std::time::Duration::from_secs(12);
+    game.tick();
+    for (who, rx) in [("hero", &hero), ("cameraman", &cam)] {
+        let sent: Vec<Packet> = rx.try_iter().collect();
+        let made: Vec<u64> = sent.iter().filter(|p| p.opcode == op::SMSG_UPDATE_OBJECT)
+            .flat_map(|p| near.keys().copied().filter(|g| p.body.windows(8).any(|w| w == g.to_le_bytes()) || p.body.windows(packed(*g).len()).any(|w| w == packed(*g).as_slice())).collect::<Vec<_>>())
+            .collect();
+        assert!(near.keys().all(|g| made.contains(g)), "the {who} is sent the stand-ins by the entrance");
+        let clouds = sent.iter().filter(|p| p.opcode == op::SMSG_SPELL_GO).filter(|p| {
+            let (caster, rest) = packed_guid(&p.body);
+            near.contains_key(&caster) && u32::from_le_bytes(rest[packed(caster).len()..packed(caster).len() + 4].try_into().unwrap()) == air::SPELL_DUST
+        }).count();
+        assert!(clouds >= 3, "the {who} sees {clouds} clouds at the entrance in its first seconds");
+    }
+    assert!(game.aftermath.as_ref().unwrap().air.puffs >= 3, "counted for `.es aftermath status`");
 }

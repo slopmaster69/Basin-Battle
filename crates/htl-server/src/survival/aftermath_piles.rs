@@ -61,6 +61,9 @@ struct Builder<'a> {
     k: usize,
     /// The floor height the current site's pieces are found from.
     near: f32,
+    /// Rock heaped onto a pile keeps under the roof (a slab through the ceiling of a beamed
+    /// tunnel reads as a hole in it).
+    under_roof: bool,
 }
 
 impl Builder<'_> {
@@ -243,12 +246,25 @@ impl Builder<'_> {
             let w = turn(&m, mul(*r, scale));
             match self.support(at[0] + w[0], at[1] + w[1], near) {
                 Some(s) => sunk = sunk.min(s - w[2]),
-                None if self.in_wall([at[0], at[1], near], [at[0] + w[0], at[1] + w[1]]) => {}
+                // (Heaped rock sits whole on what's there: a rail at knee height is not a wall.)
+                None if !self.under_roof && self.in_wall([at[0], at[1], near], [at[0] + w[0], at[1] + w[1]]) => {}
                 None => return None,
             }
         }
-        if !sunk.is_finite() || self.floor_at(at[0], at[1], near).is_none() { return None; }
+        let Some(fl) = self.floor_at(at[0], at[1], near).filter(|_| sunk.is_finite()) else { return None };
         let p = self.prop(model, [at[0], at[1], sunk - 0.25 * scale - 0.1], scale, q);
+        if self.under_roof {
+            let top = self.g.points(&p).iter().map(|v| v[2]).fold(f32::MIN, f32::max);
+            if self.g.roof([at[0], at[1], fl]).is_some_and(|r| top > r - 0.3) { return None; }
+            // Its rim buried all round in the floor as the floor is found from the rim itself, or
+            // in rock (not hanging over a drop the floor near the pile hides).
+            for r in &rim {
+                let w = add(p.pos, turn(&m, mul(*r, scale)));
+                let rock = self.props.iter().filter(|q| rocky(q.model) && (q.pos[0] - w[0]).hypot(q.pos[1] - w[1]) < 8.0 * q.scale)
+                    .filter_map(|q| self.g.top_at(q, w[0], w[1])).fold(f32::MIN, f32::max);
+                if w[2] - floor_under(&*self.g.land, w).max(rock) > 0.05 { return None; }
+            }
+        }
         self.place(p)
     }
 
@@ -480,24 +496,22 @@ impl Builder<'_> {
         let Some(roof) = self.g.roof([over[0], over[1], fl]) else { return };
         if roof - fl > ROOF_REACH { return; }
         let _ = face;
-        // The beam: out of the roof beside the scar, down onto the pile.
-        // (Beside the scar, from the first of a few places in the roof over the pile it fits.)
-        for (du, dv) in [(-2.0, 1.7), (-1.2, -1.8), (-2.6, -0.4), (-0.6, 2.4)] {
+        // The beam: out of the roof beside the scar, down onto the pile, from the first of a few
+        // places in the roof over the pile to the first place on the pile it reaches. Never a
+        // stub left hanging from the roof: on film one read as a pole floating in the air.
+        'beam: for (du, dv) in [(-2.0, 1.7), (-1.2, -1.8), (-2.6, -0.4), (-0.6, 2.4), (-1.6, 0.4), (0.0, -2.6)] {
             let t = ax.at(um + du * sl, dv * hand * sl);
             let Some(tf) = self.floor_at(t[0], t[1], z0) else { continue };
             let Some(tr) = self.g.roof([t[0], t[1], tf]).filter(|r| r - tf < ROOF_REACH) else { continue };
             let top = [t[0], t[1], tr + 0.6];
-            // Its lower end on the pile itself, never down on the bare floor.
-            let b = ax.at(um - 0.9 * sl, 0.9 * hand * sl);
-            let fl = self.floor_at(b[0], b[1], z0).unwrap_or(z0);
-            let rest = self.support(b[0], b[1], z0).filter(|s| *s > fl + 0.5).map(|s| [b[0], b[1], s + 0.1]);
-            let shallow = |r: &V3| (top[2] - r[2]) < 2.1 * (top[0] - r[0]).hypot(top[1] - r[1]);
-            if rest.is_some_and(|r| len(sub(top, r)) < 9.0 && shallow(&r) && self.beam(top, r).is_some()) { break; }
-            // Too far to reach the pile: a stub hanging from the roof, 30 degrees out.
-            let d = unit([ax.f[0] * -0.5, ax.f[1] * -0.5, -0.87]);
-            if self.beam(top, add(top, mul(d, 4.2))).is_some() { break; }
-            let d = unit([ax.s[0] * 0.5, ax.s[1] * 0.5, -0.87]);
-            if self.beam(top, add(top, mul(d, 3.4))).is_some() { break; }
+            for (fu, fv) in [(0.9, 0.9), (0.5, 0.0), (1.3, -0.9), (0.2, 1.6), (1.6, 0.4), (0.8, -1.6)] {
+                // Its lower end on the pile itself, never down on the bare floor.
+                let b = ax.at(um - fu * sl, fv * hand * sl);
+                let fl = self.floor_at(b[0], b[1], z0).unwrap_or(z0);
+                let Some(r) = self.support(b[0], b[1], z0).filter(|s| *s > fl + 0.5).map(|s| [b[0], b[1], s + 0.1]) else { continue };
+                let shallow = (top[2] - r[2]) < 2.1 * (top[0] - r[0]).hypot(top[1] - r[1]);
+                if len(sub(top, r)) < 11.0 && shallow && self.beam(top, r).is_some() { break 'beam; }
+            }
         }
         // The broken post: its iron foot on the floor in front, its top on the pile (the first of
         // a few ways round the pile's front that has room).
@@ -548,8 +562,10 @@ impl Builder<'_> {
                 self.tipped(CARGO, near(2.4, 3.2), z0, 0.95, 1.45, 0.0, yaw0 + 0.4);
                 self.tipped(CRATE, near(3.8, -2.6), z0, 1.4, 0.0, FRAC_PI_2, yaw0 + 2.1);
                 self.tipped(BARREL, near(1.8, -4.0), z0, 1.5, FRAC_PI_2, 0.0, yaw0 + 1.5);
-                self.tipped(SACK, near(4.4, 0.8), z0, 1.8, 0.0, 0.0, yaw0 + 0.3);
-                self.tipped(SACK, near(5.0, 1.9), z0, 1.6, 0.0, 0.0, yaw0 + 2.6);
+                // (No sacks: the split sack's pale cloth glowed green by the rear cell's lantern on
+                // film, twice. A second barrel and crate instead.)
+                self.tipped(BARREL, near(4.4, 0.8), z0, 1.3, FRAC_PI_2, 0.2, yaw0 + 0.3);
+                self.tipped(CRATE, near(5.0, 2.4), z0, 1.1, FRAC_PI_2, 0.0, yaw0 + 2.6);
             }
             Dressing::Shore => {
                 self.tipped(BOAT, near(2.6, 3.6), z0, 0.6, 0.2, 0.12, yaw0 + 1.1);
@@ -595,6 +611,49 @@ impl Builder<'_> {
         let front = um - 3.0 * sl;
         self.foot(ax, z0, front, main, k, hand);
         self.dressing(site.dressing, ax, z0, front, k, hand);
+    }
+
+    /// The rock at a site from `from` on, by the review's measure: each rock's footprint (its
+    /// model's box across, scaled) times how far its turned box stands over the floor under it.
+    pub(super) fn rock_volume(&self, site: &str) -> f32 {
+        self.props.iter().filter(|p| p.site == site && rocky(p.model)).map(|p| {
+            let m = &MODELS[p.model];
+            let b = p.obb(0.0);
+            let top = b.c[2] + (0..3).map(|i| b.a[i][2].abs() * b.h[i]).sum::<f32>();
+            let fl = floor(&*self.g.land, [p.pos[0], p.pos[1], p.pos[2] + 1.0], true).unwrap_or(p.pos[2]);
+            (m.max[0] - m.min[0]) * (m.max[1] - m.min[1]) * p.scale * p.scale * (top - fl).max(0.0)
+        }).sum()
+    }
+
+    /// Big rock heaped on and round a site's pile until it holds `target` (see
+    /// [`layout::OLD_ROCK`]): several large pieces jumbled over the first mass and against it,
+    /// then smaller ones, each seated on whatever is under its rim and kept under the roof.
+    fn heap(&mut self, site: &Site, z0: f32, target: f32) {
+        let short = target - self.rock_volume(site.name);
+        if short <= 0.0 { return; }
+        let rocks: Vec<&Prop> = self.props.iter().filter(|p| p.site == site.name && p.model == ROCK && p.scale > 0.3).collect();
+        let c = match rocks.iter().max_by(|a, b| a.scale.total_cmp(&b.scale)) {
+            // (Round the largest: the pile's own mass.)
+            Some(m) => [m.pos[0], m.pos[1]],
+            None => [site.at[0], site.at[1]],
+        };
+        // The size whose rock (about 128 s^3 by the measure) would make up a third of what's
+        // short: three or four of those and their smaller pieces.
+        let s0 = (short / 3.0 / 128.0).cbrt().clamp(0.6, 2.4);
+        self.under_roof = true;
+        let mut added = 0;
+        'all: for size in [1.0, 0.8, 0.65, 0.5] {
+            for ring in [0.0, 0.8, 1.6, 2.4] {
+                for a in 0..6 {
+                    if added == 10 || self.rock_volume(site.name) >= target { break 'all; }
+                    let ang = a as f32 * 1.05 + ring * 1.3 + size * 3.0;
+                    let r = ring * s0 * 3.0;
+                    let yaw = ang * 1.7 + self.jit();
+                    if self.rock([c[0] + r * ang.cos(), c[1] + r * ang.sin()], z0, s0 * size, yaw).is_some() { added += 1; }
+                }
+            }
+        }
+        self.under_roof = false;
     }
 
     /// A side passage filled to its lintel: a row of large rocks across it, more stacked on them
@@ -752,7 +811,7 @@ fn apron(b: &mut Builder, r: &Region, rows: &[(usize, [f32; 2], f32, f32)]) {
 }
 
 pub(super) fn compose(g: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
-    let mut b = Builder { g, props: Vec::new(), region: 0, site: "", wet: false, seed: 0, k: 0, near: 0.0 };
+    let mut b = Builder { g, props: Vec::new(), region: 0, site: "", wet: false, seed: 0, k: 0, near: 0.0, under_roof: false };
     let mut missing = Vec::new();
     for (index, site) in layout::SITES.iter().enumerate() {
         (b.region, b.site, b.wet, b.seed, b.k) = (site.region, site.name, false, index, 0);
@@ -767,6 +826,35 @@ pub(super) fn compose(g: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
             Fall::Seal => b.seal(site, z0, hand),
             Fall::Lintel => b.lintel(site, z0, hand),
             Fall::Spill => b.spill(site, z0, hand),
+        }
+    }
+    // Then rock heaped on each pile until it has at least the old layout's there, with some to
+    // spare (after every pile has its own parts, so one's heap doesn't crowd out the next's).
+    // Where a pile can't take it (the walk runs by it, the shore drops into the water), the rest
+    // of its region's piles take more, until the region has the old layout's and more.
+    let heap_at = |b: &mut Builder, index: usize, target: f32| {
+        let site = &layout::SITES[index];
+        // (The cove's shore piles may run into the shallows.)
+        (b.region, b.site, b.wet, b.seed, b.k) = (site.region, site.name, site.region == 6, 500 + index, 0);
+        let Some(z0) = b.floor_at(site.at[0], site.at[1], site.at[2]) else { return };
+        b.near = z0;
+        b.heap(site, z0, target);
+        b.wet = false;
+    };
+    for (index, site) in layout::SITES.iter().enumerate() {
+        heap_at(&mut b, index, 1.25 * layout::old_rock(site.name));
+    }
+    for region in 0..layout::REGIONS.len() {
+        let sites: Vec<usize> = (0..layout::SITES.len()).filter(|i| layout::SITES[*i].region == region).collect();
+        let old: f32 = sites.iter().map(|i| layout::old_rock(layout::SITES[*i].name)).sum();
+        for round in 0..3 {
+            let have: f32 = sites.iter().map(|i| b.rock_volume(layout::SITES[*i].name)).sum();
+            if have >= 1.2 * old { break; }
+            let each = (1.2 * old - have) / sites.len() as f32;
+            for &i in &sites {
+                let now = b.rock_volume(layout::SITES[i].name);
+                heap_at(&mut b, i, now + each * (1.0 + 0.5 * round as f32));
+            }
         }
     }
     for (region, r) in layout::REGIONS.iter().enumerate() {
