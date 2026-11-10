@@ -15,7 +15,7 @@ use benilla_formats::{
 use crate::layers::{Layers, Sources};
 use crate::world::{placement_matrix, transform};
 
-mod aftermath;
+pub mod aftermath;
 
 /// `v` turned by the quaternion `q` (x, y, z, w).
 fn quat_rotate(q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
@@ -124,16 +124,32 @@ pub fn load_instance(data_dir: &Path, map_dir: &str) -> Result<LoadedDeadmines> 
 
 /// [`load_instance`] at another cell size, over part of the map only.
 pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32; 2], [f32; 2])>) -> Result<LoadedDeadmines> {
-    load_variant(data_dir, map_dir, cell, window, false)
+    load_variant(data_dir, map_dir, cell, window, false, None)
 }
 
 /// The finished Deadmines: the Juggernaut, its cargo and its added gangway are absent.
 /// The client applies the same group mask in its aftermath WMO asset (patch 0087).
 pub fn load_aftermath(data_dir: &Path) -> Result<LoadedDeadmines> {
-    load_variant(data_dir, MAP_DIR, CELL, None, true)
+    load_variant(data_dir, MAP_DIR, CELL, None, true, None)
 }
 
-fn load_variant(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32; 2], [f32; 2])>, aftermath: bool) -> Result<LoadedDeadmines> {
+/// [`load_aftermath`] with the shapes themselves kept: every solid triangle (walls, ceilings,
+/// floors, the hulls of what stands in the mine) and where every native doodad still standing
+/// is, for seating the ruins against the real rock and keeping them out of what's already there.
+pub fn load_aftermath_survey(data_dir: &Path) -> Result<aftermath::Survey> {
+    let mut kept = aftermath::Kept::default();
+    let loaded = load_variant(data_dir, MAP_DIR, CELL, None, true, Some(&mut kept))?;
+    Ok(aftermath::Survey::new(loaded, kept))
+}
+
+fn load_variant(
+    data_dir: &Path,
+    map_dir: &str,
+    cell: f32,
+    window: Option<([f32; 2], [f32; 2])>,
+    aftermath: bool,
+    mut kept: Option<&mut aftermath::Kept>,
+) -> Result<LoadedDeadmines> {
     let mut chain = Chain::open(data_dir)
         .with_context(|| format!("opening the game data in {}", data_dir.display()))?;
     let tiles = tiles_of(&mut chain, map_dir)?;
@@ -197,6 +213,10 @@ fn load_variant(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32;
                             }
                         };
                         props.push((d.model.clone(), transform(&m, w.position, d.position), !hull.is_empty()));
+                        if let Some(k) = kept.as_deref_mut() {
+                            let bounds = k.bounds(&mut chain, &d.model);
+                            k.standing.push(aftermath::Standing::in_wmo(&d.model, bounds, &m, w.position, d.orientation, d.position, d.scale));
+                        }
                         if hull.is_empty() {
                             continue;
                         }
@@ -289,10 +309,14 @@ fn load_variant(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32;
                     }
                 };
                 props.push((d.model.clone(), d.position, !hull.is_empty()));
+                let m = placement_matrix(d.rotation);
+                if let Some(k) = kept.as_deref_mut() {
+                    let bounds = k.bounds(&mut chain, &d.model);
+                    k.standing.push(aftermath::Standing::on_terrain(&d.model, bounds, &m, d.position, d.scale));
+                }
                 if hull.is_empty() {
                     continue;
                 }
-                let m = placement_matrix(d.rotation);
                 let pts: Vec<[f32; 3]> = hull
                     .positions
                     .iter()
@@ -307,6 +331,10 @@ fn load_variant(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32;
         solid.extend(DEADMINES_BRIDGES);
     }
     let (min, max) = window.unwrap_or(([lo[0] - MARGIN, lo[1] - MARGIN], [hi[0] + MARGIN, hi[1] + MARGIN]));
+    if let Some(k) = kept.as_deref_mut() {
+        k.solid = solid.clone();
+        k.box_ = (min, max);
+    }
     for c in &chunks {
         for l in &c.liquids {
             liquid.extend(l.indices.chunks_exact(3).map(|i| {

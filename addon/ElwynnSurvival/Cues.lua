@@ -38,6 +38,11 @@ ES.CUE = {
   wall = { stop = 120, shake = { 3.2, 0.24 } },
   -- A killing blow cheated: the world held around the hero a long moment, the view barely moving.
   cheat_death = { stop = 260, shake = { 1.2, 0.4 }, self = true },
+  -- The mine coming down (Rhahk'Zor's collapse): near its front the ground rumbles under the
+  -- hero (a long low shake, each beat running into the next), and rock or a beam landing beside
+  -- them jolts the view. Shakes alone: no stop, nothing held, the hero runs on.
+  rumble = { shake = { 1.4, 0.75 } },
+  rockfall = { shake = { 4.5, 0.32 } },
   -- Valor given back, and every cooldown readied: on the HUD (below), not the camera.
   valor = { hud = "valor" },
   readied = { hud = "keys" },

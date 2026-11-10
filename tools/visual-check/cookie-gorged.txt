@@ -1,7 +1,7 @@
 # Controlled secret-form demonstration. Fresh summon, periodic heals and debug finish.
 # Not the secret-ingredient discovery/handoff or an unassisted clear. Markers stay disabled.
-# Inspect the enlarged orange murloc, long alert/cast inhale stand-in, committed steam direction,
-# four-second wounded cough stand-in, and no murloc reinforcements at low health.
+# Inspect the swollen murloc (Cookie's own body at 1.95), the held rear-back, the belch cone drawn on
+# the ground, the four-second open look, and no murloc reinforcements at low health.
 hero warrior
 cam 0 -24 14
 0 .es debug quiet

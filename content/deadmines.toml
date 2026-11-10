@@ -201,11 +201,13 @@ z = 41.5
 radius = 0.0
 count = 1
 
+# He waits in his cabin's doorway and, pulled, steps out onto the lit main deck to duel
+# (docs/vancleef-encounter.md); his Blackguards watch from the west rail.
 [[dungeon.pack]]
 key = "vancleef"
 mob = "dm_vancleef"
-at = [-84.0, -820.0]
-z = 39.5
+at = [-77.0, -820.0]
+z = 40.0
 radius = 0.0
 count = 1
 
@@ -533,7 +535,9 @@ respawn = 0.0
   weight = 4.0
   steps = [ { clip = 17, take = 1, ranged = false, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6, sound = 0 } ]
 
-# Cookie serves one cooling spill, then risks a scoop after three completed exchanges.
+# Cookie (docs/cookie-encounter.md): a cleaver pair, a broad ladle and Serve It Hot, then a greedy
+# scoop at his cauldron after 3, 4 and 5 exchanges. The kitchen (sim/kitchen.rs) owns the pot,
+# the tankard in his hand, the puddle, the scoop and Gorged's rise.
 [[mob]]
 key = "dm_cookie"
 name = "Cookie"
@@ -556,13 +560,12 @@ trophy = { cookie_tenderizer = 1 }
 gear = ["cookie_tenderizer", "cookie_trousers"]
 respawn = 0.0
 # Whoever carries his secret ingredient into the fight sees what the stew does to him: he lies
-# still a while, then gets up bigger.
+# still 2 s, gets up in a puff of dust, walks to the pot, gulps it empty and swells. No narration
+# and no arcane swirl (kit 356 was one): the kitchen shows it and says "MORE STEW!" when he's grown.
 then = "dm_cookie_gorged"
-then_after = 3.5
+then_after = 2.0
 then_needs = "secret_ingredient"
-then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot and grows."
-then_kit = 356
-# Geyser 10987 is an ice-hand effect, not stew; growth and the next breath carry the reveal.
+then_text = ""
 aggro_text = "Mrrgl! Cookie's kitchen!"
 slay_text = "More meat for the pot!"
 death_text = "...burnt."
@@ -586,18 +589,20 @@ death_text = "...burnt."
   name = "ladle"
   weight = 1.0
   steps = [ { clip = 57, take = 0, windup = 1.2, damage = 24, arc = 150.0, heavy = true, recovery = 1.6 } ]
-  # Kitchen owns the committed landing point, one 2 yd patch, and its cooling. No generic arc hit.
-  # 20 on contact, two 4-damage ticks, then 1.5 sec of harmless thinning steam.
+  # The tankard lifted (HoldThrown, held), then thrown in an arc onto where the hero stood, 4 to
+  # 8 yd off: a 2 yd puddle, 20 as it lands and 4 a second until its last edge puff drops (4.2 s).
+  # The kitchen owns the landing and the puddle; no generic arc hit. He fights on while it cools.
   [[mob.pattern]]
   name = "serve it hot"
   weight = 1.0
-  max_range = 5.0
-  steps = [ { clip = 107, take = 0, windup = 1.8, range = 5.0, arc = 65.0, damage = 20, blockable = false, poise = true, recovery = 1.7 } ]
-  # Only a successful scoop chooses this: a short locked cone and a four-second cough.
+  max_range = 8.0
+  steps = [ { clip = 111, take = 0, windup = 1.8, range = 8.0, arc = 65.0, damage = 20, blockable = false, poise = true, recovery = 1.7 } ]
+  # Only a scoop left alone chooses this: a breath drawn in (HoldThrown, MurlocAlert), a locked
+  # 5 yd, 65-degree steam cone, then a short 1.5 s opening.
   [[mob.pattern]]
   name = "steam"
   weight = 0.0
-  steps = [ { clip = 32, take = 0, windup = 1.6, range = 5.0, arc = 65.0, damage = 24, blockable = false, poise = true, recovery = 4.0 } ]
+  steps = [ { clip = 111, take = 0, windup = 1.6, range = 5.0, arc = 65.0, damage = 24, sound = 1109, blockable = false, poise = true, recovery = 1.5 } ]
 
 # Mr. Smite: three physical loadouts, earned by a run to his rack, never an arena stun.
 [[mob]]
@@ -624,8 +629,9 @@ gear = ["smite_hammer", "smite_breastplate"]
 respawn = 0.0
 aggro_sound = 5775
   [mob.arsenal]
-  # Native floor probe: (-2, -774, 9.55), 7 walking steps from the dock home.
-  rack = [0.0, -6.0]
+  # Native floor probe (Nov 9): (-2, -777, 9.6), 9 yd to his side of the way in, 19 walking
+  # steps from the dock home, so his run to it crosses the duel camera.
+  rack = [0.0, -9.0]
   display = 130
   loadouts = [
     { weapon = 679, grip = "sword", patterns = ["sweep", "delayed overhead"] },
@@ -656,7 +662,8 @@ aggro_sound = 5775
   [[mob.pattern]]
   name = "sweep"
   weight = 3.0
-  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.95, damage = 36, arc = 170.0, recovery = 1.25 } ]
+  # (No knockdown: block it or step back. Only the overhead and the hammer floor a hero.)
+  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.95, damage = 36, arc = 170.0, recovery = 1.25, heavy = false } ]
   [[mob.pattern]]
   name = "delayed overhead"
   weight = 2.0
@@ -676,14 +683,20 @@ aggro_sound = 5775
   [[mob.pattern]]
   name = "hammer slam"
   weight = 3.0
-  steps = [ { from = "TaurenMale", clip = 58, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379 } ]
+  # Attack2H (18), not the overhead's Special2H (58): the two read apart. Dust bursts where the
+  # head lands, hit or miss, and its wedge flashes on the ground. (Rocky Ground Impact's boulders
+  # filmed pink and lingering, Nov 9 take 331: dropped.)
+  steps = [ { from = "TaurenMale", clip = 18, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379, burst = "D8B070" } ]
   [[mob.pattern]]
   name = "hoof stomp"
   weight = 1.5
   max_range = 3.0
-  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, kit = 356 } ]
+  # Dust as the hoof comes down and its true 3.5 yd ring flashed tan on the ground. No spell look:
+  # kit 356 and War Stomp's own 5089 both flash a blue ring (5089 filmed so, Nov 9 take 331).
+  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, burst = "D8B070" } ]
 
-# Captain Greenskin: the finite firing line controls the opening and the reload windows.
+# Captain Greenskin: break the firing line (docs/greenskin-encounter.md). His two gunners stand at
+# their posts before the pull and take turns to fire; he fights between their shots.
 [[temper]]
 key = "quarterdeck"
 punish = true
@@ -698,7 +711,9 @@ subname = "The Juggernaut's Captain"
 display = 7113
 windup_sound = 1409
 scale = 1.5
-health = 520
+# Tuned with the fair-hero sim (firing_line_tests.rs): breaking the line first takes a lone sword
+# hero about 70 to 80 sec; dueling him through the volleys takes them through 16 or 17 shots.
+health = 1500
 run_speed = 7.0
 walk_speed = 2.0
 aggro = 12.0
@@ -735,23 +750,29 @@ death_text = "My ship..."
   weight = 2.0
   max_range = 4.0
   steps = [ { clip = 57, take = 0, windup = 1.25, range = 4.0, arc = 220.0, damage = 20, recovery = 1.6 } ]
-  # Crew death, never health, unlocks these. Both aim at the position held at the first pose.
+  # Both gunners down, never health, unlocks these (`sim::firing_line`). The gun: at a hero
+  # kiting him, at most every 10 sec; a load (0.6) and a 1.2 sec aim (a draw first when it's put
+  # away), then a ball along a 1 yd line (radius is half its width) at 20 yd/s. 1.12 has no
+  # pistol item model: a short native blunderbuss.
   [[mob.pattern]]
   name = "pistol shot"
   weight = 2.0
-  min_range = 4.0
+  min_range = 6.0
   max_range = 28.0
-  # 1.12 has no pistol item model: a short native blunderbuss makes the draw visible.
-  steps = [ { ranged = true, windup = 2.4, damage = 23, range = 28.0, radius = 0.85, speed = 40.0, spell = 8682, sound = 1147, recovery = 1.8 } ]
+  steps = [ { ranged = true, windup = 1.8, damage = 23, range = 28.0, radius = 0.5, speed = 20.0, spell = 8682, recovery = 1.8 } ]
+  # The harpoon, only at a hero who has kept 8 yd away for 2 sec: held back 1.7 sec, thrown along
+  # a line on the native net (6533) at 14 yd/s. A fair hit hauls them to 3 yd and into his
+  # clearing cut; a sidestep, a dodge or a guard spares them the haul.
   [[mob.pattern]]
   name = "harpoon"
   weight = 1.5
-  min_range = 5.0
+  min_range = 8.0
   max_range = 26.0
-  # Borrow the native rope/net throw used by Reverse Grapple, with a fair hit-gated pull.
-  steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.85, speed = 24.0, spell = 6533, blockable = true, recovery = 2.0 } ]
+  steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.5, speed = 14.0, spell = 6533, blockable = true, recovery = 2.0 } ]
 
-# Exactly 2 spawn with the captain's pull, on reachable deck, and never get replacements.
+# Exactly 2 stand at their posts either side of the quarterdeck before the pull, are pulled with
+# him, and never get replacements. Each shot: a load (0.6), the gun at the shoulder where the aim
+# locks (1.6), and a ball along a 1 yd line (radius is half its width) at 20 yd/s.
 [[mob]]
 key = "dm_deck_gunner"
 name = "Defias Deck Gunner"
@@ -768,7 +789,7 @@ respawn = 0.0
   [mob.attack]
   ranged = true
   windup = 2.2
-  damage = 17
+  damage = 28
   range = 32.0
   arc = 20.0
   recovery = 0.8
@@ -776,12 +797,12 @@ respawn = 0.0
   turn_rate = 0.0
   lock = 2.2
   blockable = true
-  radius = 0.85
-  speed = 40.0
+  radius = 0.5
+  speed = 20.0
   spell = 8682
-  sound = 1147
 
-# Edwin VanCleef: two honest cuts, then an Invitation that can be waited out.
+# Edwin VanCleef: hunched means hit, blades up means wait (docs/vancleef-encounter.md). Two honest
+# cuts and a hunch, then the Invitation: wait it out, or be answered by the riposte.
 [[mob]]
 key = "dm_vancleef"
 name = "Edwin VanCleef"
@@ -803,6 +824,10 @@ grip = "1h"
 evade = 0.0
 boss = true
 posture = 300
+# His posture drains over 7 sec, not 6, and each hit in a hunch counts 3 times: a lone sword hero
+# who parries his cuts and punishes his hunches breaks it 2 to 6 times a fight (the duel-by-tells
+# test), where before only a debug command ever did.
+posture_secs = 7.0
 drops = { plunder = [40, 50] }
 trophy = { cruel_barb = 1, blackened_armor = 1 }
 gear = ["cruel_barb", "vancleef_pauldrons"]
@@ -826,37 +851,41 @@ slay_sound = 5781
   turn_rate = 0.0
   lock = 1.5
   blockable = true
-  # Authored strings never gain or lose a random blow, nor skip their final recovery.
+  # Authored strings never gain or lose a random blow, nor skip their final recovery. Every cut
+  # winds up rising, blades up and back over the head (the Undead man's overhead cuts, 17 takes 2
+  # and 0, and his overhead 18 for the heavy), so only the hunch is low (Nov 9 filming: the human
+  # man's own cuts wound up in a crouch that read as more of a hunch than the hunch).
   [[mob.pattern]]
   name = "string"
   weight = 3.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.75, damage = 20, recovery = 0.22 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 24, recovery = 1.8 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 0.75, damage = 20, recovery = 0.22 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.65, damage = 24, recovery = 1.8 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
   max_range = 9.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 4.0, damage = 26, recovery = 1.8 } ]
-  # The module holds the native guard pose with both blades. This dummy step never fires.
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.0, lunge = 4.0, damage = 26, recovery = 1.8 } ]
+  # The module holds the native guard pose with both blades for 2 sec. This dummy step never fires.
   [[mob.pattern]]
   name = "invitation"
   weight = 0.0
-  steps = [ { windup = 1.8, damage = 0, recovery = 1.2 } ]
-  # Keep Desktop's HumanMale 57 correction: no borrowed crouching/leaping special.
+  steps = [ { windup = 2.0, damage = 0, recovery = 1.2 } ]
+  # A thrust (Pierce), not the cuts' raised arm, his weapon glowing red: no guard stops it. The
+  # module carries the lunge past where the hero stood and keeps it from killing.
   [[mob.pattern]]
   name = "riposte"
   weight = 0.0
-  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.9, damage = 36, arc = 80.0, lunge = 2.0, heavy = true, recovery = 2.4, kit = 379 } ]
+  steps = [ { from = "HumanMale", clip = 85, take = 0, windup = 0.9, damage = 36, arc = 80.0, heavy = true, blockable = false, recovery = 2.4 } ]
   [[mob.pattern]]
   name = "advance"
   weight = 0.0
   max_range = 14.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 4.0, damage = 22, recovery = 0.25 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.7, lunge = 1.5, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 32, heavy = true, recovery = 2.5 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.1, lunge = 4.0, damage = 22, recovery = 0.25 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.7, lunge = 1.5, damage = 22, recovery = 0.3 }, { from = "ScourgeMale", clip = 18, take = 0, windup = 1.0, damage = 32, heavy = true, recovery = 2.5 } ]
   [[mob.pattern]]
   name = "last stand"
   weight = 0.0
   max_range = 30.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 3.0, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 36, heavy = true, recovery = 3.0 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.0, lunge = 3.0, damage = 22, recovery = 0.18 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.18 }, { from = "ScourgeMale", clip = 17, take = 2, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.3 }, { from = "ScourgeMale", clip = 18, take = 0, windup = 1.0, damage = 36, heavy = true, recovery = 3.0 } ]
 
 # Finite spectators. They never aggro, attack, intercept hero hits, or drop loot.
 [[mob]]
@@ -1021,11 +1050,13 @@ boss = "gilnid"
 bars = [[-240.0, -572.0], [-240.0, -586.0]]
 text = "Gilnid is beaten. The Foundry's back door stands open at the top of the ramp."
 
-# Gilnid in the pit, by the smelter.
+# Gilnid in the pit, by the smelter. (He stood at (-205, -592), behind the cargo, the cannonballs
+# and the ramp's rock base from the way in: a hero stepping into the Foundry couldn't see or lock
+# him. Here he's in sight from the gap by the door. Nov 9 2026, the boss review.)
 [[dungeon.pack]]
 key = "gilnid"
 mob = "dm_gilnid"
-at = [-205.0, -592.0]
+at = [-200.0, -587.0]
 z = 21.0
 radius = 0.0
 count = 1
@@ -1110,7 +1141,7 @@ boss = "sneed"
 bars = [[-244.0, -468.0], [-244.0, -497.0]]
 text = "Sneed is beaten. The Mast Room's north door opens on the galleries."
 
-# Sneed in his shredder; he climbs out of the wreck.
+# Sneed in his shredder, cutting at a log with its back to the door; thrown out of the wreck.
 [[dungeon.pack]]
 key = "sneed"
 mob = "dm_shredder"
@@ -1301,6 +1332,8 @@ respawn = 0.0
 
 # This pair belongs to the encounter, never to a pack. The same engineer changes to
 # wrench fighting on landing; ambient engineers elsewhere retain their own behavior.
+# The stick: a 3 sec fuse lit in his hand (Heavy Dynamite's own ready pose and lit stick), thrown
+# in an arc, then it sits sparking 1 sec before it blows (`sim::perches`).
 [[mob]]
 key = "dm_perched_engineer"
 temper = "skirmisher"
@@ -1317,7 +1350,8 @@ grip = "1h"
 respawn = 0.0
   [mob.attack]
   ranged = true
-  windup = 1.8
+  # The fuse: Corey's 3 sec (Nov 9 2026, was 1.8).
+  windup = 3.0
   damage = 18
   range = 26.0
   arc = 0.0
@@ -1326,8 +1360,9 @@ respawn = 0.0
   turn_rate = 180.0
   lock = 0.7
   blockable = false
-  speed = 10.0
-  # At least LOB_RADIUS (2.5): the landing is warned during the fuse and flight.
+  # The client flies Heavy Dynamite at 14 yd a second; the arc's two legs are timed by it.
+  speed = 14.0
+  # At least LOB_RADIUS (2.5): the landing is warned during the fuse, the flight and the sit.
   radius = 2.5
   spell = 4062
   look = 3204
@@ -1359,7 +1394,8 @@ respawn = 0.0
   lock = 0.35
   blockable = true
 
-# Gilnid, the Smelter: a wrench up close, molten iron thrown far, and the channels overflowing.
+# Gilnid, the Smelter: a spanner up close, his crew's dynamite from the ramp, then the furnace's
+# own fire, and a last flurry that sticks his spanner in the floor (docs/gilnid-encounter.md).
 [[mob]]
 key = "dm_gilnid"
 name = "Gilnid"
@@ -1386,10 +1422,13 @@ respawn = 0.0
   [mob.perch_crew]
   airborne = "dm_perched_engineer"
   grounded = "dm_ground_engineer"
-  # Probed on the lower Foundry floor (~21 yd), not the upper ring.
-  spots = [[-6.0, 3.0], [6.0, 3.0]]
-  valve = [0.0, -6.0]
-  channel = [[-6.0, -3.0], [0.0, -3.0], [6.0, -3.0]]
+  # Two planks laid from the rail of the spiral ramp's south side (rail tops measured at about
+  # z 29.2 and 30.3) out over the pit, the first 8.6 yd up and the second 9.7, splayed apart.
+  # Each rests on a pole from the pit floor (`tests/gilnid_native.rs` checks them on the map).
+  ledges = [ { at = [-9.98, -8.65, 8.57], out = 1.771 }, { at = [-6.18, -8.75, 9.67], out = 1.221 } ]
+  # The valve on the melting pot's south face, (-208.1, -583.1), and the pot's mouth.
+  valve = [-8.1, 3.9]
+  furnace = [-5.7, 8.0, 6.8]
   [mob.attack]
   windup = 0.6
   damage = 24
@@ -1417,9 +1456,17 @@ respawn = 0.0
   weight = 1.5
   max_range = 2.6
   steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
+  # The finish, once the valve is done, and then only this (`sim::perches`): three blows pressing
+  # forward, the last a two-handed chop (Attack2H's second take) over-reaching into the floor. The
+  # spanner sticks there: he's open 2.5 sec, bent double over it, both hands on it.
+  [[mob.pattern]]
+  name = "flurry"
+  weight = 1.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.4, damage = 20, lunge = 1.0, recovery = 0.15 }, { clip = 18, take = 1, windup = 0.8, damage = 30, arc = 80.0, heavy = true, lunge = 1.5, recovery = 2.5, kit = 379 } ]
 
-# Sneed's machine builds pressure from saws, then stamp/rake, then a straight grind and stall.
-# sim/machinery owns this cycle and the one repair, regardless of either form's health.
+# Sneed's machine (docs/shredder-encounter.md): saw sweep, stamp and rake, then the grind (a rev in
+# place, a straight drive) and a slumped stall. sim/machinery owns this cycle, the walk in, the break
+# and the one repair, regardless of either form's health. Its lines are said there, 2 sec apart.
 [[mob]]
 key = "dm_shredder"
 name = "Sneed's Shredder"
@@ -1430,12 +1477,14 @@ windup_sound = 0
 aggro_sound = 1982
 death_sound = 1980
 scale = 1.1
+# Its legs stand about 1.5 yd out from its middle (2.2 yd at its size): blows reach it from there,
+# and it stops with a hero outside them.
+girth = 1.5
 health = 950
 run_speed = 6.0
 walk_speed = 2.0
 aggro = 18.0
 aggro_text = "Clear the floor!"
-death_text = "No, no, not now!"
 leash = 30.0
 boss = true
 unparryable = true
@@ -1444,11 +1493,11 @@ posture = 320
 drops = {}
 respawn = 0.0
 then = "dm_sneed"
-then_text = "That was company property!"
   [mob.attack]
   windup = 1.0
   damage = 30
-  range = 3.4
+  # Reaches past its legs (was 3.4, inside them): it stops 4 yd from its hero.
+  range = 4.3
   arc = 140.0
   recovery = 1.2
   cooldown = 1.5
@@ -1457,19 +1506,23 @@ then_text = "That was company property!"
   blockable = true
   heavy = true
   sound = 1977
+  # The arm swings out to the side and the saw revs 1 sec, sparking. One vent puff after.
   [[mob.pattern]]
   name = "saws"
   steps = [ { clip = 16, take = 0, windup = 1.0, damage = 30, recovery = 1.4 } ]
+  # A foot rises and lands in dust (no guard stops it), then a blockable rake. Steam pours after.
   [[mob.pattern]]
   name = "stamp and rake"
-  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.2, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, kit = 356, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
-  # Locks as the engine revs, travels 6 yd in 0.9 sec, then stalls for 3.5 sec.
+  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.9, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
+  # Plants and churns its legs in place (its Run, held) as the engine races 1.4 sec, then drives
+  # 6 yd straight in 0.9 sec and stalls, slumped, for 3.5 sec.
   [[mob.pattern]]
   name = "grind"
   max_range = 8.0
-  steps = [ { clip = 16, take = 1, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, kit = 379, sound = 1982 } ]
+  steps = [ { clip = 5, take = 0, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, sound = 1982 } ]
 
-# Fragile on foot: a thrown wrench covers a scramble, a close flurry when cornered.
+# Fragile on foot: he keeps his distance, a wrench every 6 sec covering a scramble; cornered, three
+# blows and then he's open (hunched) 1.4 sec. sim/machinery moves him, and his one repair.
 [[mob]]
 key = "dm_sneed"
 name = "Sneed"
@@ -2526,14 +2579,17 @@ perks = [{ kind = "regen", amount = 0.003 }]
 
 [[mob]]
 key = "dm_cookie_gorged"
-name = "Cookie"
+# His own name, so a camera or a hero can tell the forms apart.
+name = "Gorged Cookie"
 temper = "bruiser"
 subname = "Gorged on the Stew"
-display = 1773
+# Cookie's own body (display 1305), so he rises at Cookie's size and the swell (1.3 to 1.95, over
+# 1.5 s at the pot) compares like with like. The orange 1773 (its own display scale 2.0) at 1.15
+# was filmed smaller than Cookie.
+display = 1305
 # Each string has its own voice so the inhale alert is not masked by an attack grunt.
 windup_sound = 0
-# Native display 1773 is 2x; 1.15 makes the secret form visibly larger than Cookie.
-scale = 1.15
+scale = 1.95
 health = 820
 run_speed = 6.0
 walk_speed = 2.0
@@ -2549,7 +2605,7 @@ death_text = "...burnt."
   [mob.attack]
   windup = 0.9
   damage = 24
-  range = 3.4
+  range = 3.8
   arc = 110.0
   recovery = 1.3
   cooldown = 1.5
@@ -2562,12 +2618,13 @@ death_text = "...burnt."
   name = "slaps"
   weight = 1.0
   steps = [ { clip = 16, take = 0, windup = 0.9, damage = 22, sound = 417, recovery = 0.4 }, { clip = 17, take = 0, windup = 0.8, damage = 24, recovery = 1.6 } ]
-  # A generous inhale locks at the first pose. Move beside him, then punish four seconds of cough.
+  # He rears back (HoldThrown, held) and swells for 2.2 s, the cone drawn on the ground at the
+  # 7.4 yd and 70 degrees it hits. Move beside him, then punish four seconds of cough.
   [[mob.pattern]]
   name = "belch"
   weight = 1.0
   max_range = 7.0
-  steps = [ { clip = 32, take = 0, windup = 2.2, range = 7.0, arc = 70.0, damage = 34, sound = 1109, blockable = false, poise = true, recovery = 4.0 } ]
+  steps = [ { clip = 111, take = 0, windup = 2.2, range = 7.0, arc = 70.0, damage = 34, sound = 1109, blockable = false, poise = true, recovery = 4.0 } ]
 
 # --- Edwin VanCleef, unbowed: longer commitments, greater punish windows ---------------------------
 
@@ -2585,8 +2642,10 @@ run_speed = 8.0
 walk_speed = 2.4
 aggro = 30.0
 leash = 40.0
-weapon = 1928
-off_hand = 2806
+# Risen, he carries black blades and a dark swirl at his feet: another look.
+weapon = 31855
+off_hand = 31856
+aura = 15473
 grip = "1h"
 # The authored retreat and advance own his footwork; no random backstep interrupts a tell.
 evade = 0.0
@@ -2611,31 +2670,24 @@ slay_sound = 5781
   [[mob.pattern]]
   name = "string"
   weight = 3.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.8, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 32, heavy = true, recovery = 2.8 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 0.8, damage = 22, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 2, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "ScourgeMale", clip = 18, take = 0, windup = 1.0, damage = 32, heavy = true, recovery = 2.8 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
   max_range = 10.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 5.0, damage = 28, recovery = 2.2 } ]
-  [[mob.pattern]]
-  name = "invitation"
-  weight = 0.0
-  steps = [ { windup = 1.8, damage = 0, recovery = 1.2 } ]
-  [[mob.pattern]]
-  name = "riposte"
-  weight = 0.0
-  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.9, damage = 38, arc = 80.0, lunge = 2.0, heavy = true, recovery = 2.8, kit = 379 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.1, lunge = 5.0, damage = 28, recovery = 2.2 } ]
+  # No Invitation once risen: long strings, and only the final hunch is open.
   [[mob.pattern]]
   name = "advance"
   weight = 0.0
   max_range = 14.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.1, lunge = 4.0, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.0, damage = 34, heavy = true, recovery = 3.0 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.1, lunge = 4.0, damage = 22, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 2, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "ScourgeMale", clip = 18, take = 0, windup = 1.0, damage = 34, heavy = true, recovery = 3.0 } ]
   [[mob.pattern]]
   name = "last stand"
   weight = 0.0
   max_range = 40.0
-  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 1.0, lunge = 3.0, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.18 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "HumanMale", clip = 57, take = 0, windup = 1.1, damage = 38, heavy = true, recovery = 3.4 } ]
+  steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.0, lunge = 3.0, damage = 22, recovery = 0.18 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.18 }, { from = "ScourgeMale", clip = 17, take = 2, windup = 0.65, lunge = 1.5, damage = 22, recovery = 0.18 }, { from = "ScourgeMale", clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.3 }, { from = "ScourgeMale", clip = 18, take = 0, windup = 1.1, damage = 38, heavy = true, recovery = 3.4 } ]
 
 # --- the rares ---------------------------------------------------------------------------------------
 

@@ -810,6 +810,21 @@ secs = 0.5
 scale = 1.5
 speed = 120
 
+# Greenskin's crew's shots (`sim::firing_line`): Fire Shot's bolt (no one else flies 6980) with a
+# pale smoke streak, flown at the ball's own 20 yd/s so it can be seen and stepped from (patch
+# 0040; older clients fly the spell's 40). The 1.12 data has no gun flash or bullet to borrow.
+[[missile_look]]
+spell = 6980
+trail = "E8E2D0"
+width = 0.15
+secs = 0.35
+speed = 20.0
+
+# His harpoon's line: the native net (no one else throws 6533), at the throw's 14 yd/s.
+[[missile_look]]
+spell = 6533
+speed = 14.0
+
 # Multi-Shot's frost-tipped fan.
 [[missile_look]]
 spell = 6984

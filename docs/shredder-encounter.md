@@ -1,87 +1,105 @@
-# Sneed's Shredder: the machine and the coward
+# Sneed's Shredder, then Sneed: the machine and the coward
 
-The machine uses one complete saw sweep, then a stamp and rake, then a straight grind. Only
-executed strings build pressure. Smoke puffs come twice as often at the second pressure step.
-The grind locks its direction at the first pose, winds up for 1.4 sec, travels 6 yd in 0.9 sec,
-and stalls for 3.5 sec. Its 3 yd lane checks the actual swept path and can hit each hero once.
-Walls stop the grind. A sidestep works without a dodge, parry, interrupt or ranged loadout.
-There are no health-triggered phases or damage multipliers in either form.
+Corey's revised design (Nov 9). The machine's three moves each look and sound like themselves, its
+grind is a plant, a rev and a drive, and Sneed climbs out, runs, and gets chased. One machine cycle
+is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (tests in
+`machinery_tests.rs`); the numbers are `dm_shredder` and `dm_sneed` in `content/deadmines.toml`.
 
-The machine still has 950 base health. Its driver has 340 base health, down from 700. Sneed
-aims the native wrench missile during its tell, then scrambles back 4 yd where the ground allows, and flurries up
-close. After at least 5 sec on foot, at a safe attack boundary, he returns to the wreck. He has
-6 sec to get there; no path means he abandons the attempt. He chooses a dry reachable edge
-nearest his opponent, outside the retained native Death pose, and faces the machine. He works
-for 4 sec there, using the existing Mining cast and repeated sparks. Any positive damage or a
-stagger stops that attempt permanently. No particular class ability is required.
+## The nine beats
 
-A successful repair consumes the corpse and removes the driver, replacing them with one machine
-at the original wreck position with one third of its original maximum health. The driver's remaining health is saved; when the
-machine breaks again, he emerges with that health and no repair left. Only the final driver's
-death awards plunder and gear and clears the pack. A wipe restores one whole machine at its
-original post. A lamp rest and a driver death remove any retained wreck.
+1. **Pull.** At its post the machine cuts at a log with its back to the Mast Room door: a swing
+   (AttackUnarmed, either take) every 3.2 sec, sparks off the blade, the saw's sound. It notices a
+   hero as any creature does, turns to face them (0.8 sec), "Clear the floor!", and walks in at its
+   Walk clip's own pace (2.5 yd a second) until it's in reach. Its first blow comes only then.
+2. **Saw sweep.** The arm swings out (AttackUnarmed take 0, 1 sec), the saw revs with sparks every
+   0.35 sec. A guard stops it, or get behind it or out of its 4.7 yd. One vent puff after.
+3. **Stamp and rake.** A foot rises and lands (CreatureSpecial, 1.1 sec), dust where it lands, no
+   guard stops it. Then a blockable rake (AttackUnarmed take 1, 0.7 sec). Now the vents pour steam
+   (a puff every 0.5 sec) with a hiss.
+4. **Grind,** at full heat. It plants and stops turning, its legs churning in place (its Run,
+   held 1.4 sec, the engine racing and smoking): "That'll cut it!" Then it drives 6 yd straight in
+   0.9 sec, its legs running, chips and sparks off the floor every 0.2 sec. Its 3 yd lane checks
+   the swept path and hits each hero once; walls stop it. Step aside during the rev.
+5. **Stall,** 3.5 sec, facing the way it drove: its legs buckle and it slumps (JumpEnd's landing
+   crouch, caught 0.25 sec in with the body at half its height and tipped about 30°, and held
+   still), smoke pouring (a puff every 0.25 sec) and sparks flying (every 0.4 sec) the whole time,
+   the engine sputtering (its own clanks at uneven gaps). 0.45 sec before the end the engine
+   catches and it heaves itself up. Hits don't flinch it out of the slump.
+   "C'mon, you heap of junk!" A posture break may lengthen it, never shorten it.
+6. **Break.** "No, no, not now!" The machine collapses (its Death lands at 2.5 sec). Then Sneed is
+   thrown out (0.6 sec in the air) past the wreck's edge farthest from his foe and lands in dust.
+   Nothing reaches him before he lands. A second later: "That was company property!" His first
+   blow comes no sooner than 2 sec after he lands. The wreck smokes while he can still mend it.
+7. **Sneed on foot.** He backs off, facing his foe, to 8 yd at 4 yd a second (slower than a hero
+   runs). A wrench every 6 sec, then a 4 yd scramble. Caught within 3.4 yd, he flurries three
+   blows, then is open 1.4 sec, hunched (StandWound, held).
+8. **The repair, once.** No sooner than 6 sec after he lands, at a safe moment: "Just...
+   one... bolt..." and he runs to the reachable edge of the wreck farthest from his foe (6 sec to
+   get there, else he gives up). 4 sec of hammering (Mining) and sparks. Any hit, or a stagger,
+   stops it for good, and the wreck goes quiet where it lies: no more smoke or sparks. It stays
+   until Sneed's body goes (4 sec after he falls) or a wipe clears the floor. Finished,
+   the same wreck heaves back up (JumpEnd) in smoke and dust where it lay, facing the way it fell,
+   at a third of its health. It says nothing and doesn't walk in; it waits 2 sec before its first
+   blow.
+9. **Second break.** He bails out the same way, with the health he had. No repair left.
 
-The implementation is in `sim/machinery.rs`, with small attack and lifecycle hooks. Other boss
-content, shared boss-run behavior, the client patches and the native creature models stay with
-their existing owners. The native Throw Wrench spell 13398 was verified against the rig's client
-data: `Spells\Missile_Wrench.mdx`, speed 20. Sneed uses GoblinMale's native AttackThrown 107,
-whose release event is at 0.20 sec in its 0.67 sec take; that model has no clip 61. Smoke and work use existing spell visuals 1856 and
-2575. The native model audit confirmed attack 16 takes 0/1, special 130 and StandWound 8; it
-has no separate stun clip. Sweep uses take 0, stamp uses 130 and grind uses take 1, with native
-attack/pre-aggro/aggro sounds 1977/1981/1982. Stall uses StandWound and wound sound 1979. The
-special and take 1 share impact timings, so distinct silhouettes must still be checked on film.
-Exact smoke appearance, sound separation and the work animation also need that visual pass.
+A wipe at any point (Sneed inside, on foot, mid-repair) puts back one whole machine at its post;
+a lamp rest does too. Only Sneed's death awards plunder and gear and clears the pack.
 
-## Capture checklist
+## Health and sizes
 
-`tools/visual-check/shredder-pressure-repair.txt` is a **dev-command demonstration**, with forced
-health transitions and repeated healing. It does not prove an unassisted full fight. Start with
-an unbeaten Sneed pack. Record the source commit and client build in the capture notes.
+The machine has 950 base health and 320 posture; Sneed 340 and 160. The machine's legs stand
+about 1.5 yd out from its middle at scale 1 (`girth`), 2.2 yd at its drawn size (1.1 times the
+bosses' 1.35). A hero's blow reaches it from there, and it stops 4 yd from its hero (reach 4.3),
+so the hero stands outside its legs. Between blows it turns where it stands rather than circling.
 
-- Approach from the Mast Room entry and frame both safe sides of the machine.
-- Show each normal move's preparation, danger and recovery. Sidestep the locked grind and strike
-  during the stall. Keep the full first pressure cycle in one shot.
-- Show driver emergence, a wrench covering his retreat, and a close flurry.
-- Let one repair complete. Show its full 4 sec and the one-third health bar. Break the machine
-  again and verify that the driver retains his damage and never repairs again.
-- On a fresh pull, interrupt the work with a normal light swing, with an empty ability loadout.
-  Show the wreck disappearing and Sneed remaining on foot.
-- On separate fresh pulls, wipe during work and during the grind. Return to the post, then rest
-  at a lamp: one full-health machine, no duplicate Sneed, lingering attack or ghost wreck.
-- Record solo and duo fights, with melee and ranged loadouts, including earned finishes. Record
-  at least one full fight with floor markers turned off in Controls. Record that separately
-  from the scripted demonstration, and report boss length and any unclear native animation.
+## What the shared fixes became here
 
-The script can be parsed without launching a client using
-`scripts/visual-check-windows.ps1 -Check shredder-pressure-repair`.
+The shared-fixes table belongs to the Chandrian session; these are the local versions for this
+fight only.
 
-## Actor diagnostics and their limits
+| Shared fix | Here |
+| --- | --- |
+| Punish windows look like idling | The stall's slump: JumpEnd caught with the legs buckled and held still (`freeze_open_pose`, the add-on's `FZ`), smoke, sparks and a sputter the whole 3.5 sec; Sneed's open 1.4 sec holds GoblinMale's StandWound (`hold_open_pose` 8). Neither is flinched out of by the hits that punish it |
+| Debug damage counts as real | `machinery_debug`: debug damage builds no posture on either form and never stops the repair |
+| Second forms are instant swaps | Sneed hidden in the wreck until it lands, thrown out, a line, 2 sec before his first blow; the rebuilt machine heaves up and waits 2 sec |
+| Deaths lag | Either form sends `HoldPose` 0 as it falls, letting go of a held slump, rev or hunch |
+| Yells collide | `machinery_say` keeps the encounter's lines at least 2 sec apart (the pull line included) |
+| Bodies overlap | `girth` on the machine: hero reach and the machine's stop are measured from its legs |
 
-The existing ignored `tests_fair_hero::fair_hero_one` report was run with `FAIR_HERO_FOES`
-set to each form and `FAIR_HERO_SEED` set to 1, 7 and 19. Its careful sword actor moves,
-attacks and answers tells, but has 1,000,000 health and fights on flat open-world ground.
-The machine's first life lasted 78.62, 74.26 and 76.58 sec; the actor took 56, 28 and 0
-damage. Sneed spawned alone lasted 25.78, 31.98 and 41.92 sec, with no damage taken.
-Neither form produced a hit the report classed as too quick to answer.
+The one-tint tell: the machine's wind-ups no longer tint its body. The server marks its
+telegraphs (`TG` field 13, "1") and drops the creature from its unblockable warning (`WN`), and the
+add-on skips the glow for it. The hero is still warned on their own screen (the flash and ping
+before an unblockable blow, the floor mark with markers on).
 
-These are isolated-form diagnostics. The harness tracks only the original creature IDs, so
-its machine report stops at driver emergence; its standalone Sneed has no wreck or repair.
-It has no duo mode. These timings must not be added together or called full encounter balance
-evidence. Whole-encounter solo and duo pacing, normal-health survival and earned finishes
-remain to be measured in play or a separately extended actor report.
+## Native data used
 
-## Repair edge regression
+GoblinShredder (display 1269, `Creature\Goblin\GoblinShredder.m2`) has Stand, Walk (2.5 yd a
+second), Run (6.9), AttackUnarmed takes 0 and 1 (impact 1.00 and 0.83 sec), CreatureSpecial 130,
+StandWound, Death ($DTH at 2.50 sec), Walkbackwards, Swim and the jumps. No stun or kneel clip,
+and StandWound keeps the body at full height (measured on its bones: head and body never under
+0.95 of standing), so the stall is JumpEnd held at its landing crouch (0.18 to 0.34 sec in, the
+body at 0.49 to 0.55 of its height) and the heave is JumpEnd played through. Sounds: GoblinShredderAttack 1977 (saw),
+GoblinShredder 3700 (engine), GoblinShredderWoundCrit 1979 (stall), SteamGeyserVar1 4858 (vent
+hiss). Smoke is Vanish's puff (spell 1856), sparks the parry kit (555), dust 5649. Sneed's wrench
+is spell 13398 (`Spells\Missile_Wrench.mdx`, speed 20) on GoblinMale's AttackThrown 107.
 
-The old center-seeking stop was 1.5 yd from the retained wreck in both native capture setups.
-GoblinShredder's Death pose extends several yards farther at the final encounter scale
-(including `combat.boss_scale`), hiding the goblin and close sword contact. The repair now checks four edge points against native footing
-and walking paths plus dry melee standing room, selects the nearest reachable edge to the opponent, and never falls back
-to the center. The 0.2 yd arrival and 0.35 yd work drift limits retain clearance for Sneed's
-body. A failed route still abandons the single attempt without teleporting.
+## Filming
 
-`shredder_native` (ignored without `WOW_DATA`) exercises the authored post and the north/east
-capture setups. It checks actual Mining-start clearance, continuous dry movement, facing,
-ordinary empty-loadout melee interruption, the full four-second work interval, rebuild at the
-original center, preserved driver health and no second repair. Run it with
+Film with the spectator cameraman ("Filming a boss" in `docs/visual-check.md`): `camera low
+Sneed's Shredder` for the machine, `camera duel Sneed` for him on foot. Start from an unbeaten
+Sneed pack and a hero out of its sight near the Mast Room door, so the log work, the turn and the
+walk in are on camera. `tools/visual-check/shredder-pressure-repair.txt` is an older
+dev-command demonstration (forced breaks, repeated heals): it shows the moves, not a fight.
+
+Not yet filmed (Nov 10): the held slump, the pouring smoke and sparks and the sputter in the stall,
+and the quiet wreck staying after a stopped repair.
+
+## Tests
+
+`cargo test -p htl-survival machinery` covers each beat on flat ground: the move order and each
+move's look, the walk in and where it stops, the lane and the stall, the break and Sneed's
+landing, the 2 sec lines, his footwork, the repair (far edge, 4 sec, the heave, health kept, no
+second repair), interruptions, wipes and debug damage. `shredder_native` (ignored without
+`WOW_DATA`) runs the repair on the real Mast Room floor:
 `cargo test --release -p htl-server --test shredder_native -- --ignored --nocapture`.
-The real client's hand animation, sparks and sword contact still require the visual pass.

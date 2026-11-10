@@ -65,6 +65,7 @@ pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT
 };
 pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
+pub use perches::LedgeView;
 pub use arena::Arena;
 pub use dungeon::{door_open, Below, BelowHero};
 pub use raid::RaidPhase;
@@ -234,6 +235,10 @@ pub enum Event {
     /// A pose held on a unit (the ward's arm held out): `clip` looped for `secs` (0: let go), for
     /// the clients that hold one (`WP`).
     HoldPose { id: Id, clip: u16, secs: f32, from: Option<String> },
+    /// A unit's animation held still `after` seconds from now, for `secs` (0: let go at once),
+    /// for the clients that can (`FZ`): a pose caught part way through a clip (the Shredder's
+    /// buckled legs, Gilnid bent over his stuck spanner) where no clip of the model holds it.
+    Freeze { id: Id, after: f32, secs: f32 },
     /// A staff's heavy bolt began its charge: it can go from `lo` seconds, and is whole at `hi`
     /// (for the staff's mark on the caster's screen; no ring, no flare on the body).
     StaffHeavy { player: Id, lo: f32, hi: f32 },
@@ -911,6 +916,9 @@ pub struct Mob {
     pub raider: bool,
     /// Reeling (parried, or struck mid wind-up) until then: it does nothing, and takes more.
     pub stagger_until: f32,
+    /// Holding an open pose until then (a hunch, a stall, a stuck spanner: `hold_open_pose`): a
+    /// hit's flinch doesn't replace it, so a punish window still looks open while it's punished.
+    pub posed_until: f32,
     /// Thrown (knocked back or pulled) through the air until then: it lands where it was thrown,
     /// whatever else the blow did (a slow, a root or a stagger takes hold once it's down).
     pub thrown_until: f32,
@@ -1110,6 +1118,8 @@ pub struct Survival {
     pub storage: BTreeMap<usize, u32>,
     pub events: Vec<Event>,
     pub(crate) missiles: Vec<combat::Missile>,
+    /// Creatures' shots along a line in flight (Greenskin's crew's balls, his harpoon).
+    pub(crate) line_shots: Vec<combat::LineShot>,
     /// Heroes' projectiles in flight, ground marked to land, ground burning, totems standing.
     pub(crate) projectiles: Vec<abilities::Projectile>,
     pub(crate) grounds: Vec<abilities::GroundCast>,
@@ -1135,6 +1145,9 @@ pub struct Survival {
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
+    /// Creatures' lines waiting their turn, and where and when lines were last said.
+    pub(crate) lines: std::collections::VecDeque<Line>,
+    pub(crate) said: Vec<(f32, Vec3)>,
     pub(crate) traps: Vec<moves::Trap>,
     /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
     pub hunt: hunter::Hunt,
@@ -1273,8 +1286,11 @@ impl Survival {
             storage: BTreeMap::new(),
             events: Vec::new(),
             missiles: Vec::new(),
+            line_shots: Vec::new(),
             projectiles: Vec::new(),
             landings: Vec::new(),
+            lines: std::collections::VecDeque::new(),
+            said: Vec::new(),
             traps: Vec::new(),
             hunt: hunter::Hunt::default(),
             duels: Vec::new(),
@@ -1477,15 +1493,56 @@ impl Survival {
         self.events.push(Event::Announce { text });
     }
 
-    /// A creature yells `text` (nothing for an empty line); the log keeps it with its name.
+    /// A creature yells `text` (nothing for an empty line); the log keeps it with its name. Lines
+    /// in one place come at least [`LINE_GAP`] apart: one due sooner waits its turn (Nov 8: two
+    /// or three lines in one tick at Greenskin's pull, Sneed's break, VanCleef's 30%).
     pub(crate) fn yell(&mut self, id: Id, text: impl Into<String>) {
         let text = text.into();
         if text.is_empty() {
             return;
         }
+        let Some(at) = self.mobs.get(&id).map(|m| m.pos) else { return self.say_line(id, text) };
+        if self.lines.iter().any(|l| dist2d(l.at, at) < LINE_AREA) || !self.line_clear(at) {
+            self.lines.push_back(Line { id, text, at, since: self.clock });
+        } else {
+            self.say_line(id, text);
+        }
+    }
+
+    fn say_line(&mut self, id: Id, text: String) {
+        if let Some(at) = self.mobs.get(&id).map(|m| m.pos) {
+            self.said.push((self.clock, at));
+        }
         let name = self.mobs.get(&id).map_or("", |m| self.content.mobs[m.def].name.as_str());
         self.events.push(Event::Log(format!("{name}: {text}")));
         self.events.push(Event::Yell { id, text });
+    }
+
+    /// Whether no line was said near `at` in the last [`LINE_GAP`].
+    fn line_clear(&self, at: Vec3) -> bool {
+        !self.said.iter().any(|(t, p)| self.clock - t < LINE_GAP && dist2d(*p, at) < LINE_AREA)
+    }
+
+    /// Lines waiting their turn are said, the oldest first in each place; one whose speaker is
+    /// gone, or that waited too long to still fit the moment, is dropped.
+    pub(crate) fn step_lines(&mut self) {
+        let now = self.clock;
+        self.said.retain(|(t, _)| now - t < LINE_GAP);
+        if self.lines.is_empty() {
+            return;
+        }
+        let waiting = std::mem::take(&mut self.lines);
+        for l in waiting {
+            if !self.mobs.contains_key(&l.id) || now - l.since > LINE_STALE {
+                continue;
+            }
+            let first_here = !self.lines.iter().any(|w| dist2d(w.at, l.at) < LINE_AREA);
+            if first_here && self.line_clear(l.at) {
+                self.say_line(l.id, l.text);
+            } else {
+                self.lines.push_back(l);
+            }
+        }
     }
 
     // --- heroes ---------------------------------------------------------------------------------
@@ -1673,6 +1730,10 @@ impl Survival {
         let drop = if self.clock < p.landing_until { LANDING_FALL } else { FELL_THROUGH };
         if self.is_below() && pos.iter().all(|v| v.is_finite()) && self.hold_at_doors(id, was, pos)
         {
+            return;
+        }
+        // Over the ship's side in VanCleef's duel: back on the deck.
+        if self.hold_on_deck(id, pos) {
             return;
         }
         // Fallen through the world (the floor not there on arrival): back to the last firm ground.
@@ -2390,7 +2451,7 @@ impl Survival {
                 && angle_between(p.facing, facing(p.pos, at)) <= w.arc / 2.0
                 && crate::land::clear_line(self.land.as_ref(), p.pos, at)
         };
-        let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, 0.5 * self.content.mobs[m.def].scale)).count();
+        let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, self.content.mobs[m.def].body())).count();
         let heroes = if self.heroes_clash() {
             self.players.iter().filter(|(hid, h)| **hid != id && h.health > 0 && self.hostile(id, **hid) && reaches(h.pos, 0.4)).count()
         } else {
@@ -2466,6 +2527,22 @@ pub const WALK_SPEED: f32 = 2.5;
 /// circle. The looks are as big as they are (play-test: the Deadmines' dynamite, 2.6 yards, laid
 /// fire over the whole floor), so a splash smaller than this gets its true size drawn.
 pub const GROUND_LOOK_MIN: f32 = 6.0;
+
+/// Creatures' lines in one place come at least this far apart (seconds).
+pub const LINE_GAP: f32 = 2.0;
+/// Lines said within this of each other (yards) are in one place.
+pub const LINE_AREA: f32 = 40.0;
+/// A line that waited this long for its turn no longer fits the moment, and is dropped.
+pub const LINE_STALE: f32 = 8.0;
+
+/// A creature's line waiting its turn (see [`Survival::yell`]).
+#[derive(Debug, Clone)]
+pub struct Line {
+    pub id: Id,
+    pub text: String,
+    pub at: Vec3,
+    pub since: f32,
+}
 pub const DASH_SPEED: f32 = 30.0;
 
 /// The smallest angle between two facings, in degrees.

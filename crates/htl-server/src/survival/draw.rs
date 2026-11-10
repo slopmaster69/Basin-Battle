@@ -293,6 +293,9 @@ impl SurvivalGame {
         match v.kind {
             ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) || self.sim.is_perch_visual_prop(v.id) || self.sim.is_kitchen_prop(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            // The falling mine's rock and timbers: there at once, moved in place as they fall,
+            // and no hull (the heroes and the boss go on through them, as before they showed).
+            ObjKind::Prop { .. } if self.sim.collapse_piece_tilt(v.id).is_some() => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             _ => (kind, flags),
         }
     }
@@ -710,16 +713,36 @@ impl SurvivalGame {
 
     /// Equipment slots are updated on the existing unit, without destroying/recreating it.
     pub(crate) fn mob_gear_fields(&self, id: Id, f: &mut Fields) {
-        if let Some(g) = self.sim.arsenal_loadout(id) {
+        if self.sim.arsenal_hands_empty(id) {
+            // Kneeling at his rack between weapons: nothing in either hand.
+            for k in 0..3u16 {
+                f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + k, 0).set(idx::UNIT_VIRTUAL_ITEM_INFO + 2 * k, 0).set(idx::UNIT_VIRTUAL_ITEM_INFO + 2 * k + 1, 0);
+            }
+            f.set(idx::UNIT_BYTES_2, 0);
+        } else if let Some(g) = self.sim.arsenal_loadout(id) {
             arsenal_gear_fields(g, f);
         } else if let Some(m) = self.sim.mobs.get(&id) {
             mob_def_gear_fields(&self.sim.content.mobs[m.def], f);
+        }
+        // Cookie's tankard, held to pour or to scoop, or his hand empty once he's thrown it.
+        if let Some(held) = self.sim.kitchen_hand(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, held)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO, if held == 0 { 0 } else { grip_info("1h") })
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, if held == 0 { 0 } else { 3 })
+                .set(idx::UNIT_BYTES_2, u32::from(held != 0));
         }
         if let Some(gun) = self.sim.firing_line_gun(id) {
             f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2, gun)
                 .set(idx::UNIT_VIRTUAL_ITEM_INFO + 4, 2 | 3 << 8 | 2 << 16 | 26 << 24)
                 .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
                 .set(idx::UNIT_BYTES_2, 2);
+        }
+        // Greenskin's harpoon, in his hand through its held throw.
+        if let Some(spear) = self.sim.firing_line_spear(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, spear)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO, grip_info("polearm"))
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, 1)
+                .set(idx::UNIT_BYTES_2, 1);
         }
     }
 
@@ -734,7 +757,8 @@ impl SurvivalGame {
             guid,
             entry: CREATURE_ENTRY + m.def as u32,
             display_id: d.display,
-            scale: d.scale,
+            // Gorged swelling over the pot is drawn at his size now.
+            scale: self.sim.kitchen_scale(id).unwrap_or(d.scale),
             level,
             faction: if m.friendly { fields::FACTION_FRIENDLY } else { fields::FACTION_MONSTER },
             health: m.health,
@@ -938,8 +962,12 @@ impl SurvivalGame {
         let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
         // The arrow glows white (patch 0039's flag) so it can be found in the grass; a client
         // without the patch ignores the bit.
-        let (display, scale, tilt, flags) =
-            if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW) } else { (v.display, v.scale, 0.0, flags) };
+        // A piece of the falling mine is tipped as it falls and lies (a beam swinging down).
+        let (display, scale, tilt, flags) = if arrow {
+            (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW)
+        } else {
+            (v.display, v.scale, self.sim.collapse_piece_tilt(v.id).unwrap_or(0.0), flags)
+        };
         let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
@@ -1057,6 +1085,16 @@ impl SurvivalGame {
     pub(crate) fn stand_in_create(&mut self, id: Id, pos: [f32; 3]) -> (u64, Packet) {
         let guid = creature_guid(STAND_IN_ENTRY, id);
         self.bind(id, guid);
+        (guid, Self::stand_in_packet(guid, pos))
+    }
+
+    /// A stand-in's guid for the `n`th of a scene's own (the aftermath's dust), outside the rules'.
+    pub(crate) fn stand_in_guid(n: u32) -> u64 {
+        creature_guid(STAND_IN_ENTRY, n)
+    }
+
+    /// The packet that makes the unseen stand-in `guid` at `pos` (see [`Self::stand_in_create`]).
+    pub(crate) fn stand_in_packet(guid: u64, pos: [f32; 3]) -> Packet {
         let look = UnitLook {
             guid,
             entry: STAND_IN_ENTRY,
@@ -1077,11 +1115,10 @@ impl SurvivalGame {
             ranged: 0,
         };
         let f = fields::unit_fields(&look);
-        let p = packets::update_object(
+        packets::update_object(
             &[Create { guid, object_type: packets::TYPE_UNIT, is_self: false, placement: Placement::Living { pos, facing: 0.0, speeds: packets::speeds(7.0) }, fields: &f }],
             &[],
-        );
-        (guid, p)
+        )
     }
 
     /// A danger circle drawn to `radius`.
@@ -1152,7 +1189,7 @@ impl SurvivalGame {
     }
 
     /// A creature's blow (or a hero's wind-up) for a client that draws it under the unit:
-    /// `TG\t<key>\t<guid>\t<wedge|ring|line>\t<reach>\t<arc>\t<seconds to the blow>\t<block|unblockable|friendly>\t<the parry's window>\t<meant for this hero>\t<a line's width>\t<the roll's window>`
+    /// `TG\t<key>\t<guid>\t<wedge|ring|line>\t<reach>\t<arc>\t<seconds to the blow>\t<block|unblockable|friendly>\t<the parry's window>\t<meant for this hero>\t<a line's width>\t<the roll's window>\t<1: its body tells it>`
     /// (`TG\t<key>` once it's gone). The window is this hero's own (their weapon's share in it). A
     /// client before the eighth round gets no lines, and no `friendly`. The roll's window: a dodge
     /// started up to this long before the blow lands evades it (`[dodge] evade_to`), which the
@@ -1182,13 +1219,15 @@ impl SurvivalGame {
             (if t.blockable { "block" } else { "unblockable" }, t.foe == Some(hero) || (ring && near) || p.is_some_and(|p| p.lock == Some(t.mob)))
         };
         Some(format!(
-            "TG\t{key}\t{g:#X}\t{shape}\t{:.2}\t{:.0}\t{:.2}\t{kind}\t{parry:.2}\t{}\t{:.2}\t{:.2}",
+            "TG\t{key}\t{g:#X}\t{shape}\t{:.2}\t{:.0}\t{:.2}\t{kind}\t{parry:.2}\t{}\t{:.2}\t{:.2}\t{}",
             t.reach,
             t.arc.min(360.0),
             t.secs,
             u8::from(focus),
             t.width,
-            c.dodge.evade_to
+            c.dodge.evade_to,
+            // Its body tells it (Sneed's Shredder: an arm out, a stamp, a rev): no glow over it.
+            u8::from(!t.hero && self.sim.tells_by_body(t.mob))
         ))
     }
 
@@ -1442,7 +1481,7 @@ fn grip_info(grip: &str) -> u32 {
 #[cfg(test)]
 mod rope_tests {
     #[test]
-    fn gilnid_platforms_keep_collision_while_visual_cues_appear_immediately() {
+    fn gilnid_planks_and_poles_keep_collision_while_visual_cues_appear_immediately() {
         use htl_survival::{content::Content, land::FlatLand};
         let mut game = super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
         game.sim.mobs.clear();
@@ -1455,23 +1494,28 @@ mod rope_tests {
         p.max_health = 100_000;
         game.sim.spawn_target(hero, "dm_gilnid", 8.0, false, false, 1.0).unwrap();
         game.sim.step(0.05);
-        assert_eq!(game.sim.objects().iter().filter(|o| matches!(o.display, 36 | 6481)).count(), 4);
+        // Two planks over the drop, two poles under them; no crate stacks.
+        assert_eq!(game.sim.objects().iter().filter(|o| matches!(o.display, 6481 | 1508)).count(), 4);
+        assert!(!game.sim.objects().iter().any(|o| o.display == 36));
         let mut seen = [false; 3];
         for _ in 0..300 {
             for obj in game.sim.objects() {
                 let no_hull = game.obj_look_in(&obj).1 & super::GO_FLAG_PREVIEW_MOVE != 0;
+                let visual = game.sim.is_perch_visual_prop(obj.id);
                 match obj.display {
-                    36 | 6481 => assert!(!no_hull, "platform display {} must retain its collision hull", obj.display),
-                    353 | 755 | 1108 => {
-                        assert!(no_hull, "visual display {} must be immediate", obj.display);
-                        seen[match obj.display { 353 => 0, 755 => 1, _ => 2 }] = true;
+                    // A standing plank or pole keeps its hull; a fallen plank shows at once.
+                    1508 => assert!(!no_hull, "a standing pole must retain its collision hull"),
+                    6481 => assert_eq!(no_hull, visual, "a plank's hull goes only once it has fallen"),
+                    353 | 397 | 423 | 1108 => {
+                        assert!(no_hull && visual, "visual display {} must be immediate", obj.display);
+                        if let Some(k) = [423, 397, 1108].iter().position(|d| *d == obj.display) { seen[k] = true; }
                     }
                     _ => {}
                 }
             }
             game.sim.step(0.05);
         }
-        assert_eq!(seen, [true; 3], "exercise steam, valve and dropped support debris");
+        assert_eq!(seen, [true; 3], "exercise the stick, the flames and the fallen pole");
     }
 
     #[test]

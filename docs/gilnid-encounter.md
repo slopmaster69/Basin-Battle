@@ -1,122 +1,126 @@
 # Gilnid: trouble above the furnace
 
-Status: mechanics merged in PR #295 and checked in controlled real-client footage. PR #299
-follows up the visible tells; an unassisted fight and solo-versus-duo validation remain open.
+Corey's revised design (Nov 9, "Deadmines bosses: review and redesign"). The lesson: **men on
+ledges above the drop can be brought down, and the furnace is Gilnid's last weapon.** The code is
+`crates/htl-survival/src/sim/perches.rs`; the numbers are in `content/deadmines.toml`.
 
-Codex owns this encounter, following the independent Codex and Claude design comparison.
-Claude's monster yells and Rhahk'Zor engine are already on main.
+The fight was first built by Codex (#295, #299, #302, #304) with low crate-stack perches beside
+him. This rebuild replaces those with ledges on the Foundry's own spiral ramp and follows Corey's
+seven beats; the finite crew, the one-fall-per-man rule, the cleanup on death or reset and the
+fallback when a ledge can't be placed are kept.
 
-The fight uses low, visible perches over the Foundry pit. Engineers throw dynamite with clear
-fuses and arcs. A ranged hit brings an engineer down through a continuous fall, followed by
-a stunned landing and melee combat. A reachable support offers a melee alternative, and a
-bounded automatic descent prevents loadout restrictions. The first fall is demonstrated by
-the Foundry's overflow. Workers are finite; they are not a health-threshold summon wave.
+## The arena
 
-Once the workers are dealt with, Gilnid operates the furnace and commits to a visible molten
-discharge with a dry escape route. He then finishes the fight directly, without a generic
-low-health damage multiplier.
+- **His post** is (-200, -587) on the pit floor (z 21). He stood at (-205, -592), behind the
+  cargo, the cannonball stacks and the rock the ramp's east side rests on: from the gap by the door
+  a hero couldn't see or lock him. From the gap (-186, -579) and (-188, -580) he's in sight and in
+  his 18 yd. The spot the review filmed from, (-183, -585), is under the ramp beside that rock;
+  he's still out of sight from there, but nobody has to stand there to come in.
+- **The ledges** are on the spiral ramp's south side, where its walkway is 7 to 10 yd over the
+  pit. Each is a plank (DarkIronWoodPlanks07, display 6481, scale 1.8) laid with its back end on
+  the ramp's rail and its far end out over the drop, and a timber pole with an iron foot
+  (ExcavationBarrierPole, 1508) from the pit floor up to the plank's underside. The engineer
+  stands 2.4 yd out from the rail. The first stands 8.6 yd over the pit (rail top z 29.2), the
+  second 9.7 (z 30.3); their planks splay apart. No crate stacks.
+- Nothing new is added to the map: the ramp, rail and pit are the Deadmines' own floors, and the
+  plank and pole are game objects with their own hulls (the client stands each engineer on his
+  plank). `crates/htl-server/tests/gilnid_native.rs` checks every piece on the installed map:
+  the rail under each plank's back end, open air under the man and the pole, the pole and the
+  landing on the pit floor and walkable from his post, the plank in sight from his post, the
+  walkway behind the rail and a way down the ramp from it.
+- **The valve** is the melting pot's own, on its south face at (-208.1, -583.1); he works it from
+  1.3 yd off, on his post's side. The pot's mouth is the furnace that belches and glows.
 
-Implementation scope: new encounter code with minimal hooks into existing simulation,
-content definitions, focused lifecycle and combat tests, and a real-client recording scenario.
-Preserve ordinary ledge safety, the existing ogre encounter, enemy variety, and the HumanMale
-VanCleef animation correction. No client animation patches are claimed here.
+## The seven beats
 
-Acceptance includes solo and party targeting, one hit triggering one fall, melee support and
-automatic fallbacks, safe landing, no duplicate workers on reset, and a full fight with optional
-floor markers disabled. The showcase must identify any dev-controlled demonstration footage.
+1. **Pull.** "Back to work! All of you!" The first engineer stands on his plank over the drop;
+   the second waits his turn on his.
+2. **First throw.** 1.5 sec after the pull the first man lights a stick: Heavy Dynamite's cast
+   (4062), a 3 sec fuse with the lit stick in his hand (its precast kit and ReadyThrown pose) and
+   the fire-lighting sound. Its landing is chosen as the fuse is lit, at his foe. On release
+   (AttackThrown) it flies up to the top of an arc 1.8 yd over the line from his hand, then down
+   from there to where it lands (the client flies a missile straight, so the arc is two flights,
+   the second from an unseen stand-in a tick later; at least 0.7 sec in the air). It lands and
+   sits there a second, a stick on the floor (GunShopDynamite, 423), hissing (1424), its 2.5 yd
+   blast drawn as a ring on the floor whatever the floor markers. Then it blows. **While a stick is
+   lit, in the air or on the floor, Gilnid holds his heavy blows** (the overhead, the kick).
+3. **The demonstration**, after that first stick blows, if no one has been brought down yet. The
+   furnace belches (Molten Metal at its mouth) and 0.6 sec later a spill of molten iron runs from
+   its foot to the first man's pole, a section every 1.5 yd, every 0.2 sec, each a small splash
+   (8) drawn as a line on the floor. Where it reaches, the pole takes light (flames, 397) and
+   Gilnid shouts "Mind the equipment!". 1.4 sec later the plank goes: the pole and plank fall as
+   lumber and a plank lying on the floor, and he falls outward, away from the ramp, 2.6 yd past
+   where he stood, in plain view (0.9 sec, his Fall pose). He lands sitting (SitGround, 1.3 sec),
+   gets up (SitGroundUp, 1.2 sec) and fights with his wrench.
+4. **The second engineer** throws in turn, a stick each time the last one has blown and 1.5 sec
+   passed. He comes down to one direct ranged hit (a projectile's own contact, not its splash, a
+   burn or zero damage), a melee blow on his pole from the pit floor (it cracks: the same fall),
+   or a blow on him from the ramp behind his plank. If none of those, after his third stick he
+   steps back off his plank onto the ramp (1 sec) and walks down it to fight.
+5. **Workers on foot** fight with wrenches. When the last is down: "Useless. Every one of you."
+6. **The valve.** He runs to the valve (8 sec at most) and works it 2 sec (the goblin's standing
+   use). A stagger stops his hands; he goes back and starts the 2 sec again. Then the furnace
+   glows, a whistle (3431), steam vents along the channel for 1.2 sec, and a stripe of fire floor
+   advances across the pit from his feet: up to 10 sections 1.6 yd apart, 3 yd wide, one every
+   0.25 sec, each burning (30, then 15 once more 1.2 sec later). It runs at his foe where the pit
+   floor carries it that way, else straight out from the furnace; it stops at a wall, a step or a
+   drop. Both sides are dry. It's drawn whatever the floor markers as a solid band its true width
+   (3 yd): both edges at once, pale lines the whole length, so the dry ground either side reads;
+   the amber fill laid two sections at a time as the fire reaches them, so it advances across the
+   pit, each lasting 4 sec. Step aside, or stagger him first.
+7. **Finish.** "Then we'll melt the lot!" From now his only string is a flurry: three blows, each
+   stepping in (lunge), the last a heavy two-handed chop (Attack2H's second take) that over-reaches
+   into the floor. The spanner sticks there and he's open 2.5 sec, bent double over it with both
+   hands on it (the chop caught 0.2 sec after it lands, his head at half his height and both hands
+   by the floor, and held still the whole window), dust at his feet. Hits don't flinch him out of
+   it. It repeats until he falls: "Who's... going to pay for this..."
 
-## Implemented behavior
+His lines never come closer than 2 sec together: one due sooner waits its turn.
 
-`sim/perches.rs` owns two engineers, their cargo supports and platforms, the valve, and temporary
-steam warnings. Platforms sit 2.85 yd above checked floor points. The landing is 1.8 yd towards
-the room; a different floor, wall, water, overhead slab or unreachable point omits that platform
-instead of stranding a worker. The remaining encounter can still complete.
+## The shared fixes, done here for Gilnid alone
 
-Only one engineer commits dynamite at a time. The 1.8 sec fuse chooses its landing before the
-throw. A damaging direct projectile contact drops that engineer once; nearby splash and damage
-over time do not drop living engineers. A lethal hit still brings the body down. An ordinary
-melee swing can break a support from the same floor, within reach and facing it. Falls take
-0.85 sec and leave a living engineer stunned for 2.4 sec, then fighting with a wrench.
+Corey's table of shared fixes belongs to another session, which builds them engine-wide. These
+are Gilnid's versions, for it to fold in:
 
-The first automatic overflow is eligible after 8 sec, between committed throws. After 26 sec,
-remaining perched engineers descend in sequence when no throw or fall is in progress. This is a
-fallback, not a requirement to bring a ranged ability. Killing all workers sends Gilnid to the
-valve regardless of his health. His 2.2 sec opening can be delayed by a stagger; the discharge
-then travels through three separated floor points, leaving dry space to either side. The valve
-sequence runs once. Boss death or reset removes workers, props, warning steam and pending throws.
+| Shared fix | Gilnid's version |
+| --- | --- |
+| Debug damage counts as real | `perch_posture_share`: "debug" damage builds no posture on Gilnid or his crew (hook in `hurt_mob_as`) |
+| Effects play at the start of a windup | The blast plays when the stick blows (after its sit); the spill and each stripe section burst when they arrive; the flames come where the fire has reached, not before |
+| Small hazards draw nothing with markers off | The stick's blast is a ring on the floor while it sits; the spill and the stripe are lines their true width (`GroundBurst`, drawn whatever the markers); steam and flames are real props |
+| Projectiles too fast to see | The stick is in the air at least 0.7 sec, in an arc of two flights |
+| Long windups freeze | The 3 sec fuse is Heavy Dynamite's own ready pose with the lit stick; the throw frame plays on release |
+| Things outlive their boss | Death, reset or a wipe takes the crew, planks, poles, sticks, flames, steam, the fire still to come and every mark |
+| Deaths lag | Death lets go of the stuck pose (`HoldPose` 0) and the valve's cast |
+| Punish windows look like idling | The stuck spanner: the chop into the floor caught bent double and held 2.5 sec (`freeze_open_pose`, the add-on's `FZ`), no flinch meanwhile; a landed engineer sits, then gets up, instead of the stagger's reel |
+| Yells collide | `perch_say` keeps his lines 2 sec apart, the pull line included |
 
-Five native valve-steam props now cover each overflow's width, even with optional floor circles
-disabled. `DeadMineValveSteam02` (display 353) at scale 1.4 uses anchors inside the existing damage
-disk and expires at impact. Only encounter-owned steam (353), low debris (1108), and the valve
-wheel (755) reuse client patch 0017's immediate, noncolliding-object flag. Cargo (36) and planks
-(6481) keep their collision hulls and ordinary fade: workers rely on those surfaces for client
-floor projection. Ordinary 2 sec fades had hidden most of the 1.4 sec warning. Damage,
-the three 2.2 yd discharge radii, and the global minimum ground-spell radius are unchanged.
+## Tests
 
-Perched engineers hold native red dynamite (item display 18575), with Heavy Dynamite's ready
-pose, fuse effect and arc (spell 4062), plus the native fire-lighting sound 6155. On landing,
-`MobGear` from PR #298 switches the same body to wrench 1610. Takeoff dust is removed; landing
-dust remains. Low native Deadmines lumber (1108) appears immediately when the support is
-removed, with a wooden impact sound; the structural support keeps its ordinary client fade.
-This is a broken-state swap, not a simulated tipping support.
+`perches_tests.rs` (21 sim tests): the planks, poles and heights; the fuse, the arc's two legs,
+the stick's sit and blast and the heavy-blow hold; the demonstration (belch, spill to the pole,
+fire, line, fall outward, sit, get up, fight); one fall per man from a projectile, a pole blow
+and a blow from the ramp; splash, burns and zero damage don't count; a corpse still falls; the
+second man's three throws and climb; no demonstration once a hero has dropped a man; the valve's
+2 sec, its stagger, the stripe advancing on one line with a dry side; his lines 2 sec apart; the
+finish's flurry and stuck pose; debug posture; wipe, death and party handoff cleanup; a ledge
+without floor is left out and the fight goes on.
 
-Gilnid faces the valve before using the goblin's native standing interaction (Opening 21651,
-animation 123), with the Deadmines steam whistle (3431). The opening remains 2.2 sec and can be
-staggered; it grants no invulnerability. There is no wheel animation or guaranteed hand contact.
+`gilnid_native.rs` (installed data, `--ignored`): his post seen from the way in; both ledges and
+their pieces on the real ramp and pit; the first stick and the furnace's lesson, the fall onto
+the pit floor; the valve and a 17 yd stripe on his floor.
 
-The Windows GNU timezone compatibility shim now lives once in the server library so examples,
-the executable and integration tests link it consistently. The standalone protocol bot, which
-does not link the server library, includes its own copy. This fixes the pre-existing example
-link failures exposed by the required full test sweep.
+## Not yet seen in the client
 
-## Verification and remaining acceptance
+Nov 10, not yet filmed: the stripe's band and edges on the Foundry floor (the Nov 9 footage saw a
+row of glowing dots: the one line drawn from the stripe's middle covered only its far half and had
+faded before the fire reached it), and Gilnid bent double over his spanner (the Nov 9 footage saw
+him nearly upright in StandWound). Measured on GoblinMale's bones, 0.1 to 0.3 sec after Attack2H's
+second take lands his head is at 0.50 to 0.54 of standing height and both hands are within a fifth
+of it of the floor, 0.2 to 0.3 yd apart.
 
-After integrating the gauntlet from main `56c4b6a`, `cargo test --release --offline -j2` passed:
-1,060 workspace tests passed, 19 ignored, no failures. The survival crate passed 893 tests with
-4 ignored, including all 11 focused Gilnid tests. `cargo build --release -p htl-server --offline
--j2` also passed. Both commands used `scripts/windows-rust.ps1` on Windows GNU. Repository rules
-(`scripts/check-pr.sh`) passed across all 17 changed files, with no failures or warnings.
-
-Focused simulation tests cover direct contact versus splash/damage over time, repeated and lethal
-hits, support reach/facing/floor, warned throws and automatic descents, wipe/repull, the valve's
-health-independent trigger and stagger delay, unreachable platforms, native-warning lifetime and
-owner-death cleanup, and a surviving party member taking over the fight.
-
-The `gilnid-perches` and `gilnid-perch-shot` recording scenarios parse successfully. Both disable
-optional floor markers and explicitly describe controlled demonstration footage. They use debug
-healing and selected debug kills; neither is evidence of an unassisted full-fight clear.
-
-Controlled recordings on `8dc26de` with client `skyB` showed real projectile contact dropping a
-worker while Gilnid stayed at full health, both automatic descents, grounded melee, the valve
-trigger and cleanup. They also exposed tiny warning steam, weak dynamite preparation and dust
-obscuring the fall. These recordings are video-only and cannot prove sound audibility.
-
-PR #299 passed 1,084 release tests but failed in the real client: its broad immediate-prop
-predicate removed the cargo and plank hulls, hiding both perched bodies. PR #302 reverted that
-merge first (main `22d65ad`). Exact revert `b97f8d9` restored both visible bodies in a same-camera comparison on
-client `skyB` (watcher request `gilnid-revert-b97f8d9-platforms`).
-
-PR #304 restores the cues with a visual-only predicate. The simulation regression checks owned
-visuals, structural props, unrelated objects, and cleanup. The server regression runs the real
-crew through warning and drop, asserting that cargo/plank renderer flags never remove hulls
-while steam, valve, and debris render immediately. Existing tests retain direct-hit versus
-splash, finite crew, landing gear, warning bounds, safe dry side, and valve interruption checks.
-
-`gilnid-tells-valve` keeps the canonical camera yaw 0 before spawning; camera yaw also affects
-the hero's facing and therefore the boss's home. It scripts crew deaths, then moves along the
-dry side during the actual discharge. `gilnid-tells-direct-hit` isolates one real Fireball on a
-stationary debug boss's worker, with normal crew/controller behavior. These scenarios hide
-floor markers and remain controlled QA, not unassisted fight or balance acceptance.
-
-The restored production source was filmed at `299ac99` on `skyB` in watcher request
-`gilnid-safe-299ac99-comparison`. Both perched bodies remain visible. The isolated Fireball
-reduces one engineer from 80 to 59 health while Gilnid stays at 1,300; the worker visibly
-descends and remains on the floor. The valve scene shows the correct-home boss working the
-valve, then a dry-side traversal out and back during warning/discharge with health held at
-200/200. The last debug heal is at scenario t=30; movement runs t=33-36.8 with no further heal.
-The MP4s are 25.5 and 11 sec, 1,942 by 1,136, video only. Local evidence is retained under
-`outputs/gilnid/safe-299ac99-*`, with detailed limits in `recovery-review.json`.
-
-Still unverified: an unassisted clear, solo-versus-duo balance, audio audibility, normal-player
-fuse readability, support rocking or tipping, and valve hand contact. Native impact effects
-still obscure parts of the brief fall. Keep `needs playtest` for those remaining acceptance gaps.
+Nothing here has been filmed. `tools/visual-check/gilnid-ledges.txt` and `gilnid-valve.txt` are
+the takes to film (dev setup: debug heals, and debug kills for the valve take). To look for: the
+plank's hull holding each engineer in the client, the pole's look, the arc's two flights reading
+as one throw, the stick and its ring on the floor, the spill and the stripe, SitGround and
+SitGroundUp on the goblin, and the stuck pose. The server's floor doesn't know the planks
+(they're objects, not map floor), so a hero who climbs onto one isn't stood on it by the rules.

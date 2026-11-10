@@ -1,0 +1,46 @@
+# An unassisted solo clear of Captain Greenskin that duels him straight through his crew's volleys
+# (docs/greenskin-encounter.md: the harder way, 16 or 17 shots to step out of), filmed by the
+# cameraman (camera duel), markers off. Dev setup, all before the video: travel, the deck cleared
+# but for the captain (his crew is posted afresh at their posts), the warrior healed and put at
+# (-74.5, -816) facing him, on the open deck in front of VanCleef's cabin, 12.5 yd south of him and
+# out of his reach (dmprobe: floor 40.2, a walk to him): 25 yd from the east side (y -841, no rail
+# in the map's collision) and 16 yd from the west rail. The player never rolls (a roll with no keys
+# is a step back); its sidesteps strafe across the deck and alternate, so they don't add up.
+# From the video on, no debug command: only the warrior's own keys (.es in, ActionDash; the rig's
+# walk keys don't move the hero), pressed by a small player in the interface (GD below), locked on
+# the captain the whole fight, that reads only what the client shows: his windup (AN mob: raise the
+# guard as it lands, then two hits in his recovery) and a gun at the shoulder or the harpoon held
+# back (AN cast, clip 48 or 108: a strafe just before it fires). The gunners go with him.
+hero warrior
+# No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to him.
+cam off
+# `camera duel Captain Greenskin + Defias Deck Gunner` keeps the gunners in the picture too, but
+# needs a client with patch 0090 (#328); the rig's smiteA client stops at 0089.
+camera duel Captain Greenskin
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes greenskin
+12 .es goto -74.5 -816 41.5 0.0798
+12.6 .es heal
+12.2 lua GD = { q = {}, on = false, side = 1, pending = 0, nextHit = 0 }
+12.2 lua function GD.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function GD.after(d, f) table.insert(GD.q, { GetTime() + d, f }) end
+12.2 lua function GD.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+12.2 lua function GD.hit(why) GD.log(why .. " hp " .. UnitHealth("player")) GD.say(".es in a") GD.after(0.08, function() GD.say(".es in au") end) end
+12.2 lua function GD.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.2 lua function GD.aside(t) GD.after(math.max(0.3, t - 0.4), function() GD.side = -GD.side GD.log("step off the line hp " .. UnitHealth("player")) ActionDash(0.35, 7, GD.side > 0 and "l" or "r") end) end
+12.2 lua function GD.blow(t) GD.pending = GetTime() + t GD.after(math.max(0.3, t - 0.15), function() GD.log("guard hp " .. UnitHealth("player")) GD.say(".es in g") end) GD.after(t + 0.2, function() GD.say(".es in gu") end) GD.after(t + 0.45, function() GD.hit("punish") end) GD.after(t + 1.1, function() GD.hit("punish") end) end
+12.2 lua function GD.line(l) local f = GD.split(l) if not GD.on or f[1] ~= "AN" then return end local clip, t = tonumber(f[3]), tonumber(f[4]) or 0 if f[11] == "cast" and (clip == 48 or clip == 108) then GD.aside(t) elseif f[11] == "mob" and f[7] ~= "1" then GD.blow(t) end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) GD.line(l) return old(l) end
+12.2 lua GD.f = CreateFrame("Frame") GD.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(GD.q) do local a = GD.q[i] if now >= a[1] then table.remove(GD.q, i) a[2]() else i = i + 1 end end if GD.locked and now > GD.pending + 1.5 and now >= GD.nextHit then GD.nextHit = now + 1.2 GD.hit("press him") end end)
+13.2 video
+13.6 lua GD.on = true
+14 lua ActionDash(0.4, 7, "f")
+15.5 .es in lock
+15.7 lua GD.locked = true
+14 shots pull 10 1.0
+30 shots duel 30 4.0
+150 shots late 20 4.0
+240 end
