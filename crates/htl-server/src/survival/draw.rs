@@ -1070,6 +1070,16 @@ impl SurvivalGame {
     pub(crate) fn stand_in_create(&mut self, id: Id, pos: [f32; 3]) -> (u64, Packet) {
         let guid = creature_guid(STAND_IN_ENTRY, id);
         self.bind(id, guid);
+        (guid, Self::stand_in_packet(guid, pos))
+    }
+
+    /// A stand-in's guid for the `n`th of a scene's own (the aftermath's dust), outside the rules'.
+    pub(crate) fn stand_in_guid(n: u32) -> u64 {
+        creature_guid(STAND_IN_ENTRY, n)
+    }
+
+    /// The packet that makes the unseen stand-in `guid` at `pos` (see [`Self::stand_in_create`]).
+    pub(crate) fn stand_in_packet(guid: u64, pos: [f32; 3]) -> Packet {
         let look = UnitLook {
             guid,
             entry: STAND_IN_ENTRY,
@@ -1090,11 +1100,10 @@ impl SurvivalGame {
             ranged: 0,
         };
         let f = fields::unit_fields(&look);
-        let p = packets::update_object(
+        packets::update_object(
             &[Create { guid, object_type: packets::TYPE_UNIT, is_self: false, placement: Placement::Living { pos, facing: 0.0, speeds: packets::speeds(7.0) }, fields: &f }],
             &[],
-        );
-        (guid, p)
+        )
     }
 
     /// A danger circle drawn to `radius`.

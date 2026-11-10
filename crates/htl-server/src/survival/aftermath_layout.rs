@@ -18,6 +18,18 @@ pub(super) const REGIONS: &[Region] = &[
     Region { key: "landing", name: "Smugglers' Landing", view: [-80.0, -936.0, 40.0], facing: 1.8 },
 ];
 
+/// The review's other cameras (Codex's branch and cove views, filmed again on 10 Nov): where each
+/// stands and the way it looks (map degrees). The ruin keeps their footing and the yards in front
+/// clear, as it does the regions' views (Johnson's camera stood inside the debris).
+pub(super) const CAMERAS: &[([f32; 3], f32)] = &[
+    ([-59.0, -363.0, 54.6], 105.0), ([-49.0, -372.0, 55.4], 122.0), ([-120.0, -438.0, 54.8], 305.0),
+    ([-127.0, -442.0, 55.7], 346.0), ([-160.0, -526.0, 52.5], 338.0), ([-158.0, -512.0, 53.0], 294.0),
+    ([-300.0, -595.0, 48.2], 258.0), ([-200.0, -585.0, 21.0], 234.0), ([-208.0, -580.0, 27.9], 284.0),
+    ([-114.0, -614.0, 13.7], 348.0), ([-146.0, -906.0, 8.1], 186.0), ([-103.0, -993.0, 35.0], 235.0),
+    ([8.0, -766.0, 9.6], 220.0), ([-6.0, -758.0, 9.0], 222.0), ([-86.0, -936.0, 39.2], 85.0),
+    ([-76.0, -925.0, 36.0], 89.0), ([-127.0, -790.0, 17.2], 328.0),
+];
+
 // The views' foregrounds: a few small stones, soil and boards between the support bases, the
 // inspector's own footing clear. Each row is (model, forward/side yards from the view, size,
 // turn); a board's size is its length in yards.
@@ -51,7 +63,7 @@ macro_rules! site {
 
 pub(super) const SITES: &[Site] = &[
     site!(0, "Buried front door", [-62.5, -350.0, 55.9], 0.6, 1.1, Slump, Tunnel),
-    site!(0, "Entrance supports", [-65.0, -360.0, 54.1], 1.8, 0.9, Slump, Timber),
+    site!(0, "Entrance supports", [-65.0, -360.0, 54.1], 1.8, 0.7, Slump, Timber),
     site!(0, "Foreman's chamber", [-70.0, -380.0, 54.2], 2.6, 1.25, Slump, Tunnel),
     site!(1, "Lamp gallery", [-123.0, -409.5, 58.6], 2.9, 0.9, Slump, Tunnel),
     site!(1, "Eastern approach", [-100.0, -400.0, 58.5], 0.6, 0.85, Spill, Cargo),
@@ -68,7 +80,7 @@ pub(super) const SITES: &[Site] = &[
     site!(1, "Mast approach", [-235.0, -490.0, 49.9], 2.1, 0.85, Spill, Tunnel),
     site!(2, "Mast room collapse", [-253.5, -485.5, 49.4], 0.3, 1.1, Slump, Timber),
     site!(2, "Broken timber yard", [-260.0, -490.0, 49.4], 1.4, 1.2, Spill, Timber),
-    site!(2, "Shredder wreck", [-288.0, -505.0, 50.0], 3.0, 1.4, Slump, Machine),
+    site!(2, "Shredder wreck", [-288.0, -505.0, 50.0], 3.0, 1.1, Slump, Machine),
     site!(2, "Mast south wall", [-295.5, -533.5, 49.4], 0.8, 1.0, Slump, Timber),
     site!(3, "Workshop throat", [-285.0, -545.0, 49.4], 4.4, 0.8, Spill, Minecart),
     site!(3, "Workshop north", [-295.0, -564.5, 49.0], 1.2, 1.0, Slump, Machine),
@@ -119,6 +131,6 @@ pub(super) const SITES: &[Site] = &[
     site!(7, "Landing ascent", [-74.0, -922.0, 32.0], 4.7, 0.75, Spill, Timber),
     site!(7, "Smugglers' lamp", [-80.0, -936.0, 40.0], 0.8, 0.9, Spill, Cargo),
     site!(7, "Sea tunnel mouth", [-85.0, -958.0, 42.5], 2.3, 1.0, Slump, Tunnel),
-    site!(7, "Sea tunnel bend", [-94.0, -988.0, 36.0], 4.0, 1.1, Slump, Timber),
+    site!(7, "Sea tunnel bend", [-94.0, -988.0, 36.0], 4.0, 0.8, Slump, Timber),
     site!(7, "Smugglers' cache", [-107.0, -998.5, 34.0], 1.1, 1.0, Seal, Cargo),
 ];
