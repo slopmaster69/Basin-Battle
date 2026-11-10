@@ -156,7 +156,10 @@ include _setup                # another file's lines, at their own times
 - **Moving**: a script can't press the movement or jump keys (they're protected), so a strafe is
   `lua ActionDash(<secs>, <yards a second>, "l")` (or `"r"`: a sidestep at that speed) and a jump
   is `.es hop [yards]` (the server throws the hero up where they stand). Press the ability partway
-  through either.
+  through either. A dash stops as soon as the hero swims; for a longer walk or a swim (client
+  patch 0085 and later) `lua ConsoleExec("probemove <secs> <f|b|l|r|fl|fr|bl|br> [facing]")`
+  holds those keys for that long at the swim speed, wading or swimming, facing that map facing
+  first (degrees, 0 north, 90 west) when given; `probemove stop` lets go.
 - **Tripwire** takes two presses, each a placed arrow, and **Stoop** goes on the 4th E by itself:
   their scenarios play them as #110's rework (#120) has them.
 

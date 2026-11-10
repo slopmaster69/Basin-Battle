@@ -1,0 +1,58 @@
+# Wakes in the rain, fourth round (client 0085): Crystal Lake from steeply above in a steady rain
+# (lookweather rain 0.8, #271's). The third filming (r9) swam the hero south past the dock and the
+# huts, and the camera clipped through them; now he swims west, out into the lake and away from
+# every structure, with the camera behind him over the water (yaw 90, looking west, pitched 50
+# down, 20 yd back, so the frame's top corners reach toward the field's edge, 40 yd round him).
+# He starts in the south shallows at WoW (-9461, -333), swims 10 yd west, stops for 2 s, swims
+# 10 yd more and back east to the start (`probemove`, client 0085); then a swim west each with
+# lookwater wakes 0, worldWater 0 and worldLook 0.
+# PLEASE send client.log's "[look wakes]" lines (the foam should stay under 4% of the field).
+# Look for: small rings all over the near water, each spreading and fading, crossing each other
+# and the hero's V without whitening (the rings' pale crest lines fainter in the rain); the V
+# thin, white and broken into streaks; the bed clear through the shallows with no pink speckle;
+# no straight edge where the field ends (its last yards fade into #271's own rain rings);
+# wakes-0 the rain's own rings only.
+hero warrior
+cam 90 -50 20
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9461 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookwater grade")
+4.35 lua ConsoleExec("lookwater wakes 1")
+4.4 lua ConsoleExec("lookweather rain 0.8")
+20.0 video
+20.5 shots rain-start 3 0.5
+21.8 lua ConsoleExec("lookwater wakes")
+22.0 lua ConsoleExec("probemove 2.2 f 90")
+22.1 shots rain-swim-out 8 0.3
+24.4 shots rain-stop-rings 7 0.3
+26.4 lua ConsoleExec("probemove 2.2 f 90")
+26.5 shots rain-swim-on 8 0.3
+28.8 lua ConsoleExec("probemove 4.4 f 270")
+28.9 shots rain-swim-back 10 0.5
+34.0 shots rain-back-stop 4 0.4
+36.0 lua ConsoleExec("lookwater wakes")
+36.5 lua ConsoleExec("lookwater wakes 0")
+36.6 .es goto -9461 -333
+39.5 lua ConsoleExec("probemove 4 f 90")
+39.6 shots rain-wakes-0 8 0.6
+45.0 lua ConsoleExec("lookwater wakes 1")
+45.05 lua SetCVar("worldWater", "0")
+45.1 .es goto -9461 -333
+48.0 lua ConsoleExec("probemove 4 f 90")
+48.1 shots rain-worldwater-0 8 0.6
+53.5 lua SetCVar("worldWater", "1")
+53.55 lua SetCVar("worldLook", "0")
+53.6 lua ClearWorldFog()
+53.65 .es goto -9461 -333
+56.5 lua ConsoleExec("probemove 4 f 90")
+56.6 shots rain-classic 8 0.6
+62.0 lua SetCVar("worldLook", "1")
+62.05 lua ClearWorldFog()
+62.1 lua ConsoleExec("lookweather server")
+64 end

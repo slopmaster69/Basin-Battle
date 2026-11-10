@@ -1,0 +1,39 @@
+# Wakes in the rain (client 0085, on #273's stack): Crystal Lake from steeply above (yaw 180,
+# pitched 50 down, 16 yd) in a steady rain (lookweather rain 0.8, #271's): inside the ripple field
+# raindrops dimple the water as small rings that cross each other and the hero's wake; outside it
+# (about 32 yd round the view) #271's own rain rings go on. The hero wades in, stands, swims out
+# and stops; then lookwater wakes 0 and worldWater 0 in the same rain.
+# PLEASE send client.log's "[look wakes]" lines.
+# Look for: small rings all over the near water, each spreading and fading, running into the
+# hero's rings and V without a seam; no square edge where the field ends (it fades over its last
+# few yards); wakes-0 the rain's own rings only.
+hero warrior
+cam 180 -50 16
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWeather", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookwater grade")
+4.35 lua ConsoleExec("lookwater wakes 1")
+4.4 lua ConsoleExec("lookweather rain 0.8")
+21.0 video
+21.5 shots rain-shore 2 0.5
+23.0 lua ActionDash(2.0, 3, "b")
+23.1 shots rain-wade-in 5 0.4
+25.5 shots rain-standing 4 0.5
+27.5 lua ActionDash(3.0, 4.7, "b")
+27.6 shots rain-swim 8 0.35
+30.7 shots rain-stop 6 0.3
+32.6 lua ConsoleExec("lookwater wakes")
+33.0 lua ConsoleExec("lookwater wakes 0")
+34.0 shots rain-wakes-0 3 0.5
+36.0 lua ConsoleExec("lookwater wakes 1")
+36.05 lua SetCVar("worldWater", "0")
+37.0 shots rain-worldwater-0 3 0.5
+39.0 lua SetCVar("worldWater", "1")
+39.05 lua ConsoleExec("lookweather server")
+41 end

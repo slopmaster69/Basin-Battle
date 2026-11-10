@@ -1,0 +1,56 @@
+# The wakes' cost, fourth round (client 0085): Crystal Lake from steeply above (yaw 90, looking
+# west, pitched 55 down, 18 yd back) at noon, the fps journal on. The hero starts in the south
+# shallows at WoW (-9461, -333): 10 s standing in the water with the wakes on, then `probemove`
+# (client 0085) swims him 20 yd west, out into the lake and away from the dock and the huts (r9's
+# camera clipped through them swimming south), and back east, with them on; then the same swim
+# with lookwater wakes 0, lookwater refract 0 (no bent bed), worldWater 0 and worldLook 0.
+# r9 measured look_wakes at 0.015 ms a frame on a 256 x 256 field; this round's is 320 x 320
+# (80 yd, about 1.6 times the texels), and the water takes up to 8 more samples of the field a
+# pixel inside it (the streaks' ridges and the rings' crests: gpu_transparent).
+# Look for: in the CSV, gpu_look and gpu_transparent per step against gpu_ms and frame ms; in
+# client.log, look_wakes on the GPU_PASSES lines.
+# Please send the CSV, the GPU_PASSES lines and the "[look wakes]" lines.
+hero warrior
+cam 90 -55 18
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9461 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+5.0 lua SetCVar("fpsJournal", "1")
+5.5 video
+6.0 shots cost-standing 1 1.0
+16.0 lua ConsoleExec("probemove 4.4 f 90")
+17.0 shots cost-swim 1 1.0
+21.0 lua ConsoleExec("probemove 4.4 f 270")
+25.8 lua ConsoleExec("lookwater wakes")
+26.0 lua ConsoleExec("lookwater wakes 0")
+26.1 lua ConsoleExec("probemove 4.4 f 90")
+27.0 shots cost-wakes-0 1 1.0
+31.1 lua ConsoleExec("probemove 4.4 f 270")
+36.2 lua ConsoleExec("lookwater wakes 1")
+36.25 lua ConsoleExec("lookwater refract 0")
+36.3 lua ConsoleExec("probemove 4.4 f 90")
+37.0 shots cost-refract-0 1 1.0
+41.3 lua ConsoleExec("probemove 4.4 f 270")
+46.4 lua ConsoleExec("lookwater refract grade")
+46.45 lua SetCVar("worldWater", "0")
+46.5 lua ConsoleExec("probemove 4.4 f 90")
+47.0 shots cost-worldwater-0 1 1.0
+51.5 lua ConsoleExec("probemove 4.4 f 270")
+56.6 lua SetCVar("worldWater", "1")
+56.65 lua SetCVar("worldLook", "0")
+56.7 lua ClearWorldFog()
+56.75 lua ConsoleExec("probemove 4.4 f 90")
+57.5 shots cost-classic 1 1.0
+61.75 lua ConsoleExec("probemove 4.4 f 270")
+67.0 lua SetCVar("fpsJournal", "0")
+67.05 lua SetCVar("worldLook", "1")
+67.1 lua ClearWorldFog()
+67.15 lua ConsoleExec("lookweather server")
+69 end
