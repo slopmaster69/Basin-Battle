@@ -18,7 +18,8 @@
 //!   whenever that's changed (no add-on, or an older one: on).
 //! - `CU\t<beat>\t<guid>`: an outcome of the hero's (since add-on 21): its beat on their screen
 //!   (`crit`, `shatter`, `execute`, `backstab`, `break`, `too_heavy`, `wall`, `cheat_death`,
-//!   `readied`, `valor`), `guid` the unit it happened to (0x0 none). Its look and sound come
+//!   `readied`, `valor`; and the falling mine's shaking, `rumble` near the collapse's front and
+//!   `rockfall` beside a piece landing), `guid` the unit it happened to (0x0 none). Its look and sound come
 //!   by `SMSG_PLAY_SPELL_VISUAL` and `SMSG_PLAY_OBJECT_SOUND` to everyone near; an older add-on
 //!   ignores the line and misses only the beat.
 //! - `FU\t<guid>\t<own>\t<secs>\t<from>\t<cuts>\t<cut>\t<windup>\t<finish>\t<finish secs>\t<turn deg>\t<trail>\t<trail ms>`:
@@ -119,6 +120,9 @@
 //! - `WP\t<guid>\t<clip>\t<secs>\t<own>\t<model>`: a pose held on a unit (the ward's arm out, a
 //!   staff heavy's ready stance): the clip held `secs`, renewed while it lasts; `secs` 0 lets it go.
 //!   `model` (if any) is the character model whose take every race plays.
+//! - `FZ	<guid>	<after>	<secs>`: a unit's animation held still from `after` seconds on, for
+//!   `secs` (a hit-stop renewed while it lasts): a pose caught part way through the clip it's
+//!   playing (the Shredder's stalled slump, Gilnid bent over his stuck spanner). `secs` 0 lets go.
 //! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
 //!   `hi`).
 //! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
@@ -492,7 +496,9 @@ pub(crate) const VERSION: u32 = 2;
 /// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
 /// 61: the add-on says `ac29`: the legs walk under a swing (a lunge keeps the legs' walk, the leap
 /// and the kick stay on the whole body).
-pub(crate) const ADDON_NEWEST: u32 = 61;
+/// 62: `FZ`, a boss's open pose caught part way through a clip and held (the Shredder's stall,
+/// Gilnid's stuck spanner).
+pub(crate) const ADDON_NEWEST: u32 = 62;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

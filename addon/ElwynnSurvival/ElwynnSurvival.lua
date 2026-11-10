@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 61
+local VERSION = 62
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -862,6 +862,31 @@ function ES.ReactLine(f)
   end
 end
 
+-- FZ: a unit's animation held still from `after` seconds on, for `secs`: a boss's open pose caught
+-- part way through the clip it's playing (the Shredder's buckled legs, Gilnid bent over his stuck
+-- spanner). A hit-stop, renewed until it's done; `secs` 0 (or the unit's held pose let go) ends it.
+ES.frozen = {}
+function ES.FreezeLine(f)
+  local guid, after, secs = f[2], tonumber(f[3]) or 0, tonumber(f[4]) or 0
+  if not guid or not HitStop then return end
+  if secs <= 0 then
+    ES.frozen[guid] = nil
+    return
+  end
+  local untilAt = GetTime() + after + secs
+  ES.frozen[guid] = untilAt
+  local function hold()
+    if ES.frozen[guid] ~= untilAt then return end
+    local left = untilAt - GetTime()
+    if left <= 0.01 then
+      ES.frozen[guid] = nil
+      return
+    end
+    HitStop(guid, math.min(250, left * 1000))
+    After(0.15, hold)
+  end
+  After(after, hold)
+end
 
 -- LO: the lock-on (a guid, or 0x0 to let go).
 function ES.LockLine(f)
@@ -6835,8 +6860,11 @@ function ES.Line(line)
         ReactUnit(guid, clip, 0, 0, 0, secs)
       elseif StopUnitAnimation then
         StopUnitAnimation(guid, 0.15)
+        ES.frozen[guid] = nil
       end
     end
+  elseif verb == "FZ" then
+    ES.FreezeLine(f)
   elseif verb == "SF" then
     if ES.StaffLine then ES.StaffLine(f) end
   elseif verb == "SK" then

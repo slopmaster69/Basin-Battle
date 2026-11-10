@@ -504,6 +504,16 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("WP\t{g:#X}\t{clip}\t{secs:.2}\t{own}\t{}", from.as_deref().unwrap_or("")));
                 }
             }
+            Event::Freeze { id, after, secs } => {
+                // A pose caught part way through a clip and held (`FZ guid after secs`; secs 0:
+                // let go), for every client that plays clips.
+                let Some(g) = self.guid_of(id) else { return };
+                let line = format!("FZ	{g:#X}	{after:.2}	{secs:.2}");
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::StaffHeavy { player, lo, hi } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_line(c, &format!("SH	{lo:.2}	{hi:.2}"));
@@ -827,6 +837,22 @@ impl SurvivalGame {
                         }
                         return;
                     }
+                }
+                // A piece of the falling mine on its way down (`sim::bosses`): sent again under
+                // its guid to everyone, which a client with patch 0017 moves in place (its flag
+                // `PREVIEW_MOVE`: no fade, no hull); an older one has it destroyed and drawn afresh.
+                if let (true, Some(g)) = (self.sim.collapse_piece_tilt(id).is_some(), self.guid_of(id)) {
+                    let made = self.obj_create(id);
+                    let conns: Vec<(ConnId, bool)> = self.in_world().map(|(c, _, w)| (*c, w.level >= 12)).collect();
+                    for (c, patched) in conns {
+                        if !patched {
+                            self.send(c, packets::destroy_object(g));
+                        }
+                        for p in &made {
+                            self.send(c, p.clone());
+                        }
+                    }
+                    return;
                 }
                 // A new look or name (damaged): the client caches names by entry, so it's drawn
                 // afresh.

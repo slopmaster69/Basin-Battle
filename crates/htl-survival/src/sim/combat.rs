@@ -1716,7 +1716,7 @@ impl Survival {
                     let wary = self.clock + self.content.combat.knock_aside_wary;
                     self.mobs.get_mut(&mid).unwrap().wary_until = wary;
                 }
-            } else if standing {
+            } else if standing && !self.posed(mid) {
                 self.events.push(Event::React { id: mid, anim: WOUND_ANIM, from: pos, lean: lean * 0.7, hold: 0.0, fit: 0.0 });
             }
             if damage > 0 { self.vancleef_hit(mid, id, pos); }
