@@ -1679,7 +1679,10 @@ impl SurvivalGame {
                 let n = arg2.parse::<u32>().unwrap_or(1).clamp(1, 99);
                 self.sim.give_for_testing(me, &arg, n).map(|name| self.tell(conn, &format!("{n} {name} into your bags.")))
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" | "target" | "ally" | "crit" | "hop" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
+            // Filming: `.es weather clear|overcast|rain|storm [0-1]` holds a weather for everyone,
+            // `.es weather auto` gives it back to the clock, `.es weather` says what it is.
+            "weather" if self.dev_ok() => self.weather_command(conn, &arg, arg2),
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" | "target" | "ally" | "crit" | "hop" | "weather" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
@@ -2089,6 +2092,39 @@ impl SurvivalGame {
         if self.has_addon(conn) {
             self.ui_line(conn, "CW");
         }
+    }
+
+    /// `.es weather`: hold a weather for everyone (filming), give it back to the clock, or say it.
+    fn weather_command(&mut self, conn: ConnId, arg: &str, arg2: &str) -> Result<(), String> {
+        use htl_survival::weather::{Sky, Weather};
+        let usage = "Try .es weather clear, overcast, rain or storm, with a strength from 0 to 1, or .es weather auto.";
+        if self.realm.below || self.realm.siege {
+            return Err("There's no weather here.".into());
+        }
+        match arg {
+            "" => {
+                let (w, ease) = self.weather_now();
+                let held = if self.weather_hold.is_some() { "held" } else { "by the clock" };
+                self.tell(conn, &format!("Weather: {} at {:.2}, eased {:.2} ({held}).", w.sky.name(), w.intensity, ease));
+            }
+            "auto" | "clock" => {
+                self.weather_hold = None;
+                self.weather_tick(true);
+                self.tell(conn, "The weather follows the clock again.");
+            }
+            _ => {
+                let sky = Sky::parse(arg).ok_or_else(|| usage.to_string())?;
+                let intensity = if arg2.is_empty() {
+                    1.0
+                } else {
+                    arg2.parse::<f32>().ok().filter(|i| (0.0..=1.0).contains(i)).ok_or_else(|| usage.to_string())?
+                };
+                self.weather_hold = Some(Weather { sky, intensity });
+                self.weather_tick(true);
+                self.tell(conn, &format!("The weather is held: {} at {intensity}.", sky.name()));
+            }
+        }
+        Ok(())
     }
 
     /// The dev-only commands: a dev build's rules, or debug on.

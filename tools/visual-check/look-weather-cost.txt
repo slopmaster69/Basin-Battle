@@ -1,4 +1,4 @@
-# Visible weather (client 0071): what it costs in heavy rain. Goldshire at night (23:00, so the
+# Visible weather (client 0082): what it costs in heavy rain. Goldshire at night (23:00, so the
 # torches' sheen is in the wet ground), held at storm 1 with lookweather, standing still, the fps
 # journal on (benilla-config/Diagnostics/fps-journal.csv): 10 s with the weather's look on, 10 s
 # with worldWeather 0 (1.12's rain under the rest of the new look), 10 s with worldLook 0, 10 s on

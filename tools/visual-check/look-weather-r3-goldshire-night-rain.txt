@@ -1,4 +1,4 @@
-# Visible weather at night, revised (client 0071, #271's third round): Goldshire at 23:30 in rain,
+# Visible weather at night, revised (client 0082, #271's third round): Goldshire at 23:30 in rain,
 # the camera on the road facing the inn's lit windows (left) and the lamp posts down the road
 # (centre), 10 yd off and pitched 12 degrees down so the wet road between lies in the foreground.
 # Take 272's night rain (yaw 180) went near-black and murky. Dry first, then a minute of rain to
