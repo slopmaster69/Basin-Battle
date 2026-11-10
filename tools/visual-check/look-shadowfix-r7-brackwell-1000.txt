@@ -1,0 +1,32 @@
+# The jack-o'-lanterns' shadows (client 0080, #269's seventh round): Brackwell's pumpkin patch at
+# 10:00. Take 310 found the two jack-o'-lanterns (g_pumpkin_01.m2, #6351 at WoW (-9815.3, -903.5)
+# and one at (-9815.5, -918.6)) logged "left out: hidden" there, though #6351 cast in view
+# elsewhere: they are game objects, and the scene's election hides a body that is off screen, so
+# one beside or behind the camera cast nothing. A body hidden only for being off screen, with the
+# camera outdoors, now still casts. The hero stands 4 yd north and 4 yd west of #6351 facing west
+# (yaw 90), the camera 4 yd behind and pitched 25 down, so the lantern is 4 yd to the camera's
+# left, out of the frame, and its shadow falls west into it; then worldShadows 0. Run with
+# WOW_SHADOW_STATS=1.
+# Look for: a small round shadow at the frame's left edge that worldShadows 0 takes away (if the
+# lantern itself is in the frame, say so). PLEASE send client.log's "[shadows near]" lines naming
+# g_pumpkin_01.m2: they should read "casts", not "left out: hidden".
+hero warrior
+cam 90 -25 4
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9811.3 -899.5 39.5
+4.0 lua ConsoleExec("worldclock 600")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookshadow grade")
+5.5 video
+6.0 shots lantern-off-screen-high 3 0.5
+8.0 lua SetCVar("worldShadows", "1")
+9.0 shots lantern-off-screen-low 2 0.5
+10.5 lua SetCVar("worldShadows", "0")
+11.5 shots lantern-off-screen-shadows-0 2 0.5
+13.0 lua SetCVar("worldShadows", "2")
+13.05 lua ConsoleExec("lookweather server")
+15 end
