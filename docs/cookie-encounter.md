@@ -23,17 +23,17 @@ a hero who kept taking the first slap.
    degrees, 1.2 sec wind-up, a 1.6 sec opening). Unchanged.
 3. **Serve It Hot.** He swaps the cleaver for the tankard (metal tankard, item display 2723) and
    holds it up (HoldThrown, held 1.8 sec) as the stew bubbles (Blood Boil's sound, 3135). Where it
-   lands is fixed as he begins: where the hero stood, pushed out to at least 4 yd from him and in to
-   at most 8, on dry floor he can see. That spot is drawn at once as a ring at its true 2 yd radius
-   (an effect, shown with the floor markers off) and redrawn every 0.5 sec until it lands, so a
-   broken-off pour stops showing within half a second. On release he throws (AttackThrown) and his
-   hand is empty: the mug (Throw Dark Iron Ale's, 14814) flies an arc in 3 legs, up 2.5 yd over
-   the middle, 0.32 sec at 4 yd and 0.42 at 8. It lands with a splash (1096) and a tan ring at
-   the puddle's edge for 1.2 sec, and leaves a puddle: 12 large steam puffs (Steam02, 431, at 1.5)
-   on its edge and its edge drawn as a ring. It deals 20 as it lands and 4 a second while any steam shows: hot 3 sec, then the puffs
-   drop away one by one over 1.2 sec, and it's safe when the last is gone. He fights on while it
-   cools; the next pour waits for it. Step off the line in the wind-up, then hit him in the
-   1.7 sec recovery.
+   lands is fixed as he begins: where the hero stood, pushed out to at least 4 yd from him and in
+   to at most 8, on dry floor he can see. That spot is drawn at once as a ring at its true 2 yd
+   radius (an effect, shown with the floor markers off) and redrawn every 0.5 sec until it lands,
+   so a broken-off pour stops showing within half a second. On release he throws (AttackThrown) and
+   his hand is empty: the mug (Throw Dark Iron Ale's, 14814) flies an arc in 4 legs, up 4 yd over
+   the middle, about half a second in the air. It lands with a splash (1096) and a tan ring at the
+   puddle's edge for 1.2 sec, and leaves a puddle: 12 large steam puffs (Steam02, 431, at 1.5) on
+   its edge and its edge drawn as a ring. It deals 20 as it lands and 4 a second while any steam
+   shows: hot 3 sec, then the puffs drop away one by one over 1.2 sec, and it's safe when the last
+   is gone. He fights on while it cools; the next pour waits for it. Step off the line in the wind-
+   up, then hit him in the 1.7 sec recovery.
 4. **The scoop, after 3, then 4, then 5 exchanges** (5 for every later one), while the pot has stew
    in it. He takes out the tankard and walks to the pot's east side (on the real map
    (-61.4, -898.2)), turns to it side-on, "Mmm... one taste.", and dips the tankard again and
@@ -54,14 +54,16 @@ a hero who kept taking the first slap.
    - Other control delays the gulp; only the posture break knocks the pot. A pot he can't reach in
      6 sec is given up: no heal, no teleport, a 1.5 sec opening.
 5. **Death.** He falls where he fought, beside the pot. "...burnt." The pot and its steam stay.
-6. **Gorged** (the secret ingredient in the killer's bags). The body lies still 2 sec. He gets up
-   in a puff of dust (no arcane swirl, no narration), at Cookie's size, walks to the pot, dips into
-   it twice with slurps (1.8 sec), gulps it empty (its steam goes), and swells over 1.5 sec, drawn
-   a step every 0.1 sec, from Cookie's 1.3 to 1.95. "MORE STEW!", a roar (emote 15, MurlocAggro
-   416), then 2 sec before his first blow. Two slaps, then the belch: he rears back (HoldThrown
-   held 2.2 sec, MurlocAlert) and swells 10% more as the wind-up runs, the cone drawn on the ground
-   at the 7.4 yd and 70 degrees it hits. Then Acid Breath's liquid gush (kit 2373), the burst, a
-   stew-coloured flash of the cone, his size back, and a 4 sec cough in the open look.
+6. **Gorged Cookie** (the secret ingredient in the killer's bags), named so the forms can be told
+   apart. The body lies still 2 sec. He gets up out of a cloud of dust (a fall's and a stomp's,
+   with a tan ring 3 yd round; no arcane swirl, no narration), at Cookie's size, walks to the pot,
+   dips into it twice with slurps (1.8 sec), gulps it empty (its steam goes), and swells over 1.5
+   sec, drawn a step every 0.1 sec, from Cookie's 1.3 past 2.1 and settling to 1.95, with a puff of
+   dust. "MORE STEW!", a roar (emote 15, MurlocAggro 416), then 2 sec before his first blow. Two
+   slaps, then the belch: he rears back (HoldThrown held 2.2 sec, MurlocAlert) and swells 10% more
+   as the wind-up runs, the cone drawn on the ground at the 7.4 yd and 70 degrees it hits. Then
+   Acid Breath's liquid gush (kit 2373), the burst, a stew-coloured flash of the cone, his size
+   back, and a 4 sec cough in the open look.
 
 **Exchanges.** Any blow he lets go counts its string's exchange, once: a pair cut short by a
 stagger after its first blow counts; one broken off before any blow lands never does. So a hero
@@ -69,9 +71,12 @@ staggered by every first slap still sees the belch within 15 sec.
 
 **Staying in the fight.** He stays on a hero for as long as the engine counts them in his fight
 (`in_fight_of`: alive, within his leash, within 10 yd of height of him), and turns to the next one
-in it, as every creature does. Take 341 lost Gorged: the kitchen had its own filter, 6 yd of height
-from his post, and the cove climbs 8 yd in the 12 east of it, so a hero who dodged up the slope
-sent him home mid-fight.
+in it, as every creature does. Two takes lost Gorged. In 341 the kitchen had its own filter, 6 yd
+of height from his post, and the cove climbs 8 yd in the 12 east of it, so a hero who dodged up the
+slope sent him home. In 348 he stopped by the pot after a belch: a creature that finds no way to
+its hero for 4 sec gives up and goes home, and the hero stood where he couldn't walk. Cookie and
+Gorged no longer give up that way while the hero is still in their fight (`kitchen_holds_on`); they
+wait, and come for them as soon as there is a way.
 
 **The open look.** The murloc has no StandWound or kneel. His openings (the knocked pot, the
 steam's recovery, the belch's cough) hold CombatWound (clip 9) for their whole length (`HoldPose`),
@@ -115,7 +120,9 @@ outside its drawn edge; control delaying the gulp; waiting out every scoop still
 blocked pot; the pot staying through death and a wipe and going with a reset; the dungeon wipe;
 Gorged lying 2 sec, walking, gulping the pot empty, swelling past Cookie, "MORE STEW!" and waiting
 2 sec; the belch's drawn length, pulse, hit and cough, a broken-off belch letting go of its
-pulse, and both forms staying on a hero who dodged up a slope like the cove's until they die.
+pulse, both forms staying on a hero who dodged up a slope like the cove's until they die, and
+Gorged turning on the hero after his gulp wherever they stand: beside the pot either side, up
+close, far off, and behind it where he can't walk (he waits, then comes when they step out).
 
 `a_lone_hero_playing_by_the_tells_clears_cookie_and_gorged` plays both forms with a warrior on the
 starting weapon and their own health, reading only what the client shows with a 0.3 sec reaction:
@@ -130,27 +137,30 @@ the client. Waiting out every scoop instead (no break) still kills him with the 
 ## Filming
 
 `tools/visual-check/cookie-clear.txt` is an unassisted solo clear of both forms, filmed by the
-spectator cameraman in the duel shot (`camera duel Cookie|Gorged`), close enough to read the tankard,
-the scoop and the knocked pot, with markers off. Setup
-before the video: the cove cleared but for Cookie, the secret ingredient in the bags, the warrior
-healed 9 yd west of his post. From the video on, only the warrior's own keys play (`.es in`),
-pressed by a small player in the interface that reads only what the client shows: a quick wind-up
-(`AN` under 1.5 sec: guard it, one hit back), a long one (the pour or a breath: `ActionDash` out
-sideways, left and right in turn, since the rig's walk and strafe keys don't move the hero), the
-open look (`WP` clip 9: hit him), the scoop's yell (dash in and hit until the pot is knocked), and
-otherwise lock on again and press him. Take 341, filmed high, beat Cookie at 63 s and lost Gorged
-when he went home mid-fight (fixed above). This version has not been run yet.
+spectator cameraman in the duel shot (`camera duel Cookie|Gorged Cookie`), close enough to read the
+tankard, the scoop and the knocked pot, with markers off. Setup before the video: the cove cleared
+but for Cookie, the secret ingredient in the bags, the warrior healed 9 yd west of his post. From
+the video on, only the warrior's own keys play (`.es in`), pressed by a small player in the
+interface that reads only what the client shows: a quick wind-up (`AN` under 1.5 sec: guard it, one
+hit back), a long one (the pour or a breath: `ActionDash` out sideways, left and right in turn,
+since the rig's walk and strafe keys don't move the hero), the open look (`WP` clip 9: hit him),
+the scoop's yell (dash in and hit until the pot is knocked), and otherwise lock on again and press
+him. Take 341, filmed high, beat Cookie at 63 s and lost Gorged when he went home mid-fight (fixed
+above). This version has not been run yet.
 
 The old `cookie-kitchen.txt` and `cookie-gorged.txt` are dev-setup demonstrations (summons, heals,
 `.es hurt`) and prove nothing about the fight.
 
 ## Not tested in the client
 
-Take 341 (camera high) showed the pull, the pour's orange ring, the knocked pot's reel, the
-belch's green gush and the steam cones, too small to judge from that height. Not judged yet: whether the tankard reads in his hand at the camera's distance; whether
-the 3-leg mug reads as one arc (each leg after the first flies from an unseen stand-in a tick
-late); whether Blood Boil's sound reads as bubbling stew; the Steam02 puffs' size on the puddle's
-edge and in the cones; Frost Breath's and Acid Breath's looks on a murloc's head; the HoldThrown
-pose as a held lift and a rear-back; CombatWound held as the open look (it may read as repeated
-flinches rather than a reel); the swell's 0.1 sec steps; Gorged on Cookie's blue skin (the orange
-skin is gone with display 1773).
+Take 349 cleared both forms on film (114.7 sec, the warrior on 200 of 200) before the last fixes
+here (Gorged's name, holding on, the rise's dust and the swell's heave, the higher arc); take 348
+lost Gorged at his pot. Take 341 (camera high) showed the pull, the pour's orange ring, the knocked
+pot's reel, the belch's green gush and the steam cones, too small to judge from that height. Not
+judged yet: whether the tankard reads in his hand at the camera's distance; whether the 4-leg mug
+reads as one arc (each leg after the first flies from an unseen stand-in a tick late); whether
+Blood Boil's sound reads as bubbling stew; the Steam02 puffs' size on the puddle's edge and in the
+cones; Frost Breath's and Acid Breath's looks on a murloc's head; the HoldThrown pose as a held
+lift and a rear-back; CombatWound held as the open look (it may read as repeated flinches rather
+than a reel); the swell's 0.1 sec steps; Gorged on Cookie's blue skin (the orange skin is gone with
+display 1773).

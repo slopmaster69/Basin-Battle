@@ -14,7 +14,7 @@
 # sight, take 348.
 hero warrior
 cam off
-camera duel Cookie|Gorged
+camera duel Cookie|Gorged Cookie
 0 .es debug quiet
 1 .es travel landing
 10 .es debug quiet

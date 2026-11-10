@@ -675,6 +675,10 @@ fn gorged_lies_two_seconds_walks_to_the_pot_gulps_it_empty_swells_past_cookie_an
     let fell = s.clock;
     ev.extend(until(&mut s, next, 0.5, |s, n| !s.mobs[&n].hidden));
     assert!(!ev.iter().any(|e| matches!(e, Event::Visual { kit: 356, .. })), "no arcane swirl");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id: who, kit: combat::KIT_FALL_DUST, .. } if *who == next)), "he gets up out of a cloud of dust");
+    assert!(bursts(&ev, STEW_COLOUR).iter().any(|b| b.2 == "ring" && b.3 >= 3.0));
+    assert_eq!(s.content.mobs[s.mobs[&next].def].name, "Gorged Cookie", "his own name, so the forms can be told apart");
+    assert_ne!(s.content.mobs[s.mobs[&next].def].name, s.content.mobs[s.content.mob(COOKIE).unwrap()].name);
     assert!(!ev.iter().any(|e| matches!(e, Event::Yell { text, .. } if text.contains("gulps"))), "no narration yelled");
     let cookie_scale = s.content.mobs[s.content.mob(COOKIE).unwrap()].scale;
     let gorged_scale = s.content.mobs[s.mobs[&next].def].scale;
@@ -692,7 +696,10 @@ fn gorged_lies_two_seconds_walks_to_the_pot_gulps_it_empty_swells_past_cookie_an
     let swell = until(&mut s, next, 2.0, |s, n| matches!(s.kitchen.cooks[&n].stage, Some(Stage::Rising(Rise::Waiting { .. }))));
     let grows: Vec<f32> = swell.iter().filter_map(|e| match e { Event::Grow { id: who, scale } if *who == next => Some(*scale), _ => None }).collect();
     assert!(grows.len() >= 8, "a swelling, not a jump: {grows:?}");
-    assert!(grows.windows(2).all(|w| w[1] > w[0]));
+    let top = grows.iter().cloned().fold(0.0f32, f32::max);
+    let peak = grows.iter().position(|g| *g == top).unwrap();
+    assert!(grows[..=peak].windows(2).all(|w| w[1] > w[0]) && grows[peak..].windows(2).all(|w| w[1] < w[0]), "up past his size, then settling: {grows:?}");
+    assert!(top > gorged_scale * 1.05);
     assert!((s.clock - swelled_from - SWELL).abs() < 0.15);
     assert!((grows.last().unwrap() - gorged_scale).abs() < 1e-4);
     assert!(gorged_scale >= cookie_scale * 1.4, "clearly bigger than Cookie");
@@ -970,5 +977,45 @@ fn gorged_stays_on_a_hero_who_dodged_up_the_slope_until_he_dies() {
             s.step(DT);
         }
         assert_eq!(s.mobs[&id].health, 0, "engaged until he died");
+    }
+}
+
+/// The cove's floor with no way behind the pot (y over 3): nothing walks there, and no search
+/// finds a way, as on a dock or beyond the cauldron's hull.
+struct Fenced;
+impl Land for Fenced {
+    fn height(&self, _: f32, _: f32) -> f32 { 0.0 }
+    fn plans(&self) -> bool { true }
+    fn walk_clear(&self, from: Vec3, to: Vec3) -> bool { from[1] <= 3.0 && to[1] <= 3.0 }
+}
+
+#[test]
+fn gorged_always_turns_on_the_hero_after_the_gulp_wherever_they_stand() {
+    // Beside the pot either side, up close, far off, and behind it where he can't walk.
+    for (spot, reachable) in [([2.6, 1.8], true), ([-2.0, 1.8], true), ([0.6, -0.6], true), ([9.0, -6.0], true), ([0.0, 7.5], false)] {
+        let (mut s, band, id) = fight(COOKIE, 1);
+        s.land = Box::new(Fenced);
+        let h = band[0];
+        let item = s.content.item("secret_ingredient").unwrap();
+        s.give(h, item, 1);
+        s.hurt_mob(id, h, u32::MAX);
+        let next = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == GORGED).unwrap().0;
+        let at = [spot[0], spot[1], 0.0];
+        s.move_player(h, at, 0.0, Moving::default());
+        until(&mut s, next, 15.0, |s, n| s.kitchen.cooks.get(&n).is_some_and(|c| c.stage.is_none()) && !s.mobs[&n].hidden);
+        let done = s.clock;
+        if reachable {
+            until(&mut s, next, 10.0, |s, n| matches!(s.mobs[&n].state, MobState::Windup { .. }));
+            assert!(s.clock - done < 8.0, "at {spot:?} he came for the hero {:.1} s after his wait", s.clock - done);
+        } else {
+            // He can't reach them: he waits for them, still in the fight, not home.
+            for _ in 0..(12.0 / DT) as usize {
+                s.step(DT);
+                assert!(!matches!(s.mobs[&next].state, MobState::Return | MobState::Idle { .. }), "behind the pot at {:.1}: {:?}", s.clock, s.mobs[&next].state);
+            }
+            s.move_player(h, [3.0, 0.0, 0.0], 0.0, Moving::default());
+            until(&mut s, next, 8.0, |s, n| matches!(s.mobs[&n].state, MobState::Windup { .. }));
+        }
+        assert!(s.kitchen.cooks.contains_key(&next));
     }
 }

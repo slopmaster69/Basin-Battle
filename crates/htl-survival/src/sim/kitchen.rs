@@ -48,8 +48,8 @@ const POUR_NEAR: f32 = 4.0;
 const POUR_FAR: f32 = 8.0;
 /// The mug's arc: from his hand, this high over the straight line at its middle, in legs.
 const HAND: f32 = 1.0;
-const ARC_LIFT: f32 = 2.5;
-const LEGS: usize = 3;
+const ARC_LIFT: f32 = 4.0;
+const LEGS: usize = 4;
 const LEG_TICK: f32 = 0.05;
 /// A shape on the ground is drawn again this often, so it ends soon after what it shows does.
 const REDRAW: f32 = 0.5;
@@ -91,6 +91,8 @@ const STEAM_COLOUR: &str = "F2F2F2";
 const GORGED_WALK: f32 = 6.0;
 const GORGED_GULP: f32 = 1.8;
 const SWELL: f32 = 1.5;
+/// The swell runs past his full size by this much, then settles back: a gulp's heave.
+const SWELL_OVER: f32 = 0.08;
 /// The belch's swelling pulse at its fullest.
 const PULSE: f32 = 0.1;
 
@@ -510,6 +512,13 @@ impl Survival {
         if heavy { SCOOP_HEAVY } else { 1.0 }
     }
 
+    /// A cook keeps to a hero still in his fight even when he can find no way to them (a dock,
+    /// behind the pot): he waits for them rather than going home (take 348).
+    pub(crate) fn kitchen_holds_on(&self, id: Id, foe: Foe) -> bool {
+        let (Some(m), Foe::Hero(h)) = (self.mobs.get(&id), foe) else { return false };
+        self.kitchen.cooks.contains_key(&id) && self.in_fight_of(m, h)
+    }
+
     /// What his hand should hold now, sent as it changes.
     fn kitchen_hand_now(&mut self, id: Id) {
         let Some(c) = self.kitchen.cooks.get(&id) else { return };
@@ -639,6 +648,11 @@ impl Survival {
         }));
         self.kitchen.cooks.insert(id, c);
         self.halt(id);
+        // He gets up out of a cloud of dust: a fall's and a stomp's, and its ring on the ground.
+        self.events.push(Event::Visual { id, kit: combat::KIT_FALL_DUST, by: None });
+        let at = self.mobs[&id].pos;
+        self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: 3.0, arc: 360.0, width: 0.0,
+            secs: 1.2, colour: STEW_COLOUR.into() });
         let m = self.mobs.get_mut(&id).unwrap();
         m.ready_at = m.ready_at.max(now + 30.0);
     }
@@ -685,13 +699,16 @@ impl Survival {
                 let start = self.content.mob(COOKIE).map_or(1.0, |d| self.content.mobs[d].scale);
                 let end = self.content.mobs[self.mobs[&id].def].scale;
                 let t = ((now - since) / SWELL).min(1.0);
-                let scale = start + (end - start) * t;
+                // Up past his size by 80% of the way, then settling back onto it.
+                let over = end * SWELL_OVER;
+                let scale = if t < 0.8 { start + (end + over - start) * (t / 0.8) } else { end + over * (1.0 - t) / 0.2 };
                 if now >= drawn + 0.1 || t >= 1.0 {
                     self.kitchen.cooks.get_mut(&id).unwrap().scale = scale;
                     self.events.push(Event::Grow { id, scale });
                     set(self, Rise::Swelling { since, drawn: now });
                 }
                 if t >= 1.0 {
+                    self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
                     self.yell(id, "MORE STEW!");
                     self.events.push(Event::Emote { id, emote: ROAR_EMOTE });
                     self.events.push(Event::Sound { id, sound: AGGRO });

@@ -2222,6 +2222,9 @@ impl Survival {
                     return;
                 }
                 // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
+                // (Cookie and Gorged never give a hero in their fight up for a spot they can't
+                // walk to: a dock, the far side of the pot. They wait for the hero to come down.)
+                let lost = lost && !self.kitchen_holds_on(id, foe);
                 if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
