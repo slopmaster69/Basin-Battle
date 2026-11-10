@@ -828,6 +828,22 @@ impl SurvivalGame {
                         return;
                     }
                 }
+                // A piece of the falling mine on its way down (`sim::bosses`): sent again under
+                // its guid to everyone, which a client with patch 0017 moves in place (its flag
+                // `PREVIEW_MOVE`: no fade, no hull); an older one has it destroyed and drawn afresh.
+                if let (true, Some(g)) = (self.sim.collapse_piece_tilt(id).is_some(), self.guid_of(id)) {
+                    let made = self.obj_create(id);
+                    let conns: Vec<(ConnId, bool)> = self.in_world().map(|(c, _, w)| (*c, w.level >= 12)).collect();
+                    for (c, patched) in conns {
+                        if !patched {
+                            self.send(c, packets::destroy_object(g));
+                        }
+                        for p in &made {
+                            self.send(c, p.clone());
+                        }
+                    }
+                    return;
+                }
                 // A new look or name (damaged): the client caches names by entry, so it's drawn
                 // afresh.
                 self.obj_destroy(id);

@@ -18,7 +18,8 @@
 //!   whenever that's changed (no add-on, or an older one: on).
 //! - `CU\t<beat>\t<guid>`: an outcome of the hero's (since add-on 21): its beat on their screen
 //!   (`crit`, `shatter`, `execute`, `backstab`, `break`, `too_heavy`, `wall`, `cheat_death`,
-//!   `readied`, `valor`), `guid` the unit it happened to (0x0 none). Its look and sound come
+//!   `readied`, `valor`; and the falling mine's shaking, `rumble` near the collapse's front and
+//!   `rockfall` beside a piece landing), `guid` the unit it happened to (0x0 none). Its look and sound come
 //!   by `SMSG_PLAY_SPELL_VISUAL` and `SMSG_PLAY_OBJECT_SOUND` to everyone near; an older add-on
 //!   ignores the line and misses only the beat.
 //! - `FU\t<guid>\t<own>\t<secs>\t<from>\t<cuts>\t<cut>\t<windup>\t<finish>\t<finish secs>\t<turn deg>\t<trail>\t<trail ms>`:

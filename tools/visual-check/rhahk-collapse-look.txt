@@ -1,0 +1,43 @@
+# DEV SETUP, a look at the falling mine, not a fight: `.es hurt` brings on the collapse (70%) and
+# later the ring of beams (45%), and `.es goto` turns the hero at the route's corners. Floor
+# markers off. What to look for: rock dropping from overhead and lying where it lands, a big rock
+# down at the front every few yards, a timber cracking and swinging down across the tunnel every
+# ~14 yd, the tunnel behind buried, dust rolling ahead of the front and its dusty line on the
+# floor, and at 45% six beams crashing down in a ring round Rhahk'Zor. The hero keeps 9 to 15 yd
+# ahead of the front (a 1.5 s dash at 6 yd/s every 2.2 s, the front's 4 yd/s) along the first
+# three legs of the route: the mouth (-40 -385), the foreman's chamber (-70 -380), the lamp
+# gallery (-112.5 -405), toward the upper bend (-140 -400). The cameraman's own view never shakes
+# (patch 0088 writes its eye after the shake): the shaking is only on the hero's screen.
+hero warrior
+camera duel Rhahk'Zor
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es unbar all
+11.5 .es clearfoes rhahk
+12 .es goto -47 -384 55.8 0
+13 .es heal
+14 video
+15 .es in a
+15.1 .es in au
+16 .es hurt 0.69 rhahk
+16.3 .es goto -47 -384 55.8 2.98
+16.4 lua ActionDash(1.5, 6, "f")
+16.5 shots mouth 10 0.3
+18.7 lua ActionDash(1.5, 6, "f")
+21 .es goto -70 -380 54.2 3.67
+21.1 lua ActionDash(1.5, 6, "f")
+21.2 shots front 16 0.5
+23.3 lua ActionDash(1.5, 6, "f")
+25.5 lua ActionDash(1.5, 6, "f")
+27.7 lua ActionDash(1.5, 6, "f")
+29.9 lua ActionDash(1.5, 6, "f")
+32 .es hurt 0.44 rhahk
+32.1 .es goto -112.5 -405 59.9 2.96
+32.2 shots ring 12 0.25
+34.5 lua ActionDash(1.5, 6, "f")
+36.7 lua ActionDash(1.5, 6, "f")
+38 shots buried 10 0.5
+39 lua ActionDash(1.5, 6, "f")
+44 end

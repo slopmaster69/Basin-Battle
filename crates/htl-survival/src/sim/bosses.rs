@@ -12,6 +12,25 @@
 //!
 //! Each danger shows before it lands (dust before rocks, the flames where they burn), with or
 //! without the floor markers.
+//!
+//! **How the falling mine looks** (`Looks`, Corey on the footage, Nov 9: "NO falling rocks, no
+//! debris, the map doesn't appear to be falling apart"). None of it strikes, warns or times
+//! anything: the blows, their warnings and the front's crush are exactly as they were.
+//! - Every fall of rock (`rocks_fall`) shows a rock dropping from overhead onto the spot as its
+//!   blow lands, its ring on the floor till then (markers or not), and a burst of rock and a
+//!   shake for heroes beside it where it lands. The rock stays.
+//! - The collapse's front brings a big rock down every few yards (`WALL_STEP`), and a timber
+//!   cracks and swings down across the tunnel now and then (`BEAM_STEP`): the tunnel behind is
+//!   buried under them. Dust rolls ahead of the front, a dusty line marks where it is, the
+//!   ground rumbles, and a hero near it feels the shaking.
+//! - The 45% ring (`rocks_round`) brings a beam down over each of its falls, a ring of timbers
+//!   round the boss.
+//! - Everything that came down stays (at most `RUBBLE_MOST`, the oldest going first) until the
+//!   fight is lost or the dungeon resets. They're the props the finished ruin is built of
+//!   (`htl-server`'s `aftermath.rs`): the dark Burning Steppes rocks and a dig site's timber.
+//!   The pieces have no hull: a hero or the boss walks through them, as before.
+
+use std::collections::VecDeque;
 
 use super::mobs::MobState;
 use super::*;
@@ -57,6 +76,67 @@ const OFF_ROUTE: f32 = 20.0;
 const LINE_SLACK: f32 = 6.0;
 const HURL_EVERY: f32 = 4.0;
 
+// --- how it looks (`Looks`): nothing below strikes, warns or times anything ----------------------
+
+/// The props, by `GameObjectDisplayInfo` id, measured from the installed meshes (`godisp`), the
+/// ones the finished ruin is built of: `BurningSteppesBoulders05.mdx` (a broken dark rock, z
+/// 0.41..3.61), `BurningSteppesBoulders01.mdx` (a tall dark boulder, z -0.10..9.42), and the dig
+/// site's `ExcavationBarrierPole.mdx` (a timber post, z -5.77..23.87 along its up, 2.4 thick).
+pub(crate) const ROCK: u32 = 5741;
+pub(crate) const BOULDER: u32 = 5737;
+pub(crate) const BEAM: u32 = 1508;
+const ROCK_BOTTOM: f32 = 0.41;
+const BOULDER_BOTTOM: f32 = -0.10;
+/// A rock is sunk this much of its size below its lowest point, as the ruin's are, so its open
+/// underside stays under the floor.
+const EMBED: f32 = 0.4;
+const BEAM_LEN: f32 = 23.87;
+const BEAM_HALF: f32 = 1.2;
+/// Sizes: a fall's rock (about 1.7 by 2.3 yd, a yard high; a heavy fall's a little more), the
+/// front's rocks (3 to 4 yd across, nearly 2 high) and its boulders, and a beam (7 yd long).
+const CHUNK_SCALE: f32 = 0.3;
+const CHUNK_HEAVY: f32 = 0.36;
+const WALL_SCALES: [f32; 4] = [0.55, 0.62, 0.48, 0.68];
+const WALL_BOULDER: f32 = 0.27;
+pub(crate) const BEAM_SCALE: f32 = 0.3;
+/// Rock falls from this high over the floor (lower where a floor lies overhead, never under
+/// `DROP_LOW`), in the last `ROCK_SECS` before its blow lands.
+const DROP_HIGH: f32 = 5.0;
+const DROP_LOW: f32 = 2.0;
+pub(crate) const ROCK_SECS: f32 = 0.45;
+/// A beam shows cracked overhead `BEAM_HOLD`, then comes down over `BEAM_SECS`: its loose end
+/// swings to the floor (the first `BEAM_SWING` of it), then the rest crashes down flat.
+const BEAM_HOLD: f32 = 0.3;
+pub(crate) const BEAM_SECS: f32 = 0.8;
+const BEAM_SWING: f32 = 0.55;
+/// The front's wall: a rock down at the front every this far along the route, a beam every this far.
+pub(crate) const WALL_STEP: f32 = 3.0;
+pub(crate) const BEAM_STEP: f32 = 14.0;
+/// The most pieces left lying (the oldest, farthest behind, goes first), and in the air at once.
+pub(crate) const RUBBLE_MOST: usize = 400;
+const FALLING_MOST: usize = 24;
+/// `Rocky Ground Impact` (`BurrowEarth_Brown_Missile.mdx`, no caster kit): brown rock bursting
+/// from the floor where a piece lands. `Plant Thornling`'s ground look (`DustCloud_Land.mdx`,
+/// Charge's dust): the dust rolling ahead of the front. Each from an unseen stand-in on the spot.
+const ROCK_BURST: u32 = 26271;
+const DUST_ROLL: u32 = 22792;
+/// The front's line and a landing's ring on the floor (drawn whatever the markers), dust brown.
+const DUST_COLOUR: &str = "A88E6A";
+/// `DeadmineDoor01Destroy` (wood smashing) as a beam cracks, `BlackRockDoorSingleDestroy` (stone
+/// crashing) as it and the front's rocks land, `EarthquakeCameraShake` (a deep rumble) at the
+/// front every `RUMBLE_EVERY`.
+const SOUND_CRACK: u32 = 3079;
+const SOUND_CRASH: u32 = 6533;
+const SOUND_RUMBLE: u32 = 1485;
+const RUMBLE_EVERY: f32 = 3.0;
+/// The shaking: `BEAT_RUMBLE` for a hero this near the front, each dust beat; `BEAT_ROCKFALL` for
+/// one this near a piece landing, at most once in `SHAKE_GAP` (the add-on's `Cues.lua`).
+pub(crate) const BEAT_RUMBLE: &str = "rumble";
+pub(crate) const BEAT_ROCKFALL: &str = "rockfall";
+const RUMBLE_NEAR: f32 = 20.0;
+const SHAKE_NEAR: f32 = 6.0;
+const SHAKE_GAP: f32 = 0.3;
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Bosses {
     /// Bosses on the run, by creature.
@@ -69,6 +149,53 @@ pub(crate) struct Bosses {
     fires: Vec<Fire>,
     /// The place coming down behind the heroes, if a boss has brought it down.
     collapse: Option<Collapse>,
+    /// What the falling mine looks like.
+    pub(crate) looks: Looks,
+}
+
+/// The falling mine's pieces: on their way down, and lying where they fell.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Looks {
+    falling: Vec<Falling>,
+    /// What came down and stays, oldest first: (whose, the prop).
+    rubble: VecDeque<(Id, Id)>,
+    /// Every piece's tilt (falling or lying), for the drawing.
+    tilt: BTreeMap<Id, f32>,
+    /// When each hero last shook from a landing.
+    shook: BTreeMap<Id, f32>,
+    /// A count for the pieces' own variety (never the rules' dice, whose draws stay as they were).
+    seq: u32,
+    /// (Tests) none of it shown, to prove the rules don't change with it.
+    pub(crate) off: bool,
+}
+
+#[derive(Debug, Clone)]
+struct Falling {
+    owner: Id,
+    /// Its prop, once it shows.
+    id: Option<Id>,
+    shows: f32,
+    start: f32,
+    land: f32,
+    display: u32,
+    scale: f32,
+    path: Path,
+    /// Where it lands (the floor), and how wide its ring and the shaking round it.
+    at: Vec3,
+    ring: f32,
+    /// Its sound as it starts down (0: none) and as it lands.
+    crack: u32,
+    crash: u32,
+    landed: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Path {
+    /// Straight down from `from` to `to` (its resting place), turning as it goes.
+    Drop { from: Vec3, to: Vec3, yaw: f32, tilt: (f32, f32) },
+    /// A beam hinged overhead at `hinge`, lying along `yaw`: its loose end swings to the floor
+    /// (`floor`), then (`flat`) the rest comes down after it.
+    Beam { hinge: Vec3, yaw: f32, floor: f32, flat: bool },
 }
 
 /// A collapse under way (`[mob.phase.collapse]`).
@@ -102,6 +229,10 @@ struct Collapse {
     /// the same position occurs twice; a nearest-point projection alone can go backwards.
     boss_leg: usize,
     holding: bool,
+    /// How far along the route the front's rocks and beams have come down, and the next rumble.
+    walled: f32,
+    beamed: f32,
+    rumble_at: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -155,6 +286,12 @@ impl Survival {
                 let a = k as f32 * std::f32::consts::TAU / 6.0 + 0.4;
                 let p = [at[0] + a.cos() * e.rocks_round, at[1] + a.sin() * e.rocks_round, at[2]];
                 self.rocks_fall(mid, p, DEBRIS_RADIUS, DEBRIS_WARN, damage, true);
+                // The beam over each comes down with its rock, lying round the ring's edge.
+                let p = self.ground_near(p[0], p[1], p[2]);
+                let yaw = a + std::f32::consts::FRAC_PI_2;
+                let hinge = [p[0] - yaw.cos() * 3.0, p[1] - yaw.sin() * 3.0, p[2]];
+                let land = self.clock + DEBRIS_WARN;
+                self.beam_falls(mid, hinge, yaw, land, true);
             }
         }
         if let Some(c) = e.collapse.filter(|c| c.route.len() >= 2) {
@@ -189,6 +326,9 @@ impl Survival {
                 hurl_at: now,
                 boss_leg: 1,
                 holding: false,
+                walled: 0.0,
+                beamed: 0.0,
+                rumble_at: now,
             });
             let name = self.content.mobs[def].name.clone();
             self.events.push(Event::Log(format!("{name} brings the place down: a collapse along {:.0} yd at {:.1} yd/s", self.bosses.collapse.as_ref().unwrap().along.last().copied().unwrap_or(0.0), c.speed)));
@@ -228,11 +368,13 @@ impl Survival {
     /// buried are crushed; ahead of it dust and warning falls; the boss fights on through it,
     /// leashed to nowhere. A fight lost puts everything back: the boss where its fight began.
     pub(crate) fn step_boss_collapse(&mut self, dt: f32) {
+        self.step_falling_looks();
         let Some(c) = self.bosses.collapse.clone() else { return };
         let now = self.clock;
         let boss = c.boss;
         let Some(m) = self.mobs.get(&boss) else {
             self.bosses.collapse = None;
+            self.clear_looks(boss);
             return;
         };
         if m.health == 0 {
@@ -243,6 +385,8 @@ impl Survival {
         // where its fight began, to be whole again there.
         if matches!(m.state, MobState::Return | MobState::Idle { .. }) {
             self.bosses.collapse = None;
+            // The mine stands again for the next try: what came down is gone.
+            self.clear_looks(boss);
             if let Some(at) = self.bosses.began.get(&boss).copied() {
                 self.mobs.get_mut(&boss).unwrap().home = at;
                 self.set_back(boss, at, "the collapse lost: back where the fight began");
@@ -269,11 +413,14 @@ impl Survival {
             }
         }
         if !c.done {
+            // The front's own rock and timbers coming down (for the eye alone).
+            self.front_comes_down(&mut c, boss);
             // Dust at the front.
             if now >= c.dust_at {
                 c.dust_at = now + DUST_EVERY;
                 let at = route_point(&c.route, &c.along, c.front);
                 self.events.push(Event::Missile { caster: boss, spell: DUST, target: Target::Point(at) });
+                self.front_dust(&mut c, boss);
             }
             // Rock behind the front, everywhere: what the buried see.
             if now >= c.buried_at {
@@ -511,6 +658,7 @@ impl Survival {
     pub(crate) fn boss_home(&mut self, id: Id) {
         self.bosses.runs.remove(&id);
         self.bosses.burning.remove(&id);
+        self.clear_looks(id);
         if let Some(at) = self.bosses.began.remove(&id) {
             if let Some(m) = self.mobs.get_mut(&id) {
                 m.home = at;
@@ -681,7 +829,324 @@ impl Survival {
         for v in near {
             self.events.push(Event::Danger { player: v, secs: warn, from: None });
         }
+        // How it looks: its ring on the floor till it lands, and a rock dropping onto it.
+        if !self.bosses.looks.off {
+            self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: radius, arc: 360.0, width: 0.0, secs: warn, colour: mobs::HAZARD_COLOUR.into() });
+            let scale = if heavy { CHUNK_HEAVY } else { CHUNK_SCALE };
+            self.rock_drops(owner, at, ROCK, scale, now + warn, radius, 0);
+        }
     }
+
+    // --- how the falling mine looks --------------------------------------------------------------
+
+    /// A piece of the falling mine (on its way down or lying where it fell), and its tilt: the
+    /// server draws it at once with no hull, moved in place as it falls.
+    pub fn collapse_piece_tilt(&self, id: Id) -> Option<f32> {
+        self.bosses.looks.tilt.get(&id).copied()
+    }
+
+    /// The pieces lying where they fell (for tests and the log).
+    pub fn collapse_rubble(&self) -> Vec<Id> {
+        self.bosses.looks.rubble.iter().map(|(_, id)| *id).collect()
+    }
+
+    /// The next of the looks' own count (their variety, never the rules' dice).
+    fn look_seq(&mut self) -> u32 {
+        let l = &mut self.bosses.looks;
+        l.seq = l.seq.wrapping_add(1);
+        l.seq
+    }
+
+    /// How high over the floor at `at` a piece starts down: the ceiling's height in a tunnel, or
+    /// lower where a floor lies overhead (the Foundry's ring over its pit).
+    fn drop_height(&self, at: Vec3) -> f32 {
+        let mut h = DROP_HIGH;
+        while h > DROP_LOW && self.land.slab_between(at[0], at[1], at[2] + 0.3, at[2] + h + 0.5) {
+            h -= 0.5;
+        }
+        h
+    }
+
+    /// A rock (`display` at `scale`) drops onto `at`, landing at `land` (shaking the heroes beside
+    /// it, `ring` its ring's reach), and stays there.
+    #[allow(clippy::too_many_arguments)]
+    fn rock_drops(&mut self, owner: Id, at: Vec3, display: u32, scale: f32, land: f32, ring: f32, crash: u32) {
+        if self.bosses.looks.off || self.bosses.looks.falling.len() >= FALLING_MOST {
+            return;
+        }
+        let k = self.look_seq();
+        let yaw = (k as f32 * 2.399) % std::f32::consts::TAU;
+        let bottom = if display == BOULDER { BOULDER_BOTTOM } else { ROCK_BOTTOM };
+        let to = [at[0], at[1], at[2] - (bottom + EMBED) * scale];
+        let h = self.drop_height(at);
+        // In from a little to one side, as rock coming away from a wall.
+        let from = [to[0] + yaw.cos() * 0.7, to[1] + yaw.sin() * 0.7, at[2] + h];
+        let tilt = (0.5 + (k % 5) as f32 * 0.15, (k % 3) as f32 * 0.04);
+        let start = (land - ROCK_SECS).max(self.clock);
+        self.bosses.looks.falling.push(Falling {
+            owner,
+            id: None,
+            shows: start,
+            start,
+            land,
+            display,
+            scale,
+            path: Path::Drop { from, to, yaw, tilt },
+            at,
+            ring,
+            crack: 0,
+            crash,
+            landed: false,
+        });
+    }
+
+    /// A beam cracks overhead at `hinge` (its floor beneath), lying along `yaw`, and comes down to
+    /// land at `land`: its loose end to the floor, then (`flat`) the rest after it. It stays.
+    fn beam_falls(&mut self, owner: Id, hinge: Vec3, yaw: f32, land: f32, flat: bool) {
+        if self.bosses.looks.off || self.bosses.looks.falling.len() >= FALLING_MOST {
+            return;
+        }
+        let floor = hinge[2];
+        let h = self.drop_height(hinge);
+        let start = (land - BEAM_SECS).max(self.clock);
+        let path = Path::Beam { hinge: [hinge[0], hinge[1], floor + h], yaw, floor, flat };
+        let (foot, _, _) = beam_pose(&path, 1.0);
+        let len = BEAM_LEN * BEAM_SCALE;
+        // Where it comes down: about the middle of where it lies (or leans).
+        let at = [foot[0] + yaw.cos() * len * 0.4, foot[1] + yaw.sin() * len * 0.4, floor];
+        self.bosses.looks.falling.push(Falling {
+            owner,
+            id: None,
+            shows: (start - BEAM_HOLD).max(self.clock),
+            start,
+            land,
+            display: BEAM,
+            scale: BEAM_SCALE,
+            path,
+            at,
+            ring: len * 0.5,
+            crack: SOUND_CRACK,
+            crash: SOUND_CRASH,
+            landed: false,
+        });
+    }
+
+    /// The front's own rock (a big one every `WALL_STEP` it comes) and timbers (one across the
+    /// tunnel every `BEAM_STEP`): what buries the tunnel behind it.
+    fn front_comes_down(&mut self, c: &mut Collapse, boss: Id) {
+        if self.bosses.looks.off {
+            return;
+        }
+        let now = self.clock;
+        while c.walled + WALL_STEP <= c.front {
+            c.walled += WALL_STEP;
+            let k = self.look_seq();
+            let (p, yaw) = route_pose(&c.route, &c.along, c.walled);
+            let side = [-yaw.sin(), yaw.cos()];
+            let off = [-1.3, 1.1, 0.2, -0.6, 1.5, -1.6, 0.7][k as usize % 7];
+            let at = self.floor_beside(p, [p[0] + side[0] * off, p[1] + side[1] * off]);
+            let (display, scale) = if k % 4 == 3 { (BOULDER, WALL_BOULDER) } else { (ROCK, WALL_SCALES[k as usize % 4]) };
+            let crash = if k % 2 == 0 { SOUND_CRASH } else { 0 };
+            self.rock_drops(boss, at, display, scale, now + ROCK_SECS, 2.0, crash);
+        }
+        while c.beamed + BEAM_STEP <= c.front {
+            c.beamed += BEAM_STEP;
+            let k = self.look_seq();
+            let (p, yaw) = route_pose(&c.route, &c.along, c.beamed);
+            // Hinged up by one wall, across the tunnel to the other.
+            let hand = if k % 2 == 0 { 1.0 } else { -1.0 };
+            let across = yaw + hand * std::f32::consts::FRAC_PI_2;
+            let hinge = self.floor_beside(p, [p[0] - across.cos() * 2.6, p[1] - across.sin() * 2.6]);
+            // Every other one stays leaning where its end struck the floor; the rest come down flat.
+            self.beam_falls(boss, hinge, across, now + BEAM_HOLD + BEAM_SECS, k % 4 < 2);
+        }
+    }
+
+    /// Each dust beat at the front: dust rolling on ahead of it, its line across the tunnel, the
+    /// rumble, and the shaking for every hero near it.
+    fn front_dust(&mut self, c: &mut Collapse, boss: Id) {
+        if self.bosses.looks.off {
+            return;
+        }
+        let now = self.clock;
+        let total = *c.along.last().unwrap();
+        let (p, yaw) = route_pose(&c.route, &c.along, c.front);
+        self.events.push(Event::GroundBurst { at: p, yaw: yaw + std::f32::consts::FRAC_PI_2, shape: "line", reach: 3.5, arc: 0.0, width: 1.4, secs: DUST_EVERY + 0.15, colour: DUST_COLOUR.into() });
+        for ahead in [1.5, 4.5] {
+            let at = route_point(&c.route, &c.along, (c.front + ahead).min(total));
+            self.point_look(boss, at, DUST_ROLL);
+        }
+        if now >= c.rumble_at {
+            c.rumble_at = now + RUMBLE_EVERY;
+            if let Some(&(_, piece)) = self.bosses.looks.rubble.back() {
+                self.events.push(Event::Sound { id: piece, sound: SOUND_RUMBLE });
+            }
+        }
+        let near: Vec<Id> = self.players.iter().filter(|(_, h)| h.health > 0 && dist3(h.pos, p) <= RUMBLE_NEAR).map(|(h, _)| *h).collect();
+        for h in near {
+            self.events.push(Event::Beat { player: h, beat: BEAT_RUMBLE.into(), on: None });
+        }
+    }
+
+    /// A spot beside the route's point `p`, on its floor (the route's own height if the spot is
+    /// off any floor near it).
+    fn floor_beside(&self, p: Vec3, xy: [f32; 2]) -> Vec3 {
+        let g = self.ground_near(xy[0], xy[1], p[2]);
+        if g[2].is_finite() && (g[2] - p[2]).abs() < 2.0 { g } else { [xy[0], xy[1], p[2]] }
+    }
+
+    /// A ground look at `at` from an unseen stand-in on the spot (no caster's pose, and seen
+    /// however far its owner is).
+    fn point_look(&mut self, owner: Id, at: Vec3, spell: u32) {
+        let anchor = self.alloc();
+        self.events.push(Event::MissileFrom { anchor, caster: owner, spell, from: at, target: Target::Point(at) });
+        self.events.push(Event::ObjGone { id: anchor });
+    }
+
+    /// The pieces on their way down move; those landing burst, shake whoever is beside them and
+    /// stay. What a reset took away is let go.
+    fn step_falling_looks(&mut self) {
+        let l = &self.bosses.looks;
+        if l.falling.is_empty() && l.rubble.is_empty() && l.tilt.is_empty() {
+            return;
+        }
+        let objs = &self.objs;
+        let l = &mut self.bosses.looks;
+        l.rubble.retain(|(_, id)| objs.contains_key(id));
+        l.falling.retain(|f| f.id.is_none_or(|id| objs.contains_key(&id)));
+        l.tilt.retain(|id, _| objs.contains_key(id));
+        let now = self.clock;
+        let mut landed = Vec::new();
+        for k in 0..self.bosses.looks.falling.len() {
+            let f = self.bosses.looks.falling[k].clone();
+            if now < f.shows {
+                continue;
+            }
+            let t = if f.land > f.start { ((now - f.start) / (f.land - f.start)).clamp(0.0, 1.0) } else { 1.0 };
+            let (pos, facing, tilt) = f.path.pose(t);
+            match f.id {
+                None => {
+                    let id = self.alloc();
+                    self.objs.insert(id, Obj { kind: ObjKind::Prop { display: f.display, scale: f.scale }, pos, facing });
+                    self.bosses.looks.tilt.insert(id, tilt);
+                    self.events.push(Event::ObjSpawned { id });
+                    if f.crack != 0 {
+                        self.events.push(Event::Sound { id, sound: f.crack });
+                    }
+                    self.bosses.looks.falling[k].id = Some(id);
+                }
+                Some(id) if now >= f.start => {
+                    if let Some(o) = self.objs.get_mut(&id) {
+                        o.pos = pos;
+                        o.facing = facing;
+                    }
+                    self.bosses.looks.tilt.insert(id, tilt);
+                    self.events.push(Event::ObjChanged { id });
+                }
+                Some(_) => {}
+            }
+            if t >= 1.0 && now >= f.start {
+                self.bosses.looks.falling[k].landed = true;
+                landed.push(k);
+            }
+        }
+        for k in landed {
+            let f = self.bosses.looks.falling[k].clone();
+            let Some(id) = f.id else { continue };
+            // Brown rock bursting where it struck, its ring on the floor, its crash.
+            self.point_look(f.owner, f.at, ROCK_BURST);
+            self.events.push(Event::GroundBurst { at: f.at, yaw: 0.0, shape: "ring", reach: f.ring, arc: 360.0, width: 0.0, secs: 0.5, colour: DUST_COLOUR.into() });
+            if f.crash != 0 {
+                self.events.push(Event::Sound { id, sound: f.crash });
+            }
+            let shaken: Vec<Id> = self
+                .players
+                .iter()
+                .filter(|(h, p)| p.health > 0 && dist3(p.pos, f.at) <= SHAKE_NEAR.max(f.ring + 2.0)
+                    && self.bosses.looks.shook.get(*h).is_none_or(|t| now - t >= SHAKE_GAP))
+                .map(|(h, _)| *h)
+                .collect();
+            for h in shaken {
+                self.bosses.looks.shook.insert(h, now);
+                self.events.push(Event::Beat { player: h, beat: BEAT_ROCKFALL.into(), on: None });
+            }
+            let l = &mut self.bosses.looks;
+            l.rubble.push_back((f.owner, id));
+            while l.rubble.len() > RUBBLE_MOST {
+                let (_, old) = l.rubble.pop_front().unwrap();
+                l.tilt.remove(&old);
+                if self.objs.remove(&old).is_some() {
+                    self.events.push(Event::ObjGone { id: old });
+                }
+            }
+        }
+        self.bosses.looks.falling.retain(|f| !f.landed);
+        self.bosses.looks.shook.retain(|_, t| now - *t < SHAKE_GAP);
+    }
+
+    /// Everything of `owner`'s that came down (or is coming down) gone: its fight lost, the mine
+    /// stands again.
+    fn clear_looks(&mut self, owner: Id) {
+        let l = &mut self.bosses.looks;
+        let mut gone: Vec<Id> = l.rubble.iter().filter(|(o, _)| *o == owner).map(|(_, id)| *id).collect();
+        gone.extend(l.falling.iter().filter(|f| f.owner == owner).filter_map(|f| f.id));
+        l.rubble.retain(|(o, _)| *o != owner);
+        l.falling.retain(|f| f.owner != owner);
+        for id in gone {
+            self.bosses.looks.tilt.remove(&id);
+            if self.objs.remove(&id).is_some() {
+                self.events.push(Event::ObjGone { id });
+            }
+        }
+    }
+}
+
+impl Path {
+    /// Where its prop stands `t` of the way down (0 to 1, falling faster as it goes): its
+    /// position, facing and tilt (about the model's own Y after its facing, the drawing's).
+    fn pose(&self, t: f32) -> (Vec3, f32, f32) {
+        match *self {
+            Path::Drop { from, to, yaw, tilt } => {
+                let u = t * t;
+                let pos = [from[0] + (to[0] - from[0]) * u, from[1] + (to[1] - from[1]) * u, from[2] + (to[2] - from[2]) * u];
+                (pos, yaw + (1.0 - u) * 1.3, tilt.0 + (tilt.1 - tilt.0) * u)
+            }
+            Path::Beam { .. } => beam_pose(self, t),
+        }
+    }
+}
+
+/// A beam's pose `t` of the way down: the post's foot (its origin) at the hinge, the post along
+/// `yaw` tipped from lying level (a tilt of a quarter turn from upright) until its far end strikes
+/// the floor; then, coming down flat, its foot drops after it, the far end where it struck.
+fn beam_pose(path: &Path, t: f32) -> (Vec3, f32, f32) {
+    let Path::Beam { hinge, yaw, floor, flat } = *path else { return ([0.0; 3], 0.0, 0.0) };
+    use std::f32::consts::FRAC_PI_2;
+    let len = BEAM_LEN * BEAM_SCALE;
+    let rest = floor + BEAM_HALF * BEAM_SCALE;
+    let d = [yaw.cos(), yaw.sin()];
+    // The tilt that puts the far end on the floor, swung from the hinge.
+    let struck = (-((hinge[2] - rest) / len).clamp(-1.0, 1.0)).acos();
+    let swing = if flat { BEAM_SWING } else { 1.0 };
+    if t <= swing {
+        let u = (t / swing).powi(2);
+        return (hinge, yaw, FRAC_PI_2 + (struck - FRAC_PI_2) * u);
+    }
+    let end = [hinge[0] + d[0] * len * struck.sin(), hinge[1] + d[1] * len * struck.sin(), rest];
+    let u = ((t - swing) / (1.0 - swing)).powi(2);
+    let z = hinge[2] + (rest - hinge[2]) * u;
+    let reach = (len * len - (z - end[2]).powi(2)).max(0.0).sqrt();
+    let foot = [end[0] - d[0] * reach, end[1] - d[1] * reach, z];
+    let tilt = ((end[2] - z) / len).clamp(-1.0, 1.0).acos();
+    (foot, yaw, tilt)
+}
+
+/// The point `d` yards along a route and the way the route runs there.
+fn route_pose(route: &[Vec3], along: &[f32], d: f32) -> (Vec3, f32) {
+    let a = route_point(route, along, (d - 0.5).max(0.0));
+    let b = route_point(route, along, d + 0.5);
+    let yaw = (b[1] - a[1]).atan2(b[0] - a[0]);
+    (route_point(route, along, d), yaw)
 }
 
 fn dist3(a: Vec3, b: Vec3) -> f32 {
