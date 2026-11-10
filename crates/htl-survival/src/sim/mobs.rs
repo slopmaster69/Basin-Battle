@@ -568,6 +568,7 @@ impl Survival {
                 continue;
             }
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
+            let mut say = None;
             if (matches!(mob.state, MobState::Idle { .. } | MobState::Return) || m == mid)
                 && !matches!(mob.state, MobState::Windup { .. } | MobState::Recover { .. })
             {
@@ -589,12 +590,15 @@ impl Survival {
                         self.events.push(Event::Sound { id: m, sound });
                     }
                     if !line.is_empty() {
-                        self.events.push(Event::Log(format!("{}: {line}", self.content.mobs[mob.def].name)));
-                        self.events.push(Event::Yell { id: m, text: line.clone() });
+                        say = Some(line.clone());
                     }
                 }
             }
             let (pos, link) = (mob.pos, mob.pack.map_or(0.0, |k| self.content.packs[k].link));
+            // Through the line queue, so the next line nearby waits its turn (Greenskin's order).
+            if let Some(text) = say {
+                self.yell(m, text);
+            }
             if link <= 0.0 {
                 continue;
             }
@@ -672,6 +676,8 @@ impl Survival {
             let heft = heft * self.vancleef_posture_share(mid, label);
             // Gilnid's and his crew's (`sim::perches`): debug damage never counts.
             let heft = heft * self.perch_posture_share(mid, label);
+            // Cookie's (`sim::kitchen`): a heavy blow knocks his pot as he scoops.
+            let heft = heft * self.kitchen_posture_share(mid, by, label);
             // Smite's (`sim::arsenal`): struck kneeling at his rack, more.
             let heft = heft * self.arsenal_posture_share(mid);
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
@@ -733,8 +739,9 @@ impl Survival {
     /// in its fight as its health takes (0: it has none).
     pub fn posture_limit(&self, mid: Id) -> u32 {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
-        // Greed leaves Cookie's hands occupied. Ordinary light blows can spoil the scoop too.
-        let limit = if self.kitchen_scooping(mid) { 60 } else { self.content.mobs[m.def].posture };
+        // Greed leaves Cookie's hands occupied: about 2 s of a hero's blows, or one heavy blow,
+        // spoils the scoop (`sim::kitchen`).
+        let limit = if self.kitchen_scooping(mid) { super::kitchen::SCOOP_POSTURE } else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }
@@ -943,8 +950,9 @@ impl Survival {
             self.events.push(Event::Missile { caster: s, spell: of.then_look, target: Target::Point(at) });
         }
         self.yell(s, of.then_text.clone());
-        // (VanCleef's Unbowed kneels first and roars as he stands: `sim::vancleef`.)
-        if of.then_after > 0.0 && !self.is_vancleef(s) {
+        // (VanCleef's Unbowed kneels first and roars as he stands: `sim::vancleef`. Gorged roars
+        // once he has emptied the pot and swollen: `sim::kitchen`.)
+        if of.then_after > 0.0 && !self.is_vancleef(s) && !self.is_kitchen(s) {
             self.events.push(Event::Emote { id: s, emote: ROAR_EMOTE });
             let sound = self.content.mobs[nd].aggro_sound;
             if sound != 0 {
@@ -967,6 +975,7 @@ impl Survival {
             }
         }
         self.vancleef_risen(s);
+        self.kitchen_risen(s);
     }
 
     /// Secret forms whose time has come rise.
@@ -2027,6 +2036,7 @@ impl Survival {
         }
         let marks: Vec<Id> = self.missiles.iter().filter(|x| x.owner == id && x.mark != 0).map(|x| x.mark).collect();
         self.missiles.retain(|x| x.owner != id);
+        self.line_shots.retain(|x| x.owner != id);
         for mk in marks {
             self.unmark(mk);
         }
@@ -2037,6 +2047,7 @@ impl Survival {
     fn spend_missiles(&mut self, id: Id) {
         let marks: Vec<Id> = self.missiles.iter().filter(|x| x.owner == id && x.mark != 0).map(|x| x.mark).collect();
         self.missiles.retain(|x| x.owner != id);
+        self.line_shots.retain(|x| x.owner != id);
         for mk in marks {
             self.unmark(mk);
         }
@@ -2068,7 +2079,9 @@ impl Survival {
     /// find nothing (it evades, as 1.12's do) until it's home or they come back within it.
     pub(crate) fn evading(&self, mid: Id, by: Id) -> bool {
         let (Some(m), Some(p)) = (self.mobs.get(&mid), self.players.get(&by)) else { return false };
-        !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK
+        // (Cookie and Gorged waiting for a hero they can find no way to evade too: `sim::kitchen`.)
+        self.kitchen_evading(mid)
+            || (!m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK)
     }
 
     /// An evading creature slips a blow from `from`: the dodge's clip on it, and no word over it
@@ -2217,6 +2230,9 @@ impl Survival {
                     return;
                 }
                 // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
+                // (Cookie and Gorged never give a hero in their fight up for a spot they can't
+                // walk to: a dock, the far side of the pot. They wait for the hero to come down.)
+                let lost = lost && !self.kitchen_holds_on(id, foe);
                 if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
@@ -2481,6 +2497,7 @@ impl Survival {
                     // A hit can mercy-cancel the pattern; retain the step that actually released.
                     let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
                     self.release(id, foe);
+                    self.kitchen_blow_released(id, released);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
                     let steps = pat.map_or(0, |p| p.steps.len());
@@ -2585,6 +2602,10 @@ impl Survival {
             || (a.ranged && (self.is_firing_captain(id) || d.key == "dm_deck_gunner")) {
             a.turn_rate = 0.0;
             a.lock = a.windup;
+        }
+        // Greenskin alone: no pause between his attacks (`sim::firing_line`).
+        if self.firing_alone(id) {
+            a.cooldown = 0.0;
         }
         // A blow held a beat (the delayed swing).
         a.windup += m.hold;
@@ -2736,7 +2757,10 @@ impl Survival {
         let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
         let tele = if self.machine_grind(id) { Telegraph { reach: 7.5, width: 3.0, at: Some((pos, face)), ..tele } } else { tele };
         let mark = if let Some(mark) = self.kitchen_pour_mark(id, tele) { Some(mark) } else if a.ranged {
-            self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
+            // (Greenskin's guns and harpoon play their own load, aim and hold: `sim::firing_line`.)
+            if !self.firing_shooter(id) {
+                self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
+            }
             // A lobbed throw that splashes: where it will come down is chosen now and marked
             // through the whole wind-up and flight, so the ring is there to read and step out of,
             // however near the thrower stands.

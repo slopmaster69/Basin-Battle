@@ -498,7 +498,8 @@ pub(crate) const VERSION: u32 = 2;
 /// and the kick stay on the whole body).
 /// 62: `FZ`, a boss's open pose caught part way through a clip and held (the Shredder's stall,
 /// Gilnid's stuck spanner).
-pub(crate) const ADDON_NEWEST: u32 = 62;
+/// 63: the `FZ` holds last their whole time (a timer set from inside a timer was dropped).
+pub(crate) const ADDON_NEWEST: u32 = 63;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
