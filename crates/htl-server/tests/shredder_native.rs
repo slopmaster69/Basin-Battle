@@ -108,7 +108,7 @@ fn sneed_works_outside_the_native_wreck_and_can_be_hit_or_rebuild_at_its_center(
             s.input(hero, Input::Attack);
             for _ in 0..28 { step(&mut s, hero); }
             assert!(s.mobs[&driver].health < hp, "ordinary attack lands beside wreck");
-            assert!(s.mobs.get(&machine).is_none_or(|m| m.health == 0 && matches!(m.state, htl_survival::mobs::MobState::Dead { gone_at } if gone_at.is_finite())), "interruption leaves a quiet body");
+            assert!(s.mobs.get(&machine).is_some_and(|m| m.health == 0 && m.pos == wreck && matches!(m.state, htl_survival::mobs::MobState::Dead { gone_at } if gone_at.is_infinite())), "interruption leaves the wreck where it lay, quiet");
             for _ in 0..200 {
                 assert!(!step(&mut s, hero).iter().any(|e| matches!(e, Event::Cast { spell: 2575, .. })));
             }
