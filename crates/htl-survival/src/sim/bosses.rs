@@ -17,7 +17,7 @@
 //! debris, the map doesn't appear to be falling apart"). None of it strikes, warns or times
 //! anything: the blows, their warnings and the front's crush are exactly as they were.
 //! - Every fall of rock (`rocks_fall`) shows a rock dropping from overhead onto the spot as its
-//!   blow lands, its ring on the floor till then (markers or not), and a burst of rock and a
+//!   blow lands, its ring on the floor till then (markers or not), and dust thrown up and a
 //!   shake for heroes beside it where it lands. The rock stays.
 //! - The collapse's front brings a big rock down every few yards (`WALL_STEP`), and a timber
 //!   cracks and swings down across the tunnel now and then (`BEAM_STEP`): the tunnel behind is
