@@ -535,7 +535,9 @@ respawn = 0.0
   weight = 4.0
   steps = [ { clip = 17, take = 1, ranged = false, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6, sound = 0 } ]
 
-# Cookie serves one cooling spill, then risks a scoop after three completed exchanges.
+# Cookie (docs/cookie-encounter.md): a cleaver pair, a broad ladle and Serve It Hot, then a greedy
+# scoop at his cauldron after 3, 4 and 5 exchanges. The kitchen (sim/kitchen.rs) owns the pot,
+# the tankard in his hand, the puddle, the scoop and Gorged's rise.
 [[mob]]
 key = "dm_cookie"
 name = "Cookie"
@@ -558,13 +560,12 @@ trophy = { cookie_tenderizer = 1 }
 gear = ["cookie_tenderizer", "cookie_trousers"]
 respawn = 0.0
 # Whoever carries his secret ingredient into the fight sees what the stew does to him: he lies
-# still a while, then gets up bigger.
+# still 2 s, gets up in a puff of dust, walks to the pot, gulps it empty and swells. No narration
+# and no arcane swirl (kit 356 was one): the kitchen shows it and says "MORE STEW!" when he's grown.
 then = "dm_cookie_gorged"
-then_after = 3.5
+then_after = 2.0
 then_needs = "secret_ingredient"
-then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot and grows."
-then_kit = 356
-# Geyser 10987 is an ice-hand effect, not stew; growth and the next breath carry the reveal.
+then_text = ""
 aggro_text = "Mrrgl! Cookie's kitchen!"
 slay_text = "More meat for the pot!"
 death_text = "...burnt."
@@ -588,18 +589,20 @@ death_text = "...burnt."
   name = "ladle"
   weight = 1.0
   steps = [ { clip = 57, take = 0, windup = 1.2, damage = 24, arc = 150.0, heavy = true, recovery = 1.6 } ]
-  # Kitchen owns the committed landing point, one 2 yd patch, and its cooling. No generic arc hit.
-  # 20 on contact, two 4-damage ticks, then 1.5 sec of harmless thinning steam.
+  # The tankard lifted (HoldThrown, held), then thrown in an arc onto where the hero stood, 4 to
+  # 8 yd off: a 2 yd puddle, 20 as it lands and 4 a second until its last edge puff drops (4.2 s).
+  # The kitchen owns the landing and the puddle; no generic arc hit. He fights on while it cools.
   [[mob.pattern]]
   name = "serve it hot"
   weight = 1.0
-  max_range = 5.0
-  steps = [ { clip = 107, take = 0, windup = 1.8, range = 5.0, arc = 65.0, damage = 20, blockable = false, poise = true, recovery = 1.7 } ]
-  # Only a successful scoop chooses this: a short locked cone and a four-second cough.
+  max_range = 8.0
+  steps = [ { clip = 111, take = 0, windup = 1.8, range = 8.0, arc = 65.0, damage = 20, blockable = false, poise = true, recovery = 1.7 } ]
+  # Only a scoop left alone chooses this: a breath drawn in (HoldThrown, MurlocAlert), a locked
+  # 5 yd, 65-degree steam cone, then a short 1.5 s opening.
   [[mob.pattern]]
   name = "steam"
   weight = 0.0
-  steps = [ { clip = 32, take = 0, windup = 1.6, range = 5.0, arc = 65.0, damage = 24, blockable = false, poise = true, recovery = 4.0 } ]
+  steps = [ { clip = 111, take = 0, windup = 1.6, range = 5.0, arc = 65.0, damage = 24, sound = 1109, blockable = false, poise = true, recovery = 1.5 } ]
 
 # Mr. Smite: three physical loadouts, earned by a run to his rack, never an arena stun.
 [[mob]]
@@ -2576,14 +2579,17 @@ perks = [{ kind = "regen", amount = 0.003 }]
 
 [[mob]]
 key = "dm_cookie_gorged"
-name = "Cookie"
+# His own name, so a camera or a hero can tell the forms apart.
+name = "Gorged Cookie"
 temper = "bruiser"
 subname = "Gorged on the Stew"
-display = 1773
+# Cookie's own body (display 1305), so he rises at Cookie's size and the swell (1.3 to 1.95, over
+# 1.5 s at the pot) compares like with like. The orange 1773 (its own display scale 2.0) at 1.15
+# was filmed smaller than Cookie.
+display = 1305
 # Each string has its own voice so the inhale alert is not masked by an attack grunt.
 windup_sound = 0
-# Native display 1773 is 2x; 1.15 makes the secret form visibly larger than Cookie.
-scale = 1.15
+scale = 1.95
 health = 820
 run_speed = 6.0
 walk_speed = 2.0
@@ -2599,7 +2605,7 @@ death_text = "...burnt."
   [mob.attack]
   windup = 0.9
   damage = 24
-  range = 3.4
+  range = 3.8
   arc = 110.0
   recovery = 1.3
   cooldown = 1.5
@@ -2612,12 +2618,13 @@ death_text = "...burnt."
   name = "slaps"
   weight = 1.0
   steps = [ { clip = 16, take = 0, windup = 0.9, damage = 22, sound = 417, recovery = 0.4 }, { clip = 17, take = 0, windup = 0.8, damage = 24, recovery = 1.6 } ]
-  # A generous inhale locks at the first pose. Move beside him, then punish four seconds of cough.
+  # He rears back (HoldThrown, held) and swells for 2.2 s, the cone drawn on the ground at the
+  # 7.4 yd and 70 degrees it hits. Move beside him, then punish four seconds of cough.
   [[mob.pattern]]
   name = "belch"
   weight = 1.0
   max_range = 7.0
-  steps = [ { clip = 32, take = 0, windup = 2.2, range = 7.0, arc = 70.0, damage = 34, sound = 1109, blockable = false, poise = true, recovery = 4.0 } ]
+  steps = [ { clip = 111, take = 0, windup = 2.2, range = 7.0, arc = 70.0, damage = 34, sound = 1109, blockable = false, poise = true, recovery = 4.0 } ]
 
 # --- Edwin VanCleef, unbowed: longer commitments, greater punish windows ---------------------------
 
