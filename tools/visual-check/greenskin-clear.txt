@@ -1,0 +1,40 @@
+# An unassisted solo clear of Captain Greenskin (docs/greenskin-encounter.md), filmed by the
+# cameraman (camera duel), markers off. Dev setup, all before the video: travel, the deck cleared
+# but for the captain (his crew is posted afresh at their posts), the warrior healed and put 15 yd
+# east of him at (-62, -830), facing him, out of his reach, with the east gunner beside the way in.
+# From the video on, no debug command: only the warrior's own keys (.es in, ActionDash), pressed by
+# a small player in the interface (GS below) that reads only what the client shows: a gun at the
+# shoulder or the harpoon held back (AN cast, clip 48 or 108: step aside, alternating sides, just
+# before it fires), and his windups (AN mob: raise the guard as it lands, then two hits in his
+# recovery). It walks in to pull him, locks on and duels him while the crew fires.
+hero warrior
+# No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to him.
+cam off
+camera duel Captain Greenskin
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes greenskin
+12 .es goto -62 -830 41.5 1.570796
+12.6 .es heal
+12.2 lua GS = { q = {}, on = false, side = 1, pending = 0, nextHit = 0 }
+12.2 lua function GS.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function GS.after(d, f) table.insert(GS.q, { GetTime() + d, f }) end
+12.2 lua function GS.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+12.2 lua function GS.hit(why) GS.log(why .. " hp " .. UnitHealth("player")) GS.say(".es in a") GS.after(0.08, function() GS.say(".es in au") end) end
+12.2 lua function GS.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.2 lua function GS.aside(t) GS.after(math.max(0.3, t - 0.4), function() GS.side = -GS.side GS.log("step off the line hp " .. UnitHealth("player")) ActionDash(0.35, 7, GS.side > 0 and "l" or "r") end) end
+12.2 lua function GS.blow(t) local land = GetTime() + t GS.pending = land GS.after(math.max(0.3, t - 0.15), function() GS.log("guard hp " .. UnitHealth("player")) GS.say(".es in g") end) GS.after(t + 0.2, function() GS.say(".es in gu") end) GS.after(t + 0.45, function() GS.hit("punish") end) GS.after(t + 1.1, function() GS.hit("punish") end) end
+12.2 lua function GS.line(l) local f = GS.split(l) if f[1] ~= "AN" or not GS.on then return end local clip, t = tonumber(f[3]), tonumber(f[4]) or 0 if f[11] == "cast" and (clip == 48 or clip == 108) then GS.aside(t) elseif f[11] == "mob" and f[7] ~= "1" then GS.blow(t) end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) GS.line(l) return old(l) end
+12.2 lua GS.f = CreateFrame("Frame") GS.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(GS.q) do local a = GS.q[i] if now >= a[1] then table.remove(GS.q, i) a[2]() else i = i + 1 end end if GS.locked and now > GS.pending + 1.5 and now >= GS.nextHit then GS.nextHit = now + 1.2 GS.hit("press him") end end)
+13.2 video
+13.6 lua GS.on = true
+14 lua ActionDash(0.6, 7, "f")
+16 .es in lock
+16.2 lua GS.locked = true
+14 shots pull 10 1.0
+30 shots duel 30 4.0
+150 shots late 20 4.0
+240 end

@@ -13,7 +13,7 @@ carry their own local versions (`docs/vancleef-encounter.md`, `docs/shredder-enc
 | Second forms were instant swaps | A form that rises from a fallen one waits `SECOND_FORM_WAIT` (2 s) before its first blow. Unbowed keeps his own kneel and wait. |
 | Deaths lagged | A creature that falls mid-blow, or any champion, lets go of its swing or held pose (`HoldPose` clip 0) as it dies, so the death plays at once. |
 | Things outlived their boss | When a creature dies, what it called up goes with it, and its throws still in the air are spent: nothing it threw lands after its death. |
-| Yells collided | Lines within 40 yd of each other come at least 2 s apart (`LINE_GAP`). One due sooner waits its turn, and is dropped if its speaker is gone or it waited 8 s. |
+| Yells collided | Lines within 40 yd of each other come at least 2 s apart (`LINE_GAP`). One due sooner waits its turn, and is dropped if its speaker is gone or it waited 8 s. A creature's pull line goes through the same queue. |
 
 Still for each boss, because they depend on its own models, clips and props:
 

@@ -1111,6 +1111,8 @@ pub struct Survival {
     pub storage: BTreeMap<usize, u32>,
     pub events: Vec<Event>,
     pub(crate) missiles: Vec<combat::Missile>,
+    /// Creatures' shots along a line in flight (Greenskin's crew's balls, his harpoon).
+    pub(crate) line_shots: Vec<combat::LineShot>,
     /// Heroes' projectiles in flight, ground marked to land, ground burning, totems standing.
     pub(crate) projectiles: Vec<abilities::Projectile>,
     pub(crate) grounds: Vec<abilities::GroundCast>,
@@ -1277,6 +1279,7 @@ impl Survival {
             storage: BTreeMap::new(),
             events: Vec::new(),
             missiles: Vec::new(),
+            line_shots: Vec::new(),
             projectiles: Vec::new(),
             landings: Vec::new(),
             lines: std::collections::VecDeque::new(),

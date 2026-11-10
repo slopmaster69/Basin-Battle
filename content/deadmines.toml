@@ -685,7 +685,8 @@ aggro_sound = 5775
   max_range = 3.0
   steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, kit = 356 } ]
 
-# Captain Greenskin: the finite firing line controls the opening and the reload windows.
+# Captain Greenskin: break the firing line (docs/greenskin-encounter.md). His two gunners stand at
+# their posts before the pull and take turns to fire; he fights between their shots.
 [[temper]]
 key = "quarterdeck"
 punish = true
@@ -737,23 +738,29 @@ death_text = "My ship..."
   weight = 2.0
   max_range = 4.0
   steps = [ { clip = 57, take = 0, windup = 1.25, range = 4.0, arc = 220.0, damage = 20, recovery = 1.6 } ]
-  # Crew death, never health, unlocks these. Both aim at the position held at the first pose.
+  # Both gunners down, never health, unlocks these (`sim::firing_line`). The gun: at a hero
+  # kiting him, at most every 10 sec; a load (0.6) and a 1.2 sec aim (a draw first when it's put
+  # away), then a ball along a 1 yd line (radius is half its width) at 20 yd/s. 1.12 has no
+  # pistol item model: a short native blunderbuss.
   [[mob.pattern]]
   name = "pistol shot"
   weight = 2.0
-  min_range = 4.0
+  min_range = 6.0
   max_range = 28.0
-  # 1.12 has no pistol item model: a short native blunderbuss makes the draw visible.
-  steps = [ { ranged = true, windup = 2.4, damage = 23, range = 28.0, radius = 0.85, speed = 40.0, spell = 8682, sound = 1147, recovery = 1.8 } ]
+  steps = [ { ranged = true, windup = 1.8, damage = 23, range = 28.0, radius = 0.5, speed = 20.0, spell = 8682, recovery = 1.8 } ]
+  # The harpoon, only at a hero who has kept 8 yd away for 2 sec: held back 1.7 sec, thrown along
+  # a line on the native net (6533) at 14 yd/s. A fair hit hauls them to 3 yd and into his
+  # clearing cut; a sidestep, a dodge or a guard spares them the haul.
   [[mob.pattern]]
   name = "harpoon"
   weight = 1.5
-  min_range = 5.0
+  min_range = 8.0
   max_range = 26.0
-  # Borrow the native rope/net throw used by Reverse Grapple, with a fair hit-gated pull.
-  steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.85, speed = 24.0, spell = 6533, blockable = true, recovery = 2.0 } ]
+  steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.5, speed = 14.0, spell = 6533, blockable = true, recovery = 2.0 } ]
 
-# Exactly 2 spawn with the captain's pull, on reachable deck, and never get replacements.
+# Exactly 2 stand at their posts either side of the quarterdeck before the pull, are pulled with
+# him, and never get replacements. Each shot: a load (0.6), the gun at the shoulder where the aim
+# locks (1.6), and a ball along a 1 yd line (radius is half its width) at 20 yd/s.
 [[mob]]
 key = "dm_deck_gunner"
 name = "Defias Deck Gunner"
@@ -778,10 +785,9 @@ respawn = 0.0
   turn_rate = 0.0
   lock = 2.2
   blockable = true
-  radius = 0.85
-  speed = 40.0
+  radius = 0.5
+  speed = 20.0
   spell = 8682
-  sound = 1147
 
 # Edwin VanCleef: hunched means hit, blades up means wait (docs/vancleef-encounter.md). Two honest
 # cuts and a hunch, then the Invitation: wait it out, or be answered by the riposte.

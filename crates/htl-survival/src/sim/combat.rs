@@ -17,6 +17,28 @@ pub(crate) enum Area {
     Circle { at: Vec3, radius: f32 },
     /// In a strip from `pos` along `facing`, `len` long and `half` either side.
     Line { pos: Vec3, facing: f32, len: f32, half: f32 },
+    /// Within `radius` of the segment from `from` to `to`: a shot's line, round at both ends.
+    Capsule { from: Vec3, to: Vec3, radius: f32 },
+}
+
+/// How far along the segment from `a` to `b` the point nearest `p` lies, in yards (0 at `a`,
+/// the segment's length at `b`), and how far `p` is from that point, on the ground.
+pub(crate) fn along_segment(a: Vec3, b: Vec3, p: Vec3) -> (f32, f32) {
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let len = (dx * dx + dy * dy).sqrt();
+    if len < 1e-4 {
+        return (0.0, dist2d(a, p));
+    }
+    let (ux, uy) = (dx / len, dy / len);
+    let t = ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy).clamp(0.0, len);
+    (t, dist2d([a[0] + ux * t, a[1] + uy * t, a[2]], p))
+}
+
+/// Whether `p` lies within `radius` of the segment from `a` to `b` (a capsule), on its floor.
+pub(crate) fn in_capsule(a: Vec3, b: Vec3, radius: f32, p: Vec3) -> bool {
+    let (t, off) = along_segment(a, b, p);
+    let z = a[2] + (b[2] - a[2]) * (t / dist2d(a, b).max(1e-4));
+    off <= radius && (p[2] - z).abs() <= 3.0
 }
 
 /// Whether `p` lies in a strip from `pos` along `facing`, `len` long and `half` either side.
@@ -71,6 +93,28 @@ pub(crate) struct Missile {
     pub mark: Id,
     /// The spell whose ground look plays where it lands (0: none).
     pub look: u32,
+}
+
+/// A shot along a line (a gun's ball, a thrown harpoon): it flies from `from` to `to` at `speed`
+/// and strikes each hero on its line as it reaches them, not before and not after. A hero who
+/// stepped off the line by then is missed, and so is one who steps onto it behind the shot.
+pub(crate) struct LineShot {
+    pub owner: Id,
+    pub from: Vec3,
+    pub to: Vec3,
+    /// Half the line's width (a hero's body is added).
+    pub radius: f32,
+    pub speed: f32,
+    pub start: f32,
+    /// How far along it has flown so far.
+    pub reached: f32,
+    pub damage: u32,
+    pub blockable: bool,
+    /// A fair hit hauls the hero in to this far from the thrower (a harpoon); none for a ball.
+    pub pull_to: Option<f32>,
+    /// The spell whose ground look plays where it ends (0: none): splinters where a ball stops.
+    pub look: u32,
+    pub struck: Vec<Id>,
 }
 
 impl Survival {
@@ -1817,7 +1861,7 @@ impl Survival {
     ) {
         // A creature's blow is melee, its missile marked on the ground an area; a hero's swing
         // melee.
-        let how = if area.is_some_and(|a| matches!(a, Area::Circle { .. } | Area::Line { .. })) { HitKind::Area } else { HitKind::Melee };
+        let how = if area.is_some_and(|a| matches!(a, Area::Circle { .. } | Area::Line { .. } | Area::Capsule { .. })) { HitKind::Area } else { HitKind::Melee };
         self.strike_fair_as(attacker, victim, damage, from, blockable, heavy, parryable, style, area, follow, how);
     }
 
@@ -1898,6 +1942,7 @@ impl Survival {
             }
             Some(Area::Circle { at, radius }) => dist2d(vpos, at) <= radius,
             Some(Area::Line { pos, facing: f, len, half }) => in_strip(pos, f, len, half + 0.4, vpos),
+            Some(Area::Capsule { from, to, radius }) => in_capsule(from, to, radius, vpos),
         };
         // A blink that left the blow's area slipped it (its reward); one that stayed inside it
         // (a few yards within a slam, or through the attacker) didn't. A blow on them alone
@@ -1933,6 +1978,8 @@ impl Survival {
             if matches!(out, Outcome::Hit | Outcome::GuardBroken) && after > 0 {
                 let effect = crate::content::AbilityEffect { kind: "pull".into(), amount: yards, from_caster: true, ..Default::default() };
                 self.displace(s.attacker, s.victim, &effect);
+                // Greenskin's harpoon: hauled in, then straight into his clearing cut.
+                self.firing_pulled(s.attacker, s.victim);
             }
         }
         if self.players.contains_key(&s.attacker) {
@@ -2481,15 +2528,53 @@ impl Survival {
         }
     }
 
+    /// Shots along a line in flight: each hero on the line is struck as the shot reaches them
+    /// (a fair hit, so a sidestep, a dodge or a guard made as they saw it coming still counts).
+    pub(crate) fn step_line_shots(&mut self) {
+        let now = self.clock;
+        let shots = std::mem::take(&mut self.line_shots);
+        let mut keep = Vec::new();
+        for mut s in shots {
+            let len = dist2d(s.from, s.to);
+            let reach = ((now - s.start) * s.speed).clamp(0.0, len);
+            // Those the shot's front passed over since the last step (a body's width behind it).
+            let behind = s.reached - HERO_SIZE;
+            let caught: Vec<(Id, Vec3)> = self
+                .players
+                .iter()
+                .filter(|(h, p)| p.health > 0 && !s.struck.contains(h) && in_capsule(s.from, s.to, s.radius + HERO_SIZE, p.pos)
+                    && (behind..=reach).contains(&along_segment(s.from, s.to, p.pos).0))
+                .map(|(h, p)| (*h, p.pos))
+                .collect();
+            for (v, at) in caught {
+                s.struck.push(v);
+                let follow = match (s.pull_to, self.unit_pos(s.owner)) {
+                    (Some(stop), Some(o)) => Follow::Pull { yards: (dist2d(o, at) - stop).max(0.0) },
+                    _ => Follow::None,
+                };
+                let area = Some(Area::Capsule { from: s.from, to: s.to, radius: s.radius + HERO_SIZE });
+                self.strike_fair_as(s.owner, v, s.damage, s.from, s.blockable, false, false, Blow::Light, area, follow, HitKind::Projectile);
+            }
+            s.reached = reach;
+            if reach < len - 1e-3 {
+                keep.push(s);
+            } else if s.look != 0 && self.mobs.contains_key(&s.owner) {
+                // Where it stops, hit or miss: its burst (splinters off the rail).
+                self.events.push(Event::Missile { caster: s.owner, spell: s.look, target: Target::Point(s.to) });
+            }
+        }
+        keep.append(&mut self.line_shots);
+        self.line_shots = keep;
+    }
+
     /// Fireballs and the like land where they were aimed.
     pub(crate) fn step_missiles(&mut self) {
+        self.step_line_shots();
         let now = self.clock;
         let (due, keep): (Vec<Missile>, Vec<Missile>) = std::mem::take(&mut self.missiles).into_iter().partition(|m| m.land_at <= now);
         self.missiles = keep;
         for m in due {
             self.unmark(m.mark);
-            let follow = self.firing_follow(m.owner, m.land_at);
-            let firing = self.is_firing_captain(m.owner) || self.firing_sees_veil(m.owner);
             // A grounding totem near where it lands takes it.
             if self.grounded_at(m.at) {
                 continue;
@@ -2505,14 +2590,12 @@ impl Survival {
             let caught: Vec<Id> = self
                 .players
                 .iter()
-                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius
-                    && (!firing || (p.pos[2] - m.at[2]).abs() < 3.0))
+                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius)
                 .map(|(id, _)| *id)
                 .collect();
             for v in caught {
                 let area = Some(Area::Circle { at: m.at, radius: m.radius });
-                let how = if firing { HitKind::Projectile } else { HitKind::Area };
-                self.strike_fair_as(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, follow.clone(), how);
+                self.strike_fair_as(m.owner, v, m.damage, m.from, m.blockable, m.heavy, false, Blow::Light, area, Follow::None, HitKind::Area);
             }
         }
     }
