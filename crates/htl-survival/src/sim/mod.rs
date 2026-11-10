@@ -1136,6 +1136,9 @@ pub struct Survival {
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
+    /// Creatures' lines waiting their turn, and where and when lines were last said.
+    pub(crate) lines: std::collections::VecDeque<Line>,
+    pub(crate) said: Vec<(f32, Vec3)>,
     pub(crate) traps: Vec<moves::Trap>,
     /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
     pub hunt: hunter::Hunt,
@@ -1276,6 +1279,8 @@ impl Survival {
             missiles: Vec::new(),
             projectiles: Vec::new(),
             landings: Vec::new(),
+            lines: std::collections::VecDeque::new(),
+            said: Vec::new(),
             traps: Vec::new(),
             hunt: hunter::Hunt::default(),
             duels: Vec::new(),
@@ -1478,15 +1483,56 @@ impl Survival {
         self.events.push(Event::Announce { text });
     }
 
-    /// A creature yells `text` (nothing for an empty line); the log keeps it with its name.
+    /// A creature yells `text` (nothing for an empty line); the log keeps it with its name. Lines
+    /// in one place come at least [`LINE_GAP`] apart: one due sooner waits its turn (Nov 8: two
+    /// or three lines in one tick at Greenskin's pull, Sneed's break, VanCleef's 30%).
     pub(crate) fn yell(&mut self, id: Id, text: impl Into<String>) {
         let text = text.into();
         if text.is_empty() {
             return;
         }
+        let Some(at) = self.mobs.get(&id).map(|m| m.pos) else { return self.say_line(id, text) };
+        if self.lines.iter().any(|l| dist2d(l.at, at) < LINE_AREA) || !self.line_clear(at) {
+            self.lines.push_back(Line { id, text, at, since: self.clock });
+        } else {
+            self.say_line(id, text);
+        }
+    }
+
+    fn say_line(&mut self, id: Id, text: String) {
+        if let Some(at) = self.mobs.get(&id).map(|m| m.pos) {
+            self.said.push((self.clock, at));
+        }
         let name = self.mobs.get(&id).map_or("", |m| self.content.mobs[m.def].name.as_str());
         self.events.push(Event::Log(format!("{name}: {text}")));
         self.events.push(Event::Yell { id, text });
+    }
+
+    /// Whether no line was said near `at` in the last [`LINE_GAP`].
+    fn line_clear(&self, at: Vec3) -> bool {
+        !self.said.iter().any(|(t, p)| self.clock - t < LINE_GAP && dist2d(*p, at) < LINE_AREA)
+    }
+
+    /// Lines waiting their turn are said, the oldest first in each place; one whose speaker is
+    /// gone, or that waited too long to still fit the moment, is dropped.
+    pub(crate) fn step_lines(&mut self) {
+        let now = self.clock;
+        self.said.retain(|(t, _)| now - t < LINE_GAP);
+        if self.lines.is_empty() {
+            return;
+        }
+        let waiting = std::mem::take(&mut self.lines);
+        for l in waiting {
+            if !self.mobs.contains_key(&l.id) || now - l.since > LINE_STALE {
+                continue;
+            }
+            let first_here = !self.lines.iter().any(|w| dist2d(w.at, l.at) < LINE_AREA);
+            if first_here && self.line_clear(l.at) {
+                self.say_line(l.id, l.text);
+            } else {
+                self.lines.push_back(l);
+            }
+        }
     }
 
     // --- heroes ---------------------------------------------------------------------------------
@@ -2467,6 +2513,22 @@ pub const WALK_SPEED: f32 = 2.5;
 /// circle. The looks are as big as they are (play-test: the Deadmines' dynamite, 2.6 yards, laid
 /// fire over the whole floor), so a splash smaller than this gets its true size drawn.
 pub const GROUND_LOOK_MIN: f32 = 6.0;
+
+/// Creatures' lines in one place come at least this far apart (seconds).
+pub const LINE_GAP: f32 = 2.0;
+/// Lines said within this of each other (yards) are in one place.
+pub const LINE_AREA: f32 = 40.0;
+/// A line that waited this long for its turn no longer fits the moment, and is dropped.
+pub const LINE_STALE: f32 = 8.0;
+
+/// A creature's line waiting its turn (see [`Survival::yell`]).
+#[derive(Debug, Clone)]
+pub struct Line {
+    pub id: Id,
+    pub text: String,
+    pub at: Vec3,
+    pub since: f32,
+}
 pub const DASH_SPEED: f32 = 30.0;
 
 /// The smallest angle between two facings, in degrees.
