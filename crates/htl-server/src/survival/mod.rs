@@ -420,6 +420,7 @@ impl SurvivalGame {
     /// world is saved now and then.
     pub(crate) fn tick(&mut self) {
                 if self.aftermath.is_some() {
+                    self.aftermath_air();
                     self.aftermath_keep_watchers_near();
                     return;
                 }

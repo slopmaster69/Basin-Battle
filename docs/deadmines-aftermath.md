@@ -144,6 +144,19 @@ spill now lies beside it. The two pale green circles on the workshop floor (view
 mine's own: they show in the same place in Codex's first palette trial, with no ruin there and
 no native doodad within 8 yd, so they belong to the floor itself.
 
+The air is native too (`aftermath_air.rs`): while the preview lasts, dust rises now and then at
+each pile's foot (Charge's landing dust, spell 22792 `DustCloud_Land`, cast as a ground look from
+an unseen stand-in on the spot, as Rhahk'Zor's falling mine shows its dust), about a third of the
+puffs with the clatter of grit landing (sound kit 1211), and the snapped beams and posts creak
+(the Deadmines' wooden door, 3078, and the haunted windmill's timber, 1650). Each source fires
+every 5 to 9 s (dust) or 8 to 24 s (creaks), fixed per preview. Every pile has two dust spots
+(the first take's cap of 90 left the cove and the landing with none), each cast 0.3 yd over the
+floor; `.es aftermath status` counts the spots and the clouds raised so far, and the server logs
+the spots when the preview starts. (A spell visual kit played on a game object showed nothing on
+film. The second film showed no clouds either: its cameraman never left the landing, which the
+piles' branch now fixes.) There is no lasting haze model in the data that reads as
+dust (the ground fogs are orange or green); the repeated settling clouds stand in for it.
+
 What the server can't do: open a real hole in the roof (the WMO's ceiling is one group), topple or tip the mine's own cargo stacks, carts, barrows and
 lanterns (they are the WMO's doodads, views 3, 9 and 15), or put out or tilt a lantern. Each needs
 a client patch beside 0087 that hides those doodads by index while the marker stands.

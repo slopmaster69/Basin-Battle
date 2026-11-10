@@ -555,6 +555,95 @@ fn packed(guid: u64) -> Vec<u8> {
     std::iter::once(mask).chain(bytes.iter().copied().filter(|b| *b != 0)).collect()
 }
 
+/// A packed guid from the front of `b`, and the bytes after it.
+fn packed_guid(b: &[u8]) -> (u64, &[u8]) {
+    let mask = b[0];
+    let (mut guid, mut k) = (0u64, 1);
+    for bit in 0..8 {
+        if mask & (1 << bit) != 0 { guid |= u64::from(b[k]) << (8 * bit); k += 1; }
+    }
+    (guid, &b[k..])
+}
+
+#[test]
+fn the_piles_raise_dust_and_grit_and_their_timber_creaks_while_the_preview_lasts() {
+    let g = authored_ground();
+    let (props, _) = compose(&g);
+    let mut air = air::Air::new(&props, &g, std::time::Instant::now());
+    let spots: BTreeMap<u64, [f32; 3]> = air.dust.iter().map(|s| (s.guid, s.at)).collect();
+    assert_eq!(spots.len(), air.dust.len(), "a stand-in of its own for every spot");
+    for s in &air.dust {
+        let p = &props[s.prop];
+        assert!(p.site != "Rubble apron" && p.site != "Juggernaut collapse basin");
+        assert!(p.model == SKIRT || p.model == SCREE || (p.model == ROCK && p.scale < 0.3), "dust from the gravel");
+        assert!((s.at[0] - p.pos[0]).hypot(s.at[1] - p.pos[1]) < 0.01 && (s.at[2] - p.pos[2]).abs() < 2.0, "on the floor at the gravel");
+        assert!(!props.iter().enumerate().any(|(i, r)| prop_guid(i, r.model) == s.guid), "the stand-ins are no ruin's guid");
+    }
+    let made = air.stand_ins();
+    assert_eq!(made.len(), air.dust.len());
+    assert!(made.iter().all(|p| p.opcode == op::SMSG_UPDATE_OBJECT));
+    let mut sent: Vec<Packet> = Vec::new();
+    for step in 1..=600 { sent.extend(air.due(&props, step as f32 * 0.1)); }
+    let ruins: BTreeMap<u64, &Prop> = props.iter().enumerate().map(|(i, p)| (prop_guid(i, p.model), p)).collect();
+    let (mut puffs, mut grit, mut creaks) = (BTreeMap::<u64, usize>::new(), 0, 0);
+    for p in &sent {
+        if p.opcode == op::SMSG_SPELL_GO {
+            // Cast by the spot's stand-in, as a ground look at the spot, naming no one.
+            let (caster, rest) = packed_guid(&p.body);
+            let (_, rest) = packed_guid(rest);
+            let spot = spots.get(&caster).expect("dust comes from a spot's stand-in");
+            assert_eq!(u32::from_le_bytes(rest[0..4].try_into().unwrap()), air::SPELL_DUST);
+            assert_eq!(&rest[6..8], &[0, 0], "no one struck or missed");
+            let at: Vec<f32> = (0..3).map(|k| f32::from_le_bytes(rest[10 + 4 * k..14 + 4 * k].try_into().unwrap())).collect();
+            assert_eq!(at, spot.to_vec(), "on the spot's floor");
+            *puffs.entry(caster).or_default() += 1;
+            continue;
+        }
+        assert_eq!(p.opcode, op::SMSG_PLAY_OBJECT_SOUND);
+        let guid = u64::from_le_bytes(p.body[4..12].try_into().unwrap());
+        let ruin = ruins.get(&guid).expect("every sound comes from a ruin in the scene");
+        let sound = u32::from_le_bytes(p.body[0..4].try_into().unwrap());
+        match sound {
+            air::SOUND_GRIT => { grit += 1; assert!(ruin.model != BEAM, "grit from the gravel") }
+            s if air::SOUND_CREAK.contains(&s) => { creaks += 1; assert_eq!(ruin.model, BEAM, "timber creaks") }
+            s => panic!("an unknown sound {s}"),
+        }
+    }
+    // A minute: every spot puffs now and then, never in a stream; some puffs bring grit.
+    assert!(puffs.len() >= 60, "{} dust spots", puffs.len());
+    assert!(puffs.values().all(|n| (5..=14).contains(n)), "{puffs:?}");
+    let total: usize = puffs.values().sum();
+    assert!(grit * 5 > total && grit * 2 < total, "{grit} of {total}");
+    assert!(creaks >= 20, "{creaks} creaks");
+}
+
+#[test]
+fn the_air_goes_out_to_inspectors_and_stops_with_the_preview() {
+    let mut game = game();
+    let (_, rx) = observer(&mut game, 1);
+    game.aftermath_start(1).unwrap();
+    rx.try_iter().for_each(drop);
+    let stand_ins: Vec<u64> = game.aftermath.as_ref().unwrap().air.dust.iter().map(|s| s.guid).collect();
+    assert!(!stand_ins.is_empty());
+    game.aftermath.as_mut().unwrap().air.started -= std::time::Duration::from_secs(30);
+    game.tick();
+    let sent: Vec<Packet> = rx.try_iter().collect();
+    assert!(sent.iter().any(|p| p.opcode == op::SMSG_SPELL_GO && stand_ins.contains(&packed_guid(&p.body).0)), "the dust reaches the inspector");
+    assert!(sent.iter().any(|p| p.opcode == op::SMSG_PLAY_OBJECT_SOUND));
+    // A newcomer is sent the stand-ins with the ruins.
+    let (_, late) = observer(&mut game, 2);
+    late.try_iter().for_each(drop);
+    game.send_aftermath_to(2);
+    let units = late.try_iter().filter(|p| p.opcode == op::SMSG_UPDATE_OBJECT).count();
+    assert!(units > stand_ins.len(), "{units} updates for {} stand-ins and the ruins", stand_ins.len());
+    game.aftermath_command(1, "off", "").unwrap();
+    let gone: Vec<u64> = rx.try_iter().filter(|p| p.opcode == op::SMSG_DESTROY_OBJECT)
+        .map(|p| u64::from_le_bytes(p.body[0..8].try_into().unwrap())).collect();
+    assert!(stand_ins.iter().all(|g| gone.contains(g)), "the stand-ins go with the preview");
+    game.tick();
+    assert!(!rx.try_iter().any(|p| p.opcode == op::SMSG_SPELL_GO || p.opcode == op::SMSG_PLAY_OBJECT_SOUND), "silent once restored");
+}
+
 /// The cameraman follows the hero round the preview: its client is put where the hero inspects,
 /// so its world is loaded there (it stayed at the landing and filmed the cove's water).
 #[test]
@@ -614,6 +703,44 @@ fn native_every_region_has_at_least_the_old_layouts_rock() {
         if new[i] < OLD[i] { short.push(r.name); }
     }
     assert!(short.is_empty(), "less rock than before in {short:?}");
+}
+
+/// The dust reaches whoever is looking, where they look: the hero and the cameraman following
+/// them are both sent the stand-ins and, at the pile in front of the entrance's view, their
+/// clouds (none showed on the second film: the cameraman never left the landing).
+#[test]
+fn the_dust_goes_out_where_the_hero_and_the_cameraman_look() {
+    let mut game = game();
+    let (_, hero) = observer(&mut game, 1);
+    let (_, cam) = observer(&mut game, 2);
+    game.watch_command(2, "observer1").unwrap();
+    hero.try_iter().for_each(drop);
+    cam.try_iter().for_each(drop);
+    game.aftermath_start(1).unwrap();
+    game.aftermath_command(1, "visit", "mouth").unwrap();
+    let a = game.aftermath.as_ref().unwrap();
+    let mouth = layout::REGIONS[0].view;
+    let near: BTreeMap<u64, [f32; 3]> = a.air.dust.iter().filter(|s| (s.at[0] - mouth[0]).hypot(s.at[1] - mouth[1]) < 35.0).map(|s| (s.guid, s.at)).collect();
+    assert!(near.len() >= 3, "{} dust spots by the entrance", near.len());
+    // Every pile has its dust, the cove's and the landing's too.
+    for r in 0..layout::REGIONS.len() {
+        assert!(a.air.dust.iter().any(|s| a.props[s.prop].region == r), "dust in {}", layout::REGIONS[r].name);
+    }
+    game.aftermath.as_mut().unwrap().air.started -= std::time::Duration::from_secs(12);
+    game.tick();
+    for (who, rx) in [("hero", &hero), ("cameraman", &cam)] {
+        let sent: Vec<Packet> = rx.try_iter().collect();
+        let made: Vec<u64> = sent.iter().filter(|p| p.opcode == op::SMSG_UPDATE_OBJECT)
+            .flat_map(|p| near.keys().copied().filter(|g| p.body.windows(8).any(|w| w == g.to_le_bytes()) || p.body.windows(packed(*g).len()).any(|w| w == packed(*g).as_slice())).collect::<Vec<_>>())
+            .collect();
+        assert!(near.keys().all(|g| made.contains(g)), "the {who} is sent the stand-ins by the entrance");
+        let clouds = sent.iter().filter(|p| p.opcode == op::SMSG_SPELL_GO).filter(|p| {
+            let (caster, rest) = packed_guid(&p.body);
+            near.contains_key(&caster) && u32::from_le_bytes(rest[packed(caster).len()..packed(caster).len() + 4].try_into().unwrap()) == air::SPELL_DUST
+        }).count();
+        assert!(clouds >= 3, "the {who} sees {clouds} clouds at the entrance in its first seconds");
+    }
+    assert!(game.aftermath.as_ref().unwrap().air.puffs >= 3, "counted for `.es aftermath status`");
 }
 
 /// A cameraman already by its hero isn't sent off to the landing when the preview starts (its

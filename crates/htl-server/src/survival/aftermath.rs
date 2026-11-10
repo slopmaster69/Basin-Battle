@@ -17,6 +17,8 @@ use super::*;
 use crate::packets::{Create, Placement};
 use shapes::{matrix, unturn, Obb, V3};
 
+#[path = "aftermath_air.rs"]
+mod air;
 #[path = "aftermath_layout.rs"]
 mod layout;
 #[path = "aftermath_piles.rs"]
@@ -42,6 +44,8 @@ pub(crate) struct Aftermath {
     /// Inspectors move only here, never in the saved simulation.
     positions: BTreeMap<ConnId, ([f32; 3], f32)>,
     missing: Vec<&'static str>,
+    /// Dust settling and timber creaking (`aftermath_air.rs`).
+    air: air::Air,
 }
 
 pub(super) struct Region {
@@ -510,7 +514,7 @@ impl SurvivalGame {
             }
             "" | "status" => {
                 let text = self.aftermath.as_ref().map_or_else(|| "Aftermath preview is off.".into(), |a|
-                    format!("Aftermath preview is on. {} solid objects across {} regions. {} sites lack a matching floor. Use .es aftermath off to restore the dungeon.", a.props.len(), layout::REGIONS.len(), a.missing.len()));
+                    format!("Aftermath preview is on. {} solid objects across {} regions. {} sites lack a matching floor. {} dust spots, {} clouds raised so far. Use .es aftermath off to restore the dungeon.", a.props.len(), layout::REGIONS.len(), a.missing.len(), a.air.dust.len(), a.air.puffs));
                 self.say_to(conn, &text);
                 Ok(())
             }
@@ -540,7 +544,9 @@ impl SurvivalGame {
             return Err("The aftermath has an empty region. Check the installed map data before previewing it.".into());
         }
         println!("[aftermath] {} solids in {:?}; {} sites unavailable: {}", props.len(), started.elapsed(), missing.len(), missing.join(", "));
-        self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing });
+        let air = air::Air::new(&props, self.aftermath_land.as_deref().unwrap(), Instant::now());
+        println!("[aftermath] {} dust spots (unseen stand-ins casting {}), {} creaking beams", air.dust.len(), air::SPELL_DUST, props.iter().filter(|p| p.model == BEAM).count());
+        self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing, air });
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }
         let viewers: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
@@ -570,6 +576,7 @@ impl SurvivalGame {
             }).collect();
             self.send(conn, packets::update_object(&creates, &[]));
         }
+        for p in scene.air.stand_ins() { self.send(conn, p); }
     }
 
     /// The cameraman goes where the hero it films is inspecting. The rules stand still in the
@@ -631,6 +638,7 @@ impl SurvivalGame {
         let Some(scene) = self.aftermath.take() else { return };
         for (i, p) in scene.props.iter().enumerate() { self.broadcast(&packets::destroy_object(prop_guid(i, p.model))); }
         self.broadcast(&packets::destroy_object(MARKER_GUID));
+        for s in &scene.air.dust { self.broadcast(&packets::destroy_object(s.guid)); }
         let viewers: Vec<(ConnId, Id)> = self.in_world().map(|(c, _, w)| (*c, w.id)).collect();
         for (conn, id) in viewers {
             if let Some(p) = self.sim.players.get(&id) { self.aftermath_teleport(conn, p.pos, p.facing); }
