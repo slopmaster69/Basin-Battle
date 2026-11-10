@@ -284,7 +284,7 @@ A	ready	0.00	0.00
 RE	0xF130000000000025	121	1.0	0.0	0.00	0.00	0	1.50
 !OLDHS = HitStop function HitStop(u, ms) HSCALLS = (HSCALLS or 0) + 1 HSLAST = u .. " " .. ms end
 FZ	0xF130000000000025	0.00	0.50
-!ElwynnSurvival.RunTimers() table.insert(SAID, "frozen: " .. tostring(ElwynnSurvival.frozen["0xF130000000000025"] ~= nil) .. " hit-stops " .. tostring(HSCALLS) .. " " .. tostring(HSLAST))
+!ElwynnSurvival.RunTimers() table.insert(SAID, "frozen: " .. tostring(ElwynnSurvival.frozen["0xF130000000000025"] ~= nil) .. " hit-stops " .. tostring(HSCALLS) .. " " .. tostring(HSLAST) .. ", its renewal waiting: " .. tostring(table.getn(ElwynnSurvival.timers) > 0))
 FZ	0xF130000000000025	0.00	0.00
 !table.insert(SAID, "freeze let go: " .. tostring(ElwynnSurvival.frozen["0xF130000000000025"] == nil)) HitStop = OLDHS
 RO	0xF130000000000025	0.45	0	left

@@ -172,7 +172,7 @@ the first client, as in any scenario. One line in the scenario asks for it:
 ```
 hero warrior
 camera duel Rhahk'Zor          # camera <shot> <the subject's name, as the game shows it>
-camera high Cookie|Gorged      # a boss and the form it comes back as, in turn
+camera high Cookie|Gorged Cookie  # a boss and the form it comes back as, in turn
 camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the picture
 ```
 
@@ -183,7 +183,7 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   back than that only when the two wouldn't fit. Under a low roof (the Foundry's cave) a shot's
   positions are tried 12 and then 24 degrees lower before the camera comes in along its line.
   With no name (`camera duel`) it films the hero alone, looking past them the way they face.
-  With a boss's forms named in turn (`Cookie|Gorged`, `Sneed's Shredder|Sneed`), the living one
+  With a boss's forms named in turn (`Cookie|Gorged Cookie`, `Sneed's Shredder|Sneed`), the living one
   nearest the hero is filmed.
 - **The crew**: after a `+`, the names of creatures that are part of the fight (a boss's crew,
   his adds), apart by `|`: `camera wide Gilnid + Furnace Engineer`,

@@ -160,3 +160,40 @@ fn a_native_posture_break_backs_him_away_on_the_open_deck_then_cues_the_advance(
         println!("delay {delay}s, break at {at:?}: arrival +{:.2} at {:.1} yd, advance +{:.2}", arrived_at.unwrap() - began, dist2d(at, previous), advanced_at.unwrap() - began);
     }
 }
+
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_hero_carried_over_either_rail_mid_duel_is_set_back_on_the_deck() {
+    // West (toward the Blackguards' rail) and east, across the beam from the lit deck.
+    for side in [1.0_f32, -1.0] {
+        let (mut s, hero, boss) = fight();
+        for _ in 0..120 {
+            step(&mut s, hero);
+        }
+        assert!(s.mobs[&boss].state.foe().is_some(), "he's dueling");
+        let deck = s.players[&hero].pos[2];
+        let mut at = s.players[&hero].pos;
+        let mut held = None;
+        for k in 0..80 {
+            // A roll's reports: half a yard at a time at the deck's height, over the side too.
+            let next = [at[0], at[1] + side * 0.5, deck];
+            s.move_player(hero, next, std::f32::consts::PI, Default::default());
+            let now = s.players[&hero].pos;
+            if dist2d(now, next) > 0.01 {
+                held = Some((k, next, now));
+                break;
+            }
+            step(&mut s, hero);
+            at = next;
+        }
+        let (k, past, back) = held.unwrap_or_else(|| panic!("side {side}: never held at the rail"));
+        let floor = s.land().height_near(past[0], past[1], deck + 1.0);
+        eprintln!("side {side}: held {k} steps out at {past:?} (floor {floor}), back at {back:?}, deck {deck}");
+        assert!(s.land().water_near(past[0], past[1], deck + 1.0) || floor < deck - 4.0, "side {side}: held only over the side: {past:?} floor {floor}");
+        assert!((back[2] - deck).abs() < 1.5 && dist2d(back, past) < 3.0, "side {side}: back on the deck by the rail: {back:?} (deck {deck}, {k} steps out)");
+        for _ in 0..40 {
+            step(&mut s, hero);
+        }
+        assert!(s.mobs[&boss].state.foe().is_some(), "side {side}: the duel goes on");
+    }
+}

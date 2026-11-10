@@ -724,11 +724,25 @@ impl SurvivalGame {
         } else if let Some(m) = self.sim.mobs.get(&id) {
             mob_def_gear_fields(&self.sim.content.mobs[m.def], f);
         }
+        // Cookie's tankard, held to pour or to scoop, or his hand empty once he's thrown it.
+        if let Some(held) = self.sim.kitchen_hand(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, held)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO, if held == 0 { 0 } else { grip_info("1h") })
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, if held == 0 { 0 } else { 3 })
+                .set(idx::UNIT_BYTES_2, u32::from(held != 0));
+        }
         if let Some(gun) = self.sim.firing_line_gun(id) {
             f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + 2, gun)
                 .set(idx::UNIT_VIRTUAL_ITEM_INFO + 4, 2 | 3 << 8 | 2 << 16 | 26 << 24)
                 .set(idx::UNIT_VIRTUAL_ITEM_INFO + 5, 0)
                 .set(idx::UNIT_BYTES_2, 2);
+        }
+        // Greenskin's harpoon, in his hand through its held throw.
+        if let Some(spear) = self.sim.firing_line_spear(id) {
+            f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY, spear)
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO, grip_info("polearm"))
+                .set(idx::UNIT_VIRTUAL_ITEM_INFO + 1, 1)
+                .set(idx::UNIT_BYTES_2, 1);
         }
     }
 
@@ -743,7 +757,8 @@ impl SurvivalGame {
             guid,
             entry: CREATURE_ENTRY + m.def as u32,
             display_id: d.display,
-            scale: d.scale,
+            // Gorged swelling over the pot is drawn at his size now.
+            scale: self.sim.kitchen_scale(id).unwrap_or(d.scale),
             level,
             faction: if m.friendly { fields::FACTION_FRIENDLY } else { fields::FACTION_MONSTER },
             health: m.health,
