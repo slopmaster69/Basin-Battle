@@ -921,6 +921,79 @@ pub(super) fn compose(g: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
     (b.props, missing)
 }
 
+/// The mine's own doodads the collapse moved (`aftermath_doodads.rs`): each one's copy knocked
+/// over, hung askew or down on the floor where it stood, fitted as the piles are and among them,
+/// to `open`: the mine as a client that hides the mine's own has it. Each copy comes with the
+/// place of the doodad it stands for in the mine's WMO.
+pub(super) fn knock_over(open: &Ground, piles: &[Prop]) -> Vec<(u32, Prop)> {
+    let mut b = Builder { g: open, props: piles.to_vec(), region: 0, site: "", wet: false, seed: 0, k: 0, near: 0.0, through_hull: false, under_roof: false };
+    let mut out = Vec::new();
+    for h in open.hidden() {
+        let Some(index) = h.index else { continue };
+        let Some(fate) = doodads::fate(index) else { continue };
+        let off = |r: &Region| (r.view[0] - h.origin[0]).hypot(r.view[1] - h.origin[1]);
+        let region = (0..layout::REGIONS.len()).min_by(|a, c| off(&layout::REGIONS[*a]).total_cmp(&off(&layout::REGIONS[*c]))).unwrap_or(0);
+        (b.region, b.site, b.seed, b.k, b.near) = (region, doodads::site(fate), 3000 + index as usize, 0, h.origin[2]);
+        if let Some(i) = b.knock(h, fate) { out.push((index, b.props[i].clone())); }
+    }
+    out
+}
+
+impl Builder<'_> {
+    /// One of the mine's own doodads as the collapse left it: knocked over on its own spot (or a
+    /// little way off, where the fall crowds it), a lantern hung askew from its own hook, or one
+    /// down on the floor or the rock under it.
+    fn knock(&mut self, h: &htl_map::deadmines::aftermath::Standing, fate: doodads::Fate) -> Option<usize> {
+        use doodads::Fate::*;
+        let x_axis = [h.axes[0][0], h.axes[1][0], h.axes[2][0]];
+        let scale = len(x_axis);
+        let yaw = x_axis[1].atan2(x_axis[0]);
+        let at = [h.origin[0], h.origin[1]];
+        let spots: Vec<[f32; 2]> = std::iter::once(at)
+            .chain([0.6f32, 1.2, 1.8, 2.4].into_iter().flat_map(|r| (0..8).map(move |k| {
+                let a = k as f32 * FRAC_PI_4 + 0.3;
+                [at[0] + r * a.cos(), at[1] + r * a.sin()]
+            })))
+            .collect();
+        match fate {
+            Over(model, roll, pitch) => {
+                // (Where it won't lie so far over, a little less: a stack among its fallen kegs.)
+                for roll in [roll, 0.8 * roll, 1.2 * roll] {
+                    for spot in &spots {
+                        for turn in [0.35, -0.6, 1.3, 2.4, -1.9, 3.0] {
+                            if let Some(i) = self.tipped(model, *spot, h.origin[2], scale, roll, pitch, yaw + turn) { return Some(i); }
+                        }
+                    }
+                }
+                None
+            }
+            Askew(model) => self.askew(h, model, scale, yaw),
+            Gone | Buried => None,
+        }
+    }
+
+    /// A lantern hung askew from its own hook (the top of its mesh, where the mine's own hung):
+    /// swung up to half a right angle, whichever way leaves it clear of the rock and the mine's
+    /// beams.
+    fn askew(&mut self, h: &htl_map::deadmines::aftermath::Standing, model: usize, scale: f32, yaw: f32) -> Option<usize> {
+        let top = MODELS[model].max[2];
+        let hook = h.world([0.0, 0.0, top]);
+        for swing in [0.45, 0.35, 0.28, 0.2, 0.12] {
+            for k in 0..8 {
+                let way = k as f32 * FRAC_PI_4 + 0.4 * self.jit();
+                let q = shapes::euler(swing * way.cos(), swing * way.sin(), yaw);
+                let p = self.prop(model, sub(hook, turn(&matrix(q), [0.0, 0.0, top * scale])), scale, q);
+                let points = self.g.points(&p);
+                if self.fits(&p, &points) {
+                    self.props.push(p);
+                    return Some(self.props.len() - 1);
+                }
+            }
+        }
+        None
+    }
+}
+
 /// Native DeadminesInstance_33_32 MCLQ: all 42 water chunks have surface -0.023 yd.
 pub(super) const WATER: f32 = -0.023;
 /// Where the Juggernaut lay (the middle of its berth: the intact map's deck ran from x -130 to

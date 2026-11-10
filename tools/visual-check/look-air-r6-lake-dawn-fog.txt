@@ -1,0 +1,50 @@
+# Dawn fog with the sun in frame (client 0084, #273's sixth round): Crystal Lake at 07:45 from its
+# south shore, the hero on the grass at WoW (-9462, -350), facing north-west over the whole lake
+# (yaw 45: the sun's bearing, about 23 degrees up at 07:45) toward the north bank's woods 60 to
+# 100 yd off, the camera pitched 12 up, 6 yd back, so the sun stands in the frame above the far
+# trees with open water and air between. Take 291's camera on the north bank had an oak 8 yd
+# ahead filling the frame. lookmist 3.5, a fog day, lookfog 2, worldShadows 0, worldFog 0,
+# worldLook 0, and a sidestep.
+# Look for: the sun in frame; shafts of sun in the mist between the far trunks and over the
+# water toward the camera; the fog at least as bright as worldfog-0; no crawl in the sidestep.
+hero warrior
+cam 45 12 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9462 -350
+4.0 lua ConsoleExec("worldclock 465")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldFogQuality", "2")
+4.3 lua SetCVar("worldShadows", "2")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookfog grade")
+4.45 lua ConsoleExec("lookmist 3.5")
+4.5 lua ConsoleExec("lookwind 0")
+6.0 video
+6.5 shots fog-3.5 4 0.5
+9.0 lua ActionDash(2, 2, "l")
+9.05 shots fog-moving 12 0.15
+12.0 lua ConsoleExec("lookmist day 20765")
+12.05 lua ClearWorldFog()
+13.0 shots fog-day 2 0.5
+14.5 lua ConsoleExec("lookmist 3.5")
+14.55 lua ConsoleExec("lookfog 2")
+15.5 shots lookfog-2 2 0.5
+17.0 lua ConsoleExec("lookfog grade")
+17.05 lua SetCVar("worldShadows", "0")
+18.0 shots worldshadows-0 2 0.5
+19.5 lua SetCVar("worldShadows", "2")
+19.55 lua SetCVar("worldFog", "0")
+20.5 shots worldfog-0 2 0.5
+22.0 lua SetCVar("worldFog", "1")
+22.05 lua SetCVar("worldLook", "0")
+22.1 lua ClearWorldFog()
+23.5 shots classic 2 0.5
+25.0 lua SetCVar("worldLook", "1")
+25.05 lua ClearWorldFog()
+25.1 lua ConsoleExec("lookmist grade")
+25.15 lua ConsoleExec("lookwind grade")
+25.2 lua ConsoleExec("lookweather server")
+27 end

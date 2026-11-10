@@ -1,0 +1,84 @@
+# Wakes, rings and splashes, second round (client 0085): Crystal Lake from steeply above, as in
+# Corey's reference video (a swimmer's crisp white V seen from above). The first filming (r7)
+# started the hero on the grass and its swim was one 2 s dash (ActionDash runs 2 s at most), so
+# he stayed near the shore. Here he starts IN the lake's south-east shallows at WoW (-9454, -333):
+# 6 yd from take 291's swimming spot (-9451, -328) toward the south shore's grass (-9462, -350).
+# A script can't turn the hero (goto's facing needs a height, and a height in the lake drops him
+# to its bed), so he swims sideways: west across the lake, three 2 s dashes at 4.7 yd/s (28 yd,
+# past the edge of the ripple field's first place), stops, a 1 s swim north (the turn), and east
+# back. The camera looks north from steeply above (yaw 0, pitched 52 down, 16 yd back), so he
+# crosses the frame right to left and back. Then a shorter swim each with lookwater wakes 0
+# (0081's froth and 1.12's wade rings back), worldWater 0 (1.12's water) and worldLook 0.
+# What changed since r7: behind a moving body two arms trail from its sides at 19.5 degrees either
+# side of its track (a Kelvin wake), pushing on the water and laying foam along them; their foam
+# is carried outward with the arms, so it stays a crisp V of white streaks, fading over about
+# 1.5 s. A still body, a ring or a raindrop never foams. The entry splash throws a few soft
+# droplets on a ring, no white disc. The bed bends 3.5 times as much under the ripples.
+# PLEASE send client.log's "[look wakes]" lines: they now also say the fastest body's speed and
+# how deep its feet are (if the start isn't in the water, say where he stood, and the depth).
+# Look for, crop 1:1 round the hero:
+#   start: the hero standing in the water, gentle rings, no foam, no ring at the neck;
+#   swim-out: a crisp white V of streaks from his sides, opening behind him at about 20 degrees
+#   a side and fading over 1 to 2 s; the bed wavering under the ripples and the wake;
+#   stop: the V fading out, rings left; turn and swim-back: the wake bending, then a new V;
+#   the field's edge (32 yd round the view's centre): no seam as the old wake slides out;
+#   the shore at every still's edge of the lake: no foam line, a faint pale haze;
+#   wakes-0: the old froth and 1.12's thin ring instead; worldwater-0 and classic: 1.12's water.
+hero warrior
+cam 0 -52 16
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9454 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+5.0 video
+5.5 shots start 3 0.5
+6.8 lua ConsoleExec("lookwater wakes")
+7.0 lua ActionDash(2.0, 4.7, "l")
+7.1 shots swim-out 20 0.3
+9.0 lua ActionDash(2.0, 4.7, "l")
+10.5 lua ConsoleExec("lookwater wakes")
+11.0 lua ActionDash(2.0, 4.7, "l")
+13.0 shots stop 8 0.25
+15.0 lua ConsoleExec("lookwater wakes")
+15.5 lua ActionDash(1.0, 4.7, "f")
+15.6 shots turn 6 0.25
+16.5 lua ActionDash(2.0, 4.7, "r")
+17.0 shots swim-back 18 0.3
+18.5 lua ActionDash(2.0, 4.7, "r")
+20.5 lua ActionDash(2.0, 4.7, "r")
+22.5 shots back-stop 8 0.25
+24.5 lua ConsoleExec("lookwater wakes")
+25.0 lua ConsoleExec("lookwater wakes 0")
+25.1 .es goto -9454 -333
+28.0 shots wakes-0-start 2 0.5
+29.0 lua ActionDash(2.0, 4.7, "l")
+29.1 shots wakes-0-swim 8 0.5
+31.0 lua ActionDash(2.0, 4.7, "l")
+33.0 shots wakes-0-stop 3 0.4
+34.5 lua ConsoleExec("lookwater wakes 1")
+34.55 lua SetCVar("worldWater", "0")
+34.6 .es goto -9454 -333
+37.5 shots worldwater-0-start 2 0.5
+38.5 lua ActionDash(2.0, 4.7, "l")
+38.6 shots worldwater-0-swim 8 0.5
+40.5 lua ActionDash(2.0, 4.7, "l")
+42.5 shots worldwater-0-stop 3 0.4
+44.0 lua SetCVar("worldWater", "1")
+44.05 lua SetCVar("worldLook", "0")
+44.1 lua ClearWorldFog()
+44.15 .es goto -9454 -333
+47.0 shots classic-start 2 0.5
+48.0 lua ActionDash(2.0, 4.7, "l")
+48.1 shots classic-swim 8 0.5
+50.0 lua ActionDash(2.0, 4.7, "l")
+52.0 shots classic-stop 3 0.4
+53.5 lua SetCVar("worldLook", "1")
+53.55 lua ClearWorldFog()
+53.6 lua ConsoleExec("lookweather server")
+55 end

@@ -1,0 +1,111 @@
+# Wakes, fifth round (client 0085): the open water's surface and how it moves, on Crystal Lake
+# seen nearly straight down, as Corey's reference video is. Corey on the fourth filming: the wake
+# is okay; the movement and the surface of the water need refining. So this round leaves the V as
+# it was and changes the surface under the wakes: 1.12's ripple flipbook and its sparkle (the white
+# flecks over the whole lake) are gone; the surface is four layers of small wavelets (3.2 yd down
+# to 0.2 yd) drifting gently with the wind, smoothly, no popping; the sun's highlight off them is
+# soft and capped (no specks); the sky's mirror is faint looking down and strong toward the
+# horizon; the bed wobbles gently under the long wavelets even with nobody swimming, with soft
+# moving light on the shallow bed; the water's colour and clearness take the bed's depth averaged
+# over 2.5 yd, which should blend the fourth filming's toothed diagonal line (about 8 to 10 yd west
+# of the start) over a few yards; a sun shadow's edge on the water is softer.
+# The camera: yaw 90 (looking west), pitched 76 down, 18 yd back, so it hangs about 4 yd east of
+# the hero and 17 yd up (r10's 60 down put it 9 yd east, inside the south shore's hill as the
+# walk-in started; the walk-in now starts 4 yd further west as well).
+# 1. surface: the hero stands on the east shore at WoW (-9462, -346), facing west, nobody in the
+#    water; 6 s of the open water west of him, the top of the frame (please film it whole: the
+#    motion is what to judge).
+# 2. the swim as in r10: from (-9461, -333) 10 yd west, a 2 s stop, 10 yd more, back east.
+# 3. seam: at the start again, the inputs the water is drawn from, one still each, in place of the
+#    water (`lookwater show`): depth (black dry to white 4 yd deep, a blue line each half yard, red
+#    where the colour's smoothed depth differs), shadow (white sunlit), clear (how much of the bed
+#    comes through, by colour), bed (the bed with no water); then the water with sun shadows off
+#    (`lookshadow 0`), to tell a shelf in the bed from a shadow's edge.
+# 4. the walk-in from (-9462, -346) for 1.5 s (into the shallows, not out to swimming depth) and a
+#    3 yd hop there (r10 hopped once he swam, which a swimmer can't: no splash).
+# 5. a swim west each with lookwater wakes 0, worldWater 0 and worldLook 0 (all exactly as r10's).
+# PLEASE send client.log's "[look wakes]" lines.
+# Look for:
+#   surface: no white flecks anywhere; small wavelets drifting one way (the wind's), smoothly, a
+#   fine grain over soft larger swells; the bed showing through near the shore, wobbling gently;
+#   soft moving light on the shallow bed; brightness varying softly with the wavelets;
+#   swim: the V as r10's (thin white streaks); the surface around it as above;
+#   seam: is the diagonal line still there, and is it soft over a few yards now? which of the
+#   inputs shows a line there (depth, shadow or neither), and does it go with lookshadow 0?
+#   wade-in: as in r10 (not changed this round: the white bars at his sides may still show);
+#   jump-in: a splash of droplets and a ring as he lands;
+#   wakes-0, worldwater-0 and classic: exactly as in r10 (1.12's sparkle comes back with wakes 0).
+hero warrior
+cam 90 -76 18
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9462 -346
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookshadow grade")
+4.45 lua ConsoleExec("lookwater show off")
+5.0 video
+6.0 shots surface 13 0.5
+13.0 .es goto -9461 -333
+16.0 shots start 2 0.5
+16.8 lua ConsoleExec("lookwater wakes")
+17.0 lua ConsoleExec("probemove 2.2 f 90")
+17.3 shots swim-out 8 0.25
+19.3 shots stop-rings 9 0.25
+21.3 lua ConsoleExec("probemove 2.2 f 90")
+21.6 shots swim-on 8 0.25
+23.6 shots stop 8 0.25
+25.6 lua ConsoleExec("lookwater wakes")
+26.0 lua ConsoleExec("probemove 4.4 f 270")
+26.3 shots swim-back 15 0.3
+30.6 shots back-stop 6 0.25
+32.5 .es goto -9461 -333
+35.5 shots seam 2 0.5
+36.6 lua ConsoleExec("lookwater show depth")
+37.0 shots seam-depth 1 0.5
+37.6 lua ConsoleExec("lookwater show shadow")
+38.0 shots seam-shadow 1 0.5
+38.6 lua ConsoleExec("lookwater show clear")
+39.0 shots seam-clear 1 0.5
+39.6 lua ConsoleExec("lookwater show bed")
+40.0 shots seam-bed 1 0.5
+40.6 lua ConsoleExec("lookwater show off")
+40.7 lua ConsoleExec("lookshadow 0")
+41.2 shots seam-no-shadow 2 0.5
+42.5 lua ConsoleExec("lookshadow grade")
+43.0 .es goto -9462 -346
+46.0 lua ConsoleExec("probemove 1.5 f 90")
+46.1 shots wade-in 10 0.2
+48.0 .es hop 3
+48.05 shots jump-in 14 0.1
+50.0 lua ConsoleExec("lookwater wakes")
+50.5 lua ConsoleExec("lookwater wakes 0")
+50.6 .es goto -9461 -333
+53.5 shots wakes-0-start 2 0.5
+54.5 lua ConsoleExec("probemove 4 f 90")
+54.6 shots wakes-0-swim 8 0.5
+58.7 shots wakes-0-stop 3 0.4
+61.0 lua ConsoleExec("lookwater wakes 1")
+61.05 lua SetCVar("worldWater", "0")
+61.1 .es goto -9461 -333
+64.0 shots worldwater-0-start 2 0.5
+65.0 lua ConsoleExec("probemove 4 f 90")
+65.1 shots worldwater-0-swim 8 0.5
+69.2 shots worldwater-0-stop 3 0.4
+71.5 lua SetCVar("worldWater", "1")
+71.55 lua SetCVar("worldLook", "0")
+71.6 lua ClearWorldFog()
+71.65 .es goto -9461 -333
+74.5 shots classic-start 2 0.5
+75.5 lua ConsoleExec("probemove 4 f 90")
+75.6 shots classic-swim 8 0.5
+79.7 shots classic-stop 3 0.4
+82.0 lua SetCVar("worldLook", "1")
+82.05 lua ClearWorldFog()
+82.1 lua ConsoleExec("lookweather server")
+84 end

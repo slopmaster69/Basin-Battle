@@ -1,0 +1,76 @@
+# The wakes' cost, second round (client 0085): Crystal Lake from steeply above (yaw 0, pitched 50
+# down, 16 yd) at noon, the fps journal on. The hero starts in the south-east shallows at WoW
+# (-9454, -333): 10 s standing in the water with the wakes on, then 12 s swimming west 28 yd and
+# east back (sideways: a script can't turn him) with them on, then the same swim with lookwater
+# wakes 0, lookwater refract 0 (no bent bed), worldWater 0 and worldLook 0. The ripple field's
+# compute pass is in the journal's gpu_look column, and now named on the journal's GPU_PASSES line
+# without WOW_GPU_PASSES (the new look's passes only: look_wakes, look_water_copy, the shadows,
+# the fog...; WOW_GPU_PASSES=1 still names every pass). The water's own extra work (the field's
+# slopes and foam, the bent bed, the shore's haze) is in the transparent pass, gpu_transparent.
+# Look for: in the CSV, gpu_look and gpu_transparent per step against gpu_ms and frame ms; in
+# client.log, look_wakes on the GPU_PASSES lines (estimated 0.05 to 0.1 ms a frame at 60 fps).
+# Please send the CSV, the GPU_PASSES lines and the "[look wakes]" lines.
+hero warrior
+cam 0 -50 16
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9454 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+5.0 lua SetCVar("fpsJournal", "1")
+5.5 video
+6.0 shots cost-standing 1 1.0
+16.0 lua ActionDash(2.0, 4.7, "l")
+17.0 shots cost-swim 1 1.0
+18.0 lua ActionDash(2.0, 4.7, "l")
+20.0 lua ActionDash(2.0, 4.7, "l")
+22.0 lua ActionDash(2.0, 4.7, "r")
+24.0 lua ActionDash(2.0, 4.7, "r")
+26.0 lua ActionDash(2.0, 4.7, "r")
+27.8 lua ConsoleExec("lookwater wakes")
+28.0 lua ConsoleExec("lookwater wakes 0")
+28.1 lua ActionDash(2.0, 4.7, "l")
+29.0 shots cost-wakes-0 1 1.0
+30.1 lua ActionDash(2.0, 4.7, "l")
+32.1 lua ActionDash(2.0, 4.7, "l")
+34.1 lua ActionDash(2.0, 4.7, "r")
+36.1 lua ActionDash(2.0, 4.7, "r")
+38.1 lua ActionDash(2.0, 4.7, "r")
+40.2 lua ConsoleExec("lookwater wakes 1")
+40.25 lua ConsoleExec("lookwater refract 0")
+40.3 lua ActionDash(2.0, 4.7, "l")
+41.0 shots cost-refract-0 1 1.0
+42.3 lua ActionDash(2.0, 4.7, "l")
+44.3 lua ActionDash(2.0, 4.7, "l")
+46.3 lua ActionDash(2.0, 4.7, "r")
+48.3 lua ActionDash(2.0, 4.7, "r")
+50.3 lua ActionDash(2.0, 4.7, "r")
+52.4 lua ConsoleExec("lookwater refract grade")
+52.45 lua SetCVar("worldWater", "0")
+52.5 lua ActionDash(2.0, 4.7, "l")
+53.0 shots cost-worldwater-0 1 1.0
+54.5 lua ActionDash(2.0, 4.7, "l")
+56.5 lua ActionDash(2.0, 4.7, "l")
+58.5 lua ActionDash(2.0, 4.7, "r")
+60.5 lua ActionDash(2.0, 4.7, "r")
+62.5 lua ActionDash(2.0, 4.7, "r")
+64.6 lua SetCVar("worldWater", "1")
+64.65 lua SetCVar("worldLook", "0")
+64.7 lua ClearWorldFog()
+64.75 lua ActionDash(2.0, 4.7, "l")
+65.5 shots cost-classic 1 1.0
+66.75 lua ActionDash(2.0, 4.7, "l")
+68.75 lua ActionDash(2.0, 4.7, "l")
+70.75 lua ActionDash(2.0, 4.7, "r")
+72.75 lua ActionDash(2.0, 4.7, "r")
+74.75 lua ActionDash(2.0, 4.7, "r")
+77.0 lua SetCVar("fpsJournal", "0")
+77.05 lua SetCVar("worldLook", "1")
+77.1 lua ClearWorldFog()
+77.15 lua ConsoleExec("lookweather server")
+79 end

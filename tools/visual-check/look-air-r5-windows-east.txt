@@ -1,0 +1,48 @@
+# Far lit windows (client 0084, #273's fifth round): Goldshire's windows at night from the east, on
+# take 280's one spot that saw the town (WoW -9440, -260, about 310 yd), then from 100 yd nearer on
+# the same line (-9446, -160, about 210 yd), facing Goldshire (yaw 94), the camera 6 yd back and
+# nearly level. Take 280 saw two white blobs about 35 px wide that mist 3 did not dim: the 64
+# nearest window points all lay in one or two buildings and their halos piled up. Now no two glows
+# are within 3 yd, each is small (a 0.5 yd core, a 1.2 yd halo), warmer and dimmer, and the mist
+# takes nearly all of its dimming. 23:30, lookwindows 0 and 2, lookmist 3, 21:00, worldLook 0.
+# (Take 280's south spot is behind a hill among the Deathguard's NPCs and its west spot behind
+# trees; neither is filmed again.)
+# Look for: Goldshire as a cluster of small warm points where the buildings are, a few pixels
+# apart, hidden behind anything nearer; much dimmer in mist 3; about half as bright at 21:00; none
+# at worldLook 0.
+hero warrior
+cam 94 -3 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9440 -260
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("lookweather clear")
+4.25 lua ConsoleExec("lookmist grade")
+4.3 lua ConsoleExec("lookwindows 1")
+6.0 shots far-windows 3 0.5
+8.0 lua ConsoleExec("lookwindows 0")
+9.0 shots far-lookwindows-0 1 0.5
+9.5 lua ConsoleExec("lookwindows 2")
+10.5 shots far-lookwindows-2 1 0.5
+11.0 lua ConsoleExec("lookwindows 1")
+11.05 lua ConsoleExec("lookmist 3")
+12.5 shots far-mist-3 2 0.5
+14.0 lua ConsoleExec("lookmist grade")
+14.05 .es goto -9446 -160
+18.0 shots near-windows 3 0.5
+20.0 lua ConsoleExec("lookmist 3")
+21.5 shots near-mist-3 2 0.5
+23.0 lua ConsoleExec("lookmist grade")
+23.05 lua ConsoleExec("worldclock 1260")
+23.1 lua ClearWorldFog()
+24.5 shots near-at-2100 2 0.5
+26.0 lua ConsoleExec("worldclock 1410")
+26.05 lua SetCVar("worldLook", "0")
+26.1 lua ClearWorldFog()
+27.5 shots near-classic 2 0.5
+29.0 lua SetCVar("worldLook", "1")
+29.05 lua ClearWorldFog()
+29.1 lua ConsoleExec("lookweather server")
+31 end

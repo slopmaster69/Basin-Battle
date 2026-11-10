@@ -1,0 +1,41 @@
+# Far lit windows (client 0084, #273's fourth round): Goldshire's windows at night from about 285 yd west, on the road toward the camp and Westfall
+# (WoW x -9530, y 330, on the ground), facing Goldshire (yaw 279), the camera 6 yd back and nearly
+# level. The NE spot of take 275 was hidden by trees; this round tries open ground (the west road,
+# the south fields and the east lake side): say which shows the town best, and if trees or a hill
+# hide it from here. 23:30, lookwindows 0 and 2, lookmist 3, 21:00, worldLook 0. The fps journal is on (send the CSV).
+# Look for: Goldshire as a cluster of small warm points where the buildings are, hidden behind
+# anything nearer, dimmer in mist, about half as bright at 21:00, none at worldLook 0.
+hero warrior
+cam 279 -3 6
+include _look_setup
+1.0 .es goto -9530 330
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.1 lua UIParent:Hide()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("lookweather clear")
+4.25 lua ConsoleExec("lookmist grade")
+4.3 lua ConsoleExec("lookwindows 1")
+4.35 lua SetCVar("fpsJournal", "1")
+6.0 video
+6.5 shots windows 3 0.5
+8.5 lua ConsoleExec("lookwindows 0")
+9.5 shots lookwindows-0 2 0.5
+11.0 lua ConsoleExec("lookwindows 2")
+12.0 shots lookwindows-2 2 0.5
+13.5 lua ConsoleExec("lookwindows 1")
+13.55 lua ConsoleExec("lookmist 3")
+15.0 shots mist-3 2 0.5
+16.5 lua ConsoleExec("lookmist grade")
+16.55 lua ConsoleExec("worldclock 1260")
+16.6 lua ClearWorldFog()
+18.0 shots at-2100 2 0.5
+19.5 lua ConsoleExec("worldclock 1410")
+19.55 lua SetCVar("worldLook", "0")
+19.6 lua ClearWorldFog()
+21.0 shots classic 2 0.5
+22.5 lua SetCVar("worldLook", "1")
+22.55 lua ClearWorldFog()
+22.6 lua ConsoleExec("lookweather server")
+22.65 lua SetCVar("fpsJournal", "0")
+24 end

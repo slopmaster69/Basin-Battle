@@ -1,0 +1,54 @@
+# Far lit windows (client 0084, #273's sixth round): Goldshire's windows at night from the east, from
+# take 291's two spots (WoW -9440, -260, about 310 yd, and -9446, -160, about 210 yd), facing
+# Goldshire (yaw 94), the camera 6 yd back and nearly level. Take 291 found three white points
+# drawn over a nearer oak trunk, one glow on a roof edge beside its lit window, mist 3 not dimming
+# them, and lookwindows replying with the old count. Now: a pixel of anything nearer than a
+# window (a trunk) takes none of its glow; a window's points keep to one wall (a pane round the
+# corner pooled with its neighbour put the point inside the building) and hide behind anything
+# 2 yd in front (was 5); they're deeper amber and a little dimmer; the mist takes all its dimming
+# and spreads the halo; and lookwindows picks them again at the new setting and says how much
+# light the mist lets through from the nearest. 23:30, lookwindows 0 and 2, lookmist 3, 21:00,
+# worldLook 0.
+# Look for: small warm amber points where the windows are, none over the trunk, none on a roof
+# edge; plainly dimmer and softer in mist 3 (its lookwindows reply gives the share let through);
+# none at worldLook 0. PLEASE send the "lookwindows" replies from client.log.
+hero warrior
+cam 94 -3 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9440 -260
+4.0 lua ConsoleExec("worldclock 1410")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua ConsoleExec("lookweather clear")
+4.25 lua ConsoleExec("lookmist grade")
+4.3 lua ConsoleExec("lookwindows 1")
+5.5 video
+6.0 shots far-windows 3 0.5
+8.0 lua ConsoleExec("lookwindows 0")
+9.0 shots far-lookwindows-0 1 0.5
+9.5 lua ConsoleExec("lookwindows 2")
+10.5 shots far-lookwindows-2 1 0.5
+11.0 lua ConsoleExec("lookmist 3")
+11.05 lua ConsoleExec("lookwindows 1")
+12.5 shots far-mist-3 2 0.5
+14.0 lua ConsoleExec("lookmist grade")
+14.05 .es goto -9446 -160
+18.0 lua ConsoleExec("lookwindows 1")
+18.5 shots near-windows 3 0.5
+20.0 lua ConsoleExec("lookmist 3")
+20.05 lua ConsoleExec("lookwindows 1")
+21.5 shots near-mist-3 2 0.5
+23.0 lua ConsoleExec("lookmist grade")
+23.05 lua ConsoleExec("worldclock 1260")
+23.1 lua ClearWorldFog()
+23.15 lua ConsoleExec("lookwindows 1")
+24.5 shots near-at-2100 2 0.5
+26.0 lua ConsoleExec("worldclock 1410")
+26.05 lua SetCVar("worldLook", "0")
+26.1 lua ClearWorldFog()
+27.5 shots near-classic 2 0.5
+29.0 lua SetCVar("worldLook", "1")
+29.05 lua ClearWorldFog()
+29.1 lua ConsoleExec("lookweather server")
+31 end

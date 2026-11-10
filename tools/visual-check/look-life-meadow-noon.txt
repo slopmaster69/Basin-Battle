@@ -1,4 +1,4 @@
-# Ambient life (client 0072): the open field at the Brackwell pumpkin patch at noon, for the
+# Ambient life (client 0083): the open field at the Brackwell pumpkin patch at noon, for the
 # butterflies (a couple at a time, out on open ground away from the trees); then looklife 3,
 # worldLife 0 and worldLook 0.
 # Look for: one or two small butterflies (white, yellow, orange or pale blue) fluttering low over

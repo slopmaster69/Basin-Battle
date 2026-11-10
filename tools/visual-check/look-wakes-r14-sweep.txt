@@ -1,0 +1,100 @@
+# Wakes, eighth round (client 0085): a sweep of the open water's knobs (`lookwater tune`), so
+# the surface's numbers are picked from the client itself rather than from the CPU model (which
+# missed the fine texture twice). The open water of look-wakes-r14-lake-above's first shot: the
+# hero still at the spit's tip, WoW (-9461, -333), facing west; the camera yaw 90 (looking west),
+# pitched 76 down, 18 yd back; noon, clear, sun shadows at the grade.
+# It holds still on the defaults for 3.5 s, then steps one knob at a time through a few values,
+# 3 s each, the rest at their defaults, and ends on the defaults again. Each value has its own
+# still, named for it (`milk-0.2-00.jpg`: milk at 0.2), and client.log logs every change
+# ("[look water] tune set: milk set to 0.2 (default 0.35)") and, at the start and the end, every
+# knob ("Knobs: ..."), so the video's frames can be matched to the values by time.
+# The knobs swept (defaults in brackets; `lookwater tune <name>` says what each holds):
+#   milk [0.35]: the shallows' milky veil, the most of the bed's light it takes;
+#   milk_tone [0.85]: the shallows' milk colour's brightness (the seventh filming's 155);
+#   relief [0.2]: how much the 0.36 and 0.2 yd wavelets shade the water (the embossed look; 0.5
+#     was the seventh round's);
+#   mid [0.5]: the 0.36 yd wavelets' weight (1 was the seventh round's);
+#   grain [0.25]: the new fine grain, about 0.1 yd (7 px on these films);
+#   grain_yd [0.1]: its wavelength;
+#   milk_depth [1.2]: the depth (yd) by which the veil is fully in (0 from the waterline);
+#   sky [0.85]: the mirror.
+# PLEASE send client.log's "[look water]" lines with the video.
+# Look for, at each value: the shallows' brightness (about 120 to 130 wanted) and how plainly the
+# bed shows under the first yard; the fine grain (an even fine texture, no embossed dents); the
+# deep's brightness and movement (right on the seventh filming: keep them).
+hero warrior
+cam 90 -76 18
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9461 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+4.4 lua ConsoleExec("lookshadow grade")
+4.45 lua ConsoleExec("lookwater show off")
+4.5 lua ConsoleExec("lookwater tune grade")
+4.55 lua ConsoleExec("lookwater tune")
+5.0 video
+6.0 shots defaults 2 1.0
+8.5 lua ConsoleExec("lookwater tune milk 0")
+10.1 shots milk-0 1 0.5
+11.5 lua ConsoleExec("lookwater tune milk 0.2")
+13.1 shots milk-0.2 1 0.5
+14.5 lua ConsoleExec("lookwater tune milk 0.5")
+16.1 shots milk-0.5 1 0.5
+17.5 lua ConsoleExec("lookwater tune milk 0.7")
+19.1 shots milk-0.7 1 0.5
+20.45 lua ConsoleExec("lookwater tune milk grade")
+20.5 lua ConsoleExec("lookwater tune milk_tone 0.65")
+22.1 shots milk_tone-0.65 1 0.5
+23.5 lua ConsoleExec("lookwater tune milk_tone 0.75")
+25.1 shots milk_tone-0.75 1 0.5
+26.5 lua ConsoleExec("lookwater tune milk_tone 1")
+28.1 shots milk_tone-1 1 0.5
+29.45 lua ConsoleExec("lookwater tune milk_tone grade")
+29.5 lua ConsoleExec("lookwater tune relief 0")
+31.1 shots relief-0 1 0.5
+32.5 lua ConsoleExec("lookwater tune relief 0.1")
+34.1 shots relief-0.1 1 0.5
+35.5 lua ConsoleExec("lookwater tune relief 0.35")
+37.1 shots relief-0.35 1 0.5
+38.5 lua ConsoleExec("lookwater tune relief 0.5")
+40.1 shots relief-0.5 1 0.5
+41.45 lua ConsoleExec("lookwater tune relief grade")
+41.5 lua ConsoleExec("lookwater tune mid 0")
+43.1 shots mid-0 1 0.5
+44.5 lua ConsoleExec("lookwater tune mid 1")
+46.1 shots mid-1 1 0.5
+47.45 lua ConsoleExec("lookwater tune mid grade")
+47.5 lua ConsoleExec("lookwater tune grain 0")
+49.1 shots grain-0 1 0.5
+50.5 lua ConsoleExec("lookwater tune grain 0.15")
+52.1 shots grain-0.15 1 0.5
+53.5 lua ConsoleExec("lookwater tune grain 0.35")
+55.1 shots grain-0.35 1 0.5
+56.5 lua ConsoleExec("lookwater tune grain 0.5")
+58.1 shots grain-0.5 1 0.5
+59.45 lua ConsoleExec("lookwater tune grain grade")
+59.5 lua ConsoleExec("lookwater tune grain_yd 0.07")
+61.1 shots grain_yd-0.07 1 0.5
+62.5 lua ConsoleExec("lookwater tune grain_yd 0.14")
+64.1 shots grain_yd-0.14 1 0.5
+65.45 lua ConsoleExec("lookwater tune grain_yd grade")
+65.5 lua ConsoleExec("lookwater tune milk_depth 0")
+67.1 shots milk_depth-0 1 0.5
+68.5 lua ConsoleExec("lookwater tune milk_depth 2.5")
+70.1 shots milk_depth-2.5 1 0.5
+71.45 lua ConsoleExec("lookwater tune milk_depth grade")
+71.5 lua ConsoleExec("lookwater tune sky 0.5")
+73.1 shots sky-0.5 1 0.5
+74.5 lua ConsoleExec("lookwater tune sky 1.2")
+76.1 shots sky-1.2 1 0.5
+77.45 lua ConsoleExec("lookwater tune grade")
+77.5 lua ConsoleExec("lookwater tune")
+79.0 shots defaults-end 2 1.0
+81.1 lua ConsoleExec("lookweather server")
+82.0 end

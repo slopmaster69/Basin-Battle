@@ -1,0 +1,33 @@
+# Falling leaves (client 0083, #272's seventh round): Crystal Lake's north bank at noon (take
+# 310's 31 to 34 out of a cap of 40), the camera behind the hero under the bank's oaks looking
+# out over the lake (yaw 180, level, 7 yd), lookwind 2, then the wind's own. Take 310's tally
+# showed lifetime was the limit: leaves lived 2 to 3 s, born low in their crowns and down within
+# a second or two, so none could be picked out on film. Now a leaf is born about its crown's
+# middle and at least 2.5 yd up, falls at 0.45 to 0.8 yd/s (was 0.7 to 1.2) and lies 6 s (was
+# 2.5): each drifts down for 4 to 10 s. "looklife" runs at the start and 20 s on.
+# Look for: leaves seen drifting down the whole way from the crowns to the grass, landing and
+# lying a while. PLEASE send client.log's "looklife" replies ("Leaves since": the mean life
+# should be well over 5 s).
+hero warrior
+cam 180 0 7
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookwind 2")
+4.35 lua ConsoleExec("looklife grade")
+14.5 video
+15.0 shots lake-wind-2 10 0.5
+24.0 lua ConsoleExec("looklife grade")
+24.5 lua ConsoleExec("lookwind grade")
+30.0 shots lake-wind-grade 6 0.5
+34.0 lua ConsoleExec("looklife grade")
+34.5 lua SetCVar("worldLife", "0")
+35.5 shots lake-worldlife-0 2 0.5
+37.0 lua SetCVar("worldLife", "1")
+37.05 lua ConsoleExec("lookweather server")
+39 end

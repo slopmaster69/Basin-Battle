@@ -124,13 +124,13 @@ pub fn load_instance(data_dir: &Path, map_dir: &str) -> Result<LoadedDeadmines> 
 
 /// [`load_instance`] at another cell size, over part of the map only.
 pub fn load_instance_with(data_dir: &Path, map_dir: &str, cell: f32, window: Option<([f32; 2], [f32; 2])>) -> Result<LoadedDeadmines> {
-    load_variant(data_dir, map_dir, cell, window, false, None)
+    load_variant(data_dir, map_dir, cell, window, false, false, None)
 }
 
 /// The finished Deadmines: the Juggernaut, its cargo and its added gangway are absent.
 /// The client applies the same group mask in its aftermath WMO asset (patch 0087).
 pub fn load_aftermath(data_dir: &Path) -> Result<LoadedDeadmines> {
-    load_variant(data_dir, MAP_DIR, CELL, None, true, None)
+    load_variant(data_dir, MAP_DIR, CELL, None, true, false, None)
 }
 
 /// [`load_aftermath`] with the shapes themselves kept: every solid triangle (walls, ceilings,
@@ -138,7 +138,16 @@ pub fn load_aftermath(data_dir: &Path) -> Result<LoadedDeadmines> {
 /// is, for seating the ruins against the real rock and keeping them out of what's already there.
 pub fn load_aftermath_survey(data_dir: &Path) -> Result<aftermath::Survey> {
     let mut kept = aftermath::Kept::default();
-    let loaded = load_variant(data_dir, MAP_DIR, CELL, None, true, Some(&mut kept))?;
+    let loaded = load_variant(data_dir, MAP_DIR, CELL, None, true, false, Some(&mut kept))?;
+    Ok(aftermath::Survey::new(loaded, kept))
+}
+
+/// [`load_aftermath_survey`] as a client with patch 0091 has it: the mine's own doodads in
+/// [`aftermath::MINE_DOODADS`] are gone too (their bodies, their hulls and the floors they gave),
+/// and [`aftermath::Survey::hidden`] says where each stood, for what the server sets there instead.
+pub fn load_aftermath_open_survey(data_dir: &Path) -> Result<aftermath::Survey> {
+    let mut kept = aftermath::Kept::default();
+    let loaded = load_variant(data_dir, MAP_DIR, CELL, None, true, true, Some(&mut kept))?;
     Ok(aftermath::Survey::new(loaded, kept))
 }
 
@@ -148,6 +157,8 @@ fn load_variant(
     cell: f32,
     window: Option<([f32; 2], [f32; 2])>,
     aftermath: bool,
+    // The aftermath's mine doodads gone as well (patch 0091).
+    open: bool,
     mut kept: Option<&mut aftermath::Kept>,
 ) -> Result<LoadedDeadmines> {
     let mut chain = Chain::open(data_dir)
@@ -204,6 +215,15 @@ fn load_variant(
                         if d.model.is_empty() {
                             continue;
                         }
+                        // The mine's own doodads are numbered by their place in its WMO.
+                        let index = aftermath::is_ship_root(&w.model).then_some(k as u32);
+                        if open && index.is_some_and(|i| aftermath::MINE_DOODADS.contains(&i)) {
+                            if let Some(k) = kept.as_deref_mut() {
+                                let bounds = k.bounds(&mut chain, &d.model);
+                                k.hidden.push(aftermath::Standing::in_wmo(&d.model, bounds, &m, w.position, d.orientation, d.position, d.scale, index));
+                            }
+                            continue;
+                        }
                         let hull = match hulls.get(&d.model) {
                             Some(h) => h.clone(),
                             None => {
@@ -215,7 +235,7 @@ fn load_variant(
                         props.push((d.model.clone(), transform(&m, w.position, d.position), !hull.is_empty()));
                         if let Some(k) = kept.as_deref_mut() {
                             let bounds = k.bounds(&mut chain, &d.model);
-                            k.standing.push(aftermath::Standing::in_wmo(&d.model, bounds, &m, w.position, d.orientation, d.position, d.scale));
+                            k.standing.push(aftermath::Standing::in_wmo(&d.model, bounds, &m, w.position, d.orientation, d.position, d.scale, index));
                         }
                         if hull.is_empty() {
                             continue;

@@ -1,0 +1,89 @@
+# Wakes, rings and splashes, fourth round (client 0085): Crystal Lake from steeply above, as in
+# Corey's reference video (a swimmer's thin white V seen from above). The third filming (r9) swam
+# the hero south along the shore, past the dock and the huts, and the camera clipped through them.
+# Now he swims west, out into the lake and away from every structure, with the camera behind him
+# over the water (yaw 90, looking west, pitched 60 down, 18 yd back): he starts in the south
+# shallows at WoW (-9461, -333), swims 10 yd west, stops for 2 s (the rings a stop leaves), swims
+# 10 yd more, stops, and swims back east to the start, his V trailing behind him each way.
+# `probemove <seconds> <way> [facing]` (client 0085's dev console command) holds his keys at the
+# swim speed, facing that map facing (0 north, 90 west). Then a walk in from the south shore's
+# grass (-9462, -350), facing west, for the entry splash, and a 3 yd hop in the shallows (out of
+# the water and back in: a landing's splash). Then a swim west each with lookwater wakes 0 (0081's
+# froth and 1.12's wade rings back), worldWater 0 (1.12's water) and worldLook 0 (the classic look).
+# What changed since r9: the V is thin white lines (about a hand's width) along the ridges of its
+# foam, broken into streaks with gaps, letting a little water through, with a faint soft halo
+# (r9's were thick opaque slabs); 1.12's pink-white sparkle and the sun's glint are all but gone
+# over the shallows (under about 1.5 yd), and the sparkle is smaller and white further out; a
+# wader's shins make rings, not white bars; walking in throws a few droplets and a ring; a
+# landing splashes harder; a stop sends a ring on ahead and he settles in rings for about a
+# second; the rings show as faint pale crest lines; the field is bigger (80 yd, centred on him).
+# PLEASE send client.log's "[look wakes]" lines.
+# Look for, crop 1:1 round the hero:
+#   start: the bed clear under him, no pink speckle over the shallows, gentle rings;
+#   swim-out and swim-on: a V of thin, broken white lines from his sides, opening behind him at
+#   about 20 degrees a side, white for about 1.5 s, faint pale wave lines outside it;
+#   stop-rings: a ring running on ahead of where he stopped and rings round him for about 1 s,
+#   the V fading out over about 1.5 s; swim-back: a new V the other way;
+#   wade-in: a few small droplets and a soft ring that fade, no white bars beside him;
+#   jump-in: a small splash of droplets and a ring as he lands;
+#   wakes-0: the old froth and 1.12's thin ring instead, 1.12's sparkle as in r9;
+#   worldwater-0 and classic: 1.12's water, exactly as in r9.
+# The straight tone edge r9 found about 28 yd out also shows with lookwater wakes 0 and stays put
+# on the lake as the camera moves, so it isn't the wakes' field: say if it is still there.
+hero warrior
+cam 90 -60 18
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9461 -333
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldWater", "1")
+4.25 lua ConsoleExec("lookwater grade")
+4.3 lua ConsoleExec("lookwater wakes 1")
+4.35 lua ConsoleExec("lookweather clear")
+5.0 video
+5.5 shots start 3 0.5
+6.8 lua ConsoleExec("lookwater wakes")
+7.0 lua ConsoleExec("probemove 2.2 f 90")
+7.3 shots swim-out 8 0.25
+9.3 shots stop-rings 9 0.25
+11.3 lua ConsoleExec("probemove 2.2 f 90")
+11.6 shots swim-on 8 0.25
+13.6 shots stop 8 0.25
+15.6 lua ConsoleExec("lookwater wakes")
+16.0 lua ConsoleExec("probemove 4.4 f 270")
+16.3 shots swim-back 15 0.3
+20.6 shots back-stop 8 0.25
+23.0 lua ConsoleExec("lookwater wakes")
+25.0 .es goto -9462 -350
+28.0 lua ConsoleExec("probemove 4 f 90")
+28.2 shots wade-in 15 0.25
+32.5 .es hop 3
+32.6 shots jump-in 14 0.1
+34.5 lua ConsoleExec("lookwater wakes")
+35.0 lua ConsoleExec("lookwater wakes 0")
+35.1 .es goto -9461 -333
+38.0 shots wakes-0-start 2 0.5
+39.0 lua ConsoleExec("probemove 4 f 90")
+39.1 shots wakes-0-swim 8 0.5
+43.2 shots wakes-0-stop 3 0.4
+45.5 lua ConsoleExec("lookwater wakes 1")
+45.55 lua SetCVar("worldWater", "0")
+45.6 .es goto -9461 -333
+48.5 shots worldwater-0-start 2 0.5
+49.5 lua ConsoleExec("probemove 4 f 90")
+49.6 shots worldwater-0-swim 8 0.5
+53.7 shots worldwater-0-stop 3 0.4
+56.0 lua SetCVar("worldWater", "1")
+56.05 lua SetCVar("worldLook", "0")
+56.1 lua ClearWorldFog()
+56.15 .es goto -9461 -333
+59.0 shots classic-start 2 0.5
+60.0 lua ConsoleExec("probemove 4 f 90")
+60.1 shots classic-swim 8 0.5
+64.2 shots classic-stop 3 0.4
+66.5 lua SetCVar("worldLook", "1")
+66.55 lua ClearWorldFog()
+66.6 lua ConsoleExec("lookweather server")
+68 end

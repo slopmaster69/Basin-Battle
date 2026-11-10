@@ -1,0 +1,32 @@
+# Motes in the sun (client 0083, #272's sixth round): the Brackwell pumpkin patch at 17:30, the
+# hero at WoW (-9803, -904), facing the low sun (yaw 45) across the open field, the camera pitched
+# 8 up, 5 yd back, as take 291, which found the motes drifting in the sunlit air but the nearest
+# showing as big glowing orbs, like fireflies by day. No mote is now drawn more than 14 px across
+# at 1080p, so one a yard or two off is a speck, not an orb; farther ones are as before. looklife
+# 1, then 3, then worldLife 0.
+# Look for: golden specks drifting in the sunlit air, none of them an orb, however near the lens;
+# as many trails as take 291 (about 35 in 3 s at looklife 1).
+hero warrior
+cam 45 8 5
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldLife", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looklife grade")
+4.35 lua ConsoleExec("lookwind grade")
+14.0 lua ConsoleExec("looklife grade")
+14.5 video
+15.0 shots motes-1 6 0.5
+18.5 lua ConsoleExec("looklife 3")
+28.0 lua ConsoleExec("looklife 3")
+28.5 shots motes-3 6 0.5
+32.0 lua ConsoleExec("looklife grade")
+32.05 lua SetCVar("worldLife", "0")
+33.5 shots worldlife-0 2 0.5
+35.0 lua SetCVar("worldLife", "1")
+35.05 lua ConsoleExec("lookweather server")
+37 end

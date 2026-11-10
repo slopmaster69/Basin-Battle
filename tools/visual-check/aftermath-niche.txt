@@ -1,0 +1,21 @@
+# The aftermath, the eastern niche (the 9 Nov review's view 9): the intact mine and then its
+# collapse, from the review's camera there (x -160, y -526, facing 338 degrees). With client patch
+# 0091 (round 30) the niche's stacked lumber lies spilled under the seal, the bucket that stood on
+# it knocked over, and its lantern hangs askew, still lit (the review found the niche too dark).
+# Dev setup as the region scenarios: the preview's `point` puts the hero back on the same spot and
+# facing for the second half.
+hero warrior
+camera duel
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes
+12 .es goto -160.0 -526.0 52.5 5.9
+14 video
+16 shots before 4 1.0
+21 .es aftermath on
+24 .es aftermath point -160.0 -526.0 52.5 5.9
+29 shots after 4 1.0
+34 .es aftermath off
+37 end

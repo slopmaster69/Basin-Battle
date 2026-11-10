@@ -1,0 +1,42 @@
+# The air's cost by pass (client 0084, #273's sixth round): the woods by Crystal Lake at 07:45 in
+# thick mist (lookmist 3.5), facing the sun, standing still: 10 s at each fog quality step (1, 2,
+# 3), 10 s with worldFog 0, 10 s with worldSharpen 0, 10 s with worldLook 0, the fps journal on.
+# Take 291's journal put every look pass in gpu_other. The journal now has a gpu_look column at
+# its end: the sun-shadow slices, the contact shadows and their blur, the fog's march and resolve,
+# the water's scene copy and the look pass. (Run with WOW_GPU_PASSES=1 for each pass by name.)
+# Look for: in the CSV, gpu_look per step against gpu_ms and frame ms. Please send the CSV.
+hero warrior
+cam 45 16 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 465")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldFog", "1")
+4.25 lua SetCVar("worldSharpen", "0.4")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("lookmist 3.5")
+4.4 lua ConsoleExec("lookfog quality 1")
+14.0 lua SetCVar("fpsJournal", "1")
+14.5 video
+15.0 shots cost-q1 1 1.0
+24.0 lua ConsoleExec("lookfog quality 2")
+25.0 shots cost-q2 1 1.0
+34.0 lua ConsoleExec("lookfog quality 3")
+35.0 shots cost-q3 1 1.0
+44.0 lua ConsoleExec("lookfog quality 2")
+44.05 lua SetCVar("worldFog", "0")
+45.0 shots cost-fog-off 1 1.0
+54.0 lua SetCVar("worldFog", "1")
+54.05 lua SetCVar("worldSharpen", "0")
+55.0 shots cost-sharpen-off 1 1.0
+64.0 lua SetCVar("worldSharpen", "0.4")
+64.05 lua SetCVar("worldLook", "0")
+65.0 shots cost-classic 1 1.0
+74.0 lua SetCVar("fpsJournal", "0")
+74.05 lua SetCVar("worldLook", "1")
+74.1 lua ClearWorldFog()
+74.15 lua ConsoleExec("lookmist grade")
+74.2 lua ConsoleExec("lookweather server")
+76 end

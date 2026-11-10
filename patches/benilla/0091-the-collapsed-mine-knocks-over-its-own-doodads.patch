@@ -1,0 +1,219 @@
+From 895167cbe567444a8b61c2a57212834b55de90c0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 10 Nov 2026 07:27:21 -0600
+Subject: [PATCH] The collapsed mine knocks over its own cargo, carts and
+ lanterns (patch 0091)
+
+The finished Deadmines' preview (patch 0087's marker, game object 500100 at
+0xF11007A184FFFFFF on map 36) left the mine's own doodads as they were: the neat cargo stacks,
+carts and barrows of its review views 3, 9 and 15 stood untouched beside the fall, and a lantern
+hung lit right over each pile (views 1 and 15). They are the mine WMO's own doodads, so a server
+can't move them.
+
+While the marker stands, the mine's aftermath WMO variant now also clears the models of the
+doodads in MINE_DOODADS (their MODD indices, kept: portals and the prop lighting tables index
+them), as it clears the ship's, so no prop, collider or interior-light slot is made for them.
+For those in DARK_LANTERNS the mine's own lights (MOLT) within LANTERN_REACH (1.6 yd) of the
+lantern go to intensity 0: the mine's lanterns carry theirs 0.4 to 1 yd off their pivot and no two
+are that close. A dark light is still spawned and named by its rooms, so nothing becomes ungated.
+The intact model is untouched: when the marker goes the streamer reloads it, every doodad and
+light as it was.
+
+The server sets its own knocked-over, tipped and crooked copies where they stood. Three of the
+mine's models have no game-object display, so they join EXTRA_DISPLAYS: 60005 the hanging lantern
+(GeneralLantern03), 60006 the ore cart (CaveMineCar01), 60007 the netted cargo
+(DeadMineCargoNetBoxes).
+
+HasActionCombat() is 30: the server sends the copies only to this round, so an older client keeps
+the mine's own doodads and sees nothing twice. The lists are mirrored in Basin Battle's
+htl-map/src/deadmines/aftermath.rs and held to its server plan by a test there.
+---
+ .../benilla-assets/src/deadmines_aftermath.rs | 102 ++++++++++++++++++
+ crates/benilla-formats/src/gameobjects.rs     |  14 +++
+ crates/benilla-ui/src/action_combat.rs        |   8 +-
+ 3 files changed, 123 insertions(+), 1 deletion(-)
+
+diff --git a/crates/benilla-assets/src/deadmines_aftermath.rs b/crates/benilla-assets/src/deadmines_aftermath.rs
+index 8f556e0f..b577062a 100644
+--- a/crates/benilla-assets/src/deadmines_aftermath.rs
++++ b/crates/benilla-assets/src/deadmines_aftermath.rs
+@@ -19,6 +19,24 @@ pub const SHIP_ADT_DOODADS: &[u32] = &[
+     333919,
+ ];
+ 
++// Basin Battle patch 0091. Mirrored in htl-map/src/deadmines/aftermath.rs, whose server plans
++// what stands in each one's place.
++/// The mine's own doodads (MODD indices) the collapse knocked over or put out: the server sets
++/// its own toppled, tipped or crooked copies where they stood, so the WMO's are hidden.
++pub const MINE_DOODADS: &[u32] = &[
++    67, 88, 89, 92, 93, 98, 101, 103, 104, 105, 106, 108, 120, 141, 162, 184, 185, 186, 220, 221,
++    251, 252, 253, 254, 255, 256, 257, 259, 264, 283, 331, 332, 333, 342, 381, 386, 387, 502, 503,
++    513,
++];
++/// Of those, the lanterns whose light goes out with them.
++pub const DARK_LANTERNS: &[u32] = &[
++    98, 101, 106, 108, 120, 162, 184, 185, 220, 221, 283, 331, 332, 333, 381, 386, 387, 502, 503,
++    513,
++];
++/// A put-out lantern's own lights are the mine's (MOLT) within this of its pivot (yd): the mine's
++/// lanterns carry theirs 0.4 to 1 yd off it, and no two lanterns' lights are this close.
++pub const LANTERN_REACH: f32 = 1.6;
++
+ pub fn is_ship_root(path: &str) -> bool {
+     path.replace('\\', "/")
+         .eq_ignore_ascii_case("world/wmo/dungeon/az_deadmines/az_deadmines_b.wmo")
+@@ -112,11 +130,39 @@ pub(crate) fn variant(
+     for d in m.doodads.iter_mut().take(SHIP_DOODADS) {
+         d.model.clear();
+     }
++    hide_mine_doodads(&mut m);
+     (m.group_collision_bounds, m.collision_bounds) = collision_tri_bounds(&m.group_collision_tris);
+     m.group_collision_grids = collision_tri_grids(&m.group_collision_tris);
+     m
+ }
+ 
++/// The collapse's own doodads gone (patch 0091): each one's model cleared, as the ship's are, so
++/// no prop, collider or interior-light slot is made for it; and a put-out lantern's lights dark.
++/// A light at zero is still spawned and still named by its rooms, so nothing becomes ungated.
++fn hide_mine_doodads(m: &mut WmoModel) {
++    let mut dark = Vec::new();
++    for &i in MINE_DOODADS {
++        let Some(d) = m.doodads.get_mut(i as usize) else {
++            continue;
++        };
++        if DARK_LANTERNS.contains(&i) {
++            dark.push(d.position);
++        }
++        d.model.clear();
++    }
++    for light in &mut m.lights {
++        let near = |at: &[f32; 3]| {
++            (0..3)
++                .map(|a| (light.position[a] - at[a]).powi(2))
++                .sum::<f32>()
++                < LANTERN_REACH * LANTERN_REACH
++        };
++        if dark.iter().any(near) {
++            light.intensity = 0.0;
++        }
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+@@ -264,4 +310,60 @@ mod tests {
+         assert_eq!(intact.group_nav[17].area_table_id, 7);
+         assert_eq!(intact.group_collision_tris[30], vec![tri]);
+     }
++
++    #[test]
++    fn the_collapse_hides_its_doodads_and_puts_out_its_lanterns_in_the_variant_only() {
++        assert!(
++            MINE_DOODADS.windows(2).all(|w| w[0] < w[1]),
++            "sorted, each once"
++        );
++        assert!(MINE_DOODADS.iter().all(|&i| i as usize >= SHIP_DOODADS));
++        assert!(DARK_LANTERNS.iter().all(|i| MINE_DOODADS.contains(i)));
++        let last = *MINE_DOODADS.iter().max().unwrap() as usize + 2;
++        // One doodad every 4 yd along x, each with its own light 0.4 yd over its pivot.
++        let doodads: Vec<benilla_formats::WmoDoodad> = (0..last)
++            .map(|i| benilla_formats::WmoDoodad {
++                model: format!("doodad{i}.m2"),
++                position: [4.0 * i as f32, 0.0, 0.0],
++                orientation: [0., 0., 0., 1.],
++                scale: 1.,
++                color: [255; 4],
++            })
++            .collect();
++        let lights: Vec<benilla_formats::WmoLight> = (0..last)
++            .map(|i| benilla_formats::WmoLight {
++                light_type: 0,
++                use_atten: true,
++                color: [1.0, 0.8, 0.5],
++                position: [4.0 * i as f32, 0.0, 0.4],
++                intensity: 1.0,
++                attenuation_start: 1.0,
++                attenuation_end: 6.0,
++            })
++            .collect();
++        let intact = WmoModel {
++            doodads,
++            lights,
++            ..Default::default()
++        };
++        let after = variant(&intact, CollisionMesh::default(), CollisionMesh::default());
++        for i in SHIP_DOODADS..last {
++            let hidden = MINE_DOODADS.contains(&(i as u32));
++            let dark = DARK_LANTERNS.contains(&(i as u32));
++            assert_eq!(after.doodads[i].model.is_empty(), hidden, "doodad {i}");
++            assert_eq!(
++                after.lights[i].intensity,
++                if dark { 0.0 } else { 1.0 },
++                "light {i}"
++            );
++            // The intact model, which the marker's going brings back, is untouched.
++            assert_eq!(intact.doodads[i].model, format!("doodad{i}.m2"));
++            assert_eq!(intact.lights[i].intensity, 1.0);
++        }
++        assert_eq!(
++            after.lights.len(),
++            intact.lights.len(),
++            "a dark light keeps its place"
++        );
++    }
+ }
+diff --git a/crates/benilla-formats/src/gameobjects.rs b/crates/benilla-formats/src/gameobjects.rs
+index 74580bd4..f650fb9b 100644
+--- a/crates/benilla-formats/src/gameobjects.rs
++++ b/crates/benilla-formats/src/gameobjects.rs
+@@ -66,6 +66,20 @@ pub const EXTRA_DISPLAYS: &[(u32, &str)] = &[
+         "World\\Generic\\Human\\Passive Doodads\\Weapons&Armor\\HumanArrow.m2",
+     ),
+     (60004, "Item\\ObjectComponents\\Ammo\\ArrowFlight_01.m2"),
++    // The Deadmines' own doodads, which the collapsed mine's preview sets down knocked over where
++    // the mine's stood (patch 0091): its hanging lantern, its ore cart and its netted cargo.
++    (
++        60005,
++        "World\\Generic\\Human\\Passive Doodads\\Lanterns\\GeneralLantern03.mdx",
++    ),
++    (
++        60006,
++        "World\\Generic\\PassiveDoodads\\Misc\\MineCars\\CaveMineCar01.mdx",
++    ),
++    (
++        60007,
++        "World\\Generic\\Human\\Passive Doodads\\CargoNetBoxes\\DeadMineCargoNetBoxes.mdx",
++    ),
+ ];
+ 
+ /// Load GameObjectDisplayInfo.dbc from the patch chain into a [`GameObjectCatalog`].
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 3a5af3ce..f4295ec5 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -310,6 +310,12 @@
+ //! - `ActionDash`'s fifth argument `"legs"`: while the dash runs, the legs keep walking the way the
+ //!   movement keys go (a lunge into a strafe's swing doesn't flick the legs forward and back); the
+ //!   body still runs the dash's way.
++//!
++//! The thirtieth (`HasActionCombat() >= 30`), the collapsed Deadmines' own doodads (patch 0091):
++//! nothing new to call. While the mine's aftermath preview marker stands, its knocked-over cargo,
++//! carts and barrows and some of its lanterns are hidden, a put-out lantern's light with it. A
++//! server sends its own knocked-over copies only to a client of this round; an older one keeps
++//! the mine's own.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -1277,7 +1283,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(29))?,
++        lua.create_function(|_, _: MultiValue| Ok(30))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+-- 
+2.56.0.windows.4
+
