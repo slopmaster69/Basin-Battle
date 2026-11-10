@@ -2120,6 +2120,14 @@ pub struct SpecialDef {
     /// (seconds; 0: no), open to every blow: the best opening of a fight.
     #[serde(default)]
     pub lodge: f32,
+    /// The look on the creature as the blow lands, hit or miss (`SpellVisualKit`; 0 none): a
+    /// stomp's dust, a slam's debris. `kit` is the wind-up's tell; this is the impact.
+    #[serde(default)]
+    pub impact_kit: u32,
+    /// Its shape flashed on the ground as it lands (a colour, `RRGGBB`), for the clients that draw
+    /// one: what it covered reads with the floor markers off.
+    #[serde(default)]
+    pub burst: Option<String>,
 }
 
 fn one_u32() -> u32 {

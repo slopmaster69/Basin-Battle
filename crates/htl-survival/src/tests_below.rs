@@ -746,13 +746,17 @@ fn a_bosss_words_are_yelled_by_the_boss_as_it_turns_at_each_phase_over_its_kill_
     let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
     let yelled = |s: &Survival, line: &str| s.events.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == line));
     let told = |s: &Survival, line: &str| s.events.iter().any(|e| matches!(e, Event::Announce { text } if text.contains(line)));
+    // Lines in one place come 2 s apart: each moment below waits out the last one's.
+    let gap = |s: &mut Survival| { s.events.clear(); let end = s.clock + crate::sim::LINE_GAP; while s.clock < end { s.step(0.05); } };
     s.events.clear();
     s.engage(boss, mobs::Foe::Hero(a));
     assert!(yelled(&s, "Who goes there?"), "its words as it turns on them");
+    gap(&mut s);
     s.events.clear();
     let max = s.mobs[&boss].max_health;
     s.hurt_mob(boss, a, max / 2 + 1);
     assert!(yelled(&s, "Enough!") && !told(&s, "Enough!"), "a phase's words, yelled, not a server line");
+    gap(&mut s);
     s.events.clear();
     // The boss's blow is the one that fells Bram (what a creature's strike records as it lands).
     let now = s.clock;
@@ -762,6 +766,7 @@ fn a_bosss_words_are_yelled_by_the_boss_as_it_turns_at_each_phase_over_its_kill_
     let hp = p.health;
     s.hurt_player_by(b, hp + 10_000, boss, "a blow");
     assert!(yelled(&s, "One less."), "over the hero it felled: {:?}", s.events);
+    gap(&mut s);
     s.events.clear();
     let left = s.mobs[&boss].health;
     s.hurt_mob(boss, a, left);
@@ -769,7 +774,7 @@ fn a_bosss_words_are_yelled_by_the_boss_as_it_turns_at_each_phase_over_its_kill_
 }
 
 #[test]
-fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_falls() {
+fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_and_when_it_falls() {
     use crate::content::EnrageDef;
     let mut c = content();
     let w = c.mob("warlord").unwrap();
@@ -810,13 +815,13 @@ fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_fa
     assert_eq!((b.health, b.phase), (b.max_health, 0));
     assert!(!s.mobs.values().any(|m| m.summoned_by == Some(boss)), "none left");
 
-    // The boss felled with its adds still up: they fight on.
+    // The boss felled with its adds still up: they go with it (Nov 8 review: nothing fights on
+    // over a fallen boss).
     let (mut s, id, boss, adds) = fight(c);
     s.hurt_mob(boss, id, 1_000_000);
     run(&mut s, 1.0);
     for a in &adds {
-        let m = &s.mobs[a];
-        assert!(m.health > 0 && m.state.target() == Some(id), "{:?}", m.state);
+        assert!(!s.mobs.contains_key(a), "an add gone with its boss");
     }
 }
 

@@ -4,11 +4,23 @@
 use super::*;
 use crate::land::clear_line;
 
+#[cfg(test)]
+#[path = "shared_fixes_tests.rs"]
+mod shared_fixes_tests;
+
 /// A creature's missile that splashes at least this wide is a lobbed throw (a pot, a bomb): its
 /// landing is marked from the wind-up's start.
 pub(crate) const LOB_RADIUS: f32 = 2.5;
 /// The least a lobbed throw spends in the air, however near it lands.
 pub(crate) const LOB_MIN_FLY: f32 = 0.7;
+/// The label of damage dealt by hand (`.es hurt`): it moves health and nothing else.
+pub(crate) const DEBUG_LABEL: &str = "debug";
+/// A second form (Gorged, Unbowed) shows itself this long before its first blow.
+pub(crate) const SECOND_FORM_WAIT: f32 = 2.0;
+/// The colour a creature's hazard is drawn on the ground in, with the floor markers off.
+pub(crate) const HAZARD_COLOUR: &str = "FF5A28";
+/// How long a blow's shape flashes on the ground where it lands.
+pub(crate) const IMPACT_BURST_SECS: f32 = 0.45;
 
 /// How long a lobbed throw is in the air over `dist` yards.
 pub(crate) fn lob_flight(dist: f32, speed: f32) -> f32 {
@@ -641,12 +653,15 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
-        if damage > 0 { self.arsenal_hurt(mid); }
+        // Debug damage (`.es hurt`) only moves health: it never builds posture, spoils a weapon
+        // change or counts as an exchange, so a health gate set by hand fires no beat a hero
+        // didn't earn (Nov 8 review: every filmed posture break came from it).
+        let earned = label != DEBUG_LABEL;
+        if damage > 0 && earned { self.arsenal_hurt(mid); }
         self.machinery_hurt(mid, damage, label);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
-        // weapons count more, and a blow in its recovery more again). (Never debug damage on
-        // Sneed and his machine: `sim::machinery`.)
-        if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 && !self.machinery_debug(mid, label) {
+        // weapons count more, and a blow in its recovery more again).
+        if earned && self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 && !self.machinery_debug(mid, label) {
             let heft = self.players.get(&by).map_or(1.0, |p| self.weapon_of(p).posture).max(1.0);
             // Struck just after its own blow, it's open: that counts more.
             let m = &self.mobs[&mid];
@@ -940,6 +955,14 @@ impl Survival {
         if let Some(h) = foe {
             self.engage(s, Foe::Hero(h));
         }
+        // It shows itself before it swings: no second form's first blow comes as it appears on top
+        // of a hero (Gorged swung the instant he rose). VanCleef's Unbowed kneels longer.
+        if of.then_after > 0.0 && !self.is_vancleef(s) {
+            let now = self.clock;
+            if let Some(m) = self.mobs.get_mut(&s) {
+                m.ready_at = m.ready_at.max(now + SECOND_FORM_WAIT);
+            }
+        }
         self.vancleef_risen(s);
     }
 
@@ -963,6 +986,15 @@ impl Survival {
         self.firing_died(mid);
         self.remove_kitchen(mid);
         self.remove_duel(mid);
+        // What it called up goes with it, and what it threw is spent: no add fights on over a
+        // fallen boss, no charge still in the air hits after its thrower died.
+        self.dismiss_adds(mid);
+        self.spend_missiles(mid);
+        // Its swing or held pose stops as it falls: the client otherwise plays the wind-up and
+        // recovery out first (Smite stood 3.5 s after his last blow, VanCleef 2 s).
+        if self.mobs.get(&mid).is_some_and(|m| matches!(m.state, MobState::Windup { .. } | MobState::Recover { .. }) || self.content.mobs[m.def].posture > 0) {
+            self.events.push(Event::HoldPose { id: mid, clip: 0, secs: 0.0, from: None });
+        }
         // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
@@ -1204,6 +1236,7 @@ impl Survival {
 
     pub(crate) fn step_mobs(&mut self, dt: f32) {
         self.step_rises();
+        self.step_lines();
         self.step_boss_fires();
         self.step_boss_collapse(dt);
         self.clean_machinery();
@@ -1974,8 +2007,17 @@ impl Survival {
         self.events.push(Event::MobGone { id });
     }
 
-    /// A boss's fight is over (its heroes fell or left, or it was drawn past its leash): what it
-    /// called up still standing goes with it. The fallen lie where they fell.
+    /// What `id` threw and is still in the air lands harmlessly: its rings go, nothing hits.
+    fn spend_missiles(&mut self, id: Id) {
+        let marks: Vec<Id> = self.missiles.iter().filter(|x| x.owner == id && x.mark != 0).map(|x| x.mark).collect();
+        self.missiles.retain(|x| x.owner != id);
+        for mk in marks {
+            self.unmark(mk);
+        }
+    }
+
+    /// A boss's fight is over (it fell, its heroes fell or left, or it was drawn past its leash):
+    /// what it called up still standing goes with it. The fallen lie where they fell.
     fn dismiss_adds(&mut self, boss: Id) {
         let adds: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.summoned_by == Some(boss) && !matches!(m.state, MobState::Dead { .. })).map(|(id, _)| *id).collect();
         for id in adds {
@@ -2684,6 +2726,11 @@ impl Survival {
                 // the pot lands; the ring is the throw's own.
                 if look != 0 && a.radius >= GROUND_LOOK_MIN {
                     self.mark_ground(at, a.radius, secs, look);
+                } else {
+                    // Too small for a ground look: its true size drawn on the ground anyway, as an
+                    // effect, so it reads with the floor markers off (Nov 8: the small splashes
+                    // showed nothing).
+                    self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: a.radius, arc: 360.0, width: 0.0, secs, colour: HAZARD_COLOUR.into() });
                 }
                 let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
                 let mk = self.mark_as(at, a.radius, secs, Some(tele));
@@ -2775,6 +2822,14 @@ impl Survival {
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
         let (pos, f) = (m.pos, m.facing);
+        // The blow's own look as it lands, hit or miss (a pattern step's, or its special's): the
+        // wind-up's `kit` is the tell, this is the impact (Nov 8: Smite's stomp played its look
+        // a second before the damage).
+        let step = if m.pattern.is_some() { self.pattern_step(id).cloned() } else { self.content.mobs[m.def].special.clone().filter(|_| m.special) };
+        let stepped = step.is_some();
+        if let Some(kit) = step.as_ref().map(|s| s.impact_kit).filter(|k| *k != 0) {
+            self.events.push(Event::Visual { id, kit, by: None });
+        }
         if a.ranged {
             self.events.push(Event::CastEnd { caster: id });
             let lob = self.mobs.get_mut(&id).and_then(|m| m.lob.take());
@@ -2805,9 +2860,15 @@ impl Survival {
             });
             return;
         }
-        // A heavy special blow shakes the ground where it lands.
-        if self.mobs[&id].special && a.heavy {
+        // A heavy special blow (or a heavy step of a string) shakes the ground where it lands.
+        if stepped && a.heavy {
             self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+        }
+        // Its shape flashed on the ground where it lands, for a step that asks: what it covered
+        // reads with the floor markers off.
+        if let Some(colour) = step.as_ref().and_then(|s| s.burst.clone()) {
+            let (shape, arc) = if a.arc >= 300.0 { ("ring", 360.0) } else { ("wedge", a.arc) };
+            self.events.push(Event::GroundBurst { at: pos, yaw: f, shape, reach: a.range, arc, width: 0.0, secs: IMPACT_BURST_SECS, colour });
         }
         // Its look on the ground as it lands (a stomp's shockwave, a nova's burst), at its feet
         // for a blow all round, else where its reach ends.

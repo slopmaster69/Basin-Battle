@@ -272,11 +272,12 @@ fn kitchen_posture_break_from_plain_light_attacks_spills_without_healing_or_brea
         events.extend(s.step(DT));
     }
     assert!(s.mobs[&id].health < before, "starting weapon attacks actually connected");
-    assert!(events.iter().any(|e| matches!(e, Event::Yell { id: who, text } if *who == id && text == "MRGLGLGL!")));
     assert_eq!(s.kitchen.cooks[&id].healed, 0);
     assert!(matches!(s.kitchen.cooks[&id].stage, Some(Stage::Coughing { until }) if until - s.clock >= COUGH - DT));
-    let events = run(&mut s, 3.5);
-    assert!(!events.iter().any(|e| matches!(e, Event::MobWindup { id: who, .. } if *who == id)));
+    let later = run(&mut s, 3.5);
+    // (His line may wait its turn behind the scoop's: lines in one place come 2 s apart.)
+    assert!(events.iter().chain(&later).any(|e| matches!(e, Event::Yell { id: who, text } if *who == id && text == "MRGLGLGL!")));
+    assert!(!later.iter().any(|e| matches!(e, Event::MobWindup { id: who, .. } if *who == id)));
 }
 
 #[test]
