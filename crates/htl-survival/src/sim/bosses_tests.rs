@@ -250,10 +250,13 @@ fn rocks_are_seen_falling_from_overhead_and_landing_at_the_front() {
     // The ground shakes for the hero near the front, and rock lands beside them.
     assert!(ev.iter().any(|e| matches!(e, Event::Beat { player, beat, .. } if *player == h && beat == BEAT_RUMBLE)));
     assert!(ev.iter().any(|e| matches!(e, Event::Beat { player, beat, .. } if *player == h && beat == BEAT_ROCKFALL)));
-    // Dust rolls ahead of the front, its line shows on the floor, rock bursts where it lands.
+    // Dust rolls ahead of the front and is thrown up where rock lands, its line on the floor; no
+    // Rocky Ground Impact (its pink boulders linger on film).
     assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: DUST_ROLL, .. })));
     assert!(ev.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", .. })));
-    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: ROCK_BURST, .. })));
+    let dust = ev.iter().filter(|e| matches!(e, Event::MissileFrom { spell: LAND_DUST, .. })).count();
+    assert!(dust >= landed.len(), "dust where each piece lands: {dust} for {}", landed.len());
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: 26271, .. } | Event::Missile { spell: 26271, .. })));
 }
 
 #[test]

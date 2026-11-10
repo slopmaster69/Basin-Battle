@@ -115,11 +115,12 @@ pub(crate) const BEAM_STEP: f32 = 14.0;
 /// The most pieces left lying (the oldest, farthest behind, goes first), and in the air at once.
 pub(crate) const RUBBLE_MOST: usize = 400;
 const FALLING_MOST: usize = 24;
-/// `Rocky Ground Impact` (`BurrowEarth_Brown_Missile.mdx`, no caster kit): brown rock bursting
-/// from the floor where a piece lands. `Plant Thornling`'s ground look (`DustCloud_Land.mdx`,
-/// Charge's dust): the dust rolling ahead of the front. Each from an unseen stand-in on the spot.
-const ROCK_BURST: u32 = 26271;
+/// `Plant Thornling`'s ground look (`DustCloud_Land.mdx`, Charge's dust, nothing but dust): the
+/// dust rolling ahead of the front, and thrown up where a piece lands. From an unseen stand-in on
+/// the spot (its own cast pose isn't anyone's). Not `Rocky Ground Impact` (26271): on film (take
+/// 344, and Smite's slam) its boulders show pink and linger.
 const DUST_ROLL: u32 = 22792;
+const LAND_DUST: u32 = DUST_ROLL;
 /// The front's line and a landing's ring on the floor (drawn whatever the markers), dust brown.
 const DUST_COLOUR: &str = "A88E6A";
 /// `DeadmineDoor01Destroy` (wood smashing) as a beam cracks, `BlackRockDoorSingleDestroy` (stone
@@ -1053,8 +1054,8 @@ impl Survival {
         for k in landed {
             let f = self.bosses.looks.falling[k].clone();
             let Some(id) = f.id else { continue };
-            // Brown rock bursting where it struck, its ring on the floor, its crash.
-            self.point_look(f.owner, f.at, ROCK_BURST);
+            // Dust thrown up where it struck, its ring on the floor, its crash.
+            self.point_look(f.owner, f.at, LAND_DUST);
             self.events.push(Event::GroundBurst { at: f.at, yaw: 0.0, shape: "ring", reach: f.ring, arc: 360.0, width: 0.0, secs: 0.5, colour: DUST_COLOUR.into() });
             if f.crash != 0 {
                 self.events.push(Event::Sound { id, sound: f.crash });
