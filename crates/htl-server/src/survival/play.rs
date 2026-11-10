@@ -87,6 +87,33 @@ impl SurvivalGame {
         }
     }
 
+    /// What a fight leaves drawn once it's over, cleared: casts whose caster is gone, stand-ins
+    /// (each only a missile's launcher, never a fight in itself), and marks the rules no longer
+    /// hold. The marks still on the ground: a fight still going.
+    pub(crate) fn clear_fight_leftovers(&mut self) -> usize {
+        let gone: Vec<(Id, u32)> = self.casting.iter()
+            .filter(|(c, _)| !self.sim.mobs.contains_key(c) && !self.sim.players.contains_key(c))
+            .map(|(c, s)| (*c, *s)).collect();
+        for (c, spell) in gone {
+            self.casting.remove(&c);
+            if let Some(g) = self.guid_of(c) { self.broadcast(&packets::spell_failed_other(g, spell)); }
+        }
+        let stand_ins: Vec<(Id, u64)> = self.stand_ins.iter().map(|(id, s)| (*id, s.guid)).collect();
+        for (id, guid) in stand_ins {
+            self.stand_ins.remove(&id);
+            self.unbind(id);
+            self.broadcast(&packets::destroy_object(guid));
+        }
+        let stale: Vec<Id> = self.mark_at.keys().chain(self.area_looks.keys()).copied()
+            .filter(|id| self.sim.mark_left(*id) <= 0.0).collect();
+        for id in stale {
+            self.mark_at.remove(&id);
+            if let Some(g) = self.area_looks.remove(&id) { self.broadcast(&packets::destroy_object(g)); }
+            if let Some(g) = self.unbind(id) { self.broadcast(&packets::destroy_object(g)); }
+        }
+        self.mark_at.len() + self.area_looks.len()
+    }
+
     /// Each tick: the stand-ins made last tick cast their missiles, and those done with go.
     fn step_stand_ins(&mut self) {
         let mut cast = Vec::new();
@@ -129,6 +156,9 @@ impl SurvivalGame {
                 }
             }
             Event::MobGone { id } => {
+                // Its cast goes with it (taken away mid-draw, by `.es clearfoes` or a reset, it
+                // never ends one).
+                self.casting.remove(&id);
                 if let Some(g) = self.unbind(id) {
                     self.broadcast(&packets::destroy_object(g));
                 }
@@ -504,6 +534,16 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("WP\t{g:#X}\t{clip}\t{secs:.2}\t{own}\t{}", from.as_deref().unwrap_or("")));
                 }
             }
+            Event::Freeze { id, after, secs } => {
+                // A pose caught part way through a clip and held (`FZ guid after secs`; secs 0:
+                // let go), for every client that plays clips.
+                let Some(g) = self.guid_of(id) else { return };
+                let line = format!("FZ	{g:#X}	{after:.2}	{secs:.2}");
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::StaffHeavy { player, lo, hi } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_line(c, &format!("SH	{lo:.2}	{hi:.2}"));
@@ -671,7 +711,9 @@ impl SurvivalGame {
             }
             Event::Danger { player, secs, from } => {
                 // `WN\t<secs>\t<the creature's guid>`: the blow's foe warned; on a client that
-                // can, the creature's weapon goes red for it (the guid empty: a hazard).
+                // can, the creature's weapon goes red for it (the guid empty: a hazard). A body
+                // that tells its blows itself (Sneed's Shredder) never goes red all over.
+                let from = from.filter(|m| !self.sim.tells_by_body(*m));
                 let g = from.and_then(|m| self.guid_of(m)).map_or(String::new(), |g| format!("{g:#X}"));
                 if let Some(c) = self.conn_of(player) {
                     if self.has_addon(c) {
@@ -825,6 +867,22 @@ impl SurvivalGame {
                         }
                         return;
                     }
+                }
+                // A piece of the falling mine on its way down (`sim::bosses`): sent again under
+                // its guid to everyone, which a client with patch 0017 moves in place (its flag
+                // `PREVIEW_MOVE`: no fade, no hull); an older one has it destroyed and drawn afresh.
+                if let (true, Some(g)) = (self.sim.collapse_piece_tilt(id).is_some(), self.guid_of(id)) {
+                    let made = self.obj_create(id);
+                    let conns: Vec<(ConnId, bool)> = self.in_world().map(|(c, _, w)| (*c, w.level >= 12)).collect();
+                    for (c, patched) in conns {
+                        if !patched {
+                            self.send(c, packets::destroy_object(g));
+                        }
+                        for p in &made {
+                            self.send(c, p.clone());
+                        }
+                    }
+                    return;
                 }
                 // A new look or name (damaged): the client caches names by entry, so it's drawn
                 // afresh.

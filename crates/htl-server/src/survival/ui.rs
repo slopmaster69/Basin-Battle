@@ -18,7 +18,8 @@
 //!   whenever that's changed (no add-on, or an older one: on).
 //! - `CU\t<beat>\t<guid>`: an outcome of the hero's (since add-on 21): its beat on their screen
 //!   (`crit`, `shatter`, `execute`, `backstab`, `break`, `too_heavy`, `wall`, `cheat_death`,
-//!   `readied`, `valor`), `guid` the unit it happened to (0x0 none). Its look and sound come
+//!   `readied`, `valor`; and the falling mine's shaking, `rumble` near the collapse's front and
+//!   `rockfall` beside a piece landing), `guid` the unit it happened to (0x0 none). Its look and sound come
 //!   by `SMSG_PLAY_SPELL_VISUAL` and `SMSG_PLAY_OBJECT_SOUND` to everyone near; an older add-on
 //!   ignores the line and misses only the beat.
 //! - `FU\t<guid>\t<own>\t<secs>\t<from>\t<cuts>\t<cut>\t<windup>\t<finish>\t<finish secs>\t<turn deg>\t<trail>\t<trail ms>`:
@@ -94,7 +95,7 @@
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
-//! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
+//! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>\t<a line's width>\t<the roll's window>\t<1: its body tells it, no glow>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
 //! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0030's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0036); a speed of their own in yards a second, uncapped (patch 0040; absent or 0: the spell's own).
 //! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0031's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
@@ -119,6 +120,9 @@
 //! - `WP\t<guid>\t<clip>\t<secs>\t<own>\t<model>`: a pose held on a unit (the ward's arm out, a
 //!   staff heavy's ready stance): the clip held `secs`, renewed while it lasts; `secs` 0 lets it go.
 //!   `model` (if any) is the character model whose take every race plays.
+//! - `FZ	<guid>	<after>	<secs>`: a unit's animation held still from `after` seconds on, for
+//!   `secs` (a hit-stop renewed while it lasts): a pose caught part way through the clip it's
+//!   playing (the Shredder's stalled slump, Gilnid bent over his stuck spanner). `secs` 0 lets go.
 //! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
 //!   `hi`).
 //! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
@@ -492,7 +496,10 @@ pub(crate) const VERSION: u32 = 2;
 /// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
 /// 61: the add-on says `ac29`: the legs walk under a swing (a lunge keeps the legs' walk, the leap
 /// and the kick stay on the whole body).
-pub(crate) const ADDON_NEWEST: u32 = 61;
+/// 62: `FZ`, a boss's open pose caught part way through a clip and held (the Shredder's stall,
+/// Gilnid's stuck spanner).
+/// 63: the `FZ` holds last their whole time (a timer set from inside a timer was dropped).
+pub(crate) const ADDON_NEWEST: u32 = 63;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

@@ -2123,6 +2123,14 @@ pub struct SpecialDef {
     /// (seconds; 0: no), open to every blow: the best opening of a fight.
     #[serde(default)]
     pub lodge: f32,
+    /// The look on the creature as the blow lands, hit or miss (`SpellVisualKit`; 0 none): a
+    /// stomp's dust, a slam's debris. `kit` is the wind-up's tell; this is the impact.
+    #[serde(default)]
+    pub impact_kit: u32,
+    /// Its shape flashed on the ground as it lands (a colour, `RRGGBB`), for the clients that draw
+    /// one: what it covered reads with the floor markers off.
+    #[serde(default)]
+    pub burst: Option<String>,
 }
 
 fn one_u32() -> u32 {
@@ -2169,6 +2177,10 @@ pub struct MobDef {
     pub clips_from: Option<String>,
     #[serde(default = "one_f")]
     pub scale: f32,
+    /// Its body's half-width at scale 1, where a blow reaches it from and where a foe stops
+    /// (0: half a yard). A machine on legs stands wider than its middle.
+    #[serde(default)]
+    pub girth: f32,
     pub health: u32,
     pub run_speed: f32,
     pub walk_speed: f32,
@@ -2225,7 +2237,8 @@ pub struct MobDef {
     /// come with a pattern's `below`. Read in order once loaded (see [`Content::settle`]).
     #[serde(rename = "phase", default)]
     pub phases: Vec<EnrageDef>,
-    /// A finite crew on low work platforms, with breakable supports and a furnace valve.
+    /// A finite crew on ledges over the drop, each plank on a support that breaks, and a furnace
+    /// valve (`sim::perches`).
     #[serde(default)]
     pub perch_crew: Option<PerchCrewDef>,
     /// Ordered equipment changes at a physical rack, using the health phases as milestones.
@@ -2321,9 +2334,21 @@ pub struct MobDef {
 pub struct PerchCrewDef {
     pub airborne: String,
     pub grounded: String,
-    pub spots: Vec<[f32; 2]>,
+    /// One engineer's ledge each, in turn order (the first is the one the furnace brings down).
+    pub ledges: Vec<LedgeDef>,
+    /// The furnace's own valve that he works.
     pub valve: [f32; 2],
-    pub channel: Vec<[f32; 2]>,
+    /// The furnace's mouth (x, y and height over his floor): it belches and glows.
+    pub furnace: [f32; 3],
+}
+
+/// A plank laid from a rail out over the drop, a support under it on the floor below.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LedgeDef {
+    /// Where the engineer stands on the plank: x, y, and his height over the boss's floor.
+    pub at: [f32; 3],
+    /// The way the plank juts out over the drop, from its rail (radians).
+    pub out: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2347,6 +2372,11 @@ impl MobDef {
     /// It stands and is struck, nothing more (a totem, a dummy).
     pub fn inert(&self) -> bool {
         self.totem || self.dummy
+    }
+
+    /// Its body's half-width as drawn (`girth` at its scale; half a yard at its scale by default).
+    pub fn body(&self) -> f32 {
+        self.scale * if self.girth > 0.0 { self.girth } else { 0.5 }
     }
 }
 
@@ -3455,8 +3485,11 @@ impl Content {
                 }
             }
             if let Some(c) = &m.perch_crew {
-                if !m.boss || !(2..=3).contains(&c.spots.len()) || c.channel.is_empty() || c.channel.len() > 5 {
-                    bail!("mob {}: a perch crew needs a boss, 2-3 platforms and 1-5 channel points", m.key);
+                if !m.boss || !(2..=3).contains(&c.ledges.len()) {
+                    bail!("mob {}: a perch crew needs a boss and 2-3 ledges", m.key);
+                }
+                if c.ledges.iter().any(|l| !(5.0..=12.0).contains(&l.at[2]) || !l.out.is_finite()) {
+                    bail!("mob {}: a ledge stands 5 to 12 yd over the floor, its plank jutting some way", m.key);
                 }
                 for key in [&c.airborne, &c.grounded] {
                     let Some(k) = self.mob(key) else { bail!("mob {}: no crew mob {key}", m.key) };
@@ -3467,7 +3500,7 @@ impl Content {
                 if !self.mobs[self.mob(&c.airborne).unwrap()].attack.ranged || self.mobs[self.mob(&c.grounded).unwrap()].attack.ranged {
                     bail!("mob {}: its perched crew throws, its grounded crew fights up close", m.key);
                 }
-                if c.spots.iter().chain(c.channel.iter()).chain(std::iter::once(&c.valve)).flatten().any(|n| !n.is_finite() || n.abs() > 30.0) {
+                if c.ledges.iter().flat_map(|l| l.at).chain(c.valve).chain(c.furnace).any(|n| !n.is_finite() || n.abs() > 30.0) {
                     bail!("mob {}: crew offsets must be finite and within 30 yd", m.key);
                 }
             }

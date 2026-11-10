@@ -1,0 +1,34 @@
+# DEV SETUP, not an unassisted clear: the hero walks in through the gap by the Foundry door,
+# pulls Gilnid from his post, then stands beside him, healed, while the crew's beats play: the
+# 3 sec fuse at the first man's hand, the stick's arc, the stick sitting a second, the furnace's
+# lesson (spill, pole alight, "Mind the equipment!", the fall, the sit, getting up), then the
+# second man's three sticks and his climb down the ramp. Floor markers off.
+hero warrior
+cam off
+camera duel Gilnid
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes gilnid
+12 .es goto -178 -579 19.4 3.3
+13 video
+14 .es goto -188 -580 21 3.6
+16 .es goto -197 -585 21 3.8
+18 .es heal
+20 shots fuse 12 0.3
+23 .es heal
+26 shots stick 10 0.2
+28 .es heal
+29 shots lesson 24 0.3
+33 .es heal
+38 .es heal
+43 .es heal
+44 shots second 20 1.2
+48 .es heal
+53 .es heal
+58 .es heal
+63 .es heal
+68 .es heal
+70 shots climb 10 0.5
+75 end
