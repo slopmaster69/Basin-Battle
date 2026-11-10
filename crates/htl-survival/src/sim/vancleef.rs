@@ -54,6 +54,9 @@ const LEAVE_LIMIT: f32 = 20.0;
 /// Unbowed kneels this long, roars, then waits this long before his first attack.
 const RISE_KNEEL: f32 = 1.0;
 const RISE_WAIT: f32 = 2.5;
+/// Off the deck: the floor under a hero this far below where they last stood firm (or water).
+/// The sea is far below the Juggernaut's rail; a stair or a ramp never drops this much in a step.
+const OVERBOARD_DROP: f32 = 4.0;
 /// His lines never come closer together than this.
 const LINE_GAP: f32 = 2.0;
 /// "Go on, then." again only after this long.
@@ -406,6 +409,29 @@ impl Survival {
     /// Out on the open deck, not under his cabin's roof (or any other).
     fn duel_open_sky(&self, at: Vec3) -> bool {
         !self.land.slab_between(at[0], at[1], at[2] + 2.5, at[2] + 40.0)
+    }
+
+    /// The ship's side in his duel: a hero carried over it (a roll from his follow-up; in the
+    /// Nov 10 filming three takes in four ended in the sea, and he reset) is set back on the deck
+    /// where they last stood firm, and the fight goes on. Only for a hero in his fight (or
+    /// Unbowed's) on his deck, and only off it, under the open sky: over water, or over a floor
+    /// `OVERBOARD_DROP` below.
+    pub(crate) fn hold_on_deck(&mut self, id: Id, to: Vec3) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        if p.health == 0 || to.iter().any(|v| !v.is_finite()) { return false; }
+        let (safe, facing) = (p.last_safe, p.facing);
+        let dueling = self.vancleef.duels.keys().any(|v| self.mobs.get(v).is_some_and(|m| {
+            m.health > 0 && m.state.foe().is_some() && (safe[2] - m.pos[2]).abs() < 3.0 && self.in_fight_of(m, id)
+        }));
+        if !dueling { return false; }
+        let deck = safe[2] + 1.0;
+        // (Under a roof, his cabin's, a gap in the land's floors is the map's, not the sea.)
+        let over_side = (self.land.water_near(to[0], to[1], deck)
+            || self.land.height_near(to[0], to[1], deck) < safe[2] - OVERBOARD_DROP)
+            && self.duel_open_sky([to[0], to[1], safe[2]]);
+        if !over_side { return false; }
+        self.put_at(id, [safe[0], safe[1], safe[2] + ARRIVE_LIFT], facing);
+        true
     }
 
     /// Where he duels: the lit deck in front of his cabin (Unbowed: where he rose).

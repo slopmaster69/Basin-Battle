@@ -1729,6 +1729,10 @@ impl Survival {
         {
             return;
         }
+        // Over the ship's side in VanCleef's duel: back on the deck.
+        if self.hold_on_deck(id, pos) {
+            return;
+        }
         // Fallen through the world (the floor not there on arrival): back to the last firm ground.
         if pos.iter().all(|v| v.is_finite()) && pos[2] < safe[2] - drop && up {
             self.put_at(id, [safe[0], safe[1], safe[2] + ARRIVE_LIFT], f);
