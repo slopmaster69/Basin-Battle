@@ -1,0 +1,37 @@
+# Clouds in the water (0068's sky in 0066/0081's water, #270's fifth round): Crystal Lake at noon
+# and 17:30, the hero at the lake's north edge (the goto puts him by the north bank), the camera
+# behind him facing out across the lake to the south (yaw 180), pitched 15 down so the near and
+# middle water mirror the sky high overhead, where the clouds are (the far shore's trees take the
+# low mirror). Take 280's Stone Cairn Lake spot put the camera against a trunk; the films that
+# looked south from here (160 to 200) all showed open water. The day's cover, looksky clouds 0.8
+# and 0, worldSky 0. look-tune1-r5-clouds-survey looks round Stone Cairn Lake for next time.
+# Look for: the painted clouds mirrored in the open water, the clouds-0.8 water greyer and broken
+# by cloud, the clouds-0 water plain sky, against worldSky 0's flat sky colour.
+hero warrior
+cam 180 -15 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto crystal_lake
+4.0 lua ConsoleExec("worldclock 720")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua SetCVar("worldWater", "1")
+4.3 lua ConsoleExec("lookweather clear")
+4.35 lua ConsoleExec("looksky grade")
+6.0 shots noon-day 2 0.5
+7.5 lua ConsoleExec("looksky clouds 0.8")
+8.5 shots noon-clouds-08 2 0.5
+10.0 lua ConsoleExec("looksky clouds 0")
+11.0 shots noon-clouds-0 2 0.5
+12.5 lua ConsoleExec("looksky grade")
+12.55 lua SetCVar("worldSky", "0")
+13.5 shots noon-worldsky-0 2 0.5
+15.0 lua SetCVar("worldSky", "1")
+15.05 lua ConsoleExec("worldclock 1050")
+16.5 shots golden-day 2 0.5
+18.0 lua ConsoleExec("looksky clouds 0.8")
+19.0 shots golden-clouds-08 2 0.5
+20.5 lua ConsoleExec("looksky grade")
+20.55 lua ConsoleExec("lookweather server")
+22 end
