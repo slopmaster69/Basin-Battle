@@ -11,6 +11,8 @@ mod tests;
 const CHANGE_LIMIT: f32 = 14.0;
 const AXE_SHOWING: f32 = 7.0;
 const FIT_WEAPON: f32 = 2.0;
+/// A posture break while he kneels at the rack: he fumbles this much longer once he's back up.
+const FUMBLE: f32 = 1.5;
 /// TaurenMale's KneelLoop: down on one knee at the rack, rummaging, hands empty.
 const KNEEL_CLIP: u16 = 115;
 /// Struck while he kneels at the rack, his posture takes this much more.
@@ -168,10 +170,11 @@ impl Survival {
     pub(crate) fn arsenal_hurt(&mut self, id: Id) {
         let now = self.clock;
         if let Some(c) = self.arsenal.racks.get_mut(&id).and_then(|r| r.transition.as_mut()) {
-            // Any ordinary damaging blow buys a visible half beat, once per current half beat.
-            c.pause_until = (now + 0.45).min(c.since + CHANGE_LIMIT - FIT_WEAPON);
-            if let ChangeStage::Equip { until } = &mut c.stage {
-                *until = until.max(now + 0.65).min(c.since + CHANGE_LIMIT);
+            // A blow on his way to the rack buys a visible half beat. Kneeling there, hits are
+            // free and count more toward his posture, but don't keep him down: only a posture
+            // break adds to the kneel (Nov 9 take 331: hits held him at the rack the whole 14 s).
+            if !matches!(c.stage, ChangeStage::Equip { .. }) {
+                c.pause_until = (now + 0.45).min(c.since + CHANGE_LIMIT - FIT_WEAPON);
             }
         }
     }
@@ -228,8 +231,9 @@ impl Survival {
         if !forced && (now < change.pause_until || self.disabled(id) || self.mobs[&id].stagger_until > now) {
             self.halt(id);
             // A posture break during the fitting restarts its hands, within the same deadline.
-            if matches!(change.stage, ChangeStage::Equip { .. }) {
-                change.stage = ChangeStage::Equip { until: (self.mobs[&id].stagger_until.max(now) + FIT_WEAPON).min(change.since + CHANGE_LIMIT) };
+            if let ChangeStage::Equip { until } = change.stage {
+                // A posture break: he fumbles 1.5 s longer once he's back up, within the deadline.
+                change.stage = ChangeStage::Equip { until: until.max(self.mobs[&id].stagger_until.max(now) + FUMBLE).min(change.since + CHANGE_LIMIT) };
                 if change.working { self.events.push(Event::HoldPose { id, clip: 0, secs: 0.0, from: None }); }
                 change.working = false;
             }

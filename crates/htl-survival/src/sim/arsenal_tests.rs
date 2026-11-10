@@ -276,3 +276,23 @@ fn he_kneels_empty_handed_at_the_rack_and_stands_with_the_new_weapon_roaring() {
     s.hurt_mob(boss, h, health);
     assert!(!lying(&s, SWORD_LEFT) && !lying(&s, HAMMER_WAITING), "the rack and what lies there go with him");
 }
+
+#[test]
+fn hits_while_he_kneels_dont_keep_him_at_the_rack() {
+    let (mut s, h, boss, _) = fight(false);
+    hurt_to(&mut s, h, boss, 0.6);
+    let until = s.clock + 20.0;
+    while !s.arsenal_hands_empty(boss) && s.clock < until { tick(&mut s, 0.05); }
+    assert!(s.arsenal_hands_empty(boss));
+    let knelt = s.clock;
+    let mut next = s.clock;
+    while s.arsenal_hands_empty(boss) && s.clock < knelt + 6.0 {
+        if s.clock >= next {
+            s.hurt_mob(boss, h, 5);
+            next = s.clock + 0.3;
+        }
+        tick(&mut s, 0.05);
+    }
+    assert!(!s.arsenal_hands_empty(boss), "up with the new weapon");
+    assert!(s.clock <= knelt + FIT_WEAPON + 0.2, "hits held him at the rack until {:.2} s after he knelt", s.clock - knelt);
+}

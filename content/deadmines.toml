@@ -680,16 +680,17 @@ aggro_sound = 5775
   [[mob.pattern]]
   name = "hammer slam"
   weight = 3.0
-  # Attack2H (18), not the overhead's Special2H (58): the two read apart. Rocky Ground Impact's
-  # debris bursts where the head lands, hit or miss, and its wedge flashes on the ground.
-  steps = [ { from = "TaurenMale", clip = 18, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379, look = 26271, burst = "D8B070" } ]
+  # Attack2H (18), not the overhead's Special2H (58): the two read apart. Dust bursts where the
+  # head lands, hit or miss, and its wedge flashes on the ground. (Rocky Ground Impact's boulders
+  # filmed pink and lingering, Nov 9 take 331: dropped.)
+  steps = [ { from = "TaurenMale", clip = 18, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379, burst = "D8B070" } ]
   [[mob.pattern]]
   name = "hoof stomp"
   weight = 1.5
   max_range = 3.0
-  # War Stomp's own dust ring (kit 5089, the racial's: no blue caster lightning, which kit 356
-  # was) as the hoof comes down, and the true 3.5 yd ring flashed on the ground.
-  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, impact_kit = 5089, burst = "D8B070" } ]
+  # Dust as the hoof comes down and its true 3.5 yd ring flashed tan on the ground. No spell look:
+  # kit 356 and War Stomp's own 5089 both flash a blue ring (5089 filmed so, Nov 9 take 331).
+  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, burst = "D8B070" } ]
 
 # Captain Greenskin: the finite firing line controls the opening and the reload windows.
 [[temper]]
