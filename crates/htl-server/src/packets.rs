@@ -176,6 +176,14 @@ pub fn login_set_time_speed_rate(clock: Option<[u32; 2]>, speed: f32) -> Packet 
     Packet::new(op::SMSG_LOGIN_SETTIMESPEED, b)
 }
 
+/// `SMSG_WEATHER`: type (0 clear, 1 rain), grade (0 to 1), the rain's sound loop (0 none), and
+/// whether it shows at once (a hero coming in) or eases (1.12's ramp, about 10 s).
+pub fn weather(kind: u32, grade: f32, sound: u32, instant: bool) -> Packet {
+    let mut b = Body::new();
+    b.u32(kind).f32(grade).u32(sound).u8(u8::from(instant));
+    Packet::new(op::SMSG_WEATHER, b)
+}
+
 /// The packet's rate for a clock `speed` times real time: the client's game minutes a second,
 /// which it holds from a sixtieth (a minute a minute) through sixty (a day in 24 seconds).
 pub fn time_rate(speed: f32) -> f32 {

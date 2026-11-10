@@ -1,4 +1,4 @@
-# The contact shadows' new default (client 0070, `look-tune-1`): Goldshire at golden hour (17:30),
+# The contact shadows' new default (client 0081, `look-tune-1`): Goldshire at golden hour (17:30),
 # facing the cart and the fences. The default is now what `lookao 2` was on the first films (#262): `lookao 0` (none),
 # `lookao 0.5` (the old default), `lookao grade` (the new default), `lookao 2` (twice the new),
 # then worldAO 0 (should match lookao 0) and 1.12's look.

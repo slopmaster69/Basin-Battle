@@ -1,0 +1,37 @@
+# Sun shadows (client 0080, #269's sixth round): the Brackwell pumpkin patch at 10:00, the hero at
+# WoW (-9803, -904), 4 yd clear of every Defias pack's reach, facing west (yaw 100) over the patch,
+# the camera 6 yd behind him and nearly level (pitched 12 down), so the pumpkins about 25 yd ahead
+# (take 291: "at the top of the frame") stand in the middle of it. The pumpkin nodes are placed
+# at random each world and the jack-o'-lantern was not 12 yd ahead, so this round the shadow log
+# finds them: run the client with WOW_SHADOW_STATS=1. Each "[shadows near]" line now gives the
+# mesh's place in WoW coordinates beside its distance, so the next film can stand beside the
+# jack-o'-lantern with ".es goto x y z facing"; Goldshire's water basin's water should now read
+# "left out: not casting (water)". High, lookshadow map 1, low, worldShadows 0. The Defias camp
+# lies behind the pumpkins: they may show in the background (none came at the hero in take 291).
+# Look for: the pumpkins' short shadows toward the south-east on high, against worldShadows 0
+# (crop 1:1 round the nearest); the hero's crisp shadow as before. PLEASE send client.log's
+# "[shadows near]" lines that name a pumpkin or the jack-o'-lantern.
+hero warrior
+cam 100 -12 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 600")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldShadows", "2")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("lookshadow grade")
+4.35 lua ConsoleExec("lookshadow map off")
+5.5 video
+6.0 shots patch-high 2 0.5
+7.2 lua ConsoleExec("lookshadow map 1")
+8.0 shots patch-map1 1 0.5
+8.6 lua ConsoleExec("lookshadow map off")
+8.65 lua SetCVar("worldShadows", "1")
+9.5 shots patch-low 1 0.5
+10.1 lua SetCVar("worldShadows", "0")
+11.0 shots patch-worldshadows-0 1 0.5
+11.6 lua SetCVar("worldShadows", "2")
+11.65 lua ConsoleExec("lookweather server")
+13 end

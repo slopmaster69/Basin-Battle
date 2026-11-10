@@ -2058,3 +2058,41 @@ fn two_heroes_duel_through_the_clients_own_duel() {
     assert!(matches!(won, Some(ServerPacket::DuelWinner { fled: true, ref winner, ref loser }) if winner == "Ann" && loser == "Ben"), "Ann won, Ben fled");
     assert!(a.until(2.0, |c| value_of(c, bg, TEAM) == Some(0)), "friends again");
 }
+
+fn weathers(c: &Client) -> Vec<(u32, f32, u32, bool)> {
+    c.seen
+        .iter()
+        .filter_map(|p| match p {
+            ServerPacket::Weather { weather_type, grade, sound_id, instant } => Some((*weather_type, *grade, *sound_id, *instant)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Elwynn's weather reaches every hero as 1.12's own packet: at once on coming in, and to everyone
+/// as it changes; `.es weather` holds one for filming and `.es weather auto` gives it back.
+#[test]
+fn the_weather_reaches_every_hero_and_holds_for_filming() {
+    let mut c = content();
+    // Always clear by the clock, so only the hold changes it.
+    c.weather.on = false;
+    let server = start_content(None, false, c);
+    let mut a = Client::connect(server.login, "wren", "hold", REALM).expect("into Elwynn");
+    enter(&mut a);
+    a.drain(0.5);
+    assert_eq!(weathers(&a).first(), Some(&(0, 0.0, 0, true)), "clear, at once, on coming in");
+    let mut b = Client::connect(server.login, "otto", "hold", REALM).expect("into Elwynn");
+    enter(&mut b);
+    a.chat(".es weather storm 1");
+    assert!(a.until(3.0, |c| weathers(c).iter().any(|w| w.0 == 1 && w.1 > 0.98 && w.2 == 8535 && !w.3)), "{:?}", weathers(&a));
+    assert!(b.until(3.0, |c| weathers(c).iter().any(|w| w.0 == 1 && w.1 > 0.98)), "the other hero too: {:?}", weathers(&b));
+    // A hero coming in mid-storm sees it at once.
+    let mut d = Client::connect(server.login, "ines", "hold", REALM).expect("into Elwynn");
+    enter(&mut d);
+    d.drain(0.3);
+    assert!(weathers(&d).iter().any(|w| w.0 == 1 && w.1 > 0.98 && w.3), "{:?}", weathers(&d));
+    a.chat(".es weather overcast 1");
+    assert!(b.until(3.0, |c| weathers(c).last().is_some_and(|w| *w == (1, 0.25, 0, false))), "{:?}", weathers(&b));
+    a.chat(".es weather auto");
+    assert!(b.until(3.0, |c| weathers(c).last().is_some_and(|w| w.0 == 0)), "{:?}", weathers(&b));
+}

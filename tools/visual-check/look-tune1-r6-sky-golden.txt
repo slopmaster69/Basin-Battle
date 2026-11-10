@@ -1,0 +1,45 @@
+# The golden-hour glare (client 0081, #270's sixth round): the Brackwell pumpkin patch at 17:30,
+# the hero at WoW (-9803, -904), facing the sun (yaw 45, about 30 degrees up), the camera pitched
+# up 35, 6 yd back. Take 291 still found a clipped white disc 36% of the frame wide (17.4% over
+# 230, was 25 to 32%). The 0.45 size and 0.35 strength did take effect (the share over 230 fell,
+# and the disc is about 80% of the shrunken quad's width), but 1.12's glare quad is drawn into the
+# frame before the look's grade, and the golden-hour grade and bloom lifted the sky round the sun
+# and any glare on it past 230 nearly to the quad's edge. Under the new look 1.12's quad is now
+# hidden and the look's pass draws the glare after its grade: a small core and a faint halo in the
+# sun's tint. "lookglare classic" puts 1.12's quad back under the new look, drawn before the
+# grade, for the still that compares them (its reply says which draws); then lookglare 0 and 2,
+# SkySunGlare 0, worldLook 0.
+# Look for, per still: the share of the frame over 230 and the glare's width. golden-after-grade
+# should show a hand-sized core with no rim (near worldLook 0's glare); golden-classic-glare the
+# old wide disc (this proves the order is the cause); golden-glare-0 the sky alone.
+hero warrior
+cam 45 35 6
+include _look_setup
+include _look_r5_hide
+1.0 .es goto -9803 -904
+4.0 lua ConsoleExec("worldclock 1050")
+4.05 lua ClearWorldFog()
+4.15 lua SetCVar("worldLook", "1")
+4.2 lua SetCVar("worldSky", "1")
+4.25 lua ConsoleExec("lookweather clear")
+4.3 lua ConsoleExec("looksky grade")
+4.35 lua ConsoleExec("lookglare grade")
+5.5 video
+6.0 shots golden-after-grade 2 0.5
+7.5 lua ConsoleExec("lookglare classic")
+8.5 shots golden-classic-glare 2 0.5
+10.0 lua ConsoleExec("lookglare 0")
+11.0 shots golden-glare-0 2 0.5
+12.5 lua ConsoleExec("lookglare 2")
+13.5 shots golden-glare-2 2 0.5
+15.0 lua ConsoleExec("lookglare grade")
+15.05 lua ConsoleExec("SkySunGlare 0")
+16.0 shots golden-sunglare-off 2 0.5
+17.5 lua ConsoleExec("SkySunGlare 1")
+17.55 lua SetCVar("worldLook", "0")
+17.6 lua ClearWorldFog()
+18.5 shots golden-classic-look 2 0.5
+20.0 lua SetCVar("worldLook", "1")
+20.05 lua ClearWorldFog()
+20.1 lua ConsoleExec("lookweather server")
+22 end
