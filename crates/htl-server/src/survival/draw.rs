@@ -710,7 +710,13 @@ impl SurvivalGame {
 
     /// Equipment slots are updated on the existing unit, without destroying/recreating it.
     pub(crate) fn mob_gear_fields(&self, id: Id, f: &mut Fields) {
-        if let Some(g) = self.sim.arsenal_loadout(id) {
+        if self.sim.arsenal_hands_empty(id) {
+            // Kneeling at his rack between weapons: nothing in either hand.
+            for k in 0..3u16 {
+                f.set(idx::UNIT_VIRTUAL_ITEM_SLOT_DISPLAY + k, 0).set(idx::UNIT_VIRTUAL_ITEM_INFO + 2 * k, 0).set(idx::UNIT_VIRTUAL_ITEM_INFO + 2 * k + 1, 0);
+            }
+            f.set(idx::UNIT_BYTES_2, 0);
+        } else if let Some(g) = self.sim.arsenal_loadout(id) {
             arsenal_gear_fields(g, f);
         } else if let Some(m) = self.sim.mobs.get(&id) {
             mob_def_gear_fields(&self.sim.content.mobs[m.def], f);

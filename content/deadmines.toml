@@ -626,8 +626,9 @@ gear = ["smite_hammer", "smite_breastplate"]
 respawn = 0.0
 aggro_sound = 5775
   [mob.arsenal]
-  # Native floor probe: (-2, -774, 9.55), 7 walking steps from the dock home.
-  rack = [0.0, -6.0]
+  # Native floor probe (Nov 9): (-2, -777, 9.6), 9 yd to his side of the way in, 19 walking
+  # steps from the dock home, so his run to it crosses the duel camera.
+  rack = [0.0, -9.0]
   display = 130
   loadouts = [
     { weapon = 679, grip = "sword", patterns = ["sweep", "delayed overhead"] },
@@ -658,7 +659,8 @@ aggro_sound = 5775
   [[mob.pattern]]
   name = "sweep"
   weight = 3.0
-  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.95, damage = 36, arc = 170.0, recovery = 1.25 } ]
+  # (No knockdown: block it or step back. Only the overhead and the hammer floor a hero.)
+  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.95, damage = 36, arc = 170.0, recovery = 1.25, heavy = false } ]
   [[mob.pattern]]
   name = "delayed overhead"
   weight = 2.0
@@ -678,12 +680,16 @@ aggro_sound = 5775
   [[mob.pattern]]
   name = "hammer slam"
   weight = 3.0
-  steps = [ { from = "TaurenMale", clip = 58, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379 } ]
+  # Attack2H (18), not the overhead's Special2H (58): the two read apart. Rocky Ground Impact's
+  # debris bursts where the head lands, hit or miss, and its wedge flashes on the ground.
+  steps = [ { from = "TaurenMale", clip = 18, take = 0, windup = 1.65, range = 4.8, damage = 60, arc = 85.0, blockable = false, poise = true, recovery = 2.6, kit = 379, look = 26271, burst = "D8B070" } ]
   [[mob.pattern]]
   name = "hoof stomp"
   weight = 1.5
   max_range = 3.0
-  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, kit = 356 } ]
+  # War Stomp's own dust ring (kit 5089, the racial's: no blue caster lightning, which kit 356
+  # was) as the hoof comes down, and the true 3.5 yd ring flashed on the ground.
+  steps = [ { from = "TaurenMale", clip = 181, take = 0, windup = 1.35, range = 3.5, arc = 360.0, damage = 28, blockable = false, poise = true, recovery = 2.1, impact_kit = 5089, burst = "D8B070" } ]
 
 # Captain Greenskin: the finite firing line controls the opening and the reload windows.
 [[temper]]
