@@ -235,6 +235,10 @@ pub enum Event {
     /// A pose held on a unit (the ward's arm held out): `clip` looped for `secs` (0: let go), for
     /// the clients that hold one (`WP`).
     HoldPose { id: Id, clip: u16, secs: f32, from: Option<String> },
+    /// A unit's animation held still `after` seconds from now, for `secs` (0: let go at once),
+    /// for the clients that can (`FZ`): a pose caught part way through a clip (the Shredder's
+    /// buckled legs, Gilnid bent over his stuck spanner) where no clip of the model holds it.
+    Freeze { id: Id, after: f32, secs: f32 },
     /// A staff's heavy bolt began its charge: it can go from `lo` seconds, and is whole at `hi`
     /// (for the staff's mark on the caster's screen; no ring, no flare on the body).
     StaffHeavy { player: Id, lo: f32, hi: f32 },

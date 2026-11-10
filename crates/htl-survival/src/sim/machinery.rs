@@ -23,10 +23,16 @@ const WORK_DRIFT: f32 = 0.35;
 const SMOKE: u32 = 1856;
 // Mining's working animation, already used by gatherers.
 const WORK: u32 = 2575;
-/// GoblinShredder's own clips: Run (churning in place for the rev, then the drive), StandWound
-/// (the slump of a stall) and JumpEnd (heaving up off the ground, rebuilt).
+/// GoblinShredder's own clips: Run (churning in place for the rev, then the drive) and JumpEnd
+/// (heaving up off the ground, rebuilt). The stall's slump is JumpEnd too: its landing crouch,
+/// caught `SLUMP_AT` in with the legs buckled (the body at half its height, tipped about 30
+/// degrees) and held still until the engine catches `SLUMP_RISE` before the stall's end and it
+/// heaves itself up. (StandWound, the slump before, kept the body at full height: the Nov 9
+/// filming read the stall as idling.)
 const RUN_CLIP: u16 = 5;
-const SLUMP_CLIP: u16 = 8;
+const SLUMP_CLIP: u16 = 39;
+const SLUMP_AT: f32 = 0.25;
+const SLUMP_RISE: f32 = 0.45;
 const HEAVE_CLIP: u16 = 39;
 /// GoblinMale's StandWound, held: Sneed open after his flurry.
 const OPEN_CLIP: u16 = 8;
@@ -36,6 +42,14 @@ const SAW_SOUND: u32 = 1977;
 const ENGINE_SOUND: u32 = 3700;
 const STALL_SOUND: u32 = 1979;
 const HISS_SOUND: u32 = 4858;
+/// The stalled engine's sputter: the machine's own clanks (GoblinShredderWound), at uneven gaps.
+const SPUTTER_SOUND: u32 = 1978;
+const SPUTTER_GAPS: [f32; 5] = [0.55, 0.3, 0.75, 0.35, 0.5];
+/// Through a stall, a smoke puff this often (it pours) and sparks this often.
+const STALL_SMOKE_EVERY: f32 = 0.25;
+const STALL_SPARK_EVERY: f32 = 0.4;
+/// A wreck left on the floor (a stopped repair's, or the one under Sneed) goes with his body.
+const BODY_SECS: f32 = 4.0;
 /// The pull: it turns from its log, then walks in at its Walk clip's own pace.
 const TURN: f32 = 0.8;
 const WALK_IN: f32 = 2.5;
@@ -96,8 +110,10 @@ struct Grind {
 #[derive(Clone, Copy)]
 struct Stall {
     until: f32,
-    fx_at: f32,
-    fx: u8,
+    smoke_at: f32,
+    spark_at: f32,
+    sputter_at: f32,
+    sputters: usize,
 }
 
 /// A wind-up's own look while it builds: which move, its next effect, when it lands.
@@ -293,7 +309,8 @@ impl Survival {
         } else if self.content.mobs[m.def].key == DRIVER && name == "flurry" {
             // Spent after three blows: hunched, open for his recovery.
             let secs = self.content.mobs[m.def].patterns[k].steps.last().and_then(|st| st.recovery).unwrap_or(1.4);
-            self.events.push(Event::HoldPose { id, clip: OPEN_CLIP, secs, from: None });
+            // Held through the hits that punish it.
+            self.hold_open_pose(id, OPEN_CLIP, secs);
         }
     }
 
@@ -355,7 +372,10 @@ impl Survival {
         self.machinery.pressure.remove(&id);
         self.machinery.steam_at.remove(&id);
         self.machinery.grinds.remove(&id);
-        self.machinery.stalls.remove(&id);
+        // A stall's held slump lets go, so its fall plays.
+        if self.machinery.stalls.remove(&id).is_some() {
+            self.freeze_open_pose(id, 0.0, 0.0);
+        }
         self.machinery.revs.remove(&id);
         self.machinery.wrenches.remove(&id);
         self.machinery.logs.remove(&id);
@@ -364,21 +384,28 @@ impl Survival {
         // Keep rebuilt until the normal second-form handoff consumes it.
         if let Some(d) = self.machinery.drivers.remove(&id) {
             self.events.push(Event::CastEnd { caster: id });
-            if let Some(wreck) = d.wreck {
-                self.dismiss(wreck);
+            // Sneed fallen, the wreck lies where it fell and goes with his body; otherwise (a
+            // repair finished, a wipe) it's gone now.
+            for wreck in d.wreck.into_iter().chain(d.quiet) {
+                if dying {
+                    let gone_at = self.clock + BODY_SECS;
+                    if let Some(w) = self.mobs.get_mut(&wreck) { w.state = MobState::Dead { gone_at }; }
+                } else {
+                    self.dismiss(wreck);
+                }
             }
         }
     }
 
-    /// A hit (or a stagger) stops the repair for good. The wreck goes quiet and, like any body,
-    /// is gone a while later.
+    /// A hit (or a stagger) stops the repair for good. The wreck goes quiet where it lies (no
+    /// smoke, no sparks) until Sneed's body goes or a wipe clears the floor. (It used to vanish
+    /// 6 s later: Nov 9 filming.)
     fn abandon_repair(&mut self, id: Id) {
         let now = self.clock;
-        let wreck = self.machinery.drivers.get_mut(&id).and_then(|d| {
+        if let Some(d) = self.machinery.drivers.get_mut(&id) {
             d.stage = RepairStage::Spent;
             d.quiet = d.wreck.take();
-            d.quiet
-        });
+        }
         self.events.push(Event::CastEnd { caster: id });
         self.halt(id);
         if let Some(m) = self.mobs.get_mut(&id) {
@@ -388,9 +415,6 @@ impl Survival {
                 m.think = 0.0;
             }
         }
-        if let Some(w) = wreck.and_then(|w| self.mobs.get_mut(&w)) {
-            w.state = MobState::Dead { gone_at: now + 6.0 };
-        }
     }
 
     /// Reset before the lamp replaces second forms. Bodies never survive their encounter.
@@ -398,7 +422,7 @@ impl Survival {
         let old = std::mem::take(&mut self.machinery);
         for (id, d) in old.drivers {
             self.events.push(Event::CastEnd { caster: id });
-            if let Some(wreck) = d.wreck { self.dismiss(wreck); }
+            for wreck in d.wreck.into_iter().chain(d.quiet) { self.dismiss(wreck); }
         }
     }
 
@@ -462,17 +486,22 @@ impl Survival {
                     // A posture break during the opening may extend it, never shorten it.
                     m.state = MobState::Recover { foe, until: st.until.max(m.stagger_until) };
                     m.pattern = None;
-                    // Slumped, smoking and sparking.
-                    if now >= st.fx_at {
-                        if st.fx % 2 == 0 {
-                            self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
-                        } else {
-                            self.events.push(Event::Visual { id, kit: combat::KIT_PARRY, by: None });
-                        }
-                        st.fx += 1;
-                        st.fx_at = now + 0.6;
-                        self.machinery.stalls.insert(id, st);
+                    // Slumped, smoke pouring and sparks flying the whole stall, the engine
+                    // sputtering.
+                    if now >= st.smoke_at {
+                        self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
+                        st.smoke_at = now + STALL_SMOKE_EVERY;
                     }
+                    if now >= st.spark_at {
+                        self.events.push(Event::Visual { id, kit: combat::KIT_PARRY, by: None });
+                        st.spark_at = now + STALL_SPARK_EVERY;
+                    }
+                    if now >= st.sputter_at {
+                        self.events.push(Event::Sound { id, sound: SPUTTER_SOUND });
+                        st.sputter_at = now + SPUTTER_GAPS[st.sputters % SPUTTER_GAPS.len()];
+                        st.sputters += 1;
+                    }
+                    self.machinery.stalls.insert(id, st);
                     return true;
                 }
             }
@@ -510,11 +539,14 @@ impl Survival {
                     let m = self.mobs.get_mut(&id).unwrap();
                     m.state = MobState::Recover { foe, until: now + STALL };
                     m.ready_at = now + STALL;
-                    self.machinery.stalls.insert(id, Stall { until: now + STALL, fx_at: now + 0.3, fx: 1 });
+                    self.machinery.stalls.insert(id, Stall { until: now + STALL, smoke_at: now + STALL_SMOKE_EVERY, spark_at: now + 0.15, sputter_at: now + 0.4, sputters: 0 });
                     self.machinery_say(id, "C'mon, you heap of junk!");
                     self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
-                    // Slumped where it stopped, facing the way it drove (no stun clip on this model).
-                    self.events.push(Event::React { id, anim: SLUMP_CLIP, from: g.last, lean: 0.0, hold: STALL, fit: 0.0 });
+                    // Slumped where it stopped, facing the way it drove: its legs buckle and it's
+                    // held there, no flinch standing it up, until it heaves itself up at the end.
+                    self.events.push(Event::React { id, anim: SLUMP_CLIP, from: g.last, lean: 0.0, hold: 0.1, fit: 0.0 });
+                    self.freeze_open_pose(id, SLUMP_AT, STALL - SLUMP_AT - SLUMP_RISE);
+                    self.mobs.get_mut(&id).unwrap().posed_until = now + STALL;
                     self.events.push(Event::Sound { id, sound: STALL_SOUND });
                 }
             } else {

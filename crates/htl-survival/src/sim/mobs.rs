@@ -2004,6 +2004,15 @@ impl Survival {
         self.events.push(Event::HoldPose { id, clip, secs, from: None });
     }
 
+    /// A boss's open pose caught part way through the clip it's playing: held still from `after`
+    /// seconds for `secs` (0: let go), with no flinch from `after` until it's let go. The clip
+    /// then plays on from where it was held.
+    pub(crate) fn freeze_open_pose(&mut self, id: Id, after: f32, secs: f32) {
+        let until = if secs > 0.0 { self.clock + after + secs } else { 0.0 };
+        if let Some(m) = self.mobs.get_mut(&id) { m.posed_until = until; }
+        self.events.push(Event::Freeze { id, after, secs });
+    }
+
     /// Whether it's holding an open pose now (no flinch shown).
     pub(crate) fn posed(&self, id: Id) -> bool {
         self.mobs.get(&id).is_some_and(|m| m.posed_until > self.clock)
