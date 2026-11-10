@@ -1,0 +1,21 @@
+# The aftermath, Foundry: the intact mine and then its collapse, from one camera, for the 9 Nov
+# review's change G (its views 5 (the Foundry's back door)). The cameraman's duel shot with no subject films the hero
+# from the side, looking past them the way they face: at the view, toward the fall.
+# Dev setup, all before the video: travel, debug in the dungeon, foes cleared, the hero put at the
+# view. The preview's own `visit` puts the hero back on the same spot and facing for the second
+# half (its arrival first sends everyone to the landing).
+hero warrior
+camera duel
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes
+12 .es goto -250.0 -578.0 51.1 0.0
+14 video
+16 shots before 4 1.0
+21 .es aftermath on
+24 .es aftermath visit foundry
+29 shots after 4 1.0
+34 .es aftermath off
+37 end

@@ -286,7 +286,8 @@ pub struct SurvivalGame {
     pub(crate) watchers: BTreeMap<Id, htl_survival::Player>,
     /// A temporary finished dungeon, independent of simulation and saved progression.
     pub(crate) aftermath: Option<aftermath::Aftermath>,
-    pub(crate) aftermath_land: Option<Box<dyn htl_survival::Land>>,
+    /// The collapsed map the aftermath is fitted to, read once from the installed data.
+    pub(crate) aftermath_land: Option<Box<aftermath::Ground>>,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
@@ -418,7 +419,10 @@ impl SurvivalGame {
     /// One tick: the rules step, their events play out, the add-ons hear what changed, and the
     /// world is saved now and then.
     pub(crate) fn tick(&mut self) {
-                if self.aftermath.is_some() { return; }
+                if self.aftermath.is_some() {
+                    self.aftermath_keep_watchers_near();
+                    return;
+                }
                 self.lab_queue();
                 self.lab_steps();
                 let events = self.sim.step(TICK.as_secs_f32());
