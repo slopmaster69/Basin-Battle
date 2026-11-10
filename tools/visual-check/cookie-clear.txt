@@ -9,7 +9,9 @@
 # a dash sideways out from under it, left and right in turn so he doesn't climb the slope east of
 # the post), the open look held (WP clip 9: hit him), his scoop (the yell "one taste": dash in and
 # hit until the pot is knocked), and otherwise lock on again and press him. Take 341 (camera high)
-# lost Gorged when he went home mid-fight; fixed in the kitchen.
+# lost Gorged when he went home mid-fight; fixed in the kitchen. With no lock for 3 s it dashes a
+# step (ahead, left, back, right in turn) and tries again: Gorged stood at his pot out of its
+# sight, take 348.
 hero warrior
 cam off
 camera duel Cookie|Gorged
@@ -32,7 +34,7 @@ camera duel Cookie|Gorged
 12.2 lua function CB.line(l) local f = CB.split(l) local v, now = f[1], GetTime() if v == "WP" and f[5] ~= "1" then local c, s = tonumber(f[3]), tonumber(f[4]) or 0 if c == 9 then if s > 0 then CB.openAt = now + 0.3 CB.open = now + s CB.log("open " .. s) else CB.open = 0 end end elseif v == "AN" and f[11] == "mob" then CB.react(tonumber(f[4]) or 0) elseif v == "HT" then CB.lastHT = now elseif v == "LO" then CB.sawLO = true CB.locked = f[2] ~= nil and f[2] ~= "" and f[2] ~= "0x0" and f[2] ~= "0X0" and f[2] ~= "0" end end
 12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) CB.line(l) return old(l) end
 12.2 lua CB.y = CreateFrame("Frame") CB.y:RegisterEvent("CHAT_MSG_MONSTER_YELL") CB.y:SetScript("OnEvent", function() if CB.on and arg1 and string.find(arg1, "one taste", 1, true) then CB.log("scoop seen") CB.scoopEnd = GetTime() + 4.0 ActionDash(0.45, 7, "f") end end)
-12.2 lua CB.f = CreateFrame("Frame") CB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(CB.q) do local a = CB.q[i] if now >= a[1] then table.remove(CB.q, i) a[2]() else i = i + 1 end end if not CB.on then return end if now >= (CB.openAt or 0) and now < CB.open - 0.35 and now >= CB.nextHit then CB.nextHit = now + 0.75 CB.hit("hit the open look") end if now < CB.scoopEnd and now >= CB.nextHit then CB.nextHit = now + 0.55 CB.hit("hit the scoop") end if now - CB.anAt > 4 and now - CB.lastHT > 2 and now >= CB.scoopEnd then if CB.sawLO and not CB.locked and now >= CB.nextLock then CB.nextLock = now + 1 CB.say(".es in lock") CB.log("lock on again") end if CB.locked and now >= CB.nextDash then CB.nextDash = now + 0.8 ActionDash(0.4, 7, "f") CB.log("after him") end if now >= CB.nextHit then CB.nextHit = now + 0.75 CB.hit("press him") end end end)
+12.2 lua CB.f = CreateFrame("Frame") CB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(CB.q) do local a = CB.q[i] if now >= a[1] then table.remove(CB.q, i) a[2]() else i = i + 1 end end if not CB.on then return end if now >= (CB.openAt or 0) and now < CB.open - 0.35 and now >= CB.nextHit then CB.nextHit = now + 0.75 CB.hit("hit the open look") end if now < CB.scoopEnd and now >= CB.nextHit then CB.nextHit = now + 0.55 CB.hit("hit the scoop") end if now - CB.anAt > 4 and now - CB.lastHT > 2 and now >= CB.scoopEnd then if CB.sawLO and not CB.locked and now >= CB.nextLock then CB.nextLock = now + 1 CB.misses = (CB.misses or 0) + 1 if math.mod(CB.misses, 3) == 0 then CB.turn = math.mod(CB.misses / 3, 4) local k = ({ "f", "l", "b", "r" })[CB.turn + 1] ActionDash(0.6, 7, k) CB.log("no lock: look round " .. k) end CB.say(".es in lock") CB.log("lock on again") elseif CB.locked then CB.misses = 0 end if CB.locked and now >= CB.nextDash then CB.nextDash = now + 0.8 ActionDash(0.4, 7, "f") CB.log("after him") end if now >= CB.nextHit then CB.nextHit = now + 0.75 CB.hit("press him") end end end)
 13.2 video
 13.6 lua CB.on = true
 14 .es in lock
