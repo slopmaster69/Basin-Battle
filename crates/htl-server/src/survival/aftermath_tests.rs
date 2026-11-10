@@ -693,7 +693,8 @@ fn native_ship_is_wrecked_not_deleted() {
     assert_eq!(mast.len(), 2, "mast and yard");
     assert!(mast.iter().all(|p| p.model == MAST));
     let up = |p: &Prop| shapes::matrix(p.rotation)[2][2];
-    assert!(tops(mast[0]).1 > 25.0 && (0.6..0.97).contains(&up(mast[0])), "the mast stands aslant high out of the water");
+    assert!(tops(mast[0]).1 > 40.0 && (0.6..0.97).contains(&up(mast[0])), "the mast stands aslant high out of the water");
+    assert!(tops(mast[0]).1 > tops(hull[0]).1 + 8.0, "the mast stands well over the reared bow (level with it, it read as a rib)");
     assert!(tops(mast[1]).0 < piles::WATER && up(mast[1]) < 0.7, "the yard hangs into the water");
     assert!(in_view(top(mast[0])) && clear_of_dock(mast[0]));
     // Cannons at the water's edge under the landing (out of the water, in its view) and on the
@@ -820,4 +821,48 @@ fn the_dust_goes_out_where_the_hero_and_the_cameraman_look() {
         assert!(clouds >= 3, "the {who} sees {clouds} clouds at the entrance in its first seconds");
     }
     assert!(game.aftermath.as_ref().unwrap().air.puffs >= 3, "counted for `.es aftermath status`");
+}
+
+/// A cameraman already by its hero isn't sent off to the landing when the preview starts (its
+/// client took ten seconds to load the ground again, and filmed the void meanwhile).
+#[test]
+fn the_cameraman_stays_by_its_hero_when_the_preview_starts() {
+    let mut game = game();
+    let (_, _hero) = observer(&mut game, 1);
+    let (_, cam) = observer(&mut game, 2);
+    game.watch_command(2, "observer1").unwrap();
+    game.set_watcher_aside(2);
+    game.tick();
+    let at = game.watchers.values().next().map(|b| b.pos).expect("the cameraman's body");
+    cam.try_iter().for_each(drop);
+    game.aftermath_start(1).unwrap();
+    assert!(!cam.try_iter().any(|p| p.opcode == op::MSG_MOVE_TELEPORT_ACK), "not moved");
+    let (pos, _) = game.aftermath_where(2).unwrap();
+    assert!((pos[0] - at[0]).hypot(pos[1] - at[1]) < 0.1);
+}
+
+/// The entrance's pile, as its camera sees it: in each column of the picture where the old dome
+/// stood, at least as tall as it and a little more, and in all a third bigger (the second film's
+/// pile was one narrow cone where the dome rose to the beam and spread right to the cart). The
+/// other views hold their old rock where the walk and the views leave room for it.
+#[test]
+#[ignore = "requires the user's WoW 1.12.1 Data folder in WOW_DATA"]
+fn native_the_entrance_pile_fills_its_view_as_the_old_dome_did() {
+    let n = native();
+    let ground = native_ground(&n);
+    let (props, _) = compose(&ground);
+    let pts: Vec<Vec<V3>> = props.iter().filter(|p| rocky(p.model)).map(|p| ground.points(p)).collect();
+    let natives: Vec<Obb> = ground.natives().iter().map(|(_, o)| *o).collect();
+    for (i, r) in layout::REGIONS.iter().enumerate() {
+        let new = picture_rock(view_eye(r), r.facing, pts.iter().map(|v| v.as_slice()), &n.land, Some(&n.survey.solids), &natives);
+        println!("{}: {:?} (old {:?})", r.name, new.map(|v| v.round()), layout::OLD_VIEW_ROCK[i]);
+    }
+    let r = &layout::REGIONS[0];
+    let old = layout::OLD_VIEW_ROCK[0];
+    let new = picture_rock(view_eye(r), r.facing, pts.iter().map(|v| v.as_slice()), &n.land, Some(&n.survey.solids), &natives);
+    for c in (0..COLUMNS).filter(|c| old[*c] > 3.0) {
+        assert!(new[c] >= old[c] + 1.0, "column {c}: {:.1} where the dome stood {:.1}", new[c], old[c]);
+    }
+    let (o, w): (f32, f32) = (old.iter().sum(), new.iter().sum());
+    assert!(w >= 1.3 * o, "{w:.0} against the dome's {o:.0}");
 }

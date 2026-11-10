@@ -35,8 +35,9 @@ const FIRST_ENTRY: u32 = MARKER_ENTRY + 1;
 const INERT: u32 = 0x30;
 const GENERIC: u32 = 5;
 const BATCH: usize = 16;
-/// A cameraman is brought to the hero it films once this far off (yd), as in play.
-const WATCH_NEAR: f32 = 25.0;
+/// A cameraman is brought to the hero it films once this far off (yd): sooner than in play, so
+/// its ground is loaded round each spot the hero is set down at.
+const WATCH_NEAR: f32 = 12.0;
 
 pub(crate) struct Aftermath {
     props: Vec<Prop>,
@@ -403,17 +404,58 @@ pub(super) fn floor_under(land: &dyn Land, v: V3) -> f32 {
 pub(super) fn covers_view(p: &Prop) -> bool {
     let views = layout::REGIONS.iter().map(|r| (r.view, r.facing))
         .chain(layout::CAMERAS.iter().map(|(at, deg)| (*at, deg.to_radians())));
-    // The footing, and the first yards it looks across; for timber further on at eye height (boards
-    // and a post filled the workshop's picture, a pole stood at the lens at Johnson's; the piles a
+    // The footing, and the first yards it looks across; for timber, nothing round the footing or in
+    // the first 9 yd at any height (boards and a post filled the workshop's picture, a pole stood
+    // at the lens at Johnson's, planks lay and stood in the entrances' foregrounds; the piles a
     // camera is there to see stand 7 yd off and more, filling a passage); and the hero's own
     // camera, up behind them.
     let timber = matches!(p.model, BEAM | BOARD | LUMBER);
     views.into_iter().any(|(at, f)| {
         let ahead = |d: f32| [at[0] + d * f.cos(), at[1] + d * f.sin(), at[2]];
         covers(p, at, 1.2) || covers(p, ahead(2.0), 1.0) || covers(p, ahead(3.8), 0.7)
-            || timber && [5.2, 6.8, 8.5].iter().any(|d| covers_at(p, ahead(*d), 1.5, &[1.75, 2.6, 3.4]))
+            || timber && [(0.0, 3.0), (2.0, 2.5), (3.8, 2.5), (5.2, 1.5), (6.8, 1.5), (8.5, 1.5)].iter()
+                .any(|(d, r)| covers_at(p, ahead(*d), *r, &[0.15, 0.95, 1.75, 2.6, 3.4]))
             || covers_at(p, ahead(-2.5), 1.2, &[1.75, 2.6, 3.4]) || covers_at(p, ahead(-4.5), 1.2, &[2.6, 3.4])
     })
+}
+
+/// Where a region's view is seen from in its pairs: about the hero's head, looking the way they
+/// face (their own camera is a little behind and above).
+pub(super) fn view_eye(r: &Region) -> V3 {
+    [r.view[0] - 1.0 * r.facing.cos(), r.view[1] - 1.0 * r.facing.sin(), r.view[2] + 1.9]
+}
+
+/// The picture's columns: 4 degrees each across 64 (32 each side of the way it looks).
+pub(super) const COLUMNS: usize = 16;
+
+/// How tall rock stands in a camera's picture: in each column of it (out to 45 yd), the most any
+/// rock seen from the eye stands over the floor under it, as an angle (degrees). Rock behind the
+/// camera, outside its picture or behind the mine's own walls counts nothing (the volume measure
+/// counted those, and the entrance's pile still read smaller than the dome it replaced). Column 0
+/// is the picture's right edge.
+pub(super) fn picture_rock<'a>(eye: V3, facing: f32, rocks: impl Iterator<Item = &'a [V3]>, land: &dyn Land, solids: Option<&Solids>, natives: &[Obb]) -> [f32; COLUMNS] {
+    let mut bins = [0.0f32; COLUMNS];
+    // (The mine's own posts and beams in front hide what's behind them: the entrance's pile stood
+    // half behind its left post.)
+    let near: Vec<&Obb> = natives.iter().filter(|n| (n.c[0] - eye[0]).hypot(n.c[1] - eye[1]) < 47.0 && !n.contains(eye)).collect();
+    for points in rocks {
+        for v in points.iter().step_by(2) {
+            let (dx, dy) = (v[0] - eye[0], v[1] - eye[1]);
+            let h = dx.hypot(dy);
+            if !(3.0..=45.0).contains(&h) { continue; }
+            let off = ((dy.atan2(dx) - facing + 3.0 * std::f32::consts::PI).rem_euclid(2.0 * std::f32::consts::PI) - std::f32::consts::PI).to_degrees();
+            if off.abs() >= 32.0 { continue; }
+            if near.iter().any(|n| !n.contains(*v) && n.cuts(eye, *v)) { continue; }
+            // (Nor anything of the mine's own between: a post, a beam, a wall.)
+            let d = shapes::sub(*v, eye);
+            if solids.is_some_and(|s| s.ray(eye, shapes::unit(d), (shapes::len(d) - 0.4).max(0.0)).is_some()) { continue; }
+            let fl = floor_under(land, *v);
+            let rise = ((v[2] - eye[2]).atan2(h) - (fl - eye[2]).atan2(h)).to_degrees();
+            let b = ((off + 32.0) / 4.0) as usize;
+            bins[b] = bins[b].max(rise);
+        }
+    }
+    bins
 }
 
 /// Whether a prop's box comes within `radius` of a body standing at `at` (feet to head).
@@ -580,12 +622,26 @@ impl SurvivalGame {
     }
 
     pub(crate) fn aftermath_arrival(&mut self, conn: ConnId) {
-        // A returning inspector might have logged out on the old ship. Start every inspection
-        // at the retained smugglers' landing; the saved position is still used on exit.
-        let _ = self.aftermath_command(conn, "visit", "landing");
+        // An inspector standing where the ruined mine has ground stays there; one who might have
+        // logged out on the old ship (no ground there now) starts at the retained smugglers'
+        // landing. The saved position is still used on exit. A cameraman stays by its hero and
+        // follows them (`aftermath_keep_watchers_near`): sent off to the landing and back, its
+        // client took ten seconds to load the ground again and filmed the void meanwhile.
+        let id = self.world_of(conn).map(|w| w.id);
+        let at = match self.sessions.get(&conn).is_some_and(|s| s.watching.is_some()) {
+            true => id.and_then(|id| self.watchers.get(&id).or_else(|| self.sim.players.get(&id))).map(|b| (b.pos, b.facing)),
+            false => id.and_then(|id| self.sim.players.get(&id)).map(|p| (p.pos, p.facing)),
+        };
+        let ground = |pos: [f32; 3]| self.aftermath_land.as_deref().is_some_and(|g| floor(&*g.land, pos, false).is_some());
+        match at.filter(|(pos, _)| ground(*pos) || self.sessions.get(&conn).is_some_and(|s| s.watching.is_some())) {
+            Some(at) => { if let Some(a) = self.aftermath.as_mut() { a.positions.insert(conn, at); } }
+            None => { let _ = self.aftermath_command(conn, "visit", "landing"); }
+        }
+        let watchers: Vec<ConnId> = self.sessions.iter().filter(|(_, s)| s.watching.is_some()).map(|(c, _)| *c).collect();
         if let Some(a) = self.aftermath.as_ref() {
             for (other, (pos, facing)) in &a.positions {
-                if *other != conn {
+                // (No one is told of a cameraman.)
+                if *other != conn && !watchers.contains(other) {
                     if let Some(w) = self.world_of(*other) { self.send(conn, packets::heartbeat(w.guid, *pos, *facing)); }
                 }
             }

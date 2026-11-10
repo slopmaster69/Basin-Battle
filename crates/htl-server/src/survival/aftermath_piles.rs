@@ -661,6 +661,51 @@ impl Builder<'_> {
         self.under_roof = false;
     }
 
+    /// How tall the rock stands across region `r`'s view ([`picture_rock`]).
+    pub(super) fn view_rock(&self, r: &Region) -> [f32; COLUMNS] {
+        let pts: Vec<Vec<V3>> = self.props.iter().filter(|p| rocky(p.model)).map(|p| self.g.points(p)).collect();
+        let natives: Vec<Obb> = self.g.natives().iter().map(|(_, o)| o.clone()).collect();
+        picture_rock(view_eye(r), r.facing, pts.iter().map(|v| v.as_slice()), &*self.g.land, self.g.solids.as_ref(), &natives)
+    }
+
+    /// Rock heaped where a region's view sees it until in every column of its picture the rock
+    /// stands at least as tall as the old layout's did there (`old`): large pieces at the columns
+    /// most short, each kept only if it makes up some of that (the entrance's pile was one narrow
+    /// cone where the dome it replaced rose to the beam and spread right to the cart). Each is put
+    /// to the site nearest it.
+    fn fill_view(&mut self, region: usize, old: &[f32; COLUMNS]) {
+        let r = &layout::REGIONS[region];
+        let short = |bins: &[f32; COLUMNS]| -> f32 { bins.iter().zip(old).map(|(n, o)| (o - n).max(0.0)).sum() };
+        let mut have = short(&self.view_rock(r));
+        if have < 0.5 { return; }
+        let eye = view_eye(r);
+        self.under_roof = true;
+        let mut added = 0;
+        for _ in 0..3 {
+            let bins = self.view_rock(r);
+            // The columns most short first.
+            let mut cols: Vec<usize> = (0..COLUMNS).filter(|c| old[*c] - bins[*c] > 0.5).collect();
+            cols.sort_by(|a, b| (old[*b] - bins[*b]).total_cmp(&(old[*a] - bins[*a])));
+            for c in cols {
+                for size in [1.6, 1.25, 0.95] {
+                    for dist in [16.0, 20.0, 24.0, 28.0, 12.0, 32.0] {
+                        if added == 14 { break; }
+                        let off = (-30.0 + 4.0 * c as f32).to_radians();
+                        let (x, y) = (eye[0] + dist * (r.facing + off).cos(), eye[1] + dist * (r.facing + off).sin());
+                        let site = layout::SITES.iter().filter(|s| s.region == region)
+                            .min_by(|a, b| (a.at[0] - x).hypot(a.at[1] - y).total_cmp(&(b.at[0] - x).hypot(b.at[1] - y))).unwrap();
+                        let Some(z0) = self.floor_at(x, y, eye[2] - 1.9) else { continue };
+                        (self.region, self.site, self.near) = (region, site.name, z0);
+                        if self.rock([x, y], z0, size, off * 7.0 + size).is_none() { continue; }
+                        let now = short(&self.view_rock(r));
+                        if now < have - 0.3 { have = now; added += 1; } else { self.props.pop(); }
+                    }
+                }
+            }
+        }
+        self.under_roof = false;
+    }
+
     /// A side passage filled to its lintel: a row of large rocks across it, more stacked on them
     /// until the stack meets the roof, and the
     /// lintel's beam down across the front of the fill.
@@ -862,6 +907,12 @@ pub(super) fn compose(g: &Ground) -> (Vec<Prop>, Vec<&'static str>) {
             }
         }
     }
+    // And where a view's pile still reads smaller than the old one did from there, more rock where
+    // that view sees it.
+    for region in 0..layout::REGIONS.len() {
+        (b.wet, b.seed, b.k) = (false, 1500 + region, 0);
+        b.fill_view(region, &layout::view_target(region));
+    }
     for (region, r) in layout::REGIONS.iter().enumerate() {
         (b.region, b.site, b.wet, b.seed, b.k, b.near) = (region, "Rubble apron", false, 1000 + region, 0, r.view[2]);
         apron(&mut b, r, layout::APRONS[region]);
@@ -916,11 +967,12 @@ fn wreck(b: &mut Builder) {
             if b.sunk(BOAT, [x, y], scale, -0.55, pitch, yaw, 9.0).is_some() { break 'stern; }
         }
     }
-    // The mast: a plain wooden pole 34 yd long, stepped in the bow half a third of the way to its
+    // The mast: a plain wooden pole 48 yd long, stepped in the bow half a third of the way to its
     // reared bow, its foot just under the water (never down on the seabed: on film a mast footed
     // there never showed, nor an anchor seated under the beach), standing square to the broken
-    // deck and so aslant. A spar hangs off it into the water (the yard it carried): a mast and
-    // yard, not a spike.
+    // deck and so aslant, and well over the reared bow (at 34 yd it rose no higher than the bow
+    // and read as one more of the hull's ribs). A spar hangs off it into the water (the yard it
+    // carried): a mast and yard, not a spike.
     b.site = "Juggernaut's mast";
     // (A mast is stepped through its hull: it may stand in the hull's broken side.)
     b.through_hull = true;
@@ -932,9 +984,14 @@ fn wreck(b: &mut Builder) {
             for across in [0.2, -0.4, 0.8] {
                 let p = add(h.pos, turn(&m, mul([along, across, 0.0], h.scale)));
                 let foot = [p[0], p[1], WATER - 1.5];
-                if b.pole(foot, add(foot, mul(lean, 34.0))).is_none() { continue; }
+                // (Under the cove's roof.)
+                let Some(long) = [48.0, 42.0].into_iter().find(|l| {
+                    let top = add(foot, mul(lean, *l));
+                    b.g.roof([top[0], top[1], WATER]).is_none_or(|r| r > top[2] + 3.0)
+                }) else { continue };
+                if b.pole(foot, add(foot, mul(lean, long))).is_none() { continue; }
                 // The yard, hanging from two thirds of the way up down to the water beside the hull.
-                let hang = add(foot, mul(lean, 23.0));
+                let hang = add(foot, mul(lean, 0.68 * long));
                 for (ox, oy) in [(9.0, -9.0), (12.0, -5.0), (-12.0, -8.0), (6.0, -12.0)] {
                     if b.pole(hang, [hang[0] + ox, hang[1] + oy, WATER - 2.0]).is_some() { break; }
                 }
