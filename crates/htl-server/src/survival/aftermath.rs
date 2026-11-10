@@ -19,6 +19,8 @@ use shapes::{matrix, unturn, Obb, V3};
 
 #[path = "aftermath_air.rs"]
 mod air;
+#[path = "aftermath_doodads.rs"]
+pub(crate) mod doodads;
 #[path = "aftermath_layout.rs"]
 mod layout;
 #[path = "aftermath_piles.rs"]
@@ -46,6 +48,9 @@ pub(crate) struct Aftermath {
     missing: Vec<&'static str>,
     /// Dust settling and timber creaking (`aftermath_air.rs`).
     air: air::Air,
+    /// The copies of the mine's own doodads that client patch 0091 hides (`aftermath_doodads.rs`),
+    /// sent only to a client of its round, after the ruins (their GUIDs number on from them).
+    knocked: Vec<Prop>,
 }
 
 pub(super) struct Region {
@@ -139,6 +144,20 @@ pub(super) const DRIFTWOOD: usize = 17;
 pub(super) const FLOTSAM: usize = 18;
 /// A plain wooden pole (Stormwind's flagpole, no flag): the wrecked ship's mast and its yard.
 pub(super) const MAST: usize = 19;
+// The mine's own doodads, set down where the collapse left them (`aftermath_doodads.rs`).
+/// The mine's hanging lantern (patch 0091's own display).
+pub(super) const LANTERN: usize = 20;
+/// The lantern the mine stands on its floors.
+pub(super) const FLOOR_LANTERN: usize = 21;
+/// The mine's ore cart (patch 0091's own display).
+pub(super) const MINE_CART: usize = 22;
+/// The mine's netted cargo (patch 0091's own display).
+pub(super) const NET_CARGO: usize = 23;
+pub(super) const KEG: usize = 24;
+pub(super) const CASK: usize = 25;
+pub(super) const BUCKET: usize = 26;
+/// The mine's large lumber pile.
+pub(super) const LUMBER_PILE: usize = 27;
 
 pub(super) const MODELS: &[Model] = &[
     Model { display: 5741, name: "Fallen Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
@@ -161,6 +180,14 @@ pub(super) const MODELS: &[Model] = &[
     Model { display: 627, name: "Driftwood", min: [-1.56,-1.78,-0.33], max: [1.26,2.24,1.18] },
     Model { display: 6434, name: "Floating Wreckage", min: [-2.50,-2.76,-3.08], max: [1.91,2.71,0.43] },
     Model { display: 625, name: "Broken Mast", min: [-0.55,-0.57,-0.08], max: [0.47,0.58,9.90] },
+    Model { display: 60005, name: "Crooked Lantern", min: [-0.35,-0.35,0.0], max: [0.36,0.36,1.79] },
+    Model { display: 6038, name: "Fallen Lantern", min: [-0.35,-0.35,0.0], max: [0.37,0.36,1.37] },
+    Model { display: 60006, name: "Tipped Ore Cart", min: [-1.02,-0.77,-0.01], max: [1.03,0.75,1.48] },
+    Model { display: 60007, name: "Toppled Netted Cargo", min: [-1.82,-1.99,-0.26], max: [1.92,2.03,1.48] },
+    Model { display: 436, name: "Rolled Powder Keg", min: [-0.24,-0.25,-0.01], max: [0.24,0.31,0.59] },
+    Model { display: 288, name: "Rolled Barrel", min: [-0.43,-0.47,0.0], max: [0.43,0.52,0.99] },
+    Model { display: 2891, name: "Kicked Bucket", min: [-0.29,-0.39,0.02], max: [0.42,0.33,0.74] },
+    Model { display: 1109, name: "Spilled Lumber Pile", min: [-1.68,-0.91,0.0], max: [1.70,0.86,1.67] },
 ];
 
 /// Rock and soil: the masses a pile is made of. They may run into the mine's walls (a cave-in
@@ -246,12 +273,25 @@ pub(crate) struct Ground {
     shapes: Vec<Shape>,
     /// The walk from the mine's entrance to the cove, every half yard: kept open.
     route: Vec<V3>,
+    /// The mine's own doodads this ground lacks (client patch 0091's, an open survey's), where
+    /// they stood.
+    hidden: Vec<htl_map::deadmines::aftermath::Standing>,
+    /// The same mine as a client of patch 0091's round has it, those doodads gone: what their
+    /// copies are fitted to (the piles are fitted to this one, which older clients show).
+    pub(crate) open: Option<Box<Ground>>,
 }
 
 impl Ground {
     #[cfg(test)]
     pub(crate) fn with_solids(land: Box<dyn Land>, solids: Solids) -> Self {
-        Self { land, solids: Some(solids), natives: Vec::new(), shapes: Vec::new(), route: Vec::new() }
+        Self { land, solids: Some(solids), natives: Vec::new(), shapes: Vec::new(), route: Vec::new(), hidden: Vec::new(), open: None }
+    }
+
+    /// The same, lacking these of the mine's own doodads (an open ground's stand-in).
+    #[cfg(test)]
+    pub(crate) fn lacking(mut self, hidden: Vec<htl_map::deadmines::aftermath::Standing>) -> Self {
+        self.hidden = hidden;
+        self
     }
 
     /// The surveyed map, and each of [`MODELS`]' triangles in its own space.
@@ -273,8 +313,11 @@ impl Ground {
         }).collect();
         let land = super::land::DeadminesLand::new(survey.loaded);
         let route = Self::walk(&land);
-        Self { land: Box::new(land), solids: Some(survey.solids), natives, shapes, route }
+        Self { land: Box::new(land), solids: Some(survey.solids), natives, shapes, route, hidden: survey.hidden, open: None }
     }
+
+    /// The mine's own doodads this ground lacks, where they stood.
+    pub(super) fn hidden(&self) -> &[htl_map::deadmines::aftermath::Standing] { &self.hidden }
 
     /// The way from the entrance's view to the cove's, view to view, every half yard. (The landing
     /// is across the water now the ship is gone.)
@@ -528,7 +571,7 @@ impl SurvivalGame {
             }
             "" | "status" => {
                 let text = self.aftermath.as_ref().map_or_else(|| "Aftermath preview is off.".into(), |a|
-                    format!("Aftermath preview is on. {} solid objects across {} regions. {} sites lack a matching floor. {} dust spots, {} clouds raised so far. Use .es aftermath off to restore the dungeon.", a.props.len(), layout::REGIONS.len(), a.missing.len(), a.air.dust.len(), a.air.puffs));
+                    format!("Aftermath preview is on. {} solid objects across {} regions. {} sites lack a matching floor. {} of the mine's own doodads knocked over or askew. {} dust spots, {} clouds raised so far. Use .es aftermath off to restore the dungeon.", a.props.len(), layout::REGIONS.len(), a.missing.len(), a.knocked.len(), a.air.dust.len(), a.air.puffs));
                 self.say_to(conn, &text);
                 Ok(())
             }
@@ -548,19 +591,24 @@ impl SurvivalGame {
         if self.aftermath_land.is_none() {
             let data = super::lab::data_dir().ok_or("Start the server with --data or WOW_DATA to inspect the aftermath.")?;
             let survey = htl_map::deadmines::load_aftermath_survey(&data).map_err(|e| format!("Couldn't load the collapsed Deadmines. {e}"))?;
+            let open = htl_map::deadmines::load_aftermath_open_survey(&data).map_err(|e| format!("Couldn't load the collapsed Deadmines. {e}"))?;
             let displays: Vec<u32> = MODELS.iter().map(|m| m.display).collect();
-            let meshes = htl_map::deadmines::aftermath::display_shapes(&data, &displays).map_err(|e| format!("Couldn't load the ruins' models. {e}"))?;
-            self.aftermath_land = Some(Box::new(Ground::surveyed(survey, meshes)));
+            let meshes = htl_map::deadmines::aftermath::display_shapes_with(&data, &displays, doodads::EXTRA).map_err(|e| format!("Couldn't load the ruins' models. {e}"))?;
+            let mut ground = Ground::surveyed(survey, meshes.clone());
+            ground.open = Some(Box::new(Ground::surveyed(open, meshes)));
+            self.aftermath_land = Some(Box::new(ground));
         }
         let started = Instant::now();
         let (props, missing) = compose(self.aftermath_land.as_deref().unwrap());
         if layout::REGIONS.iter().enumerate().any(|(r, _)| !props.iter().any(|p| p.region == r)) {
             return Err("The aftermath has an empty region. Check the installed map data before previewing it.".into());
         }
+        let knocked = self.aftermath_land.as_deref().and_then(|g| g.open.as_deref()).map_or_else(Vec::new, |open| piles::knock_over(open, &props).into_iter().map(|(_, p)| p).collect());
         println!("[aftermath] {} solids in {:?}; {} sites unavailable: {}", props.len(), started.elapsed(), missing.len(), missing.join(", "));
+        println!("[aftermath] {} of the mine's own doodads knocked over or hung askew, for clients of round {}", knocked.len(), doodads::LEVEL);
         let air = air::Air::new(&props, self.aftermath_land.as_deref().unwrap(), Instant::now());
         println!("[aftermath] {} dust spots (unseen stand-ins casting {}), {} creaking beams", air.dust.len(), air::SPELL_DUST, props.iter().filter(|p| p.model == BEAM).count());
-        self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing, air });
+        self.aftermath = Some(Aftermath { props, positions: BTreeMap::new(), missing, air, knocked });
         let hidden: Vec<u64> = self.sim.mobs.keys().chain(self.sim.objs.keys()).filter_map(|id| self.guid_of(*id)).collect();
         for guid in hidden { self.broadcast(&packets::destroy_object(guid)); }
         let viewers: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
@@ -581,16 +629,31 @@ impl SurvivalGame {
         for (i, m) in MODELS.iter().enumerate() {
             self.send(conn, packets::gameobject_query_response(FIRST_ENTRY+i as u32, GENERIC, m.display, m.name));
         }
-        for (chunk_index, chunk) in scene.props.chunks(BATCH).enumerate() {
-            let fields: Vec<Fields> = chunk.iter().enumerate().map(|(i, p)| go_fields(prop_guid(chunk_index*BATCH+i, p.model),
+        self.send_props_to(conn, &scene.props, 0);
+        for p in scene.air.stand_ins() { self.send(conn, p); }
+        self.send_knocked_to(conn);
+    }
+
+    /// The ruins `props`, numbered from `first`, in batches.
+    fn send_props_to(&self, conn: ConnId, props: &[Prop], first: usize) {
+        for (chunk_index, chunk) in props.chunks(BATCH).enumerate() {
+            let at = first + chunk_index * BATCH;
+            let fields: Vec<Fields> = chunk.iter().enumerate().map(|(i, p)| go_fields(prop_guid(at+i, p.model),
                 FIRST_ENTRY+p.model as u32, MODELS[p.model].display, p.pos, p.scale, p.rotation, p.facing)).collect();
             let creates: Vec<Create> = chunk.iter().enumerate().map(|(i, p)| Create {
-                guid: prop_guid(chunk_index*BATCH+i, p.model), object_type: packets::TYPE_GAMEOBJECT, is_self: false,
+                guid: prop_guid(at+i, p.model), object_type: packets::TYPE_GAMEOBJECT, is_self: false,
                 placement: Placement::At { pos: p.pos, facing: p.facing }, fields: &fields[i],
             }).collect();
             self.send(conn, packets::update_object(&creates, &[]));
         }
-        for p in scene.air.stand_ins() { self.send(conn, p); }
+    }
+
+    /// The copies of the mine's own doodads, to a client that hides the mine's (patch 0091's
+    /// round): an older one keeps the mine's own and gets none, so nothing stands twice.
+    pub(crate) fn send_knocked_to(&self, conn: ConnId) {
+        let Some(scene) = self.aftermath.as_ref() else { return };
+        if self.world_of(conn).is_none_or(|w| w.level < doodads::LEVEL) { return; }
+        self.send_props_to(conn, &scene.knocked, scene.props.len());
     }
 
     /// The cameraman goes where the hero it films is inspecting. The rules stand still in the
@@ -650,7 +713,7 @@ impl SurvivalGame {
 
     pub(crate) fn aftermath_stop(&mut self) {
         let Some(scene) = self.aftermath.take() else { return };
-        for (i, p) in scene.props.iter().enumerate() { self.broadcast(&packets::destroy_object(prop_guid(i, p.model))); }
+        for (i, p) in scene.props.iter().chain(&scene.knocked).enumerate() { self.broadcast(&packets::destroy_object(prop_guid(i, p.model))); }
         self.broadcast(&packets::destroy_object(MARKER_GUID));
         for s in &scene.air.dust { self.broadcast(&packets::destroy_object(s.guid)); }
         let viewers: Vec<(ConnId, Id)> = self.in_world().map(|(c, _, w)| (*c, w.id)).collect();

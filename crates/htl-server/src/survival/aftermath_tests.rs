@@ -311,7 +311,16 @@ fn native() -> Native {
     let survey = htl_map::deadmines::load_aftermath_survey(data).unwrap();
     let land = super::super::land::DeadminesLand::new(htl_map::deadmines::load_aftermath(data).unwrap());
     let displays: Vec<u32> = MODELS.iter().map(|m| m.display).collect();
-    let meshes = htl_map::deadmines::aftermath::display_shapes(data, &displays).unwrap();
+    let meshes = htl_map::deadmines::aftermath::display_shapes_with(data, &displays, doodads::EXTRA).unwrap();
+    Native { survey, land, meshes }
+}
+
+/// The same, as a client of patch 0091's round has the mine: its hidden doodads gone.
+fn native_open(meshes: Vec<Vec<[V3; 3]>>) -> Native {
+    let data = std::env::var_os("WOW_DATA").expect("set WOW_DATA");
+    let data = std::path::Path::new(&data);
+    let survey = htl_map::deadmines::load_aftermath_open_survey(data).unwrap();
+    let land = super::super::land::DeadminesLand::new(htl_map::deadmines::load_aftermath_open_survey(data).unwrap().loaded);
     Native { survey, land, meshes }
 }
 
@@ -335,6 +344,13 @@ fn world_tris(n: &Native, p: &Prop) -> Vec<[V3; 3]> {
 /// What's wrong with each prop that doesn't rest on the floor or on rock, or passes through a
 /// wall, one of the mine's doodads or another piece of wood or iron (none, for a sound ruin).
 fn contact_failures(n: &Native, props: &[Prop]) -> Vec<String> {
+    contact_failures_from(n, props, 0)
+}
+
+/// [`contact_failures`] of `props[first..]` alone, among all of them. A lantern hung askew where
+/// the mine's own hung (by its hook: the mine's beam or bracket over it, the survey's hidden one)
+/// hangs there; nothing else does but a beam lodged in the roof.
+fn contact_failures_from(n: &Native, props: &[Prop], first: usize) -> Vec<String> {
     let solids = &n.survey.solids;
     let land: &dyn Land = &n.land;
     let natives: Vec<(String, Obb)> = n.survey.standing.iter()
@@ -358,8 +374,11 @@ fn contact_failures(n: &Native, props: &[Prop]) -> Vec<String> {
             .fold(None, |a: Option<f32>, t| Some(a.map_or(t, |a| a.max(t))))
     };
     let mut out = Vec::new();
-    for (i, p) in props.iter().enumerate() {
+    let top = MODELS[LANTERN].max[2];
+    for (i, p) in props.iter().enumerate().skip(first) {
         let name = format!("{} {} at {:.1},{:.1},{:.1}", p.site, MODELS[p.model].name, p.pos[0], p.pos[1], p.pos[2]);
+        let hung = p.model == LANTERN && n.survey.hidden.iter()
+            .any(|h| shapes::len(shapes::sub(h.world([0.0, 0.0, top]), p.world([0.0, 0.0, top]))) < 0.02);
         let w: Vec<V3> = tris[i].iter().flatten().copied().collect();
         let afloat = p.region == 6 && land.water_near(p.pos[0], p.pos[1], -16.0) && w.iter().any(|v| v[2] < -0.02);
         let c = p.obb(0.0).c;
@@ -395,7 +414,7 @@ fn contact_failures(n: &Native, props: &[Prop]) -> Vec<String> {
             if let Some(v) = w.iter().filter(|v| (p.local(**v)[2] - low).abs() < 0.05).find(|v| { let (g, _, pinned) = gap(**v); g > 0.05 && !pinned && !walled(**v) }) {
                 out.push(format!("{name}: its skirt shows {:.2} over what's under it at {:.1},{:.1}", gap(*v).0, v[0], v[1]));
             }
-        } else if !afloat && !(p.model == BEAM && anchored) {
+        } else if !afloat && !(p.model == BEAM && anchored) && !hung {
             let bx = p.obb(0.0);
             let flat = piles::rest_axes(&bx);
             let mut ends = [[false; 2]; 2];
@@ -865,4 +884,147 @@ fn native_the_entrance_pile_fills_its_view_as_the_old_dome_did() {
     }
     let (o, w): (f32, f32) = (old.iter().sum(), new.iter().sum());
     assert!(w >= 1.3 * o, "{w:.0} against the dome's {o:.0}");
+}
+
+
+/// One of the mine's own doodads the open ground lacks: `model`'s box standing upright at `at`,
+/// turned `yaw`.
+fn hidden_doodad(index: u32, model: usize, at: V3, yaw: f32) -> htl_map::deadmines::aftermath::Standing {
+    let (s, c) = yaw.sin_cos();
+    let m = &MODELS[model];
+    htl_map::deadmines::aftermath::Standing {
+        model: format!("doodad{index}.mdx"), origin: at, axes: [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+        bounds: Some((m.min, m.max)), index: Some(index),
+    }
+}
+
+/// The authored game, its preview knowing three of the mine's own doodads gone for clients of
+/// patch 0091's round: a cargo stack on the floor by the buried front door, a lantern hung under
+/// its roof and another lantern lost in the fall.
+fn game_with_hidden_doodads() -> (SurvivalGame, Vec<htl_map::deadmines::aftermath::Standing>) {
+    let mut game = game();
+    let door = layout::SITES[0].at;
+    let hidden = vec![
+        hidden_doodad(255, CARGO, [door[0] + 6.0, door[1] - 4.0, door[2]], 0.4),
+        hidden_doodad(186, LANTERN, [door[0] + 5.0, door[1] + 3.0, door[2] + 2.0], 1.0),
+        hidden_doodad(220, LANTERN, [door[0] - 4.0, door[1] + 5.0, door[2] + 4.0], 0.0),
+    ];
+    let mut ground = authored_ground();
+    ground.open = Some(Box::new(authored_ground().lacking(hidden.clone())));
+    game.aftermath_land = Some(Box::new(ground));
+    (game, hidden)
+}
+
+fn game_objects(rx: &crossbeam_channel::Receiver<Packet>) -> Vec<u64> {
+    creates(&rx.try_iter().collect::<Vec<_>>()).into_iter().filter(|(_, kind, _)| *kind == ObjectType::GameObject).map(|(g, _, _)| g).collect()
+}
+
+/// The client's lists (patch 0091) and the server's plan are the same doodads, and the lanterns
+/// it puts out are the plan's dark ones.
+#[test]
+fn the_plan_is_patch_0091s_list_of_the_mines_own_doodads() {
+    use htl_map::deadmines::aftermath::{DARK_LANTERNS, MINE_DOODADS};
+    let planned: Vec<u32> = doodads::PLAN.iter().map(|(i, _)| *i).collect();
+    assert_eq!(planned, MINE_DOODADS, "the plan has a fate for each hidden doodad, in order");
+    let dark: Vec<u32> = doodads::PLAN.iter().filter(|(_, f)| doodads::dark(*f)).map(|(i, _)| *i).collect();
+    assert_eq!(dark, DARK_LANTERNS);
+    let patch = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../patches/benilla/0091-the-collapsed-mine-knocks-over-its-own-doodads.patch")).unwrap();
+    for (name, list) in [("MINE_DOODADS", MINE_DOODADS), ("DARK_LANTERNS", DARK_LANTERNS)] {
+        let head = format!("pub const {name}: &[u32] = &[");
+        let from = patch.find(&head).unwrap_or_else(|| panic!("patch 0091 names {name}"));
+        let body = &patch[from + head.len()..];
+        let body = &body[..body.find("];").unwrap()];
+        let numbers: Vec<u32> = body.split(|c: char| !c.is_ascii_digit()).filter(|w| !w.is_empty()).map(|w| w.parse().unwrap()).collect();
+        assert_eq!(numbers, list, "patch 0091's {name}");
+    }
+    for (id, path) in doodads::EXTRA {
+        assert!(patch.contains(&format!("{id},")) && patch.contains(&path.replace('\\', "\\\\")), "patch 0091 shows display {id} as {path}");
+        assert!(MODELS.iter().any(|m| m.display == *id));
+    }
+    // A lantern's fate is a lantern's; the rest are knocked over or buried.
+    for (i, f) in doodads::PLAN {
+        if let doodads::Fate::Askew(m) | doodads::Fate::Dark(m) = f { assert_eq!(*m, LANTERN, "{i}"); }
+        if let doodads::Fate::Over(m, ..) = f { assert!(![LANTERN, FLOOR_LANTERN].contains(m), "{i}"); }
+    }
+}
+
+/// Only a client that hides the mine's own doodads (patch 0091's round) gets their copies, at
+/// the start or when its hello comes later; the cargo lies on its side, the lantern hangs from
+/// the mine's own hook askew, the lost lantern is gone. Turning the preview off takes every copy
+/// away again, and turning it on again sets them down the same.
+#[test]
+fn the_mines_own_doodads_go_to_their_round_alone_and_come_back_exactly() {
+    let (mut game, hidden) = game_with_hidden_doodads();
+    let (_, old) = observer(&mut game, 1);
+    let (_, new) = observer(&mut game, 2);
+    game.world_mut(2).unwrap().level = doodads::LEVEL;
+    game.aftermath_start(1).unwrap();
+    let (props, knocked) = {
+        let a = game.aftermath.as_ref().unwrap();
+        (a.props.len(), a.knocked.clone())
+    };
+    assert_eq!(knocked.len(), 2, "the cargo and the hung lantern; the lost one is gone: {knocked:?}");
+    let cargo = knocked.iter().find(|p| p.model == CARGO).expect("the cargo knocked over");
+    assert!(matrix(cargo.rotation)[2][2].abs() < 0.5, "on its side");
+    let lamp = knocked.iter().find(|p| p.model == LANTERN).expect("the lantern hung askew");
+    let top = MODELS[LANTERN].max[2];
+    let hook = hidden[1].world([0.0, 0.0, top]);
+    assert!(shapes::len(shapes::sub(lamp.world([0.0, 0.0, top]), hook)) < 1e-3, "from the mine's own hook");
+    assert!(matrix(lamp.rotation)[2][2] < 0.99, "askew");
+    let older = game_objects(&old);
+    let newer = game_objects(&new);
+    assert_eq!(older.len(), props + 1, "an older client: the marker and the ruins, the mine's own doodads kept");
+    assert_eq!(newer.len(), props + 1 + knocked.len());
+    let copies: Vec<u64> = newer.iter().filter(|g| !older.contains(g)).copied().collect();
+    assert_eq!(copies.len(), knocked.len());
+    // An older hello first, then this round's: the copies come with it.
+    game.command(1, "es hello 64 ac30");
+    assert_eq!(game_objects(&old), copies);
+    game.command(1, "es hello 64 ac30");
+    assert!(game_objects(&old).is_empty(), "once");
+    game.aftermath_command(1, "off", "").unwrap();
+    let destroyed: std::collections::BTreeSet<u64> = new.try_iter().filter(|p| p.opcode == op::SMSG_DESTROY_OBJECT)
+        .map(|p| u64::from_le_bytes(p.body[..8].try_into().unwrap())).collect();
+    assert!(newer.iter().all(|g| destroyed.contains(g)), "every ruin, copy and the marker go");
+    assert!(game.aftermath.is_none());
+    game.aftermath_start(1).unwrap();
+    assert_eq!(game.aftermath.as_ref().unwrap().knocked, knocked, "on-off-on sets the same copies down");
+}
+
+/// Every copy of the mine's own doodads on the installed map: one for each hidden doodad but the
+/// lanterns gone and the sack buried, each resting on the floor or rock, or hanging askew by the
+/// mine's own hook, passing through nothing (the contact check, on the mine without them, among
+/// the piles); none on the walk from the entrance to the cove; and no lantern within 5 yd of that
+/// walk put out (the walk stays lit).
+#[test]
+#[ignore = "requires the user's WoW 1.12.1 Data folder in WOW_DATA"]
+fn native_the_mines_own_doodads_rest_or_hang_where_they_stood() {
+    let n = native();
+    let ground = native_ground(&n);
+    let (props, _) = compose(&ground);
+    let open = native_open(n.meshes.clone());
+    let data = std::env::var_os("WOW_DATA").unwrap();
+    let open_ground = Ground::surveyed(htl_map::deadmines::load_aftermath_open_survey(std::path::Path::new(&data)).unwrap(), n.meshes.clone());
+    let knocked = piles::knock_over(&open_ground, &props);
+    for (i, p) in &knocked { println!("  {i}: {} {} at {:.1},{:.1},{:.1}", p.site, MODELS[p.model].name, p.pos[0], p.pos[1], p.pos[2]); }
+    let placed: Vec<u32> = knocked.iter().map(|(i, _)| *i).collect();
+    let missing: Vec<u32> = doodads::PLAN.iter()
+        .filter(|(i, f)| !matches!(f, doodads::Fate::Gone | doodads::Fate::Buried) && !placed.contains(i))
+        .map(|(i, _)| *i).collect();
+    assert!(missing.is_empty(), "no copy found room for {missing:?}");
+    let mut all = props.clone();
+    all.extend(knocked.iter().map(|(_, p)| p.clone()));
+    let failures = contact_failures_from(&open, &all, props.len());
+    for f in &failures { println!("  {f}"); }
+    assert!(failures.is_empty(), "{} copies don't rest or hang, or pass through something", failures.len());
+    for (i, p) in &knocked {
+        assert!(!covers_view(p), "{i} stands in a view");
+        let tall = p.obb(0.0).samples().iter().map(|v| v[2]).fold(f32::MIN, f32::max);
+        assert!(!ground.route().iter().any(|at| tall > at[2] + 0.7 && covers(p, *at, 0.45) && !ground.land.water_near(at[0], at[1], at[2])), "{i} stands on the walk");
+    }
+    for s in n.survey.standing.iter().filter(|s| s.index.is_some_and(|i| htl_map::deadmines::aftermath::DARK_LANTERNS.contains(&i))) {
+        let off = ground.route().iter().filter(|r| (r[2] - s.origin[2]).abs() < 12.0)
+            .map(|r| (r[0] - s.origin[0]).hypot(r[1] - s.origin[1])).fold(f32::INFINITY, f32::min);
+        assert!(off > 5.0, "lantern {:?} by the walk ({off:.1} yd) is put out", s.index);
+    }
 }

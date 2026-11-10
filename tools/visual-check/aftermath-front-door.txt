@@ -1,0 +1,21 @@
+# The aftermath, the buried front door (the 9 Nov review's view 15): the intact mine and then its
+# collapse, from the review's camera there (x -59, y -363, facing 105 degrees). With client patch
+# 0091 (round 30) the barrow lies upside down, the stacked lumber spilled and its bucket kicked
+# over, and the lantern that hung over the fall is down on the rock, its light out.
+# Dev setup as the region scenarios: the preview's `point` puts the hero back on the same spot and
+# facing for the second half.
+hero warrior
+camera duel
+0 .es debug quiet
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes
+12 .es goto -59.0 -363.0 54.6 1.83
+14 video
+16 shots before 4 1.0
+21 .es aftermath on
+24 .es aftermath point -59.0 -363.0 54.6 1.83
+29 shots after 4 1.0
+34 .es aftermath off
+37 end

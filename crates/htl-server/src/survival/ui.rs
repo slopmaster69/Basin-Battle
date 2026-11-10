@@ -499,7 +499,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 62: `FZ`, a boss's open pose caught part way through a clip and held (the Shredder's stall,
 /// Gilnid's stuck spanner).
 /// 63: the `FZ` holds last their whole time (a timer set from inside a timer was dropped).
-pub(crate) const ADDON_NEWEST: u32 = 63;
+/// 64: the add-on says `ac30`: the collapsed Deadmines' own doodads knocked over (patch 0091).
+pub(crate) const ADDON_NEWEST: u32 = 64;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -525,7 +526,10 @@ pub(crate) const ADDON_NEWEST: u32 = 63;
 /// round of its own: nothing new for the add-on to call.)
 /// 29: the legs walk under a swing (0079): a swing or an ability's cast (the body word `auto`)
 /// plays on the torso while the hero walks, and a lunge's `ActionDash` keeps the legs' walk.
-pub(crate) const CLIENT_NEWEST: u8 = 29;
+/// 30: the collapsed Deadmines' own cargo, carts, barrows and lanterns hidden while the aftermath
+/// preview's marker stands, and a put-out lantern's light (0091); the server sends their knocked
+/// over and crooked copies only to this round (`aftermath_doodads.rs`).
+pub(crate) const CLIENT_NEWEST: u8 = 30;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1413,10 +1417,16 @@ impl SurvivalGame {
                     p.shoulder_cam = level >= 1;
                 }
                 let local = level >= 3;
+                let was = self.world_of(conn).map_or(0, |w| w.level);
                 if let Some(w) = self.world_mut(conn) {
                     w.anim = level >= 2;
                     w.local = local;
                     w.level = level;
+                }
+                // `ac30` hides the collapsed mine's own doodads (patch 0091): a preview already
+                // on sends their copies now (its world came before this hello).
+                if was < super::aftermath::doodads::LEVEL && level >= super::aftermath::doodads::LEVEL {
+                    self.send_knocked_to(conn);
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));

@@ -4,6 +4,8 @@
 # Dev setup, all before the video: travel, debug in the dungeon, foes cleared, the hero put at the
 # view. The preview's own `visit` puts the hero back on the same spot and facing for the second
 # half (its arrival first sends everyone to the landing).
+# With client patch 0091 (round 30) the Mast Room's neat cargo lies toppled, its kegs and barrels
+# rolled, the netted cargo on its side, the large lumber pile spilled and the ore cart tipped.
 hero warrior
 camera duel
 0 .es debug quiet
