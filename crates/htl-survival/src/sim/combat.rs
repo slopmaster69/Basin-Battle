@@ -112,7 +112,7 @@ pub(crate) struct LineShot {
     pub blockable: bool,
     /// A fair hit hauls the hero in to this far from the thrower (a harpoon); none for a ball.
     pub pull_to: Option<f32>,
-    /// The spell whose ground look plays where it ends (0: none): splinters where a ball stops.
+    /// The spell whose ground look plays where it ends (0: none): dust where a ball stops.
     pub look: u32,
     pub struck: Vec<Id>,
 }
@@ -2559,7 +2559,7 @@ impl Survival {
             if reach < len - 1e-3 {
                 keep.push(s);
             } else if s.look != 0 && self.mobs.contains_key(&s.owner) {
-                // Where it stops, hit or miss: its burst (splinters off the rail).
+                // Where it stops, hit or miss: its burst (dust where a ball stops).
                 self.events.push(Event::Missile { caster: s.owner, spell: s.look, target: Target::Point(s.to) });
             }
         }

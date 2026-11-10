@@ -701,7 +701,9 @@ subname = "The Juggernaut's Captain"
 display = 7113
 windup_sound = 1409
 scale = 1.5
-health = 520
+# Tuned with the fair-hero sim (firing_line_tests.rs): breaking the line first takes a lone sword
+# hero about 70 to 80 sec; dueling him through the volleys takes them through 16 or 17 shots.
+health = 1500
 run_speed = 7.0
 walk_speed = 2.0
 aggro = 12.0
@@ -777,7 +779,7 @@ respawn = 0.0
   [mob.attack]
   ranged = true
   windup = 2.2
-  damage = 17
+  damage = 28
   range = 32.0
   arc = 20.0
   recovery = 0.8

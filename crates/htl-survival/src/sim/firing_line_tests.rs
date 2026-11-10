@@ -846,5 +846,9 @@ fn a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines() {
         assert_eq!(out.gunners_felled, 0, "the crew goes with him: {out:?}");
         assert!(out.shots >= 4 && out.sidesteps >= 3, "the crew fired all through: {out:?}");
         assert!(out.shots_taken * 2 <= out.shots, "most lines left: {out:?}");
+        // Breaking the line first meets two or three shots and takes none (the test above); a
+        // duel through the volleys meets 16 or more and costs several.
+        assert!(out.shots >= 12 && out.shots_taken >= 3, "the duel is the harder way: {out:?}");
     }
 }
+

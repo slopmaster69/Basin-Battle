@@ -61,8 +61,9 @@ const CLATTER: u32 = 1207;
 const POINT: u32 = 25;
 /// The shot in flight: Fire Shot's bolt, flown at the shot's own speed (`[[missile_look]]`).
 const TRACER: u32 = 6980;
-/// Where a shot stops, hit or miss: Rocky Ground Impact's burst of debris.
-const SPLINTERS: u32 = 26271;
+/// Where a shot stops, hit or miss: Irritating Spores' dust burst (Rocky Ground Impact's debris
+/// filmed as pink boulders that lingered, take 336).
+const SPLINTERS: u32 = 22786;
 
 #[derive(Default)]
 pub(crate) struct FiringLine {
@@ -607,7 +608,7 @@ impl Survival {
 
     /// It fires (or the harpoon flies) along the line its aim locked on: a puff at the muzzle,
     /// the bang, the ball flown at its own speed, the line flashed on the ground for its flight,
-    /// and splinters where it stops.
+    /// and a dust burst where it stops.
     pub(crate) fn firing_release(&mut self, id: Id) -> bool {
         if self.firing_line.aims.remove(&id).is_none() {
             return false;

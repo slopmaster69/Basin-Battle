@@ -23,8 +23,8 @@ lines.** The code is `crates/htl-survival/src/sim/firing_line.rs`; the line's hi
    shot (AttackRifle 49): a puff of dust at his feet (kit 5930), the bang (spell 8682's cast kit:
    AttackRifle and GunRelease 1148), a tracer (Fire Shot's bolt, 6980, with a pale smoke streak,
    flown at 20 yd/s), the 1 yd-wide line flashed on the deck for the ball's flight (a ground
-   burst, drawn with the floor markers off), and splinters where it stops (26271, Rocky Ground
-   Impact). The ball strikes each hero on its line as it reaches them, along the barrel to its
+   burst, drawn with the floor markers off), and a dust burst where it stops (22786, Irritating
+   Spores; Rocky Ground Impact's debris filmed as pink boulders that lingered, take 336). The ball strikes each hero on its line as it reaches them, along the barrel to its
    full 32 yd or the first thing in the way. Step out of the line the barrel points along, or
    block facing the gunner.
 4. **The captain never idles.** Thrust and the broad clearing cut, all the time, with no freeze for
@@ -36,7 +36,7 @@ lines.** The code is `crates/htl-survival/src/sim/firing_line.rs`; the line's hi
    every 7.2 sec, half the shots. The captain fights straight through the empty turns.
 6. **The last gunner falls.** At his next free moment, "I'll do it meself." A real draw: GoblinMale's
    Sheath (89), the gun in his hand 0.3 sec in; the load as the cocking (106 and the click), a
-   1.2 sec aim (48), and the shot with its puff, bang, tracer, line and splinters. The gun stays
+   1.2 sec aim (48), and the shot with its puff, bang, tracer, line and dust. The gun stays
    out 6 sec after a shot, then he puts it away the same way. From now on he has no pause
    between his attacks: that's the escalation.
 7. **The harpoon,** only with both gunners down and only at a hero who has stayed 8 yd or more
@@ -81,7 +81,7 @@ outside the repository.
 | The bang | spell 8682 | "Fake Shot": cast kit 167, AttackRifle with sound 1148, no missile |
 | Tracer | spell 6980 | "Fire Shot": FireShot_Missile, speed 40 in the data (20 by its `[[missile_look]]`) |
 | Harpoon line | spell 6533 | "Net": Net_Missile, speed 40 in the data (14 by its `[[missile_look]]`) |
-| Splinters | spell 26271 | "Rocky Ground Impact": a ground burst at a point |
+| End burst | spell 22786 | "Irritating Spores": `dustnova_cast_base` at a point, no caster kit, no rocks (`fxdest`) |
 | Puff | kit 5930 | Charge's landing dust (`KIT_FALL_DUST`) |
 | Click, bang, clatter | sounds 1147, 1148, 1207 | GunPrecastOneShot, GunRelease, PutDownLargeMetal |
 | Point | emote 25 | EmotePoint |
@@ -107,7 +107,7 @@ missing walk or path, with a checked spot beside him on the same side for custom
 the pull and pulled with him (and a gunner struck first pulling him), the order after his pull
 line, the turns 3.6 sec apart and alternating, the captain never idle and no blow landing within
 0.8 sec of a shot (three seeds), the load, click, barrel following, shoulder lock and the shot's
-clips, puff, bang, tracer, line burst and splinters, the line striking as the ball reaches a hero
+clips, puff, bang, tracer, line burst and end burst, the line striking as the ball reaches a hero
 and missing a sidestep, another floor or a hero stepping on behind it, a guard blocking it, a
 fallen gunner's turns passing unshot while the captain fights through them, the last gunner's
 draw, load, 1.2 sec aim and shot with the gun out 6 sec, no pause and the 10 sec gun when alone,
@@ -118,11 +118,22 @@ the captain-first reward. `a_lone_sword_hero_playing_by_the_tells_clears_the_cre
 plays a warrior with the starting sword and their own health, reading only what the client is
 sent (the crew at its posts, a gun at the shoulder or the harpoon held back, his windups): they
 run to each gunner and cut him down, stepping out of each line as it fires and raising the guard
-as his blows land, then duel him (30 to 36 sec, 180 to 200 health left, three seeds).
-`a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines` takes the other choice:
-it duels him from the start with the crew firing throughout (18 to 19 sec, 161 health left).
-These are the simulation's numbers, not a filmed fight.
+as his blows land, then duel him: 68 to 82 sec, 74 to 200 health left, no shot taken (three
+seeds). `a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines` takes the other
+choice: it duels him from the start with the crew firing throughout: 60 to 65 sec, 2 to 94 health
+left, 3 to 6 of 16 or 17 shots taken. These are the simulation's numbers, not a filmed fight.
+
+**Balance (after take 336).** On film a duel killed him in 29 sec before any gunner fell. His
+health is now 1500 (was 520) and a gunner's shot 28 (was 17). The duel is now clearly the harder
+way, but not the longer one: alone he attacks without pause, which costs the hero about as much
+time as the volleys do, so both ways wear him down at about 25 health a sec. Making the duel
+longer as well needs a lever outside health and damage (his guard up while a shot is due, say),
+which is a design call.
 
 `tools/visual-check/greenskin-clear.txt` is the unassisted solo clear for the cameraman
 (`camera duel Captain Greenskin`, markers off): setup before the video, then only the warrior's
-own keys, pressed by a small player in the interface that reads the same tells. Not filmed yet.
+own keys (`ActionDash`; the rig's walk keys don't move the hero), pressed by a small player in the
+interface that reads the same tells. It breaks the line: the east gunner first (straight ahead of
+its start at (-58, -831)), then a 17 yd dash up the deck along x -58 to the west gunner, stopping
+about 3 yd short of his post (the cannons stand at the west rail, y -801 to -807: `dmprobe`), then
+the captain.
