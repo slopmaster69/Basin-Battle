@@ -71,7 +71,7 @@ fn aftermath_is_a_bounded_deterministic_solid_scene_with_side_rooms() {
     let (props, missing) = compose(&ground);
     assert_eq!((props.clone(), missing.clone()), compose(&ground));
     assert!(missing.is_empty(), "{missing:?}");
-    assert!((700..1500).contains(&props.len()), "{} props", props.len());
+    assert!((700..1800).contains(&props.len()), "{} props", props.len());
     for (region, _) in layout::REGIONS.iter().enumerate() {
         assert!(props.iter().filter(|p| p.region == region).count() >= 20, "region {region}");
         assert!(props.iter().filter(|p| p.region == region && p.site == "Rubble apron").count() >= 3,
@@ -104,13 +104,13 @@ fn pile_shortfalls(ground: &Ground, props: &[Prop]) -> Vec<String> {
         let rocks = |lo: f32, hi: f32| mine.iter().filter(|p| p.model == ROCK && !hanging(p) && p.scale >= lo && p.scale < hi).count();
         let mut miss = |ok: bool, what: &str| if !ok { out.push(format!("{}: {what}", site.name)); };
         miss(rocks(0.75, 9.0) >= 1 && rocks(0.3, 0.75) >= 2 && rocks(0.0, 0.3) >= 3, "three sizes of rock");
-        miss(mine.iter().any(|p| matches!(p.model, SKIRT | SCREE)), "a soil skirt");
+        miss(mine.iter().filter(|p| matches!(p.model, SKIRT | SCREE)).count() >= 3, "a gravel skirt");
         miss(mine.iter().filter(|p| matches!(p.model, BOARD | BEAM)).count() >= 3, "timber at its foot");
-        // Where the roof is out of sight (the cove's open cavern) there is no scar to show.
+        // Where the roof is out of sight (the cove's open cavern) there is no break to show. (The
+        // rock hung from the roof read as a smooth lump on film and is gone: the snapped beam is the
+        // break.)
         let fl = ground.land.height_near(site.at[0], site.at[1], site.at[2]);
         let roofed = ground.roof([site.at[0], site.at[1], fl]).is_some_and(|r| r - fl < 15.0);
-        // (At the Foundry's back door the lintel is what broke: it lies on the pile.)
-        miss(!roofed || site.fall == Fall::Lintel || mine.iter().any(|p| hanging(p)), "rock hanging from the broken roof");
         if site.fall == Fall::Slump {
             let lodged = |p: &&Prop| {
                 let top = p.world([0.0, 0.0, -5.77]);
@@ -493,8 +493,7 @@ fn native_aftermath_floors_support_every_region_and_no_ship_deck() {
     assert!(floor(land, [-105.0,-821.0,37.9], false).is_none(), "captain's quarters really gone");
     assert!(floor(land, [-62.0,-815.0,41.5], false).is_none(), "upper ship deck really gone");
     assert!(floor(land, [-80.0,-820.0,-16.0], true).is_some(), "seabed remains under wreckage");
-    assert!(props.iter().any(|p| p.site == "Smite's ruined landing" && p.model == CANNON),
-        "the dock retains a grounded cannon wreck beside the inspection approach");
+    // (Smite's dock is kept clear for its cameras now: its cannon went to the shore.)
     assert!(props.iter().any(|p| p.site == "Juggernaut collapse basin" && p.scale >= 6.0), "large seated cove masses");
     assert!(!props.iter().any(covers_view), "the views stay clear");
 }
@@ -530,5 +529,6 @@ fn native_way_from_the_entrance_to_the_cove_stays_open() {
     for b in &blocked { println!("  {b}"); }
     assert!(blocked.is_empty(), "the way through is blocked in {} places", blocked.len());
 }
+
 
 

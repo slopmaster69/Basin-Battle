@@ -98,9 +98,10 @@ pub(super) struct Model {
 /// open skirt. Every size in a pile is this mesh, turned and scaled; the tall 5737 boulder read
 /// as a stalagmite and is gone (views 8, 10, 12).
 pub(super) const ROCK: usize = 0;
-/// Tirisfal's grave mound, dark soil on an open skirt: the gravel skirt a pile spreads.
+/// The gravel a pile spreads across the floor: the same dark rock, a hand or two across. (The
+/// grave and dirt mounds tried first read as green grass on film, and one glowed pale.)
 pub(super) const SKIRT: usize = 1;
-/// Duskwood's dirt mound: smaller scree.
+/// Scree: a little larger gravel.
 pub(super) const SCREE: usize = 2;
 /// The dwarven excavation pole, an iron-shod log: snapped beams and broken posts.
 pub(super) const BEAM: usize = 3;
@@ -122,8 +123,8 @@ pub(super) const SACK: usize = 14;
 
 pub(super) const MODELS: &[Model] = &[
     Model { display: 5741, name: "Fallen Rock", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
-    Model { display: 49, name: "Rubble Skirt", min: [-2.17,-2.19,-0.55], max: [2.19,2.18,0.83] },
-    Model { display: 20, name: "Scree", min: [-1.69,-1.06,-0.01], max: [1.69,1.00,0.67] },
+    Model { display: 5741, name: "Gravel", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
+    Model { display: 5741, name: "Scree", min: [-2.93,-3.64,0.41], max: [2.62,4.05,3.61] },
     Model { display: 1508, name: "Snapped Beam", min: [-1.20,-1.24,-5.77], max: [1.15,1.45,23.87] },
     Model { display: 4651, name: "Broken Board", min: [-0.28,-5.57,0.0], max: [0.22,5.82,2.29] },
     Model { display: 1108, name: "Spilled Lumber", min: [-1.68,-0.65,0.0], max: [1.68,0.66,0.56] },
@@ -153,11 +154,8 @@ pub(super) fn bottom(model: usize, q: [f32; 4]) -> f32 {
 /// Where the fallen rock's open skirt meets the floor (its rim, model space), and the mounds':
 /// sampled round each mesh's footprint when the installed meshes aren't at hand.
 fn rim_samples(model: usize) -> Vec<V3> {
-    let (cx, cy, rx, ry, z) = match model {
-        ROCK => (-0.15, 0.2, 2.75, 3.85, 0.41),
-        SKIRT => (0.0, 0.0, 2.19, 2.19, -0.55),
-        _ => (0.0, -0.03, 1.69, 1.03, 0.0),
-    };
+    let _ = model;
+    let (cx, cy, rx, ry, z) = (-0.15, 0.2, 2.75, 3.85, 0.41);
     (0..12).map(|k| { let a = k as f32 * std::f32::consts::PI / 6.0; [cx + rx * 0.97 * a.cos(), cy + ry * 0.97 * a.sin(), z] }).collect()
 }
 
@@ -167,18 +165,6 @@ fn rock_top(x: f32, y: f32) -> Option<f32> {
     let (rx, ry) = ((x + 0.15) / 2.75, (y - 0.2) / 3.85);
     let r2 = rx*rx + ry*ry;
     (r2 < 1.0).then(|| 0.41 + 3.15 * (1.0 - r2).powf(0.4))
-}
-
-/// The soil mounds' tops without the installed meshes: Tirisfal's a low cone (its rim 0.55 under
-/// the pivot, its peak 0.83 over), Duskwood's a 0.64 yd hump.
-fn mound_top(model: usize, x: f32, y: f32) -> Option<f32> {
-    if model == SKIRT {
-        let r = (x*x + y*y).sqrt() / 2.19;
-        return (r < 1.0).then(|| 0.83 - 1.38*r);
-    }
-    let (rx, ry) = (x / 1.69, (y + 0.03) / 1.03);
-    let r2 = rx*rx + ry*ry;
-    (r2 < 1.0).then(|| 0.64 * (1.0 - r2).sqrt())
 }
 
 /// The highest point of a mesh straight over (x, y).
@@ -321,8 +307,7 @@ impl Ground {
     fn top_local(&self, model: usize, x: f32, y: f32) -> Option<f32> {
         match self.shape(model) {
             Some(s) => top_of(&s.tris, x, y),
-            None if model == ROCK => rock_top(x, y),
-            None => mound_top(model, x, y),
+            None => rock_top(x, y),
         }
     }
 
@@ -393,7 +378,13 @@ pub(super) fn floor_under(land: &dyn Land, v: V3) -> f32 {
 /// check showed that a model's enclosing sphere cleared enormous clean disks around views,
 /// even for a low plank or a tall rock whose solid body never reached the inspector.
 pub(super) fn covers_view(p: &Prop) -> bool {
-    layout::REGIONS.iter().any(|r| covers(p, r.view, 0.9))
+    let views = layout::REGIONS.iter().map(|r| (r.view, r.facing))
+        .chain(layout::CAMERAS.iter().map(|(at, deg)| (*at, deg.to_radians())));
+    // The footing, and the first yards it looks across.
+    views.into_iter().any(|(at, f)| {
+        let ahead = |d: f32| [at[0] + d * f.cos(), at[1] + d * f.sin(), at[2]];
+        covers(p, at, 1.2) || covers(p, ahead(2.0), 1.0) || covers(p, ahead(3.8), 0.7)
+    })
 }
 
 /// Whether a prop's box comes within `radius` of a body standing at `at` (feet to head).
