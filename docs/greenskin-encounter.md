@@ -131,7 +131,7 @@ longer as well needs a lever outside health and damage (his guard up while a sho
 which is a design call.
 
 `tools/visual-check/greenskin-clear.txt` is the unassisted solo clear for the cameraman
-(`camera duel Captain Greenskin`, markers off): setup before the video, then only the warrior's
+(`camera duel Captain Greenskin + Defias Deck Gunner`, markers off): setup before the video, then only the warrior's
 own keys (`ActionDash`; the rig's walk keys don't move the hero), pressed by a small player in the
 interface that reads the same tells. It breaks the line: the east gunner first (straight ahead of
 its start at (-58, -831)), then a 17 yd dash up the deck along x -58 to the west gunner, stopping

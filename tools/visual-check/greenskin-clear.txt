@@ -1,5 +1,5 @@
 # An unassisted solo clear of Captain Greenskin (docs/greenskin-encounter.md), filmed by the
-# cameraman (camera duel), markers off. Dev setup, all before the video: travel, the deck cleared
+# cameraman (camera duel, his gunners kept in the picture), markers off. Dev setup, all before the video: travel, the deck cleared
 # but for the captain (his crew is posted afresh at their posts), the warrior healed and put at
 # (-58, -831) facing +y: the east gunner (-58, -824.5) 6.5 yd straight ahead, the west gunner
 # (-58, -806.5) 24.5 yd ahead on the same line, the captain 16.5 yd off, out of his reach.
@@ -15,7 +15,7 @@
 hero warrior
 # No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to the target.
 cam off
-camera duel Captain Greenskin
+camera duel Captain Greenskin + Defias Deck Gunner
 0 .es debug quiet
 1 .es travel landing
 10 .es debug quiet
