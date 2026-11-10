@@ -218,3 +218,24 @@ pub(super) const OLD_ROCK: &[(&str, f32)] = &[
 pub(super) fn old_rock(site: &str) -> f32 {
     OLD_ROCK.iter().find(|(s, _)| *s == site).map_or(0.0, |(_, v)| *v)
 }
+
+/// How tall the old layout's rock stood across each region's view, column by column
+/// ([`super::picture_rock`] from [`super::view_eye`], degrees), measured on the installed map with
+/// the old rocks' own meshes.
+pub(super) const OLD_VIEW_ROCK: [[f32; super::COLUMNS]; 8] = [
+    [0.0, 0.0, 2.9, 6.1, 5.2, 10.4, 12.6, 13.7, 11.6, 0.0, 0.0, 0.3, 6.5, 5.6, 4.4, 0.0],
+    [10.3, 10.4, 6.1, 5.3, 4.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9, 3.5, 4.7, 2.8, 0.0],
+    [5.1, 4.9, 2.7, 0.0, 0.0, 5.2, 8.0, 27.4, 22.1, 10.1, 7.8, 8.3, 4.9, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 0.0, 0.0, 8.0, 9.8, 15.2, 14.2, 15.1, 6.3, 4.0, 5.1, 5.4, 0.0, 0.0],
+    [0.0, 4.8, 7.6, 14.9, 12.0, 15.6, 14.2, 22.0, 20.4, 18.2, 23.6, 14.8, 0.0, 0.0, 0.0, 0.0],
+    [5.3, 6.9, 7.5, 7.9, 3.8, 0.2, 4.5, 7.5, 10.1, 10.8, 8.2, 4.1, 0.0, 5.2, 5.4, 5.4],
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.1, 5.0],
+    [5.9, 5.1, 3.5, 5.1, 7.2, 7.1, 8.5, 4.4, 0.9, 0.0, 1.9, 3.7, 9.4, 3.3, 0.0, 0.0],
+];
+
+/// The entrance's pile is wanted a good deal bigger than the old dome by that measure, which saw
+/// the two about even where the film showed the new one smaller (its camera stands a little
+/// behind and above the hero, where the pile half hides behind the left post).
+pub(super) fn view_target(region: usize) -> [f32; super::COLUMNS] {
+    OLD_VIEW_ROCK[region].map(|o| if region == 0 && o > 1.0 { 1.35 * o + 2.0 } else { o })
+}
