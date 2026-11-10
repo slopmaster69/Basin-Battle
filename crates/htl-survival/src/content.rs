@@ -1626,6 +1626,29 @@ pub struct DungeonDef {
     /// Notes left lying about: diaries, orders, recipes; some tell of what's hidden.
     #[serde(rename = "note", default)]
     pub notes: Vec<NoteDef>,
+    /// Rails along open edges (a ship's side): nothing crosses one.
+    #[serde(rename = "rail", default)]
+    pub rails: Vec<RailDef>,
+}
+
+/// A rail along an open edge, drawn with a native fence piece every few yards seated on the floor
+/// and following the line. Nothing crosses it: a hero's walk, roll or jump over it is put back,
+/// and a knockback, a pull or a hop back stops at it, for heroes and creatures alike.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct RailDef {
+    pub key: String,
+    /// The line it runs along, in order: `[x, y, z]`, z the floor's height there.
+    pub points: Vec<[f32; 3]>,
+    /// The piece (`GameObjectDisplayInfo`), its scale, and its length at scale 1: the piece runs
+    /// that far along its -x from its origin.
+    pub display: u32,
+    #[serde(default = "rail_scale")]
+    pub scale: f32,
+    pub length: f32,
+}
+
+fn rail_scale() -> f32 {
+    1.0
 }
 
 fn exit_radius() -> f32 {

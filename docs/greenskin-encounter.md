@@ -102,16 +102,36 @@ below is at -16.1. Runtime placement still rejects water, a different floor, a b
 missing walk or path, with a checked spot beside him on the same side for custom test arenas.
 
 **The ship's sides (takes 346 and 347, where the hero went into the water).** The west rail has
-collision (blocked cells at y -801 to -803, the cannons behind them). The east side has none: the
-deck (41.4) runs to y -841 and stops, with the next floor 9 yd below (32.8) and the water at -16.1,
-and no blocked cell at deck height. So any body can walk off it, in the client and in the server's
-land alike; that is the map, not a dodge bug. A roll with no keys held is a step back, so a hero
-facing away from that side steps off it. On the clients that run their own dodges (action combat,
-as the rig's), the step is the client's own walk, stopped only by the client's collision. On
-older clients the server throws the step, and that throw used to fly its full distance whatever was
-behind; it now stops short of a wall or a drop as a knockback does (`start_dodge`, tested by
-`a_hop_back_stops_short_of_a_drop_or_a_wall_behind`). Giving the east side a rail would need an
-invisible wall along it (a change to the world, Corey's call).
+collision (blocked cells at y -801 to -803, the cannons behind them). The east side had none in the
+map: the deck runs to y -840 (x -76 to -60) and stops, curving in to -834 toward the stern and the
+bow, with the next floor 9 yd below and the water beyond, and no blocked cell at deck height. A
+hero walked or rolled straight off it (a roll with no keys held is a step back).
+
+**The starboard rail** (Corey, 10 Nov) now runs 0.6 yd inside that lip for the stretch his fight
+can reach, from x -92 by VanCleef's cabin to x -44 by the bow, each point on the deck and walkable
+from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the ship is as it was.
+
+- **What it looks like:** ElwynnWoodFence01 (display 6151, the dungeons' own dark wood, posts and
+  rails, 4.3 yd a piece and 1.9 yd tall), at 0.75: pieces of 3.2 yd, 1.4 yd high, laid end to end
+  along the line (overlapping a little, so they meet), each seated at the lower of the deck's
+  heights under its two ends with its posts sunk in as modelled, so it follows the deck's curve
+  and its rise toward the bow (38.9 to 43.1). The data has no ship's rail to place: its only
+  railing (6157, CarnivalRailing) is 14 yd long and can't follow the curve.
+- **On the client:** each piece is an ordinary solid object, so the clients keep its hull and a
+  walk or a roll stops against it (as against Gilnid's planks).
+- **On the server:** nothing crosses its line (`through_rail`). A hero whose move would cross it
+  (a walk, the client's own roll, a jump over it, a step off falling) is put back where they were
+  that moment, as a shut fog door does (`hold_at_doors`): what a player sees is their body stopped
+  at the rail, or set back on the deck a step short of it if their client carried them past. A
+  knockback, a pull (his harpoon) and the server's own hop back stop at it as at a wall
+  (`slide_end`), for heroes and creatures alike.
+- **The aftermath:** the preview hides every world object along with the ship's own groups and
+  colliders (patch 0087), and the wrecked Juggernaut has no deck there, so the rail goes with the
+  ship. Turning the preview off brings both back.
+
+Separately, the server's own hop back (older clients that don't run their own dodges) now stops
+short of a wall or a drop as a knockback does (`start_dodge`, tested by
+`a_hop_back_stops_short_of_a_drop_or_a_wall_behind`).
 
 ## Verification
 
@@ -126,7 +146,10 @@ draw, load, 1.2 sec aim and shot with the gun out 6 sec, no pause and the 10 sec
 the harpoon waiting for 2 sec at 8 yd, its held pose, spear, throw, haul and clearing cut, a
 sidestep or guard sparing the haul, party retarget, Vanish, the wipe putting the crew back at
 its posts, death clearing every shot, the floor checks, ranged input on a gunner, knockback, and
-the captain-first reward. `a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain`
+the captain-first reward. The starboard rail: its pieces meet along the whole line and keep their
+hulls; a walk, a roll's dash, a jump and a falling step over it are put back on the deck; the
+server's hop back, a knockback (a hero and a gunner) and a pull (even from beyond it) end on the
+deck; past its ends nothing changes. `a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain`
 plays a warrior with the starting sword and their own health, reading only what the client is
 sent (the crew at its posts, a gun at the shoulder or the harpoon held back, his windups): they
 run to each gunner and cut him down, stepping out of each line as it fires and raising the guard

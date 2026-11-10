@@ -3,9 +3,9 @@
 # video: travel, the deck cleared but for the captain (his crew is posted afresh at their posts),
 # the warrior healed and put at (-58, -831) facing +y: the east gunner (-58, -824.5) 6.5 yd
 # straight ahead, the west gunner (-58, -806.5) 24.5 yd ahead on the same line, the captain 16.5 yd
-# off, out of his reach. The deck's east side (y -841) has no rail in the map's collision, so the
-# player never rolls (a roll with no keys is a step back, toward that side: takes 346 and 347);
-# its sidesteps strafe along x.
+# off, out of his reach. The deck's east side has its rail now (the starboard rail, 0.6 yd inside
+# the lip: takes 346 and 347 rolled off the open side), so nothing there needs keeping away from;
+# the player still doesn't roll, as its sidesteps (strafes along x) are all it needs.
 # From the video on, no debug command: only the warrior's own keys (.es in, ActionDash; the rig's
 # walk keys don't move the hero), pressed by a small player in the interface (GS below) that reads
 # only what the client shows:

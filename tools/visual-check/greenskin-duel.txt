@@ -3,9 +3,9 @@
 # cameraman (camera duel), markers off. Dev setup, all before the video: travel, the deck cleared
 # but for the captain (his crew is posted afresh at their posts), the warrior healed and put at
 # (-74.5, -816) facing him, on the open deck in front of VanCleef's cabin, 12.5 yd south of him and
-# out of his reach (dmprobe: floor 40.2, a walk to him): 25 yd from the east side (y -841, no rail
-# in the map's collision) and 16 yd from the west rail. The player never rolls (a roll with no keys
-# is a step back); its sidesteps strafe across the deck and alternate, so they don't add up.
+# out of his reach (dmprobe: floor 40.2, a walk to him), mid-deck between the starboard rail and the
+# west rail. The player doesn't roll; its sidesteps strafe across the deck and alternate, so they
+# don't add up.
 # From the video on, no debug command: only the warrior's own keys (.es in, ActionDash; the rig's
 # walk keys don't move the hero), pressed by a small player in the interface (GD below), locked on
 # the captain the whole fight, that reads only what the client shows: his windup (AN mob: raise the

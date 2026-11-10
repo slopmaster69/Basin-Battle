@@ -852,3 +852,139 @@ fn a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines() {
     }
 }
 
+
+// --- the starboard rail ------------------------------------------------------------------------
+
+const FENCE: u32 = 6151;
+
+/// The Deadmines as built, with a hero on the quarterdeck by its open side.
+fn deck(at: Vec3) -> (Survival, Id) {
+    let mut s = Survival::new_dungeon(Content::dev(), Box::new(FlatLand::default()), 31, 0.0);
+    let h = s.join("boarder", "Boarder", None);
+    let p = s.players.get_mut(&h).unwrap();
+    // (Its arrival's firm ground is the entrance, 40 yd up on the real map: here, the deck.)
+    (p.pos, p.last_safe, p.stamina) = (at, at, 100.0);
+    (s, h)
+}
+
+/// How far south (toward the open side, -y) the rail's line is at `x`.
+fn rail_y(s: &Survival, x: f32) -> f32 {
+    let d = s.dungeon_def().unwrap();
+    let r = d.rails.iter().find(|r| r.key == "juggernaut_starboard").unwrap();
+    let w = r.points.windows(2).find(|w| (w[0][0]..=w[1][0]).contains(&x)).unwrap();
+    let t = (x - w[0][0]) / (w[1][0] - w[0][0]);
+    w[0][1] + (w[1][1] - w[0][1]) * t
+}
+
+fn hop_yards(ev: &[Event], h: Id) -> Option<f32> {
+    ev.iter().find_map(|e| match e {
+        Event::Hop { player, speed, lift, .. } if *player == h => Some(speed * super::super::moves::airtime(*lift)),
+        _ => None,
+    })
+}
+
+#[test]
+fn the_starboard_rail_runs_along_the_open_side_in_pieces_that_meet() {
+    let (s, _) = deck([-62.0, -830.0, 0.0]);
+    let d = s.dungeon_def().unwrap();
+    let r = d.rails.iter().find(|r| r.key == "juggernaut_starboard").expect("the rail");
+    let pieces: Vec<&Obj> = s.objs.values().filter(|o| matches!(o.kind, ObjKind::Prop { display: FENCE, .. })).collect();
+    let len = r.length * r.scale;
+    let total: f32 = r.points.windows(2).map(|w| dist2d(w[0], w[1])).sum();
+    assert!(pieces.len() as f32 >= total / len, "{} pieces for {total:.1} yd", pieces.len());
+    // Every yard of the line is under a piece (each runs back along its facing from its origin).
+    for w in r.points.windows(2) {
+        let n = dist2d(w[0], w[1]).ceil() as usize;
+        for k in 0..=n {
+            let t = k as f32 / n as f32;
+            let p = [w[0][0] + (w[1][0] - w[0][0]) * t, w[0][1] + (w[1][1] - w[0][1]) * t, 0.0];
+            let covered = pieces.iter().any(|o| {
+                let back = [o.pos[0] - o.facing.cos() * len, o.pos[1] - o.facing.sin() * len, 0.0];
+                let (_, off) = combat::along_segment(back, o.pos, p);
+                off < 0.2
+            });
+            assert!(covered, "a gap in the rail at {p:?}");
+        }
+    }
+    // A solid piece: the clients keep its hull (it isn't one of the passable props).
+    let id = *s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Prop { display: FENCE, .. })).unwrap().0;
+    assert!(!s.is_trap_obj(id) && !s.is_perch_visual_prop(id) && !s.is_kitchen_prop(id) && s.collapse_piece_tilt(id).is_none());
+}
+
+#[test]
+fn a_walk_a_roll_or_a_jump_over_the_rail_is_put_back_on_the_deck() {
+    for (from, to) in [
+        ([-62.0, -839.0, 0.0], [-62.0, -840.5, 0.0]),  // a walk
+        ([-62.0, -836.5, 0.0], [-62.0, -842.0, 0.0]),  // a roll's dash
+        ([-70.0, -839.2, 0.0], [-70.0, -841.0, 1.6]),  // a jump over it
+        ([-50.0, -836.0, 0.0], [-50.0, -838.0, -2.0]), // a step off, falling
+    ] {
+        let (mut s, h) = deck(from);
+        s.events.clear();
+        s.move_player(h, to, 0.0, Moving::default());
+        assert_eq!(s.players[&h].pos, from, "{from:?} -> {to:?}: back on the deck");
+        assert!(s.events.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == h)));
+    }
+    // Along the deck, and up to it, nothing holds them.
+    let (mut s, h) = deck([-62.0, -838.5, 0.0]);
+    s.move_player(h, [-60.0, -838.8, 0.0], 0.0, Moving::default());
+    assert_eq!(s.players[&h].pos, [-60.0, -838.8, 0.0]);
+    // Past its ends the ship is as it was.
+    let (mut s, h) = deck([-100.0, -830.0, 0.0]);
+    s.move_player(h, [-100.0, -834.0, 0.0], 0.0, Moving::default());
+    assert_eq!(s.players[&h].pos, [-100.0, -834.0, 0.0]);
+}
+
+#[test]
+fn a_hop_back_toward_the_edge_stops_at_the_rail() {
+    let at = [-62.0, -838.0, 0.0];
+    let (mut s, h) = deck(at);
+    s.set_local_moves(h, false);
+    // Facing in, toward the deck: the hop back goes toward the open side.
+    s.move_player(h, at, std::f32::consts::FRAC_PI_2, Moving::default());
+    s.events.clear();
+    s.input(h, Input::Dodge);
+    let yards = hop_yards(&s.events, h).expect("a hop back");
+    assert!(at[1] - yards >= rail_y(&s, at[0]) - 0.05, "{yards:.2} yd: no farther than the rail");
+}
+
+#[test]
+fn a_knockback_toward_the_edge_ends_on_the_deck_for_a_hero_and_a_creature() {
+    let at = [-62.0, -837.5, 0.0];
+    let (mut s, h) = deck(at);
+    let g = s.spawn_mob(s.content.mob("dm_deck_gunner").unwrap(), [-62.0, -834.5, 0.0], None, false);
+    let shove = crate::content::AbilityEffect { kind: "knockback".into(), amount: 8.0, from_caster: true, ..Default::default() };
+    s.events.clear();
+    s.displace(g, h, &shove);
+    let yards = hop_yards(&s.events, h).expect("thrown");
+    assert!(at[1] - yards >= rail_y(&s, at[0]) - 0.05, "the hero: {yards:.2} yd");
+    // A gunner thrown at the side by a hero stops at it too.
+    s.mobs.get_mut(&g).unwrap().pos = at;
+    s.players.get_mut(&h).unwrap().pos = [-62.0, -834.5, 0.0];
+    s.displace(h, g, &shove);
+    for _ in 0..40 {
+        s.step(DT);
+    }
+    assert!(s.mobs[&g].pos[1] >= rail_y(&s, at[0]) - 0.05, "the gunner: {:?}", s.mobs[&g].pos);
+}
+
+#[test]
+fn a_pull_toward_the_edge_ends_on_the_deck() {
+    // His harpoon hauls toward him; even a puller beyond the rail can't haul anyone over it.
+    let at = [-62.0, -834.0, 0.0];
+    let (mut s, h) = deck(at);
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "dm_greenskin").unwrap().0;
+    s.mobs.get_mut(&boss).unwrap().pos = [-62.0, -846.0, 0.0];
+    let haul = crate::content::AbilityEffect { kind: "pull".into(), amount: 20.0, from_caster: true, ..Default::default() };
+    s.events.clear();
+    s.displace(boss, h, &haul);
+    let yards = hop_yards(&s.events, h).unwrap_or(0.0);
+    assert!(at[1] - yards >= rail_y(&s, at[0]) - 0.05, "{yards:.2} yd");
+    // The harpoon itself, from him on deck by the rail: the hero ends 3 yd from him, on deck.
+    s.mobs.get_mut(&boss).unwrap().pos = [-62.0, -838.5, 0.0];
+    s.players.get_mut(&h).unwrap().pos = [-62.0, -826.0, 0.0];
+    s.events.clear();
+    s.strike_fair_as(boss, h, 1, s.mobs[&boss].pos, true, false, false, Blow::Light, None, combat::Follow::Pull { yards: 9.0 }, HitKind::Projectile);
+    let yards = hop_yards(&s.events, h).expect("hauled");
+    assert!(-826.0 - yards >= rail_y(&s, -62.0), "{yards:.2} yd");
+}
