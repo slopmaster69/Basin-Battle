@@ -553,3 +553,16 @@ fn shredder_stall_holds_through_hits_and_lets_go_as_it_breaks() {
     s.hurt_mob(id, h, u32::MAX);
     assert!(s.events.iter().any(|e| matches!(e, Event::Freeze { id: who, secs, .. } if *who == id && *secs == 0.0)), "the held slump lets go as it breaks");
 }
+
+/// Sneed's wrench reads in flight (Corey, Nov 13: a speck at 16 yd): its look draws it three
+/// times its size, tumbling, with a streak behind it, flown at the throw's own speed so the look
+/// lands with the blow.
+#[test]
+fn sneeds_wrench_is_drawn_big_and_streaked_at_the_throws_speed() {
+    let c = Content::dev();
+    let l = c.missile_looks.iter().find(|l| l.spell == 13398).expect("the wrench's look");
+    assert!(l.scale >= 3.0 && l.tumble && !l.trail.is_empty(), "{l:?}");
+    let sneed = c.mobs.iter().find(|m| m.key == "dm_sneed").expect("Sneed");
+    let throw = sneed.patterns.iter().flat_map(|p| &p.steps).find(|s| s.spell == Some(13398)).expect("his throw");
+    assert_eq!(throw.speed, Some(l.speed), "the look flies with the throw");
+}
