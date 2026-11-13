@@ -117,6 +117,11 @@ fn crosses(a: Vec3, b: Vec3, c: [f32; 2], d: [f32; 2]) -> bool {
     (d1 > 0.0) != (d2 > 0.0) && (d3 > 0.0) != (d4 > 0.0)
 }
 
+/// A rail holds back what moves within this height of the floor at it (a body thrown up over it
+/// too), and nothing on another floor above or below.
+const RAIL_REACH: f32 = 6.0;
+/// A hero held at a rail stands this far short of its line (the fence's half width and a body's).
+const RAIL_STOP: f32 = 0.4;
 /// A hazard's flames burn this long where it went off.
 const HAZARD_FLAME_SECS: f32 = 1.4;
 /// The veil's columns stand this far apart along what it bars.
@@ -210,6 +215,32 @@ impl Survival {
                     let pos = self.ground_near(x, y, dr.at[2]);
                     let id = self.alloc();
                     self.objs.insert(id, Obj { kind: ObjKind::Veil { key: dr.key.clone() }, pos, facing: dr.facing });
+                }
+            }
+        }
+        // The rails along open edges: a fence piece at a time along each stretch of the line,
+        // evenly spaced (overlapping a little) so the pieces meet, each standing on the floor
+        // under its higher end (and `raise` over it), so its top is never low where the deck
+        // rises; its posts, sunk into the floor as modelled, still reach it at its lower end.
+        for r in &d.rails {
+            let len = r.length * r.scale;
+            if len <= 0.0 {
+                continue;
+            }
+            for w in r.points.windows(2) {
+                let ([ax, ay, az], [bx, by, bz]) = (w[0], w[1]);
+                let span = ((bx - ax).powi(2) + (by - ay).powi(2)).sqrt();
+                let n = ((span / len).ceil() as usize).max(1);
+                let f = (by - ay).atan2(bx - ax);
+                for k in 1..=n {
+                    // The piece runs back along its -x from its origin: its origin at the far end.
+                    let t = k as f32 / n as f32;
+                    let (ex, ey) = (ax + (bx - ax) * t, ay + (by - ay) * t);
+                    let (sx, sy) = (ex - f.cos() * len.min(span), ey - f.sin() * len.min(span));
+                    let hint = az + (bz - az) * t;
+                    let z = self.ground_near(ex, ey, hint)[2].max(self.ground_near(sx, sy, hint)[2]) + r.raise;
+                    let id = self.alloc();
+                    self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos: [ex, ey, z], facing: f });
                 }
             }
         }
@@ -858,6 +889,43 @@ impl Survival {
             (Some(b), Some(d)) => door_open(b, d),
             _ => true,
         }
+    }
+
+    /// Whether the way from `a` to `b` goes over a rail (a ship's side) off its deck.
+    pub(crate) fn through_rail(&self, a: Vec3, b: Vec3) -> bool {
+        self.rail_crossing(a, b).is_some()
+    }
+
+    /// Where a way from `a` to `b` would leave the deck over a rail: the spot on it `RAIL_STOP`
+    /// short of the rail's line (no nearer `a` than `a` itself), at `a`'s height. A rail's points
+    /// run with its deck on their left; coming back aboard over it is free, and so is anything on
+    /// another floor.
+    pub(crate) fn rail_crossing(&self, a: Vec3, b: Vec3) -> Option<Vec3> {
+        let d = self.dungeon_def().filter(|_| self.is_below())?;
+        let cross = |u: [f32; 2], v: [f32; 2]| u[0] * v[1] - u[1] * v[0];
+        for r in &d.rails {
+            for w in r.points.windows(2) {
+                let (c, e) = ([w[0][0], w[0][1]], [w[1][0], w[1][1]]);
+                if !crosses(a, b, c, e) {
+                    continue;
+                }
+                let line = [e[0] - c[0], e[1] - c[1]];
+                // (On the deck's side: to the left of the line as it runs.)
+                if cross(line, [a[0] - c[0], a[1] - c[1]]) <= 0.0 {
+                    continue;
+                }
+                let z = self.ground_near((c[0] + e[0]) / 2.0, (c[1] + e[1]) / 2.0, (w[0][2] + w[1][2]) / 2.0)[2];
+                if (a[2] - z).abs() >= RAIL_REACH && (b[2] - z).abs() >= RAIL_REACH {
+                    continue;
+                }
+                let way = [b[0] - a[0], b[1] - a[1]];
+                let len = (way[0] * way[0] + way[1] * way[1]).sqrt().max(1e-4);
+                let t = cross([c[0] - a[0], c[1] - a[1]], line) / cross(way, line);
+                let k = ((t * len - RAIL_STOP) / len).clamp(0.0, 1.0);
+                return Some([a[0] + way[0] * k, a[1] + way[1] * k, a[2]]);
+            }
+        }
+        None
     }
 
     /// A walk from a to b goes through a shut door.
@@ -1659,15 +1727,21 @@ impl Survival {
 
     /// A shut door in a hero's way: back to where they were.
     pub(crate) fn hold_at_doors(&mut self, id: Id, from: Vec3, to: Vec3) -> bool {
-        if dist2d(from, to) > 12.0 || !self.through_shut_door(from, to) {
+        if dist2d(from, to) > 12.0 {
             return false;
         }
+        // A rail along a ship's side holds them on the deck: a walk, a roll, a jump over it as
+        // their own client moved them, stopped where they reached it (a step short of its line),
+        // at once, as a stop and not a jump back.
+        let Some(back) = (if self.through_shut_door(from, to) { Some(from) } else { self.rail_crossing(from, to) }) else {
+            return false;
+        };
         if let Some(p) = self.players.get_mut(&id) {
-            p.pos = from;
+            p.pos = back;
             let f = p.facing;
             self.events.push(Event::Teleport {
                 player: id,
-                pos: from,
+                pos: back,
                 facing: f,
             });
         }

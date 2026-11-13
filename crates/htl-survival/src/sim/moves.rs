@@ -139,7 +139,8 @@ impl Survival {
             let next = (d + STEP).min(dist);
             let p = [from[0] + c * next, from[1] + s * next];
             let g = self.land.height_near(p[0], p[1], at[2] + 1.0);
-            if self.land.blocked_near(p[0], p[1], g) || (g - at[2]).abs() > 1.5 {
+            // (A rail along a ship's side stops it as a wall does.)
+            if self.land.blocked_near(p[0], p[1], g) || (g - at[2]).abs() > 1.5 || self.through_rail(at, [p[0], p[1], g]) {
                 break;
             }
             at = [p[0], p[1], g];

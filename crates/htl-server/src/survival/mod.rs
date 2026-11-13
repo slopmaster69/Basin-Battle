@@ -31,6 +31,9 @@ mod siege_ui;
 mod ui;
 mod wager_ui;
 mod watch;
+#[cfg(test)]
+#[path = "rail_tests.rs"]
+mod rail_tests;
 
 pub(crate) const TICK: Duration = Duration::from_millis(50);
 /// Saves at most this often (and when a hero leaves).
