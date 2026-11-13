@@ -2272,6 +2272,82 @@ fn a_collapse_ends_when_its_fight_is_lost_and_the_boss_goes_back_whole() {
     assert_eq!(m.health, m.max_health, "whole");
 }
 
+/// The boss's own blow fells the last hero: the fight is lost there and then, not when that blow's
+/// recovery ends. (The blow's release fells the hero, and the creature is set to its recovery
+/// after: it stands there with a fallen foe. A hero who woke at their lamp before it ended used to
+/// find the collapse still coming down and rock hurled after them the length of the dungeon.)
+#[test]
+fn a_collapse_is_lost_the_moment_its_boss_fells_the_last_hero() {
+    use crate::content::{CollapseDef, CollapseSectionDef, EnrageDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
+    let sections = [130.0, 160.0].iter().map(|x| CollapseSectionDef { face: [[*x, 15.0], [*x, -15.0]], reach: 20.0, height: 8.0 }).collect();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 10.0, lead: 10.0, hold: 0.25, warn: 0.5, rest: 30.0, sections, ..Default::default() }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [136.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    // The first section down, its face standing, the boss out past it.
+    run(&mut s, 6.0);
+    assert_eq!(s.collapse_state().map(|c| (c.0, c.1)), Some((0, "rest")));
+    assert!(!s.collapse_faces().is_empty() && s.collapse_face_lines().len() == 1);
+    // Its blow lands and fells them; it stands in that blow's recovery.
+    let hp = s.players[&id].health;
+    s.hurt_player_by(id, hp + 10_000, boss, "a blow");
+    let now = s.clock;
+    s.mobs.get_mut(&boss).unwrap().state = mobs::MobState::Recover { foe: mobs::Foe::Hero(id), until: now + 30.0 };
+    run(&mut s, 0.1);
+    assert_eq!(s.collapse_front(), None, "the collapse over at once");
+    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_lines().is_empty(), "the place put back");
+    run(&mut s, 1.0);
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, start) < 0.5 && dist2d(m.home, start) < 0.5, "back where it began: {:?}", m.pos);
+    assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, its phases to start over");
+    assert!(matches!(m.state, mobs::MobState::Idle { .. }), "at rest: {:?}", m.state);
+}
+
+/// A hero carried right out of the fight while the collapse comes down (woken at a lamp far off)
+/// is no hero who ran off ahead: no rock is hurled after them, and with nobody else in the fight
+/// it is lost.
+#[test]
+fn a_hero_far_out_of_a_collapses_fight_is_let_go() {
+    use crate::content::{CollapseDef, CollapseSectionDef, EnrageDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
+    let sections = [130.0, 160.0].iter().map(|x| CollapseSectionDef { face: [[*x, 15.0], [*x, -15.0]], reach: 20.0, height: 8.0 }).collect();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 2.0, lead: 10.0, hold: 0.25, sections, ..Default::default() }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [110.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    run(&mut s, 1.0);
+    assert!(s.collapse_front().is_some());
+    // Far off the route's end, where a hero running from it could not have got to yet.
+    s.players.get_mut(&id).unwrap().pos = [700.0, 300.0, 0.0];
+    let hp = s.players[&id].health;
+    let ev = run(&mut s, 12.0);
+    assert_eq!(s.players[&id].health, hp, "nothing hurled after them");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == id)), "nor any warning of it");
+    assert_eq!(s.collapse_front(), None, "the fight lost");
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, start) < 0.5, "the boss back where it began: {:?}", m.pos);
+    assert_eq!(m.health, m.max_health, "whole");
+}
+
 /// A dungeon's other ways out (`more_exits`) end the run as the front door does, once its boss is down.
 #[test]
 fn another_way_out_ends_the_run_once_the_exit_boss_is_down() {

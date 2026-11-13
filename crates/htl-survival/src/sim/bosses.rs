@@ -126,6 +126,10 @@ const OFF_ROUTE: f32 = 20.0;
 /// them this often.
 const LINE_SLACK: f32 = 6.0;
 const HURL_EVERY: f32 = 4.0;
+/// A hero farther than this from the collapse's whole route hasn't run off ahead of it: they've
+/// left the fight (woken at a lamp elsewhere, carried off). Far past the lamp beyond the route's
+/// end, so nobody running from it gets here on foot before it's over.
+const FIGHT_LEFT: f32 = 150.0;
 
 // --- how it looks (`Looks`): nothing below strikes, warns or times anything ----------------------
 
@@ -449,6 +453,11 @@ impl Collapse {
         })
     }
 
+    /// Whether a spot is right out of the fight: farther than `FIGHT_LEFT` from the whole route.
+    fn left(&self, pos: Vec3) -> bool {
+        route_progress(&self.route, &self.along, pos).is_none_or(|(_, off)| off > FIGHT_LEFT)
+    }
+
     /// Whether a spot is on the stretch the collapse takes: within a section's reach of the
     /// route, or (past the last face) as near the route as a hero on it would be.
     fn on_stretch(&self, pos: Vec3) -> bool {
@@ -626,18 +635,27 @@ impl Survival {
             self.bosses.collapse = None;
             return;
         }
+        // Its foe felled (by its own blow: it stands in that blow's recovery yet) or gone out of
+        // the fight altogether (woken at a lamp elsewhere): on to whoever is still in its fight.
+        let left = match m.state.foe() {
+            Some(mobs::Foe::Hero(h)) => !self.players.get(&h).is_some_and(|p| p.health > 0 && !c.left(p.pos)),
+            _ => false,
+        };
+        let next = if left { self.next_in_fight(boss) } else { None };
         // The fight lost (every hero down or gone): the collapse ends, and the boss goes back to
-        // where its fight began, to be whole again there.
-        if matches!(m.state, MobState::Return | MobState::Idle { .. }) {
-            self.bosses.collapse = None;
-            // The mine stands again for the next try: what came down is gone, its faces with it.
-            self.collapse_cleared(boss);
-            if let Some(at) = self.bosses.began.get(&boss).copied() {
-                self.mobs.get_mut(&boss).unwrap().home = at;
-                self.set_back(boss, at, "the collapse lost: back where the fight began");
-            }
+        // where its fight began, to be whole again there. It ends the moment the last hero is
+        // down, not when the boss next looks for them: a hero who wakes at a lamp a moment later
+        // must find the mine standing, not a fight still on a long way off.
+        if (left && next.is_none()) || matches!(m.state, MobState::Return | MobState::Idle { .. }) {
+            self.collapse_lost(boss);
             return;
         }
+        if let (Some(h), MobState::Chase { .. }) = (next, &m.state) {
+            let m = self.mobs.get_mut(&boss).unwrap();
+            m.state = MobState::Chase { foe: mobs::Foe::Hero(h) };
+            m.lost_at = None;
+        }
+        let Some(m) = self.mobs.get(&boss) else { return };
         if !c.done {
             // Its leash runs from wherever it is while the place comes down round it.
             if let Some(pos) = self.land.footing(m.pos) {
@@ -956,6 +974,30 @@ impl Survival {
         self.bosses.faces.retain(|f| f.owner != owner);
     }
 
+    /// A collapse's fight is lost: the mine stands again for the next try (what came down is
+    /// gone, its faces and their stops with it), and the boss is back where its fight began, on
+    /// its way to being whole there (home, a creature heals and its phases start over).
+    fn collapse_lost(&mut self, boss: Id) {
+        self.bosses.collapse = None;
+        self.collapse_cleared(boss);
+        let Some(at) = self.bosses.began.get(&boss).copied() else { return };
+        self.collapse_lets_go(boss);
+        let Some(m) = self.mobs.get_mut(&boss) else { return };
+        m.home = at;
+        if !matches!(m.state, MobState::Idle { .. }) {
+            m.state = MobState::Return;
+        }
+        self.set_back(boss, at, "the collapse lost: back where the fight began");
+    }
+
+    /// Every hero below is down and the foes stir: a collapse still standing is lost with them.
+    pub(crate) fn collapse_wiped(&mut self) {
+        let Some(boss) = self.bosses.collapse.as_ref().map(|c| c.boss) else { return };
+        if self.mobs.get(&boss).is_some_and(|m| m.health > 0) {
+            self.collapse_lost(boss);
+        }
+    }
+
     /// The dungeon resets: no collapse, no face, no rubble, nobody running from one.
     pub(crate) fn collapse_reset(&mut self) {
         let off = self.bosses.looks.off;
@@ -1025,7 +1067,7 @@ impl Survival {
         }
         let (boss_at, boss_off) = route_progress(&route[leg - 1..=leg], &along[leg - 1..=leg], m.pos).unwrap();
         let hero = match m.state.foe() {
-            Some(mobs::Foe::Hero(h)) => self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos),
+            Some(mobs::Foe::Hero(h)) => self.players.get(&h).filter(|p| p.health > 0 && route_progress(&route, &along, p.pos).is_some_and(|(_, off)| off <= FIGHT_LEFT)).map(|p| p.pos),
             _ => None,
         };
         let lost = m.lost_at.is_some_and(|t| now - t >= STUCK);

@@ -970,6 +970,8 @@ impl Survival {
         self.reset_machinery();
         self.reset_kitchens();
         self.reset_duels();
+        // (A collapse: its rubble, faces and stops gone, its boss back where its fight began.)
+        self.collapse_wiped();
         let fallen = std::mem::take(&mut self.below.as_mut().unwrap().fallen);
         for (def, home, pack) in fallen {
             if pack.is_some_and(|k| self.pack_slain(k)) {

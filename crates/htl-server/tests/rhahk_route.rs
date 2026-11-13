@@ -361,3 +361,79 @@ fn smites_existing_short_rack_walk_still_reaches_its_floor() {
     assert_eq!(s.mobs[&boss].phase, 1, "equipped axes after the walk");
     println!("Smite rack: {nearest:.3} yd nearest, equipped axes, no resets/falls");
 }
+
+/// A hero on the door side of his post who does nothing at all (what
+/// `tools/visual-check/rhahk-collapse-wipe.txt` films): caught by the first section and thrown out
+/// ahead of its face, never left behind it; felled there by Rhahk'Zor's own blow; and from that
+/// moment the mine stands again, he is whole at his post, and the hero who wakes at their lamp is
+/// left alone (no fight still on behind them, no rock hurled the length of the mine).
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
+    let land = real_land();
+    let mut c = content();
+    let def = c.mob("dm_rhahkzor").unwrap();
+    c.dungeon.as_mut().unwrap().packs.retain(|p| p.mob == "dm_rhahkzor");
+    let mut s = Survival::new_dungeon(c, Box::new(land), 3, 0.0);
+    let boss = *s.mobs.iter().find(|(_, m)| m.def == def).unwrap().0;
+    let home = s.mobs[&boss].home;
+    let hero = s.join("film", "Film", None);
+    // Between the buried door and his post, behind where the first face will stand (x = -37).
+    let at = s.land().footing([-25.0, -376.0, 60.8]).expect("the door pocket's floor");
+    s.move_player(hero, at, 3.14, Default::default());
+    s.dev_hurt(hero, 0.69, "rhahkzor").unwrap();
+    let t0 = s.clock;
+    let (mut caught, mut fell, mut woke, mut resets) = (Vec::new(), None, None, 0);
+    let mut health = s.players[&hero].health;
+    for _ in 0..(40 * 20) {
+        for e in s.step(0.05) {
+            if let Event::Log(t) = e {
+                assert!(!t.contains("fell through"), "{t}");
+                if t.contains("the collapse catches") {
+                    caught.push((s.clock - t0, s.players[&hero].pos));
+                }
+                if t.contains("put back") {
+                    resets += 1;
+                }
+            }
+        }
+        let now = s.players[&hero].health;
+        let t = s.clock - t0;
+        match (fell, woke) {
+            (None, _) if now == 0 => {
+                fell = Some(t);
+                let m = &s.mobs[&boss];
+                assert!(dist2d(m.pos, s.players[&hero].pos) < 8.0, "felled by him, at the face: he is at {:?}", m.pos);
+            }
+            (None, _) => {
+                // Whatever else happens to them, they are never behind the rubble.
+                assert!(!s.collapse_behind(s.players[&hero].pos) || s.collapse_state().is_some_and(|c| c.1 != "rest"), "left behind a standing face at {t:.2} s: {:?}", s.players[&hero].pos);
+            }
+            (Some(at), _) if t <= at + 0.11 => {}
+            (Some(at), None) => {
+                // The fight was lost the moment they fell.
+                assert_eq!(s.collapse_front(), None, "the collapse still on {:.2} s after the hero fell", t - at);
+                assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_lines().is_empty(), "the mine put back");
+                if now > 0 {
+                    woke = Some(t);
+                }
+            }
+            (Some(_), Some(_)) => {
+                assert!(now >= health, "struck after waking at the lamp, at {t:.2} s: {health} to {now}");
+                assert_eq!(s.collapse_front(), None, "no collapse begun again on a hero at their lamp");
+            }
+        }
+        health = now;
+    }
+    let (fell, woke) = (fell.expect("felled"), woke.expect("woken at the lamp"));
+    assert_eq!(caught.len(), 1, "caught once, by the first section: {caught:?}");
+    let (when, to) = caught[0];
+    assert!(to[0] < -37.0 - 2.0 && dist2d(to, at) > 10.0, "thrown out ahead of the first face, not left behind it: {to:?}");
+    assert!(when < fell);
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, home) < 1.0 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}", m.pos);
+    assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, his fight to start over");
+    assert!((1..=2).contains(&resets), "bounded wipe reset: {resets}");
+    assert_eq!(s.players[&hero].health, s.players[&hero].max_health, "the hero whole at the lamp");
+    println!("door side: caught at {when:.2} s and thrown to ({:.1}, {:.1}, {:.1}); felled at {fell:.2} s, the mine put back at once; woke at {woke:.2} s and left alone", to[0], to[1], to[2]);
+}
