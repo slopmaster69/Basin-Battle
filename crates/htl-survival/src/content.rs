@@ -1640,18 +1640,24 @@ pub struct DungeonDef {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct RailDef {
     pub key: String,
-    /// The line it runs along, in order: `[x, y, z]`, z the floor's height there.
+    /// The line it runs along, in order: `[x, y, z]`, z the floor's height there. The deck lies to
+    /// the line's left as its points run.
     pub points: Vec<[f32; 3]>,
-    /// The piece (`GameObjectDisplayInfo`), its scale, and its length at scale 1: the piece runs
-    /// that far along its -x from its origin.
+    /// The piece (`GameObjectDisplayInfo`) and its scale.
     pub display: u32,
     #[serde(default = "rail_scale")]
     pub scale: f32,
-    pub length: f32,
-    /// How far above the floor under its higher end each piece stands (its posts still sink in at
-    /// its lower end): its top clear of a step up and a hop.
+    /// Where the piece runs, from and to, at scale 1: along its own x from its origin, or along its
+    /// y with `along_y`. Pieces are laid as straight chords of the line that long, end to end.
+    pub run: [f32; 2],
     #[serde(default)]
-    pub raise: f32,
+    pub along_y: bool,
+    /// Its bottom and top over its origin at scale 1 (its collision hull's).
+    pub height: [f32; 2],
+    /// How far its origin stands over the deck under it (below zero: sunk into it). Each piece is
+    /// tipped to follow the deck's rise along its chord, so this holds all along it.
+    #[serde(default)]
+    pub lift: f32,
 }
 
 fn rail_scale() -> f32 {

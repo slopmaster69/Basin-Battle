@@ -111,19 +111,31 @@ hero walked or rolled straight off it (a roll with no keys held is a step back).
 can reach, from x -92 by VanCleef's cabin to x -44 by the bow, each point on the deck and walkable
 from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the ship is as it was.
 
-- **What it looks like:** ElwynnWoodFence01 (display 6151, the dungeons' own dark wood, posts and
-  rails, 4.3 yd a piece; its collision hull from 0.56 below its origin to 1.80 above), at 0.9:
-  pieces of 3.9 yd laid end to end along the line (overlapping a little, so they meet). Each stands
-  0.1 over the deck under its higher end, so its posts still sink in at its lower end and it
-  follows the deck's curve and its rise toward the bow (38.9 to 43.1). Its top stands 1.72 to 2.0
-  yd over the deck: chest to shoulder high. The data has no ship's rail to place: its only railing
-  (6157, CarnivalRailing) is 14 yd long and can't follow the curve.
-- **Why that tall (take 375):** at 0.75, seated under its lower end, its top stood 1 yd over the
-  deck where the deck rose, and a hero rolling back went over it: the client's own roll is a dash
-  at 16 yd/s along the ground, and the client lets a body step up 1 yd. Now its top clears that
-  step up and the server's own hop back (older clients: 0.23 yd at its peak) by half a yard. A
-  jump (1.6 yd) still clears it on the client; the server's stop below holds that.
-- **On the client:** walking, a dash roll and a run into it stop against it (take 375).
+- **What it looks like:** a bulwark of weathered planks, the Juggernaut's own deck wood carried up
+  its side. Its pieces are ExcavationBarrierPlank (display 4651): a plank wall of FinishedWood, whose
+  colour (texture average 141/103/67) is the deck's (`STU_DREADNAUGHTDECK`, 144/111/76). At 0.85
+  each is 9.7 yd long and 1.95 yd tall, laid as straight chords of the line end to end (the deck
+  is convex there, so each chord stays on it), tipped to follow the deck's rise toward the bow
+  (38.9 to 43.1) and sunk 0.15 into it, so its top stands 1.80 yd over the deck all along: shoulder
+  high. Each piece goes to the clients with its whole rotation (`rail_piece_rotation`), as the
+  game objects' tilt alone can't tip a piece that runs along its own y.
+- **The models looked at (Corey, 12 Nov: darker and more ship-like than the pale Elwynn fence):**
+  no ship's or dock's rail exists as a game object in the 1.12 data, and the Juggernaut's own
+  woodwork is the dungeon's map (`STU_DREADNAUGHT*`), which no placeable model uses. Of those that
+  can be placed:
+  - ElwynnWoodFence01 (6151, the rail before): a farm fence, pale yellow wood (195/147/74).
+  - CarnivalRailing (6157): Booty Bay trim, rope and red paint, but a bright orange (180/102/33) and
+    14 yd of horizontal bands with no posts; it would stand out more than the fence did.
+  - ElwynnFenceSimple (6150), BurningSteppesFence (6526): field fencing and chain.
+  - The Darkshore docks (6556, 6557), rowboats (124, 223), lumber piles (1108, 1109): not rails.
+  - Duskwood, Undead and Orc sets: furniture, tombs and lamp posts, no fencing.
+- **Why it is that tall (take 375):** the fence at 0.75 stood only 1 yd over the deck where the
+  deck rose, and a hero rolling back went over it: the client's own roll is a dash at 16 yd/s
+  along the ground, and the client lets a body step up 1 yd. The bulwark's top clears that step
+  up and the server's own hop back (older clients: 0.23 yd at its peak) by half a yard. A jump
+  (1.6 yd) still clears it on the client; the server's stop below holds that.
+- **On the client:** walking, a dash roll and a run into the fence stopped against it (take 375).
+  The bulwark's hull is one solid box over the whole piece.
 - **On the server:** nothing leaves the deck over its line (`rail_crossing`). The deck lies to the
   left of the line as its points run; coming back aboard over it is free. A hero whose move would
   take them over it (a walk, the client's own roll, a jump, a step off falling) is stopped where
@@ -164,8 +176,8 @@ draw, load, 1.2 sec aim and shot with the gun out 6 sec, no pause and the 10 sec
 the harpoon waiting for 2 sec at 8 yd, its held pose, spear, throw, haul and clearing cut, a
 sidestep or guard sparing the haul, party retarget, Vanish, the wipe putting the crew back at
 its posts, death clearing every shot, the floor checks, ranged input on a gunner, knockback, and
-the captain-first reward. The starboard rail: its pieces meet along the whole line and keep their
-hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
+the captain-first reward. The starboard rail: its pieces cover the whole line end to end as chords, each
+along its chord tipped to the deck, tall enough all along, and keep their hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
 server never carries a running hero over it, nor their firm ground; coming back aboard is free; the
 server's hop back, a knockback (a hero and a gunner) and a pull (even from beyond it) end on the
 deck; past its ends nothing changes. `crates/htl-server/src/survival/rail_tests.rs` runs a hero
