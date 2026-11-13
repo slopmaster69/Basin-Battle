@@ -2472,26 +2472,29 @@ pub struct EnrageDef {
     /// ring, dust first.
     #[serde(default)]
     pub rocks_round: f32,
-    /// The place coming down behind the heroes (`sim::bosses`'s collapse): a front that runs
-    /// along a route, everything behind it buried.
+    /// The place coming down behind the heroes (`sim::bosses`'s collapse): section after section
+    /// along a route, each left full of rubble behind a face of it.
     #[serde(default)]
     pub collapse: Option<CollapseDef>,
 }
 
-/// A collapse (`[mob.phase.collapse]`): a front runs along `route` (the heroes' way out, point to
-/// point) at `speed` yards a second. Behind it rock is falling everywhere and a hero there is
-/// crushed (`crush`, a share of their health each second); for `lead` yards ahead of it dust
-/// trickles and lighter rocks come down, and those heroes are warned. The boss fights on through
-/// it, unhurt, and can't be brought below `hold` of its health until the front reaches the route's
-/// end, where it yells `end_text` and the last of the fight is fought.
+/// A collapse (`[mob.phase.collapse]`): the place comes down in `sections` along `route`, which
+/// runs from the buried end (behind the boss) the way the heroes are to go. Each section goes in
+/// a surge: `warn` seconds of warning (a bright band across the section's front edge, dust from
+/// the roof), then a wave of falling rock from its back edge to its front edge at `speed` yards a
+/// second, which leaves a face of rubble across that front edge, wall to wall; then the front
+/// holds still for `rest` seconds and the next section goes. A hero behind the wave or behind a
+/// face, however far to the side (`reach`), is caught: `catch` of their health gone once a surge,
+/// thrown onto clear floor `throw` yards past the surge's line, down for `down` seconds. Nobody is
+/// left behind the rubble. For `lead` yards ahead of the wave lighter rocks come down. The boss
+/// fights on through it and can't be brought below `hold` of its health until the last section is
+/// down, where it yells `end_text` and the last of the fight is fought.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CollapseDef {
     pub route: Vec<[f32; 3]>,
     pub speed: f32,
     #[serde(default = "collapse_lead")]
     pub lead: f32,
-    #[serde(default = "collapse_crush")]
-    pub crush: f32,
     #[serde(default)]
     pub hold: f32,
     #[serde(default)]
@@ -2499,14 +2502,84 @@ pub struct CollapseDef {
     /// Yelled the first time a blow would have brought it below `hold` before the end.
     #[serde(default)]
     pub held_text: String,
+    /// The sections, in the order they come down. None: the whole route is one, its face a little
+    /// short of the route's end.
+    #[serde(rename = "section", default)]
+    pub sections: Vec<CollapseSectionDef>,
+    #[serde(default = "collapse_warn")]
+    pub warn: f32,
+    #[serde(default = "collapse_rest")]
+    pub rest: f32,
+    #[serde(default = "collapse_catch")]
+    pub catch: f32,
+    #[serde(default = "collapse_throw")]
+    pub throw: f32,
+    #[serde(default = "collapse_down")]
+    pub down: f32,
+}
+
+impl Default for CollapseDef {
+    fn default() -> Self {
+        CollapseDef {
+            route: Vec::new(),
+            speed: 5.0,
+            lead: collapse_lead(),
+            hold: 0.0,
+            end_text: String::new(),
+            held_text: String::new(),
+            sections: Vec::new(),
+            warn: collapse_warn(),
+            rest: collapse_rest(),
+            catch: collapse_catch(),
+            throw: collapse_throw(),
+            down: collapse_down(),
+        }
+    }
+}
+
+/// One section of a collapse: `face` is its front edge, the line its rubble is built across, from
+/// one wall to the other (the route crosses it). A hero within `reach` yards of the route there
+/// (a side cave, a pocket) is in the section. `height` is the roof over the floor at the face: how
+/// high the rubble is built.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CollapseSectionDef {
+    pub face: [[f32; 2]; 2],
+    #[serde(default = "collapse_reach")]
+    pub reach: f32,
+    #[serde(default = "collapse_height")]
+    pub height: f32,
 }
 
 fn collapse_lead() -> f32 {
     12.0
 }
 
-fn collapse_crush() -> f32 {
-    0.2
+fn collapse_warn() -> f32 {
+    2.0
+}
+
+fn collapse_rest() -> f32 {
+    12.0
+}
+
+fn collapse_catch() -> f32 {
+    0.35
+}
+
+fn collapse_throw() -> f32 {
+    4.0
+}
+
+fn collapse_down() -> f32 {
+    1.0
+}
+
+pub(crate) fn collapse_reach() -> f32 {
+    20.0
+}
+
+pub(crate) fn collapse_height() -> f32 {
+    8.0
 }
 
 /// Burning ground a boss's heavy blow leaves (`[mob.phase.burn]`): how wide, what it does each

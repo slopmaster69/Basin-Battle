@@ -1337,6 +1337,10 @@ impl Survival {
             if self.step_boss_run(id) {
                 continue;
             }
+            // A foe running from a collapse: gone in a moment, it heeds nothing else.
+            if self.step_collapse_flee(id) {
+                continue;
+            }
             // A boss holding the line of its collapse: the route and the front set where it goes.
             if self.step_boss_holdline(id) {
                 continue;

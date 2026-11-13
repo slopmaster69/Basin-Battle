@@ -1735,6 +1735,10 @@ impl Survival {
         {
             return;
         }
+        // A face of a collapse's rubble: nobody walks, rolls or jumps through one.
+        if pos.iter().all(|v| v.is_finite()) && self.hold_at_face(id, was, pos) {
+            return;
+        }
         // Over the ship's side in VanCleef's duel: back on the deck.
         if self.hold_on_deck(id, pos) {
             return;
@@ -1896,7 +1900,10 @@ impl Survival {
             // (Never over a rail or through a shut door: carried there, the next report would
             // seem to come from the far side. Take 370: a walk through the Juggernaut's rail.)
             let (from, to) = (p.pos, [x, y, p.pos[2]]);
-            if self.land.blocked_near(x, y, p.pos[2]) || (self.is_below() && (self.through_rail(from, to) || self.through_shut_door(from, to))) {
+            if self.land.blocked_near(x, y, p.pos[2])
+                || (self.is_below() && (self.through_rail(from, to) || self.through_shut_door(from, to)))
+                || self.face_crossing(from, to).is_some()
+            {
                 continue;
             }
             let p = self.players.get_mut(&id).unwrap();

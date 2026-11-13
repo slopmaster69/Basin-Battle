@@ -295,7 +295,8 @@ impl SurvivalGame {
             ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) || self.sim.is_perch_visual_prop(v.id) || self.sim.is_kitchen_prop(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             // The falling mine's rock and timbers: there at once, moved in place as they fall,
             // and no hull (the heroes and the boss go on through them, as before they showed).
-            ObjKind::Prop { .. } if self.sim.collapse_piece_tilt(v.id).is_some() => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            // A face's rocks, landed, are the exception: plain objects, solid, to the roof.
+            ObjKind::Prop { .. } if self.sim.collapse_piece_tilt(v.id).is_some() && !self.sim.collapse_piece_solid(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             _ => (kind, flags),
         }
     }

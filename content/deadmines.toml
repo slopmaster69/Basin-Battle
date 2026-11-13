@@ -31,7 +31,7 @@ hero_health = 0.7
 # an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
 # same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
 hero_foes = 0.35
-# Out once Rhahk'Zor is down: he brings the mine down on the front door (his gauntlet), so the way
+# Out once Rhahk'Zor is down: he brings the mine down on the front door (his collapse), so the way
 # out is the smugglers' tunnel at the landing, where the heroes came in.
 exit = [-110.0, -1003.0, 34.0]
 exit_radius = 5.0
@@ -2081,15 +2081,16 @@ respawn = 0.0
   steps = [ { from = "NightElfFemale", clip = 95, take = 0, ranged = false, windup = 0.35, damage = 7, range = 2.6, arc = 80.0, blockable = true, recovery = 0.6 } ]
 
 # Rhahk'Zor, the Brotherhood's foreman, the last thing between the heroes and daylight (the final
-# boss, Corey Nov 8: "the final boss needs to feel like a final boss... runs back to his default
-# fight in the FORGE"). Three acts across the mine:
+# boss, Corey Nov 8: "the final boss needs to feel like a final boss"). Three acts, all at the
+# mine's mouth:
 # 1. The front door: a broad sweep, an overhead that sticks a moment, a shoulder rush.
-# 2. At about two thirds he brings the mouth's props down (rocks over the tunnel; the front door
-#    barred while he fights) and runs back through the galleries, the Mast Room and the workshop to
-#    the Foundry, rocks shaken loose behind him (light ones), waiting there for the heroes.
-# 3. The forge: his maul heated in the smelter, every heavy blow leaves burning iron; at a third a
-#    slam brings the Foundry's ceiling down over three spots (a dry way between); at the last the
-#    pound, and the maul lodges in the floor: the best opening of the run.
+# 2. At 70% he brings the mine down, from the buried front door inward: section after section,
+#    each left full of rubble behind a face of it, pushing the fight back toward the galleries
+#    (the collapse below). He can't be brought below 26% until the last section is down.
+# 3. The last stand, where the collapse stopped, short of the Galleries lamp: his maul catches
+#    fire and every heavy blow leaves burning iron; a slam brings the roof down over three spots
+#    (a dry way between); at the last the pound, and the maul lodges in the floor: the best
+#    opening of the run.
 # No miners at a health line, no roar that throws all down: the ogre changes the place, not the
 # count.
 [[mob]]
@@ -2127,29 +2128,82 @@ death_text = "...VanCleef... never pay..."
   lock = 0.35
   blockable = true
   heavy = true
-  # The gauntlet (Corey, Nov 8: "a continuous slow gauntlet back through the whole dungeon... a
-  # boulder chase scene from Indiana Jones until we're back at the ship"). At 70% he brings the
-  # mouth down, and the mine comes down behind the heroes all the way back: a front that runs the
-  # heroes' own way out (the galleries, the Mast Room, the workshop, the Foundry's ramp and pit, the
-  # Cannon Gallery, the ledge along the dry dock) to Smite's island before the Juggernaut, its points
-  # resolved through the land's native walking corners and floors: 1,018 yd at 4 yd/s,
-  # about 4 min 15 sec. Behind it rock falls everywhere and a hero there is crushed (a fifth of their health a second); ahead of it dust
-  # and warning falls. He fights them the whole way, unhurt by it, and can't be brought below 26%
-  # until it reaches the ship: the last of the fight is fought there.
+  # The collapse (Corey, Nov 13: "what happens if the player is on the other side of that rubble?
+  # Then he's cut off and cannot escape. The rubble should start from the entrance of deadmines
+  # and continue to fill, fall, and build towards the way you want the player to escape"). At 70%
+  # the mine comes down in four sections, from the buried front door inward, each in a surge: a
+  # bright band across the section's front edge (the line to get past) and dust from the roof for
+  # `warn` seconds, then a wave of falling rock from its door end to the band, which leaves the
+  # section full and a face of rubble across the band, wall to wall, solid. Then the front holds
+  # still (`rest`) while he fights at the face, and the next section goes. A hero behind the wave
+  # or a face, wherever (the door pocket, the chamber's side cave), is caught and thrown clear
+  # past the band: nobody is ever cut off. It stops short of the Galleries lamp (31 yd from the
+  # route's end), so a hero who wakes there walks up to the fight, never into rubble. About 61 sec
+  # from the yell to the last face.
   [[mob.phase]]
   at = 0.7
   speed = 0.95
   text = "Rhahk'Zor bring whole mine down on you!"
-  debris = [[-30.0, -388.0, 56.0], [-25.0, -381.0, 57.5], [-34.0, -379.0, 56.0]]
-  collapse = { route = [[-40.0, -385.0, 55.8], [-70.0, -380.0, 54.2], [-112.5, -405.0, 59.9], [-140.0, -400.0, 58.2], [-190.0, -442.5, 53.6], [-190.0, -480.0, 54.0], [-244.0, -482.0, 48.9], [-288.0, -505.0, 50.0], [-290.3, -537.0, 49.4], [-300.0, -580.0, 47.2], [-250.0, -578.0, 51.1], [-240.0, -579.0, 51.2], [-216.0, -561.0, 51.2], [-192.0, -563.0, 51.2], [-184.0, -575.0, 47.9], [-185.0, -587.0, 41.9], [-195.0, -598.0, 34.4], [-207.0, -600.0, 28.2], [-219.0, -595.0, 21.8], [-205.0, -592.0, 21.0], [-181.0, -583.0, 19.3], [-145.0, -583.0, 18.8], [-133.0, -591.0, 18.7], [-126.0, -615.0, 13.7], [-119.0, -639.0, 11.4], [-110.0, -650.0, 7.2], [-109.0, -691.0, 4.6], [-100.0, -692.0, 8.2], [-93.0, -716.0, 8.6], [-81.0, -726.0, 8.9], [-57.0, -728.0, 8.9], [-33.0, -731.0, 8.6], [-21.0, -742.0, 9.1], [-9.0, -754.0, 9.1], [-2.0, -768.0, 9.6]], speed = 4.0, lead = 14.0, crush = 0.2, hold = 0.26, held_text = "Rhahk'Zor not die in a hole!", end_text = "No more mine. Only Rhahk'Zor!" }
-  # On the way, wherever he is: the beams over him come down in a ring.
+  # Three heavy falls in the tunnel behind him as he yells, each on a floor the land knows (the old
+  # points hung over rock: one had no floor under it at all).
+  debris = [[-28.0, -376.0, 59.6], [-22.0, -378.0, 60.9], [-34.0, -379.0, 59.3]]
+    [mob.phase.collapse]
+    # From the buried front door (its floor begins at x -6), down the tunnel, across the
+    # foreman's chamber and up the corridor to where the galleries open: 94.6 yd as the land
+    # walks it. Its end is the last stand.
+    route = [[-7.0, -375.5, 62.4], [-37.0, -375.5, 57.3], [-50.0, -378.5, 54.8], [-62.0, -382.0, 53.9], [-68.0, -382.5, 53.8], [-78.0, -377.5, 55.2], [-91.0, -375.8, 57.9], [-97.0, -378.0, 58.2]]
+    # The wave of rock: slower than a hero runs (7 yd/s), so the band is always reachable from
+    # anywhere in its section once the warning starts.
+    speed = 5.0
+    # Time to see the band and turn for it before the first rock.
+    warn = 2.0
+    # The front stands still this long between sections: a round of the fight at the face.
+    rest = 12.0
+    # A hero caught behind the wave loses this share of their health, once a surge: a mistake
+    # that costs, never a death by itself from full health.
+    catch = 0.35
+    # ...and is set down this far past the band, down for `down` seconds.
+    throw = 4.0
+    down = 1.0
+    lead = 14.0
+    hold = 0.26
+    held_text = "Rhahk'Zor not die in a hole!"
+    end_text = "No more mine. Only Rhahk'Zor!"
+    # The sections' front edges, each across a narrowing, wall to wall and a yard into the rock
+    # at both ends. `reach` is how far to the side of the route the section's floor runs (its
+    # pockets and side caves); `height` the roof over the floor there (measured on the land).
+    # 1. The door pocket and the tunnel, to the tunnel's mouth at his post (30 yd). The pocket
+    #    runs 16 yd south of the route.
+    [[mob.phase.collapse.section]]
+    face = [[-37.0, -366.5], [-37.0, -381.5]]
+    reach = 20.0
+    height = 8.8
+    # 2. The chamber's near end, to the pillar (14 yd): the widest face, both sides of the pillar.
+    [[mob.phase.collapse.section]]
+    face = [[-50.0, -365.5], [-50.0, -405.5]]
+    reach = 30.0
+    height = 11.5
+    # 3. The rest of the chamber, to the corridor's mouth (30 yd). Its side cave ends 36 yd north
+    #    of the route, its south part 31 yd south.
+    [[mob.phase.collapse.section]]
+    face = [[-78.0, -368.5], [-78.0, -386.5]]
+    reach = 40.0
+    height = 9.0
+    # 4. The corridor, to its narrowest (14 yd). A reach of 12 keeps the cave south of it, which
+    #    opens on the galleries and not on the corridor, out of the collapse.
+    [[mob.phase.collapse.section]]
+    face = [[-91.0, -371.0], [-91.0, -380.0]]
+    reach = 12.0
+    height = 6.5
+  # As the mine comes down, wherever he is: the beams over him come down in a ring.
   [[mob.phase]]
   at = 0.45
   speed = 0.9
   text = "Rocks for everyone!"
   rocks_round = 7.0
-  # At the ship, the last stand (held back until the collapse is done): his maul catches fire, and
-  # every heavy blow leaves burning iron.
+  # The last stand, where the collapse stopped (held back until its last section is down): his
+  # maul catches fire, and every heavy blow leaves burning iron. Its three falls are at the
+  # galleries' opening, where he stands by then.
   [[mob.phase]]
   at = 0.25
   speed = 0.85
@@ -2158,7 +2212,7 @@ death_text = "...VanCleef... never pay..."
   text = "RHAHK'ZOR... SMASH!"
   kit = 38
   burn = { radius = 3.0, damage = 9, secs = 7.0, look = 22191 }
-  debris = [[-214.0, -584.0, 21.0], [-197.0, -600.0, 21.0], [-198.0, -578.0, 21.0]]
+  debris = [[-95.0, -377.0, 57.8], [-102.0, -384.0, 58.0], [-104.0, -378.0, 57.8]]
   # The last: he pounds the floor, and the maul sticks in it (`lodge`): haul it free he must.
   [[mob.phase]]
   at = 0.12
