@@ -91,10 +91,11 @@ of equal length.
   dust rolling at the front. A row's rock has no ring and no burst of its own: it is one roof, not
   many throws. Only the lighter falls ahead of the front, the ones that hurt, keep their ring.
 - **It fills and stays.** Behind the front the floor is full of rock, up to 400 loose pieces (the
-  oldest go first) and 96 in the air at once. A whole collapse lays fewer: filmed on November 13,
-  after the third face stood, 250 loose pieces lay, with 41 face rocks, 41 pale rocks over them
-  and 16 torches (348 things standing, 28 at most in the air), so nothing was taken away and the
-  first tunnel was as full at the end as when it fell.
+  oldest go first) and 96 in the air at once. Three of the four sections lay fewer: filmed on
+  November 13, as the third face stood, 250 loose pieces lay, with 41 face rocks, 41 pale rocks
+  over them and 16 torches (348 things standing, 28 at most in the air; the third face ends at 55
+  rocks in the route test), so nothing had been taken away and the first tunnel was as full then
+  as when it fell. The fourth section (13.5 yd of corridor) was not filmed or counted.
   At the front edge a face is built to the roof, wall to wall. What's seen of a face is the pale
   rock, lit by its line's torches, with dust at its foot every 0.9 sec while he fights there; the
   hull behind it is the ruin's dark rock, as before.
