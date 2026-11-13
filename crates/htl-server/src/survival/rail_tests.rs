@@ -9,8 +9,8 @@ impl htl_survival::Land for Flat {
     fn height_near(&self, _: f32, _: f32, z: f32) -> f32 { z }
 }
 
-/// The rail's line at x -64 (between its points at x -68 and -60).
-const RAIL_Y: f32 = -839.45;
+/// The rail's line at x -64 (between its corners at x -66.75 and -56.9, along the deck's edge).
+const RAIL_Y: f32 = -840.49;
 
 fn deck() -> (SurvivalGame, Id, Receiver<Packet>) {
     let content = htl_survival::Content::builtin().for_dungeon_of("deadmines");

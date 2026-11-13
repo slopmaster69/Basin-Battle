@@ -107,18 +107,65 @@ map: the deck runs to y -840 (x -76 to -60) and stops, curving in to -834 toward
 bow, with the next floor 9 yd below and the water beyond, and no blocked cell at deck height. A
 hero walked or rolled straight off it (a roll with no keys held is a step back).
 
-**The starboard rail** (Corey, 10 Nov) now runs 0.9 yd inside that lip for the stretch his fight
-can reach, from x -92 by VanCleef's cabin to x -44 by the bow, each point on the deck and walkable
-from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the ship is as it was.
+**The bulwark** (Corey, 10 and 12 Nov: "make sure it goes around all the way") runs along the very
+edge of every open edge of the ship's decks (`[[dungeon.rail]]` in `content/deadmines.toml`). A
+survey of the deck at a quarter of a yard (the game's own ground is a yard wide) took every floor
+walkable from the captain's home and found each edge with a drop of more than 2 yd and no wall:
+
+| Edge | Where | Drop | Now |
+| --- | --- | --- | --- |
+| The stern-port quarter | from the gangway's head (-84, -803) to the transom (-108, -812) | 3 to 8 yd to the gangway and the hull | bulwark (`juggernaut_starboard`) |
+| Stern | the flat transom at x -108, y -812 to -827 | 8 yd to the hull, then the water | bulwark (`juggernaut_starboard`) |
+| Starboard side | y -827 to -841, x -108 to -38 | 9 yd to the hull's shelf, then the water | bulwark (`juggernaut_starboard`) |
+| Bow | from the forecastle's north face (-38, -813) down the slope to the point (-34.2, -794.8), its torch inside | 7 yd to the stem | bulwark (`juggernaut_port`) |
+| Port side | the port walkway's outer edge, x -34 to -81 | 20 yd to the dock | bulwark (`juggernaut_port`) |
+| The port walkway's west end | x -85, y -790 to -793, a yard short of the gangway's head | to the gangway and the dock | invisible wall (`juggernaut_gangway_head`) |
+| The trench's main-deck rim | from the steps' head (-49.6, -803.3) to the block at x -61 | 17 yd to the scaffold | invisible wall (`juggernaut_trench`) |
+| The gangway's head | the stern-port quarter, x -84 to -100, y -794 to -802.6 | | open: the way aboard |
+| The trench's north end | x -45 to -51.6, y -796 to -804 | | open: the steps between the main deck and the port walkway, and their head |
+| The port walkway's rim over the trench | y -792.5 to -800, x -45 to -62.5 | 17 yd | open: the boarding route and the Blackguards' way off to (-54, -793) run along it (#308) |
+
+The edge is not where a line of chords suggested (take 380: at the bow, the stern's corners and
+along the port walkway, pieces laid as chords of a line drawn inside the edge cut across it,
+leaving deck, the bow's torch and the walkway's torches and lanterns outside them, and a hero
+standing at the bow's point outside the planks). Each line's points are now its corners, on the
+deck's edge as the fine survey draws it, pushed out past it where the edge bows out between them,
+so that no deck and no light is left outside a piece. Its pieces lie along each straight run
+between two corners, none cutting across one: a run gets as few as cover it, the first from its
+start and the last ending at its end, those between spread evenly and every other one set 0.04 yd
+toward the deck so overlapping pieces lap like boards. A run shorter than a piece gets one ending
+at its end and reaching back past its start, over the deck (or, at the bow's first, into the
+forecastle). Each piece stands on the deck in from its line: under it, or (where the line runs over
+the water just past the deck) the nearest deck in from it.
+
+Where the plank runs past a corner of the deck that is rounded, a wedge of open water up to
+0.9 yd deep stands between the deck and the plank's inner face (the transom's corners; the bow's
+point, about half a yard); elsewhere the gap is under half a yard. The gap is narrower than a
+body, and the server's stop holds anything that reaches the line.
+
+The trench's main-deck rim and the walkway's west end are short and bend too tightly for a plank
+piece (the shortest tall enough is 9.4 yd); the data's own invisible collision wall
+(CollisionWallPvP01, display 6391, 11 by 9 yd, no texture) holds them at 0.35, in 3.9 yd pieces
+3.1 yd tall, with the server's stop. The deck's edges against the forecastle (the bow's works,
+x -52 to -37, y -813 to -828, its top 8 to 10 yd up) and against VanCleef's cabin are their own
+walls. Nothing is placed at VanCleef's cabin door, his duel's walk-out or his retreat (all
+mid-deck).
 
 - **What it looks like:** a bulwark of weathered planks, the Juggernaut's own deck wood carried up
   its side. Its pieces are ExcavationBarrierPlank (display 4651): a plank wall of FinishedWood, whose
   colour (texture average 141/103/67) is the deck's (`STU_DREADNAUGHTDECK`, 144/111/76). At 0.85
-  each is 9.7 yd long and 1.95 yd tall, laid as straight chords of the line end to end (the deck
-  is convex there, so each chord stays on it), tipped to follow the deck's rise toward the bow
-  (38.9 to 43.1) and sunk 0.15 into it, so its top stands 1.80 yd over the deck all along: shoulder
-  high. Each piece goes to the clients with its whole rotation (`rail_piece_rotation`), as the
-  game objects' tilt alone can't tip a piece that runs along its own y.
+  each is 9.7 yd long, 1.95 yd tall and 0.43 yd thick, tipped to follow the deck's rise toward the
+  bow (38.9 to 43.1) and sunk 0.1 into it, so its top stands 1.85 yd over the deck at its ends
+  and at least 1.8 all along: shoulder high. Over a crown in the deck (the port walkway's) a piece
+  rises by the crown's height (its foot then clears the deck at its ends by up to 0.2 yd). On the
+  bow's slope, where the deck falls 3.9 yd within a piece's length and twists as it falls, no
+  straight piece lies flush: a piece spans the slope standing on its ends, up to 0.75 yd over it
+  at its middle (take 381: the dark and the red hull showed through under it), so a second board
+  goes under each such piece, as long, lowered to the deck where it is lowest and set 0.04 yd in
+  from the one over it. The two read as a two-board bulwark with one even top, and nowhere is
+  more than 0.2 yd open under them (0.09 at most, on the survey). Each piece goes to
+  the clients with its whole rotation (`rail_piece_rotation`), as the game objects' tilt alone
+  can't tip a piece that runs along its own y.
 - **The models looked at (Corey, 12 Nov: darker and more ship-like than the pale Elwynn fence):**
   no ship's or dock's rail exists as a game object in the 1.12 data, and the Juggernaut's own
   woodwork is the dungeon's map (`STU_DREADNAUGHT*`), which no placeable model uses. Of those that
@@ -139,7 +186,7 @@ from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the 
 - **On the server:** nothing leaves the deck over its line (`rail_crossing`). The deck lies to the
   left of the line as its points run; coming back aboard over it is free. A hero whose move would
   take them over it (a walk, the client's own roll, a jump, a step off falling) is stopped where
-  they reached it, 0.4 yd short of the line on the deck, at the first report that crosses it
+  they reached it, 0.4 yd short of the line, at the first report that crosses it
   (`hold_at_doors`). What a player sees is their body set back to the rail, a step at most. A
   knockback, a pull (his harpoon) and the server's own hop back stop at it as at a wall
   (`slide_end`), for heroes and creatures alike. The server's own carrying-on of a running hero
@@ -176,15 +223,20 @@ draw, load, 1.2 sec aim and shot with the gun out 6 sec, no pause and the 10 sec
 the harpoon waiting for 2 sec at 8 yd, its held pose, spear, throw, haul and clearing cut, a
 sidestep or guard sparing the haul, party retarget, Vanish, the wipe putting the crew back at
 its posts, death clearing every shot, the floor checks, ranged input on a gunner, knockback, and
-the captain-first reward. The starboard rail: its pieces cover the whole line end to end as chords, each
-along its chord tipped to the deck, tall enough all along, and keep their hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
+the captain-first reward. The bulwark: on each of its lines, its pieces cover every run end to
+end and cut no corner, each tipped to the deck, tall enough all along, and keep their hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
 server never carries a running hero over it, nor their firm ground; coming back aboard is free; the
 server's hop back, a knockback (a hero and a gunner) and a pull (even from beyond it) end on the
 deck; past its ends nothing changes. `crates/htl-server/src/survival/rail_tests.rs` runs a hero
 through it by movement packets, and `crates/htl-server/tests/rail_native.rs` (with WOW_DATA) on
-the real deck. `a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain`
-plays a warrior with the starting sword and their own health, reading only what the client is
-sent (the crew at its posts, a gun at the shoulder or the harpoon held back, his windups): they
+the real deck, surveyed at a quarter of a yard: no walkable deck outside the bulwark but at the
+three passages, the bow's point and its torch inside, every light inside, every open edge railed,
+a passage or a pocket, every piece standing on the deck with its top 1.8 yd up or more and no
+more than 0.2 yd open under it, and the gangway, from its foot to its head, clear of every piece's
+collision hull (read from the game's model, placed as the clients place it) by a body's width.
+`a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain` plays a warrior with
+the starting sword and their own health, reading only what the client is sent (the crew at its
+posts, a gun at the shoulder or the harpoon held back, his windups): they
 run to each gunner and cut him down, stepping out of each line as it fires and raising the guard
 as his blows land, then duel him: 68 to 82 sec, 74 to 200 health left, no shot taken (three
 seeds). `a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines` takes the other

@@ -189,7 +189,8 @@ fn a_hero_carried_over_either_rail_mid_duel_is_set_back_on_the_deck() {
         let (k, past, back) = held.unwrap_or_else(|| panic!("side {side}: never held at the rail"));
         let floor = s.land().height_near(past[0], past[1], deck + 1.0);
         eprintln!("side {side}: held {k} steps out at {past:?} (floor {floor}), back at {back:?}, deck {deck}");
-        assert!(s.land().water_near(past[0], past[1], deck + 1.0) || floor < deck - 4.0, "side {side}: held only over the side: {past:?} floor {floor}");
+        // Held over the side, or at the bulwark that now runs along both rails (#343).
+        assert!(s.land().water_near(past[0], past[1], deck + 1.0) || floor < deck - 4.0 || s.through_rail(at, past), "side {side}: held only over the side or at the bulwark: {past:?} floor {floor}");
         assert!((back[2] - deck).abs() < 1.5 && dist2d(back, past) < 3.0, "side {side}: back on the deck by the rail: {back:?} (deck {deck}, {k} steps out)");
         for _ in 0..40 {
             step(&mut s, hero);

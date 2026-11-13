@@ -380,6 +380,7 @@ name = "htl-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "benilla-formats",
  "benilla-protocol",
  "benilla-srp",
  "crossbeam-channel",
