@@ -1032,28 +1032,33 @@ loot = { draught_flask = 1, plunder = 12 }
 
 # The ship had nothing along its sides: its decks (37.7 to 43.7) simply stop, with a drop of 9 to
 # 20 yd to the hull, the dock or the water and no collision in the map (dmprobe; heroes walked and
-# rolled off them, takes 346 and 347). A survey of every floor walkable from the deck found its
-# open edges: the starboard side and the stern, the port side and the bow, and a trench in the
-# deck between the main deck and the port walkway (docs/greenskin-encounter.md lists them). A
-# bulwark now runs 0.9 yd inside each of them, but for the ways people must pass: the boarding
-# ramp up the stern-port quarter (x -80 to -107), the steps at the trench's north end between the
-# main deck and the port walkway (x -45.5 to -51), and the walkway's own rim over the trench, along
-# which the boarding route and the Blackguards' way off to (-54, -793) run (#308).
+# rolled off them, takes 346 and 347). Every open edge of every floor walkable from the deck has a
+# bulwark along it, but for the ways people must pass: the gangway's head at the stern-port quarter,
+# the steps at the trench's north end between the main deck and the port walkway, and the
+# walkway's own rim over the trench, along which the boarding route and the Blackguards' way off to
+# (-54, -793) run (#308). docs/greenskin-encounter.md lists them.
 #
 # Its pieces are ExcavationBarrierPlank (4651): a plank wall of FinishedWood, the same weathered
 # brown as the Juggernaut's own deck (its texture averages 141/103/67, the deck's 144/111/76), a
-# solid box for its hull. At 0.85 each is a straight 9.7 yd chord of its line, tipped to follow the
-# deck's rise and sunk 0.15 into it, its top 1.80 yd over the deck all along: clear of a hero's 1.0
-# yd step up (the client's roll back is a dash that steps up: take 375) and the server's hop back
-# (0.23 yd) by half a yard. Each line's points are [x, y, floor z], on the deck and walkable from
-# the captain's home (dmprobe), and run with the deck on their left. The aftermath preview hides it
-# all with the ship.
+# solid box for its hull, 0.43 yd thick. At 0.85 each is a straight 9.7 yd piece, sunk 0.15 into
+# the deck and tipped to follow its rise, its top 1.80 yd over it all along: clear of a hero's
+# 1.0 yd step up (the client's roll back is a dash that steps up: take 375) and the server's hop
+# back (0.23 yd) by half a yard.
+#
+# Each line's points are its corners, [x, y, deck z], with the deck on their left. Its pieces lie
+# along each straight run between two corners, none cutting across one, so every run is at least a
+# piece long (but a line's first, whose piece reaches back into what the line starts against).
+# The corners stand on the deck's very edge as a 0.25 yd survey of the deck draws it (take 380: at
+# the bow, the stern's corners and along the port walkway, pieces laid as chords of a line inside
+# the edge left deck, a torch and lanterns outside them), pushed out past it where the edge bows
+# out between them, so that no deck and no light is left outside a piece; each piece stands on the
+# deck in from its line. The aftermath preview hides it all with the ship.
 
-# The stern and the starboard side: from the stern-port corner by the boarding ramp, round the
-# stern, along the starboard side to the bow.
+# The stern and the starboard side: from the gangway's head along the main deck's stern-port edge,
+# across the stern's flat transom, and along the starboard side to the forecastle.
 [[dungeon.rail]]
 key = "juggernaut_starboard"
-points = [[-94.2, -806.9, 38.7], [-96.7, -807.9, 38.5], [-100.2, -809.4, 38.2], [-103.0, -811.3, 38.0], [-105.8, -812.6, 37.8], [-106.6, -815.0, 37.8], [-107.1, -820.0, 37.8], [-106.4, -825.6, 37.8], [-103.6, -827.7, 38.0], [-100.1, -829.7, 38.3], [-96.2, -831.9, 38.6], [-92.0, -834.1, 38.9], [-88.0, -835.4, 39.2], [-84.0, -836.9, 39.5], [-80.0, -838.4, 39.8], [-76.0, -839.3, 40.2], [-68.0, -839.6, 40.9], [-60.0, -839.3, 41.6], [-56.0, -838.4, 42.0], [-52.0, -837.4, 42.4], [-48.0, -835.4, 42.8], [-44.0, -832.9, 43.1], [-41.6, -830.4, 43.4], [-39.7, -827.9, 43.5]]
+points = [[-84.0, -803.0, 39.4], [-93.52, -805.26, 38.7], [-98.78, -807.68, 38.3], [-108.2, -812.2, 37.8], [-108.25, -826.75, 37.7], [-99.53, -831.07, 38.3], [-95.03, -833.57, 38.6], [-85.78, -837.32, 39.4], [-76.26, -840.07, 40.1], [-66.75, -840.77, 41.0], [-56.9, -839.76, 41.9], [-46.55, -836.07, 42.9], [-38.23, -828.52, 43.7]]
 display = 4651
 scale = 0.85
 # Its run is along its own y; its hull stands from its origin to 2.29 over it.
@@ -1062,11 +1067,11 @@ along_y = true
 height = [0.0, 2.29]
 lift = -0.15
 
-# The bow and the port side: from the bow's structures round its point, then aft along the port
-# walkway's outer edge to the head of the boarding ramp.
+# The bow and the port side: from the forecastle's north face down the bow's slope to its point,
+# then aft along the port walkway's outer edge to its walled stern end.
 [[dungeon.rail]]
 key = "juggernaut_port"
-points = [[-42.8, -808.8, 43.2], [-42.8, -806.6, 42.6], [-41.7, -804.8, 41.4], [-40.7, -802.9, 40.1], [-39.2, -800.6, 39.3], [-37.8, -798.6, 39.3], [-36.4, -796.6, 39.4], [-35.5, -795.2, 39.4], [-35.9, -794.4, 39.4], [-38.2, -793.2, 39.4], [-40.6, -791.7, 39.4], [-43.0, -789.9, 39.3], [-45.0, -789.4, 39.1], [-47.0, -789.0, 38.9], [-50.0, -787.4, 38.6], [-55.0, -786.4, 39.0], [-60.0, -786.2, 39.4], [-70.0, -786.2, 39.8], [-75.0, -785.4, 39.2], [-79.5, -785.9, 38.9]]
+points = [[-38.19, -812.96, 43.7], [-42.52, -808.0, 43.3], [-36.94, -798.54, 39.3], [-33.33, -794.64, 39.4], [-41.54, -789.08, 39.4], [-50.97, -785.98, 38.7], [-59.25, -784.33, 39.4], [-68.6, -783.4, 40.0], [-80.9, -784.8, 38.9]]
 display = 4651
 scale = 0.85
 run = [-5.57, 5.82]
@@ -1074,15 +1079,25 @@ along_y = true
 height = [0.0, 2.29]
 lift = -0.15
 
-# The main deck's rim over the trench (a 17 yd drop to the scaffold), beside Greenskin's fight: it
-# turns in and out round a crate and a solid block on it (x -55 to -61) in steps of a yard or two,
-# too tight for a bulwark piece (the shortest that is tall enough is 9.4 yd) to follow. It is held
-# by the data's own invisible collision wall (CollisionWallPvP01, 6391: 11 x 9 yd, no texture) at
-# 0.35, 3.9 yd pieces 3.1 yd tall, sunk 0.3 yd, half a yard inside the rim and through the crate
-# and the block, and by the server's stop like every rail.
+# The main deck's rim over the trench (a 17 yd drop to the scaffold), beside Greenskin's fight, from
+# the steps to the solid block at its west end; and the port walkway's west end, beside the
+# gangway's head, from its walled end to the gangway. Both are short and bend too tightly for a
+# bulwark piece (the shortest that is tall enough is 9.4 yd); they are held by the data's own
+# invisible collision wall (CollisionWallPvP01, 6391: 11 x 9 yd, no texture) at 0.35, 3.9 yd
+# pieces 3.1 yd tall sunk 0.3 yd, and by the server's stop like every rail.
 [[dungeon.rail]]
 key = "juggernaut_trench"
-points = [[-51.0, -803.0, 42.4], [-53.0, -802.7, 42.2], [-56.0, -802.6, 42.0], [-62.0, -802.6, 43.0], [-65.3, -802.6, 42.2]]
+points = [[-49.6, -803.3, 42.5], [-53.4, -801.85, 42.2], [-57.2, -800.7, 41.8], [-61.0, -799.6, 41.7]]
+display = 6391
+scale = 0.35
+run = [-5.55, 5.52]
+along_y = true
+height = [-0.37, 8.86]
+lift = -0.3
+
+[[dungeon.rail]]
+key = "juggernaut_gangway_head"
+points = [[-85.55, -789.9, 38.5], [-84.3, -794.45, 38.3]]
 display = 6391
 scale = 0.35
 run = [-5.55, 5.52]

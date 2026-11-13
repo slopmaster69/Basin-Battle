@@ -893,7 +893,7 @@ fn the_bulwark_runs_along_every_open_side_in_pieces_that_meet() {
     let (s, _) = deck([-62.0, -830.0, 0.0]);
     let d = s.dungeon_def().unwrap();
     let keys: Vec<&str> = d.rails.iter().map(|r| r.key.as_str()).collect();
-    assert_eq!(keys, ["juggernaut_starboard", "juggernaut_port", "juggernaut_trench"]);
+    assert_eq!(keys, ["juggernaut_starboard", "juggernaut_port", "juggernaut_trench", "juggernaut_gangway_head"]);
     for (k, r) in d.rails.iter().enumerate() {
         let len = (r.run[1] - r.run[0]) * r.scale;
         // In the order they were laid (ids rise), from the line's start to its end.
@@ -902,17 +902,31 @@ fn the_bulwark_runs_along_every_open_side_in_pieces_that_meet() {
             .filter_map(|(id, _)| s.rail_piece(*id).map(|p| (*id, p))).filter(|(_, p)| p.rail == k).collect();
         pieces.sort_by_key(|(id, _)| *id);
         assert!(!pieces.is_empty(), "{}", r.key);
-        let (first, last) = (r.points[0], *r.points.last().unwrap());
-        assert!(dist2d(pieces[0].1.from, first) < 0.01 && dist2d(pieces.last().unwrap().1.to, last) < 0.01, "{}: from end to end", r.key);
-        for w in pieces.windows(2) {
-            // End to end, or (the last) starting further back along the one before: never a gap.
-            let joined = dist2d(w[0].1.to, w[1].1.from) < 0.01 || off_line(r, w[1].1.from) < 0.05 && dist2d(w[1].1.to, last) < 0.01;
-            assert!(joined, "{}: a gap between {:?} and {:?}", r.key, w[0].1, w[1].1);
+        let last = *r.points.last().unwrap();
+        assert!(dist2d(pieces.last().unwrap().1.to, last) < 0.01, "{}: to its end", r.key);
+        // Every yard of the line has a piece along it, and no piece cuts a corner: its ends and
+        // middle are all on the line.
+        let along = |p: Vec3| pieces.iter().any(|(_, q)| combat::along_segment(q.from, q.to, p).1 < 0.05);
+        for w in r.points.windows(2) {
+            let n = (dist2d(w[0], w[1]) / 0.25).ceil() as usize;
+            for k in 0..=n {
+                let t = k as f32 / n as f32;
+                let p = [w[0][0] + (w[1][0] - w[0][0]) * t, w[0][1] + (w[1][1] - w[0][1]) * t, 0.0];
+                assert!(along(p), "{}: a gap at {p:?}", r.key);
+            }
         }
         for (id, p) in &pieces {
             assert!((dist2d(p.from, p.to) - len).abs() < 0.05, "{}: a whole piece's chord: {p:?}", r.key);
+            // Along one run of the line, ending on it (a short run's reaching back past its start
+            // along the run): it cuts no corner.
+            let on_run = r.points.windows(2).any(|w| {
+                let (a, b) = (w[0], w[1]);
+                let l = dist2d(a, b);
+                let off = |e: Vec3| ((b[0] - a[0]) * (e[1] - a[1]) - (b[1] - a[1]) * (e[0] - a[0])).abs() / l;
+                off(p.from) < 0.05 && off(p.to) < 0.05 && combat::along_segment(a, b, p.to).1 < 0.05
+            });
+            assert!(on_run, "{}: {p:?} cuts a corner", r.key);
             for end in [p.from, p.to] {
-                assert!(off_line(r, end) < 0.05, "{}: {end:?} on the line", r.key);
                 let top = end[2] + r.lift + r.height[1] * r.scale;
                 assert!(top - end[2] >= 1.73, "{}: its top {:.2} over the deck: clear of a 1 yd step up and a hop by half a yard", r.key, top - end[2]);
                 assert!(end[2] + r.lift + r.height[0] * r.scale <= end[2], "{}: seated on the deck", r.key);
@@ -1006,12 +1020,18 @@ fn each_rail_piece_lies_along_its_chord_tipped_to_follow_the_deck() {
 
 #[test]
 fn a_piece_over_a_crown_in_the_deck_rises_over_it_by_up_to_its_sink() {
-    // A deck crowned along x (as the port walkway's), 0.19 yd over a piece's chord at its middle.
+    // A deck crowned along x (as the port walkway's), 0.2 yd over a piece's chord at its middle,
+    // and a rail run along it, its corners on the deck.
     struct Crowned;
     impl Land for Crowned {
         fn height(&self, x: f32, _: f32) -> f32 { 40.0 - 0.008 * (x + 70.0).powi(2) }
     }
-    let s = Survival::new_dungeon(Content::dev(), Box::new(Crowned), 31, 0.0);
+    let mut c = Content::dev();
+    let d = c.dungeon.as_mut().unwrap();
+    let mut rail = d.rails[0].clone();
+    rail.points = vec![[-75.0, -840.0, 39.8], [-65.0, -840.0, 39.8]];
+    d.rails = vec![rail];
+    let s = Survival::new_dungeon(c, Box::new(Crowned), 31, 0.0);
     let r = s.dungeon_def().unwrap().rails[0].clone();
     let deck = |x: f32| 40.0 - 0.008 * (x + 70.0).powi(2);
     let (mut n, mut raised) = (0, false);
@@ -1027,22 +1047,27 @@ fn a_piece_over_a_crown_in_the_deck_rises_over_it_by_up_to_its_sink() {
         let top = mid[1] + r.lift + r.height[1] * r.scale - deck(mid[0]);
         assert!(top >= 1.73, "its top stands {top} over the crown");
     }
-    assert!(n >= 5 && raised, "{n} pieces");
+    assert!(n >= 2 && raised, "{n} pieces");
 }
 
 #[test]
-fn a_line_cut_into_chords_covers_it_end_to_end() {
-    let line = [[0.0, 0.0, 0.0], [10.0, 0.0, 1.0], [14.0, 4.0, 2.0], [14.0, 12.0, 3.0]];
-    let chords = dungeon::rail_chords(&line, 6.0);
-    assert_eq!(dist2d(chords[0].0, line[0]), 0.0);
-    assert!(dist2d(chords.last().unwrap().1, line[3]) < 1e-4);
-    for (a, b) in &chords {
+fn a_line_is_laid_run_by_run_with_no_piece_cutting_a_corner() {
+    let line = [[0.0, 0.0, 0.0], [10.0, 0.0, 1.0], [14.0, 4.0, 2.0], [14.0, 20.0, 3.0]];
+    let pieces = dungeon::rail_runs(&line, 6.0);
+    for (a, b, _) in &pieces {
         assert!((dist2d(*a, *b) - 6.0).abs() < 1e-3, "{a:?} {b:?}");
     }
-    let n = chords.len();
-    for k in 1..n - 1 {
-        assert!(dist2d(chords[k - 1].1, chords[k].0) < 1e-3, "end to end");
-    }
+    // 10 yd: two pieces, from its start and to its end (overlapping 2 yd).
+    assert_eq!(pieces[0].2, 0);
+    assert!(dist2d(pieces[0].0, line[0]) < 1e-4 && dist2d(pieces[1].1, line[1]) < 1e-4 && pieces[1].2 == 1);
+    // 5.7 yd: one, ending at its corner, reaching back along it past its start.
+    assert!(dist2d(pieces[2].1, line[2]) < 1e-4 && dist2d(pieces[2].0, line[1]) > 0.2);
+    // 16 yd: three, spread evenly.
+    assert_eq!(pieces.len(), 6);
+    assert!(dist2d(pieces[3].0, line[2]) < 1e-4 && dist2d(pieces[5].1, line[3]) < 1e-4);
+    assert!((pieces[4].0[1] - 9.0).abs() < 1e-3 && pieces[4].2 == 1, "{:?}", pieces[4]);
+    // Its height along it, as the line's.
+    assert!((pieces[0].1[2] - 0.6).abs() < 1e-4);
 }
 
 #[test]

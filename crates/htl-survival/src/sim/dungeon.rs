@@ -120,69 +120,32 @@ pub struct RailPiece {
     pub to: Vec3,
 }
 
-/// A line cut into straight chords `len` long, end to end from its first point; the last ends at
-/// its last point (overlapping the one before). Each end is on the line, z interpolated there.
-pub(crate) fn rail_chords(points: &[[f32; 3]], len: f32) -> Vec<(Vec3, Vec3)> {
-    let at = |seg: usize, t: f32| {
-        let (a, b) = (points[seg], points[seg + 1]);
-        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
-    };
-    // The first point at `len` from `from` on the line past (seg, t), searching forward.
-    let next = |from: Vec3, seg: usize, t: f32| -> Option<(usize, f32, Vec3)> {
-        for k in seg..points.len() - 1 {
-            let t0 = if k == seg { t } else { 0.0 };
-            let (a, b) = (points[k], points[k + 1]);
-            if dist2d(from, b) < len {
-                continue;
-            }
-            // On this segment from t0: |a + (b - a) t - from| = len, the larger root.
-            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-            let (fx, fy) = (a[0] - from[0], a[1] - from[1]);
-            let qa = dx * dx + dy * dy;
-            let qb = 2.0 * (fx * dx + fy * dy);
-            let qc = fx * fx + fy * fy - len * len;
-            let disc = (qb * qb - 4.0 * qa * qc).max(0.0).sqrt();
-            let t = ((-qb + disc) / (2.0 * qa)).clamp(t0, 1.0);
-            return Some((k, t, at(k, t)));
-        }
-        None
-    };
-    let last = *points.last().unwrap();
+/// The pieces along a line, `len` long: each straight run between two of its points (its corners)
+/// gets as few as cover it, the first from its start and the last ending at its end, the rest spread
+/// evenly between (overlapping a little), so none cuts a corner. A run shorter than a piece gets one
+/// ending at its end (its start reaching back past the run's, into what the line starts against).
+/// Each end is on the line, z interpolated there; with each, its place along its run (the ones
+/// that overlap the one before are set a hair aside, by [`RAIL_LAP`]).
+pub(crate) fn rail_runs(points: &[[f32; 3]], len: f32) -> Vec<(Vec3, Vec3, usize)> {
     let mut out = Vec::new();
-    let (mut seg, mut t, mut from) = (0, 0.0, points[0]);
-    loop {
-        match next(from, seg, t) {
-            Some((k, u, to)) if dist2d(to, last) > 0.05 => {
-                out.push((from, to));
-                (seg, t, from) = (k, u, to);
-            }
-            _ => break,
-        }
-    }
-    // The last: ending at the line's end, `len` back along it (or all of it, if shorter).
-    let rev: Vec<[f32; 3]> = points.iter().rev().copied().collect();
-    let back = rail_chords_back(&rev, len).unwrap_or(points[0]);
-    out.push((back, last));
-    out
-}
-
-/// The first point `len` from the start of `points`, along them.
-fn rail_chords_back(points: &[[f32; 3]], len: f32) -> Option<Vec3> {
-    let from = points[0];
     for w in points.windows(2) {
         let (a, b) = (w[0], w[1]);
-        if dist2d(from, b) < len {
+        let l = dist2d(a, b).max(1e-4);
+        let at = |d: f32| {
+            let t = d / l;
+            [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+        };
+        if l < len {
+            out.push((at(l - len), b, 0));
             continue;
         }
-        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-        let (fx, fy) = (a[0] - from[0], a[1] - from[1]);
-        let qa = dx * dx + dy * dy;
-        let qb = 2.0 * (fx * dx + fy * dy);
-        let qc = fx * fx + fy * fy - len * len;
-        let t = ((-qb + (qb * qb - 4.0 * qa * qc).max(0.0).sqrt()) / (2.0 * qa)).clamp(0.0, 1.0);
-        return Some([a[0] + dx * t, a[1] + dy * t, a[2] + (b[2] - a[2]) * t]);
+        let n = (l / len - 1e-3).ceil().max(1.0) as usize;
+        for k in 0..n {
+            let d = if n == 1 { 0.0 } else { (l - len) * k as f32 / (n - 1) as f32 };
+            out.push((at(d), at(d + len), k));
+        }
     }
-    None
+    out
 }
 
 /// Whether segment a-b crosses segment c-d (in the plane).
@@ -195,11 +158,18 @@ fn crosses(a: Vec3, b: Vec3, c: [f32; 2], d: [f32; 2]) -> bool {
     (d1 > 0.0) != (d2 > 0.0) && (d3 > 0.0) != (d4 > 0.0)
 }
 
-/// A rail holds back what moves within this height of the floor at it (a body thrown up over it
-/// too), and nothing on another floor above or below.
-const RAIL_REACH: f32 = 6.0;
+/// A rail holds back what moves within this height of the deck at it (a body thrown up over it
+/// too, a jump clears 1.6 yd), and nothing on another floor above or below (the gangway passes
+/// 4 yd under the stern-port quarter's).
+const RAIL_REACH: f32 = 3.0;
 /// A hero held at a rail stands this far short of its line (the fence's half width and a body's).
 const RAIL_STOP: f32 = 0.4;
+/// Every other piece of a run is set this far toward the deck, so where two overlap they lap like
+/// boards rather than flicker through each other.
+pub(crate) const RAIL_LAP: f32 = 0.04;
+/// How far in from its line a rail's piece looks for the deck it stands on (its line runs along
+/// the deck's very edge, where the ground under it may already be the water).
+const RAIL_SEAT_IN: f32 = 2.0;
 /// A hazard's flames burn this long where it went off.
 const HAZARD_FLAME_SECS: f32 = 1.4;
 /// The veil's columns stand this far apart along what it bars.
@@ -234,6 +204,40 @@ impl Survival {
     /// A rail piece as it was laid.
     pub fn rail_piece(&self, id: Id) -> Option<RailPiece> {
         self.rail_pieces.get(&id).copied()
+    }
+
+    /// A point of a rail's line set on the deck it runs along: the floor under it if that is near
+    /// the line's own height, else of the floors in from it (within [`RAIL_SEAT_IN`], toward
+    /// `inward`, or toward `along` and between: the line runs along the deck's very edge, where the
+    /// ground under it may already be the water, and a corner's may stand out past a point of the
+    /// deck) the one nearest the line's height; else the ground under it.
+    fn rail_deck(&self, p: Vec3, inward: [f32; 2], along: [f32; 2]) -> Vec3 {
+        let steps = (RAIL_SEAT_IN / 0.25) as usize;
+        let mid = [inward[0] + along[0], inward[1] + along[1]];
+        let ml = (mid[0] * mid[0] + mid[1] * mid[1]).sqrt().max(1e-4);
+        let ways = [inward, [mid[0] / ml, mid[1] / ml], along];
+        // The deck under it, if it is near the line's height.
+        let under = self.land.height_near(p[0], p[1], p[2] + 0.5);
+        if (under - p[2]).abs() < 1.0 {
+            return [p[0], p[1], under];
+        }
+        let mut best: Option<f32> = None;
+        for k in 1..=steps {
+            let off = k as f32 * 0.25;
+            for w in ways {
+                let z = self.land.height_near(p[0] + w[0] * off, p[1] + w[1] * off, p[2] + 0.5);
+                if (z - p[2]).abs() < 2.5 && best.map_or(true, |b| (z - p[2]).abs() < (b - p[2]).abs() - 1e-3) {
+                    best = Some(z);
+                }
+            }
+            if best.is_some_and(|b| (b - p[2]).abs() < 0.3) {
+                break;
+            }
+        }
+        match best {
+            Some(z) => [p[0], p[1], z],
+            None => self.ground_near(p[0], p[1], p[2]),
+        }
     }
 
     pub fn is_below(&self) -> bool {
@@ -306,37 +310,46 @@ impl Survival {
                 }
             }
         }
-        // The rails along open edges: straight pieces end to end as chords of the line (the deck
-        // is convex there, so a chord between points on it stays on the deck), each tipped to
-        // follow the deck's rise along it and standing `lift` over it all along.
+        // The rails along open edges: straight pieces along each run of the line, standing on the
+        // deck at its edge, each tipped to follow the deck's rise along it and standing `lift`
+        // over it all along.
         self.rail_pieces.retain(|id, _| self.objs.contains_key(id));
         for (rail, r) in d.rails.iter().enumerate() {
             let len = (r.run[1] - r.run[0]) * r.scale;
             if len <= 0.0 || r.points.len() < 2 {
                 continue;
             }
-            for (a, b) in rail_chords(&r.points, len) {
-                let (mut a, mut b) = (self.ground_near(a[0], a[1], a[2]), self.ground_near(b[0], b[1], b[2]));
+            for (a, b, k) in rail_runs(&r.points, len) {
+                let span = dist2d(a, b).max(1e-3);
+                // Toward the deck: the line's left.
+                let inward = [-(b[1] - a[1]) / span, (b[0] - a[0]) / span];
+                let toward = [(b[0] - a[0]) / span, (b[1] - a[1]) / span];
+                let (mut a, mut b) = (self.rail_deck(a, inward, toward), self.rail_deck(b, inward, [-toward[0], -toward[1]]));
                 // Over a crown in the deck (the port walkway's), the chord dips into it: raised by
                 // the crown's height, up to its sink, so its ends still meet the deck and its top
                 // stays as high over the crown.
                 let crown = [0.25f32, 0.5, 0.75]
                     .iter()
                     .map(|t| {
-                        let z = a[2] + (b[2] - a[2]) * t;
-                        let deck = self.land.height_near(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, z + 0.5);
-                        if (deck - z).abs() < 0.6 { deck - z } else { 0.0 }
+                        let at = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+                        let deck = self.rail_deck(at, inward, inward)[2];
+                        if (deck - at[2]).abs() < 0.6 { deck - at[2] } else { 0.0 }
                     })
                     .fold(0.0f32, f32::max)
                     .min(-r.lift.min(0.0));
                 a[2] += crown;
                 b[2] += crown;
                 let f = (b[1] - a[1]).atan2(b[0] - a[0]);
-                let span = dist2d(a, b).max(1e-3);
                 let pitch = (b[2] - a[2]).atan2(span);
-                // Its origin where the chord's start is `run[0]` of it back along its run.
+                // Its origin where the chord's start is `run[0]` of it back along its run (every
+                // other one of a run a hair toward the deck, to lap the one before).
                 let t = -r.run[0] * r.scale / span;
-                let pos = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t + r.lift];
+                let lap = if k % 2 == 1 { RAIL_LAP } else { 0.0 };
+                let pos = [
+                    a[0] + (b[0] - a[0]) * t + inward[0] * lap,
+                    a[1] + (b[1] - a[1]) * t + inward[1] * lap,
+                    a[2] + (b[2] - a[2]) * t + r.lift,
+                ];
                 // Turned so its run lies along the chord, then tipped about the axis across it.
                 let (facing, rot) = if r.along_y {
                     let facing = f - std::f32::consts::FRAC_PI_2;
@@ -1021,7 +1034,12 @@ impl Survival {
                 if cross(line, [a[0] - c[0], a[1] - c[1]]) <= 0.0 {
                     continue;
                 }
-                let z = self.ground_near((c[0] + e[0]) / 2.0, (c[1] + e[1]) / 2.0, (w[0][2] + w[1][2]) / 2.0)[2];
+                // (The deck it runs along, at its middle: in from its line, which runs along the
+                // deck's edge, over the water.)
+                let l = (line[0] * line[0] + line[1] * line[1]).sqrt().max(1e-4);
+                let mid = [(c[0] + e[0]) / 2.0, (c[1] + e[1]) / 2.0, (w[0][2] + w[1][2]) / 2.0];
+                let inward = [-line[1] / l, line[0] / l];
+                let z = self.rail_deck(mid, inward, inward)[2];
                 if (a[2] - z).abs() >= RAIL_REACH && (b[2] - z).abs() >= RAIL_REACH {
                     continue;
                 }
