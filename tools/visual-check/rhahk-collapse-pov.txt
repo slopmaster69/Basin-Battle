@@ -6,17 +6,20 @@
 # stand, as in rhahk-collapse-front, and stands still. Only the view turns (`cam off`, turned
 # by the scenario): first down the tunnel to its mouth, where the band is, then back to the
 # door, where the rock comes from. Times are the scenario's; the collapse begins at 18:
-#   18     his yell; the view is down the tunnel: the band across its mouth (x -37), 12 yd ahead
+#   18     his yell; the view is down the tunnel: the torches and the band across its mouth
+#          (x -37), 12 yd ahead
 #   20     the wave starts at the buried door; 20.6 the view turns to the door: the rows coming
-#   23.9   the wave reaches the hero: caught, set down past the band about (-40.6 -376.3),
-#          still looking the same way: at the line where the first face stands at 26.2
+#   23.9   the wave reaches the hero: caught, thrown through the air past the band to about
+#          (-40.6 -376.3), still looking the same way: at the line where the first face stands
+#          at 26.2
 #   27.5   the hero walks into the face (5 yd/s for 2.5 s) and is stopped
 #   31     again at a run, with a dodge into it
 #   34     again at a run, with a hop (`.es hop`: the server's jump, a script can't press the key)
 #   37.5   the end, before the second section goes (38.3)
 # `.es where` after each try says where the server has the hero: never past x -37.
-# What to look for: the band and the dust as a player sees them, and the Danger warning; the
-# rows wall to wall; whether being caught reads as being thrown clear; the face wall to wall
+# What to look for: the torches, the band and the dust as a player sees them, and the Danger
+# warning; the rows wall to wall; whether being caught reads as being thrown clear (no zone
+# name flashing at the catch: it is a knockback, not a teleport); the face wall to wall
 # and to the roof, no gap to walk, roll or jump through; the hero stopped at it each time.
 hero warrior
 cam off
@@ -27,6 +30,8 @@ cam off
 10.5 .es restock
 11.5 .es clearfoes rhahk
 12 .es goto -25 -376 60.8 3.14
+# The client keeps the view's tilt from its last run: put it back to the game's own second view.
+12.6 lua ResetView(2) SetView(2)
 13 .es heal
 13.3 lua function VCTurn(want) local d = math.mod((want - GetActionAim()) * 57.29578 + 900, 360) - 180 if math.abs(d) > 2 then FlipCameraYaw(d) end end
 13.6 lua VCTurn(3.14)

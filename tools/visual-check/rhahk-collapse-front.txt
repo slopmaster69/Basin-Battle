@@ -7,20 +7,24 @@
 # stand (where the old collapse cut a hero off), and does nothing while the first section goes.
 # Times are the scenario's; the collapse begins at 18. The server's rehearsal of this start, in
 # the real mine: crates/htl-server/tests/rhahk_route.rs, a_hero_felled_at_the_first_face_...
-#   18     his yell; a bright band across the whole tunnel at its mouth (x -37, the section's
-#          front edge, 12 yd past the hero), dust streaming from the roof over the door pocket
-#          and the tunnel, a rumble
-#   20     the wave: rows of rock across the full width, from the buried door toward the band
-#          at 5 yd/s, the tunnel left full behind them
-#   23.9   the wave reaches the hero: caught (35% of their health), thrown to clear floor 4 yd
-#          past the band, about (-40.6 -376.3), and down 1 s. Nobody is left behind the rubble.
-#   26.2   the first face stands across the tunnel mouth, wall to wall and to the lintel
+#   18     his yell; tall torches lit from wall to wall at the tunnel's mouth and a bright band
+#          across the floor between them (x -37, the section's front edge, 12 yd past the
+#          hero), dust sifting from the roof over the door pocket and the tunnel, a rumble.
+#          Nothing lands for 2 s.
+#   20     the wave: the roof comes down in rows of pale rock across the full width, from the
+#          buried door toward the band at 5 yd/s, the tunnel left full behind them
+#   23.9   the wave reaches the hero: caught (35% of their health), thrown through the air
+#          (15.6 yd in 0.8 s) to clear floor 4 yd past the band, about (-40.6 -376.3), and down
+#          1 s as they land. Nobody is left behind the rubble.
+#   26.2   the first face stands across the tunnel mouth, wall to wall and to the lintel: pale
+#          rock in the torches' light
 #   25-31  the hold (12 s): the hero fights him at the face
 #   31.4   the hero set 8 yd from the face, turned to it; 32 walks into it and is stopped (the
 #          face is solid on the client and a stop on the server); 35 again, with a dodge
 #   37.5   the end, before the second section goes (38.3)
-# What to look for: the band and the dust from the first moment; the rows across the whole
-# width (not one row down the middle); the throw landing on clear floor; the face reaching the
+# What to look for: the torches, the band and the dust from the first moment, and nothing
+# landing until the wave; the rows across the whole width (not one row down the middle); the
+# throw a flight, not a blink, landing on clear floor; the face reaching the
 # roof with no gap at either wall; the hero stopped at it and never through it; Rhahk'Zor never
 # standing in or behind his own rubble. The cameraman's view never shakes (patch 0088): the
 # shake and the Danger warning are on the hero's screen only. Not rehearsed on the server: the

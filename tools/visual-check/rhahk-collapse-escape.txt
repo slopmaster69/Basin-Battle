@@ -10,8 +10,8 @@
 # The hero starts 8 yd past the tunnel mouth, ahead of the first face, and keeps ahead of every
 # surge (these moves rehearsed on the server in the real mine: nothing catches them). Times are
 # the scenario's; the collapse begins at 18:
-#   18     his yell; section 1 (the door pocket and the tunnel, behind him): the band across
-#          the tunnel mouth at x -37, dust from the roof behind him, a rumble
+#   18     his yell; section 1 (the door pocket and the tunnel, behind him): torches and the
+#          band across the tunnel mouth at x -37, dust from the roof behind him, a rumble
 #   20     its wave, from the buried door to the band; 26.2 the first face stands. He walks
 #          out of the dust ahead of it and fights on.
 #   26-38  the hold: the hero fights him in front of the face
@@ -23,10 +23,11 @@
 #          57.4 its wave. 58.4 the hero runs 21 yd, the rows of rock coming down behind them,
 #          to (-82.4 -377), 4 yd past the band; 63.2 the third face stands
 #   64-69  the fight at the third face; 70 the end (section 4 would go at 75.3)
-# What to look for: each band across the FULL width of the floor from the first moment of its
-# surge until its face stands; dust over the whole section; rows of rock wall to wall, back
-# edge first (their rings are floor marks: never on the cameraman, and on a player's screen
-# only with marks on); the rock left lying wall to wall; each face built to the roof with no
+# What to look for: each line's torches and band across the FULL width of the floor from the
+# first moment of its surge, and nothing landing for 2 s; dust over the whole section; then
+# rows of pale rock wall to wall, back edge first, with no ring under them (a row is the roof
+# coming down, not a throw; the dark rock with a red ring is his own throw at a hero out of his
+# reach); the rock left lying wall to wall, piled; each face built to the roof with no
 # gap; Rhahk'Zor walking out ahead of each wave and never left in his rubble; the way to the
 # Galleries always open ahead. At 45% he calls his ring of rocks if the hero's blows get him
 # there; he cannot be brought under 26% until the last section is down. `camera duel` is the
