@@ -44,3 +44,39 @@ bent routes, repeated hairpin points, curved floors, stacked floors, wet targets
 endpoints, thin blocked-cell crossings and bounded recovery from an already airborne start.
 
 No other boss content, client patch, add-on or game-derived asset belongs in this repair.
+
+## Since replaced: the collapse from the front door inward
+
+Corey, Nov 13, on the footage of the 1,018 yd gauntlet: "Right now you just have a line of rocks
+falling down. But what happens if the player is on the other side of that rubble? Then he's cut
+off and cannot escape. The rubble should start from the entrance of deadmines and continue to
+fill, fall, and build towards the way you want the player to escape."
+
+The gauntlet back to the ship is gone. The collapse now runs 94.6 yd, from the buried front door
+through his post and the foreman's chamber to where the galleries open, and stops 31 yd short of
+the Galleries lamp, so a hero who wakes there always walks up to the fight. The native route
+resolution, the ordered corner cursor and the walking test above still carry it.
+
+The rules (`sim::bosses`, `[mob.phase.collapse]` in `content/deadmines.toml`):
+
+- **Sections.** Four, each ending at a narrowing: the door pocket and tunnel to his post (x -37),
+  the chamber's near end to the pillar (x -50), the rest of the chamber to the corridor's mouth
+  (x -78), the corridor to its narrowest (x -91).
+- **Surges.** At 70% he yells and the first section goes. A surge is 2 sec of warning, then a wave
+  of rock from the section's door end to its front edge at 5 yd/sec. Then the front stands still
+  for 12 sec while he fights at the face, and the next section goes. About 61 sec in all.
+- **What shows.** From the warning on: a bright band across the full width at the section's front
+  edge (the line to get past), dust from the roof over the whole section, the rumble and shake.
+  Then rock in rows across the full width, door end first. Behind the wave the floor stays full of
+  rock; at the front edge a face of rubble is built to the roof, wall to wall.
+- **The face is solid.** Its rocks have hulls on the client, and the server stops a hero at its
+  line: a walk, a roll, a jump or a knockback ends a step short of it, from either side. Faces
+  stand until the fight is lost or the dungeon resets, whatever the cap on loose rubble.
+- **Nobody is cut off.** A living hero behind the wave or behind a face, at any distance to the
+  side (the door pocket, the chamber's side cave), is caught: 35% of maximum health gone once a
+  surge, set down 4 yd past that surge's line, down for 1 sec. There is no crush any more.
+- **Rhahk'Zor** fights on through it, walks out ahead of the wave, holds the line and hurls rock
+  at a hero who runs far ahead, and can't be brought below 26% until the last face stands. Then
+  the end line, and the last stand (burning maul at 25%, lodged pound at 12%) where it stopped.
+- **Other foes** on the stretch when it starts run for it and are gone.
+- **A fight lost** puts all of it back: no rock, no face, no stop, and he is whole at his post.
