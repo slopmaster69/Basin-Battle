@@ -1,0 +1,31 @@
+# DEV SETUP, a look at #346's wait, not an unassisted clear: the hero pulls Gilnid from the gap by
+# the Foundry door, is put out on the second engineer's plank (1 yd past the ramp's rail, over the
+# pit, where Gilnid can't walk), stays there 9.5 s, then is put down on the pit floor by his post.
+# What to look for: Gilnid comes under the plank and waits there, his crew still working (fuses,
+# sticks); he does NOT walk back to his post, and the crew isn't taken away (before #346 he gave up
+# after 4 s and cleared them). A blow or shot on him while he waits does nothing. Once the hero is
+# down he comes at once and the fight goes on. Floor markers off. The plank (perch_ledges, second
+# ledge): the engineer stands at (-206.18, -595.75, 30.67), heading 1.221 out over the pit; the
+# hero 1.4 yd behind him toward the rail.
+hero warrior
+cam off
+camera wide Gilnid + Furnace Engineer
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes gilnid
+12 .es goto -178 -579 19.4 3.3
+13 video
+14 .es goto -188 -580 21 3.6
+15.5 .es goto -206.66 -597.07 31.0 1.22
+16 shots plank 10 1.0
+19 .es heal
+22 .es heal
+25 .es goto -197 -585 21 3.8
+25.5 .es heal
+26 shots down 8 1.0
+30 .es heal
+34 end
