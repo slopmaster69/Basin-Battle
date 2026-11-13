@@ -15,6 +15,7 @@ camera duel Rhahk'Zor
 0.4 .es goto -9624 675
 1 .es travel landing
 10 .es debug quiet
+10.5 .es restock
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 11 .es unbar all
 11.5 .es clearfoes rhahk

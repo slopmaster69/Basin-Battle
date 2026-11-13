@@ -1960,6 +1960,15 @@ impl SurvivalGame {
             // filming one fight with nothing else in it.
             "clearfoes" if self.sim.debug => self.sim.dev_clear_foes(&arg).map(|said| self.say_to(conn, &said)),
             "clearfoes" => Err("Turn debug on first (.es debug).".into()),
+            // (debug, below) Every pack and boss stands again, as when a beaten run resets: lit
+            // lamps and found secrets stay. For filming one boss after another (each take's
+            // `clearfoes` takes the rest away until the server restarts).
+            "restock" if self.sim.debug && self.sim.is_below() => {
+                self.sim.reset_below(false);
+                Ok(())
+            }
+            "restock" if self.sim.debug => Err("Only below: .es restock starts a dungeon's foes over.".into()),
+            "restock" => Err("Turn debug on first (.es debug).".into()),
             // Testing the progression from a blank slate: this hero back to their first day, or
             // (debug) the camp's whole world, its save copied aside first.
             "reset" => match arg.as_str() {
