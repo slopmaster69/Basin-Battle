@@ -693,8 +693,9 @@ impl Survival {
             // The Priest's own: an Empowered staff, Salvation's wings.
             out.extend(self.priest_auras(id));
         }
-        // A creature's own look (a spirit beast's glow).
-        if let Some(m) = self.mobs.get(&id) {
+        // A creature's own look (a spirit beast's glow), while it lives: Unbowed's dark swirl
+        // burned on his body after he fell (Nov 13 filming, take 421).
+        if let Some(m) = self.mobs.get(&id).filter(|m| m.health > 0) {
             let a = self.content.mobs[m.def].aura;
             if a != 0 {
                 out.push(a);
