@@ -180,8 +180,8 @@ camera duel Edwin VanCleef|Edwin VanCleef  # a form that comes back under the sa
 camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the picture
 ```
 
-- **The shots**: `duel` is a three-quarter side view from the hero's side, 10 to 14 yd out (a
-  duel); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up and 15 to 22 yd
+- **The shots**: `duel` is a three-quarter side view from the hero's side, 8 to 12 yd out (a
+  duel; 10 to 14 before patch 0092); `low` is 20 yd out and low (the Shredder); `high` is 45 to 60 degrees up and 15 to 22 yd
   out, so a ground hazard's edge shows; `wide` is 20 to 25 yd out and 30 degrees up, for the
   arena (a crew on their planks, a stripe of fire across the floor). The camera stands further
   back than that only when the two wouldn't fit. Under a low roof (the Foundry's cave) a shot's
@@ -199,7 +199,10 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   (the boss's, the hero's and anyone's near them) by more than a yard, and out of where a body's
   walk takes it in the next second, so it cuts before a charging boss reaches its spot. Each
   position has solid ground below it and a clear line from the fight, and the camera never sweeps
-  through a wall between two positions.
+  through a wall between two positions. The point it looks at is one the hero sees, and every
+  position sees the hero or the boss from inside the world (patch 0092): round a bend in a tunnel
+  their middle is in the void outside the map, and a camera measured out from there stood in the
+  void (take 418).
 - **Out of view**: one of the two is hidden when most of five points on them (low, chest, head,
   either side) can't be seen, so a thin post or a crate in front doesn't count. When either is
   hidden for more than 0.3 s, and the camera has held its position at least 3 s, it cuts to its
@@ -207,6 +210,15 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   then the other side, square to the side, behind, then the same higher up. Both hidden for more
   than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
   (`camera: spectate: t=12.3 ...`).
+- **A wall filling the picture** (patch 0092): of twenty lines across the picture, out to its
+  edges and 85 hundredths of the way to the two, the world on six (three tenths: a cabin's
+  corner, a beam, the rock of a bend; the floor under the two doesn't count) for a second is a
+  cut too, once the position has been held 3 s, to one clearly better (`the world on 9 of 20
+  lines of the foreground`). So is the hero or the boss cut off by the frame's edge (a wall
+  pulled the eye in close behind the hero, take 425: `1 of the two cut off by the frame`). Before it, a corner of
+  VanCleef's cabin filled a third to half of his takes for a minute. The fight's axis, which the
+  shot's positions turn with, follows the two over 1.5 s, so the camera doesn't swing round into
+  a wall as they circle.
 - **The end of the fight**: when the hero falls (down for 0.3 s), or the subject does (the last of
   its forms), the camera holds where it is (it doesn't follow the hero to a lamp) and the video
   ends `tail` seconds later (5), with the run. `run.txt` and the summary say when (`the fight is
@@ -259,7 +271,7 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
 landing's deck.
 
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
-cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), the cameraman hero (`setup` makes it), and a screen wide enough for both
+cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, the cameraman hero (`setup` makes it), and a screen wide enough for both
 windows side by side: the cameraman's (`resolution`) and the hero's (`hero_resolution`) on the
 `monitor` screen. The run stops with an error rather than put one over the other.
 

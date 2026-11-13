@@ -1,0 +1,394 @@
+From 12355b677140cd887c76f87c6ac20ce8f9082223 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Fri, 13 Nov 2026 12:57:27 -0600
+Subject: [PATCH] The cameraman cuts away from a wall filling the picture,
+ never films from the void, and frames a duel closer
+
+A cabin's corner filled a third to half of VanCleef's takes for a minute at a time: the camera cut
+only when the boss or hero was hidden, and 0089's eight foreground lines, short of the frame's
+edges, six tenths of the way and counting the floor, scored it low. Now twenty lines out to the
+edges, 85 hundredths of the way, the floor not counted: the world on six of them (three tenths of
+the picture) for a second is a cut, once the position has been held 3 s, to one clearly better;
+so is the hero or the boss cut off by the frame's edge (an eye pulled in close behind the hero by
+a wall, take 425). Both weigh more when a position is chosen.
+
+Round a bend in Rhahk'Zor's tunnel the middle of the two was in the void outside the mine, and the
+camera, measured out from there, stood in the void (take 418). The point it looks at is now one the
+hero sees, and every position must see the hero or the subject from inside the world.
+
+A duel stands 8 to 12 yd out (was 10 to 14, the two small in the picture), and the fight's axis
+turns over 1.5 s (was 0.8), so the camera doesn't swing round into walls as the two circle.
+---
+ crates/benilla-app/src/player/spectator.rs | 203 +++++++++++++++++----
+ 1 file changed, 171 insertions(+), 32 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
+index ebb44a7b..d47c6d78 100644
+--- a/crates/benilla-app/src/player/spectator.rs
++++ b/crates/benilla-app/src/player/spectator.rs
+@@ -3,7 +3,8 @@
+ //! its body out of the rules and unseen, `.es watch`); its camera leaves the body and holds the
+ //! named creature (`subject`, a boss) and player (`hero`) in view, framed by the shot's rules:
+ //!
+-//! - `duel` (the default): a three-quarter side view from the hero's side, 10 to 14 yd out.
++//! - `duel` (the default): a three-quarter side view from the hero's side, 8 to 12 yd out (10 to
++//!   14 before patch 0092, which left the two small in the picture).
+ //! - `low`: 20 yd out and low, for a big body (the Shredder).
+ //! - `high`: 45 to 60 degrees up (45 first), 15 to 22 yd out, so a ground hazard's edge shows.
+ //! - `wide` (patch 0090): 20 to 25 yd out and 30 degrees up, for the arena: a crew on their
+@@ -32,6 +33,14 @@
+ //!   [`BLOCKED_SECS`] moves it. One of them is hidden only when most of its five points (low,
+ //!   chest, head, either side) can't be seen, so a thin post or a crate in front doesn't count.
+ //!   A cut goes only to a position that sees them clearly better.
++//! - **Film past a wall** (patch 0092). The world filling three tenths of the picture short of
++//!   the two (a cabin's corner, a beam, the rock of a bend: [`foreground`]'s lines, the floor not
++//!   counted), or either of them cut off by the frame's edge (an eye pulled in close behind the
++//!   hero), for [`CLUTTER_SECS`] is a cut too, once the position has been held [`HOLD_SECS`], to
++//!   one clearly better. And the point the camera looks at is one the hero sees ([`anchor`]): round a
++//!   bend between the two (Rhahk'Zor's tunnel) their middle is in the void outside the world, and
++//!   a camera measured from there stood in the void (take 418). Every position sees the hero or
++//!   the subject from inside the world.
+ //! - **Film past the end.** When the hero falls, or the subject (the last of its forms) does, the
+ //!   camera says so (`spectate: ... the fight is over: <name> fell`, which the rig ends the video
+ //!   on) and holds where it is, rather than following the hero to a lamp. It films again if the
+@@ -88,10 +97,11 @@ const RESUME_SECS: f32 = 5.0;
+ /// No solid ground under the eye this long (seconds) is the eye out of the world.
+ const OUTSIDE_SECS: f32 = 0.15;
+ /// How quickly the eye and the point it looks at follow the fight (time constants, seconds),
+-/// and the fight's axis turns (so the camera doesn't whip round as the two circle).
++/// and the fight's axis turns (so the camera doesn't whip round as the two circle: 0.8 s before
++/// patch 0092, which swung it round into walls).
+ const EYE_LAG: f32 = 0.35;
+ const LOOK_LAG: f32 = 0.15;
+-const AXIS_LAG: f32 = 0.8;
++const AXIS_LAG: f32 = 1.5;
+ /// How quickly a body's measured walk follows its moves (a time constant, seconds).
+ const WALK_LAG: f32 = 0.2;
+ /// The view's half-angles' tangents: `CAM_FOVY` (45 degrees) tall at 16:9, with a margin.
+@@ -124,6 +134,19 @@ const HIDDEN_AT: usize = 3;
+ /// A cut has to see the two this much better (in [`Scene::score`]'s points) than where the
+ /// camera is.
+ const BETTER_BY: f32 = 3.0;
++/// The world on this many of [`foreground`]'s twenty lines (three tenths of the picture), or one
++/// of the two cut off by the frame, for [`CLUTTER_SECS`] moves the camera, once it has held its
++/// position [`HOLD_SECS`] (patch 0092).
++const CLUTTER_AT: usize = 6;
++const CLUTTER_SECS: f32 = 1.0;
++/// Each of [`foreground`]'s lines the world is on costs a position this much in
++/// [`Scene::score`]'s points (twenty lines; 0089's eight cost one each).
++const CLUTTER_COST: f32 = 0.6;
++/// The share of the way to the point looked at that [`foreground`]'s lines reach: a wall just
++/// short of the two is in the way as much as one at the lens (0089 looked six tenths of the way).
++const CLUTTER_REACH: f32 = 0.85;
++/// Each of the two cut off by the frame's edge costs a position this much (patch 0092).
++const CUT_OFF_COST: f32 = 6.0;
+ /// Where no position is free yet (the world round a teleport's end not loaded in), the eye stands
+ /// this near (yd) the point it looks at, until one is (patch 0090).
+ const UNSURE_NEAR: f32 = 6.0;
+@@ -186,7 +209,7 @@ impl Shot {
+ 
+     fn rule(self) -> ShotRule {
+         match self {
+-            Self::Duel => ShotRule { near: 10.0, far: 14.0, up: 15.0, higher: 25.0, sides: &[50.0, -50.0, 90.0, -90.0, 130.0, -130.0, 20.0, -20.0] },
++            Self::Duel => ShotRule { near: 8.0, far: 12.0, up: 15.0, higher: 25.0, sides: &[50.0, -50.0, 90.0, -90.0, 130.0, -130.0, 20.0, -20.0] },
+             Self::Low => ShotRule { near: 20.0, far: 20.0, up: 4.0, higher: 20.0, sides: &[70.0, -70.0, 110.0, -110.0, 30.0, -30.0, 150.0, -150.0] },
+             // 0089's 12 to 18 yd at 52 degrees filled the Foundry's frame with floor (Nov 9): further
+             // out and at the shallow end of its range, so the two and what's round them show.
+@@ -411,6 +434,40 @@ fn time_to_cut(blocked: f32, both: f32, held: f32) -> bool {
+     both > BLOCKED_SECS || (blocked > BLOCKED_SECS && held >= HOLD_SECS)
+ }
+ 
++/// Whether the camera leaves its position for a clearer one with the world filling the picture's
++/// foreground `cluttered` seconds, once it has held it `held` (patch 0092).
++fn clutter_to_cut(cluttered: f32, held: f32) -> bool {
++    cluttered > CLUTTER_SECS && held >= HOLD_SECS
++}
++
++/// The point the camera looks at, where the hero sees it (patch 0092): the shot's own `look` when
++/// the hero and the subject both see it; else (a bend in a tunnel between them: their middle in
++/// the void outside the world) the furthest point on the way from the hero toward it that the
++/// hero sees, a quarter at a time, or the hero. `sees(a, b)`: a clear line from `a` to `b`.
++fn anchor(look: Vec3, hero: Vec3, subject: Vec3, sees: impl Fn(Vec3, Vec3) -> bool) -> Vec3 {
++    if sees(hero, look) && sees(subject, look) {
++        return look;
++    }
++    [0.75, 0.5, 0.25].into_iter().map(|share| hero.lerp(look, share)).find(|&p| sees(hero, p)).unwrap_or(hero)
++}
++
++/// Whether a line across the picture that met the world at `hit` met something in the way, not
++/// the floor the two stand on (`floor`: the lower one's feet).
++fn in_the_way(hit: Vec3, floor: f32) -> bool {
++    hit.y > floor + 0.5
++}
++
++/// Whether `p` is in the picture from `eye` looking at `look`: in front, and inside the frame's
++/// edges (the view's whole half-angles, without the margins).
++fn in_picture(eye: Vec3, look: Vec3, p: Vec3) -> bool {
++    let ahead = (look - eye).normalize_or(Vec3::NEG_Z);
++    let right = ahead.cross(Vec3::Y).normalize_or(Vec3::X);
++    let up = right.cross(ahead);
++    let v = p - eye;
++    let depth = v.dot(ahead);
++    depth > 0.3 && v.dot(right).abs() <= depth * TAN_HALF_WIDE / 0.8 && v.dot(up).abs() <= depth * TAN_HALF_TALL / 0.85
++}
++
+ /// The camera's state between frames.
+ #[derive(Default)]
+ struct Framing {
+@@ -455,6 +512,8 @@ struct Framing {
+     /// so an eye inside a rock counts).
+     unsure: bool,
+     walled: f32,
++    /// How long the world has filled the picture's foreground (patch 0092).
++    cluttered: f32,
+ }
+ 
+ /// What the camera films this frame: the two, and every other body that can stand in the way.
+@@ -514,7 +573,10 @@ impl Scene {
+     /// eye pulled in; and the shot's order of positions.
+     fn score(&self, collide: &WorldCollision, eye: Vec3, look: Vec3, order: f32, pulled: bool) -> f32 {
+         let (a, b) = self.hidden(collide, eye);
+-        let mut s = 3.0 * (a + b) as f32 + foreground(collide, eye, look) as f32 + order;
++        let mut s = 3.0 * (a + b) as f32
++            + CLUTTER_COST * foreground(collide, eye, look, self.floor()) as f32
++            + CUT_OFF_COST * self.cut_off(eye, look) as f32
++            + order;
+         if a >= HIDDEN_AT {
+             s += 40.0;
+         }
+@@ -537,9 +599,32 @@ impl Scene {
+                 .count() as f32
+     }
+ 
+-    /// The shot's position `pick` here.
+-    fn pose(&self, shot: Shot, axis: f32, pick: usize) -> Pose {
+-        pose(shot, self.subject, self.hero, &self.crew, axis, pick)
++    /// The shot's position `pick` here, looking at a point the hero sees ([`anchor`]).
++    fn pose(&self, collide: &WorldCollision, shot: Shot, axis: f32, pick: usize) -> Pose {
++        let mut p = pose(shot, self.subject, self.hero, &self.crew, axis, pick);
++        p.look = anchor(p.look, self.hero.at(), self.subject.at(), |a, b| sees(collide, a, b));
++        p
++    }
++
++    /// How many of the two the frame cuts off from `eye` looking at `look`: feet or head outside
++    /// its edges (the hero alone: only the hero).
++    fn cut_off(&self, eye: Vec3, look: Vec3) -> usize {
++        let named = self.named.is_some();
++        [(&self.subject, named), (&self.hero, true)]
++            .into_iter()
++            .filter(|(b, filmed)| *filmed && b.tall > 0.0 && ![b.feet, b.feet + Vec3::Y * b.tall].into_iter().all(|p| in_picture(eye, look, p)))
++            .count()
++    }
++
++    /// The floor the two stand on: the lower one's feet.
++    fn floor(&self) -> f32 {
++        self.subject.feet.y.min(self.hero.feet.y)
++    }
++
++    /// Whether `eye` sees the hero or the subject from inside the world (patch 0092): a spot past
++    /// the world's walls, in the void, sees neither.
++    fn in_sight(&self, collide: &WorldCollision, eye: Vec3) -> bool {
++        sees(collide, self.hero.at(), eye) || sees(collide, self.subject.at(), eye)
+     }
+ 
+     /// The eye for a pose: as far out as the shot asks, or pulled in along its line short of the
+@@ -558,7 +643,7 @@ impl Scene {
+             }
+             last = d;
+             let eye = p.look + p.out * d;
+-            if !self.covered(eye, gap) && grounded(collide, eye) {
++            if !self.covered(eye, gap) && grounded(collide, eye) && self.in_sight(collide, eye) {
+                 return Some((eye, d < p.dist * CLEAR_BOOM));
+             }
+         }
+@@ -570,7 +655,7 @@ impl Scene {
+         (0..positions(&shot.rule()))
+             .filter(|&k| Some(k) != except)
+             .filter_map(|k| {
+-                let p = self.pose(shot, axis, k);
++                let p = self.pose(collide, shot, axis, k);
+                 let (eye, pulled) = self.place(collide, p, BODY_GAP + CHOOSE_GAP)?;
+                 Some(Spot { pick: k, eye, look: p.look, score: self.score(collide, eye, p.look, order(shot, k), pulled) })
+             })
+@@ -611,9 +696,12 @@ fn sees(collide: &WorldCollision, from: Vec3, eye: Vec3) -> bool {
+     len < 0.1 || collide.cast_camera(from, line, false).is_none_or(|hit| hit >= len - 0.05)
+ }
+ 
+-/// How much of the frame's foreground is the world: of eight lines across the picture from `eye`
+-/// toward `look`, how many hit something in the near six tenths of the way.
+-fn foreground(collide: &WorldCollision, eye: Vec3, look: Vec3) -> usize {
++/// How much of the frame's foreground is the world: of twenty lines across the picture from `eye`
++/// toward `look` (five across, four down, out to near its edges), how many hit something in the
++/// [`CLUTTER_REACH`] of the way short of it that is in the way ([`in_the_way`]: not the floor under the two at
++/// `floor`). Patch 0092; 0089's eight lines, short of the edges and the floor counted, let a
++/// cabin's corner fill a third of the picture.
++fn foreground(collide: &WorldCollision, eye: Vec3, look: Vec3, floor: f32) -> usize {
+     let line = look - eye;
+     let dist = line.length();
+     if dist < 1.0 {
+@@ -622,11 +710,13 @@ fn foreground(collide: &WorldCollision, eye: Vec3, look: Vec3) -> usize {
+     let ahead = line / dist;
+     let right = ahead.cross(Vec3::Y).normalize_or(Vec3::X);
+     let up = right.cross(ahead);
+-    [(-0.6, -0.5), (0.0, -0.5), (0.6, -0.5), (-0.6, 0.0), (0.6, 0.0), (-0.6, 0.5), (0.0, 0.5), (0.6, 0.5)]
++    let reach = dist * CLUTTER_REACH;
++    [-0.9f32, -0.45, 0.0, 0.45, 0.9]
+         .into_iter()
+-        .filter(|&(x, y): &(f32, f32)| {
++        .flat_map(|x| [-0.8f32, -0.27, 0.27, 0.8].into_iter().map(move |y| (x, y)))
++        .filter(|&(x, y)| {
+             let dir = (ahead + right * (x * TAN_HALF_WIDE) + up * (y * TAN_HALF_TALL)).normalize();
+-            collide.cast_camera(eye, dir * dist * 0.6, false).is_some()
++            collide.cast_camera(eye, dir * reach, false).is_some_and(|hit| in_the_way(eye + dir * hit, floor))
+         })
+         .count()
+ }
+@@ -831,10 +921,15 @@ fn film(
+     let (sub_hidden, hero_hidden) = (a >= HIDDEN_AT, b >= HIDDEN_AT);
+     state.blocked = if sub_hidden || hero_hidden { state.blocked + dt } else { 0.0 };
+     state.both = if sub_hidden && hero_hidden { state.both + dt } else { 0.0 };
+-    if state.blocked == 0.0 {
++    // The world filling the foreground (a cabin's corner beside them), or one of the two cut off by
++    // the frame (the eye pulled in behind the hero).
++    let clutter = foreground(&collide, eye, state.look, scene.floor());
++    let cut_off = scene.cut_off(eye, state.look);
++    state.cluttered = if clutter >= CLUTTER_AT || cut_off > 0 { state.cluttered + dt } else { 0.0 };
++    if state.blocked == 0.0 && state.cluttered == 0.0 {
+         state.told = false;
+     }
+-    let p = scene.pose(shot, state.axis, state.pick);
++    let p = scene.pose(&collide, shot, state.axis, state.pick);
+     let want = scene.place(&collide, p, BODY_GAP);
+     // What can't wait: a body on the camera's spot or about to be, or the eye out of the world.
+     // (A position with no room just now holds the eye where it is: being hidden moves it.)
+@@ -884,24 +979,29 @@ fn film(
+             to = Some(spot);
+         }
+         state.retry = RETRY_URGENT_SECS;
+-    } else if urgent.is_none() && time_to_cut(state.blocked, state.both, state.held) && state.retry <= 0.0 {
++    } else if urgent.is_none()
++        && (time_to_cut(state.blocked, state.both, state.held) || clutter_to_cut(state.cluttered, state.held))
++        && state.retry <= 0.0
++    {
+         let here = scene.score(&collide, eye, state.look, order(shot, state.pick), want.is_some_and(|w| w.1));
+-        let what = match (sub_hidden, hero_hidden) {
+-            (true, true) => "both hidden",
+-            (true, false) => "the subject hidden",
+-            _ => "the hero hidden",
++        let (what, secs) = match (sub_hidden, hero_hidden) {
++            (true, true) => ("both hidden".to_string(), state.blocked),
++            (true, false) => ("the subject hidden".to_string(), state.blocked),
++            (false, true) => ("the hero hidden".to_string(), state.blocked),
++            _ if clutter >= CLUTTER_AT => (format!("the world on {clutter} of 20 lines of the foreground"), state.cluttered),
++            _ => (format!("{cut_off} of the two cut off by the frame"), state.cluttered),
+         };
+         match scene.best(&collide, shot, state.axis, Some(state.pick)) {
+             Some(spot) if spot.score + BETTER_BY < here => {
+                 info!(
+-                    "spectate: t={clock:.1} {what} {:.2} s at position {} (held {:.1} s): cut to position {} (score {:.0} for {:.0})",
+-                    state.blocked, state.pick, state.held, spot.pick, spot.score, here
++                    "spectate: t={clock:.1} {what} {secs:.2} s at position {} (held {:.1} s): cut to position {} (score {:.0} for {:.0})",
++                    state.pick, state.held, spot.pick, spot.score, here
+                 );
+                 to = Some(spot);
+             }
+             _ => {
+                 if !state.told {
+-                    info!("spectate: t={clock:.1} {what} {:.2} s at position {}: no clearer position, holding", state.blocked, state.pick);
++                    info!("spectate: t={clock:.1} {what} {secs:.2} s at position {}: no clearer position, holding", state.pick);
+                     state.told = true;
+                 }
+                 state.retry = RETRY_SECS;
+@@ -911,6 +1011,7 @@ fn film(
+     let (eye, look) = if let Some(spot) = to {
+         state.unsure = !spot.score.is_finite();
+         state.walled = 0.0;
++        state.cluttered = 0.0;
+         state.pick = spot.pick;
+         state.held = 0.0;
+         state.blocked = 0.0;
+@@ -965,7 +1066,7 @@ fn track(trail: &mut Vec<(f32, Vec3, bool)>, jump: &mut Option<(Vec3, bool)>, cl
+ /// open air round the fight rather than inside a rock that isn't solid yet.
+ fn first_spot(collide: &WorldCollision, scene: &Scene, shot: Shot, axis: f32) -> Spot {
+     scene.best(collide, shot, axis, None).unwrap_or_else(|| {
+-        let p = scene.pose(shot, axis, 0);
++        let p = scene.pose(collide, shot, axis, 0);
+         let near = p.dist.min(UNSURE_NEAR);
+         let reach = collide.cast_camera(p.look, p.out * near, false).map_or(near, |hit| (hit - WALL_GAP).max(1.0));
+         Spot { pick: 0, eye: p.look + p.out * reach, look: p.look, score: f32::INFINITY }
+@@ -1037,22 +1138,22 @@ mod tests {
+         assert_eq!(s.subject_text(), "Cookie then Gorged");
+     }
+ 
+-    /// A duel's first position: three-quarter, from the hero's side, 10 to 14 yd out, a little up.
++    /// A duel's first position: three-quarter, from the hero's side, 8 to 12 yd out, a little up.
+     #[test]
+-    fn a_duel_is_three_quarter_from_the_heros_side_10_to_14_yd_out() {
++    fn a_duel_is_three_quarter_from_the_heros_side_8_to_12_yd_out() {
+         let (subject, hero) = (body(0.0, 0.0), body(0.0, 3.0));
+         let axis = 0.0; // subject to hero is +z
+         let p = pose(Shot::Duel, subject, hero, &[], axis, 0);
+-        assert!((10.0..=14.0).contains(&p.dist), "{}", p.dist);
++        assert!((8.0..=12.0).contains(&p.dist), "{}", p.dist);
+         let eye = p.look + p.out * p.dist;
+         assert!(eye.z > hero.at().z, "on the hero's side: {eye}");
+         let flat = p.out.with_y(0.0).normalize();
+         let off_axis = flat.z.acos().to_degrees();
+         assert!((40.0..=60.0).contains(&off_axis), "three-quarter: {off_axis}");
+         assert!(p.out.y > 0.1 && p.out.y < 0.5, "a little above them: {}", p.out.y);
+-        // Far apart, it stands back past 14 yd rather than lose either.
++        // Far apart, it stands back past 12 yd rather than lose either.
+         let wide = pose(Shot::Duel, subject, body(0.0, 30.0), &[], axis, 0);
+-        assert!(wide.dist > 14.0);
++        assert!(wide.dist > 12.0);
+     }
+ 
+     #[test]
+@@ -1141,6 +1242,44 @@ mod tests {
+         assert!(time_to_cut(0.4, 0.4, 0.5), "both hidden");
+     }
+ 
++    /// The world filling the foreground moves a position held 3 s once it has for a second; a
++    /// passing post, or a position just cut to, stays.
++    #[test]
++    fn a_wall_filling_the_foreground_is_a_cut_after_a_second() {
++        assert!(!clutter_to_cut(0.5, 10.0), "a post going by");
++        assert!(!clutter_to_cut(2.0, 1.0), "held 1 s");
++        assert!(clutter_to_cut(1.2, 3.5));
++        assert!(in_the_way(Vec3::new(0.0, 1.0, 0.0), 0.0), "a wall at chest height");
++        assert!(!in_the_way(Vec3::new(0.0, 0.2, 0.0), 0.0), "the floor under them");
++    }
++
++    /// A body right under the lens is cut off by the frame; one out in front isn't.
++    #[test]
++    fn a_body_under_the_lens_is_cut_off() {
++        let s = scene(true);
++        let look = (s.subject.at() + s.hero.at()) * 0.5;
++        let far = look + Vec3::new(8.0, 3.0, 0.0);
++        assert_eq!(s.cut_off(far, look), 0, "both in the picture from 8 yd");
++        // Just behind and above the hero's head, looking at the middle: the hero's feet are out.
++        let close = s.hero.feet + Vec3::new(0.0, 3.2, 0.6);
++        assert!(s.cut_off(close, look) >= 1);
++        assert!(!in_picture(Vec3::ZERO, Vec3::NEG_Z, Vec3::Z), "behind the camera");
++    }
++
++    /// Round a bend (the middle of the two in the void, which the hero can't see) the camera looks
++    /// at a point the hero sees, toward the middle; in the open it looks at the middle.
++    #[test]
++    fn the_point_looked_at_is_one_the_hero_sees() {
++        let (hero, subject) = (Vec3::ZERO, Vec3::new(8.0, 0.0, 8.0));
++        let middle = (hero + subject) * 0.5;
++        assert_eq!(anchor(middle, hero, subject, |_, _| true), middle, "in the open");
++        // A wall at x = 3 (the tunnel's bend): the hero sees only what's short of it.
++        let short_of_wall = |a: Vec3, b: Vec3| a.x.max(b.x) < 3.0 || a.x.min(b.x) >= 3.0;
++        let p = anchor(middle, hero, subject, short_of_wall);
++        assert!(p.x < 3.0 && p.distance(hero) > 0.5, "{p}");
++        assert_eq!(anchor(middle, hero, subject, |a, b| a == b), hero, "nothing seen: the hero");
++    }
++
+     #[test]
+     fn the_camera_looks_at_the_point() {
+         for (eye, look) in [(Vec3::new(3.0, 4.0, -2.0), Vec3::ZERO), (Vec3::new(-10.0, 1.0, 7.0), Vec3::new(1.0, 1.5, 2.0))] {
+-- 
+2.56.0.windows.4
+
