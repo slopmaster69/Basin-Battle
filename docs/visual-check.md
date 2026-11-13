@@ -211,9 +211,11 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
   (`camera: spectate: t=12.3 ...`).
 - **A wall filling the picture** (patch 0092): of twenty lines across the picture, out to its
-  edges, the world on seven (a third: a cabin's corner, a beam, the rock of a bend; the floor
-  under the two doesn't count) for a second is a cut too, once the position has been held 3 s,
-  to one clearly better (`the world on 9 of 20 lines of the foreground`). Before it, a corner of
+  edges and 85 hundredths of the way to the two, the world on six (three tenths: a cabin's
+  corner, a beam, the rock of a bend; the floor under the two doesn't count) for a second is a
+  cut too, once the position has been held 3 s, to one clearly better (`the world on 9 of 20
+  lines of the foreground`). So is the hero or the boss cut off by the frame's edge (a wall
+  pulled the eye in close behind the hero, take 425: `1 of the two cut off by the frame`). Before it, a corner of
   VanCleef's cabin filled a third to half of his takes for a minute. The fight's axis, which the
   shot's positions turn with, follows the two over 1.5 s, so the camera doesn't swing round into
   a wall as they circle.
