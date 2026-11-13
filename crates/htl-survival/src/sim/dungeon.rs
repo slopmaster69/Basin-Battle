@@ -162,7 +162,8 @@ fn crosses(a: Vec3, b: Vec3, c: [f32; 2], d: [f32; 2]) -> bool {
 
 /// A rail holds back what moves within this height of the deck at it (a body thrown up over it
 /// too, a jump clears 1.6 yd), and nothing on another floor above or below (the gangway passes
-/// 4 yd under the stern-port quarter's).
+/// 4 yd under the stern-port quarter's). Set for the Juggernaut, whose rails are the only ones: a
+/// rail on a deck with a floor nearer above or below, or a taller drop to hold, needs its own look.
 const RAIL_REACH: f32 = 3.0;
 /// A hero held at a rail stands this far short of its line (the fence's half width and a body's).
 const RAIL_STOP: f32 = 0.4;
@@ -202,7 +203,6 @@ impl Survival {
         s
     }
 
-    /// This is the world below.
     /// A rail piece's rotation (a quaternion), for the clients: tipped to follow the deck.
     pub fn rail_piece_rotation(&self, id: Id) -> Option<[f32; 4]> {
         self.rail_pieces.get(&id).map(|p| p.rotation)
@@ -247,6 +247,7 @@ impl Survival {
         }
     }
 
+    /// This is the world below.
     pub fn is_below(&self) -> bool {
         self.below.is_some()
     }
