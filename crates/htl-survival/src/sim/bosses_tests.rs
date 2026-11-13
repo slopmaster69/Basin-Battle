@@ -954,3 +954,22 @@ fn the_loose_rubble_left_lying_is_capped_for_the_client() {
     assert!(s.collapse_rubble().len() >= RUBBLE_MOST - 5, "the cap reached on a long run: {}", s.collapse_rubble().len());
     assert!(gone > 0, "the oldest taken away as more come down");
 }
+
+/// The filming rig's `.es restock`: after a take's `clearfoes` has taken every other boss away,
+/// a reset of the dungeon (as a beaten run's) stands them all again, with the heroes still there
+/// and found secrets kept.
+#[test]
+fn a_restock_after_clearfoes_stands_every_boss_again() {
+    let mut s = Survival::new_dungeon(Content::dev(), Box::new(FlatLand::default()), 1, 0.0);
+    let hero = s.join("hero", "Hero", None);
+    s.below.as_mut().unwrap().open.insert("vancleef_quarters".into());
+    let bosses = ["dm_rhahkzor", "dm_smite", "dm_shredder", "dm_gilnid", "dm_greenskin", "dm_cookie", "dm_vancleef"];
+    let standing = |s: &Survival, key: &str| s.mobs.values().any(|m| s.content.mobs[m.def].key == key);
+    for b in bosses { assert!(standing(&s, b), "{b} at the start"); }
+    s.dev_clear_foes("vancleef").unwrap();
+    assert!(!standing(&s, "dm_smite") && standing(&s, "dm_vancleef"));
+    s.reset_below(false);
+    for b in bosses { assert!(standing(&s, b), "{b} after the restock"); }
+    assert!(s.players.contains_key(&hero));
+    assert!(s.below.as_ref().unwrap().open.contains("vancleef_quarters"), "found secrets stay");
+}

@@ -934,8 +934,15 @@ function Start-Cameraman($s, $sc, $hero, $out, [int]$timeout) {
         $r = New-Object VisualCheckWin+RECT
         [void][VisualCheckWin]::GetWindowRect($p.MainWindowHandle, [ref]$r)
         $area = [System.Windows.Forms.Screen]::FromHandle($p.MainWindowHandle).WorkingArea
-        $w = [int](($s.hero_resolution -split 'x')[0])
-        $border = ($r.Right - $r.Left) - [int](($s.resolution -split 'x')[0])
+        # All in screen pixels: at a display scale over 100% the windows are the settings' sizes
+        # times the scale (the cameraman's picture shows by how much). Taking the settings' width
+        # as pixels counted the scale as border: at 150% nothing fit (Nov 13).
+        $c = New-Object VisualCheckWin+RECT
+        $inner = if ([VisualCheckWin]::GetPictureRect($p.MainWindowHandle, [ref]$c)) { $c.Right - $c.Left } else { 0 }
+        if ($inner -le 0) { $inner = [int](($s.resolution -split 'x')[0]) }
+        $scale = $inner / [double](($s.resolution -split 'x')[0])
+        $w = [int]([int](($s.hero_resolution -split 'x')[0]) * $scale)
+        $border = ($r.Right - $r.Left) - $inner
         $x = $r.Right + 8
         $fits = $x + $w + $border -le $area.Right
     }

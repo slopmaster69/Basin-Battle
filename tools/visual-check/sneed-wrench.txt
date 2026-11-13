@@ -1,0 +1,24 @@
+# DEV SETUP, NOT A FIGHT: Sneed's wrench in flight (speed 14 since #346), filmed by the cameraman.
+# The Shredder is broken by a debug hurt so Sneed is on foot at once; the warrior stands still in
+# his 16 yd and is healed, so every throw (one each 6 sec) flies at him. Judge: the wrench seen in
+# the air from Sneed's hand to the hero, not only as a spark at the hero's feet (take 419).
+hero warrior
+cam off
+camera duel Sneed
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11 .es clearfoes sneed
+12 .es goto -272.3 -488.9 50.4 3.94
+13 .es heal
+13.5 video
+14 .es hurt 0 dm_shredder
+20 .es heal
+26 .es heal
+32 .es heal
+38 .es heal
+44 .es heal
+16 shots wrench 40 0.75
+50 end

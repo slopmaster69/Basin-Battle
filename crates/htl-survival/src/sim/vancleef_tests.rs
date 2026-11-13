@@ -805,6 +805,20 @@ fn a_hit_while_unbowed_kneels_leaves_the_kneel_held() {
     assert!(!s.posed(id), "the pose is over once he stands");
 }
 
+/// Unbowed's dark swirl is on him while he fights and goes when he falls (take 421 filmed it
+/// burning on his body after the fall).
+#[test]
+fn unbowed_swirl_goes_with_his_fall() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    let swirl = s.content.mobs[s.mobs[&id].def].aura;
+    assert_ne!(swirl, 0);
+    assert!(s.auras_of(id).contains(&swirl));
+    s.events.clear();
+    s.hurt_mob(id, band[0], u32::MAX);
+    assert!(!s.auras_of(id).contains(&swirl), "no swirl on the body");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Auras { id: who } if *who == id)), "the clients are told");
+}
+
 /// A deck 6 yd either side of the keel line, the sea 12 yd under it beyond.
 struct Ship;
 

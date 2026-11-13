@@ -11,6 +11,7 @@ camera duel Edwin VanCleef|Edwin VanCleef
 0.4 .es goto -9624 675
 1 .es travel landing
 10 .es debug quiet
+10.5 .es restock
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 11 .es clearfoes vancleef
 # The quarters secret, searched at its barrel, so Unbowed can rise.
@@ -33,5 +34,7 @@ camera duel Edwin VanCleef|Edwin VanCleef
 14.7 lua VB.on = true
 17 .es in lock
 15 shots late 30 3.0
-110 shots unbowed 30 4.0
-240 end
+# Unbowed's own fight runs about 1.8 min from his rise (~80 s in): 240 s ended take 408 with both
+# still standing. 420 s leaves room for his fall; the rig ends the take at the last fall anyway.
+110 shots unbowed 60 4.0
+420 end

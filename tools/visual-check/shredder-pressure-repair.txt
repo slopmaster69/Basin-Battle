@@ -14,6 +14,8 @@ cam 180 -14 11
 # The first stand is 22 yd from the machine, facing it, on the room's floor (49.4). Not
 # -270 -505 50: that is under a raised deck there (its floors are at 54.7 and 61.9), and the hero
 # fell through the world over and over (the Nov 13 filming).
+11.0 .es debug quiet
+11.5 .es restock
 12.0 .es goto -272.3 -488.9 50.4 3.94
 13.0 .es heal
 14.0 video

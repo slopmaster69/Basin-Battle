@@ -1011,6 +1011,10 @@ impl Survival {
         // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
         // looks go the moment it falls, as a fallen hero's do.
         self.clear_cc(mid);
+        // Its own look goes with it (`auras_of` shows it only while it lives).
+        if self.mobs.get(&mid).is_some_and(|m| self.content.mobs[m.def].aura != 0) {
+            self.events.push(Event::Auras { id: mid });
+        }
         if matches!(self.mobs.get(&mid).map(|m| &m.state), Some(MobState::Windup { .. })) && self.attack_now(mid).ranged {
             self.events.push(Event::CastEnd { caster: mid });
         }
