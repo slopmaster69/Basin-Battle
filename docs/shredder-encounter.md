@@ -82,7 +82,7 @@ and StandWound keeps the body at full height (measured on its bones: head and bo
 body at 0.49 to 0.55 of its height) and the heave is JumpEnd played through. Sounds: GoblinShredderAttack 1977 (saw),
 GoblinShredder 3700 (engine), GoblinShredderWoundCrit 1979 (stall), SteamGeyserVar1 4858 (vent
 hiss). Smoke is Vanish's puff (spell 1856), sparks the parry kit (555), dust 5649. Sneed's wrench
-is spell 13398 (`Spells\Missile_Wrench.mdx`, speed 20) on GoblinMale's AttackThrown 107.
+is spell 13398 (`Spells\Missile_Wrench.mdx`, speed 14) on GoblinMale's AttackThrown 107.
 
 ## Filming
 

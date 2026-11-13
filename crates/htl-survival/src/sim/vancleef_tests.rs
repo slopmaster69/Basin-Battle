@@ -785,6 +785,26 @@ fn hits_into_the_hunch_leave_it_held() {
     assert!(!s.posed(id), "the pose is over with the hunch");
 }
 
+/// Unbowed's rise-kneel holds through a hit too: a blow while he kneels doesn't flinch him up
+/// before he stands to roar.
+#[test]
+fn a_hit_while_unbowed_kneels_leaves_the_kneel_held() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    s.vancleef_risen(id);
+    assert!(s.posed(id), "the kneel is an open pose");
+    assert!(poses(&s.events, id).contains(&(KNEEL_CLIP, RISE_KNEEL)));
+    let flinches = |ev: &[Event]| ev.iter().filter(|e| matches!(e, Event::React { id: who, hold, fit, .. } if *who == id && *hold == 0.0 && *fit == 0.0)).count();
+    let pos = s.mobs[&id].pos;
+    s.move_player(band[0], [pos[0] + 1.5, pos[1], pos[2]], std::f32::consts::PI, Moving::default());
+    s.events.clear();
+    s.input(band[0], Input::Attack);
+    let ev = run(&mut s, 0.8);
+    assert!(s.mobs[&id].health < s.mobs[&id].max_health, "the hit landed");
+    assert_eq!(flinches(&ev), 0, "no flinch in the kneel");
+    run(&mut s, RISE_KNEEL);
+    assert!(!s.posed(id), "the pose is over once he stands");
+}
+
 /// A deck 6 yd either side of the keel line, the sea 12 yd under it beyond.
 struct Ship;
 

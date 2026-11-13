@@ -12,6 +12,7 @@ hero warrior
 cam off
 camera duel Mr. Smite
 0 .es debug quiet
+0.4 .es goto -9624 675
 1 .es travel landing
 10 .es debug quiet
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end

@@ -240,6 +240,10 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   or a teleport once the fight has started is "dev setup", and proves nothing about the fight:
   say so in its first comment line. From the video on, only the hero's own keys (`.es in ...`,
   `ActionDash`, `.es hop`) play.
+- **Go to the logbook before `.es travel`**: `.es goto -9624 675` first. The book only reads
+  within reach, and the hero starts each take wherever the last one left them, so a travel without
+  it works only after a take that ended at the book (Nov 13: take 404 was refused the travel and
+  fell through the open world for 7 minutes).
 - **A move's clip** (8 to 20 s) shows the boss's tell, the attack, the right answer, the boss's
   recovery and the punish: time the `video` line and the bursts around them.
 

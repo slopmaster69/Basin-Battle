@@ -615,6 +615,23 @@ impl Survival {
         true
     }
 
+    /// Gilnid waits, as Cookie does (`kitchen_holds_on`), for a hero in his fight who stands where
+    /// he can't walk: a plank (an object, not the map's floor, so the rules find the pit 9 yd under
+    /// it) or anything else over the drop. He no longer gives up after 4 sec, which cleared his
+    /// crew and reset the fight for a hero who stepped out onto a plank.
+    pub(crate) fn perch_holds_on(&self, id: Id, foe: Foe) -> bool {
+        let (Some(m), Foe::Hero(h)) = (self.mobs.get(&id), foe) else { return false };
+        self.perches.crews.contains_key(&id) && self.in_fight_of(m, h)
+            && m.lost_at.is_some_and(|t| self.clock - t < super::kitchen::HOLD_ON)
+    }
+
+    /// While he waits with no way to his hero, their blows and shots find nothing (as Cookie's):
+    /// standing out of his reach buys no free hits.
+    pub(crate) fn perch_evading(&self, id: Id) -> bool {
+        self.perches.crews.contains_key(&id) && self.mobs.get(&id).is_some_and(|m| m.health > 0
+            && matches!(m.state, MobState::Chase { .. }) && m.lost_at.is_some_and(|t| self.clock - t >= super::kitchen::EVADE_AFTER))
+    }
+
     pub(crate) fn perch_controlled(&self, id: Id) -> bool {
         self.perches.workers.get(&id).is_some_and(|w| !matches!(w.state, Place::Ground))
     }

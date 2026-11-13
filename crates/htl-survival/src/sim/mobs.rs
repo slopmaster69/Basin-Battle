@@ -2079,8 +2079,9 @@ impl Survival {
     /// find nothing (it evades, as 1.12's do) until it's home or they come back within it.
     pub(crate) fn evading(&self, mid: Id, by: Id) -> bool {
         let (Some(m), Some(p)) = (self.mobs.get(&mid), self.players.get(&by)) else { return false };
-        // (Cookie and Gorged waiting for a hero they can find no way to evade too: `sim::kitchen`.)
-        self.kitchen_evading(mid)
+        // (Cookie and Gorged waiting for a hero they can find no way to evade too: `sim::kitchen`;
+        // Gilnid as well: `sim::perches`.)
+        self.kitchen_evading(mid) || self.perch_evading(mid)
             || (!m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK)
     }
 
@@ -2231,8 +2232,9 @@ impl Survival {
                 }
                 // (A boss whose collapse is coming down never gives a fleeing hero up for distance.)
                 // (Cookie and Gorged never give a hero in their fight up for a spot they can't
-                // walk to: a dock, the far side of the pot. They wait for the hero to come down.)
-                let lost = lost && !self.kitchen_holds_on(id, foe);
+                // walk to: a dock, the far side of the pot. They wait for the hero to come down.
+                // Gilnid waits the same for a hero out on a plank: `sim::perches`.)
+                let lost = lost && !self.kitchen_holds_on(id, foe) && !self.perch_holds_on(id, foe);
                 if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.

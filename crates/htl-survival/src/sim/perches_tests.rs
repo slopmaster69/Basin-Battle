@@ -1,5 +1,5 @@
 use super::*;
-use crate::land::FlatLand;
+use crate::land::{FlatLand, Land};
 
 fn fight() -> (Survival, Id, Id, Vec<Id>) {
     let mut s = Survival::bare(Content::dev(), Box::new(FlatLand::default()), 7, 0.0);
@@ -523,4 +523,46 @@ fn immediate_visuals_are_encounter_owned_and_never_a_standing_plank_or_pole() {
     assert!(fallen.iter().all(|id| s.is_perch_visual_prop(*id)));
     s.remove_perch_crew(boss);
     assert!(fallen.iter().all(|id| !s.is_perch_visual_prop(*id) && !s.objs.contains_key(id)));
+}
+
+/// Nothing walks north of y 3: a hero out there stands where Gilnid finds no way (a plank over the
+/// pit is that on the real map: an object, not floor, with the pit 9 yd under it).
+struct OverTheDrop;
+impl Land for OverTheDrop {
+    fn height(&self, _: f32, _: f32) -> f32 { 0.0 }
+    fn plans(&self) -> bool { true }
+    fn walk_clear(&self, from: Vec3, to: Vec3) -> bool { from[1] <= 3.0 && to[1] <= 3.0 }
+}
+
+/// A hero out on a plank used to have him give up after 4 sec: crew cleared, the fight reset. He
+/// waits for them now, as Cookie does, slipping their shots; stepping back where he can walk ends
+/// it, and after 10 sec with no way he goes home as before.
+#[test]
+fn gilnid_waits_for_a_hero_out_where_he_cannot_walk_and_slips_their_shots() {
+    for come_back in [false, true] {
+        let (mut s, hero, boss, _) = fight();
+        s.land = Box::new(OverTheDrop);
+        s.move_player(hero, [0.0, 9.0, 0.0], 0.0, Moving::default());
+        assert!(until(&mut s, 5.0, |s| s.mobs[&boss].lost_at.is_some()), "he finds no way");
+        let lost = s.mobs[&boss].lost_at.unwrap();
+        assert!(until(&mut s, 2.0, |s| s.perch_evading(boss)));
+        assert!(s.evading(boss, hero));
+        let hp = s.mobs[&boss].health;
+        shot(&mut s, hero, boss, 50.0, HitKind::Projectile);
+        tick(&mut s, 0.05);
+        assert_eq!(s.mobs[&boss].health, hp, "nothing reaches him while he waits");
+        // Past the old 4 sec: still in his fight, his crew still up.
+        let wait = (lost + 6.0 - s.clock).max(0.0);
+        tick(&mut s, wait);
+        assert!(!matches!(s.mobs[&boss].state, MobState::Return | MobState::Idle { .. }), "{:?}", s.mobs[&boss].state);
+        assert!(s.perches.crews.contains_key(&boss), "the crew stays");
+        if come_back {
+            s.move_player(hero, [1.5, 0.0, 0.0], 0.0, Moving::default());
+            assert!(until(&mut s, 6.0, |s| !s.evading(boss, hero) && s.mobs[&boss].lost_at.is_none()), "back where he walks, he comes");
+            assert!(!matches!(s.mobs[&boss].state, MobState::Return));
+        } else {
+            assert!(until(&mut s, super::kitchen::HOLD_ON + 1.0, |s| matches!(s.mobs[&boss].state, MobState::Return)));
+            assert!(s.clock - lost >= super::kitchen::HOLD_ON - 0.06, "he waited {:.1} s", s.clock - lost);
+        }
+    }
 }

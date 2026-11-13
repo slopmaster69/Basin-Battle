@@ -1645,8 +1645,10 @@ respawn = 0.0
   name = "wrench"
   weight = 2.0
   max_range = 16.0
-  # GoblinMale's measured throw is 107 ($CSR at 0.20 sec); it has no clip 61.
-  steps = [ { clip = 107, take = 0, ranged = true, windup = 1.0, range = 16.0, radius = 1.0, speed = 20.0, spell = 13398, damage = 16, recovery = 1.5 } ]
+  # GoblinMale's measured throw is 107 ($CSR at 0.20 sec); it has no clip 61. Speed 14, as the
+  # other thrown things here (harpoon, bomb): at 20 the wrench crossed 16 yd in 0.8 sec, too quick to
+  # see in flight (docs/boss-shared-fixes.md, "slower projectiles with a visible flight").
+  steps = [ { clip = 107, take = 0, ranged = true, windup = 1.0, range = 16.0, radius = 1.0, speed = 14.0, spell = 13398, damage = 16, recovery = 1.5 } ]
 
 [[goal]]
 title = "The Smelter"

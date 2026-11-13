@@ -14,6 +14,7 @@ cam off
 # fall to Unbowed's, or the hero's (docs/visual-check.md, "Filming a boss").
 camera duel Edwin VanCleef|Edwin VanCleef
 0 .es debug quiet
+0.4 .es goto -9624 675
 1 .es travel landing
 10 .es debug quiet
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
