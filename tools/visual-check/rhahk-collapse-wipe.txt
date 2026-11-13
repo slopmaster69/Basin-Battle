@@ -1,0 +1,35 @@
+# DEV SETUP only to start it: `.es hurt` brings Rhahk'Zor's collapse on (70%) once the video
+# runs. After that nothing: no heal, no key. A hero who does nothing on the door side of his
+# post is caught, thrown clear, and felled by him at the first face; the mine is put back.
+#
+# Times are the scenario's; the collapse begins at 18. The server's rehearsal of exactly this,
+# in the real mine: crates/htl-server/tests/rhahk_route.rs, a_hero_felled_at_the_first_face_...
+#   18     his yell; torches and the band across the tunnel mouth (x -37), dust over the door
+#          pocket
+#   20     the wave from the buried door; its lighter falls hurt the hero on the way
+#   23.9   the hero caught (35% of their health) and thrown to clear floor past the band
+#   26.2   the first face stands; about then his blow fells the hero (26.3 in the rehearsal,
+#          a hero of 200 health; one with more takes another blow or two, and one who lasts
+#          to 41.5 is caught again by the second section and thrown on past its band)
+#   at once: the collapse's rules end and Rhahk'Zor is back at his post (-40 -385), whole.
+#          The rock, the face and the torches stand 2 s more in dust, then go over 1.5 s: the
+#          tunnel open to the buried door again.
+# What to look for: the hero never left behind the rubble; the fall, then the rock standing a
+# moment in its dust, then no rock, no face, no torch left anywhere, the tunnel as it was
+# before the fight; and no rock hurled at a hero who wakes at the lamp.
+hero warrior
+camera duel Rhahk'Zor
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -25 -376 60.8 3.14
+13 .es heal
+16 video
+18 .es hurt 0.69 rhahk
+18.2 shots surge 8 0.5
+23.6 shots caught 8 0.25
+26 shots felled 16 0.5
+60 end

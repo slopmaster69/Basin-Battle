@@ -152,6 +152,7 @@ impl Survival {
         self.windups.clear();
         self.missiles.clear();
         self.pending.clear();
+        self.collapse_reset();
     }
 
     /// What's new since `before`, drawn for everyone (what says so itself already has).

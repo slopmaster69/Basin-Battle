@@ -1,0 +1,63 @@
+# Visual check: Rhahk'Zor's collapse seen whole, from clear floor past the second line.
+#
+# DEV SETUP: the hero is put 3.5 yd past the second line (`.es goto`, on the route, among that
+# line's torches) and stands there, kept alive (`.es heal`); `.es hurt` brings the collapse on
+# (70%). Nothing here is played: it is the view a hero who is already out has when they turn
+# round. The camera is held behind the hero, looking back toward the door. (No farther on: a
+# hero more than 20 yd of the route past the line of the section that is falling has run from
+# him, and he hurls rock at them.)
+#
+# Times are the scenario's; the collapse begins at 18.
+#   18     his yell; far off, lights along the first line in the timber arch, dust in the tunnel
+#   20     the roof of the door tunnel comes down, door end first; seen through the arch
+#   26.2   the first face stands in the arch, lit by the lights of its line
+#   38.3   the second section's warning: lights wall to wall along the line in front of the
+#          camera, the band on the floor between them, dust from the roof over the whole
+#          chamber; nothing lands for 2 s
+#   40.3   the chamber's roof comes down, from the first face toward the camera, rock on rock
+#   43.3   the wave reaches the line; the second face builds behind the lights
+#   46     the chamber stands full of rock behind its face
+# He comes for the hero at once and fights them there the whole take, in the middle of the
+# picture: the fight in front of a face.
+# What to look for: the lights of each line from its warning's first moment and nothing landing
+# for 2 s; the pale rock coming on in rows from the far side; the chamber full of rock behind
+# the second line's lights at the end, lit by them.
+hero warrior
+cam 35 -14 14
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -54.8 -379.9 54.6 0.27
+16 video
+18 .es hurt 0.69 rhahk
+18.2 shots first 2 4
+18.5 .es heal
+20 .es heal
+21.5 .es heal
+23 .es heal
+24.5 .es heal
+26 .es heal
+27.5 .es heal
+29 .es heal
+30.5 .es heal
+32 .es heal
+33.5 .es heal
+35 .es heal
+36.5 .es heal
+38 .es heal
+38.4 shots warning 4 0.5
+39.5 .es heal
+40.4 shots fills 8 0.5
+41 .es heal
+42.5 .es heal
+44 .es heal
+45.5 .es heal
+46 shots full 2 1
+47 .es heal
+48.5 .es heal
+50 .es heal
+51 .es where
+52 end

@@ -1341,6 +1341,10 @@ impl Survival {
             if self.step_boss_run(id) {
                 continue;
             }
+            // A foe running from a collapse: gone in a moment, it heeds nothing else.
+            if self.step_collapse_flee(id) {
+                continue;
+            }
             // A boss holding the line of its collapse: the route and the front set where it goes.
             if self.step_boss_holdline(id) {
                 continue;
@@ -1549,9 +1553,32 @@ impl Survival {
                 }
             }
         };
+        // Never through a face of rubble (`sim::bosses`): up to it, its back to it, and no farther.
+        let mut path = path;
+        if !self.short_of_faces(from, &mut path) {
+            return;
+        }
         let m = self.mobs.get_mut(&id).unwrap();
         m.lost_at = None;
         m.plan_to = (!straight).then_some(to);
+        m.path = path.clone();
+        m.speed = speed;
+        m.sidle = None;
+        let mut shown = vec![from];
+        shown.extend(path);
+        self.events.push(Event::MobMove { id, path: shown, speed, face: None });
+    }
+
+    /// Along a way already known whole (a route with its own corners), at the speed given.
+    pub(crate) fn go_along(&mut self, id: Id, mut path: Vec<Vec3>, speed: f32) {
+        let Some(m) = self.mobs.get(&id) else { return };
+        let from = m.pos;
+        if !self.short_of_faces(from, &mut path) {
+            return;
+        }
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.lost_at = None;
+        m.plan_to = None;
         m.path = path.clone();
         m.speed = speed;
         m.sidle = None;
@@ -1572,6 +1599,12 @@ impl Survival {
         if !self.land.walk_clear(from, to) || self.land.blocked_near(to[0], to[1], to[2]) {
             return;
         }
+        // (Nor sideways or backwards into a face of rubble.)
+        let mut path = vec![to];
+        if !self.short_of_faces(from, &mut path) {
+            return;
+        }
+        let to = path[0];
         let m = self.mobs.get_mut(&id).unwrap();
         m.path = vec![to];
         m.plan_to = None;

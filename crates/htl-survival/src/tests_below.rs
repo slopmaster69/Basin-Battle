@@ -2137,11 +2137,13 @@ fn a_bosss_run_ends_when_its_fight_is_lost_on_the_way_and_it_goes_home_whole() {
     assert_eq!(m.health, m.max_health, "whole");
 }
 
-/// A collapse: its front runs the route; a hero behind it is crushed, one close ahead is warned,
-/// one far ahead is left alone; at the route's end the boss yells and it stops.
+/// A collapse comes down a section at a time from its route's start. The heroes in the section
+/// going are warned from its first moment; one still there as the wave passes is caught (a
+/// share of their health gone, thrown clear past the section's line); one far ahead is left
+/// alone; with the last section down the boss yells and it stops.
 #[test]
-fn a_collapse_runs_its_route_crushing_the_buried_and_warning_those_just_ahead() {
-    use crate::content::{CollapseDef, EnrageDef};
+fn a_collapse_comes_down_in_sections_catching_the_buried_and_warning_those_inside() {
+    use crate::content::{CollapseDef, CollapseSectionDef, EnrageDef};
     let mut c = content();
     let w = c.mob("warlord").unwrap();
     c.mobs[w].enrage = None;
@@ -2149,38 +2151,74 @@ fn a_collapse_runs_its_route_crushing_the_buried_and_warning_those_just_ahead() 
     c.mobs[w].attack.damage = 0;
     c.mobs[w].patterns.clear();
     c.mobs[w].special = None;
+    // Round a corner: the first face 30 yd along, the second (across the turned tunnel) at 90.
     let route = vec![[100.0, 0.0, 0.0], [160.0, 0.0, 0.0], [160.0, 60.0, 0.0]];
-    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 10.0, lead: 10.0, crush: 0.2, hold: 0.0, end_text: "At the ship.".into(), held_text: String::new() }), ..Default::default() }];
+    let sections = vec![
+        CollapseSectionDef { face: [[130.0, 15.0], [130.0, -15.0]], reach: 20.0, height: 8.0 },
+        CollapseSectionDef { face: [[145.0, 30.0], [175.0, 30.0]], reach: 20.0, height: 8.0 },
+    ];
+    let collapse = CollapseDef { route, speed: 10.0, lead: 10.0, hold: 0.0, warn: 1.0, rest: 2.0, sections, end_text: "At the ship.".into(), ..Default::default() };
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(collapse), ..Default::default() }];
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let buried = s.join("ayla", "Ayla", None);
     let warned = s.join("bram", "Bram", None);
     let clear = s.join("cora", "Cora", None);
+    for h in [buried, warned, clear] {
+        let p = s.players.get_mut(&h).unwrap();
+        p.max_health = 1_000_000;
+        p.health = 1_000_000;
+    }
     s.move_player(buried, [102.0, 0.0, 0.0], 0.0, Moving::default());
-    s.move_player(warned, [132.0, 0.0, 0.0], 0.0, Moving::default());
+    s.move_player(warned, [120.0, 3.0, 0.0], 0.0, Moving::default());
     s.move_player(clear, [160.0, 50.0, 0.0], 0.0, Moving::default());
     let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
-    // Its fight is with the hero in the band; the one far ahead is a bystander.
+    // Its fight is with the hero in the section; the one far ahead is a bystander.
     s.engage(boss, mobs::Foe::Hero(warned));
     let max = s.mobs[&boss].max_health;
     s.hurt_mob(boss, warned, max / 5);
-    assert_eq!(s.collapse_front(), Some((0.0, false)), "the collapse has begun");
+    assert_eq!(s.collapse_front(), Some((0.0, false)), "the collapse has begun, at the route's start");
+    assert_eq!(s.collapse_lines(), Some((vec![30.0, 90.0], 120.0)), "its faces where their lines cross the route");
     let hp = |s: &Survival, h: Id| s.players[&h].health;
-    let (b0, c0) = (hp(&s, buried), hp(&s, clear));
-    let ev = run(&mut s, 3.0);
+    // The warning: both heroes in the section told, nothing down yet, nobody caught.
+    let ev = run(&mut s, 0.9);
+    assert_eq!(s.collapse_front(), Some((0.0, false)), "the front still through its warning");
+    for h in [buried, warned] {
+        assert!(ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == h)), "the heroes in the section warned");
+    }
+    assert!(!ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == clear)), "and nobody else");
+    assert_eq!(hp(&s, buried), 1_000_000, "nobody hurt before the rock comes");
+    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: 22792, .. })), "dust sifting from the roof where it will come down");
+    // The hero in the fight gets out past the line, as one must; the other stays.
+    s.move_player(warned, [133.0, 3.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 2.1);
     let front = s.collapse_front().unwrap().0;
-    assert!((front - 30.0).abs() < 1.0, "the front at 10 yd/s: {front}");
-    assert!(hp(&s, buried) < b0, "the buried hero crushed");
-    assert!(ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == warned)), "the hero just ahead warned");
-    assert_eq!(hp(&s, clear), c0, "the hero far ahead untouched");
-    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 7272, .. })), "dust and rock where it comes down");
-    // The hero in the fight retreats ahead of the front, as one must.
+    assert!((front - 20.0).abs() < 1.0, "the wave at 10 yd/s after a 1 s warning: {front}");
+    assert_eq!(hp(&s, buried), 650_000, "the buried hero caught: 35% of their health");
+    // (Thrown through the air: a hero with no client to fly them is set down there a moment
+    // after the throw should have landed.)
+    run(&mut s, 0.4);
+    let at = s.players[&buried].pos;
+    assert!(dist2d(at, [134.0, 0.0, 0.0]) < 2.0, "and thrown clear, 4 yd past the section's line: {at:?}");
+    assert_eq!(hp(&s, warned), 1_000_000, "the hero who got out untouched");
+    assert_eq!(hp(&s, clear), 1_000_000, "the hero far ahead untouched");
+    // The front holds at its face between surges; then the next section, round the corner.
+    run(&mut s, 1.6);
+    assert_eq!(s.collapse_state(), Some((0, "rest", 30.0, false)), "held at the first face");
+    assert_eq!(s.collapse_face_lines().len(), 1);
     s.move_player(warned, [160.0, 45.0, 0.0], 0.0, Moving::default());
-    let ev = run(&mut s, 10.0);
-    assert_eq!(s.collapse_front(), Some((120.0, true)), "at its end");
+    s.move_player(buried, [160.0, 40.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 9.0);
+    assert_eq!(s.collapse_front(), Some((90.0, true)), "done at its last face");
+    assert_eq!(s.collapse_face_lines().len(), 2);
     assert!(ev.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == "At the ship.")));
+    assert!(hp(&s, buried) >= 650_000, "nobody ahead of the line touched");
+    assert_eq!((hp(&s, warned), hp(&s, clear)), (1_000_000, 1_000_000));
+    for h in [buried, warned, clear] {
+        assert!(!s.collapse_behind(s.players[&h].pos), "nobody behind the rubble");
+    }
 }
 
-/// A boss can't be brought below its collapse's hold until the front reaches the end; then it can.
+/// A boss can't be brought below its collapse's hold until its last section is down; then it can.
 #[test]
 fn a_boss_is_held_above_its_last_stand_until_its_collapse_reaches_the_end() {
     use crate::content::{CollapseDef, EnrageDef};
@@ -2189,7 +2227,7 @@ fn a_boss_is_held_above_its_last_stand_until_its_collapse_reaches_the_end() {
     c.mobs[w].enrage = None;
     c.mobs[w].posture = 0;
     let route = vec![[100.0, 0.0, 0.0], [140.0, 0.0, 0.0]];
-    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 20.0, lead: 0.0, crush: 0.0, hold: 0.3, end_text: String::new(), held_text: "Not here!".into() }), ..Default::default() }];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 20.0, lead: 0.0, hold: 0.3, warn: 0.5, held_text: "Not here!".into(), ..Default::default() }), ..Default::default() }];
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
     s.move_player(id, [150.0, 0.0, 0.0], 0.0, Moving::default());
@@ -2218,7 +2256,7 @@ fn a_collapse_ends_when_its_fight_is_lost_and_the_boss_goes_back_whole() {
     c.mobs[w].enrage = None;
     c.mobs[w].posture = 0;
     let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
-    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 3.0, lead: 10.0, crush: 0.2, hold: 0.25, end_text: String::new(), held_text: String::new() }), ..Default::default() }];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 3.0, lead: 10.0, hold: 0.25, ..Default::default() }), ..Default::default() }];
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
     s.move_player(id, [110.0, 0.0, 0.0], 0.0, Moving::default());
@@ -2234,6 +2272,86 @@ fn a_collapse_ends_when_its_fight_is_lost_and_the_boss_goes_back_whole() {
     assert_eq!(s.collapse_front(), None, "the collapse is over");
     let m = &s.mobs[&boss];
     assert!(dist2d(m.pos, start) < 4.0 && dist2d(m.home, start) < 0.5, "back where it began: {:?}", m.pos);
+    assert_eq!(m.health, m.max_health, "whole");
+}
+
+/// The boss's own blow fells the last hero: the fight is lost there and then, not when that blow's
+/// recovery ends. (The blow's release fells the hero, and the creature is set to its recovery
+/// after: it stands there with a fallen foe. A hero who woke at their lamp before it ended used to
+/// find the collapse still coming down and rock hurled after them the length of the dungeon.)
+#[test]
+fn a_collapse_is_lost_the_moment_its_boss_fells_the_last_hero() {
+    use crate::content::{CollapseDef, CollapseSectionDef, EnrageDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
+    let sections = [130.0, 160.0].iter().map(|x| CollapseSectionDef { face: [[*x, 15.0], [*x, -15.0]], reach: 20.0, height: 8.0 }).collect();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 10.0, lead: 10.0, hold: 0.25, warn: 0.5, rest: 30.0, sections, ..Default::default() }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [136.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    // The first section down, its face standing, the boss out past it.
+    run(&mut s, 6.0);
+    assert_eq!(s.collapse_state().map(|c| (c.0, c.1)), Some((0, "rest")));
+    assert!(!s.collapse_faces().is_empty() && s.collapse_face_lines().len() == 1);
+    // Its blow lands and fells them; it stands in that blow's recovery.
+    let hp = s.players[&id].health;
+    s.hurt_player_by(id, hp + 10_000, boss, "a blow");
+    let now = s.clock;
+    s.mobs.get_mut(&boss).unwrap().state = mobs::MobState::Recover { foe: mobs::Foe::Hero(id), until: now + 30.0 };
+    run(&mut s, 0.1);
+    assert_eq!(s.collapse_front(), None, "the collapse over at once");
+    assert!(s.collapse_face_lines().is_empty(), "no face stops anyone from that moment");
+    // (Its rock is seen to stand a moment in its dust, then goes: 3.5 s in all.)
+    assert!(!s.collapse_faces().is_empty(), "the rock still seen");
+    run(&mut s, 1.0);
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, start) < 0.5 && dist2d(m.home, start) < 0.5, "back where it began: {:?}", m.pos);
+    assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, its phases to start over");
+    assert!(matches!(m.state, mobs::MobState::Idle { .. }), "at rest: {:?}", m.state);
+    run(&mut s, 3.0);
+    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_lines().is_empty(), "the place put back");
+}
+
+/// A hero carried right out of the fight while the collapse comes down (woken at a lamp far off)
+/// is no hero who ran off ahead: no rock is hurled after them, and with nobody else in the fight
+/// it is lost.
+#[test]
+fn a_hero_far_out_of_a_collapses_fight_is_let_go() {
+    use crate::content::{CollapseDef, CollapseSectionDef, EnrageDef};
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
+    let sections = [130.0, 160.0].iter().map(|x| CollapseSectionDef { face: [[*x, 15.0], [*x, -15.0]], reach: 20.0, height: 8.0 }).collect();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 2.0, lead: 10.0, hold: 0.25, sections, ..Default::default() }), ..Default::default() }];
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [110.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+    let start = s.mobs[&boss].home;
+    s.engage(boss, mobs::Foe::Hero(id));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, id, max / 5);
+    run(&mut s, 1.0);
+    assert!(s.collapse_front().is_some());
+    // Far off the route's end, where a hero running from it could not have got to yet.
+    s.players.get_mut(&id).unwrap().pos = [700.0, 300.0, 0.0];
+    let hp = s.players[&id].health;
+    let ev = run(&mut s, 12.0);
+    assert_eq!(s.players[&id].health, hp, "nothing hurled after them");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == id)), "nor any warning of it");
+    assert_eq!(s.collapse_front(), None, "the fight lost");
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, start) < 0.5, "the boss back where it began: {:?}", m.pos);
     assert_eq!(m.health, m.max_health, "whole");
 }
 
@@ -2255,17 +2373,19 @@ fn another_way_out_ends_the_run_once_the_exit_boss_is_down() {
 }
 
 /// A boss whose collapse is coming down doesn't chase a hero who ran off ahead of the fight: it
-/// holds the line, walking the route with the front, and hurls rock down the tunnel at them. The
-/// fight (and the collapse) goes on; the boss and the front set where it is, not the hero.
+/// holds the line a little past the section going, and hurls rock down the tunnel at them. The
+/// fight (and the collapse) goes on; the boss and the rubble set where it is, not the hero.
 #[test]
 fn a_boss_holds_the_collapse_line_and_hurls_rock_at_a_hero_who_runs_off_ahead() {
-    use crate::content::{CollapseDef, EnrageDef};
+    use crate::content::{CollapseDef, CollapseSectionDef, EnrageDef};
     let mut c = content();
     let w = c.mob("warlord").unwrap();
     c.mobs[w].enrage = None;
     c.mobs[w].posture = 0;
     let route = vec![[100.0, 0.0, 0.0], [300.0, 0.0, 0.0]];
-    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 2.0, lead: 10.0, crush: 0.2, hold: 0.25, end_text: String::new(), held_text: String::new() }), ..Default::default() }];
+    // Two sections, their faces 30 and 60 yd along.
+    let sections = [130.0, 160.0].iter().map(|x| CollapseSectionDef { face: [[*x, 15.0], [*x, -15.0]], reach: 20.0, height: 8.0 }).collect();
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef { route, speed: 2.0, lead: 10.0, hold: 0.25, sections, ..Default::default() }), ..Default::default() }];
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
     s.move_player(id, [105.0, 0.0, 0.0], 0.0, Moving::default());
@@ -2279,8 +2399,9 @@ fn a_boss_holds_the_collapse_line_and_hurls_rock_at_a_hero_who_runs_off_ahead() 
     let (front, done) = s.collapse_front().unwrap();
     assert!(!done, "the collapse still coming down");
     assert!(matches!(s.mobs[&boss].state.foe(), Some(mobs::Foe::Hero(h)) if h == id), "still in the fight with the hero");
+    assert!(front > 5.0 && front < 30.0, "its wave in the first section: {front}");
     let x = s.mobs[&boss].pos[0];
-    assert!(x > 100.0 + front - 2.0 && x < 100.0 + front + 10.0 + 6.0, "on the line, with the front ({front}): {x}");
+    assert!(x > 132.0 && x < 137.0, "on the line, a little past the section going (its face-to-be at 130): {x}");
     let hurled = ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == id));
     assert!(hurled, "rock hurled at the hero who ran");
     // The hero comes back to the fight: the boss fights them as ever.
@@ -2320,8 +2441,7 @@ fn the_collapse_and_its_boss_follow_native_bends_without_resetting() {
     c.mobs[w].enrage = None;
     c.mobs[w].posture = 0;
     c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef {
-        route: vec![[100.0, 0.0, 0.0], [140.0, 0.0, 0.0]], speed: 2.0, lead: 4.0, crush: 0.2, hold: 0.26,
-        end_text: String::new(), held_text: String::new(),
+        route: vec![[100.0, 0.0, 0.0], [140.0, 0.0, 0.0]], speed: 2.0, lead: 4.0, hold: 0.26, ..Default::default()
     }), ..Default::default() }];
     let mut s = Survival::new_dungeon(c, Box::new(Bend), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
@@ -2356,7 +2476,7 @@ fn a_collapse_passes_a_repeated_hairpin_point_in_order() {
     c.mobs[w].posture = 0;
     c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, collapse: Some(CollapseDef {
         route: vec![[100.0, 0.0, 0.0], [110.0, 0.0, 0.0], [110.2, 0.0, 0.0], [110.0, 0.0, 0.0], [110.0, 10.0, 0.0], [140.0, 10.0, 0.0]],
-        speed: 2.0, lead: 4.0, crush: 0.0, hold: 0.26, end_text: String::new(), held_text: String::new(),
+        speed: 2.0, lead: 4.0, hold: 0.26, ..Default::default()
     }), ..Default::default() }];
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
