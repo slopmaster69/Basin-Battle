@@ -1,0 +1,222 @@
+From 01cf5aa94261538cdb2b54ef8b7c243a2a6a79c7 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Fri, 13 Nov 2026 17:41:52 -0600
+Subject: [PATCH] The cameraman leaves a shot that has lost the hero after a
+ second, and holds one that still has the hero 5 s
+
+---
+ crates/benilla-app/src/player/spectator.rs | 110 ++++++++++++++-------
+ 1 file changed, 74 insertions(+), 36 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
+index d47c6d78..a31ab2b2 100644
+--- a/crates/benilla-app/src/player/spectator.rs
++++ b/crates/benilla-app/src/player/spectator.rs
+@@ -28,16 +28,20 @@
+ //! - **Stand outside the world.** Every position has solid ground below it, the world loaded
+ //!   round it, and a clear line from the point it looks at; the eye never sweeps through a wall
+ //!   between two positions, it cuts.
+-//! - **Cut all the time.** Each position is held at least [`HOLD_SECS`]. Before that only a body
+-//!   about to cover the camera, the eye out of the world, or both of the two hidden for more than
+-//!   [`BLOCKED_SECS`] moves it. One of them is hidden only when most of its five points (low,
+-//!   chest, head, either side) can't be seen, so a thin post or a crate in front doesn't count.
+-//!   A cut goes only to a position that sees them clearly better.
++//! - **Cut all the time, but not on a whim** (patch 0093). A position that has lost the hero (the
++//!   hero hidden [`BLOCKED_SECS`], or the world on half the picture short of them, [`HEAVY_AT`],
++//!   for [`CLUTTER_SECS`]) is left once it has been held [`QUICK_HOLD_SECS`]; one that still has
++//!   the hero is held [`HOLD_SECS`], and the subject alone has to be hidden [`SUBJECT_SECS`] to
++//!   move it (a boss under a plank, a crate going by: before, a cut every 3 s). A body about to
++//!   cover the camera, the eye out of the world, or both of the two hidden for more than
++//!   [`BLOCKED_SECS`] moves it at once. One of them is hidden only when most of its five points
++//!   (low, chest, head, either side) can't be seen, so a thin post or a crate in front doesn't
++//!   count. A cut goes only to a position that sees them clearly better.
+ //! - **Film past a wall** (patch 0092). The world filling three tenths of the picture short of
+ //!   the two (a cabin's corner, a beam, the rock of a bend: [`foreground`]'s lines, the floor not
+ //!   counted), or either of them cut off by the frame's edge (an eye pulled in close behind the
+-//!   hero), for [`CLUTTER_SECS`] is a cut too, once the position has been held [`HOLD_SECS`], to
+-//!   one clearly better. And the point the camera looks at is one the hero sees ([`anchor`]): round a
++//!   hero), for [`CLUTTER_SECS`] is a cut too, once the position has been held [`HOLD_SECS`]
++//!   ([`QUICK_HOLD_SECS`] with half the picture filled), to one clearly better. And the point the camera looks at is one the hero sees ([`anchor`]): round a
+ //!   bend between the two (Rhahk'Zor's tunnel) their middle is in the void outside the world, and
+ //!   a camera measured from there stood in the void (take 418). Every position sees the hero or
+ //!   the subject from inside the world.
+@@ -79,12 +83,19 @@ use crate::query_cache::Ask;
+ use crate::target::SelectionRadius;
+ use benilla_protocol::EntityKind;
+ 
+-/// Either of the two hidden this long (seconds) moves the camera, once it has held its position
+-/// [`HOLD_SECS`]; both hidden this long moves it at once.
++/// The hero hidden this long (seconds) moves the camera, once it has held its position
++/// [`QUICK_HOLD_SECS`]; both hidden this long moves it at once.
+ const BLOCKED_SECS: f32 = 0.3;
+-/// The least a position is held (seconds), unless both are hidden, a body is about to cover the
+-/// camera, or its spot leaves the world.
+-const HOLD_SECS: f32 = 3.0;
++/// The subject alone hidden this long (seconds) moves the camera, once it has held its position
++/// [`HOLD_SECS`] (patch 0093).
++const SUBJECT_SECS: f32 = 1.0;
++/// The least a position that still has the hero is held (seconds), unless both are hidden, a body
++/// is about to cover the camera, or its spot leaves the world (3 s before patch 0093).
++const HOLD_SECS: f32 = 5.0;
++/// The least a position that has lost the hero (hidden, or behind half a picture of the world) is
++/// held (seconds), patch 0093: at 3 s the camera looked at a fallen rock for the last 3 s of
++/// Rhahk'Zor's collapse (take 426).
++const QUICK_HOLD_SECS: f32 = 1.0;
+ /// After a search found no clearer position, the next waits this long (seconds); one for a
+ /// position that can't be kept, this long.
+ const RETRY_SECS: f32 = 1.0;
+@@ -139,6 +150,9 @@ const BETTER_BY: f32 = 3.0;
+ /// position [`HOLD_SECS`] (patch 0092).
+ const CLUTTER_AT: usize = 6;
+ const CLUTTER_SECS: f32 = 1.0;
++/// The world on this many of the twenty lines (half the picture) has lost the hero: it moves the
++/// camera once it has held its position [`QUICK_HOLD_SECS`] (patch 0093).
++const HEAVY_AT: usize = 9;
+ /// Each of [`foreground`]'s lines the world is on costs a position this much in
+ /// [`Scene::score`]'s points (twenty lines; 0089's eight cost one each).
+ const CLUTTER_COST: f32 = 0.6;
+@@ -428,16 +442,19 @@ fn turn(a: f32, b: f32) -> f32 {
+     (b - a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+ }
+ 
+-/// Whether the camera leaves its position for a clearer one, hidden as it is: either of the two
+-/// hidden `blocked` seconds once the position has been held `held`, or both hidden `both`.
+-fn time_to_cut(blocked: f32, both: f32, held: f32) -> bool {
+-    both > BLOCKED_SECS || (blocked > BLOCKED_SECS && held >= HOLD_SECS)
++/// Whether the camera leaves its position for a clearer one, hidden as it is (patch 0093): both
++/// of the two hidden `both` seconds; the hero hidden `hero` seconds once the position has been
++/// held `held` [`QUICK_HOLD_SECS`]; the subject alone `subject` seconds once held [`HOLD_SECS`].
++fn time_to_cut(hero: f32, subject: f32, both: f32, held: f32) -> bool {
++    both > BLOCKED_SECS || (hero > BLOCKED_SECS && held >= QUICK_HOLD_SECS) || (subject > SUBJECT_SECS && held >= HOLD_SECS)
+ }
+ 
+ /// Whether the camera leaves its position for a clearer one with the world filling the picture's
+-/// foreground `cluttered` seconds, once it has held it `held` (patch 0092).
+-fn clutter_to_cut(cluttered: f32, held: f32) -> bool {
+-    cluttered > CLUTTER_SECS && held >= HOLD_SECS
++/// foreground (or one of the two cut off) `cluttered` seconds, once it has held it [`HOLD_SECS`]
++/// (patch 0092); with half the picture filled `heavy` seconds, once held [`QUICK_HOLD_SECS`]
++/// (patch 0093).
++fn clutter_to_cut(cluttered: f32, heavy: f32, held: f32) -> bool {
++    (cluttered > CLUTTER_SECS && held >= HOLD_SECS) || (heavy > CLUTTER_SECS && held >= QUICK_HOLD_SECS)
+ }
+ 
+ /// The point the camera looks at, where the hero sees it (patch 0092): the shot's own `look` when
+@@ -512,8 +529,12 @@ struct Framing {
+     /// so an eye inside a rock counts).
+     unsure: bool,
+     walled: f32,
+-    /// How long the world has filled the picture's foreground (patch 0092).
++    /// How long the world has filled the picture's foreground (patch 0092), and half of it.
+     cluttered: f32,
++    heavy: f32,
++    /// How long the hero, and the subject, have each been hidden (patch 0093).
++    hero_blocked: f32,
++    subject_blocked: f32,
+ }
+ 
+ /// What the camera films this frame: the two, and every other body that can stand in the way.
+@@ -904,6 +925,10 @@ fn film(
+         state.held = 0.0;
+         state.blocked = 0.0;
+         state.both = 0.0;
++        state.hero_blocked = 0.0;
++        state.subject_blocked = 0.0;
++        state.cluttered = 0.0;
++        state.heavy = 0.0;
+         state.outside = 0.0;
+         state.told = false;
+         state.retry = RETRY_URGENT_SECS;
+@@ -921,11 +946,14 @@ fn film(
+     let (sub_hidden, hero_hidden) = (a >= HIDDEN_AT, b >= HIDDEN_AT);
+     state.blocked = if sub_hidden || hero_hidden { state.blocked + dt } else { 0.0 };
+     state.both = if sub_hidden && hero_hidden { state.both + dt } else { 0.0 };
++    state.hero_blocked = if hero_hidden { state.hero_blocked + dt } else { 0.0 };
++    state.subject_blocked = if sub_hidden { state.subject_blocked + dt } else { 0.0 };
+     // The world filling the foreground (a cabin's corner beside them), or one of the two cut off by
+     // the frame (the eye pulled in behind the hero).
+     let clutter = foreground(&collide, eye, state.look, scene.floor());
+     let cut_off = scene.cut_off(eye, state.look);
+     state.cluttered = if clutter >= CLUTTER_AT || cut_off > 0 { state.cluttered + dt } else { 0.0 };
++    state.heavy = if clutter >= HEAVY_AT { state.heavy + dt } else { 0.0 };
+     if state.blocked == 0.0 && state.cluttered == 0.0 {
+         state.told = false;
+     }
+@@ -980,14 +1008,15 @@ fn film(
+         }
+         state.retry = RETRY_URGENT_SECS;
+     } else if urgent.is_none()
+-        && (time_to_cut(state.blocked, state.both, state.held) || clutter_to_cut(state.cluttered, state.held))
++        && (time_to_cut(state.hero_blocked, state.subject_blocked, state.both, state.held)
++            || clutter_to_cut(state.cluttered, state.heavy, state.held))
+         && state.retry <= 0.0
+     {
+         let here = scene.score(&collide, eye, state.look, order(shot, state.pick), want.is_some_and(|w| w.1));
+         let (what, secs) = match (sub_hidden, hero_hidden) {
+             (true, true) => ("both hidden".to_string(), state.blocked),
+-            (true, false) => ("the subject hidden".to_string(), state.blocked),
+-            (false, true) => ("the hero hidden".to_string(), state.blocked),
++            (true, false) => ("the subject hidden".to_string(), state.subject_blocked),
++            (false, true) => ("the hero hidden".to_string(), state.hero_blocked),
+             _ if clutter >= CLUTTER_AT => (format!("the world on {clutter} of 20 lines of the foreground"), state.cluttered),
+             _ => (format!("{cut_off} of the two cut off by the frame"), state.cluttered),
+         };
+@@ -1012,10 +1041,13 @@ fn film(
+         state.unsure = !spot.score.is_finite();
+         state.walled = 0.0;
+         state.cluttered = 0.0;
++        state.heavy = 0.0;
+         state.pick = spot.pick;
+         state.held = 0.0;
+         state.blocked = 0.0;
+         state.both = 0.0;
++        state.hero_blocked = 0.0;
++        state.subject_blocked = 0.0;
+         state.outside = 0.0;
+         state.told = false;
+         (spot.eye, spot.look)
+@@ -1233,22 +1265,28 @@ mod tests {
+         assert!(!body(0.0, 3.0).on_line(high.0, high.1), "the line passes over its head");
+     }
+ 
+-    /// Hidden for a moment doesn't cut a position held under 3 s; both hidden does.
++    /// The hero lost is a cut after a second; the subject hidden only after 5 s held and a second
++    /// hidden (the boss under a plank isn't a cut every 3 s); both hidden at once (patch 0093).
+     #[test]
+-    fn a_position_is_held_3_s_unless_both_are_hidden() {
+-        assert!(!time_to_cut(0.2, 0.0, 10.0), "a glimpse");
+-        assert!(!time_to_cut(0.5, 0.0, 1.0), "one hidden, held 1 s");
+-        assert!(time_to_cut(0.5, 0.0, 3.2), "one hidden, held 3 s");
+-        assert!(time_to_cut(0.4, 0.4, 0.5), "both hidden");
+-    }
+-
+-    /// The world filling the foreground moves a position held 3 s once it has for a second; a
+-    /// passing post, or a position just cut to, stays.
++    fn a_position_that_has_lost_the_hero_is_left_sooner() {
++        assert!(!time_to_cut(0.2, 0.0, 0.0, 10.0), "a glimpse");
++        assert!(!time_to_cut(0.5, 0.0, 0.0, 0.5), "the hero hidden, held half a second");
++        assert!(time_to_cut(0.5, 0.0, 0.0, 1.2), "the hero hidden, held a second");
++        assert!(!time_to_cut(0.0, 0.5, 0.0, 10.0), "the subject hidden half a second");
++        assert!(!time_to_cut(0.0, 2.0, 0.0, 3.2), "the subject hidden, held 3 s");
++        assert!(time_to_cut(0.0, 1.2, 0.0, 5.2), "the subject hidden, held 5 s");
++        assert!(time_to_cut(0.4, 0.4, 0.4, 0.2), "both hidden");
++    }
++
++    /// The world filling the foreground moves a position held 5 s once it has for a second, half
++    /// the picture one held a second; a passing post, or a position just cut to, stays.
+     #[test]
+     fn a_wall_filling_the_foreground_is_a_cut_after_a_second() {
+-        assert!(!clutter_to_cut(0.5, 10.0), "a post going by");
+-        assert!(!clutter_to_cut(2.0, 1.0), "held 1 s");
+-        assert!(clutter_to_cut(1.2, 3.5));
++        assert!(!clutter_to_cut(0.5, 0.0, 10.0), "a post going by");
++        assert!(!clutter_to_cut(2.0, 0.0, 3.5), "held 3.5 s");
++        assert!(clutter_to_cut(1.2, 0.0, 5.5));
++        assert!(!clutter_to_cut(1.2, 1.2, 0.5), "half the picture, held half a second");
++        assert!(clutter_to_cut(1.2, 1.2, 1.2), "half the picture, held a second");
+         assert!(in_the_way(Vec3::new(0.0, 1.0, 0.0), 0.0), "a wall at chest height");
+         assert!(!in_the_way(Vec3::new(0.0, 0.2, 0.0), 0.0), "the floor under them");
+     }
+-- 
+2.56.0.windows.4
+
