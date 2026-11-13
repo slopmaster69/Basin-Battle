@@ -243,7 +243,15 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
 - **Go to the logbook before `.es travel`**: `.es goto -9624 675` first. The book only reads
   within reach, and the hero starts each take wherever the last one left them, so a travel without
   it works only after a take that ended at the book (Nov 13: take 404 was refused the travel and
-  fell through the open world for 7 minutes).
+  fell through the open world for 7 minutes). A hero who starts below is sent up into the
+  Deadmines' sky instead and the travel is refused ("Go to a lit lamp first."); the scenario's
+  own `.es goto` then puts them where it wants, as nothing needs the lamp there.
+- **`.es clearfoes <keep>` takes every other foe away until the server restarts**, every other
+  boss included (take 405's "Took away 69 creatures"; Greenskin, Cookie, Gilnid, Rhahk'Zor and
+  the Shredder were gone for takes 410 to 414). So every boss scenario starts below with
+  `.es restock` (debug): every pack and boss stands again, as when a beaten run resets, with the
+  lit lamps and found secrets kept. (`.es reset camp` is no help here: it shuts the book until the
+  camp's first raid is beaten.)
 - **A move's clip** (8 to 20 s) shows the boss's tell, the attack, the right answer, the boss's
   recovery and the punish: time the `video` line and the bursts around them.
 

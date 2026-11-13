@@ -47,7 +47,7 @@ The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `conte
    lay: kneeling 1 sec, then a roar as he stands, then 2.5 sec before his first attack. He's
    dropped the Invitation and the riposte. His strings are 4 blows (the last stand 5), and only
    the final hunch is open (2.8, 3 and 3.4 sec); the blows between have 0.2 to 0.3 sec and no
-   hunch. He looks different: black Blackwing blades (displays 31855 and 31856) and Shadowform's
+   hunch. His one single blow is a lunge (1.1 sec windup), open 2.2 sec after. He looks different: black Blackwing blades (displays 31855 and 31856) and Shadowform's
    dark swirl at his feet (15473). His gap is the halved one from the start.
 
 His lines never come closer than 2 sec together: one due sooner waits its turn. Both forms bypass
