@@ -94,8 +94,8 @@ const SWELL: f32 = 1.5;
 /// The swell runs past his full size by this much, then settles back: a gulp's heave.
 const SWELL_OVER: f32 = 0.08;
 /// How long a cook waits for a hero he can find no way to, and how soon he evades meanwhile.
-const HOLD_ON: f32 = 10.0;
-const EVADE_AFTER: f32 = 1.0;
+pub(crate) const HOLD_ON: f32 = 10.0;
+pub(crate) const EVADE_AFTER: f32 = 1.0;
 /// The belch's swelling pulse at its fullest.
 const PULSE: f32 = 0.1;
 

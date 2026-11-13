@@ -525,7 +525,9 @@ impl Survival {
         duel.beat = Beat::Rising { roar_at: now + RISE_KNEEL, until: now + RISE_KNEEL + RISE_WAIT };
         duel.entered = true;
         self.halt(id);
-        self.events.push(Event::HoldPose { id, clip: KNEEL_CLIP, secs: RISE_KNEEL, from: None });
+        // Held as an open pose: a hit while he kneels mustn't flinch him upright (a flinch replaces
+        // any held pose on the clients).
+        self.hold_open_pose(id, KNEEL_CLIP, RISE_KNEEL);
     }
 
     fn duel_arrival(&mut self, id: Id) {
