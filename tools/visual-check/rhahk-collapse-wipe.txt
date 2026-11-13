@@ -15,7 +15,7 @@
 # What to look for: the hero never left behind the rubble; and after the fall no rock, no face,
 # no dust left anywhere, the tunnel as it was before the fight.
 hero warrior
-camera high Rhahk'Zor
+camera duel Rhahk'Zor
 0 .es debug quiet
 0.4 .es goto -9624 675
 1 .es travel landing
