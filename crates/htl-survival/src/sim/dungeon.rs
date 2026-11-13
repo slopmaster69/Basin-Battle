@@ -111,7 +111,11 @@ pub fn door_open(below: &Below, d: &DoorDef) -> bool {
 /// chord of the rail's line it covers, on the deck.
 #[derive(Debug, Clone, Copy)]
 pub struct RailPiece {
+    /// Which of the dungeon's rails it is part of (by its place in the list).
+    pub rail: usize,
     pub rotation: [f32; 4],
+    /// The chord's ends: on the deck, or over it by a crown the piece is raised over (no more
+    /// than the rail's sink).
     pub from: Vec3,
     pub to: Vec3,
 }
@@ -306,13 +310,27 @@ impl Survival {
         // is convex there, so a chord between points on it stays on the deck), each tipped to
         // follow the deck's rise along it and standing `lift` over it all along.
         self.rail_pieces.retain(|id, _| self.objs.contains_key(id));
-        for r in &d.rails {
+        for (rail, r) in d.rails.iter().enumerate() {
             let len = (r.run[1] - r.run[0]) * r.scale;
             if len <= 0.0 || r.points.len() < 2 {
                 continue;
             }
             for (a, b) in rail_chords(&r.points, len) {
-                let (a, b) = (self.ground_near(a[0], a[1], a[2]), self.ground_near(b[0], b[1], b[2]));
+                let (mut a, mut b) = (self.ground_near(a[0], a[1], a[2]), self.ground_near(b[0], b[1], b[2]));
+                // Over a crown in the deck (the port walkway's), the chord dips into it: raised by
+                // the crown's height, up to its sink, so its ends still meet the deck and its top
+                // stays as high over the crown.
+                let crown = [0.25f32, 0.5, 0.75]
+                    .iter()
+                    .map(|t| {
+                        let z = a[2] + (b[2] - a[2]) * t;
+                        let deck = self.land.height_near(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, z + 0.5);
+                        if (deck - z).abs() < 0.6 { deck - z } else { 0.0 }
+                    })
+                    .fold(0.0f32, f32::max)
+                    .min(-r.lift.min(0.0));
+                a[2] += crown;
+                b[2] += crown;
                 let f = (b[1] - a[1]).atan2(b[0] - a[0]);
                 let span = dist2d(a, b).max(1e-3);
                 let pitch = (b[2] - a[2]).atan2(span);
@@ -330,7 +348,7 @@ impl Survival {
                 };
                 let id = self.alloc();
                 self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos, facing });
-                self.rail_pieces.insert(id, RailPiece { rotation: rot, from: a, to: b });
+                self.rail_pieces.insert(id, RailPiece { rail, rotation: rot, from: a, to: b });
             }
         }
         // A note a secret keeps (its finder's to read) waits for it to be found.
@@ -981,7 +999,7 @@ impl Survival {
     }
 
     /// Whether the way from `a` to `b` goes over a rail (a ship's side) off its deck.
-    pub(crate) fn through_rail(&self, a: Vec3, b: Vec3) -> bool {
+    pub fn through_rail(&self, a: Vec3, b: Vec3) -> bool {
         self.rail_crossing(a, b).is_some()
     }
 

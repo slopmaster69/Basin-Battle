@@ -107,18 +107,45 @@ map: the deck runs to y -840 (x -76 to -60) and stops, curving in to -834 toward
 bow, with the next floor 9 yd below and the water beyond, and no blocked cell at deck height. A
 hero walked or rolled straight off it (a roll with no keys held is a step back).
 
-**The starboard rail** (Corey, 10 Nov) now runs 0.9 yd inside that lip for the stretch his fight
-can reach, from x -92 by VanCleef's cabin to x -44 by the bow, each point on the deck and walkable
-from his home (`[[dungeon.rail]]` in `content/deadmines.toml`). The rest of the ship is as it was.
+**The bulwark** (Corey, 10 and 12 Nov: "make sure it goes around all the way") now runs half a
+yard to a yard inside every open edge of the ship's decks (`[[dungeon.rail]]` in
+`content/deadmines.toml`). A survey on 12 Nov took every floor walkable from the captain's home and
+found each edge with a drop of more than 2 yd and no wall:
+
+| Edge | Where | Drop | Now |
+| --- | --- | --- | --- |
+| Starboard side | y -834 to -841, x -108 to -39 | 9 yd to the hull's shelf, then the water | bulwark (`juggernaut_starboard`) |
+| Stern | x -108, y -811 to -827, round to (-94, -806) | 8 yd to the hull, then the water | bulwark (`juggernaut_starboard`) |
+| Bow | the point at (-34.5, -795), from (-42, -809) by the bow's works | 7 yd to the stem | bulwark (`juggernaut_port`) |
+| Port side | y -784 to -791, x -80 to -40 (the port walkway's outer edge) | 20 yd to the dock | bulwark (`juggernaut_port`) |
+| The trench's main-deck rim | y -801 to -803, x -51.5 to -65.5, beside Greenskin's fight | 17 yd to the scaffold | invisible wall (`juggernaut_trench`) |
+| The boarding ramp | the stern-port quarter, x -80 to -107 | 7 to 20 yd off its sides | open: the way aboard |
+| The trench's north end | x -45.5 to -51, y -796 to -801 | | open: the steps between the main deck and the port walkway |
+| The port walkway's rim over the trench | y -793.5 to -797.5, x -45.5 to -62 | 17 yd | open: the boarding route and the Blackguards' way off to (-54, -793) run along it (#308) |
+
+The trench's main-deck rim turns in and out round a crate and a solid block on it (x -55 to -61)
+in steps of a yard or two, too tight for a plank piece (the shortest tall enough is 9.4 yd) to
+follow. The data's own invisible collision wall (CollisionWallPvP01, display 6391, 11 by 9 yd, no
+texture) holds it at 0.35, in 3.9 yd pieces 3.1 yd tall, half a yard inside the rim and through
+the crate and the block (a hero can hop onto the crate), with the server's stop. The deck's edge
+against the forecastle (the bow's works, x -52 to -37, y -813 to -828, its top 8 to 10 yd up) is
+the forecastle's own wall. A few one-yard pockets in the land beside solid structures (the
+trench's block, the port cannons, behind VanCleef's cabin, the forecastle) are not a way over the
+side, and the port walkway's rim outside the bitts at x -63 to -64.5 (1.1 to 1.4 yd high) is
+behind the bulwark, which passes inboard of them. Nothing is placed at VanCleef's cabin door, his
+duel's walk-out or his retreat (all mid-deck).
 
 - **What it looks like:** a bulwark of weathered planks, the Juggernaut's own deck wood carried up
   its side. Its pieces are ExcavationBarrierPlank (display 4651): a plank wall of FinishedWood, whose
   colour (texture average 141/103/67) is the deck's (`STU_DREADNAUGHTDECK`, 144/111/76). At 0.85
-  each is 9.7 yd long and 1.95 yd tall, laid as straight chords of the line end to end (the deck
-  is convex there, so each chord stays on it), tipped to follow the deck's rise toward the bow
-  (38.9 to 43.1) and sunk 0.15 into it, so its top stands 1.80 yd over the deck all along: shoulder
-  high. Each piece goes to the clients with its whole rotation (`rail_piece_rotation`), as the
-  game objects' tilt alone can't tip a piece that runs along its own y.
+  each is 9.7 yd long and 1.95 yd tall, laid as straight chords of the line end to end, tipped to
+  follow the deck's rise toward the bow (38.9 to 43.1) and sunk 0.15 into it, so its top stands
+  1.80 yd over the deck all along: shoulder high. Over a crown in the deck (the port walkway's, 0.2 yd under a piece) a piece rises by up to
+  its sink, so its top stays 1.73 yd or more over it. On the bow's slope, where the deck falls
+  3.9 yd in a piece's length and twists as it falls, no straight piece lies flush: its one piece
+  stands on its ends and clears the deck by 0.35 yd at its middle, its top 2.3 yd up there. Each
+  piece goes to the clients with its whole rotation (`rail_piece_rotation`), as the game objects'
+  tilt alone can't tip a piece that runs along its own y.
 - **The models looked at (Corey, 12 Nov: darker and more ship-like than the pale Elwynn fence):**
   no ship's or dock's rail exists as a game object in the 1.12 data, and the Juggernaut's own
   woodwork is the dungeon's map (`STU_DREADNAUGHT*`), which no placeable model uses. Of those that
@@ -176,7 +203,7 @@ draw, load, 1.2 sec aim and shot with the gun out 6 sec, no pause and the 10 sec
 the harpoon waiting for 2 sec at 8 yd, its held pose, spear, throw, haul and clearing cut, a
 sidestep or guard sparing the haul, party retarget, Vanish, the wipe putting the crew back at
 its posts, death clearing every shot, the floor checks, ranged input on a gunner, knockback, and
-the captain-first reward. The starboard rail: its pieces cover the whole line end to end as chords, each
+the captain-first reward. The bulwark: on each of its three lines, its pieces cover the line end to end as chords, each
 along its chord tipped to the deck, tall enough all along, and keep their hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
 server never carries a running hero over it, nor their firm ground; coming back aboard is free; the
 server's hop back, a knockback (a hero and a gunner) and a pull (even from beyond it) end on the

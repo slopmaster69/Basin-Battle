@@ -883,33 +883,82 @@ fn hop_yards(ev: &[Event], h: Id) -> Option<f32> {
     })
 }
 
+/// How far `p` is from a rail's line, on the ground.
+fn off_line(r: &crate::content::RailDef, p: Vec3) -> f32 {
+    r.points.windows(2).map(|w| combat::along_segment(w[0], w[1], p).1).fold(f32::MAX, f32::min)
+}
+
 #[test]
-fn the_starboard_rail_runs_along_the_open_side_in_pieces_that_meet() {
+fn the_bulwark_runs_along_every_open_side_in_pieces_that_meet() {
     let (s, _) = deck([-62.0, -830.0, 0.0]);
     let d = s.dungeon_def().unwrap();
-    let r = d.rails.iter().find(|r| r.key == "juggernaut_starboard").expect("the rail");
-    let len = (r.run[1] - r.run[0]) * r.scale;
-    let mut pieces: Vec<(Id, dungeon::RailPiece)> = s.objs.iter()
-        .filter(|(_, o)| matches!(o.kind, ObjKind::Prop { display, .. } if display == r.display))
-        .map(|(id, _)| (*id, s.rail_piece(*id).expect("laid as a rail piece"))).collect();
-    pieces.sort_by(|a, b| a.1.from[0].total_cmp(&b.1.from[0]));
-    let (first, last) = (r.points[0], *r.points.last().unwrap());
-    assert!(dist2d(pieces[0].1.from, first) < 0.01 && dist2d(pieces.last().unwrap().1.to, last) < 0.01, "from end to end");
-    for w in pieces.windows(2) {
-        // End to end, or (the last) overlapping the one before: never a gap.
-        assert!(w[1].1.from[0] <= w[0].1.to[0] + 0.01, "a gap between {:?} and {:?}", w[0].1, w[1].1);
-    }
-    for (id, p) in &pieces {
-        assert!((dist2d(p.from, p.to) - len).abs() < 0.05, "a whole piece's chord: {p:?}");
-        // Its ends on the rail's line, and tall enough all along (its hull's top over the deck).
-        for end in [p.from, p.to] {
-            assert!((rail_y(&s, end[0]) - end[1]).abs() < 0.05, "{end:?} on the line");
-            let top = end[2] + r.lift + r.height[1] * r.scale;
-            assert!(top - end[2] >= 1.73, "its top {:.2} over the deck: clear of a 1 yd step up and a hop by half a yard", top - end[2]);
-            assert!(end[2] + r.lift + r.height[0] * r.scale <= end[2], "seated on the deck");
+    let keys: Vec<&str> = d.rails.iter().map(|r| r.key.as_str()).collect();
+    assert_eq!(keys, ["juggernaut_starboard", "juggernaut_port", "juggernaut_trench"]);
+    for (k, r) in d.rails.iter().enumerate() {
+        let len = (r.run[1] - r.run[0]) * r.scale;
+        // In the order they were laid (ids rise), from the line's start to its end.
+        let mut pieces: Vec<(Id, dungeon::RailPiece)> = s.objs.iter()
+            .filter(|(_, o)| matches!(o.kind, ObjKind::Prop { display, .. } if display == r.display))
+            .filter_map(|(id, _)| s.rail_piece(*id).map(|p| (*id, p))).filter(|(_, p)| p.rail == k).collect();
+        pieces.sort_by_key(|(id, _)| *id);
+        assert!(!pieces.is_empty(), "{}", r.key);
+        let (first, last) = (r.points[0], *r.points.last().unwrap());
+        assert!(dist2d(pieces[0].1.from, first) < 0.01 && dist2d(pieces.last().unwrap().1.to, last) < 0.01, "{}: from end to end", r.key);
+        for w in pieces.windows(2) {
+            // End to end, or (the last) starting further back along the one before: never a gap.
+            let joined = dist2d(w[0].1.to, w[1].1.from) < 0.01 || off_line(r, w[1].1.from) < 0.05 && dist2d(w[1].1.to, last) < 0.01;
+            assert!(joined, "{}: a gap between {:?} and {:?}", r.key, w[0].1, w[1].1);
         }
-        // A solid piece: the clients keep its hull (it isn't one of the passable props).
-        assert!(!s.is_trap_obj(*id) && !s.is_perch_visual_prop(*id) && !s.is_kitchen_prop(*id) && s.collapse_piece_tilt(*id).is_none());
+        for (id, p) in &pieces {
+            assert!((dist2d(p.from, p.to) - len).abs() < 0.05, "{}: a whole piece's chord: {p:?}", r.key);
+            for end in [p.from, p.to] {
+                assert!(off_line(r, end) < 0.05, "{}: {end:?} on the line", r.key);
+                let top = end[2] + r.lift + r.height[1] * r.scale;
+                assert!(top - end[2] >= 1.73, "{}: its top {:.2} over the deck: clear of a 1 yd step up and a hop by half a yard", r.key, top - end[2]);
+                assert!(end[2] + r.lift + r.height[0] * r.scale <= end[2], "{}: seated on the deck", r.key);
+            }
+            // A solid piece: the clients keep its hull (it isn't one of the passable props).
+            assert!(!s.is_trap_obj(*id) && !s.is_perch_visual_prop(*id) && !s.is_kitchen_prop(*id) && s.collapse_piece_tilt(*id).is_none());
+        }
+    }
+}
+
+#[test]
+fn every_rail_has_the_deck_on_its_left() {
+    // The captain's home, on the main deck: inside every rail's line.
+    let (s, _) = deck([-62.0, -830.0, 0.0]);
+    let home = [-62.0, -815.0];
+    for r in &s.dungeon_def().unwrap().rails {
+        for w in r.points.windows(2) {
+            let (dx, dy) = (w[1][0] - w[0][0], w[1][1] - w[0][1]);
+            let side = dx * (home[1] - w[0][1]) - dy * (home[0] - w[0][0]);
+            assert!(side > 0.0, "{}: the deck is on the left of {:?} -> {:?}", r.key, w[0], w[1]);
+        }
+    }
+}
+
+#[test]
+fn the_server_stop_holds_at_every_section_of_every_rail() {
+    let (s0, _) = deck([-62.0, -830.0, 0.0]);
+    for r in s0.dungeon_def().unwrap().rails.clone() {
+        for w in r.points.windows(2) {
+            let mid = [(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0];
+            let (dx, dy) = (w[1][0] - w[0][0], w[1][1] - w[0][1]);
+            let l = (dx * dx + dy * dy).sqrt();
+            // The deck's side is the line's left.
+            let (nx, ny) = (-dy / l, dx / l);
+            let inside = [mid[0] + nx * 0.6, mid[1] + ny * 0.6, 0.0];
+            let outside = [mid[0] - nx * 1.5, mid[1] - ny * 1.5, 0.0];
+            let (mut s, h) = deck(inside);
+            s.move_player(h, outside, 0.0, Moving::default());
+            let at = s.players[&h].pos;
+            assert!(dist2d(at, inside) < 0.7 && (at[0] - mid[0]) * nx + (at[1] - mid[1]) * ny > 0.0,
+                "{}: held on the deck at {:?} -> {:?}: {at:?}", r.key, w[0], w[1]);
+            // And back aboard over it is free.
+            let (mut s, h) = deck(outside);
+            s.move_player(h, inside, 0.0, Moving::default());
+            assert_eq!(s.players[&h].pos, inside, "{}", r.key);
+        }
     }
 }
 
@@ -932,9 +981,9 @@ fn each_rail_piece_lies_along_its_chord_tipped_to_follow_the_deck() {
     }
     let s = Survival::new_dungeon(Content::dev(), Box::new(Rising), 31, 0.0);
     let r = s.dungeon_def().unwrap().rails[0].clone();
-    let mut n = 0;
+    let (mut n, mut tipped) = (0, false);
     for (id, o) in s.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Prop { display, .. } if display == r.display)) {
-        let Some(p) = s.rail_piece(*id) else { continue };
+        let Some(p) = s.rail_piece(*id).filter(|p| p.rail == 0) else { continue };
         n += 1;
         let run = if r.along_y { [0.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] };
         let along = turn(p.rotation, run);
@@ -942,14 +991,43 @@ fn each_rail_piece_lies_along_its_chord_tipped_to_follow_the_deck() {
         let l = (chord[0].powi(2) + chord[1].powi(2) + chord[2].powi(2)).sqrt();
         let dot = (along[0] * chord[0] + along[1] * chord[1] + along[2] * chord[2]) / l;
         assert!(dot > 0.999, "its run along its chord, rise and all: {along:?} vs {chord:?}");
-        assert!(p.to[2] - p.from[2] > 0.5, "the deck rises under it");
+        // Its ends sit on the deck, so it rises or falls with it.
+        let rise = 0.09 * (p.to[0] - p.from[0]);
+        assert!((p.to[2] - p.from[2] - rise).abs() < 0.01, "the deck rises {rise} under it, the piece {}", p.to[2] - p.from[2]);
+        tipped |= rise.abs() > 0.5;
         // Upright: its own up stays up but for the tip along its run.
         assert!(turn(p.rotation, [0.0, 0.0, 1.0])[2] > 0.99);
         // Its run's start, from its origin, is the chord's start (at `lift` over it).
         let start = [o.pos[0] + along[0] * r.run[0] * r.scale, o.pos[1] + along[1] * r.run[0] * r.scale, o.pos[2] + along[2] * r.run[0] * r.scale];
         assert!(dist2d(start, p.from) < 0.05 && (start[2] - (p.from[2] + r.lift)).abs() < 0.05, "{start:?} vs {:?}", p.from);
     }
-    assert!(n >= 5);
+    assert!(n >= 5 && tipped, "{n} pieces");
+}
+
+#[test]
+fn a_piece_over_a_crown_in_the_deck_rises_over_it_by_up_to_its_sink() {
+    // A deck crowned along x (as the port walkway's), 0.19 yd over a piece's chord at its middle.
+    struct Crowned;
+    impl Land for Crowned {
+        fn height(&self, x: f32, _: f32) -> f32 { 40.0 - 0.008 * (x + 70.0).powi(2) }
+    }
+    let s = Survival::new_dungeon(Content::dev(), Box::new(Crowned), 31, 0.0);
+    let r = s.dungeon_def().unwrap().rails[0].clone();
+    let deck = |x: f32| 40.0 - 0.008 * (x + 70.0).powi(2);
+    let (mut n, mut raised) = (0, false);
+    for id in s.objs.keys() {
+        let Some(p) = s.rail_piece(*id).filter(|p| p.rail == 0) else { continue };
+        n += 1;
+        for end in [p.from, p.to] {
+            let over = end[2] - deck(end[0]);
+            assert!((-1e-3..=-r.lift + 1e-3).contains(&over), "its ends meet the deck: {over}");
+            raised |= over > 0.1;
+        }
+        let mid = [(p.from[0] + p.to[0]) / 2.0, (p.from[2] + p.to[2]) / 2.0];
+        let top = mid[1] + r.lift + r.height[1] * r.scale - deck(mid[0]);
+        assert!(top >= 1.73, "its top stands {top} over the crown");
+    }
+    assert!(n >= 5 && raised, "{n} pieces");
 }
 
 #[test]
@@ -988,10 +1066,10 @@ fn a_walk_a_roll_or_a_jump_over_the_rail_is_put_back_on_the_deck() {
     let (mut s, h) = deck([-62.0, -838.5, 0.0]);
     s.move_player(h, [-60.0, -838.8, 0.0], 0.0, Moving::default());
     assert_eq!(s.players[&h].pos, [-60.0, -838.8, 0.0]);
-    // Past its ends the ship is as it was.
-    let (mut s, h) = deck([-100.0, -830.0, 0.0]);
-    s.move_player(h, [-100.0, -834.0, 0.0], 0.0, Moving::default());
-    assert_eq!(s.players[&h].pos, [-100.0, -834.0, 0.0]);
+    // Off the ship nothing is held.
+    let (mut s, h) = deck([-130.0, -830.0, 0.0]);
+    s.move_player(h, [-130.0, -834.0, 0.0], 0.0, Moving::default());
+    assert_eq!(s.players[&h].pos, [-130.0, -834.0, 0.0]);
 }
 
 #[test]
