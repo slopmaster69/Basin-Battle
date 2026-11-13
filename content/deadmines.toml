@@ -2144,9 +2144,9 @@ death_text = "...VanCleef... never pay..."
   at = 0.7
   speed = 0.95
   text = "Rhahk'Zor bring whole mine down on you!"
-  # Three heavy falls in the tunnel behind him as he yells, each on a floor the land knows (the old
-  # points hung over rock: one had no floor under it at all).
-  debris = [[-28.0, -376.0, 59.6], [-22.0, -378.0, 60.9], [-34.0, -379.0, 59.3]]
+  # No falls of his own at the yell (there were three in the tunnel behind him): the collapse's
+  # warning is a beat with nothing landing in it, only the line lit, dust from the roof and the
+  # shaking. The first rock down is the wave's.
     [mob.phase.collapse]
     # From the buried front door (its floor begins at x -6), down the tunnel, across the
     # foreman's chamber and up the corridor to where the galleries open: 94.6 yd as the land
@@ -2162,7 +2162,7 @@ death_text = "...VanCleef... never pay..."
     # A hero caught behind the wave loses this share of their health, once a surge: a mistake
     # that costs, never a death by itself from full health.
     catch = 0.35
-    # ...and is set down this far past the band, down for `down` seconds.
+    # ...and is thrown clear to this far past the band, down for `down` seconds as they land.
     throw = 4.0
     down = 1.0
     lead = 14.0

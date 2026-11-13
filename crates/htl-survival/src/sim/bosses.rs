@@ -125,6 +125,8 @@ const OFF_ROUTE: f32 = 20.0;
 /// Its hero this far past the warning band has run off: the boss holds the line, and hurls rock at
 /// them this often.
 const LINE_SLACK: f32 = 6.0;
+/// A hero stopped at a face is put on the floor there when it is at most this far above them.
+const FACE_FLOOR: f32 = 3.0;
 const HURL_EVERY: f32 = 4.0;
 /// A hero farther than this from the collapse's whole route hasn't run off ahead of it: they've
 /// left the fight (woken at a lamp elsewhere, carried off). Far past the lamp beyond the route's
@@ -139,20 +141,36 @@ const FIGHT_LEFT: f32 = 150.0;
 /// site's `ExcavationBarrierPole.mdx` (a timber post, z -5.77..23.87 along its up, 2.4 thick).
 pub(crate) const ROCK: u32 = 5741;
 pub(crate) const BOULDER: u32 = 5737;
+/// The collapse's own rock is pale, so a lamp's light shows it in a dark mine (the ruin's rock is
+/// near black there): Westfall's sea boulders, `WestFallBoulder02.mdx` (a broad one, x
+/// -9.12..8.60, y -10.41..8.60, z -0.98..7.00) and `WestFallBoulder01.mdx` (a tall one, x
+/// -8.11..7.76, y -9.47..9.78, z -1.26..12.31). Both are made to stand with z 0 on the ground.
+/// `PALE_SIZE` of the broad one is as big as the broken dark rock at full size.
+pub(crate) const PALE: u32 = 4316;
+pub(crate) const PALE_TALL: u32 = 4315;
+const PALE_SIZE: f32 = 0.36;
 pub(crate) const BEAM: u32 = 1508;
 const ROCK_BOTTOM: f32 = 0.41;
 const BOULDER_BOTTOM: f32 = -0.10;
 /// A rock is sunk this much of its size below its lowest point, as the ruin's are, so its open
 /// underside stays under the floor.
 const EMBED: f32 = 0.4;
+/// How far under its resting level a rock's own middle is put, for each yard of its size.
+fn rock_sink(display: u32) -> f32 {
+    match display {
+        BOULDER => BOULDER_BOTTOM + EMBED,
+        PALE | PALE_TALL => 0.3,
+        _ => ROCK_BOTTOM + EMBED,
+    }
+}
 const BEAM_LEN: f32 = 23.87;
 const BEAM_HALF: f32 = 1.2;
 /// Sizes: a fall's rock (about 1.7 by 2.3 yd, a yard high; a heavy fall's a little more), the
 /// wave's rocks (4 to 6 yd across, 2 to 3 high) and its boulders, and a beam (7 yd long).
 const CHUNK_SCALE: f32 = 0.3;
 const CHUNK_HEAVY: f32 = 0.36;
-const ROW_SCALES: [f32; 4] = [0.8, 0.95, 0.7, 1.05];
-const ROW_BOULDER: f32 = 0.27;
+const ROW_SCALES: [f32; 4] = [0.29, 0.34, 0.25, 0.38];
+const ROW_BOULDER: f32 = 0.3;
 pub(crate) const BEAM_SCALE: f32 = 0.3;
 /// Rock falls from this high over the floor (lower where a floor lies overhead, never under
 /// `DROP_LOW`), in the last `ROCK_SECS` before its blow lands.
@@ -176,8 +194,15 @@ const ROW_SHORT: f32 = 4.5;
 const ROW_GAP: f32 = 4.5;
 const ROW_SIDE: usize = 9;
 const ROW_SECS: f32 = 0.6;
-const ROW_RING: f32 = 2.2;
-const ROW_RINGS: usize = 6;
+/// A row is piled: further layers of rock on its first, each this far over the one below and
+/// landing this long after it, a layer for every `ROW_FILLS` of roof (at most `ROW_LAYERS`). The
+/// stretch behind the wave fills toward its roof as you watch.
+pub(crate) const ROW_RISE: f32 = 2.3;
+const ROW_LAYER_SECS: f32 = 0.35;
+const ROW_FILLS: f32 = 3.0;
+pub(crate) const ROW_LAYERS: usize = 3;
+/// Seconds a row's rock is on its way down from the roof.
+const ROW_FALL_SECS: f32 = 0.6;
 pub(crate) const BEAM_STEP: f32 = 14.0;
 /// A face of rubble, of the broken rock (5.7 by 7.7 yd and 3.2 high at full size) sized by the
 /// roof (`FACE_ROOF` yards of roof to a rock of full size): its long side along the face, one
@@ -185,32 +210,51 @@ pub(crate) const BEAM_STEP: f32 = 14.0;
 /// (`FACE_BACK` of its size to its middle), a layer every `FACE_RISE` of its size up to the
 /// roof (`FACE_LAYERS` at most), each layer `FACE_LEAN` farther back, the first landing
 /// `FACE_FIRST` after the wave reaches the line and each `FACE_LAYER_SECS` after the one below.
-/// The piece that fell is taken away `FACE_SWAP` after its solid twin shows (the client fades a
-/// new object in over two seconds).
+/// The pale rock that fell stays, as what's seen of it; its solid twin (the dark rock, with the
+/// hull) shows behind it as it lands.
 const FACE_ROOF: f32 = 8.0;
 const FACE_PITCH: f32 = 5.8;
 const FACE_GAP: f32 = 0.25;
 const FACE_BACK: f32 = 2.62;
+/// What's seen of a face is the pale rock: one over each of its dark rocks, `FACE_PALE` of the
+/// size that would match it, its near side `FACE_PALE_GAP` behind the line (`FACE_PALE_BACK` of
+/// its size to its middle): just proud of the dark rock, and short of where a hero is stopped.
+/// It has no hull (the pale mesh's own let a hero who hopped into it through the floor).
+const FACE_PALE: f32 = 1.15;
+const FACE_PALE_BACK: f32 = 3.2;
+const FACE_PALE_GAP: f32 = -0.1;
 const FACE_RISE: f32 = 2.0;
 const FACE_LAYERS: usize = 7;
 const FACE_LEAN: f32 = 0.5;
 const FACE_FIRST: f32 = 0.5;
 const FACE_LAYER_SECS: f32 = 0.3;
-const FACE_SWAP: f32 = 2.2;
 /// The band across a surge's line: bright (not a blow's colour: it's where to go), this wide,
 /// drawn anew every `BAND_EVERY` for `BAND_SECS` (each a pulse from the route out to the walls).
 const BAND_COLOUR: &str = "FFE27A";
-const BAND_WIDTH: f32 = 2.0;
-const BAND_EVERY: f32 = 0.7;
-const BAND_SECS: f32 = 1.4;
+const BAND_WIDTH: f32 = 5.0;
+const BAND_EVERY: f32 = 0.5;
+const BAND_SECS: f32 = 1.1;
+/// The lamps along a surge's line, on its clear side: tall torches (`FreestandingTorch04_HUGE`,
+/// a 2 yd post under a flame as tall again) from wall to wall, this far apart and this far past
+/// the line (none where the route crosses it: that floor is where the caught land). They stand from the surge's first moment, and light the face that comes to
+/// stand behind them, and the fight held in front of it.
+pub(crate) const LINE_LAMP: u32 = 2430;
+const LINE_LAMP_SCALE: f32 = 1.2;
+const LINE_LAMP_GAP: f32 = 4.5;
+const LINE_LAMP_AHEAD: f32 = 3.0;
+const LINE_LAMP_CLEAR: f32 = 2.0;
 /// Dust from the roof over a section going: this many spots each dust beat, out to this far to
 /// each side of the route.
-const ROOF_DUST: usize = 5;
+const ROOF_DUST: usize = 18;
 const ROOF_DUST_SIDE: f32 = 9.0;
+/// The dust across the wave's front, wall to wall: a cloud every this far across.
+const FRONT_DUST_GAP: f32 = 4.0;
+/// A standing face keeps settling: dust at a spot along its foot this often, and half way up it.
+const FACE_DUST_EVERY: f32 = 0.9;
 /// The most loose pieces left lying (the oldest, farthest behind, goes first), and in the air
 /// at once (a face's rocks beside).
 pub(crate) const RUBBLE_MOST: usize = 400;
-const FALLING_MOST: usize = 48;
+const FALLING_MOST: usize = 96;
 /// `Plant Thornling`'s ground look (`DustCloud_Land.mdx`, Charge's dust, nothing but dust): the
 /// dust rolling ahead of the front, and thrown up where a piece lands. From an unseen stand-in on
 /// the spot (its own cast pose isn't anyone's). Not `Rocky Ground Impact` (26271): on film (take
@@ -234,6 +278,23 @@ pub(crate) const BEAT_ROCKFALL: &str = "rockfall";
 const RUMBLE_NEAR: f32 = 20.0;
 const SHAKE_NEAR: f32 = 6.0;
 const SHAKE_GAP: f32 = 0.3;
+/// The catch throws its hero clear through the air: at about this speed, in the air no less and
+/// no longer than this, and only where the floor between is open to within `THROW_MISS` of the
+/// landing (anywhere else they are set down there, as before). A throw shorter than
+/// `THROW_LEAST` is a set-down too. It lands before the section's face has rock in it (no later
+/// than the face's first moment after the wave reaches the line), so it never flies into a face.
+/// `THROW_GRACE` after it should have landed, a hero still behind the rubble is set down clear
+/// all the same: nobody is behind a face `FACE_FIRST + THROW_GRACE` after the wave stops.
+const THROW_SPEED: f32 = 20.0;
+const THROW_AIR: (f32, f32) = (0.5, 1.4);
+const THROW_MISS: f32 = 1.5;
+const THROW_LEAST: f32 = 2.0;
+const THROW_LIFT: f32 = 2.5;
+const THROW_GRACE: f32 = 0.4;
+/// A fight lost: the rock stands this long in its dust, then goes over this long (the newest
+/// first, back toward the door), dust where it goes.
+const LEAVE_HOLD: f32 = 2.0;
+const LEAVE_SECS: f32 = 1.5;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Bosses {
@@ -251,8 +312,21 @@ pub(crate) struct Bosses {
     faces: Vec<Face>,
     /// Foes running from a collapse, and when each is gone.
     fleeing: Vec<(Id, f32)>,
+    /// Heroes a collapse's catch has thrown, in the air on their way clear.
+    thrown: BTreeMap<Id, Thrown>,
     /// What the falling mine looks like.
     pub(crate) looks: Looks,
+}
+
+/// A hero thrown clear by a collapse's catch: when they land (and are thrown down there), and
+/// until when the catch leaves them to their flight.
+#[derive(Debug, Clone, Copy)]
+struct Thrown {
+    boss: Id,
+    lands: f32,
+    until: f32,
+    down: f32,
+    landed: bool,
 }
 
 /// The falling mine's pieces: on their way down, and lying where they fell.
@@ -266,9 +340,14 @@ pub(crate) struct Looks {
     /// The props with a hull (a face's rocks once landed): drawn as any object, not as a piece
     /// that moves.
     solid: BTreeSet<Id>,
-    /// A face's rocks as they fell, each taken away once its solid twin has shown: (when, whose,
-    /// the prop).
+    /// A face's pale rocks, lying where they fell over their solid twins (they have no hull):
+    /// (when it goes: never while the face stands, whose, the prop).
     swaps: Vec<(f32, Id, Id)>,
+    /// The lamps along the lines: (whose, the prop).
+    lamps: Vec<(Id, Id)>,
+    /// A lost fight's rock on its way out: (whose, since when, how many pieces it began with,
+    /// whether the first of it has gone).
+    leaving: Option<(Id, f32, usize, bool)>,
     /// Every piece's tilt (falling or lying), for the drawing.
     tilt: BTreeMap<Id, f32>,
     /// When each hero last shook from a landing.
@@ -299,6 +378,8 @@ struct Falling {
     landed: bool,
     /// One of a face's rocks: solid once it lands, and never counted out.
     face: bool,
+    /// A face's rock's hull, standing from when it lands: display, scale, where, facing.
+    hull: Option<(u32, f32, Vec3, f32)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -621,6 +702,7 @@ impl Survival {
     /// leashed to nowhere. A fight lost puts everything back: the boss where its fight began.
     pub(crate) fn step_boss_collapse(&mut self, dt: f32) {
         self.step_falling_looks();
+        self.step_thrown();
         self.step_collapse_fled();
         let Some(mut c) = self.bosses.collapse.clone() else { return };
         let now = self.clock;
@@ -701,6 +783,8 @@ impl Survival {
             c.sections.len(),
             c.warn
         )));
+        let s = c.sections[c.section].clone();
+        self.line_lamps(boss, &s);
         self.collapse_foes_flee(c);
     }
 
@@ -731,6 +815,15 @@ impl Survival {
                 let name = self.content.mobs[self.mobs[&boss].def].name.clone();
                 let (k, n) = (c.section + 1, c.sections.len());
                 self.events.push(Event::Log(format!("{name}'s collapse: section {k} of {n} is down, its face at {line:.1} yd")));
+                let l = &self.bosses.looks;
+                self.events.push(Event::Log(format!(
+                    "{name}'s collapse looks: {} loose pieces lying, {} in the air, {} face rocks and {} pale over them, {} lamps",
+                    l.rubble.len(),
+                    l.falling.len(),
+                    l.face_pieces.len(),
+                    l.swaps.len(),
+                    l.lamps.len()
+                )));
                 if k < n {
                     c.stage = Stage::Rest { until: now + c.rest };
                     return;
@@ -743,6 +836,10 @@ impl Survival {
                 self.mobs.get_mut(&boss).unwrap().home = pos;
             }
             Stage::Rest { until } => {
+                if now >= c.dust_at {
+                    c.dust_at = now + FACE_DUST_EVERY;
+                    self.face_dust(c);
+                }
                 if now >= until {
                     c.section += 1;
                     self.surge_begins(c);
@@ -771,12 +868,10 @@ impl Survival {
             let d = (c.front + self.rng.gen::<f32>() * c.lead).min(line - FALL_RADIUS).max(c.front);
             let at = route_point(&c.route, &c.along, d);
             let damage = self.boss_blow(boss, FALL_SHARE);
-            self.rocks_fall(boss, at, FALL_RADIUS, FALL_WARN, damage, false);
+            self.rocks_fall_as(boss, at, FALL_RADIUS, FALL_WARN, damage, false, LAND_DUST);
         }
         if now >= c.dust_at {
             c.dust_at = now + DUST_EVERY;
-            let at = route_point(&c.route, &c.along, c.front);
-            self.events.push(Event::Missile { caster: boss, spell: DUST, target: Target::Point(at) });
             self.surge_dust(c);
         }
         if now >= c.band_at {
@@ -798,29 +893,63 @@ impl Survival {
             self.players.iter().filter(|(_, p)| p.health > 0 && c.behind(p.pos, 0.0)).map(|(h, p)| (*h, p.pos, p.facing, p.max_health)).collect();
         let (clear, yaw) = route_pose(&c.route, &c.along, (line + c.throw).min(total));
         let clear = self.land.footing(clear).unwrap_or(clear);
+        let now = self.clock;
         for (h, was, facing, max) in behind {
+            // (Thrown and in the air: on their way clear.)
+            if self.bosses.thrown.get(&h).is_some_and(|t| now < t.until) {
+                continue;
+            }
             // (Side by side, not on a spot somebody stands on.)
             let to = [0.0, 1.4, -1.4, 2.8, -2.8]
                 .iter()
                 .filter_map(|off| self.land.footing([clear[0] - yaw.sin() * off, clear[1] + yaw.cos() * off, clear[2]]))
                 .find(|p| !c.behind(*p, 0.0) && !self.players.iter().any(|(o, q)| *o != h && q.health > 0 && dist2d(q.pos, *p) < 1.0))
                 .unwrap_or(clear);
-            self.set_down(h, to, facing);
             if !c.caught.insert(h) {
+                self.set_down(h, to, facing);
                 continue;
             }
             let damage = if c.catch > 0.0 { ((max as f32) * c.catch).round().max(1.0) as u32 } else { 0 };
             let name = self.players[&h].name.clone();
-            self.events.push(Event::Log(format!(
-                "the collapse catches {name} at ({:.1}, {:.1}, {:.1}): {damage} of {max} health gone, thrown clear to ({:.1}, {:.1}, {:.1})",
-                was[0], was[1], was[2], to[0], to[1], to[2]
-            )));
             if damage > 0 {
                 self.hurt_player_by(h, damage, boss, "the falling mine");
             }
-            if c.down > 0.0 && self.players.get(&h).is_some_and(|p| p.health > 0) {
-                let share = self.content.cc.player_share.max(0.05);
-                self.knock_down(boss, h, c.down / share, "the falling mine");
+            let alive = self.players.get(&h).is_some_and(|p| p.health > 0);
+            let share = self.content.cc.player_share.max(0.05);
+            let down = if c.down > 0.0 { c.down / share } else { 0.0 };
+            // Thrown clear through the air where the floor between is open; set down there
+            // where it isn't (and a hero the blow felled: their body is laid clear).
+            // The flight is over before the face has rock in it: no longer than the wave's
+            // way to the line and the face's first moment (and none once the wave is there:
+            // the face is building, or stands).
+            let most = if c.stage == Stage::Wave { (line - c.front).max(0.0) / c.speed.max(0.1) + FACE_FIRST } else { 0.0 };
+            let flight = if alive && most >= THROW_AIR.0 { self.throw_clear(was, to, most) } else { None };
+            self.events.push(Event::Log(format!(
+                "the collapse catches {name} at ({:.1}, {:.1}, {:.1}): {damage} of {max} health gone, {} clear to ({:.1}, {:.1}, {:.1})",
+                was[0],
+                was[1],
+                was[2],
+                match flight {
+                    Some((_, _, _, air)) => format!("thrown {:.1} yd through {air:.2} s", dist2d(was, to)),
+                    None => "set down".into(),
+                },
+                to[0],
+                to[1],
+                to[2]
+            )));
+            match flight {
+                Some((dir, speed, lift, air)) => {
+                    self.interrupt_hero(h);
+                    self.set_action(h, Action::Stagger { until: now + air });
+                    self.events.push(Event::Hop { player: h, dir, speed, lift, roll: false, style: "" });
+                    self.bosses.thrown.insert(h, Thrown { boss, lands: now + air, until: now + air + THROW_GRACE, down, landed: false });
+                }
+                None => {
+                    self.set_down(h, to, facing);
+                    if alive && down > 0.0 {
+                        self.knock_down(boss, h, down, "the falling mine");
+                    }
+                }
             }
         }
         if let Some(pos) = self.mobs.get(&boss).map(|m| m.pos) {
@@ -829,6 +958,45 @@ impl Survival {
                 self.set_back(boss, at, "behind its own collapse");
             }
         }
+    }
+
+    /// The flight that throws a caught hero from `was` clear to `to`: its heading, speed, lift
+    /// and time in the air. None where the floor between isn't open all the way (a wall, a drop,
+    /// a climb), or it's no distance at all: there they are set down.
+    fn throw_clear(&self, was: Vec3, to: Vec3, most: f32) -> Option<(f32, f32, f32, f32)> {
+        let dist = dist2d(was, to);
+        if dist < THROW_LEAST {
+            return None;
+        }
+        let dir = facing(was, to);
+        let end = self.slide_end(was, dir, dist);
+        if dist2d(end, to) > THROW_MISS {
+            return None;
+        }
+        let air = (dist / THROW_SPEED).clamp(THROW_AIR.0, THROW_AIR.1.min(most).max(THROW_AIR.0));
+        // Up enough to come down on the landing's own floor after `air` seconds, the floor
+        // between rising or falling evenly.
+        let lift = ((to[2] - was[2] + 0.5 * super::moves::GRAVITY * air * air) / air).max(THROW_LIFT);
+        Some((dir, dist / air, lift, air))
+    }
+
+    /// The thrown land: thrown down where they come to the floor; and a moment after, the catch
+    /// has them again (still behind the rubble then, they are set down clear).
+    fn step_thrown(&mut self) {
+        if self.bosses.thrown.is_empty() {
+            return;
+        }
+        let now = self.clock;
+        let due: Vec<(Id, Thrown)> = self.bosses.thrown.iter().filter(|(_, t)| !t.landed && now >= t.lands).map(|(h, t)| (*h, *t)).collect();
+        for (h, t) in due {
+            if let Some(e) = self.bosses.thrown.get_mut(&h) {
+                e.landed = true;
+            }
+            if t.down > 0.0 && self.players.get(&h).is_some_and(|p| p.health > 0) {
+                self.knock_down(t.boss, h, t.down, "the falling mine");
+            }
+        }
+        self.bosses.thrown.retain(|_, t| now < t.until);
     }
 
     /// A surge begins: every other foe on the stretch (no boss, nothing of the heroes') lets go
@@ -953,13 +1121,26 @@ impl Survival {
     }
 
     /// A face of rubble in the way of a hero's own move (a walk, a roll, a jump as their client
-    /// moved them): stopped a step short of it, at once. (A move too long to be one of those is
-    /// left to the catch.)
+    /// moved them): stopped a step short of it, at once, on the floor there if that's above them
+    /// (by no more than `FACE_FLOOR`: another floor is not theirs). (A move too long to be one
+    /// of those is left to the catch.)
     pub(crate) fn hold_at_face(&mut self, id: Id, from: Vec3, to: Vec3) -> bool {
         if self.bosses.faces.is_empty() || dist2d(from, to) > 12.0 {
             return false;
         }
-        let Some(back) = self.face_crossing(from, to) else { return false };
+        // (Thrown clear by the catch: its flight is over the line, not stopped at it.)
+        if self.bosses.thrown.contains_key(&id) {
+            return false;
+        }
+        let Some(mut back) = self.face_crossing(from, to) else { return false };
+        // Never under the floor. The stop is at the height they came from, and the way to a face
+        // may climb (the first one's does, 0.4 yd a yard): a step on at that height is under the
+        // floor there, and their client falls through the world (filmed: z 46.6 under a floor
+        // at 57.3). A hero in the air keeps their height.
+        let floor = self.land.height_near(back[0], back[1], back[2]);
+        if floor.is_finite() && floor > back[2] && floor - back[2] <= FACE_FLOOR {
+            back[2] = floor;
+        }
         if let Some(p) = self.players.get_mut(&id) {
             p.pos = back;
             let facing = p.facing;
@@ -979,7 +1160,11 @@ impl Survival {
     /// its way to being whole there (home, a creature heals and its phases start over).
     fn collapse_lost(&mut self, boss: Id) {
         self.bosses.collapse = None;
-        self.collapse_cleared(boss);
+        // The faces' stops go at once, with every rule of it. What it looked like goes a moment
+        // after, in its dust (well before anyone wakes at a lamp).
+        self.bosses.faces.retain(|f| f.owner != boss);
+        self.bosses.thrown.clear();
+        self.looks_leave(boss);
         let Some(at) = self.bosses.began.get(&boss).copied() else { return };
         self.collapse_lets_go(boss);
         let Some(m) = self.mobs.get_mut(&boss) else { return };
@@ -1004,6 +1189,7 @@ impl Survival {
         self.bosses.collapse = None;
         self.bosses.faces.clear();
         self.bosses.fleeing.clear();
+        self.bosses.thrown.clear();
         self.bosses.looks = Looks { off, ..Default::default() };
     }
 
@@ -1285,7 +1471,12 @@ impl Survival {
     pub(crate) fn boss_home(&mut self, id: Id) {
         self.bosses.runs.remove(&id);
         self.bosses.burning.remove(&id);
-        self.collapse_cleared(id);
+        // (A lost collapse's rock is on its way out in its dust: `step_looks_leaving` takes it.)
+        if self.bosses.looks.leaving.is_some_and(|l| l.0 == id) {
+            self.bosses.faces.retain(|f| f.owner != id);
+        } else {
+            self.collapse_cleared(id);
+        }
         if let Some(at) = self.bosses.began.remove(&id) {
             if let Some(m) = self.mobs.get_mut(&id) {
                 m.home = at;
@@ -1448,11 +1639,22 @@ impl Survival {
     /// Rocks come down on `at`: dust there first (`warn` seconds), then the fall, which strikes
     /// whoever is in it (heavy: thrown down).
     fn rocks_fall(&mut self, owner: Id, at: Vec3, radius: f32, warn: f32, damage: u32, heavy: bool) {
+        self.rocks_fall_as(owner, at, radius, warn, damage, heavy, DUST);
+    }
+
+    /// `rocks_fall` with the dust named (`look`: a collapse's own falls are in its soft dust,
+    /// not a burst of their own).
+    #[allow(clippy::too_many_arguments)]
+    fn rocks_fall_as(&mut self, owner: Id, at: Vec3, radius: f32, warn: f32, damage: u32, heavy: bool, look: u32) {
         let now = self.clock;
         let at = self.ground_near(at[0], at[1], at[2]);
-        self.events.push(Event::Missile { caster: owner, spell: DUST, target: Target::Point(at) });
-        let mark = self.mark_ground(at, radius, warn, DUST);
-        self.missiles.push(combat::Missile { owner, from: at, at, radius, damage, blockable: false, heavy, land_at: now + warn, mark, look: DUST });
+        if look == DUST {
+            self.events.push(Event::Missile { caster: owner, spell: look, target: Target::Point(at) });
+        } else if !self.bosses.looks.off {
+            self.point_look(owner, at, look);
+        }
+        let mark = self.mark_ground(at, radius, warn, look);
+        self.missiles.push(combat::Missile { owner, from: at, at, radius, damage, blockable: false, heavy, land_at: now + warn, mark, look });
         let near: Vec<Id> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= radius + 2.0).map(|(h, _)| *h).collect();
         for v in near {
             self.events.push(Event::Danger { player: v, secs: warn, from: None });
@@ -1461,7 +1663,9 @@ impl Survival {
         if !self.bosses.looks.off {
             self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: radius, arc: 360.0, width: 0.0, secs: warn, colour: mobs::HAZARD_COLOUR.into() });
             let scale = if heavy { CHUNK_HEAVY } else { CHUNK_SCALE };
-            self.rock_drops(owner, at, ROCK, scale, now + warn, radius, 0);
+            // (A collapse's own fall is of its pale rock.)
+            let (display, scale) = if look == DUST { (ROCK, scale) } else { (PALE, scale * PALE_SIZE * 1.6) };
+            self.rock_drops(owner, at, display, scale, now + warn, radius, 0);
         }
     }
 
@@ -1481,6 +1685,11 @@ impl Survival {
     /// The rocks of the faces, landed and solid (for tests and the log).
     pub fn collapse_faces(&self) -> Vec<Id> {
         self.bosses.looks.face_pieces.iter().map(|(_, id)| *id).collect()
+    }
+
+    /// The pale rocks lying over the faces' solid ones: what's seen of a face (for tests).
+    pub fn collapse_face_skin(&self) -> Vec<Id> {
+        self.bosses.looks.swaps.iter().map(|(_, _, id)| *id).collect()
     }
 
     /// Whether a piece is one of a face's rocks where it landed: drawn with its hull, as any
@@ -1515,8 +1724,7 @@ impl Survival {
         }
         let k = self.look_seq();
         let yaw = (k as f32 * 2.399) % std::f32::consts::TAU;
-        let bottom = if display == BOULDER { BOULDER_BOTTOM } else { ROCK_BOTTOM };
-        let to = [at[0], at[1], at[2] - (bottom + EMBED) * scale];
+        let to = [at[0], at[1], at[2] - rock_sink(display) * scale];
         let h = self.drop_height(at);
         // In from a little to one side, as rock coming away from a wall.
         let from = [to[0] + yaw.cos() * 0.7, to[1] + yaw.sin() * 0.7, at[2] + h];
@@ -1537,6 +1745,7 @@ impl Survival {
             crash,
             landed: false,
             face: false,
+            hull: None,
         });
     }
 
@@ -1569,6 +1778,7 @@ impl Survival {
             crash: SOUND_CRASH,
             landed: false,
             face: false,
+            hull: None,
         });
     }
 
@@ -1638,8 +1848,8 @@ impl Survival {
                 }
             }
         }
-        let every = spots.len().div_ceil(ROW_RINGS).max(1);
-        for (j, spot) in spots.into_iter().enumerate() {
+        let layers = ((s.height / ROW_FILLS).round() as usize).clamp(1, ROW_LAYERS);
+        for spot in spots {
             // (Nothing past the line: the face stands there.)
             if s.authored && s.side(spot) > -1.0 {
                 continue;
@@ -1648,12 +1858,75 @@ impl Survival {
             let jit = [((k % 7) as f32 - 3.0) * 0.25, ((k % 5) as f32 - 2.0) * 0.3];
             let at = self.floor_beside(spot, [spot[0] + jit[0], spot[1] + jit[1]]);
             let land = now + ROW_SECS + (k % 4) as f32 * 0.08;
-            if j % every == 0 {
-                self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: ROW_RING, arc: 360.0, width: 0.0, secs: land - now, colour: mobs::HAZARD_COLOUR.into() });
+            // (No ring: the wave is no blow of its own. What it does to whoever it reaches is
+            // the catch's.)
+            for layer in 0..layers {
+                let n = k as usize + layer * 3;
+                let (display, scale) = if n % 5 == 4 { (PALE_TALL, ROW_BOULDER) } else { (PALE, ROW_SCALES[n % 4]) };
+                let crash = if n % 3 == 0 { SOUND_CRASH } else { 0 };
+                self.row_rock(c.boss, at, s.height, ROW_RISE * layer as f32, display, scale, land + ROW_LAYER_SECS * layer as f32, crash);
             }
-            let (display, scale) = if k % 5 == 4 { (BOULDER, ROW_BOULDER) } else { (ROCK, ROW_SCALES[k as usize % 4]) };
-            let crash = if k % 3 == 0 { SOUND_CRASH } else { 0 };
-            self.rock_drops(c.boss, at, display, scale, land, 0.0, crash);
+        }
+    }
+
+    /// One of a row's rocks: out of the roof over `at` (`height` up) and down onto the pile
+    /// there, `rise` over the floor, landing at `land`. It stays.
+    #[allow(clippy::too_many_arguments)]
+    fn row_rock(&mut self, owner: Id, at: Vec3, height: f32, rise: f32, display: u32, scale: f32, land: f32, crash: u32) {
+        if self.bosses.looks.off || self.bosses.looks.falling.len() >= FALLING_MOST {
+            return;
+        }
+        let k = self.look_seq();
+        let yaw = (k as f32 * 2.399) % std::f32::consts::TAU;
+        let to = [at[0], at[1], at[2] + rise - rock_sink(display) * scale];
+        let from = [to[0] + yaw.cos() * 0.7, to[1] + yaw.sin() * 0.7, (at[2] + height).max(to[2] + 2.5)];
+        // (The pile's upper rocks lie as they fell, at more of a slant than the floor's.)
+        let lean = if rise > 0.0 { ((k % 5) as f32 - 2.0) * 0.14 } else { (k % 3) as f32 * 0.04 };
+        let tilt = (0.5 + (k % 5) as f32 * 0.15, lean);
+        let start = (land - ROW_FALL_SECS).max(self.clock);
+        self.bosses.looks.falling.push(Falling {
+            owner,
+            id: None,
+            shows: start,
+            start,
+            land,
+            display,
+            scale,
+            path: Path::Drop { from, to, yaw, tilt },
+            at: [at[0], at[1], at[2] + rise],
+            ring: 0.0,
+            crack: 0,
+            crash,
+            landed: false,
+            face: false,
+            hull: None,
+        });
+    }
+
+    /// The lamps along a section's line, lit as its surge begins: wall to wall on the clear side.
+    fn line_lamps(&mut self, owner: Id, s: &Section) {
+        if self.bosses.looks.off {
+            return;
+        }
+        let u = [s.b[0] - s.a[0], s.b[1] - s.a[1]];
+        let wide = (u[0] * u[0] + u[1] * u[1]).sqrt().max(1.0e-3);
+        let u = [u[0] / wide, u[1] / wide];
+        // (Past the line: the clear side.)
+        let ahead = [-u[1] * s.ahead, u[0] * s.ahead];
+        let n = ((wide / LINE_LAMP_GAP).round() as usize).max(2);
+        for j in 0..n {
+            let across = (j as f32 + 0.5) * wide / n as f32;
+            let xy = [s.a[0] + u[0] * across + ahead[0] * LINE_LAMP_AHEAD, s.a[1] + u[1] * across + ahead[1] * LINE_LAMP_AHEAD];
+            // (Not on the floor the caught are thrown to.)
+            if n > 2 && dist2d([xy[0], xy[1], 0.0], s.at) < LINE_LAMP_CLEAR {
+                continue;
+            }
+            let pos = self.floor_beside(s.at, xy);
+            let id = self.alloc();
+            self.objs.insert(id, Obj { kind: ObjKind::Prop { display: LINE_LAMP, scale: LINE_LAMP_SCALE }, pos, facing: j as f32 * 1.3 });
+            self.bosses.looks.tilt.insert(id, 0.0);
+            self.bosses.looks.lamps.push((owner, id));
+            self.events.push(Event::ObjSpawned { id });
         }
     }
 
@@ -1684,9 +1957,13 @@ impl Survival {
                 let d = FACE_BACK * scale + FACE_GAP + FACE_LEAN * layer as f32;
                 let xy = [s.a[0] + u[0] * across + back[0] * d, s.a[1] + u[1] * across + back[1] * d];
                 let floor = self.floor_beside(s.at, xy);
-                let to = [xy[0], xy[1], floor[2] + rise * layer as f32 - (ROCK_BOTTOM + EMBED) * scale];
-                let from = [to[0], to[1], (s.at[2] + s.height + 1.0).max(to[2] + 3.0)];
                 let yaw = facing + ((k % 5) as f32 - 2.0) * 0.06;
+                let hull = [xy[0], xy[1], floor[2] + rise * layer as f32 - rock_sink(ROCK) * scale];
+                // The pale rock over it, a little proud of it.
+                let pale = scale * PALE_SIZE * FACE_PALE;
+                let dp = FACE_PALE_BACK * FACE_PALE * scale + FACE_PALE_GAP + FACE_LEAN * layer as f32;
+                let to = [s.a[0] + u[0] * across + back[0] * dp, s.a[1] + u[1] * across + back[1] * dp, floor[2] + rise * layer as f32 - rock_sink(PALE) * pale];
+                let from = [to[0], to[1], (s.at[2] + s.height + 1.0).max(to[2] + 3.0)];
                 let land = now + FACE_FIRST + FACE_LAYER_SECS * layer as f32 + (k % 3) as f32 * 0.05;
                 let start = (land - ROCK_SECS).max(now);
                 self.bosses.looks.falling.push(Falling {
@@ -1695,8 +1972,8 @@ impl Survival {
                     shows: start,
                     start,
                     land,
-                    display: ROCK,
-                    scale,
+                    display: PALE,
+                    scale: pale,
                     path: Path::Drop { from, to, yaw, tilt: (0.3, 0.0) },
                     at: floor,
                     ring: 0.0,
@@ -1704,6 +1981,7 @@ impl Survival {
                     crash: if k % 4 == 0 { SOUND_CRASH } else { 0 },
                     landed: false,
                     face: true,
+                    hull: Some((ROCK, scale, hull, yaw)),
                 });
             }
         }
@@ -1736,21 +2014,40 @@ impl Survival {
         let now = self.clock;
         let boss = c.boss;
         let k = c.section;
-        let (line, reach) = (c.sections[k].line, c.sections[k].reach.min(ROOF_DUST_SIDE));
-        for _ in 0..ROOF_DUST {
+        let (line, reach, height) = (c.sections[k].line, c.sections[k].reach.min(ROOF_DUST_SIDE), c.sections[k].height);
+        // Dust sifting out of the roof over all that's still to come down: soft clouds under
+        // it, half way to the floor and at head height, where a hero down the tunnel sees them
+        // (no burst: nothing has landed).
+        for j in 0..ROOF_DUST {
             let n = self.look_seq();
             let d = c.front + (line - c.front) * ((n % 11) as f32 + 0.5) / 11.0;
             let off = ((n % 7) as f32 / 3.0 - 1.0) * reach;
             let (p, yaw) = route_pose(&c.route, &c.along, d);
             let at = self.floor_beside(p, [p[0] - yaw.sin() * off, p[1] + yaw.cos() * off]);
-            self.point_look(boss, at, DUST);
+            let up = match j % 3 {
+                0 => height - 1.5,
+                1 => height * 0.5,
+                _ => 1.5,
+            };
+            self.point_look(boss, [at[0], at[1], at[2] + up.max(1.0)], LAND_DUST);
         }
         let front = route_point(&c.route, &c.along, c.front);
         if c.stage == Stage::Wave {
-            for ahead in [1.5, 4.5] {
-                let at = route_point(&c.route, &c.along, (c.front + ahead).min(line));
-                self.point_look(boss, at, DUST_ROLL);
+            // The front itself: a wall of dust from wall to wall, and rolling on ahead of it.
+            let wide = c.sections[k].reach.min(ROW_SIDE as f32 * ROW_GAP);
+            let (p, yaw) = route_pose(&c.route, &c.along, (c.front + 1.5).min(line));
+            let side = [-yaw.sin(), yaw.cos()];
+            let mut off = -wide;
+            while off <= wide {
+                let xy = [p[0] + side[0] * off, p[1] + side[1] * off];
+                if off.abs() < 0.1 || self.land.footing([xy[0], xy[1], p[2]]).is_some() {
+                    let at = self.floor_beside(p, xy);
+                    self.point_look(boss, at, DUST_ROLL);
+                }
+                off += FRONT_DUST_GAP;
             }
+            let at = route_point(&c.route, &c.along, (c.front + 4.5).min(line));
+            self.point_look(boss, at, DUST_ROLL);
         }
         if now >= c.rumble_at {
             c.rumble_at = now + RUMBLE_EVERY;
@@ -1767,6 +2064,26 @@ impl Survival {
         for h in near {
             self.events.push(Event::Beat { player: h, beat: BEAT_RUMBLE.into(), on: None });
         }
+    }
+
+    /// Dust at the foot of the face the collapse stands at (and half way up it): the rubble is
+    /// still settling, and the dust in the lamps' light shows it for the wall it is.
+    fn face_dust(&mut self, c: &Collapse) {
+        if self.bosses.looks.off {
+            return;
+        }
+        let s = &c.sections[c.section];
+        let n = self.look_seq();
+        let t = ((n % 7) as f32 + 0.5) / 7.0;
+        let ahead = {
+            let u = [s.b[0] - s.a[0], s.b[1] - s.a[1]];
+            let wide = (u[0] * u[0] + u[1] * u[1]).sqrt().max(1.0e-3);
+            [-u[1] / wide * s.ahead, u[0] / wide * s.ahead]
+        };
+        let xy = [s.a[0] + (s.b[0] - s.a[0]) * t + ahead[0] * 0.8, s.a[1] + (s.b[1] - s.a[1]) * t + ahead[1] * 0.8];
+        let at = self.floor_beside(s.at, xy);
+        let up = if n % 2 == 0 { 0.0 } else { s.height * 0.5 };
+        self.point_look(c.boss, [at[0], at[1], at[2] + up], LAND_DUST);
     }
 
     /// A spot beside the route's point `p`, on its floor (the route's own height if the spot is
@@ -1792,8 +2109,10 @@ impl Survival {
         if l.falling.is_empty() && l.rubble.is_empty() && l.tilt.is_empty() {
             return;
         }
+        self.step_looks_leaving();
         let objs = &self.objs;
         let l = &mut self.bosses.looks;
+        l.lamps.retain(|(_, id)| objs.contains_key(id));
         l.rubble.retain(|(_, id)| objs.contains_key(id));
         l.face_pieces.retain(|(_, id)| objs.contains_key(id));
         l.swaps.retain(|(_, _, id)| objs.contains_key(id));
@@ -1869,16 +2188,17 @@ impl Survival {
                 self.events.push(Event::Beat { player: h, beat: BEAT_ROCKFALL.into(), on: None });
             }
             if f.face {
-                // Solid from here: a twin stands where it landed, drawn with its hull (a piece
-                // that moves has none), and the piece that fell goes once the twin has shown.
+                // Solid from here: its hull stands behind it, drawn with one (a piece that moves
+                // has none). The pale rock that fell stays over it.
                 let (pos, facing, tilt) = f.path.pose(1.0);
+                let (display, scale, pos, facing) = f.hull.unwrap_or((f.display, f.scale, pos, facing));
                 let twin = self.alloc();
-                self.objs.insert(twin, Obj { kind: ObjKind::Prop { display: f.display, scale: f.scale }, pos, facing });
+                self.objs.insert(twin, Obj { kind: ObjKind::Prop { display, scale }, pos, facing });
                 let l = &mut self.bosses.looks;
                 l.tilt.insert(twin, tilt);
                 l.solid.insert(twin);
                 l.face_pieces.push((f.owner, twin));
-                l.swaps.push((now + FACE_SWAP, f.owner, id));
+                l.swaps.push((f32::INFINITY, f.owner, id));
                 self.events.push(Event::ObjSpawned { id: twin });
                 continue;
             }
@@ -1901,7 +2221,12 @@ impl Survival {
     /// fight lost, the mine stands again.
     fn clear_looks(&mut self, owner: Id) {
         let l = &mut self.bosses.looks;
+        if l.leaving.is_some_and(|(o, ..)| o == owner) {
+            l.leaving = None;
+        }
         let mut gone: Vec<Id> = l.rubble.iter().filter(|(o, _)| *o == owner).map(|(_, id)| *id).collect();
+        gone.extend(l.lamps.iter().filter(|(o, _)| *o == owner).map(|(_, id)| *id));
+        l.lamps.retain(|(o, _)| *o != owner);
         gone.extend(l.falling.iter().filter(|f| f.owner == owner).filter_map(|f| f.id));
         gone.extend(l.face_pieces.iter().filter(|(o, _)| *o == owner).map(|(_, id)| *id));
         gone.extend(l.swaps.iter().filter(|(_, o, _)| *o == owner).map(|(_, _, id)| *id));
@@ -1915,6 +2240,100 @@ impl Survival {
             if self.objs.remove(&id).is_some() {
                 self.events.push(Event::ObjGone { id });
             }
+        }
+    }
+}
+
+impl Survival {
+    /// How many of `owner`'s rocks lie or stand.
+    fn looks_left(&self, owner: Id) -> usize {
+        let l = &self.bosses.looks;
+        l.rubble.iter().filter(|(o, _)| *o == owner).count()
+            + l.face_pieces.iter().filter(|(o, _)| *o == owner).count()
+            + l.swaps.iter().filter(|(_, o, _)| *o == owner).count()
+    }
+
+    /// A lost fight's rock begins to go: what was in the air is gone at once, and dust rises
+    /// over everything that lies or stands (`step_looks_leaving` takes it away).
+    fn looks_leave(&mut self, owner: Id) {
+        let l = &mut self.bosses.looks;
+        let air: Vec<Id> = l.falling.iter().filter(|f| f.owner == owner).filter_map(|f| f.id).collect();
+        l.falling.retain(|f| f.owner != owner);
+        for id in air {
+            self.bosses.looks.tilt.remove(&id);
+            if self.objs.remove(&id).is_some() {
+                self.events.push(Event::ObjGone { id });
+            }
+        }
+        let n = self.looks_left(owner);
+        if n == 0 {
+            self.clear_looks(owner);
+            return;
+        }
+        self.bosses.looks.leaving = Some((owner, self.clock, n, false));
+        self.leaving_dust(owner, 4);
+    }
+
+    /// Dust over a lost fight's rock, and its rumble: at every `every`th face rock and (thinner)
+    /// loose piece.
+    fn leaving_dust(&mut self, owner: Id, every: usize) {
+        let l = &self.bosses.looks;
+        let faces: Vec<Id> = l.face_pieces.iter().filter(|(o, _)| *o == owner).map(|(_, id)| *id).collect();
+        let loose: Vec<Id> = l.rubble.iter().filter(|(o, _)| *o == owner).map(|(_, id)| *id).collect();
+        let spots: Vec<Vec3> = faces
+            .iter()
+            .step_by(every.max(1))
+            .chain(loose.iter().step_by(every.max(1) * 3))
+            .filter_map(|id| self.objs.get(id).map(|o| o.pos))
+            .collect();
+        for at in spots {
+            self.point_look(owner, at, LAND_DUST);
+        }
+        if let Some(from) = faces.last().or(loose.last()) {
+            self.events.push(Event::Sound { id: *from, sound: SOUND_RUMBLE });
+        }
+    }
+
+    /// A lost fight's rock goes: it stands `LEAVE_HOLD` in its dust, then goes over `LEAVE_SECS`,
+    /// the newest first (the faces before the loose rock behind them), dust where it goes.
+    fn step_looks_leaving(&mut self) {
+        let Some((owner, since, n, begun)) = self.bosses.looks.leaving else { return };
+        let now = self.clock;
+        if now < since + LEAVE_HOLD {
+            return;
+        }
+        let left = self.looks_left(owner);
+        if !begun {
+            self.leaving_dust(owner, 3);
+            self.bosses.looks.leaving = Some((owner, since, n, true));
+        }
+        let share = ((now - since - LEAVE_HOLD) / LEAVE_SECS).clamp(0.0, 1.0);
+        let keep = ((1.0 - share) * n as f32).floor() as usize;
+        if share >= 1.0 || keep == 0 {
+            self.clear_looks(owner);
+            return;
+        }
+        let mut k = 0usize;
+        while left.saturating_sub(k) > keep {
+            let l = &mut self.bosses.looks;
+            let id = if let Some(p) = l.swaps.iter().rposition(|(_, o, _)| *o == owner) {
+                l.swaps.remove(p).2
+            } else if let Some(p) = l.face_pieces.iter().rposition(|(o, _)| *o == owner) {
+                l.face_pieces.remove(p).1
+            } else if let Some(p) = l.rubble.iter().rposition(|(o, _)| *o == owner) {
+                l.rubble.remove(p).map(|(_, id)| id).unwrap()
+            } else {
+                break;
+            };
+            l.tilt.remove(&id);
+            l.solid.remove(&id);
+            if let Some(o) = self.objs.remove(&id) {
+                self.events.push(Event::ObjGone { id });
+                if k % 6 == 0 {
+                    self.point_look(owner, o.pos, LAND_DUST);
+                }
+            }
+            k += 1;
         }
     }
 }

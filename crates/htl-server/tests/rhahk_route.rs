@@ -384,6 +384,7 @@ fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
     s.dev_hurt(hero, 0.69, "rhahkzor").unwrap();
     let t0 = s.clock;
     let (mut caught, mut fell, mut woke, mut resets) = (Vec::new(), None, None, 0);
+    let mut landed = None;
     let mut health = s.players[&hero].health;
     for _ in 0..(40 * 20) {
         for e in s.step(0.05) {
@@ -399,6 +400,11 @@ fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
         }
         let now = s.players[&hero].health;
         let t = s.clock - t0;
+        // The throw is a flight their client flies (0.8 s from here); with no client, the server
+        // sets them down 0.4 s after it should have landed.
+        if landed.is_none() && caught.first().is_some_and(|c: &(f32, [f32; 3])| t >= c.0 + 1.3) {
+            landed = Some(s.players[&hero].pos);
+        }
         match (fell, woke) {
             (None, _) if now == 0 => {
                 fell = Some(t);
@@ -413,7 +419,11 @@ fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
             (Some(at), None) => {
                 // The fight was lost the moment they fell.
                 assert_eq!(s.collapse_front(), None, "the collapse still on {:.2} s after the hero fell", t - at);
-                assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_lines().is_empty(), "the mine put back");
+                assert!(s.collapse_face_lines().is_empty(), "no face stops anyone any more");
+                // What's seen of it stands 2 s in its dust, then goes over 1.5 s.
+                if t > at + 3.7 {
+                    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_skin().is_empty(), "the mine put back");
+                }
                 if now > 0 {
                     woke = Some(t);
                 }
@@ -427,13 +437,15 @@ fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
     }
     let (fell, woke) = (fell.expect("felled"), woke.expect("woken at the lamp"));
     assert_eq!(caught.len(), 1, "caught once, by the first section: {caught:?}");
-    let (when, to) = caught[0];
+    let (when, _) = caught[0];
+    let to = landed.expect("landed before they fell");
     assert!(to[0] < -37.0 - 2.0 && dist2d(to, at) > 10.0, "thrown out ahead of the first face, not left behind it: {to:?}");
-    assert!(when < fell);
+    assert!(when + 1.3 < fell);
     let m = &s.mobs[&boss];
     assert!(dist2d(m.pos, home) < 1.0 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}", m.pos);
     assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, his fight to start over");
     assert!((1..=2).contains(&resets), "bounded wipe reset: {resets}");
     assert_eq!(s.players[&hero].health, s.players[&hero].max_health, "the hero whole at the lamp");
-    println!("door side: caught at {when:.2} s and thrown to ({:.1}, {:.1}, {:.1}); felled at {fell:.2} s, the mine put back at once; woke at {woke:.2} s and left alone", to[0], to[1], to[2]);
+    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_skin().is_empty(), "no rock left of it");
+    println!("door side: caught at {when:.2} s and thrown to ({:.1}, {:.1}, {:.1}); felled at {fell:.2} s, its rules ended at once and its rock gone within 3.5 s; woke at {woke:.2} s and left alone", to[0], to[1], to[2]);
 }

@@ -354,6 +354,7 @@ fn a_hero_on_the_door_side_is_caught_and_thrown_clear_never_left_behind() {
     let mut longest = 0;
     let mut first: Option<(f32, Vec3, u32, Vec<Event>)> = None;
     let mut warned = 0;
+    let mut rest_since: Option<f32> = None;
     while s.collapse_front().is_some_and(|f| !f.1) && s.clock < 120.0 {
         // They never move a step of their own: the collapse alone moves them.
         let before = s.players[&h].health;
@@ -370,7 +371,10 @@ fn a_hero_on_the_door_side_is_caught_and_thrown_clear_never_left_behind() {
         }
         behind = if s.collapse_behind(pos) { behind + 1 } else { 0 };
         longest = longest.max(behind);
-        if stage == "rest" {
+        // (A throw ends by the face's first moment; one whose client never flew it is set down
+        // `THROW_GRACE` later, at the catch's next look.)
+        rest_since = if stage == "rest" { rest_since.or(Some(s.clock)) } else { None };
+        if rest_since.is_some_and(|t| s.clock >= t + FACE_FIRST + THROW_GRACE + 2.0 * CATCH_TICK) {
             assert!(!s.collapse_behind(pos), "nobody behind a face once it stands: {pos:?} at {}", s.clock);
             assert!(pos[0] > LINES[k], "ahead of the face: {pos:?}");
         }
@@ -380,15 +384,32 @@ fn a_hero_on_the_door_side_is_caught_and_thrown_clear_never_left_behind() {
         ev.extend(e);
     }
     assert!(warned >= 2, "warned from the surge's first moment: {warned}");
-    let (front, to, lost, e) = first.expect("caught by the first surge");
+    let (front, at, lost, e) = first.expect("caught by the first surge");
     assert!(front > 12.5 && front <= 14.0, "as the wave passed them: {front}");
-    assert!(dist2d(to, [LINES[0] + 4.0, 0.0, 0.0]) < 0.1, "thrown to clear floor 4 yd past the line: {to:?}");
     assert!(lost >= 3_500_000 && lost < 3_600_000, "35% of their health: {lost}");
-    assert!(e.iter().any(|e| matches!(e, Event::Teleport { player, pos, .. } if *player == h && dist2d(*pos, to) < 0.01)), "their client told");
-    assert!(e.iter().any(|e| matches!(e, Event::React { id, .. } if *id == h)), "and down a moment");
+    // Thrown clear through the air, not blinked there: their client is told to fly them, toward
+    // clear floor 4 yd past the line, up and over, within the time a throw may take.
+    let to = [LINES[0] + 4.0, 0.0, 0.0];
+    assert!(dist2d(at, [12.0, 6.0, 0.0]) < 0.01, "still where they stood as the throw begins: {at:?}");
+    assert!(!e.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == h)), "no blink");
+    let (dir, speed, lift) = e
+        .iter()
+        .find_map(|e| match e {
+            Event::Hop { player, dir, speed, lift, .. } if *player == h => Some((*dir, *speed, *lift)),
+            _ => None,
+        })
+        .expect("their client told to fly them");
+    assert!((dir - facing([12.0, 6.0, 0.0], to)).abs() < 0.01, "toward the clear floor: {dir}");
+    let air = dist2d([12.0, 6.0, 0.0], to) / speed;
+    assert!(air >= THROW_AIR.0 && air <= THROW_AIR.1, "a flight seen, and soon over: {air}");
+    assert!(lift >= THROW_LIFT, "up and over: {lift}");
+    // This hero has no client to fly them: set down there all the same a moment after the throw
+    // should have landed, and thrown down as they land.
+    assert!(ev.iter().any(|e| matches!(e, Event::Teleport { player, pos, .. } if *player == h && dist2d(*pos, to) < 0.1)), "set down clear: {to:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::React { id, .. } if *id == h)), "and down a moment");
     // Once a surge, however long they lie there.
     assert_eq!(caught(&ev, "Mole"), 4, "caught once by each surge");
-    assert!(longest as f32 * DT <= CATCH_TICK + 0.05, "never behind the rubble longer than a blink: {longest} steps");
+    assert!(longest as f32 * DT <= THROW_AIR.1 + THROW_GRACE + 2.0 * CATCH_TICK, "never behind the rubble longer than a throw: {longest} steps");
     let pos = s.players[&h].pos;
     assert!(dist2d(pos, [LINES[3] + 4.0, 0.0, 0.0]) < 0.1, "at the end, ahead of the last face: {pos:?}");
     assert!(s.players[&h].health > 0);
@@ -406,7 +427,10 @@ fn nobody_is_behind_a_face_at_any_side_distance() {
     for at in side {
         assert!(!s.collapse_behind(at), "nothing down in the warning");
     }
-    let ev = run_to(&mut s, h, (0, "rest"));
+    let mut ev = run_to(&mut s, h, (0, "rest"));
+    // (A throw is over by the face's first moment; a hero whose client never flew it, as here,
+    // is set down a moment later.)
+    ev.extend(run_for(&mut s, FACE_FIRST + THROW_GRACE + 2.0 * CATCH_TICK));
     let at: Vec<Vec3> = heroes.iter().map(|h| s.players[h].pos).collect();
     for (k, p) in at.iter().enumerate() {
         assert!(p[0] > LINES[0] + 3.0 && p[0] < LINES[0] + 5.0 && p[1].abs() < 4.0, "set down past the line: {p:?}");
@@ -483,6 +507,14 @@ fn nobody_walks_rolls_jumps_or_is_thrown_back_through_a_face() {
     s.move_player(h, [31.0, -3.0, 2.5], std::f32::consts::PI, Moving::default());
     s.move_player(h, [28.5, -3.0, 2.5], std::f32::consts::PI, Moving::default());
     assert!(s.players[&h].pos[0] > line, "a jump stopped at it: {:?}", s.players[&h].pos);
+    assert_eq!(s.players[&h].pos[2], 2.5, "at the height of their jump");
+    // Up a slope into it (their last place lower than the floor at the stop): put on the floor
+    // there, never under it (a hero under it falls through the world on their client).
+    stand(&mut s, [33.0, 5.0, -0.8]);
+    s.move_player(h, [29.0, 5.0, -0.8], std::f32::consts::PI, Moving::default());
+    let p = s.players[&h].pos;
+    assert!(p[0] > line && p[2] == 0.0, "stopped on the floor: {p:?}");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Teleport { player, pos, .. } if *player == h && pos[2] == 0.0)), "their client told so");
     // Along the wall, slantwise, at its very end.
     stand(&mut s, [32.0, 9.0, 0.0]);
     s.move_player(h, [28.0, 10.6, 0.0], std::f32::consts::PI, Moving::default());
@@ -576,7 +608,14 @@ fn rubble_faces_and_stops_go_when_the_fight_is_lost() {
     // Every hero down: the fight is lost, and the mine stands again for the next try.
     let hp = s.players[&h].health;
     s.hurt_player_by(h, hp + 10_000, boss, "a blow");
-    let ev = run_for(&mut s, 5.0);
+    let mut ev = run_for(&mut s, 0.5);
+    // Its rules end at once; its rock is seen to stand a moment in its dust, then goes.
+    assert_eq!(s.collapse_front(), None, "the collapse is over");
+    assert!(s.collapse_face_lines().is_empty() && s.face_crossing([33.0, 0.0, 0.0], [27.0, 0.0, 0.0]).is_none(), "no stop from the first moment");
+    assert!(faces.iter().all(|id| s.objs.contains_key(id)), "the faces still seen");
+    assert!(ev.iter().filter(|e| matches!(e, Event::MissileFrom { spell: LAND_DUST, .. })).count() >= 6, "in their dust");
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. })), "and nothing more falls");
+    ev.extend(run_for(&mut s, LEAVE_HOLD + LEAVE_SECS + 1.0));
     assert_eq!(s.collapse_front(), None, "the collapse is over");
     assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty());
     assert!(pieces(&s).is_empty(), "nothing of it left standing");
@@ -667,9 +706,17 @@ fn a_face_is_built_wall_to_wall_to_the_roof_and_solid_as_it_lands() {
     let first = shown.values().copied().fold(f32::MAX, f32::min);
     let last = shown.values().copied().fold(f32::MIN, f32::max);
     assert!(last - first >= 0.5 && last - first <= 2.0, "built up layer by layer: {first}..{last}");
-    // The rock that fell is taken once its solid twin stands: one rock a place, no more.
-    let fallen: Vec<Vec3> = pieces(&s).into_iter().filter(|(id, _, p, _)| !s.collapse_piece_solid(*id) && p[0] > LINES[0] - 6.0 && p[2] > 0.5).map(|p| p.2).collect();
-    assert!(fallen.is_empty(), "no rock left doubled in the face: {fallen:?}");
+    // What's seen of it is the pale rock that fell: one over each solid rock, with no hull of its
+    // own, and none past the line.
+    let skin: Vec<Vec3> = s.collapse_face_skin().into_iter().map(|id| s.objs[&id].pos).collect();
+    assert_eq!(skin.len(), face.len(), "a pale rock over each solid one");
+    for id in s.collapse_face_skin() {
+        assert!(matches!(s.objs[&id].kind, ObjKind::Prop { display: PALE, .. }) && !s.collapse_piece_solid(id));
+    }
+    for (_, p) in &face {
+        assert!(skin.iter().any(|q| (q[1] - p[1]).abs() < 0.01 && (q[0] - p[0]).abs() < 2.0 && (q[2] - p[2]).abs() < 1.5), "pale rock over the rock at {p:?}");
+    }
+    assert!(skin.iter().all(|q| q[0] < LINES[0]), "none past the line");
     // Its rows behind it: rock across the whole width of the section, not down its middle.
     let rubble: Vec<Vec3> = s.collapse_rubble().iter().map(|id| s.objs[id].pos).collect();
     for x in [4.0, 10.0, 16.0, 22.0] {
@@ -699,7 +746,7 @@ fn rows_of_rock_are_seen_falling_across_the_tunnel_as_the_wave_comes() {
         }
     }
     // Rock seen coming down: shown high, moved down in place, and lying on the floor.
-    let rock = |s: &Survival, id: &Id| matches!(s.objs[id].kind, ObjKind::Prop { display, .. } if display == ROCK || display == BOULDER);
+    let rock = |s: &Survival, id: &Id| matches!(s.objs[id].kind, ObjKind::Prop { display, .. } if display == PALE || display == PALE_TALL);
     let fell: Vec<Id> = landed
         .keys()
         .copied()
@@ -709,7 +756,7 @@ fn rows_of_rock_are_seen_falling_across_the_tunnel_as_the_wave_comes() {
     assert!(fell.len() >= 60, "rock seen dropping from overhead: {}", fell.len());
     for id in &fell {
         let z = s.objs[id].pos[2];
-        assert!(z < 0.0 && z > -1.0, "lying sunk in the floor, not hanging: {z}");
+        assert!(z > -1.0 && z < ROW_RISE * ROW_LAYERS as f32, "lying on the floor or on the rock under it, not hanging: {z}");
         assert!(ev.iter().any(|e| matches!(e, Event::ObjChanged { id: o } if o == id)), "moved in place as it fell");
     }
     // The wave's own rows: rock landing as the wave reaches it, all along the way, wall to wall.
@@ -722,9 +769,14 @@ fn rows_of_rock_are_seen_falling_across_the_tunnel_as_the_wave_comes() {
             assert!(landed.values().any(|(p, _)| (p[0] - x as f32).abs() <= 3.5 && (p[1] - y).abs() <= 3.5), "the tunnel buried at ({x}, {y})");
         }
     }
-    // Each row's rings on the floor before it lands (a few to a row: the client draws 16 marks).
-    let rings = ev.iter().filter(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, colour, .. } if *reach == ROW_RING && colour == mobs::HAZARD_COLOUR)).count();
-    assert!(rings >= 40 && rings <= landed.len(), "rings under the rows: {rings}");
+    // The rows are a roof coming down, not blows: no ring under any of them. The only rings are
+    // under the falls ahead of the wave, which are blows.
+    let rings = ev.iter().filter(|e| matches!(e, Event::GroundBurst { shape: "ring", colour, .. } if colour == mobs::HAZARD_COLOUR)).count();
+    let falls = ev.iter().filter(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, colour, .. } if *reach == FALL_RADIUS && colour == mobs::HAZARD_COLOUR)).count();
+    assert!(falls >= 4 && rings == falls, "rings only under the falls that are blows: {rings} rings, {falls} falls");
+    // The pile builds: rock lands on rock, layer over layer, behind the wave.
+    let piled = landed.values().filter(|(p, _)| p[2] > ROW_RISE * 0.5).count();
+    assert!(piled >= 40, "rock lying on rock: {piled}");
     // A timber cracks overhead and comes down across the tunnel.
     let beams: Vec<&Id> = landed.keys().filter(|id| matches!(s.objs[*id].kind, ObjKind::Prop { display: BEAM, .. })).collect();
     assert!(beams.len() >= 2, "beams down across the tunnel: {}", beams.len());
@@ -742,12 +794,11 @@ fn rows_of_rock_are_seen_falling_across_the_tunnel_as_the_wave_comes() {
     // Dust streams from the roof over the section, rolls ahead of the wave and is thrown up where
     // rock lands; the band lies across the line; no Rocky Ground Impact (its pink boulders
     // linger on film).
-    let roof = ev.iter().filter(|e| matches!(e, Event::MissileFrom { spell: DUST, .. })).count();
-    assert!(roof >= 50, "dust from the roof, over the whole section: {roof}");
+    let roof = ev.iter().filter(|e| matches!(e, Event::MissileFrom { spell: LAND_DUST, .. })).count();
+    assert!(roof >= 200, "soft dust from the roof, over the whole section: {roof}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: DUST, .. })), "no starburst puffs: they read as hits");
     assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: DUST_ROLL, .. })));
     assert!(ev.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", colour, .. } if colour == BAND_COLOUR)));
-    let dust = ev.iter().filter(|e| matches!(e, Event::MissileFrom { spell: LAND_DUST, .. })).count();
-    assert!(dust >= landed.len(), "dust where each piece lands: {dust} for {}", landed.len());
     assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: 26271, .. } | Event::Missile { spell: 26271, .. })));
 }
 

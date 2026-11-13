@@ -2187,19 +2187,22 @@ fn a_collapse_comes_down_in_sections_catching_the_buried_and_warning_those_insid
     }
     assert!(!ev.iter().any(|e| matches!(e, Event::Danger { player, .. } if *player == clear)), "and nobody else");
     assert_eq!(hp(&s, buried), 1_000_000, "nobody hurt before the rock comes");
-    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 7272, .. })), "dust where it will come down");
+    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: 22792, .. })), "dust sifting from the roof where it will come down");
     // The hero in the fight gets out past the line, as one must; the other stays.
     s.move_player(warned, [133.0, 3.0, 0.0], 0.0, Moving::default());
     run(&mut s, 2.1);
     let front = s.collapse_front().unwrap().0;
     assert!((front - 20.0).abs() < 1.0, "the wave at 10 yd/s after a 1 s warning: {front}");
     assert_eq!(hp(&s, buried), 650_000, "the buried hero caught: 35% of their health");
+    // (Thrown through the air: a hero with no client to fly them is set down there a moment
+    // after the throw should have landed.)
+    run(&mut s, 0.4);
     let at = s.players[&buried].pos;
     assert!(dist2d(at, [134.0, 0.0, 0.0]) < 2.0, "and thrown clear, 4 yd past the section's line: {at:?}");
     assert_eq!(hp(&s, warned), 1_000_000, "the hero who got out untouched");
     assert_eq!(hp(&s, clear), 1_000_000, "the hero far ahead untouched");
     // The front holds at its face between surges; then the next section, round the corner.
-    run(&mut s, 2.0);
+    run(&mut s, 1.6);
     assert_eq!(s.collapse_state(), Some((0, "rest", 30.0, false)), "held at the first face");
     assert_eq!(s.collapse_face_lines().len(), 1);
     s.move_player(warned, [160.0, 45.0, 0.0], 0.0, Moving::default());
@@ -2305,12 +2308,16 @@ fn a_collapse_is_lost_the_moment_its_boss_fells_the_last_hero() {
     s.mobs.get_mut(&boss).unwrap().state = mobs::MobState::Recover { foe: mobs::Foe::Hero(id), until: now + 30.0 };
     run(&mut s, 0.1);
     assert_eq!(s.collapse_front(), None, "the collapse over at once");
-    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_lines().is_empty(), "the place put back");
+    assert!(s.collapse_face_lines().is_empty(), "no face stops anyone from that moment");
+    // (Its rock is seen to stand a moment in its dust, then goes: 3.5 s in all.)
+    assert!(!s.collapse_faces().is_empty(), "the rock still seen");
     run(&mut s, 1.0);
     let m = &s.mobs[&boss];
     assert!(dist2d(m.pos, start) < 0.5 && dist2d(m.home, start) < 0.5, "back where it began: {:?}", m.pos);
     assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, its phases to start over");
     assert!(matches!(m.state, mobs::MobState::Idle { .. }), "at rest: {:?}", m.state);
+    run(&mut s, 3.0);
+    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_lines().is_empty(), "the place put back");
 }
 
 /// A hero carried right out of the fight while the collapse comes down (woken at a lamp far off)
