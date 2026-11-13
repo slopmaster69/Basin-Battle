@@ -1,7 +1,7 @@
 # An unassisted solo clear of Edwin VanCleef and Unbowed (docs/vancleef-encounter.md), filmed by
 # the cameraman (camera duel), markers off. Dev setup, all before the video: travel, the deck
 # cleared but for VanCleef, the quarters secret found (the hero put
-# on its hatch) so Unbowed can rise, the warrior healed and put 14 yd from his cabin door, where he sees them. From the video on, no debug command: only the
+# at its barrel and searching it, .es e: standing there only nudges) so Unbowed can rise, the warrior healed and put 14 yd from his cabin door, where he sees them. From the video on, no debug command: only the
 # warrior's own keys (.es in, ActionDash), pressed by a small player in the interface (VB below)
 # that reads only what the client shows: his hunch or kneel held (WP clip 120 or 75: hit him), a
 # windup (AN: raise the guard as it lands; roll from a string's follow-up), the red glow (WG: roll
@@ -10,13 +10,16 @@
 hero warrior
 # No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to him.
 cam off
-camera duel Edwin VanCleef
+# Unbowed rises under VanCleef's own name: both forms named, so the take runs on past the first
+# fall to Unbowed's, or the hero's (docs/visual-check.md, "Filming a boss").
+camera duel Edwin VanCleef|Edwin VanCleef
 0 .es debug quiet
 1 .es travel landing
 10 .es debug quiet
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 11 .es clearfoes vancleef
 12 .es goto -105 -818 37.9 0
+12.45 .es e
 12.6 .es heal
 13 .es goto -63 -819.5 41.5 3.141593
 12.2 lua VB = { q = {}, open = 0, nextHit = 0, anAt = 0, glow = false, hunchEnd = 0, hunchLen = 0, provoked = 0, k = 0, on = false }
@@ -36,4 +39,5 @@ camera duel Edwin VanCleef
 40 shots duel 30 4.0
 170 shots late 40 4.0
 330 shots unbowed 20 4.0
-420 end
+# Long enough for both fights (on Nov 13 the hero was still fighting Unbowed 356 s into the video).
+470 end
