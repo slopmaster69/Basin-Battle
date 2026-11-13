@@ -1030,25 +1030,30 @@ loot = { draught_flask = 1, plunder = 12 }
 
 # --- the Juggernaut's starboard rail ---------------------------------------------------------------
 
-# Its east side had nothing along it: the deck (40.2 to 42.8) simply stops at y -840 (x -76 to -60),
+# Its east side had nothing along it: the deck (38.9 to 43.1) simply stops at y -840 (x -76 to -60),
 # curving in to -834 toward the stern and the bow, a 9 yd drop to the hull and the water beyond, with
-# no collision in the map (dmprobe; heroes walked and rolled off it, takes 346 and 347). This runs a
-# fence 0.9 yd inside that lip (clear of the map's half-yard cells at the edge, which read the hull below) for the stretch Captain Greenskin's fight can reach (his home
-# (-62, -815), leash 30 yd): ElwynnWoodFence01 (6151, the dungeons' own dark wood, 4.3 yd a piece;
-# its collision hull from 0.56 below its origin to 1.80 above). At 0.9, each piece stands 0.1 over
-# the deck under its higher end: its hull's top at least 1.72 yd above the deck everywhere, clear
-# of a hero's 1.0 yd step up (the client's own roll back is a 16 yd/s dash that steps up: take 375
-# went over the 1 yd it had where the deck rose) and the server's hop back (0.23 yd); its posts
-# still sink into the deck at the lower end. The rest of the ship is as it was. The aftermath
-# preview hides it with the ship.
+# no collision in the map (dmprobe; heroes walked and rolled off it, takes 346 and 347). A bulwark
+# runs 0.9 yd inside that lip (clear of the map's half-yard cells at the edge, which read the hull
+# below) for the stretch Captain Greenskin's fight can reach (his home (-62, -815), leash 30 yd).
+# Its pieces are ExcavationBarrierPlank (4651): a plank wall of FinishedWood, the same weathered
+# brown as the Juggernaut's own deck (its texture averages 141/103/67, the deck's 144/111/76), a
+# solid box for its hull. No ship's rail exists as a game object in the data, and the ship's own
+# woodwork is the dungeon's, not a model one can place. At 0.85 each is a straight 9.7 yd chord of
+# the line, tipped to follow the deck's rise and sunk 0.15 into it, its top 1.80 yd over the deck all
+# along: clear of a hero's 1.0 yd step up (the client's roll back is a dash that steps up: take 375)
+# and the server's hop back (0.23 yd) by half a yard. The rest of the ship is as it was. The
+# aftermath preview hides it with the ship.
 [[dungeon.rail]]
 key = "juggernaut_starboard"
 # Each point [x, y, floor z], all on the deck and walkable from his home (dmprobe).
 points = [[-92.0, -834.1, 38.9], [-88.0, -835.4, 39.2], [-84.0, -836.9, 39.5], [-80.0, -838.4, 39.8], [-76.0, -839.3, 40.2], [-68.0, -839.6, 40.9], [-60.0, -839.3, 41.6], [-56.0, -838.4, 42.0], [-52.0, -837.4, 42.4], [-48.0, -835.4, 42.8], [-44.0, -832.9, 43.1]]
-display = 6151
-scale = 0.9
-length = 4.3
-raise = 0.1
+display = 4651
+scale = 0.85
+# Its run is along its own y; its hull stands from its origin to 2.29 over it.
+run = [-5.57, 5.82]
+along_y = true
+height = [0.0, 2.29]
+lift = -0.15
 
 # --- area 4: the Foundry ----------------------------------------------------------------------------
 

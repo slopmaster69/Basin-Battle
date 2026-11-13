@@ -1120,6 +1120,8 @@ pub struct Survival {
     pub(crate) missiles: Vec<combat::Missile>,
     /// Creatures' shots along a line in flight (Greenskin's crew's balls, his harpoon).
     pub(crate) line_shots: Vec<combat::LineShot>,
+    /// The pieces of the dungeon's rails, as laid (`dungeon::place_below`).
+    pub(crate) rail_pieces: BTreeMap<Id, dungeon::RailPiece>,
     /// Heroes' projectiles in flight, ground marked to land, ground burning, totems standing.
     pub(crate) projectiles: Vec<abilities::Projectile>,
     pub(crate) grounds: Vec<abilities::GroundCast>,
@@ -1287,6 +1289,7 @@ impl Survival {
             events: Vec::new(),
             missiles: Vec::new(),
             line_shots: Vec::new(),
+            rail_pieces: BTreeMap::new(),
             projectiles: Vec::new(),
             landings: Vec::new(),
             lines: std::collections::VecDeque::new(),

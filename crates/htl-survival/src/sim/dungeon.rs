@@ -107,6 +107,80 @@ pub fn door_open(below: &Below, d: &DoorDef) -> bool {
     }
 }
 
+/// A piece of a rail as it was laid: its rotation (a quaternion, as a game object's), and the
+/// chord of the rail's line it covers, on the deck.
+#[derive(Debug, Clone, Copy)]
+pub struct RailPiece {
+    pub rotation: [f32; 4],
+    pub from: Vec3,
+    pub to: Vec3,
+}
+
+/// A line cut into straight chords `len` long, end to end from its first point; the last ends at
+/// its last point (overlapping the one before). Each end is on the line, z interpolated there.
+pub(crate) fn rail_chords(points: &[[f32; 3]], len: f32) -> Vec<(Vec3, Vec3)> {
+    let at = |seg: usize, t: f32| {
+        let (a, b) = (points[seg], points[seg + 1]);
+        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+    };
+    // The first point at `len` from `from` on the line past (seg, t), searching forward.
+    let next = |from: Vec3, seg: usize, t: f32| -> Option<(usize, f32, Vec3)> {
+        for k in seg..points.len() - 1 {
+            let t0 = if k == seg { t } else { 0.0 };
+            let (a, b) = (points[k], points[k + 1]);
+            if dist2d(from, b) < len {
+                continue;
+            }
+            // On this segment from t0: |a + (b - a) t - from| = len, the larger root.
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let (fx, fy) = (a[0] - from[0], a[1] - from[1]);
+            let qa = dx * dx + dy * dy;
+            let qb = 2.0 * (fx * dx + fy * dy);
+            let qc = fx * fx + fy * fy - len * len;
+            let disc = (qb * qb - 4.0 * qa * qc).max(0.0).sqrt();
+            let t = ((-qb + disc) / (2.0 * qa)).clamp(t0, 1.0);
+            return Some((k, t, at(k, t)));
+        }
+        None
+    };
+    let last = *points.last().unwrap();
+    let mut out = Vec::new();
+    let (mut seg, mut t, mut from) = (0, 0.0, points[0]);
+    loop {
+        match next(from, seg, t) {
+            Some((k, u, to)) if dist2d(to, last) > 0.05 => {
+                out.push((from, to));
+                (seg, t, from) = (k, u, to);
+            }
+            _ => break,
+        }
+    }
+    // The last: ending at the line's end, `len` back along it (or all of it, if shorter).
+    let rev: Vec<[f32; 3]> = points.iter().rev().copied().collect();
+    let back = rail_chords_back(&rev, len).unwrap_or(points[0]);
+    out.push((back, last));
+    out
+}
+
+/// The first point `len` from the start of `points`, along them.
+fn rail_chords_back(points: &[[f32; 3]], len: f32) -> Option<Vec3> {
+    let from = points[0];
+    for w in points.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        if dist2d(from, b) < len {
+            continue;
+        }
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let (fx, fy) = (a[0] - from[0], a[1] - from[1]);
+        let qa = dx * dx + dy * dy;
+        let qb = 2.0 * (fx * dx + fy * dy);
+        let qc = fx * fx + fy * fy - len * len;
+        let t = ((-qb + (qb * qb - 4.0 * qa * qc).max(0.0).sqrt()) / (2.0 * qa)).clamp(0.0, 1.0);
+        return Some([a[0] + dx * t, a[1] + dy * t, a[2] + (b[2] - a[2]) * t]);
+    }
+    None
+}
+
 /// Whether segment a-b crosses segment c-d (in the plane).
 fn crosses(a: Vec3, b: Vec3, c: [f32; 2], d: [f32; 2]) -> bool {
     let o = |p: [f32; 2], q: [f32; 2], r: [f32; 2]| {
@@ -148,6 +222,16 @@ impl Survival {
     }
 
     /// This is the world below.
+    /// A rail piece's rotation (a quaternion), for the clients: tipped to follow the deck.
+    pub fn rail_piece_rotation(&self, id: Id) -> Option<[f32; 4]> {
+        self.rail_pieces.get(&id).map(|p| p.rotation)
+    }
+
+    /// A rail piece as it was laid.
+    pub fn rail_piece(&self, id: Id) -> Option<RailPiece> {
+        self.rail_pieces.get(&id).copied()
+    }
+
     pub fn is_below(&self) -> bool {
         self.below.is_some()
     }
@@ -218,30 +302,35 @@ impl Survival {
                 }
             }
         }
-        // The rails along open edges: a fence piece at a time along each stretch of the line,
-        // evenly spaced (overlapping a little) so the pieces meet, each standing on the floor
-        // under its higher end (and `raise` over it), so its top is never low where the deck
-        // rises; its posts, sunk into the floor as modelled, still reach it at its lower end.
+        // The rails along open edges: straight pieces end to end as chords of the line (the deck
+        // is convex there, so a chord between points on it stays on the deck), each tipped to
+        // follow the deck's rise along it and standing `lift` over it all along.
+        self.rail_pieces.retain(|id, _| self.objs.contains_key(id));
         for r in &d.rails {
-            let len = r.length * r.scale;
-            if len <= 0.0 {
+            let len = (r.run[1] - r.run[0]) * r.scale;
+            if len <= 0.0 || r.points.len() < 2 {
                 continue;
             }
-            for w in r.points.windows(2) {
-                let ([ax, ay, az], [bx, by, bz]) = (w[0], w[1]);
-                let span = ((bx - ax).powi(2) + (by - ay).powi(2)).sqrt();
-                let n = ((span / len).ceil() as usize).max(1);
-                let f = (by - ay).atan2(bx - ax);
-                for k in 1..=n {
-                    // The piece runs back along its -x from its origin: its origin at the far end.
-                    let t = k as f32 / n as f32;
-                    let (ex, ey) = (ax + (bx - ax) * t, ay + (by - ay) * t);
-                    let (sx, sy) = (ex - f.cos() * len.min(span), ey - f.sin() * len.min(span));
-                    let hint = az + (bz - az) * t;
-                    let z = self.ground_near(ex, ey, hint)[2].max(self.ground_near(sx, sy, hint)[2]) + r.raise;
-                    let id = self.alloc();
-                    self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos: [ex, ey, z], facing: f });
-                }
+            for (a, b) in rail_chords(&r.points, len) {
+                let (a, b) = (self.ground_near(a[0], a[1], a[2]), self.ground_near(b[0], b[1], b[2]));
+                let f = (b[1] - a[1]).atan2(b[0] - a[0]);
+                let span = dist2d(a, b).max(1e-3);
+                let pitch = (b[2] - a[2]).atan2(span);
+                // Its origin where the chord's start is `run[0]` of it back along its run.
+                let t = -r.run[0] * r.scale / span;
+                let pos = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t + r.lift];
+                // Turned so its run lies along the chord, then tipped about the axis across it.
+                let (facing, rot) = if r.along_y {
+                    let facing = f - std::f32::consts::FRAC_PI_2;
+                    let ((s, c), (sx, cx)) = ((facing / 2.0).sin_cos(), (pitch / 2.0).sin_cos());
+                    (facing, [c * sx, s * sx, s * cx, c * cx])
+                } else {
+                    let ((s, c), (st, ct)) = ((f / 2.0).sin_cos(), (-pitch / 2.0).sin_cos());
+                    (f, [-s * st, c * st, s * ct, c * ct])
+                };
+                let id = self.alloc();
+                self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos, facing });
+                self.rail_pieces.insert(id, RailPiece { rotation: rot, from: a, to: b });
             }
         }
         // A note a secret keeps (its finder's to read) waits for it to be found.

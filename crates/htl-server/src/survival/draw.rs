@@ -912,19 +912,37 @@ impl SurvivalGame {
         state: u32,
         tilt: f32,
     ) -> Packet {
-        let mut f = Fields::new();
         let (s, c) = (facing / 2.0).sin_cos();
         let (ts, tc) = (tilt / 2.0).sin_cos();
+        Self::go_packet_rotated(guid, entry, display, kind, flags, scale, pos, facing, state, [-s * ts, c * ts, tc * s, c * tc])
+    }
+
+    /// A game object turned by a whole rotation (a quaternion): a rail piece tipped to follow the
+    /// deck along its run.
+    #[allow(clippy::too_many_arguments)]
+    fn go_packet_rotated(
+        guid: u64,
+        entry: u32,
+        display: u32,
+        kind: u32,
+        flags: u32,
+        scale: f32,
+        pos: [f32; 3],
+        facing: f32,
+        state: u32,
+        q: [f32; 4],
+    ) -> Packet {
+        let mut f = Fields::new();
         f.set_u64(idx::GUID, guid)
             .set(idx::TYPE, fields::TYPEMASK_GAMEOBJECT)
             .set(idx::ENTRY, entry)
             .set_f32(idx::SCALE_X, scale)
             .set(idx::GAMEOBJECT_DISPLAYID, display)
             .set(idx::GAMEOBJECT_FLAGS, flags)
-            .set_f32(idx::GAMEOBJECT_ROTATION, -s * ts)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 1, c * ts)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 2, tc * s)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 3, c * tc)
+            .set_f32(idx::GAMEOBJECT_ROTATION, q[0])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 1, q[1])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 2, q[2])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 3, q[3])
             .set(idx::GAMEOBJECT_STATE, state)
             .set_f32(idx::GAMEOBJECT_POS_X, pos[0])
             .set_f32(idx::GAMEOBJECT_POS_X + 1, pos[1])
@@ -968,7 +986,12 @@ impl SurvivalGame {
         } else {
             (v.display, v.scale, self.sim.collapse_piece_tilt(v.id).unwrap_or(0.0), flags)
         };
-        let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
+        // A rail piece is tipped to follow the deck along its run (`Survival::rail_piece_rotation`).
+        let first = match self.sim.rail_piece_rotation(v.id) {
+            Some(q) => Self::go_packet_rotated(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, q),
+            None => Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt),
+        };
+        let mut out = vec![first];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
             let (display, name, scale) =

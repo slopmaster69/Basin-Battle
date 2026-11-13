@@ -888,33 +888,83 @@ fn the_starboard_rail_runs_along_the_open_side_in_pieces_that_meet() {
     let (s, _) = deck([-62.0, -830.0, 0.0]);
     let d = s.dungeon_def().unwrap();
     let r = d.rails.iter().find(|r| r.key == "juggernaut_starboard").expect("the rail");
-    let pieces: Vec<&Obj> = s.objs.values().filter(|o| matches!(o.kind, ObjKind::Prop { display: FENCE, .. })).collect();
-    let len = r.length * r.scale;
-    let total: f32 = r.points.windows(2).map(|w| dist2d(w[0], w[1])).sum();
-    assert!(pieces.len() as f32 >= total / len, "{} pieces for {total:.1} yd", pieces.len());
-    // Every yard of the line is under a piece (each runs back along its facing from its origin).
-    for w in r.points.windows(2) {
-        let n = dist2d(w[0], w[1]).ceil() as usize;
-        for k in 0..=n {
-            let t = k as f32 / n as f32;
-            let p = [w[0][0] + (w[1][0] - w[0][0]) * t, w[0][1] + (w[1][1] - w[0][1]) * t, 0.0];
-            let covered = pieces.iter().any(|o| {
-                let back = [o.pos[0] - o.facing.cos() * len, o.pos[1] - o.facing.sin() * len, 0.0];
-                let (_, off) = combat::along_segment(back, o.pos, p);
-                off < 0.2
-            });
-            assert!(covered, "a gap in the rail at {p:?}");
+    let len = (r.run[1] - r.run[0]) * r.scale;
+    let mut pieces: Vec<(Id, dungeon::RailPiece)> = s.objs.iter()
+        .filter(|(_, o)| matches!(o.kind, ObjKind::Prop { display, .. } if display == r.display))
+        .map(|(id, _)| (*id, s.rail_piece(*id).expect("laid as a rail piece"))).collect();
+    pieces.sort_by(|a, b| a.1.from[0].total_cmp(&b.1.from[0]));
+    let (first, last) = (r.points[0], *r.points.last().unwrap());
+    assert!(dist2d(pieces[0].1.from, first) < 0.01 && dist2d(pieces.last().unwrap().1.to, last) < 0.01, "from end to end");
+    for w in pieces.windows(2) {
+        // End to end, or (the last) overlapping the one before: never a gap.
+        assert!(w[1].1.from[0] <= w[0].1.to[0] + 0.01, "a gap between {:?} and {:?}", w[0].1, w[1].1);
+    }
+    for (id, p) in &pieces {
+        assert!((dist2d(p.from, p.to) - len).abs() < 0.05, "a whole piece's chord: {p:?}");
+        // Its ends on the rail's line, and tall enough all along (its hull's top over the deck).
+        for end in [p.from, p.to] {
+            assert!((rail_y(&s, end[0]) - end[1]).abs() < 0.05, "{end:?} on the line");
+            let top = end[2] + r.lift + r.height[1] * r.scale;
+            assert!(top - end[2] >= 1.73, "its top {:.2} over the deck: clear of a 1 yd step up and a hop by half a yard", top - end[2]);
+            assert!(end[2] + r.lift + r.height[0] * r.scale <= end[2], "seated on the deck");
         }
+        // A solid piece: the clients keep its hull (it isn't one of the passable props).
+        assert!(!s.is_trap_obj(*id) && !s.is_perch_visual_prop(*id) && !s.is_kitchen_prop(*id) && s.collapse_piece_tilt(*id).is_none());
     }
-    // Tall enough everywhere: its hull (ElwynnWoodFence01's, 0.56 below its origin to 1.80 above)
-    // tops a hero's 1 yd step up and the hop back's 0.23 yd with half a yard to spare.
-    for o in &pieces {
-        let top = o.pos[2] + 1.80 * r.scale;
-        assert!(top - s.ground_near(o.pos[0], o.pos[1], o.pos[2])[2] >= 1.7, "a piece's top {top}");
+}
+
+/// A rotation (a game object's quaternion) applied to a vector.
+fn turn(q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    let (x, y, z, w) = (q[0], q[1], q[2], q[3]);
+    let u = [x, y, z];
+    let cross = |a: [f32; 3], b: [f32; 3]| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    let t = cross(u, v).map(|c| 2.0 * c);
+    let ut = cross(u, t);
+    [v[0] + w * t[0] + ut[0], v[1] + w * t[1] + ut[1], v[2] + w * t[2] + ut[2]]
+}
+
+#[test]
+fn each_rail_piece_lies_along_its_chord_tipped_to_follow_the_deck() {
+    // A deck rising toward +x, as the Juggernaut's toward its bow.
+    struct Rising;
+    impl Land for Rising {
+        fn height(&self, x: f32, _: f32) -> f32 { 0.09 * (x + 100.0) }
     }
-    // A solid piece: the clients keep its hull (it isn't one of the passable props).
-    let id = *s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Prop { display: FENCE, .. })).unwrap().0;
-    assert!(!s.is_trap_obj(id) && !s.is_perch_visual_prop(id) && !s.is_kitchen_prop(id) && s.collapse_piece_tilt(id).is_none());
+    let s = Survival::new_dungeon(Content::dev(), Box::new(Rising), 31, 0.0);
+    let r = s.dungeon_def().unwrap().rails[0].clone();
+    let mut n = 0;
+    for (id, o) in s.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Prop { display, .. } if display == r.display)) {
+        let Some(p) = s.rail_piece(*id) else { continue };
+        n += 1;
+        let run = if r.along_y { [0.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] };
+        let along = turn(p.rotation, run);
+        let chord = [p.to[0] - p.from[0], p.to[1] - p.from[1], p.to[2] - p.from[2]];
+        let l = (chord[0].powi(2) + chord[1].powi(2) + chord[2].powi(2)).sqrt();
+        let dot = (along[0] * chord[0] + along[1] * chord[1] + along[2] * chord[2]) / l;
+        assert!(dot > 0.999, "its run along its chord, rise and all: {along:?} vs {chord:?}");
+        assert!(p.to[2] - p.from[2] > 0.5, "the deck rises under it");
+        // Upright: its own up stays up but for the tip along its run.
+        assert!(turn(p.rotation, [0.0, 0.0, 1.0])[2] > 0.99);
+        // Its run's start, from its origin, is the chord's start (at `lift` over it).
+        let start = [o.pos[0] + along[0] * r.run[0] * r.scale, o.pos[1] + along[1] * r.run[0] * r.scale, o.pos[2] + along[2] * r.run[0] * r.scale];
+        assert!(dist2d(start, p.from) < 0.05 && (start[2] - (p.from[2] + r.lift)).abs() < 0.05, "{start:?} vs {:?}", p.from);
+    }
+    assert!(n >= 5);
+}
+
+#[test]
+fn a_line_cut_into_chords_covers_it_end_to_end() {
+    let line = [[0.0, 0.0, 0.0], [10.0, 0.0, 1.0], [14.0, 4.0, 2.0], [14.0, 12.0, 3.0]];
+    let chords = dungeon::rail_chords(&line, 6.0);
+    assert_eq!(dist2d(chords[0].0, line[0]), 0.0);
+    assert!(dist2d(chords.last().unwrap().1, line[3]) < 1e-4);
+    for (a, b) in &chords {
+        assert!((dist2d(*a, *b) - 6.0).abs() < 1e-3, "{a:?} {b:?}");
+    }
+    let n = chords.len();
+    for k in 1..n - 1 {
+        assert!(dist2d(chords[k - 1].1, chords[k].0) < 1e-3, "end to end");
+    }
 }
 
 #[test]

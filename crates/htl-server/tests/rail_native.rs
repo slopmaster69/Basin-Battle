@@ -26,9 +26,9 @@ fn a_walk_through_the_rail_on_the_real_deck_stops_at_it() {
     }
 }
 
-/// Each piece stands on the deck and follows it: its posts reach the floor under both of its ends
-/// (none floats where the deck falls away), and its top stands at least 1.6 yd over that floor at
-/// both (a hero's 1 yd step up and a 0.23 yd hop back clear neither).
+/// Each piece stands on the deck and follows it: a straight chord of the rail's line, its ends and
+/// middle on the deck, its base sunk into the deck and its top at least 1.73 yd over it at both
+/// ends and the middle (a hero's 1 yd step up and a 0.23 yd hop back clear neither, by half a yard).
 #[test]
 #[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
 fn every_piece_of_the_rail_stands_on_the_real_deck_and_tops_a_step_up() {
@@ -38,18 +38,17 @@ fn every_piece_of_the_rail_stands_on_the_real_deck_and_tops_a_step_up() {
     c.dungeon.as_mut().unwrap().packs.clear();
     let s = Survival::new_dungeon(c, Box::new(land), 17, 0.0);
     let r = s.content.dungeon.as_ref().unwrap().rails.iter().find(|r| r.key == "juggernaut_starboard").unwrap().clone();
-    // ElwynnWoodFence01's collision hull, from its origin.
-    let (bottom, top) = (-0.56 * r.scale, 1.80 * r.scale);
-    let len = r.length * r.scale;
-    let pieces: Vec<_> = s.objs.values().filter(|o| matches!(o.kind, htl_survival::ObjKind::Prop { display, .. } if display == r.display)).collect();
-    assert!(pieces.len() >= 14, "{} pieces", pieces.len());
-    for o in pieces {
-        let back = [o.pos[0] - o.facing.cos() * len, o.pos[1] - o.facing.sin() * len];
-        for (x, y) in [(o.pos[0], o.pos[1]), (back[0], back[1])] {
-            let floor = s.land().height_near(x, y, o.pos[2] + 0.5);
-            println!("piece {:?} end ({x:.1}, {y:.1}): floor {floor:.2}, posts to {:.2}, top {:.2}", o.pos, o.pos[2] + bottom, o.pos[2] + top);
-            assert!(o.pos[2] + bottom <= floor + 0.05, "its posts reach the deck at ({x}, {y})");
-            assert!(o.pos[2] + top - floor >= 1.6, "its top stands {:.2} over the deck at ({x}, {y})", o.pos[2] + top - floor);
+    let (bottom, top) = (r.lift + r.height[0] * r.scale, r.lift + r.height[1] * r.scale);
+    let pieces: Vec<_> = s.objs.keys().filter_map(|id| s.rail_piece(*id)).collect();
+    assert!(pieces.len() >= 5, "{} pieces", pieces.len());
+    for p in pieces {
+        let mid = [(p.from[0] + p.to[0]) / 2.0, (p.from[1] + p.to[1]) / 2.0, (p.from[2] + p.to[2]) / 2.0];
+        for at in [p.from, mid, p.to] {
+            let floor = s.land().height_near(at[0], at[1], at[2] + 0.5);
+            println!("piece {:?} -> {:?} at ({:.1}, {:.1}): deck {floor:.2}, base {:.2}, top {:.2}", p.from, p.to, at[0], at[1], at[2] + bottom, at[2] + top);
+            assert!((floor - at[2]).abs() < 0.6, "on the deck at ({}, {}): {floor} vs {}", at[0], at[1], at[2]);
+            assert!(at[2] + bottom <= floor + 0.05, "its base reaches the deck at ({}, {})", at[0], at[1]);
+            assert!(at[2] + top - floor >= 1.73, "its top stands {:.2} over the deck at ({}, {})", at[2] + top - floor, at[0], at[1]);
         }
     }
 }
