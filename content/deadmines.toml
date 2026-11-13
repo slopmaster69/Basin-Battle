@@ -2178,9 +2178,11 @@ death_text = "...VanCleef... never pay..."
     face = [[-37.0, -366.5], [-37.0, -381.5]]
     reach = 20.0
     height = 8.8
-    # 2. The chamber's near end, to the pillar (14 yd): the widest face, both sides of the pillar.
+    # 2. The chamber's near end, to the pillar (15 yd): the widest face, both sides of the pillar.
+    #    South of the pillar it lies on the lip of the bank the chamber's east floor ends in, a
+    #    yard and a half over the west floor: a hero on the lip hops down ahead of it.
     [[mob.phase.collapse.section]]
-    face = [[-50.0, -365.5], [-50.0, -405.5]]
+    face = [[-51.0, -365.5], [-51.0, -405.5]]
     reach = 30.0
     height = 11.5
     # 3. The rest of the chamber, to the corridor's mouth (30 yd). Its side cave ends 36 yd north

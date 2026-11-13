@@ -99,10 +99,18 @@ const WAVE_SLACK: f32 = 0.5;
 const BOSS_SLACK: f32 = 1.5;
 /// In a wave the boss walks out to this far past the section's line.
 const BOSS_CLEAR: f32 = 3.0;
+/// ...faster than the wave by this much at the least, whatever slows it (nothing holds it in
+/// its own falling mine).
+const BOSS_OUTRUN: f32 = 1.3;
+/// Walking the route, the leg it is on is looked for this far on from the last one only (the
+/// far side of a hairpin is never taken for it).
+const LEG_LOOK: f32 = 6.0;
 /// A face of rubble stops a hero this far short of its line, reaches this far past its ends
 /// (into the walls), and stands for a hero from this far under its floor to this far over its
 /// roof.
 const FACE_STOP: f32 = 0.4;
+/// A creature on its own feet stops this far short of one (its back to the rubble, not in it).
+const FACE_SHY: f32 = 1.2;
 const FACE_PAD: f32 = 1.0;
 const FACE_BELOW: f32 = 6.0;
 const FACE_ABOVE: f32 = 4.0;
@@ -772,11 +780,13 @@ impl Survival {
             self.players.iter().filter(|(_, p)| p.health > 0 && c.behind(p.pos, 0.0)).map(|(h, p)| (*h, p.pos, p.facing, p.max_health)).collect();
         let (clear, yaw) = route_pose(&c.route, &c.along, (line + c.throw).min(total));
         let clear = self.land.footing(clear).unwrap_or(clear);
-        for (n, (h, was, facing, max)) in behind.into_iter().enumerate() {
-            // (Side by side, not on one spot.)
-            let off = [0.0, 1.4, -1.4, 2.8, -2.8][n % 5];
-            let beside = [clear[0] - yaw.sin() * off, clear[1] + yaw.cos() * off, clear[2]];
-            let to = self.land.footing(beside).filter(|p| !c.behind(*p, 0.0)).unwrap_or(clear);
+        for (h, was, facing, max) in behind {
+            // (Side by side, not on a spot somebody stands on.)
+            let to = [0.0, 1.4, -1.4, 2.8, -2.8]
+                .iter()
+                .filter_map(|off| self.land.footing([clear[0] - yaw.sin() * off, clear[1] + yaw.cos() * off, clear[2]]))
+                .find(|p| !c.behind(*p, 0.0) && !self.players.iter().any(|(o, q)| *o != h && q.health > 0 && dist2d(q.pos, *p) < 1.0))
+                .unwrap_or(clear);
             self.set_down(h, to, facing);
             if !c.caught.insert(h) {
                 continue;
@@ -866,7 +876,7 @@ impl Survival {
     /// A face of rubble in a hero's way from `from` to `to` (a walk, a roll, a jump, a throw):
     /// where they stop, a step short of it, at `from`'s height. Either way: nobody passes one.
     /// A hero standing on its very line steps off it freely.
-    pub(crate) fn face_crossing(&self, from: Vec3, to: Vec3) -> Option<Vec3> {
+    pub fn face_crossing(&self, from: Vec3, to: Vec3) -> Option<Vec3> {
         let mut first: Option<f32> = None;
         for f in &self.bosses.faces {
             if from[2] < f.z - FACE_BELOW || from[2] > f.z + f.height + FACE_ABOVE {
@@ -897,6 +907,31 @@ impl Survival {
         let way = dist2d(from, to).max(1.0e-4);
         let k = ((t * way - FACE_STOP) / way).clamp(0.0, 1.0);
         Some([from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k, from[2]])
+    }
+
+    /// A creature's way with faces of rubble standing: cut off a stride short of the first face
+    /// it would go through (circling its foe, backing off to make space, a way found round a
+    /// pillar). False when that leaves it nowhere to go: it stays where it is.
+    pub(crate) fn short_of_faces(&self, from: Vec3, path: &mut Vec<Vec3>) -> bool {
+        if self.bosses.faces.is_empty() {
+            return true;
+        }
+        let mut at = from;
+        for i in 0..path.len() {
+            if let Some(stop) = self.face_crossing(at, path[i]) {
+                let d = dist2d(at, stop);
+                path.truncate(i);
+                let back = FACE_SHY - FACE_STOP;
+                if d > back + 0.3 {
+                    let k = (d - back) / d;
+                    let p = [at[0] + (stop[0] - at[0]) * k, at[1] + (stop[1] - at[1]) * k, at[2]];
+                    path.push(self.land.footing(p).unwrap_or(p));
+                }
+                break;
+            }
+            at = path[i];
+        }
+        !path.is_empty()
     }
 
     /// A face of rubble in the way of a hero's own move (a walk, a roll, a jump as their client
@@ -962,6 +997,7 @@ impl Survival {
         let (lead, total) = (c.lead, c.total());
         let line = c.sections[c.section].line;
         let wave = c.stage == Stage::Wave;
+        let wave_speed = c.speed;
         let (mut leg, holding) = (c.boss_leg, c.holding);
         let Some(m) = self.mobs.get(&id) else { return false };
         let now = self.clock;
@@ -972,6 +1008,17 @@ impl Survival {
         let Some((at, off)) = route_progress(&route, &along, m.pos) else { return false };
         if !holding || off > 1.0 {
             leg = along.iter().position(|a| *a > at + 0.01).unwrap_or(route.len() - 1).max(1);
+        }
+        // (It walks several corners in a step: the leg it has come to, of those just ahead.)
+        let (first, mut near) = (leg, f32::MAX);
+        for j in first..route.len() {
+            if along[j - 1] > along[first] + LEG_LOOK {
+                break;
+            }
+            let off = route_progress(&route[j - 1..=j], &along[j - 1..=j], m.pos).map_or(f32::MAX, |p| p.1);
+            if off < near - 1.0e-3 {
+                (leg, near) = (j, off);
+            }
         }
         while leg + 1 < route.len() && dist3(m.pos, route[leg]) < 0.08 {
             leg += 1;
@@ -995,23 +1042,32 @@ impl Survival {
         if out {
             self.collapse_lets_go(id);
         }
-        // Follow the next native corner, never the chord from the creature to a distant spot.
+        // Follow the route corner by corner, never the chord from the creature to a distant spot.
         // A hero on another floor doesn't pull it out of the route either.
         let want = (line + if ran { (lead * 0.5).max(BOSS_CLEAR) } else { BOSS_CLEAR }).min(total);
-        let to = if boss_off > 1.0 {
+        let on_route = boss_off <= 1.0;
+        let to = if on_route {
+            route_point(&route, &along, want.max(boss_at))
+        } else {
             // (Off the route: back onto it, on ahead if the wave is coming.)
             route_point(&route, &along, if out { (boss_at + boss_off).min(want.max(boss_at)) } else { boss_at })
-        } else {
-            route_point(&route, &along, want.min(along[leg]).max(boss_at))
         };
         let c = self.bosses.collapse.as_mut().unwrap();
         c.boss_leg = leg;
         c.holding = true;
-        if let Some(to) = self.land.footing(to).filter(|_| boss_at < want || boss_off > 1.0) {
-            let speed = self.content.mobs[def].run_speed;
+        if let Some(to) = self.land.footing(to).filter(|_| boss_at < want || !on_route) {
+            let run = self.content.mobs[def].run_speed;
             let end = self.mobs[&id].path.last().copied();
             if end.is_none_or(|end| dist3(end, to) > 0.5) {
-                self.go(id, to, speed);
+                if on_route {
+                    // (All its corners at once: a corner a step would lose the race with the wave.)
+                    let mut path: Vec<Vec3> = (leg..route.len()).take_while(|j| along[*j] < want - 0.05).map(|j| route[j]).collect();
+                    path.push(to);
+                    let speed = if out { run.max(wave_speed * BOSS_OUTRUN) } else { run * self.speed_share(id) };
+                    self.go_along(id, path, speed);
+                } else {
+                    self.go(id, to, run);
+                }
             }
         } else if !self.mobs[&id].path.is_empty() {
             self.halt(id);

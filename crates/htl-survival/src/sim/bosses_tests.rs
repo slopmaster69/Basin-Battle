@@ -494,6 +494,26 @@ fn nobody_walks_rolls_jumps_or_is_thrown_back_through_a_face() {
     assert!((free[0] - 43.0).abs() < 0.6, "and away from it goes its length: {free:?}");
     // Nor out from behind it (the catch takes whoever is there).
     assert!(s.face_crossing([27.0, 0.0, 0.0], [33.0, 0.0, 0.0]).is_some_and(|p| p[0] < line));
+    // Nor does he walk into it himself (circling his foe, backing off to make space): sent
+    // through it he goes up to it, his back to the rubble, and no farther.
+    let put = |s: &mut Survival, at: Vec3| {
+        let m = s.mobs.get_mut(&boss).unwrap();
+        m.pos = at;
+        m.path.clear();
+    };
+    put(&mut s, [36.0, 1.0, 0.0]);
+    s.go(boss, [24.0, 1.0, 0.0], 6.0);
+    let end = s.mobs[&boss].path.last().copied().expect("on his way");
+    assert!(s.mobs[&boss].path.len() == 1 && end[0] > line + 1.0 && end[0] < line + 1.5, "up to the face: {end:?}");
+    put(&mut s, [36.0, 1.0, 0.0]);
+    s.sidle_to(boss, [27.0, 4.0, 0.0], 3.0, h);
+    let end = s.mobs[&boss].path.last().copied().expect("stepping round");
+    assert!(end[0] > line + 1.0 && end[0] < line + 1.6, "sidling, too: {end:?}");
+    put(&mut s, [line + 1.2, 1.0, 0.0]);
+    s.go(boss, [24.0, 1.0, 0.0], 6.0);
+    assert!(s.mobs[&boss].path.is_empty(), "at the face he stays: {:?}", s.mobs[&boss].path);
+    s.go(boss, [38.0, 6.0, 0.0], 6.0);
+    assert_eq!(s.mobs[&boss].path, vec![[38.0, 6.0, 0.0]], "away from it he goes as ever");
     // Along it and away from it nothing stops them.
     stand(&mut s, [31.0, -6.0, 0.0]);
     s.move_player(h, [31.0, 6.0, 0.0], 0.0, Moving::default());
