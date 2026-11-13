@@ -119,7 +119,7 @@ walkable from the captain's home and found each edge with a drop of more than 2 
 | Starboard side | y -827 to -841, x -108 to -38 | 9 yd to the hull's shelf, then the water | bulwark (`juggernaut_starboard`) |
 | Bow | from the forecastle's north face (-38, -813) down the slope to the point (-34.2, -794.8), its torch inside | 7 yd to the stem | bulwark (`juggernaut_port`) |
 | Port side | the port walkway's outer edge, x -34 to -81 | 20 yd to the dock | bulwark (`juggernaut_port`) |
-| The port walkway's west end | x -85, y -790 to -794.5, beside the gangway's head | to the gangway and the dock | invisible wall (`juggernaut_gangway_head`) |
+| The port walkway's west end | x -85, y -790 to -793, a yard short of the gangway's head | to the gangway and the dock | invisible wall (`juggernaut_gangway_head`) |
 | The trench's main-deck rim | from the steps' head (-49.6, -803.3) to the block at x -61 | 17 yd to the scaffold | invisible wall (`juggernaut_trench`) |
 | The gangway's head | the stern-port quarter, x -84 to -100, y -794 to -802.6 | | open: the way aboard |
 | The trench's north end | x -45 to -51.6, y -796 to -804 | | open: the steps between the main deck and the port walkway, and their head |
@@ -155,11 +155,15 @@ mid-deck).
   its side. Its pieces are ExcavationBarrierPlank (display 4651): a plank wall of FinishedWood, whose
   colour (texture average 141/103/67) is the deck's (`STU_DREADNAUGHTDECK`, 144/111/76). At 0.85
   each is 9.7 yd long, 1.95 yd tall and 0.43 yd thick, tipped to follow the deck's rise toward the
-  bow (38.9 to 43.1) and sunk 0.15 into it, so its top stands 1.80 yd over the deck all along:
-  shoulder high. Over a crown in the deck (the port walkway's) a piece rises by up to its sink, so
-  its top stays 1.73 yd or more over it. On the bow's slope, where the deck falls 3.9 yd within a
-  piece's length and twists as it falls, no straight piece lies flush: its pieces stand on their
-  ends and clear the deck by up to 0.75 yd between, their tops 2.7 yd up there. Each piece goes to
+  bow (38.9 to 43.1) and sunk 0.1 into it, so its top stands 1.85 yd over the deck at its ends
+  and at least 1.8 all along: shoulder high. Over a crown in the deck (the port walkway's) a piece
+  rises by the crown's height (its foot then clears the deck at its ends by up to 0.2 yd). On the
+  bow's slope, where the deck falls 3.9 yd within a piece's length and twists as it falls, no
+  straight piece lies flush: a piece spans the slope standing on its ends, up to 0.75 yd over it
+  at its middle (take 381: the dark and the red hull showed through under it), so a second board
+  goes under each such piece, as long, lowered to the deck where it is lowest and set 0.04 yd in
+  from the one over it. The two read as a two-board bulwark with one even top, and nowhere is
+  more than 0.2 yd open under them (0.09 at most, on the survey). Each piece goes to
   the clients with its whole rotation (`rail_piece_rotation`), as the game objects' tilt alone
   can't tip a piece that runs along its own y.
 - **The models looked at (Corey, 12 Nov: darker and more ship-like than the pale Elwynn fence):**
@@ -227,9 +231,12 @@ deck; past its ends nothing changes. `crates/htl-server/src/survival/rail_tests.
 through it by movement packets, and `crates/htl-server/tests/rail_native.rs` (with WOW_DATA) on
 the real deck, surveyed at a quarter of a yard: no walkable deck outside the bulwark but at the
 three passages, the bow's point and its torch inside, every light inside, every open edge railed,
-a passage or a pocket, every piece standing on the deck with its top 1.73 yd up or more. `a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain`
-plays a warrior with the starting sword and their own health, reading only what the client is
-sent (the crew at its posts, a gun at the shoulder or the harpoon held back, his windups): they
+a passage or a pocket, every piece standing on the deck with its top 1.8 yd up or more and no
+more than 0.2 yd open under it, and the gangway, from its foot to its head, clear of every piece's
+collision hull (read from the game's model, placed as the clients place it) by a body's width.
+`a_lone_sword_hero_playing_by_the_tells_clears_the_crew_then_the_captain` plays a warrior with
+the starting sword and their own health, reading only what the client is sent (the crew at its
+posts, a gun at the shoulder or the harpoon held back, his windups): they
 run to each gunner and cut him down, stepping out of each line as it fires and raising the guard
 as his blows land, then duel him: 68 to 82 sec, 74 to 200 health left, no shot taken (three
 seeds). `a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines` takes the other

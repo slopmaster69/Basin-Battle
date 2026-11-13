@@ -119,7 +119,7 @@ impl Fine {
 
 /// Where people must pass, left open: a box (x from, x to, y from, y to) and why.
 const PASSAGES: &[([f32; 4], &str)] = &[
-    ([-100.0, -84.0, -802.6, -794.0], "the gangway's head, at the stern-port quarter"),
+    ([-100.0, -84.0, -802.6, -793.0], "the gangway's head, at the stern-port quarter, and the walkway's corner it comes up to"),
     ([-51.6, -45.0, -801.6, -796.0], "the steps between the main deck and the port walkway, at the trench's north end"),
     ([-49.6, -45.0, -804.2, -801.6], "the head of those steps, on the main deck"),
     ([-62.5, -45.0, -800.0, -792.5], "the port walkway's rim over the trench: the boarding route and the Blackguards' way off (#308)"),
@@ -169,14 +169,13 @@ fn pieces(s: &Survival) -> Vec<RailPiece> {
     s.objs.keys().filter_map(|id| s.rail_piece(*id)).collect()
 }
 
-/// Each piece stands on the deck and follows it, its top at least 1.73 yd over the deck at its
-/// ends, its quarters and its middle (a hero's 1 yd step up and a 0.23 yd hop back clear neither,
-/// by half a yard), its base sunk into it, measured on the deck at a quarter of a yard. Where a
-/// piece spans no deck (over the gangway, from a corner or into the forecastle), there is nothing
-/// to stand on to step over it. The one exception is the bow's slope, where the deck falls 3.9 yd
-/// within a piece's length and twists as it falls, so no straight piece lies flush: its pieces
-/// stand on their ends and clear the deck by up to 0.75 yd between, their tops 2.7 yd up there;
-/// nothing gets under that.
+/// Each piece stands on the deck and follows it, measured on the deck at a quarter of a yard at
+/// every eighth of its length: its top 1.8 yd or more over the deck (to a hundredth; a hero's 1 yd step up and a
+/// 0.23 yd hop back clear neither, by half a yard), and no more than 0.2 yd of open space between
+/// the deck and its foot,
+/// or the foot of the board under it where the deck falls away (the bow's slope). Where a piece
+/// spans no deck (over the gangway, from a corner or into the forecastle), there is nothing to
+/// stand on to step over it, nor any deck to show through under it.
 #[test]
 #[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
 fn every_piece_of_the_bulwark_stands_on_the_real_deck_and_tops_a_step_up() {
@@ -185,26 +184,111 @@ fn every_piece_of_the_bulwark_stands_on_the_real_deck_and_tops_a_step_up() {
     let rails = s.content.dungeon.as_ref().unwrap().rails.clone();
     let pieces = pieces(&s);
     assert!(pieces.len() >= 30, "{} pieces", pieces.len());
-    let mut measured = 0;
-    for p in &pieces {
+    let boards: Vec<_> = pieces.iter().filter(|p| p.under).collect();
+    assert!(!boards.is_empty(), "a board under the bow's slope");
+    let (mut measured, mut worst_top, mut worst_gap) = (0, f32::MAX, f32::MIN);
+    for p in pieces.iter().filter(|p| !p.under) {
         let r = &rails[p.rail];
         let (bottom, top) = (r.lift + r.height[0] * r.scale, r.lift + r.height[1] * r.scale);
         let span = ((p.to[0] - p.from[0]).powi(2) + (p.to[1] - p.from[1]).powi(2)).sqrt();
         let inward = [-(p.to[1] - p.from[1]) / span, (p.to[0] - p.from[0]) / span];
-        let slope = (p.to[2] - p.from[2]).abs() > 3.0;
-        for t in [0.0f32, 0.25, 0.5, 0.75, 1.0] {
+        // The board under it, if any: the same chord, lowered.
+        let board = boards.iter().find(|q| {
+            ((q.from[0] - p.from[0]).abs() + (q.from[1] - p.from[1]).abs() + (q.to[0] - p.to[0]).abs() + (q.to[1] - p.to[1]).abs()) < 0.01
+        });
+        let drop = board.map_or(0.0, |q| p.from[2] - q.from[2]);
+        for n in 0..=8 {
+            let t = n as f32 / 8.0;
             let at = [p.from[0] + (p.to[0] - p.from[0]) * t, p.from[1] + (p.to[1] - p.from[1]) * t, p.from[2] + (p.to[2] - p.from[2]) * t];
             // The deck under it or, along the deck's edge, just in from it.
             let Some(floor) = fine.floor(at, inward, 0.5) else { continue };
             measured += 1;
-            // (The game seats it on its own yard-wide ground, within a fifth of a yard of this.)
-            let clear = if slope && t > 0.0 && t < 1.0 { 0.75 } else { 0.2 };
-            println!("{} piece {:?} -> {:?} at {t}: deck {floor:.2}, base {:.2}, top {:.2}", r.key, p.from, p.to, at[2] + bottom, at[2] + top);
-            assert!(at[2] + bottom <= floor + clear, "{}: its base reaches the deck at ({}, {}): base {} deck {floor}", r.key, at[0], at[1], at[2] + bottom);
-            assert!(at[2] + top - floor >= 1.73, "{}: its top stands {:.2} over the deck at ({}, {})", r.key, at[2] + top - floor, at[0], at[1]);
+            let (foot, head) = (at[2] + bottom - drop, at[2] + top);
+            println!("{} piece {:?} -> {:?} at {t}: deck {floor:.2}, foot {foot:.2}, top {head:.2}", r.key, p.from, p.to);
+            worst_top = worst_top.min(head - floor);
+            worst_gap = worst_gap.max(foot - floor);
+            assert!(foot <= floor + 0.2, "{}: {:.2} yd open under it at ({}, {})", r.key, foot - floor, at[0], at[1]);
+            assert!(head - floor >= 1.79, "{}: its top stands {:.2} over the deck at ({}, {})", r.key, head - floor, at[0], at[1]);
         }
     }
-    assert!(measured >= pieces.len() * 3, "{measured} measured");
+    println!("lowest top over the deck {worst_top:.2}, widest gap under a foot {worst_gap:.2}");
+    let uppers = pieces.len() - boards.len();
+    assert!(measured >= uppers * 5, "{measured} measured of {uppers} pieces");
+}
+
+/// The gangway's walking path, from its foot on the lower deck to the head where it meets the
+/// deck, stays clear of every piece's collision hull (the hull the clients collide with, read from
+/// the game's own model, placed, turned and scaled as the clients place it) by a body's width
+/// (0.8 yd) at a body's height (2 yd) over every floor of it (take 381: a hero climbing it was
+/// stopped short of its head).
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn the_gangway_stays_clear_of_every_piece_of_the_bulwark_by_a_body() {
+    let data = std::env::var("WOW_DATA").expect("set WOW_DATA to installed Data directory");
+    let s = real_deck();
+    let mut chain = benilla_formats::Chain::open(std::path::Path::new(&data)).unwrap();
+    let catalog = benilla_formats::load_gameobject_catalog(&mut chain).unwrap();
+    // Each piece's hull as a box in its own frame, scaled, with its place and turn.
+    let mut boxes = Vec::new();
+    for (id, o) in &s.objs {
+        let Some(p) = s.rail_piece(*id) else { continue };
+        let htl_survival::ObjKind::Prop { display, scale } = o.kind else { continue };
+        let path = catalog.model_path(display).expect("a model").to_string();
+        let hull = benilla_formats::load_m2_collision_hull(&mut chain, &path).unwrap();
+        assert!(!hull.is_empty(), "{display} has a hull");
+        let mut lo = [f32::MAX; 3];
+        let mut hi = [f32::MIN; 3];
+        for v in &hull.positions {
+            for k in 0..3 {
+                lo[k] = lo[k].min(v[k] * scale);
+                hi[k] = hi[k].max(v[k] * scale);
+            }
+        }
+        boxes.push((p.rotation, o.pos, lo, hi));
+    }
+    let turn = |q: [f32; 4], v: [f32; 3]| {
+        let u = [q[0], q[1], q[2]];
+        let cross = |a: [f32; 3], b: [f32; 3]| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+        let t = cross(u, v).map(|c| 2.0 * c);
+        let ut = cross(u, t);
+        [v[0] + q[3] * t[0] + ut[0], v[1] + q[3] * t[1] + ut[1], v[2] + q[3] * t[2] + ut[2]]
+    };
+    // How near a point comes to a hull (0 inside it).
+    let near = |w: [f32; 3]| {
+        boxes.iter().map(|(q, pos, lo, hi)| {
+            let l = turn([-q[0], -q[1], -q[2], q[3]], [w[0] - pos[0], w[1] - pos[1], w[2] - pos[2]]);
+            (0..3).map(|k| (lo[k] - l[k]).max(l[k] - hi[k]).max(0.0).powi(2)).sum::<f32>().sqrt()
+        }).fold(f32::MAX, f32::min)
+    };
+    // The gangway at a quarter of a yard: every floor walkable from its foot in the stern-port
+    // quarter's box, from its foot (-98, -804) up to its head and the walkway beyond it.
+    let d = htl_map::deadmines::load_with(std::path::Path::new(&data), 0.25, Some(([-102.0, -808.0], [-80.0, -792.0]))).unwrap();
+    let g = &d.ground;
+    let seen = g.reachable([-98.0, -804.0, 31.0], 1.2);
+    let (w, h) = g.size();
+    let (mut cells, mut worst) = (0, (f32::MAX, [0.0f32; 3]));
+    for j in 0..h {
+        for i in 0..w {
+            for f in g.floor_range(i, j).filter(|f| seen[*f]) {
+                let z = g.floor(f).z;
+                // The gangway itself: below the deck it climbs to.
+                if !(29.0..38.2).contains(&z) {
+                    continue;
+                }
+                let c = g.cell_xy(i, j);
+                cells += 1;
+                for dz in [0.1f32, 0.7, 1.3, 2.0] {
+                    let n = near([c[0], c[1], z + dz]);
+                    if n < worst.0 {
+                        worst = (n, [c[0], c[1], z]);
+                    }
+                }
+            }
+        }
+    }
+    println!("{cells} quarter-yards of gangway; the nearest a piece comes is {:.2} yd, at {:?}", worst.0, worst.1);
+    assert!(cells > 400, "{cells} quarter-yards of gangway");
+    assert!(worst.0 >= 0.8, "a piece {:.2} yd from a body on the gangway at {:?}", worst.0, worst.1);
 }
 
 /// No walkable deck lies outside the bulwark (out past its outer face, beside a piece) but at the

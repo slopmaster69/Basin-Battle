@@ -1040,10 +1040,13 @@ loot = { draught_flask = 1, plunder = 12 }
 #
 # Its pieces are ExcavationBarrierPlank (4651): a plank wall of FinishedWood, the same weathered
 # brown as the Juggernaut's own deck (its texture averages 141/103/67, the deck's 144/111/76), a
-# solid box for its hull, 0.43 yd thick. At 0.85 each is a straight 9.7 yd piece, sunk 0.15 into
-# the deck and tipped to follow its rise, its top 1.80 yd over it all along: clear of a hero's
-# 1.0 yd step up (the client's roll back is a dash that steps up: take 375) and the server's hop
-# back (0.23 yd) by half a yard.
+# solid box for its hull, 0.43 yd thick. At 0.85 each is a straight 9.7 yd piece, sunk 0.1 into
+# the deck and tipped to follow its rise, its top 1.85 yd over it at its ends and at least 1.8
+# all along: clear of a hero's 1.0 yd step up (the client's roll back is a dash that steps up:
+# take 375) and the server's hop back (0.23 yd) by half a yard. Over a crown in the deck a piece
+# rises by the crown's height; where the deck falls away under one by more than a fifth of a yard
+# (the bow's slope, take 381) a second board goes under it, so no more than that is ever open
+# under the bulwark.
 #
 # Each line's points are its corners, [x, y, deck z], with the deck on their left. Its pieces lie
 # along each straight run between two corners, none cutting across one, so every run is at least a
@@ -1065,7 +1068,7 @@ scale = 0.85
 run = [-5.57, 5.82]
 along_y = true
 height = [0.0, 2.29]
-lift = -0.15
+lift = -0.1
 
 # The bow and the port side: from the forecastle's north face down the bow's slope to its point,
 # then aft along the port walkway's outer edge to its walled stern end.
@@ -1077,11 +1080,12 @@ scale = 0.85
 run = [-5.57, 5.82]
 along_y = true
 height = [0.0, 2.29]
-lift = -0.15
+lift = -0.1
 
 # The main deck's rim over the trench (a 17 yd drop to the scaffold), beside Greenskin's fight, from
 # the steps to the solid block at its west end; and the port walkway's west end, beside the
-# gangway's head, from its walled end to the gangway. Both are short and bend too tightly for a
+# gangway's head, from its walled end to a yard short of the gangway's head (take 381: the
+# gangway's head and the walkway's corner it comes up to stay clear by a body). Both are short and bend too tightly for a
 # bulwark piece (the shortest that is tall enough is 9.4 yd); they are held by the data's own
 # invisible collision wall (CollisionWallPvP01, 6391: 11 x 9 yd, no texture) at 0.35, 3.9 yd
 # pieces 3.1 yd tall sunk 0.3 yd, and by the server's stop like every rail.
@@ -1097,7 +1101,7 @@ lift = -0.3
 
 [[dungeon.rail]]
 key = "juggernaut_gangway_head"
-points = [[-85.55, -789.9, 38.5], [-84.3, -794.45, 38.3]]
+points = [[-85.55, -789.9, 38.5], [-84.75, -793.1, 38.4]]
 display = 6391
 scale = 0.35
 run = [-5.55, 5.52]

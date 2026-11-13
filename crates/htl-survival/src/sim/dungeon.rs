@@ -115,9 +115,11 @@ pub struct RailPiece {
     pub rail: usize,
     pub rotation: [f32; 4],
     /// The chord's ends: on the deck, or over it by a crown the piece is raised over (no more
-    /// than the rail's sink).
+    /// than the rail's sink and [`RAIL_CLEAR`]); a board's under another, lowered with it.
     pub from: Vec3,
     pub to: Vec3,
+    /// A second board under one whose deck falls away beneath it.
+    pub under: bool,
 }
 
 /// The pieces along a line, `len` long: each straight run between two of its points (its corners)
@@ -167,6 +169,11 @@ const RAIL_STOP: f32 = 0.4;
 /// Every other piece of a run is set this far toward the deck, so where two overlap they lap like
 /// boards rather than flicker through each other.
 pub(crate) const RAIL_LAP: f32 = 0.04;
+/// The most open space a rail's piece leaves between its foot and the deck (raised over a crown,
+/// or spanning a hollow before a board goes under it).
+const RAIL_CLEAR: f32 = 0.2;
+/// The deck under a rail's piece is read at this many even steps along it.
+const RAIL_SAMPLES: usize = 8;
 /// How far in from its line a rail's piece looks for the deck it stands on (its line runs along
 /// the deck's very edge, where the ground under it may already be the water).
 const RAIL_SEAT_IN: f32 = 2.0;
@@ -325,20 +332,26 @@ impl Survival {
                 let inward = [-(b[1] - a[1]) / span, (b[0] - a[0]) / span];
                 let toward = [(b[0] - a[0]) / span, (b[1] - a[1]) / span];
                 let (mut a, mut b) = (self.rail_deck(a, inward, toward), self.rail_deck(b, inward, [-toward[0], -toward[1]]));
-                // Over a crown in the deck (the port walkway's), the chord dips into it: raised by
-                // the crown's height, up to its sink, so its ends still meet the deck and its top
-                // stays as high over the crown.
-                let crown = [0.25f32, 0.5, 0.75]
-                    .iter()
-                    .map(|t| {
+                // The deck under it along its length, against its chord (positive: the deck
+                // higher, a crown it dips into; negative: lower, a hollow or a slope it spans).
+                let lie: Vec<f32> = (1..RAIL_SAMPLES)
+                    .map(|n| {
+                        let t = n as f32 / RAIL_SAMPLES as f32;
                         let at = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-                        let deck = self.rail_deck(at, inward, inward)[2];
-                        if (deck - at[2]).abs() < 0.6 { deck - at[2] } else { 0.0 }
+                        self.rail_deck(at, inward, inward)[2] - at[2]
                     })
-                    .fold(0.0f32, f32::max)
-                    .min(-r.lift.min(0.0));
+                    .filter(|d| d.abs() < 1.0)
+                    .collect();
+                // Over a crown (the port walkway's) it rises by the crown's height, so its top
+                // stands as high over it as at its ends; its ends then clear the deck by no more
+                // than [`RAIL_CLEAR`].
+                let crown = lie.iter().copied().filter(|d| *d < 0.6).fold(0.0f32, f32::max).min(RAIL_CLEAR - r.lift.min(0.0));
                 a[2] += crown;
                 b[2] += crown;
+                // Where the deck falls away under it by more than that (the bow's slope, which
+                // twists as it falls), a second board under it closes the gap: as long, lowered
+                // to the deck where it is lowest, so they read as a two-board bulwark.
+                let under = (crown - lie.iter().copied().fold(0.0f32, f32::min)).max(0.0);
                 let f = (b[1] - a[1]).atan2(b[0] - a[0]);
                 let pitch = (b[2] - a[2]).atan2(span);
                 // Its origin where the chord's start is `run[0]` of it back along its run (every
@@ -361,7 +374,16 @@ impl Survival {
                 };
                 let id = self.alloc();
                 self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos, facing });
-                self.rail_pieces.insert(id, RailPiece { rail, rotation: rot, from: a, to: b });
+                self.rail_pieces.insert(id, RailPiece { rail, rotation: rot, from: a, to: b, under: false });
+                if under > RAIL_CLEAR {
+                    // (Set a hair toward the deck from the board over it, so their faces lap.)
+                    let lap = RAIL_LAP - lap;
+                    let pos = [pos[0] + inward[0] * lap, pos[1] + inward[1] * lap, pos[2] - under];
+                    let (a, b) = ([a[0], a[1], a[2] - under], [b[0], b[1], b[2] - under]);
+                    let id = self.alloc();
+                    self.objs.insert(id, Obj { kind: ObjKind::Prop { display: r.display, scale: r.scale }, pos, facing });
+                    self.rail_pieces.insert(id, RailPiece { rail, rotation: rot, from: a, to: b, under: true });
+                }
             }
         }
         // A note a secret keeps (its finder's to read) waits for it to be found.

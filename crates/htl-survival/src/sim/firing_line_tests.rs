@@ -1019,7 +1019,7 @@ fn each_rail_piece_lies_along_its_chord_tipped_to_follow_the_deck() {
 }
 
 #[test]
-fn a_piece_over_a_crown_in_the_deck_rises_over_it_by_up_to_its_sink() {
+fn a_piece_over_a_crown_in_the_deck_rises_over_it_to_keep_its_top_up() {
     // A deck crowned along x (as the port walkway's), 0.2 yd over a piece's chord at its middle,
     // and a rail run along it, its corners on the deck.
     struct Crowned;
@@ -1040,14 +1040,48 @@ fn a_piece_over_a_crown_in_the_deck_rises_over_it_by_up_to_its_sink() {
         n += 1;
         for end in [p.from, p.to] {
             let over = end[2] - deck(end[0]);
-            assert!((-1e-3..=-r.lift + 1e-3).contains(&over), "its ends meet the deck: {over}");
+            // (Raised by the crown, its foot clears the deck at its ends by no more than 0.2 yd.)
+            assert!((-1e-3..=0.2 - r.lift + 1e-3).contains(&over), "its ends meet the deck: {over}");
             raised |= over > 0.1;
         }
         let mid = [(p.from[0] + p.to[0]) / 2.0, (p.from[2] + p.to[2]) / 2.0];
         let top = mid[1] + r.lift + r.height[1] * r.scale - deck(mid[0]);
-        assert!(top >= 1.73, "its top stands {top} over the crown");
+        assert!(top >= 1.79, "its top stands {top} over the crown");
     }
     assert!(n >= 2 && raised, "{n} pieces");
+}
+
+#[test]
+fn a_piece_over_a_hollow_in_the_deck_gets_a_board_under_it() {
+    // A deck hollowed along x, 0.6 yd under a piece's chord at its middle: more than a fifth of a
+    // yard of open space under its foot, so a second board goes under it.
+    struct Hollow;
+    impl Land for Hollow {
+        fn height(&self, x: f32, _: f32) -> f32 { 39.4 + 0.025 * (x + 70.0).powi(2) }
+    }
+    let mut c = Content::dev();
+    let d = c.dungeon.as_mut().unwrap();
+    let mut rail = d.rails[0].clone();
+    rail.points = vec![[-75.0, -840.0, 40.0], [-65.0, -840.0, 40.0]];
+    d.rails = vec![rail];
+    let s = Survival::new_dungeon(c, Box::new(Hollow), 31, 0.0);
+    let r = s.dungeon_def().unwrap().rails[0].clone();
+    let deck = |x: f32| 39.4 + 0.025 * (x + 70.0).powi(2);
+    let pieces: Vec<_> = s.objs.keys().filter_map(|id| s.rail_piece(*id)).collect();
+    let boards: Vec<_> = pieces.iter().filter(|p| p.under).collect();
+    assert_eq!(boards.len(), pieces.len() / 2, "a board under each: {pieces:?}");
+    for p in pieces.iter().filter(|p| !p.under) {
+        let q = boards.iter().find(|q| dist2d(q.from, p.from) < 0.01 && dist2d(q.to, p.to) < 0.01).expect("its board");
+        // Under it, lowered to the deck where the deck is lowest (its foot sunk as the piece's),
+        // so no more than a fifth of a yard is open under either all along.
+        for n in 0..=8 {
+            let t = n as f32 / 8.0;
+            let x = p.from[0] + (p.to[0] - p.from[0]) * t;
+            let foot = |e: &crate::sim::dungeon::RailPiece| e.from[2] + (e.to[2] - e.from[2]) * t + r.lift;
+            assert!(foot(p).min(foot(q)) <= deck(x) + 0.2 + 1e-3, "open under it at {x}");
+            assert!(foot(p) + r.height[1] * r.scale - deck(x) >= 1.79, "its top over the deck at {x}");
+        }
+    }
 }
 
 #[test]
