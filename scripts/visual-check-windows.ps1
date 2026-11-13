@@ -222,7 +222,12 @@ function Read-Scenario($name, $depth = 0) {
             $subject = $who[0].Trim()
             $crew = if ($who.Count -gt 1) { (($who[1] -split '\|') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join '|' } else { "" }
             if ($subject.Contains(",") -or $crew.Contains(",")) { throw "$($where): a name with a comma can't be filmed" }
-            $sc.Camera = @{ Shot = $shot; Subject = $subject; Crew = $crew }
+            # Its forms in turn. Two with one name (VanCleef, who rises again as Unbowed under his
+            # own name) are one name to the cameraman, and two falls to the end of the take.
+            $forms = @(($subject -split '\|') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+            $names = @()
+            foreach ($f in $forms) { if ($names -notcontains $f) { $names += $f } }
+            $sc.Camera = @{ Shot = $shot; Subject = ($names -join '|'); Forms = $forms; Crew = $crew }
             continue
         }
         if ($line -match '^cam\s+(\S+)\s+(\S+)\s+(\S+)$') {
@@ -722,9 +727,10 @@ function Close-ClientLog($log) {
 # output in $log. With $v (a video), recording starts when the cue shot lands in the screenshots
 # folder. Returns whether the client quit by itself. With $film (the cameraman's client, already
 # running) the video records that client's window instead, which is kept on its screen and muted
-# meanwhile too; $at is where this client's window goes then (beside it), and $filmLog its log,
-# where it says the fight is over.
-function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null, $at = $null, $film = $null, $filmLog = $null) {
+# meanwhile too; $at is where this client's window goes then (beside it), $filmLog its log,
+# where it says the fight is over, and $forms the subject's forms in turn (the scenario's `camera`
+# line).
+function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $null, $at = $null, $film = $null, $filmLog = $null, $forms = $null) {
     Stop-Strays $s $(if ($film) { $film.Id } else { 0 })
     $spot = Get-WindowSpot $s $at
     $filmSpot = Get-WindowSpot $s $null
@@ -738,6 +744,16 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
     $seen = @{}
     $overAt = $null
     $lookNext = Get-Date
+    # A subject with two forms of one name (VanCleef and Unbowed) falls twice: the cameraman says
+    # the fight is over at the first fall too, and that it's on again once the next form is up and
+    # the hero beside it (some 9 s later: the body lies 4 s, and it waits 5 s to be sure). So a
+    # fall with a form of that name still to come ends the take only if nothing rises in $riseWait
+    # seconds (the secret that lets it rise wasn't found), or the hero falls.
+    $formsOf = @{}
+    foreach ($f in @($forms)) { if ($f) { $formsOf[$f] = [int]$formsOf[$f] + 1 } }
+    $fell = @{}
+    $riseWait = 15
+    $fellAt = $null
     # The outputs ddagrab sees are looked at now, not when the video is due.
     if ($v -and $s.video -eq "screen" -and $s.ffmpeg) { $null = Get-OutputIdx $s.ffmpeg ([System.Windows.Forms.Screen]::PrimaryScreen) }
     try {
@@ -778,12 +794,28 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
             if ($tail -ge 0 -and $rec -and -not $overAt -and (Get-Date) -ge $lookNext) {
                 $lookNext = (Get-Date).AddMilliseconds(500)
                 foreach ($f in @("$filmLog.out", "$filmLog.err")) {
-                    if ((Read-Grown $f $seen) -match 'spectate: t=[\d.]+ the fight is over: (.+?) fell') {
+                    foreach ($m in [regex]::Matches((Read-Grown $f $seen), 'spectate: t=[\d.]+ the fight is (?:over: (.+?) fell|on again)')) {
+                        if (-not $m.Groups[1].Success) {
+                            if ($fellAt) { Say "  $($v.Over) is up again: the take runs on"; $fellAt = $null }
+                            continue
+                        }
+                        $v.Over = $m.Groups[1].Value
+                        $fell[$v.Over] = [int]$fell[$v.Over] + 1
+                        if ([int]$fell[$v.Over] -lt [int]$formsOf[$v.Over]) {
+                            $fellAt = Get-Date
+                            Say "  $($v.Over) fell, with a form of that name still to come: the take runs on if it rises within $riseWait s"
+                            continue
+                        }
                         $overAt = Get-Date
-                        $v.Over = $Matches[1]
                         Say "  the fight is over ($($v.Over) fell): the video ends $(Fmt $tail) s later"
                         break
                     }
+                    if ($overAt) { break }
+                }
+                if ($fellAt -and -not $overAt -and ((Get-Date) - $fellAt).TotalSeconds -ge $riseWait) {
+                    $overAt = $fellAt
+                    $v.NoRise = $true
+                    Say "  $($v.Over) didn't rise again in $riseWait s: the fight is over"
                 }
             }
             if ($overAt -and $rec -and -not $rec.HasExited -and ((Get-Date) - $overAt).TotalSeconds -ge $tail) {
@@ -1073,7 +1105,7 @@ function Invoke-Scenario($s, $name, $out) {
         $vars.WOW_NOSOUND = "1"
     }
     try {
-        $quit = Invoke-Client $s $vars $timeout $chome $log $v $(if ($film) { $film.At }) $(if ($film) { $film.P }) $(if ($film) { $film.Log })
+        $quit = Invoke-Client $s $vars $timeout $chome $log $v $(if ($film) { $film.At }) $(if ($film) { $film.P }) $(if ($film) { $film.Log }) $(if ($film) { , $sc.Camera.Forms })
     } finally {
         if ($film) {
             if (-not $film.P.HasExited) {
@@ -1107,7 +1139,7 @@ function Invoke-Scenario($s, $name, $out) {
     # Ended by the end of the fight: finished, the video cut a tail after it.
     if ($v -and $v.Stopped) {
         $done = $true
-        $videoNote = "the fight is over ($($v.Over) fell) at $(Fmt ($v.OverAt - (Get-VideoStart $v)).TotalSeconds) s of the video, which ends $(Fmt (Num $s.tail)) s later; $videoNote"
+        $videoNote = "the fight is over ($($v.Over) fell$(if ($v.NoRise) { ", and its next form never rose" })) at $(Fmt ($v.OverAt - (Get-VideoStart $v)).TotalSeconds) s of the video, which ends $(Fmt $(if ($v.NoRise) { [Math]::Round(($v.Stopped - $v.OverAt).TotalSeconds) } else { Num $s.tail })) s later; $videoNote"
     }
     $msg = if ($shots -eq 0) {
         if (-not (Test-Path $log) -or -not (Select-String -Path $log -Pattern 'visual-check: in the world' -Quiet)) {

@@ -5,13 +5,16 @@
 hero warrior
 # No held camera: the lock-on (SetLockOn) turns the hero, and the camera with them, to him.
 cam off
-camera duel Edwin VanCleef
+# Both forms named (Unbowed rises under VanCleef's own name), as in vancleef-clear.
+camera duel Edwin VanCleef|Edwin VanCleef
 0 .es debug quiet
 1 .es travel landing
 10 .es debug quiet
 10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 11 .es clearfoes vancleef
+# The quarters secret, searched at its barrel, so Unbowed can rise.
 12 .es goto -105 -818 37.9 0
+12.45 .es e
 13 .es goto -64 -819.5 41.5 3.141593
 13.5 .es hurt 0.33 vancleef
 14.5 .es heal

@@ -176,6 +176,7 @@ the first client, as in any scenario. One line in the scenario asks for it:
 hero warrior
 camera duel Rhahk'Zor          # camera <shot> <the subject's name, as the game shows it>
 camera high Cookie|Gorged Cookie  # a boss and the form it comes back as, in turn
+camera duel Edwin VanCleef|Edwin VanCleef  # a form that comes back under the same name: named twice
 camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the picture
 ```
 
@@ -213,6 +214,11 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   hero caught in the setup (by the pirates at the landing, say) and then teleported and healed
   doesn't end the clip, and the camera films again at once when the hero, up, is teleported
   beside a living subject.
+  A form that comes back under the same name (VanCleef, who rises as Unbowed) is named once for
+  each: `camera duel Edwin VanCleef|Edwin VanCleef`. The first fall then doesn't end the take: it
+  runs on once the next form is up (the cameraman's `the fight is on again`, some 9 s after the
+  fall), to that form's fall or the hero's. If nothing rises within 15 s (the secret that lets it
+  wasn't found), the take ends there, and the summary says its next form never rose.
 - **A teleport** (a setup's `.es goto`: the hero 15 yd or more away within half a second): the
   camera picks its position afresh where the hero is now, straight away, and for 2.5 s looks
   again every quarter second as the world there loads in, so it's on the fight from the video's
