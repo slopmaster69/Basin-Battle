@@ -1,5 +1,9 @@
 # Rhahk'Zor: restore the forge fight, then repair the gauntlet
 
+> The gauntlet this page speaks of (the collapse run back through the whole dungeon) has since
+> been replaced: the mine now comes down in four sections from the front door inward, 94.6 yd in
+> all. See [the route repair](rhahkzor-route-repair.md#since-replaced-the-collapse-from-the-front-door-inward).
+
 The controlled client take `298-rz-gauntlet-fight` on source `299ac99` with client `skyB`
 confirmed a route regression from #293. The server recorded 9 collapse route resets and 1,053
 floor-recovery events, including a position on the cave roof. The demonstration used periodic
