@@ -14,7 +14,7 @@ name: Client tests
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "claude/client-tests-ci"]
   workflow_dispatch:
 
 concurrency:
