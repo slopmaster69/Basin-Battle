@@ -112,7 +112,7 @@ the same body compares like with like whatever the client does with it. His slap
 tankard; any released blow counting once and an unreleased one never (both forms, with and without
 network delay); a hero staggered by every first slap still seeing the belch; the rhythm and
 fighting on while the puddle cools; scoops after 3, 4 and 5 exchanges; the swap, the held lift,
-where the pour lands (on the hero, pushed out to 4 yd), its ring from the first moment, the arc's 3
+where the pour lands (on the hero, pushed out to 4 yd), its ring from the first moment, the arc's 4
 legs and 0.3 sec or more in the air, the splash and the edge puffs; the puddle burning just inside
 its edge and never just outside, until the last puff drops one by one; a broken-off pour leaving
 nothing; the scoop side-on with repeated dips and slurps; two jabs not breaking it, about 2 sec of

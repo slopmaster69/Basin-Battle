@@ -37,7 +37,9 @@ wipe and death remove the rack, and a new pull starts with the sword.
 
 Read-only native-data queries on November 8 verified display 2026 as TaurenMale, weapon rack
 130 as GeneralWeaponrack01, sword 679, hatchet 2061 and two-handed hammer 2056. The actual map
-probe found a 7-step walk from (-2, -768, 9.5) to the rack point (-2, -774, 9.550336). The runtime
+probe found a 7-step walk from (-2, -768, 9.5) to the rack point (-2, -774, 9.550336). On Nov 9
+the rack moved to (-2, -777, 9.6): 9 yd to his side of the way in and 19 walking steps from the
+dock home, so his run to it crosses the duel camera. The runtime
 also rejects water, a different floor, or an unreachable authored point. Rack 130 measures
 1.29 by 1.06 yd with a 2.91 yd model height. Native clips 17, 87, 57, 58 and 181 cover main-hand,
 off-hand, special cuts, the hammer and the stomp. The exact grips, impact poses and marker-free readability still require client review.

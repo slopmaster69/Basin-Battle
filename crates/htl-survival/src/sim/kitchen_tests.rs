@@ -1052,3 +1052,23 @@ fn waiting_where_he_cannot_walk_he_evades_every_blow_and_after_10_s_he_goes_home
         }
     }
 }
+
+#[test]
+fn a_cook_who_dies_in_the_reel_leaves_the_pot_steaming() {
+    let (mut s, band, id) = fight(COOKIE, 1);
+    scoop(&mut s, id);
+    let pot = s.kitchen.cooks[&id].pot.unwrap();
+    let at = s.mobs[&id].pos;
+    s.move_player(band[0], [at[0] - 1.2, at[1], at[2]], 0.0, Moving::default());
+    while s.kitchen_scooping(id) {
+        s.input(band[0], Input::Attack);
+        s.step(DT);
+    }
+    assert!(s.kitchen.pots[&pot].down_until.is_some(), "the pot is knocked");
+    s.hurt_mob(id, band[0], u32::MAX);
+    run(&mut s, 0.5);
+    let p = &s.kitchen.pots[&pot];
+    assert!(p.down_until.is_none(), "the knock ends with the cook");
+    assert_eq!(p.stew.len(), 1 + HELPINGS as usize, "the pot and its steam stay");
+    assert!(p.stew.iter().all(|prop| s.objs.contains_key(prop)));
+}

@@ -7,6 +7,9 @@ use crate::land::clear_line;
 #[cfg(test)]
 #[path = "shared_fixes_tests.rs"]
 mod shared_fixes_tests;
+#[cfg(test)]
+#[path = "boss_fuzz_tests.rs"]
+mod boss_fuzz_tests;
 
 /// A creature's missile that splashes at least this wide is a lobbed throw (a pot, a bomb): its
 /// landing is marked from the wind-up's start.

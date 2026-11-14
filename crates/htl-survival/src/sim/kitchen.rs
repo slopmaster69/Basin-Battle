@@ -322,6 +322,14 @@ impl Survival {
         if c.stage.is_some() && alive { self.events.push(Event::HoldPose { id, clip: 0, secs: 0.0, from: None }); }
         if c.hand != Hand::Own && alive { self.events.push(Event::MobGear { id }); }
         if c.pulse.is_some() && alive { self.events.push(Event::Grow { id, scale: c.scale }); }
+        // A knocked pot's steam comes back as the cook recovers, which a death or a wipe cuts
+        // short. It stays as it stood: Gorged and the next pull find it steaming.
+        if let Some(pot) = c.pot {
+            if self.kitchen.pots.get(&pot).is_some_and(|p| p.down_until.is_some()) {
+                self.kitchen.pots.get_mut(&pot).unwrap().down_until = None;
+                self.kitchen_show_stew(pot);
+            }
+        }
     }
 
     /// A dungeon reset: every cook and every pot goes.
