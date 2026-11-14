@@ -515,7 +515,7 @@ pub(crate) const VERSION: u32 = 2;
 /// 65: `CU` beats for Rhahk'Zor's slam (`slam_near`, `slam_mid`, `slam_far`: the mine shaken for
 /// every hero in it, by how near him) and a section's face landing (`face_near`, `face_far`). An
 /// older add-on knows none of them and shows nothing for them.
-pub(crate) const ADDON_NEWEST: u32 = 65;
+pub(crate) const ADDON_NEWEST: u32 = 66;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -544,7 +544,9 @@ pub(crate) const ADDON_NEWEST: u32 = 65;
 /// 30: the collapsed Deadmines' own cargo, carts, barrows and lanterns hidden while the aftermath
 /// preview's marker stands, and a put-out lantern's light (0091); the server sends their knocked
 /// over and crooked copies only to this round (`aftermath_doodads.rs`).
-pub(crate) const CLIENT_NEWEST: u8 = 30;
+/// 31: the Deadmines' route lanterns put out on the server's say-so, one game object each, as
+/// Rhahk'Zor's collapse comes down (0096; `aftermath_wreck.rs`).
+pub(crate) const CLIENT_NEWEST: u8 = 31;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.

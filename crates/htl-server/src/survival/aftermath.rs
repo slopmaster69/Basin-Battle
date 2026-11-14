@@ -765,7 +765,7 @@ impl SurvivalGame {
     }
 
     pub(crate) fn aftermath_query(&self, conn: ConnId, entry: u32) -> bool {
-        if entry == MARKER_ENTRY {
+        if entry == MARKER_ENTRY || entry == wreck::LAMP_ENTRY {
             self.send(conn, packets::gameobject_query_response(entry, GENERIC, 0, ""));
             return true;
         }

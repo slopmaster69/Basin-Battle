@@ -2642,6 +2642,14 @@ pub struct CollapseDef {
     /// clients as they are) the whole mine's wrecked look. 0: with the first blow.
     #[serde(default = "collapse_wreck_ship")]
     pub wreck_ship: usize,
+    /// The route's lanterns go out section by section (client patch 0096, a client of this round
+    /// only: an older one has its lanterns as ever). Off: no lantern is asked to go out.
+    #[serde(default)]
+    pub wreck_lamps: bool,
+    /// With `wreck_lamps`: by section, the mine's own lanterns (their place in its WMO) that go
+    /// out when that section is down. A section past the list puts out none.
+    #[serde(default)]
+    pub wreck_lamp_sections: Vec<Vec<u32>>,
 }
 
 impl Default for CollapseDef {
@@ -2666,6 +2674,8 @@ impl Default for CollapseDef {
             down: collapse_down(),
             wreck: false,
             wreck_ship: collapse_wreck_ship(),
+            wreck_lamps: false,
+            wreck_lamp_sections: Vec::new(),
         }
     }
 }

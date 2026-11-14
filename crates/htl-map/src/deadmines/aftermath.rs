@@ -49,6 +49,12 @@ pub const DARK_LANTERNS: &[u32] = &[
 /// to 1 yd from their pivot, and no two lanterns' lights are this close to each other.
 pub const LANTERN_REACH: f32 = 1.6;
 
+/// The lit lanterns on Rhahk'Zor's collapse route, by their place in the mine's WMO (MODD): the
+/// front door's, the foreman's chamber's and the last stand's. Client patch 0096 puts out the
+/// mine's own lights (MOLT) within [`LANTERN_REACH`] of each when the server asks, a few at a time
+/// as the collapse comes down. Keep in step with the client's `deadmines_route_lamps` module.
+pub const ROUTE_LANTERNS: &[u32] = &[162, 184, 186, 199, 217, 414, 421, 422, 424];
+
 /// What [`super::load_aftermath_survey`] keeps while it loads.
 #[derive(Default)]
 pub(super) struct Kept {
@@ -224,6 +230,47 @@ mod tests {
         assert!(MINE_DOODADS.iter().all(|&i| i as usize >= SHIP_DOODADS), "none of the ship's (patch 0087 has those)");
         assert!(DARK_LANTERNS.windows(2).all(|w| w[0] < w[1]));
         assert!(DARK_LANTERNS.iter().all(|i| MINE_DOODADS.contains(i)));
+    }
+
+    #[test]
+    fn the_route_lanterns_are_sorted_and_the_mines_own() {
+        assert!(ROUTE_LANTERNS.windows(2).all(|w| w[0] < w[1]), "sorted, each once");
+        assert!(ROUTE_LANTERNS.iter().all(|&i| i as usize >= SHIP_DOODADS), "none of the ship's");
+    }
+
+    /// Patch 0096's lanterns: each is a lantern of the mine's own, and the lights within reach of
+    /// its pivot are no other lit lantern's. Prints where each
+    /// stands (the world), for the section of the collapse it belongs to.
+    #[test]
+    #[ignore = "requires the player's installed WoW data"]
+    fn native_each_route_lantern_carries_a_light_no_other_lit_lantern_shares() {
+        let data = std::env::var("WOW_DATA").expect("set WOW_DATA");
+        let mut chain = Chain::open(std::path::Path::new(&data)).unwrap();
+        let bytes = chain.read_file(&SHIP_ROOT.replace('/', "\\")).unwrap();
+        let root = parse_wmo_root(&bytes).unwrap();
+        let lights: Vec<_> = benilla_formats::parse_wmo_lights(&bytes).into_iter().filter(|l| l.is_omni() && l.intensity > 0.0).collect();
+        let doodads = root.doodads();
+        let near = |a: [f32; 3], b: [f32; 3]| (0..3).map(|i| (a[i] - b[i]).powi(2)).sum::<f32>() < LANTERN_REACH * LANTERN_REACH;
+        let lantern = |k: usize| doodads[k].model.to_ascii_lowercase().contains("lantern");
+        let own = |k: usize| lights.iter().filter(move |l| near(l.position, doodads[k].position));
+        for &k in ROUTE_LANTERNS {
+            let k = k as usize;
+            eprintln!("route doodad {k}: {} at {:?}", doodads[k].model, doodads[k].position);
+            assert!(lantern(k), "doodad {k} ({}) is a lantern", doodads[k].model);
+            // A lantern with no MOLT of the mine's within reach carries its light in its own model
+            // (an M2 point light, spawned with the prop at its pivot): the client puts out whatever
+            // light stands within reach of the pivot, so either kind goes.
+            eprintln!("  {} light(s) of the mine's own within reach", own(k).count());
+            for l in own(k) {
+                for other in (SHIP_DOODADS..doodads.len()).filter(|&o| o != k && lantern(o) && !ROUTE_LANTERNS.contains(&(o as u32)) && !DARK_LANTERNS.contains(&(o as u32))) {
+                    assert!(!near(l.position, doodads[other].position), "lantern {k}'s light is also lantern {other}'s");
+                }
+            }
+        }
+        let open = super::super::load_aftermath_open_survey(std::path::Path::new(&data)).unwrap();
+        for s in open.standing.iter().chain(&open.hidden).filter(|s| s.index.is_some_and(|i| ROUTE_LANTERNS.contains(&i))) {
+            eprintln!("route lantern {:?} stands at {:?}", s.index, s.origin);
+        }
     }
 
     /// The lanterns patch 0091 puts out: each carries a light of the mine's own within reach and

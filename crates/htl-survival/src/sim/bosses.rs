@@ -417,6 +417,8 @@ struct Wreck {
     /// How many sections are down, and how many down take the ship with them.
     fallen: usize,
     ship_at: usize,
+    /// By section, the route's lanterns put out when it is down (empty: the switch is off).
+    lamps: Vec<Vec<u32>>,
     /// The collapse as it began (its route and sections: where each one's wreck lies).
     plan: Collapse,
     /// How many piles its wave has laid (every other one is topped with one of the works).
@@ -858,7 +860,7 @@ impl Survival {
                 pound_by: f32::INFINITY,
             };
             if c.wreck {
-                self.wreck_begins(&col, c.wreck_ship);
+                self.wreck_begins(&col, c.wreck_ship, if c.wreck_lamps { c.wreck_lamp_sections.clone() } else { Vec::new() });
             }
             self.surge_begins(&mut col);
             self.bosses.collapse = Some(col);
@@ -1393,8 +1395,8 @@ impl Survival {
     }
 
     /// A wrecking collapse begins: from now no lamp can be rested at, and they stand dark.
-    fn wreck_begins(&mut self, col: &Collapse, ship_at: usize) {
-        self.bosses.wreck = Some(Wreck { owner: col.boss, fight: true, fallen: 0, ship_at, plan: col.clone(), piles: 0 });
+    fn wreck_begins(&mut self, col: &Collapse, ship_at: usize, lamps: Vec<Vec<u32>>) {
+        self.bosses.wreck = Some(Wreck { owner: col.boss, fight: true, fallen: 0, ship_at, lamps, plan: col.clone(), piles: 0 });
         self.events.push(Event::Log(format!(
             "the collapse wrecks the mine: no lamp can be rested at until the fight ends; the ship goes with {ship_at} of {} sections down",
             col.sections.len()
@@ -1450,6 +1452,12 @@ impl Survival {
             fight: w.fight,
             ship_gone: w.fallen >= w.ship_at,
         })
+    }
+
+    /// The route's lanterns a wrecking collapse has put out so far: those of every section down
+    /// (none: no wreck, or the switch is off).
+    pub fn collapse_wreck_lamps(&self) -> Vec<u32> {
+        self.bosses.wreck.as_ref().map_or_else(Vec::new, |w| w.lamps.iter().take(w.fallen).flatten().copied().collect())
     }
 
     /// Which section of the wrecking collapse a spot lies in (the first whose stretch holds it),

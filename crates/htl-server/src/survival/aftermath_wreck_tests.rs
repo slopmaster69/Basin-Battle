@@ -9,7 +9,11 @@ const LINES: [f32; 4] = [30.0, 44.0, 74.0, 88.0];
 
 /// Rhahk'Zor at 35 yd down a flat tunnel along +x, his collapse in four sections.
 fn game() -> SurvivalGame {
-    let mut c = htl_survival::Content::builtin().for_dungeon_of("deadmines");
+    game_with(htl_survival::Content::builtin().for_dungeon_of("deadmines"))
+}
+
+/// [`game`] with the content as given.
+fn game_with(mut c: htl_survival::Content) -> SurvivalGame {
     let d = c.dungeon.as_mut().unwrap();
     d.packs.retain(|p| p.mob == "dm_rhahkzor");
     d.packs[0].at = [35.0, 0.0];
@@ -59,6 +63,16 @@ struct Seen {
     gone: Vec<u64>,
     marker: bool,
     marker_gone: bool,
+    /// The lanterns asked out, in order, and those asked back (patch 0096's markers).
+    lamps: Vec<u32>,
+    lamps_gone: Vec<u32>,
+    /// Whether the lantern marker's entry was announced.
+    lamp_entry: bool,
+}
+
+/// The lantern a marker's GUID names, if it is one.
+fn lamp_of(guid: u64) -> Option<u32> {
+    (guid >> 24 == (0xF110_u64 << 24) | u64::from(LAMP_ENTRY)).then_some((guid & 0xFF_FFFF) as u32)
 }
 
 fn ours(guid: u64) -> bool {
@@ -72,6 +86,8 @@ fn seen(rx: &crossbeam_channel::Receiver<Packet>, s: &mut Seen) {
             ServerPacket::DestroyObject { guid, .. } => {
                 if guid == MARKER_GUID {
                     s.marker_gone = true;
+                } else if let Some(l) = lamp_of(guid) {
+                    s.lamps_gone.push(l);
                 } else if ours(guid) {
                     s.gone.push(guid);
                 }
@@ -81,12 +97,15 @@ fn seen(rx: &crossbeam_channel::Receiver<Packet>, s: &mut Seen) {
                     if let Object::Create { guid, .. } = o {
                         if guid == MARKER_GUID {
                             s.marker = true;
+                        } else if let Some(l) = lamp_of(guid) {
+                            s.lamps.push(l);
                         } else if ours(guid) {
                             s.made.push(guid);
                         }
                     }
                 }
             }
+            ServerPacket::GameObjectQueryResponse { entry, .. } if entry == LAMP_ENTRY => s.lamp_entry = true,
             _ => {}
         }
     }
@@ -212,6 +231,126 @@ fn a_lost_fight_takes_the_ruin_and_the_ship_back() {
         assert_eq!(s.marker, s.marker_gone, "and the ship, where it went");
     }
     assert!(game.wreck.sent.is_empty() && game.wreck.laid.is_none());
+}
+
+/// The lanterns Rhahk'Zor's content puts out with the first section, as the content has them.
+const FIRST: [u32; 4] = [414, 421, 422, 424];
+
+#[test]
+fn each_section_puts_out_its_lanterns_for_a_client_of_the_lamp_round_and_no_older_one() {
+    let mut game = game();
+    let (fighter, frx) = hero(&mut game, 1, [38.0, 0.0, 0.0], LAMPS_LEVEL);
+    let (_friend, orx) = hero(&mut game, 2, [-150.0, 200.0, 0.0], LAMPS_LEVEL);
+    let (_doodads, drx) = hero(&mut game, 3, [-150.0, 220.0, 0.0], doodads::LEVEL);
+    let (_old, oldrx) = hero(&mut game, 4, [-150.0, 240.0, 0.0], 0);
+    game.wreck.ruin = Some(ruin());
+    let (mut f, mut o, mut d, mut old) = (Seen::default(), Seen::default(), Seen::default(), Seen::default());
+    let all = |f: &mut Seen, o: &mut Seen, d: &mut Seen, old: &mut Seen| {
+        seen(&frx, f);
+        seen(&orx, o);
+        seen(&drx, d);
+        seen(&oldrx, old);
+    };
+    begin(&mut game, fighter);
+    all(&mut f, &mut o, &mut d, &mut old);
+    assert!(f.lamps.is_empty() && o.lamps.is_empty(), "no section down, no lantern out: {f:?}");
+    // The first section down: its lanterns, at once (not after the ruin's wait), to the fighter in
+    // the fight as to the friend far off.
+    until(&mut game, fighter, (0, "rest"), 0.5);
+    all(&mut f, &mut o, &mut d, &mut old);
+    assert_eq!(f.lamps, FIRST, "the fighter's lanterns, in the content's order");
+    assert_eq!(o.lamps, FIRST, "the friend's");
+    assert!(f.lamp_entry && o.lamp_entry, "the marker's entry announced before its objects");
+    assert!(d.lamps.is_empty() && old.lamps.is_empty() && !d.lamp_entry && !old.lamp_entry, "older rounds are sent none: {d:?} {old:?}");
+    // The next sections add theirs, each lantern once.
+    until(&mut game, fighter, (1, "rest"), 0.5);
+    until(&mut game, fighter, (2, "rest"), 0.5);
+    all(&mut f, &mut o, &mut d, &mut old);
+    assert_eq!(f.lamps, [FIRST.to_vec(), vec![162, 186, 184]].concat(), "{f:?}");
+    assert_eq!(f.lamps, o.lamps);
+    // A late arrival of the lamp round is sent what is out; one that sends its world again is too.
+    let (_late, lrx) = hero(&mut game, 5, [-150.0, 260.0, 0.0], LAMPS_LEVEL);
+    tick(&mut game, fighter);
+    let mut late = Seen::default();
+    seen(&lrx, &mut late);
+    assert_eq!(late.lamps, f.lamps, "a late arrival: {late:?}");
+    game.wreck_forget(2);
+    tick(&mut game, fighter);
+    let mut again = Seen::default();
+    seen(&orx, &mut again);
+    assert_eq!(again.lamps, f.lamps, "a client that came back: {again:?}");
+    // The last stand: the last pair, and the old clients still have none.
+    while game.sim.collapse_wreck().is_some_and(|w| w.fallen < 4) {
+        assert!(game.sim.clock < 300.0);
+        tick(&mut game, fighter);
+    }
+    all(&mut f, &mut o, &mut d, &mut old);
+    assert_eq!(f.lamps, [FIRST.to_vec(), vec![162, 186, 184, 217, 199]].concat(), "{f:?}");
+    assert!(d.lamps.is_empty() && old.lamps.is_empty());
+    assert!(f.lamps_gone.is_empty(), "the wreck lies on while the fight goes");
+}
+
+#[test]
+fn a_lost_fight_puts_every_lantern_back() {
+    let mut game = game();
+    let (fighter, frx) = hero(&mut game, 1, [38.0, 0.0, 0.0], LAMPS_LEVEL);
+    let (_old, oldrx) = hero(&mut game, 2, [-150.0, 220.0, 0.0], doodads::LEVEL);
+    game.wreck.ruin = Some(ruin());
+    let (mut f, mut old) = (Seen::default(), Seen::default());
+    begin(&mut game, fighter);
+    until(&mut game, fighter, (1, "rest"), 0.5);
+    seen(&frx, &mut f);
+    seen(&oldrx, &mut old);
+    assert_eq!(f.lamps, [FIRST.to_vec(), vec![162]].concat());
+    game.sim.fall_damage(fighter, u32::MAX / 2);
+    let other = game.world_of(2).unwrap().id;
+    game.sim.fall_damage(other, u32::MAX / 2);
+    for _ in 0..40 {
+        let events = game.sim.step(DT);
+        game.play(events);
+        game.wreck_tick();
+    }
+    assert!(game.sim.collapse_wreck().is_none(), "the fight lost");
+    seen(&frx, &mut f);
+    seen(&oldrx, &mut old);
+    let (mut out, mut back) = (f.lamps.clone(), f.lamps_gone.clone());
+    out.sort();
+    back.sort();
+    assert_eq!(out, back, "every lantern asked out is asked back: {f:?}");
+    assert!(old.lamps.is_empty() && old.lamps_gone.is_empty(), "an older client was never asked: {old:?}");
+    assert!(game.wreck.lamps.is_empty(), "nothing left to take back");
+}
+
+#[test]
+fn the_switch_off_asks_no_lantern_out_and_the_rest_of_the_wreck_goes_on() {
+    let mut c = htl_survival::Content::builtin().for_dungeon_of("deadmines");
+    let def = c.mob("dm_rhahkzor").unwrap();
+    let col = c.mobs[def].phases.iter_mut().find_map(|p| p.collapse.as_mut()).unwrap();
+    col.wreck_lamps = false;
+    let mut game = game_with(c);
+    let (fighter, frx) = hero(&mut game, 1, [38.0, 0.0, 0.0], LAMPS_LEVEL);
+    game.wreck.ruin = Some(ruin());
+    let mut f = Seen::default();
+    begin(&mut game, fighter);
+    until(&mut game, fighter, (1, "rest"), SHOW_AFTER + 0.5);
+    seen(&frx, &mut f);
+    assert!(f.lamps.is_empty() && !f.lamp_entry, "no lantern asked out: {f:?}");
+    assert_eq!(f.made.len(), 3, "the ruin is laid as ever: {f:?}");
+    assert!(game.sim.collapse_wreck_lamps().is_empty());
+}
+
+#[test]
+fn the_contents_lanterns_are_the_clients_route_lanterns_each_once_by_section() {
+    let c = htl_survival::Content::builtin();
+    let def = c.mob("dm_rhahkzor").unwrap();
+    let col = c.mobs[def].phases.iter().find_map(|p| p.collapse.as_ref()).unwrap();
+    assert!(col.wreck_lamps, "the mine's collapse puts its lanterns out");
+    assert_eq!(col.wreck_lamp_sections.len(), col.sections.len(), "one list a section");
+    let mut all: Vec<u32> = col.wreck_lamp_sections.iter().flatten().copied().collect();
+    all.sort_unstable();
+    assert_eq!(all, htl_map::deadmines::aftermath::ROUTE_LANTERNS, "each of the client's route lanterns, once");
+    assert_eq!(col.wreck_lamp_sections[0], FIRST);
+    assert!(LAMPS_LEVEL > doodads::LEVEL && LAMPS_LEVEL == crate::survival::ui::CLIENT_NEWEST, "the round the client reports");
 }
 
 /// The real mine: the ruin fitted to the installed data, laid by Rhahk'Zor's own collapse.

@@ -1,0 +1,392 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 17:30:00 -0600
+Subject: [PATCH] The Deadmines' route lanterns go out when the server asks
+ (patch 0096)
+
+Rhahk'Zor's collapse (Basin Battle) brings the mine down section by section, and the lanterns
+along its route should go out with them. Patch 0091 darkens lanterns only inside the aftermath
+variant, which loads with patch 0087's marker, so none could go out one at a time.
+
+New module deadmines_route_lamps: the server keeps one model-less game object of entry 500099
+(just under 0087's marker, 500100) for each lantern it wants out, whose GUID's low 24 bits are the
+lantern's place in the mine's WMO (MODD index). Like 0087's marker the state is derived from the
+object snapshot (live, map 36), so a late join, a destroy, a reconnect or leaving the map need no
+second protocol. Only the nine indices in ROUTE_LANTERNS (162, 184, 186, 199, 217, 414, 421, 422,
+424) are honoured; any other GUID is ignored.
+
+While a lantern is named, every world point light (the mine's own MOLT lights and the lights a
+lantern's model carries, which spawn as the same WorldPointLight) within LANTERN_REACH (1.6 yd, as
+0091) of its pivot goes to intensity 0, its strength kept in a PutOut component; when the marker
+goes the strength comes back. The pivot is the model's MODD position through the mine placement's
+world_from_local (the WmoPortalInstance whose handle names az_deadmines_b.wmo). While any lantern
+is named, or a light is still out, it looks at every light each frame (the mine streams in after
+its markers, a reload under the markers spawns full lights, the model and a light can land late);
+a light that is out but no longer named is put back. Lights with a parent (a carried torch) are
+never touched. Nothing is done unless the server sends a marker: an empty set with nothing out
+returns at once.
+
+The lantern's own model stays where it hangs; only its light goes (0091 found its glass glows
+whatever is near). The ship still goes only with 0087's marker: hiding it without the reload is
+not possible in a small patch (see Basin Battle's docs/deadmines-aftermath.md).
+
+HasActionCombat() is 31: the server sends the markers only to this round. ROUTE_LANTERNS is
+mirrored in Basin Battle's htl-map/src/deadmines/aftermath.rs.
+---
+diff --git a/crates/benilla-app/src/deadmines_route_lamps.rs b/crates/benilla-app/src/deadmines_route_lamps.rs
+new file mode 100644
+index 00000000..de3f90c7
+--- /dev/null
++++ b/crates/benilla-app/src/deadmines_route_lamps.rs
+@@ -0,0 +1,299 @@
++//! Basin Battle's route lanterns, not a stock 1.12 behavior. While Rhahk'Zor brings the Deadmines
++//! down the server asks, one game object at a time, for the lanterns along his route to go out
++//! (patch 0096). Each is a model-less game object of entry [`MARKER_ENTRY`] whose GUID's low 24
++//! bits are the lantern's place in the mine's WMO (MODD index); it stands for as long as that
++//! lantern is out. Like patch 0087's marker the state is derived from the snapshot, so late joins,
++//! destroy packets, reconnects and leaving the map need no second protocol, and a client that
++//! never gets one does nothing.
++//!
++//! A lantern's own light is the mine's (MOLT) within [`LANTERN_REACH`] of its pivot, as patch 0091
++//! finds it: that light goes to intensity 0 and its authored strength is kept to put back. The
++//! lantern itself stays where it hangs. A mine reloaded under the markers (the aftermath marker)
++//! spawns its lights at full strength again, and they go out again the frame they appear.
++use std::collections::BTreeSet;
++
++use benilla_assets::coords::wow_to_bevy;
++use benilla_assets::WmoModel;
++use benilla_protocol::EntityKind;
++use benilla_world::lighting::WorldPointLight;
++use benilla_world::schedule::{WorldLive, WorldStage};
++use benilla_world::wmo_portal::WmoPortalInstance;
++use benilla_world::world_map::CurrentMap;
++use bevy::math::Affine3A;
++use bevy::prelude::*;
++
++use crate::net::{Guid, NetEntity, ObjectStore};
++
++/// The marker's entry, just under patch 0087's 500100 (500101 and up are the server's own pieces). Mirrored in Basin Battle's server.
++pub(crate) const MARKER_ENTRY: u32 = 500099;
++/// The lanterns a marker may name (MODD indices of the mine's WMO); any other is ignored.
++/// Mirrored in Basin Battle's htl-map/src/deadmines/aftermath.rs.
++pub(crate) const ROUTE_LANTERNS: &[u32] = &[162, 184, 186, 199, 217, 414, 421, 422, 424];
++/// A put-out lantern's own lights are the mine's within this of its pivot (yd), as patch 0091.
++const LANTERN_REACH: f32 = 1.6;
++
++/// The lanterns the server has put out, from the object snapshot.
++#[derive(Resource, Default, PartialEq, Eq)]
++pub(crate) struct RouteLamps(pub(crate) BTreeSet<u32>);
++
++/// A light put out: the strength it had.
++#[derive(Component)]
++struct PutOut(f32);
++
++pub(crate) fn plugin(app: &mut App) {
++    app.init_resource::<RouteLamps>().add_systems(
++        Update,
++        (sync, apply)
++            .chain()
++            .after(WorldStage::Input)
++            .before(WorldStage::Stream),
++    );
++}
++
++/// The lantern a marker's GUID names: `0xF110` (game object), the entry, then the lantern.
++fn lantern_of(guid: u64) -> Option<u32> {
++    let head = (0xF110_u64 << 24) | u64::from(MARKER_ENTRY);
++    let lantern = (guid & 0xFF_FFFF) as u32;
++    ((guid >> 24) == head && ROUTE_LANTERNS.contains(&lantern)).then_some(lantern)
++}
++
++fn sync(
++    live: Res<WorldLive>,
++    map: Option<Res<CurrentMap>>,
++    objects: Query<(&Guid, &NetEntity, &ObjectStore)>,
++    mut lamps: ResMut<RouteLamps>,
++) {
++    let out: BTreeSet<u32> = if live.0 && map.is_some_and(|m| m.0 == 36) {
++        objects
++            .iter()
++            .filter(|(_, net, fields)| {
++                net.kind == EntityKind::GameObject
++                    && net.display_id.unwrap_or(0) == 0
++                    && fields.0.object_entry() == Some(MARKER_ENTRY)
++            })
++            .filter_map(|(guid, _, _)| lantern_of(guid.0))
++            .collect()
++    } else {
++        BTreeSet::new()
++    };
++    if lamps.0 != out {
++        lamps.0 = out;
++    }
++}
++
++/// Whether a placement is the mine's own WMO (its handle's path names the root).
++fn is_mine(handle: &Handle<WmoModel>) -> bool {
++    handle.path().is_some_and(|p| {
++        p.path()
++            .to_string_lossy()
++            .to_ascii_lowercase()
++            .contains("az_deadmines_b.wmo")
++    })
++}
++
++/// Where each named lantern hangs in the world, for a mine placed by `world_from_local`. A
++/// doodad the model does not have yields nothing.
++fn spots_in(out: &BTreeSet<u32>, model: &WmoModel, world_from_local: Affine3A) -> Vec<Vec3> {
++    out.iter()
++        .filter_map(|&index| model.doodads.get(index as usize))
++        .map(|d| world_from_local.transform_point3(wow_to_bevy(d.position)))
++        .collect()
++}
++
++/// Where each named lantern hangs, in the mines placed in `instances`. A mine whose model has
++/// not landed yields nothing.
++fn spots(
++    out: &BTreeSet<u32>,
++    instances: &Query<&WmoPortalInstance>,
++    models: &Assets<WmoModel>,
++) -> Vec<Vec3> {
++    instances
++        .iter()
++        .filter(|i| is_mine(&i.handle))
++        .filter_map(|i| Some(spots_in(out, models.get(&i.handle)?, i.world_from_local)))
++        .flatten()
++        .collect()
++}
++
++/// What a light by `at` does under `spots`: the strength to keep when it is put out, or to put
++/// back when it no longer is. `put` is the strength it was put out from.
++#[derive(Debug, PartialEq)]
++enum Settle {
++    Keep,
++    PutOut(f32),
++    PutBack(f32),
++}
++
++fn settle(spots: &[Vec3], at: Vec3, intensity: f32, put: Option<f32>) -> Settle {
++    let reach = LANTERN_REACH * LANTERN_REACH;
++    let dark = spots.iter().any(|s| s.distance_squared(at) < reach);
++    match (dark, put) {
++        (true, None) => Settle::PutOut(intensity),
++        (false, Some(was)) => Settle::PutBack(was),
++        _ => Settle::Keep,
++    }
++}
++
++/// Put out the lights of the named lanterns, and put back those no longer named. While any
++/// lantern is named (or a light is still out) it looks at every light each frame, which a mine
++/// streaming in after its markers, a reload under them, a late model and a late light all need;
++/// with none named and none out it returns at once.
++fn apply(
++    mut commands: Commands,
++    lamps: Res<RouteLamps>,
++    models: Res<Assets<WmoModel>>,
++    instances: Query<&WmoPortalInstance>,
++    mut lights: Query<
++        (Entity, &Transform, &mut WorldPointLight, Option<&PutOut>),
++        Without<ChildOf>,
++    >,
++    mut active: Local<bool>,
++) {
++    if lamps.0.is_empty() && !*active {
++        return;
++    }
++    let spots = spots(&lamps.0, &instances, &models);
++    let mut any_out = false;
++    for (entity, at, mut light, put) in &mut lights {
++        match settle(&spots, at.translation, light.intensity, put.map(|p| p.0)) {
++            Settle::PutOut(was) => {
++                commands.entity(entity).insert(PutOut(was));
++                light.intensity = 0.0;
++                any_out = true;
++            }
++            Settle::PutBack(was) => {
++                light.intensity = was;
++                commands.entity(entity).remove::<PutOut>();
++            }
++            Settle::Keep => any_out |= put.is_some(),
++        }
++    }
++    *active = any_out;
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use benilla_protocol::ObjectFields;
++
++    fn marker(lantern: u32) -> u64 {
++        (0xF110_u64 << 48) | (u64::from(MARKER_ENTRY) << 24) | u64::from(lantern)
++    }
++
++    fn spawn_marker(app: &mut App, guid: u64, entry: u32) -> Entity {
++        app.world_mut()
++            .spawn((
++                Guid(guid),
++                NetEntity {
++                    kind: EntityKind::GameObject,
++                    display_id: Some(0),
++                    scale: 1.0,
++                },
++                ObjectStore(ObjectFields::from_pairs(&[(3, entry)])),
++            ))
++            .id()
++    }
++
++    fn app() -> App {
++        let mut app = App::new();
++        app.insert_resource(WorldLive(true))
++            .insert_resource(CurrentMap(36))
++            .init_resource::<Assets<WmoModel>>();
++        plugin(&mut app);
++        app
++    }
++
++    #[test]
++    fn a_marker_names_its_lantern_and_only_a_route_lantern() {
++        assert_eq!(lantern_of(marker(414)), Some(414));
++        assert_eq!(lantern_of(marker(162)), Some(162));
++        assert_eq!(lantern_of(marker(415)), None, "not on the route");
++        assert_eq!(lantern_of(0xF110_07A1_84FF_FFFF), None, "patch 0087's marker is not a lantern");
++        assert_eq!(lantern_of((0xF110_u64 << 48) | (500098u64 << 24) | 414), None);
++    }
++
++    #[test]
++    fn the_snapshot_names_the_lanterns_out_and_a_map_exit_or_a_destroy_clears_them() {
++        let mut app = app();
++        let a = spawn_marker(&mut app, marker(414), MARKER_ENTRY);
++        spawn_marker(&mut app, marker(421), MARKER_ENTRY);
++        spawn_marker(&mut app, marker(415), MARKER_ENTRY);
++        spawn_marker(&mut app, marker(422), 500100);
++        app.update();
++        assert_eq!(
++            app.world().resource::<RouteLamps>().0,
++            BTreeSet::from([414, 421])
++        );
++        app.world_mut().despawn(a);
++        app.update();
++        assert_eq!(app.world().resource::<RouteLamps>().0, BTreeSet::from([421]));
++        app.world_mut().resource_mut::<CurrentMap>().0 = 0;
++        app.update();
++        assert!(app.world().resource::<RouteLamps>().0.is_empty());
++    }
++
++    fn doodad(position: [f32; 3]) -> benilla_formats::WmoDoodad {
++        benilla_formats::WmoDoodad {
++            model: "lantern.m2".into(),
++            position,
++            orientation: [0., 0., 0., 1.],
++            scale: 1.,
++            color: [255; 4],
++        }
++    }
++
++    #[test]
++    fn with_no_mine_placed_a_marker_touches_no_light_and_with_none_the_system_idles() {
++        let mut app = app();
++        let light = app
++            .world_mut()
++            .spawn((
++                WorldPointLight {
++                    color: [1.0, 0.8, 0.5],
++                    intensity: 12.0,
++                    range: 48.0,
++                },
++                Transform::from_translation(Vec3::new(1.0, 2.0, 3.0)),
++            ))
++            .id();
++        app.update();
++        app.update();
++        assert_eq!(app.world().get::<WorldPointLight>(light).unwrap().intensity, 12.0);
++        let marker = spawn_marker(&mut app, marker(414), MARKER_ENTRY);
++        app.update();
++        app.update();
++        assert!(app.world().resource::<RouteLamps>().0.contains(&414));
++        assert_eq!(
++            app.world().get::<WorldPointLight>(light).unwrap().intensity,
++            12.0,
++            "no mine placed: nothing to find the lantern in"
++        );
++        assert!(app.world().get::<PutOut>(light).is_none());
++        app.world_mut().despawn(marker);
++        app.update();
++        assert_eq!(app.world().get::<WorldPointLight>(light).unwrap().intensity, 12.0);
++    }
++
++    #[test]
++    fn a_named_lantern_hangs_where_the_placement_puts_its_pivot() {
++        let mut model = WmoModel::default();
++        model.doodads = (0..430).map(|i| doodad([i as f32, 0.0, 0.0])).collect();
++        let at = Affine3A::from_translation(Vec3::new(100.0, 200.0, 300.0));
++        let spots = spots_in(&BTreeSet::from([414, 9999]), &model, at);
++        assert_eq!(spots, vec![at.transform_point3(wow_to_bevy([414.0, 0.0, 0.0]))]);
++        assert!(spots_in(&BTreeSet::new(), &model, at).is_empty());
++    }
++
++    #[test]
++    fn a_light_by_a_named_lantern_goes_out_and_comes_back_when_it_is_put_back() {
++        let lamp = Vec3::new(5.0, 2.0, -3.0);
++        let near = lamp + Vec3::new(0.0, 0.4, 0.0);
++        let far = lamp + Vec3::new(9.0, 0.0, 0.0);
++        let spots = [lamp];
++        assert_eq!(settle(&spots, near, 12.0, None), Settle::PutOut(12.0));
++        assert_eq!(settle(&spots, near, 0.0, Some(12.0)), Settle::Keep, "already out");
++        assert_eq!(settle(&spots, far, 12.0, None), Settle::Keep, "another lantern's light");
++        assert_eq!(settle(&[], near, 0.0, Some(12.0)), Settle::PutBack(12.0));
++        assert_eq!(settle(&[], near, 12.0, None), Settle::Keep, "nothing named: nothing done");
++    }
++}
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index 294c0d2a..8a5ff269 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -110,6 +110,7 @@ impl PluginGroup for GamePlugins {
+             .add(crate::unit_rope::UnitRopePlugin)
+             .add(crate::go_glow::GoGlowPlugin)
+             .add(crate::deadmines_aftermath::plugin)
++            .add(crate::deadmines_route_lamps::plugin)
+             .add(crate::look_lights::LookLightsPlugin)
+             .add(FishingLinePlugin)
+             .add(QuestMarkersPlugin)
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index c325db28..d6b5c108 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -191,6 +191,7 @@ mod vplates;
+ mod wdb;
+ mod go_glow;
+ mod deadmines_aftermath;
++mod deadmines_route_lamps;
+ mod look_lights;
+ mod missile_look;
+ mod unit_rope;
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 54cfc322..865d665d 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -316,6 +316,12 @@
+ //! carts and barrows and some of its lanterns are hidden, a put-out lantern's light with it. A
+ //! server sends its own knocked-over copies only to a client of this round; an older one keeps
+ //! the mine's own.
++//!
++//! The thirty-first (`HasActionCombat() >= 31`), the collapse route's lanterns (patch 0096):
++//! nothing new to call. While the server keeps a lantern's marker game object (entry 500099, the
++//! lantern's place in the mine's WMO in the GUID), the mine's own light within 1.6 yd of that
++//! lantern's pivot is out; when the marker goes the light is back. A client that is sent no marker
++//! does nothing. The ship still goes only with the aftermath marker (patch 0087).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -1283,7 +1289,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(30))?,
++        lua.create_function(|_, _: MultiValue| Ok(31))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+-- 
+2.56.0.windows.4
