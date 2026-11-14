@@ -1,4 +1,4 @@
-From 4abc8c1d807c5d1766357bb08f1bb51502c72ccb Mon Sep 17 00:00:00 2001
+From dcce30fff425568064fa8bd2b6e159a2cf5a66a6 Mon Sep 17 00:00:00 2001
 From: Corios00 <52224974+Corios00@users.noreply.github.com>
 Date: Sat, 14 Nov 2026 08:26:10 -0600
 Subject: [PATCH] The client's own tests and guards keep up with the series
@@ -30,6 +30,7 @@ torn-down unit's build, which needs `PreviewTint` (0017).
  .../src/creature_anim/action/afterimage.rs    |   4 +-
  crates/benilla-app/src/entities/attach/mod.rs |   1 +
  crates/benilla-app/src/entities/missile.rs    |   4 +-
+ crates/benilla-app/src/game_plugins.rs        |  17 ++-
  crates/benilla-app/src/missile_look.rs        |   3 +-
  crates/benilla-app/src/pipe_warm/menagerie.rs |  33 ++++-
  crates/benilla-app/src/player.rs              |   2 +-
@@ -43,7 +44,7 @@ torn-down unit's build, which needs `PreviewTint` (0017).
  crates/benilla-ui/src/action_combat.rs        |  11 +-
  .../src/script/tests/reference_surface.rs     |  71 +++++++++-
  .../benilla-ui/tests/vm_parity_surface.golden |   4 +-
- 17 files changed, 300 insertions(+), 40 deletions(-)
+ 18 files changed, 315 insertions(+), 42 deletions(-)
 
 diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
 index d8863461..34f4ef44 100644
@@ -153,6 +154,45 @@ index 881a91fe..5dc288e7 100644
      /// number), over the speed the launch fitted and its [`DUE_SPEED`] cap, up to
      /// [`OWN_SPEED_MOST`]. The yards left are what the fitted flight had left; a flight already due
      /// (nothing left) stays due. Nothing happens for a speed of 0 or less.
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index 39b9eaf7..7144d1a1 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -986,12 +986,24 @@ pub(crate) mod schedule_tests {
+     ///   it, are outside that model;
+     /// - the minimap's draw (`minimap::emit_minimap`), which reads `QuestGiver`'s dialog statuses,
+     ///   against `ui_panes::feed_character_panes`, which lends the call host, whose quest verbs
+-    ///   write that window's cell and panel latches and never a status.
++    ///   write that window's cell and panel latches and never a status;
++    /// - the series' systems (`patches/benilla` 0002 to 0087), 598 pairs over the reference tree's
++    ///   1,749, read off the dump: some 390 are `Transform` on lanes that never intersect, the
++    ///   kind above: `missile_look::dress_missiles` (126, a missile in flight),
++    ///   `look::life::light_fireflies` (99, a firefly), `entities::ground_orb::drive_ground_orbs`
++    ///   (41, an orb), the action layer's `collect_nearby`, `collect_occluders`, `track_lock_on`,
++    ///   `flurry::step_flurries` and `drain_action_calls` (about 20 each, the calls' own units),
++    ///   `look::wakes::publish_wakes` (17) and `sound::combat::script_vocals` (14), each against
++    ///   the booths', emitters', markers' and attaches' writers of other entities' transforms.
++    ///   Most of the rest are the same shape over `RigPalettes` and `MeshTag`
++    ///   (`afterimage::spawn_afterimages` against the attaches and the aura tints, a ghost's own
++    ///   rig), `Visibility` (`look::sky::apply_look_sky_visibility`, the cloud layer's) and
++    ///   `AnimationPlayer`/`RigPose` (the action clips, the same population as the first bullet).
+     ///
+     /// Raising the ceiling is a claim that a new undeclared order is acceptable: make it with the
+     /// reason read off the dump, or declare the order (`.after`, a set, a `chain`). A resource
+     /// that commutes by construction belongs in [`Classes`].
+-    const UPDATE_ACTIONABLE_CEILING: usize = 1_749;
++    const UPDATE_ACTIONABLE_CEILING: usize = 2_347;
+     const UPDATE_ACTIONABLE_SLACK: usize = 40;
+ 
+     fn ratchet(what: &str, n: usize, ceiling: usize, slack: usize) {
+@@ -1069,6 +1081,7 @@ pub(crate) mod schedule_tests {
+                 eprintln!("{r}");
+             }
+         }
++        eprintln!("PostUpdate: {} ambiguous pairs", post.conflicts.len());
+         ratchet(
+             "Update (actionable)",
+             actionable.len(),
 diff --git a/crates/benilla-app/src/missile_look.rs b/crates/benilla-app/src/missile_look.rs
 index 736d910b..98e70cb0 100644
 --- a/crates/benilla-app/src/missile_look.rs
