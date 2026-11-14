@@ -1,0 +1,15 @@
+# DEV SETUP: the machine pulled 14 yd south of its post, then the hero put by the stake (debug
+# placement) and healed only before the cut. What it shows: the hero's blow on the stake, the
+# creak and the bright mark, the hero stepping under the log and standing there, the log landing
+# on them (flat 2 s, no damage), and what the machine does to a hero who is down: the cost.
+hero warrior
+cam off
+camera wide Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+13 .es heal
+13.5 video
+14.5 .es goto -280.6 -518 50.4 1.57
+21 .es heal
+21.3 .es goto -280.67 -498.7 50.4 1.5708
+21.6 lua SV.turn(1.5708) SV.hit() SV.log("cuts the rope") SV.after(0.5, function() SV.turn(-1.5708) ActionDash(0.4, 7, "f") SV.log("steps under it") end)
+34 end

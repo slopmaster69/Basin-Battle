@@ -1521,6 +1521,7 @@ impl Survival {
             self.swing_on_banners(id, w, strike.damage, f, strike.range, strike.arc);
             if strike.damage > 0.0 {
                 self.swing_on_perches(id, f, strike.range, strike.arc);
+                self.swing_on_rig(id, f, strike.range, strike.arc);
             }
         }
         let mut hits: Vec<(f32, Id)> = Vec::new();

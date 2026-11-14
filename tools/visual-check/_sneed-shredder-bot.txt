@@ -1,0 +1,29 @@
+# The scripted warrior of the real pulls (sneed-shredder-fight*), on top of the SV helper. From
+# the video on it presses only the hero's own keys (.es in, ActionDash), from what the client is
+# told (wind-ups, AN; its own blows landing, HT; what strikes it, IM; whom it is locked on, LO;
+# Sneed's yells) and, for its three runs, where it stands (`.es where`, a read). What it does:
+# - Fights whoever it is locked on: a blow every 0.75 s, a run in when none has landed for 1.5 s
+#   (1 s once Sneed is on foot: he backs off).
+# - A blow coming: a guard as it lands; a roll from the stamp (clip 130, no guard stops it); a
+#   sidestep of 0.6 s out of the Grind's lane as it revs (clip 5, or "That'll cut it!"), then
+#   back in on the stalled machine.
+# - "No, no, not now!": it lets go and watches. "That was company property!": it runs to 4 yd
+#   from where he crawled out and locks on.
+# - "Just... one... bolt...": 1 s later (a player's read of the line) it lets go, runs to the
+#   tie-off, 1.5 yd short of it, and cuts the rope with one blow; 1.7 s after that it is back on
+#   whoever is up (him stunned under the log, or the machine if it lost the race).
+13 lua SB = { on = false, heal = false, nextHeal = 0, nextHit = 0, nextDash = 0, nextLock = 0, h1 = 0, h2 = 0, pause = 0, tries = 0, struck = 0, caught = 0, grind = 0, race = false, miss = 0, foot = false, nextTally = 0 }
+13 lua function SB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+13 lua function SB.hit() SB.tries = SB.tries + 1 SV.hit() end
+13 lua function SB.tally(why) SV.log(why .. ": " .. SV.hits .. " of " .. SB.tries .. " blows landed, dealt " .. SV.dealt .. ", struck " .. SB.struck .. ", caught " .. SB.caught) end
+13 lua function SB.sidestep(why) local now = GetTime() if now < SB.grind or not SB.on or SB.race then return end SB.grind = now + 3 SB.pause = now + 2.4 SV.say(".es in gu") ActionDash(0.6, 7, "l") SV.log("sidesteps: " .. why) SV.after(2.4, function() SV.lastHT = 0 end) end
+13 lua function SB.an(clip, wind) local now = GetTime() if SB.race or not SB.on or now < SB.pause then return end if clip == 5 then SB.sidestep("the Grind revs") return end SB.h1, SB.h2 = now + wind - 0.8, now + wind + 0.3 if clip == 130 then SV.after(math.max(0, wind - 0.18), function() if SB.on and not SB.race then SV.say(".es in d") SV.log("rolls from the stamp") end end) else local d = math.max(0, wind - 0.13) SV.after(d, function() if SB.on and not SB.race then SV.say(".es in g") end end) SV.after(d + 0.2, function() SV.say(".es in gu") end) end end
+13 lua function SB.line(l) local f = SB.split(l) local v = f[1] if v == "AN" and f[11] == "mob" then SB.an(tonumber(f[3]) or 0, tonumber(f[4]) or 0) elseif v == "HT" then SB.miss = 0 elseif v == "IM" and f[7] == "1" then SB.struck = SB.struck + 1 if f[5] == "hit" then SB.caught = SB.caught + 1 end end end
+13 lua SB.old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) SB.line(l) return SB.old(l) end
+13 lua SB.f = CreateFrame("Frame") SB.f:SetScript("OnUpdate", function() local now = GetTime() if SB.heal and now >= SB.nextHeal then SB.nextHeal = now + 1.2 SV.say(".es heal") end if not SB.on then return end if UnitHealth("player") <= 0 then SB.on = false SB.heal = false SV.q = {} SB.tally("THE HERO FALLS") return end if now >= SB.nextTally then SB.nextTally = now + 5 SB.tally("so far") end if SB.race or now < SB.pause then return end if not SV.locked and now >= SB.nextLock then SB.nextLock = now + 2 SB.miss = SB.miss + 1 if SB.miss > 2 then FlipCameraYaw(120) end SV.after(0.3, function() SV.say(".es in lock") end) SV.log("locks on") end if now >= SB.h1 and now < SB.h2 then return end if now >= SB.nextHit then SB.nextHit = now + 0.75 SB.hit() end if now - SV.lastHT > (SB.foot and 1.0 or 1.5) and now >= SB.nextDash then SB.nextDash = now + 0.55 ActionDash(SB.foot and 0.5 or 0.4, 7, "f") end end)
+13 lua SV.on["cut it"] = function() SB.sidestep("That'll cut it!") end
+13 lua SV.on["not now"] = function() SB.was = SB.on SB.on = false SB.foot = false SV.say(".es in gu") SV.say(".es in unlock") SB.tally("the machine breaks") end
+13 lua SV.on["company property"] = function() if not SB.was then return end SB.foot = true SV.go(-281.2, -501.2, 4.0, function() SB.on = true SB.miss = 0 SV.locked = false SB.nextLock = 0 SV.lastHT = GetTime() end) end
+13 lua SV.on["one... bolt"] = function() if not SB.on then return end SV.log("hears the repair's line") SV.after(1.0, function() SB.race = true SV.say(".es in gu") SV.say(".es in unlock") SV.go(-280.67, -497.2, 1.5, function() SB.hit() SV.log("cuts the rope") SV.after(1.7, function() SB.race = false SB.miss = 0 SV.locked = false SB.nextLock = 0 SV.lastHT = GetTime() end) end) end) end
+13 lua SV.on["cut that loose"] = function() SB.tally("THE LOG STOPPED HIS REPAIR") end
+13 lua SV.on["by hand"] = function() SB.tally("his repair was stopped") end
