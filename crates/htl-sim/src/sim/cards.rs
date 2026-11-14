@@ -33,6 +33,7 @@ pub(super) enum Pick {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum OfferSource {
+    /// Only `roll_for_test` builds it: a roll like a level-up's, without the level's odd-level rule.
     #[allow(dead_code)]
     Wave,
     /// A boss fell (which boss, as an index into the content's bosses).
@@ -1158,7 +1159,6 @@ impl Sim {
         }
     }
 
-    #[allow(dead_code)]
     fn show_piece_menu(&mut self, id: EntityId, tier: u8) {
         let p = self.entities[&id].player().unwrap();
         let class = p.class;

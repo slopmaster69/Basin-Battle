@@ -144,7 +144,7 @@ fn after_the_first_stick_the_furnace_sets_the_first_pole_alight_and_he_falls_lan
     assert!(until(&mut s, 1.0, |s| matches!(s.perches.workers[&crew[0]].state, Place::Ground)));
     assert_eq!(s.mobs[&crew[0]].pos, landing);
     assert!(s.events.iter().any(|e| matches!(e, Event::HoldPose { id, clip: SIT_CLIP, secs, .. } if *id == crew[0] && *secs == SIT_SECS)), "lands sitting");
-    assert!(!s.events.iter().any(|e| matches!(e, Event::Emote { id, emote: STUN_EMOTE } if *id == crew[0])), "no stagger's reel over the sit");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Emote { id, emote: crate::sim::mobs::STUN_EMOTE } if *id == crew[0])), "no stagger's reel over the sit");
     assert_eq!(s.content.mobs[s.mobs[&crew[0]].def].weapon, 1610, "his wrench out");
     assert!(until(&mut s, SIT_SECS + 0.1, |s| s.events.iter().any(|e| matches!(e, Event::Clip { id, clip: SIT_UP_CLIP, .. } if *id == crew[0]))), "gets up");
     assert!(s.mobs[&crew[0]].stagger_until > s.clock + GET_UP_SECS - 0.1, "and only then fights");

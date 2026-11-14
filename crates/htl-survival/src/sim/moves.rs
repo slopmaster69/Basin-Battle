@@ -531,7 +531,6 @@ impl Survival {
             let t = self.traps.remove(mine[0]);
             self.clear_trap(&t);
         }
-        let radius = AbilityDef::at(d.radius, share);
         let life = d.secs.max(1.0);
         // No circle under it: the trap's own model shows where it is (a hero's own circles are
         // floor clutter, Corey's review), and a foe isn't shown where it waits.

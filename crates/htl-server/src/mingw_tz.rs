@@ -1,7 +1,7 @@
 //! Windows with the GNU toolchain only: mingw-w64's msvcrt import library can lack
 //! `_get_timezone` (it's ucrt's), which the `libc` crate calls for benilla's login code, and the
-//! server then fails to link. This reads the runtime's own `_timezone` instead, as
-//! `scripts/mingw-tz-shim.c` does for the client. Where the library has it, ours is simply used.
+//! server then fails to link. This reads the runtime's own `_timezone` instead. Where the library
+//! has it, ours is simply used.
 
 use std::os::raw::{c_int, c_long};
 

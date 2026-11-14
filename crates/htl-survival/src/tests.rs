@@ -3607,7 +3607,7 @@ fn keen_gear_gives_back_breath_on_a_parry_and_peerless_gear_throws_a_dodged_foe_
     s.input(p, Input::GuardUp);
     run(&mut s, 2.0);
     // Without one, a dodge through the grunt's blow doesn't throw it; with a Peerless piece, it does.
-    let mut dodge = |s: &mut Survival| {
+    let dodge = |s: &mut Survival| {
         s.mobs.get_mut(&k).unwrap().stagger_until = 0.0;
         s.input(p, Input::Dodge);
         run(s, 0.1);

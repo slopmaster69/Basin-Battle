@@ -102,10 +102,6 @@ fn held(ev: &[Event], id: Id) -> Vec<(u16, f32)> {
     ev.iter().filter_map(|e| match e { Event::HoldPose { id: who, clip, secs, .. } if *who == id => Some((*clip, *secs)), _ => None }).collect()
 }
 
-fn landed_on(ev: &[Event], id: Id, h: Id) -> bool {
-    ev.iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(v), damage, .. } if *attacker == id && *v == h && *damage > 0))
-}
-
 // --- the pull and the rhythm --------------------------------------------------------------------
 
 #[test]

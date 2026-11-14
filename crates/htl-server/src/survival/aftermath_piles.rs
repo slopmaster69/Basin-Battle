@@ -1007,6 +1007,7 @@ const DOCK_AT: [f32; 2] = [-2.0, -768.0];
 pub(super) const LANDING_EYE: V3 = [-80.0, -936.0, 41.7];
 pub(super) const LANDING_LOOK: f32 = 1.5;
 /// The ship's big pieces keep this far from the dock's cameras (a hull half filled its view black).
+#[cfg(test)]
 pub(super) const DOCK_CLEAR: f32 = 40.0;
 const MAST_LEN: f32 = 9.98;
 

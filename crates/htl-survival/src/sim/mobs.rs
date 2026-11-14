@@ -2606,7 +2606,7 @@ impl Survival {
                     match (self.mobs[&id].pattern, self.foe_pos(foe)) {
                         // A caster's next cast in a string waits too while a blow up close
                         // winds up at its hero (or has just landed).
-                        (Some(_), Some(to)) if self.attack_now(id).ranged && self.caster_waits(id, foe) => {
+                        (Some(_), Some(_)) if self.attack_now(id).ranged && self.caster_waits(id, foe) => {
                             if let Some(m) = self.mobs.get_mut(&id) {
                                 m.state = MobState::Recover { foe, until: now + 0.1 };
                             }

@@ -9,9 +9,6 @@ use super::enemies::Via;
 use super::*;
 use crate::kit::{Nums, SpellDef, SpellKind};
 
-/// Upgrades a spell can take (each a card) where a class kit doesn't say: rank 1 plus four.
-#[allow(dead_code)]
-pub(super) const MAX_PERKS: usize = 4;
 /// Most stacks of Fire Vulnerability, Winter's Chill, Shadow Vulnerability and Sunder Armor.
 pub(super) const MAX_VULN: u8 = 5;
 const VULN_SECS: f32 = 15.0;
