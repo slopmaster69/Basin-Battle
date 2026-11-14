@@ -4479,6 +4479,23 @@ impl Content {
 
 #[cfg(test)]
 mod tests {
+    /// What the player reads about an ability follows the style guide's word list and has none of
+    /// its banned marks: no semicolons, no keys' `~` or `^`, never "cards" (Elwynn Survival has
+    /// abilities), no double spaces or stray ends, "sec" and "yd" never spelled out.
+    #[test]
+    fn ability_text_keeps_to_the_style_guide() {
+        let c = super::Content::builtin();
+        for a in &c.abilities {
+            let t = &a.text;
+            assert!(!t.is_empty() || a.inner, "{} has no text", a.key);
+            for bad in [";", "~", "^", "  ", "TODO", "TBD", "lorem", " yards", " seconds", " yard "] {
+                assert!(!t.contains(bad), "{}: {bad:?} in {t:?}", a.key);
+            }
+            assert!(!t.to_lowercase().split(|ch: char| !ch.is_alphabetic()).any(|w| w == "card" || w == "cards"), "{}: {t:?}", a.key);
+            assert_eq!(t.trim(), t, "{}: stray space", a.key);
+        }
+    }
+
     #[test]
     fn the_builtin_content_reads() {
         let c = super::Content::builtin();

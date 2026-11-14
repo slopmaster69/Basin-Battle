@@ -31,6 +31,7 @@ mod pause;
 pub use fronts::{FrontView, Ping};
 pub use shop::{ShopItem, SiteView, SHOP_ICONS};
 mod spells;
+pub(crate) use spells::{FIRE_VULN, MAX_VULN, SHADOW_VULN, SUNDER, WINTERS_CHILL};
 mod synergy;
 mod triggers;
 mod waves;

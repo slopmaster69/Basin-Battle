@@ -737,7 +737,7 @@ note = "The emergency. Healing beside hired defenders mends them too, and blesse
   name = "Holy Word"
   rarity = "uncommon"
   fork = "flash"
-  text = "Also leaves a Renew on the target, and 20% more critical strike chance."
+  text = "Also leaves a Renew of 15% on the target, and 20% more critical strike chance."
   set = { hot = 0.15, hot_secs = 12 }
   add = { crit = 0.2 }
   [[spell.perk]]
@@ -1157,7 +1157,7 @@ note = "The group heal: everyone hurt near you, at once. Healing beside hired de
   name = "Prayer of Mending"
   rarity = "uncommon"
   fork = "prayer"
-  text = "Also leaves a Renew on everyone it heals."
+  text = "Also leaves a Renew of 12% on everyone it heals."
   set = { hot = 0.12, hot_secs = 12 }
   [[spell.perk]]
   key = "circle_of_healing"

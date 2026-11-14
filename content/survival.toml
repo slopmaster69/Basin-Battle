@@ -5735,7 +5735,7 @@ clip = 0
 [[ability]]
 key = "explosive_trap"
 name = "Explosive Trap"
-text = "Places a trap at the target location up to 10 yd away. It arms after 0.75 sec and lasts 20 sec; up to 2 at once. The first enemy within 2 yd sets it off: enemies within 4.5 yd take 24 damage and are knocked back 6 yd, and the ground burns for 4 damage per sec for 3 sec."
+text = "Places a trap at the target location up to 10 yd away. It arms after 0.75 sec and lasts 20 sec. Up to 2 can be down at once. The first enemy within 2 yd sets it off: enemies within 4.5 yd take 24 damage and are knocked back 6 yd, and the ground burns for 4 damage per sec for 3 sec."
 icon = "Spell_Fire_SelfDestruct"
 school = "hunter"
 slot = "defense"
@@ -6685,7 +6685,7 @@ effects = [{ kind = "vampiric", secs = [8.0, 8.0], amount = 0.2, aura = 15286 }]
 [[ability]]
 key = "void_rift"
 name = "Void Rift"
-text = "Tears open the void at the reticle, up to 30 yd away: 4 yd wide, growing to 7 yd over 2 sec. Each second it drags enemies in it 3 yd toward its heart (heroes 5 yd at most) and deals 6 damage. Press again to implode it: 40 damage, plus 8 for each enemy it caught, up to 80. Left alone, it collapses after 4 sec for 20."
+text = "Tears open the void at the reticle, up to 30 yd away: 4 yd wide, growing to 7 yd over 2 sec. Each sec it drags enemies in it 3 yd toward its heart (heroes 5 yd at most) and deals 6 damage. Press again to implode it: 40 damage, plus 8 for each enemy it caught, up to 80. Left alone, it collapses after 4 sec for 20."
 icon = "Spell_Shadow_SealOfKings"
 perfect_kit = 117
 school = "priest"
@@ -7213,7 +7213,7 @@ spell = 15407
 [[ability]]
 key = "hollow_star"
 name = "Hollow Star"
-text = "Throws a dark orb to the reticle, up to 15 yd. It has 40 health (up to 60) and lasts 10 sec. Every second it deals 5 damage to each enemy and heals each ally 5 within 3 yd (5 yd when full). The damage it deals fills it, 5 a second at most; the healing it gives drains it. Standing in it, you run 15% faster. Enemies can break it."
+text = "Throws a dark orb to the reticle, up to 15 yd. It has 40 health (up to 60) and lasts 10 sec. Every sec it deals 5 damage to each enemy and heals each ally for 5 within 3 yd (5 yd when full). The damage it deals fills it, 5 per sec at most. The healing it gives drains it. Standing in it, you run 15% faster. Enemies can break it."
 icon = "Spell_Shadow_ShadowWordDominate"
 school = "priest"
 slot = "ranged"
@@ -7516,7 +7516,7 @@ effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 },
 [[ability]]
 key = "hurricane"
 name = "Hurricane"
-text = "A storm forms on the reticle, up to 30 yd away, 0.6 sec later and rages for 5 sec. Deals 8 damage, then enemies in its 9 yd radius take 9 damage per sec and are slowed by 50%. Every second its winds hurl them 3 yd out from its center. Clear a point, or keep them off it."
+text = "A storm forms on the reticle, up to 30 yd away, 0.6 sec later and rages for 5 sec. Deals 8 damage, then enemies in its 9 yd radius take 9 damage per sec and are slowed by 50%. Every sec its winds hurl them 3 yd out from its center. Clear a point, or keep them off it."
 icon = "Spell_Nature_Cyclone"
 school = "druid"
 slot = "ultimate"
@@ -8106,7 +8106,7 @@ effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 
 [[ability]]
 key = "black_hole"
 name = "Black Hole"
-text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each second, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area abilities first."
+text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each sec, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area abilities first."
 icon = "Spell_Arcane_PortalUndercity"
 school = "beta"
 slot = "ultimate"

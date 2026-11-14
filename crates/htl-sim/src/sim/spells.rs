@@ -13,13 +13,13 @@ use crate::kit::{Nums, SpellDef, SpellKind};
 #[allow(dead_code)]
 pub(super) const MAX_PERKS: usize = 4;
 /// Most stacks of Fire Vulnerability, Winter's Chill, Shadow Vulnerability and Sunder Armor.
-pub(super) const MAX_VULN: u8 = 5;
+pub(crate) const MAX_VULN: u8 = 5;
 const VULN_SECS: f32 = 15.0;
 /// What each stack does.
-pub(super) const FIRE_VULN: f32 = 0.04;
-pub(super) const SHADOW_VULN: f32 = 0.04;
-pub(super) const SUNDER: f32 = 0.05;
-pub(super) const WINTERS_CHILL: f32 = 0.02;
+pub(crate) const FIRE_VULN: f32 = 0.04;
+pub(crate) const SHADOW_VULN: f32 = 0.04;
+pub(crate) const SUNDER: f32 = 0.05;
+pub(crate) const WINTERS_CHILL: f32 = 0.02;
 /// Seconds an ally of this radius counts as "near" for heals, team buffs and mends.
 pub(super) const ALLY_RANGE: f32 = 30.0;
 /// The window Revenge opens after a blow.

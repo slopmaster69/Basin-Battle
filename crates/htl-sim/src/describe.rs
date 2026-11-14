@@ -617,11 +617,14 @@ fn hit_effects_n(n: &Nums, _several: bool, them: &str, out: &mut Vec<String>, w:
     if n.fear_secs > 0.0 && n.damage > 0.0 {
         out.push(format!("{them_cap} flee in terror for {} sec.", w.secs(n.fear_secs)));
     }
+    // What a stack does is read from the sim's own numbers, so the words follow a retune.
+    let up = crate::sim::MAX_VULN;
+    let per = |v: f32| format!("{}", (v * 100.0).round() as i32);
     for (amount, name, what) in [
-        (n.vuln_fire, "Fire Vulnerability", "+4% fire damage taken per stack, up to 5"),
-        (n.vuln_frost, "Winter's Chill", "+2% frost critical strike chance against it per stack, up to 5"),
-        (n.vuln_shadow, "Shadow Vulnerability", "+4% shadow damage taken per stack, up to 5"),
-        (n.vuln_sunder, "Sunder Armor", "+5% physical damage taken per stack, up to 5"),
+        (n.vuln_fire, "Fire Vulnerability", format!("+{}% fire damage taken per stack, up to {up}", per(crate::sim::FIRE_VULN))),
+        (n.vuln_frost, "Winter's Chill", format!("+{}% frost critical strike chance against it per stack, up to {up}", per(crate::sim::WINTERS_CHILL))),
+        (n.vuln_shadow, "Shadow Vulnerability", format!("+{}% shadow damage taken per stack, up to {up}", per(crate::sim::SHADOW_VULN))),
+        (n.vuln_sunder, "Sunder Armor", format!("+{}% physical damage taken per stack, up to {up}", per(crate::sim::SUNDER))),
     ] {
         if amount <= 0.0 {
             continue;
@@ -791,6 +794,13 @@ mod tests {
                 assert!(t.text.ends_with('.'), "{}: {:?}", def.key, t.text);
             }
         }
+        // A stack's words are the sim's own numbers.
+        let sunder = crate::kit::Nums { vuln_sunder: 1.0, ..Default::default() };
+        let mut out = Vec::new();
+        let w = Writer { color: false };
+        hit_effects_n(&sunder, false, "enemies", &mut out, &w, 40.0);
+        let want = format!("+{}% physical damage taken per stack, up to {}", (crate::sim::SUNDER * 100.0).round(), crate::sim::MAX_VULN);
+        assert!(out.iter().any(|l| l.contains(&want)), "{out:?}");
         let mage = &content.kits[content.class_index("mage").unwrap()];
         let frostbolt = &mage.spells[mage.spell_index("frostbolt").unwrap()];
         let t = spell_text(frostbolt, &frostbolt.nums, 60.0, false);

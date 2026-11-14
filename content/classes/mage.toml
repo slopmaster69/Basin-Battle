@@ -611,7 +611,7 @@ note = "Fire's only instant: Frost Nova, then Fire Blast."
   key = "improved_fire_blast"
   name = "Improved Fire Blast"
   repeat = 2
-  text = "Cooldown 1.5 sec shorter: every 4.5, then every 3 sec. Can be taken twice."
+  text = "Cooldown 1.5 sec shorter: every 5.5, then every 4 sec. Can be taken twice."
   add = { cooldown = -1.5 }
   [[spell.perk]]
   key = "incinerate"

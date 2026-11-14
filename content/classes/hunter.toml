@@ -945,7 +945,7 @@ note = "The lockdown: what walks on it stops."
   name = "Chilling Trap"
   rarity = "uncommon"
   fork = "ice"
-  text = "When the freeze ends they stay 60% slower for 6 sec."
+  text = "When the freeze ends they stay 60% slower for 14 sec."
   set = { slow = 0.6, slow_secs = 14 }
   [[spell.perk]]
   key = "trap_bait"
@@ -1788,7 +1788,7 @@ note = "Enemies within 6 yd of it are caught too: they sleep, then the venom bur
   name = "Drowsy Venom"
   rarity = "uncommon"
   fork = "wyvern"
-  text = "When they wake they attack 30% slower for 8 sec."
+  text = "When they wake they attack 30% slower for 12 sec."
   set = { weaken = 0.3, weaken_secs = 12 }
   [[spell.perk]]
   key = "wyvern_spread"
