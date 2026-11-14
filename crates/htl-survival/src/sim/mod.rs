@@ -68,6 +68,7 @@ pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
 pub use perches::LedgeView;
 pub use machinery::ShredderRig;
+pub use bosses::{WreckView, LAMPS_OUT};
 pub use arena::Arena;
 pub use dungeon::{door_open, Below, BelowHero};
 pub use raid::RaidPhase;
@@ -2338,7 +2339,8 @@ impl Survival {
                     .map_or("Miner's Lamp".to_string(), |l| l.name.clone());
                 let lit = self.below.as_ref().is_some_and(|b| b.lit.contains(key));
                 (
-                    if lit {
+                    // (Dark while a collapse's fight is on: it can't be rested at.)
+                    if lit && !self.lamps_out() {
                         LAMP_LIT_DISPLAY
                     } else {
                         LAMP_DARK_DISPLAY

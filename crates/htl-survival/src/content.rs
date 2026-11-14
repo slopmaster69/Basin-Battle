@@ -2632,6 +2632,16 @@ pub struct CollapseDef {
     pub throw: f32,
     #[serde(default = "collapse_down")]
     pub down: f32,
+    /// The collapse wrecks the place as it goes: from its blow to the end of the fight no lamp
+    /// can be rested at (they stand dark), each section down lies as wreck (the server lays the
+    /// ruin's own pieces there), and other things than rock come down in its wave. Off: the
+    /// collapse as it was, rock alone.
+    #[serde(default)]
+    pub wreck: bool,
+    /// How many sections are down when the ship in the dry dock is gone, and with it (on the
+    /// clients as they are) the whole mine's wrecked look. 0: with the first blow.
+    #[serde(default = "collapse_wreck_ship")]
+    pub wreck_ship: usize,
 }
 
 impl Default for CollapseDef {
@@ -2654,6 +2664,8 @@ impl Default for CollapseDef {
             catch: collapse_catch(),
             throw: collapse_throw(),
             down: collapse_down(),
+            wreck: false,
+            wreck_ship: collapse_wreck_ship(),
         }
     }
 }
@@ -2669,6 +2681,10 @@ pub struct CollapseSectionDef {
     pub reach: f32,
     #[serde(default = "collapse_height")]
     pub height: f32,
+}
+
+fn collapse_wreck_ship() -> usize {
+    1
 }
 
 fn collapse_lead() -> f32 {
