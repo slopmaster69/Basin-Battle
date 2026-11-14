@@ -884,7 +884,8 @@ impl Survival {
     }
 
     /// Rest at the lamp in reach: whole again, the Draughts full, and the mine stirs (every foe
-    /// but the bosses back at their posts).
+    /// but the bosses back at their posts). Refused while this hero, or any friend in the mine,
+    /// has enemies on them.
     pub fn rest(&mut self, id: Id) -> Result<(), String> {
         let p = self.players.get(&id).ok_or("No hero.")?;
         let lamp = self.lamp_near(p.pos).ok_or("Rest at a lamp.")?;
@@ -893,6 +894,10 @@ impl Survival {
         }
         if self.in_fight(id) {
             return Err("Not while enemies are on you.".into());
+        }
+        // The rest stirs the whole mine, so it waits while a friend is mid-fight.
+        if self.players.keys().any(|h| *h != id && self.in_fight(*h)) {
+            return Err("Not while a friend is in a fight.".into());
         }
         if p.rested_at.is_some_and(|t| self.clock - t < REST_AGAIN) {
             return Ok(());
