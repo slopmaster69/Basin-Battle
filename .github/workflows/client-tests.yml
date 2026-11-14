@@ -5,7 +5,8 @@
 # Linux.
 #
 # Runs on main and by hand (Actions -> Client tests -> Run workflow, or
-# `gh workflow run client-tests.yml --ref <branch>`), not on pull requests: a pull request's
+# `gh workflow run client-tests.yml --ref <branch>`; add `-f patches=false` to run the pinned
+# benilla without our patches, the upstream baseline), not on pull requests: a pull request's
 # checks are only "builds on each OS" and "merges cleanly".
 #
 # A failing test fails the run, and the run's summary lists the failing tests. The run goes
@@ -16,9 +17,14 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      patches:
+        description: "Apply the patch series? Untick it to run the pinned benilla as upstream has it, to tell what a failing test owes to us"
+        type: boolean
+        default: true
 
 concurrency:
-  group: client-tests-${{ github.ref }}
+  group: client-tests-${{ github.ref }}-${{ inputs.patches }}
   cancel-in-progress: true
 
 jobs:
@@ -43,6 +49,7 @@ jobs:
           git clone -q "$repo" benilla
           git -C benilla checkout -q "$rev"
           for p in patches/benilla/*.patch; do
+            [ "${{ inputs.patches }}" = "false" ] && break
             git -C benilla apply --whitespace=nowarn "$GITHUB_WORKSPACE/$p"
           done
 
