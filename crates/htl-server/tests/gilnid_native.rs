@@ -78,7 +78,8 @@ fn gilnid_is_seen_from_the_way_in_his_crew_stands_on_planks_over_the_pit_and_the
     assert!(dist2d(wheel, [-208.1, -583.1, 0.0]) < 0.1, "the melting pot's own valve");
     assert!(dist2d(stand, wheel) < 1.5 && s.land().walk_clear(post, stand) || s.land().path(post, stand).is_some());
 
-    // Pull from the way in, then send the crew down at once: the fire runs across the pit floor.
+    // Pull from the way in, then send the crew down at once: the fire's channel is marked
+    // across the pit floor (the valve's own proof is `tests/gilnid_valve.rs`).
     s.move_player(hero, way_in[1], htl_survival::facing(way_in[1], post), Default::default());
     for _ in 0..10 { step(&mut s, hero); }
     assert!(s.mobs[&boss].state.foe().is_some(), "pulled from the way in");
@@ -110,8 +111,8 @@ fn gilnid_is_seen_from_the_way_in_his_crew_stands_on_planks_over_the_pit_and_the
         }));
         if !stripe.is_empty() { break; }
     }
-    let (at, reach, width) = *stripe.last().expect("the fire runs");
-    println!("stripe: middle {at:?}, {:.1} yd long, {width:.1} wide", reach * 2.0);
-    assert!(reach * 2.0 >= 9.0, "it crosses the pit: {:.1} yd", reach * 2.0);
+    let (at, reach, width) = *stripe.last().expect("the channel is marked");
+    println!("channel: from {at:?}, {reach:.1} yd long, {width:.1} wide");
+    assert!(reach >= 9.0, "it crosses the pit: {reach:.1} yd");
     assert!((at[2] - post[2]).abs() < 1.0, "on his floor");
 }

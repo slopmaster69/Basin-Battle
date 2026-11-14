@@ -7,9 +7,12 @@
 //! his heavy blows while one is live. After the first stick the furnace spills onto the first
 //! engineer's pole and sets it alight, and he falls in plain view, lands sitting and gets up to
 //! fight. The second comes down to one ranged hit, a blow on him or his pole, or climbs down after
-//! three throws. With the workers down Gilnid works the furnace's own valve 2 sec, steam runs
-//! along a channel and a stripe of fire crosses the pit with dry ground either side. Then a
-//! flurry of three that plants his spanner in the floor, open 2.5 sec, until he falls.
+//! three throws. With the workers down Gilnid runs to the furnace's own valve, and the channel its
+//! fire will take, the same one every fight, is marked on the floor from that moment. Knocked off
+//! the valve while his hands are on it, he's stopped for good: the mark goes out and he reels,
+//! open. Left to it: a whistle, steam along the channel, and a stripe of fire down it with dry
+//! ground either side. Then a flurry of three that plants his spanner in the floor, open
+//! 2.5 sec, until he falls.
 
 use std::collections::VecDeque;
 
@@ -73,8 +76,9 @@ const BELCH_AFTER: f32 = 0.6;
 const SPILL_STEP: f32 = 1.5;
 const SPILL_GAP: f32 = 0.2;
 const ALIGHT_SECS: f32 = 1.4;
-/// The valve: 2 sec of work, then steam along the channel, then the stripe of fire advances a
-/// section each `STRIPE_GAP`; each section burns, and bites again once, before it's out.
+/// The valve: his hands on it `WORK_SECS`, then the whistle and `VENT_SECS` of steam along the
+/// channel, then the stripe of fire advances a section each `STRIPE_GAP`; each section burns,
+/// and bites again once, before it's out.
 const WORK_SECS: f32 = 2.0;
 const VENT_SECS: f32 = 1.2;
 const STRIPE_STEP: f32 = 1.6;
@@ -82,13 +86,53 @@ const STRIPE_RADIUS: f32 = 1.5;
 const STRIPE_GAP: f32 = 0.25;
 const STRIPE_MOST: usize = 10;
 const STRIPE_BURN: f32 = 1.2;
+const STRIPE_DAMAGE: u32 = 30;
+/// The channel is fixed in the world: from the valve along the content's `channel`, its first
+/// section's middle this far out. Fewer sections of floor than `CHANNEL_LEAST` is no channel, and
+/// then he leaves the valve alone (never a worked valve with no fire after it).
+const CHANNEL_OUT: f32 = 1.5;
+const CHANNEL_LEAST: usize = 4;
+/// What knocks his hands off the valve, for good: one heavy blow, whatever it deals
+/// (`perch_knocked`), or this much posture built while they're on it (as Cookie's scoop,
+/// `sim::kitchen`). Then he reels `VALVE_OPEN`, open.
+pub(crate) const VALVE_POSTURE: u32 = 120;
+const VALVE_OPEN: f32 = 4.0;
+/// On his way to the valve and no nearer it for this long (time reeling doesn't count): he
+/// gives it up, and the mark goes out. (He used to work it wherever he stood after 8 sec, so
+/// fire came from a valve nobody was at.)
+const GIVE_UP: f32 = 3.0;
+/// The channel's mark, drawn whatever the floor markers, in short bursts sent again and again:
+/// the client can't take a drawn burst back, so a mark that must go out when he's stopped, falls
+/// or loses his foe can't be drawn longer than a moment ahead. Three looks: it will burn if he
+/// finishes (pale steam-blue, slow, with small wisps of steam, from his line), it burns in
+/// `VENT_SECS` (bright, quick, under the whistle and the full steam), it is burning (amber,
+/// under the flames).
+const MARK_WILL: &str = "8FB4D8";
+const WILL_EVERY: f32 = 0.5;
+const WILL_SECS: f32 = 1.0;
+const MARK_SOON: &str = "FFF2C8";
+const SOON_EVERY: f32 = 0.3;
+const SOON_SECS: f32 = 0.6;
+const MARK_FIRE: &str = "FFB23A";
+const FIRE_SECS: f32 = 0.75;
+/// Stopped: the wisps go out one after another back to the valve, under a last grey burst.
+const MARK_OUT: &str = "7A828C";
+const OUT_SECS: f32 = 0.8;
+const OUT_GAP: f32 = 0.07;
+const WISP: f32 = 0.5;
+/// A hero this far above the pit floor (on a plank, on the ramp) isn't in what burns on it.
+const OVER: f32 = 4.0;
+/// His lines for the valve: knocked off it, and going on to his finish without its fire.
+const LINE_STOPPED: &str = "No! You've jammed the valve!";
+const LINE_HIMSELF: &str = "Then I'll break you myself!";
+const LINE_MELT: &str = "Then we'll melt the lot!";
 /// The finish: his last blow is a two-handed chop (Attack2H's second take) that drives the
 /// spanner into the floor, and he's held there, bent double with both hands on it: the clip
 /// caught `STUCK_AT` after its impact (his head at half his height, both hands by the floor) and
 /// held still for the open window (`freeze_open_pose`). StandWound, before, stood him nearly
 /// upright (Nov 9 filming).
 const STUCK_AT: f32 = 0.2;
-/// The fire's band: a fill laid over each two sections as the first of them catches, lasting
+/// The spill's band: a fill laid over each two sections as the first of them catches, lasting
 /// this long, and both its edges drawn the whole way from the start (`perch_run`).
 const BAND_SECS: f32 = 4.0;
 const BAND_FILL: &str = "FFB23A";
@@ -144,8 +188,18 @@ struct Crew {
     first_blown: bool,
     demo: Option<Demo>,
     valve: Vec3,
-    stand: Vec3,
+    /// Where he stands to work it; none if the floor has no such spot (then no valve event).
+    stand: Option<Vec3>,
     furnace: Vec3,
+    /// The fire's channel, section by section from the valve, and the way it runs: fixed when
+    /// the crew is placed, the same every fight.
+    channel: Vec<Vec3>,
+    channel_yaw: f32,
+    /// The small steam along it while it only threatens.
+    wisps: Vec<Id>,
+    /// The mark's next burst, and when the first section catches (once the valve is open).
+    paint_at: f32,
+    fire_at: f32,
     stage: Stage,
     lines: VecDeque<&'static str>,
     said_at: Option<f32>,
@@ -171,9 +225,14 @@ struct Demo {
 #[derive(Clone, Copy, Debug)]
 enum Stage {
     Crew,
-    ToValve { since: f32 },
+    /// Running to the valve: the nearest he has been to it, and when he got that near.
+    ToValve { nearest: f32, at: f32 },
+    /// His hands on it.
     Working { until: f32 },
+    /// The valve open: steam, then the fire, until it's out.
     Cooling { until: f32 },
+    /// Knocked off the valve: reeling, open. No fire.
+    Open { until: f32 },
     Finished,
 }
 
@@ -231,7 +290,28 @@ impl Survival {
             worker: *id, stand: w.stand, rail: along([w.stand[0], w.stand[1], w.stand[2] - PLANK_THICK], w.out, -STAND_OUT),
             base: w.base, landing: w.landing, climb: w.climb,
         })).collect();
-        (ledges, Some((c.valve, c.stand)))
+        (ledges, c.stand.map(|s| (c.valve, s)))
+    }
+
+    /// The fire's channel for a boss with a placed crew: its sections' middles from the valve
+    /// out, the way it runs, and its half width.
+    pub fn perch_channel(&self, owner: Id) -> Option<(Vec<Vec3>, f32, f32)> {
+        self.perches.crews.get(&owner).map(|c| (c.channel.clone(), c.channel_yaw, STRIPE_RADIUS))
+    }
+
+    /// Where the valve event stands: "crew", "to valve", "working", "steam", "fire", "open" or
+    /// "finished" (for tests against the real floor).
+    pub fn perch_stage(&self, owner: Id) -> Option<&'static str> {
+        let c = self.perches.crews.get(&owner)?;
+        Some(match c.stage {
+            Stage::Crew => "crew",
+            Stage::ToValve { .. } => "to valve",
+            Stage::Working { .. } => "working",
+            Stage::Cooling { .. } if self.clock < c.fire_at => "steam",
+            Stage::Cooling { .. } => "fire",
+            Stage::Open { .. } => "open",
+            Stage::Finished => "finished",
+        })
     }
 
     /// Only visual cues may skip the 2 sec fade: that client flag also removes collision.
@@ -331,13 +411,24 @@ impl Survival {
         // He works it from the side of his post, an arm's length off.
         let toward = facing(valve, home);
         let near = along(valve, toward, 1.3);
-        let stand = self.perch_floor(home, [near[0] - home[0], near[1] - home[1]]).unwrap_or(home);
+        // Only at the valve: with no floor there to stand on he never works it (he used to work
+        // it from his post instead).
+        let stand = self.perch_floor(home, [near[0] - home[0], near[1] - home[1]]);
         let furnace = [home[0] + d.furnace[0], home[1] + d.furnace[1], home[2] + d.furnace[2]];
+        // The channel: the content's way from the valve, else straight out from the furnace.
+        let channel_yaw = d.channel.filter(|c| c[0] != 0.0 || c[1] != 0.0).map_or(facing(furnace, valve), |c| c[1].atan2(c[0]));
         self.perches.crews.insert(owner, Crew {
             home, workers, props, visuals: Vec::new(), timed: Vec::new(), later: Vec::new(), bands: Vec::new(), began: None, next_throw: 0.0,
             sticks: Vec::new(), legs: Vec::new(), first_blown: false, demo: None, valve, stand, furnace,
+            channel: Vec::new(), channel_yaw, wisps: Vec::new(), paint_at: 0.0, fire_at: 0.0,
             stage: Stage::Crew, lines: VecDeque::new(), said_at: None, stuck_until: 0.0,
         });
+        let reach = STRIPE_STEP * (STRIPE_MOST - 1) as f32;
+        let channel = self.perch_run_points(owner, along(valve, channel_yaw, CHANNEL_OUT), channel_yaw, reach, STRIPE_STEP);
+        if channel.len() < CHANNEL_LEAST || stand.is_none() {
+            self.events.push(Event::Log(format!("perch crew {owner}: no valve event ({} sections of channel, stand {stand:?})", channel.len())));
+        }
+        self.perches.crews.get_mut(&owner).unwrap().channel = channel;
     }
 
     /// Says `text` now, or once his last line is `LINE_GAP` behind him.
@@ -425,6 +516,7 @@ impl Survival {
                 c.next_throw = now + FIRST_THROW;
             }
             self.perch_lines(owner);
+            self.paint_channel(owner);
             let ids = self.perches.crews[&owner].workers.clone();
             for id in &ids {
                 if let Some(m) = self.mobs.get_mut(id).filter(|m| m.health > 0 && m.state.foe().is_none()) {
@@ -438,7 +530,7 @@ impl Survival {
             if ids.iter().all(|id| !alive(self, id)) {
                 self.perch_say(owner, "Useless. Every one of you.");
                 self.stagger_mob(owner, 0.05, false); // Let go of the current blow before running.
-                self.perches.crews.get_mut(&owner).unwrap().stage = Stage::ToValve { since: now };
+                self.begin_valve(owner);
                 continue;
             }
             // Neither two sticks at once, nor one while a man is falling.
@@ -586,7 +678,7 @@ impl Survival {
         self.events.push(Event::Sound { id: owner, sound: 1507 }); // Molten Blast Impact.
         let reach = (dist2d(foot, base) - 0.8).max(0.0);
         let points = self.perch_run_points(owner, foot, dir, reach, SPILL_STEP);
-        let n = self.perch_run(owner, &points, dir, 1.0, start, SPILL_GAP, 8, 0.0, false);
+        let n = self.perch_run(owner, &points, dir, 1.0, start, SPILL_GAP, 8);
         let alight_at = start + n as f32 * SPILL_GAP;
         self.perches.crews.get_mut(&owner).unwrap().demo = Some(Demo { worker, base, alight_at, drop_at: alight_at + ALIGHT_SECS, alight: false });
     }
@@ -737,28 +829,17 @@ impl Survival {
         out
     }
 
-    /// Molten iron (or fire) run along the floor: a section each point, the first landing at
+    /// The spill of molten iron run along the floor: a section each point, the first landing at
     /// `start` and each next `gap` later, every one drawn to its true width whatever the floor
     /// markers. The number of sections laid.
     #[allow(clippy::too_many_arguments)]
-    fn perch_run(&mut self, owner: Id, points: &[Vec3], yaw: f32, radius: f32, start: f32,
-        gap: f32, damage: u32, burn: f32, steam: bool) -> usize {
+    fn perch_run(&mut self, owner: Id, points: &[Vec3], yaw: f32, radius: f32, start: f32, gap: f32, damage: u32) -> usize {
         let now = self.clock;
         for (n, p) in points.iter().copied().enumerate() {
             let lands = start + n as f32 * gap;
             let mark = self.mark_ground(p, radius, lands - now, 0);
             self.missiles.push(combat::Missile { owner, from: p, at: p, radius, damage, blockable: false, heavy: false,
                 land_at: lands, mark, look: MOLTEN });
-            if burn > 0.0 {
-                // Still burning where it came: it bites once more, then it's out.
-                if let Some(c) = self.perches.crews.get_mut(&owner) { c.later.push((lands, p, FIRE, 1.0, lands + burn + 0.4)); }
-                let mark = self.mark_ground(p, radius, lands + burn - now, 0);
-                self.missiles.push(combat::Missile { owner, from: p, at: p, radius, damage: damage / 2, blockable: false,
-                    heavy: false, land_at: lands + burn, mark, look: 0 });
-            }
-            if steam && n % 2 == 0 {
-                self.perch_visual(owner, p, STEAM, 1.4, 0.0, Some(start));
-            }
         }
         let n = points.len();
         // Drawn whatever the floor markers: a solid band its true width, laid two sections at a
@@ -771,7 +852,7 @@ impl Survival {
             let begin = along(*first, yaw, -half);
             let len = dist2d(*first, *last) + 2.0 * half;
             let side = yaw + std::f32::consts::FRAC_PI_2;
-            let secs = start - now + n as f32 * gap + burn + 0.4;
+            let secs = start - now + n as f32 * gap + 0.4;
             for edge in [radius, -radius] {
                 self.events.push(Event::GroundBurst { at: along(begin, side, edge), yaw, shape: "line", reach: len, arc: 0.0,
                     width: BAND_EDGE_WIDTH, secs, colour: BAND_EDGE.into() });
@@ -787,52 +868,181 @@ impl Survival {
         n
     }
 
-    /// Walk to the furnace's valve and work it, then the fire runs across the pit. A stagger
-    /// delays his hands; it cannot restart the event or summon another workforce.
+    /// His line is said: the race for the valve begins, and the channel its fire would take is
+    /// marked from now. With no channel on his floor, or nowhere to stand at the valve, he
+    /// leaves the valve alone and goes on to his finish.
+    fn begin_valve(&mut self, owner: Id) {
+        let now = self.clock;
+        let c = &self.perches.crews[&owner];
+        let channel = c.channel.clone();
+        let Some(stand) = c.stand.filter(|_| channel.len() >= CHANNEL_LEAST) else {
+            self.perches.crews.get_mut(&owner).unwrap().stage = Stage::Finished;
+            self.perch_say(owner, LINE_HIMSELF);
+            return;
+        };
+        let wisps: Vec<Id> = channel.iter().map(|p| self.perch_visual(owner, *p, STEAM, WISP, 0.0, None)).collect();
+        let nearest = dist2d(self.mobs[&owner].pos, stand);
+        let c = self.perches.crews.get_mut(&owner).unwrap();
+        c.wisps = wisps;
+        c.paint_at = now;
+        c.stage = Stage::ToValve { nearest, at: now };
+    }
+
+    /// One burst over the channel's sections `from..to`, its true width; `back` runs it from
+    /// the far end toward the valve.
+    fn channel_burst(&mut self, owner: Id, from: usize, to: usize, back: bool, secs: f32, colour: &str) {
+        let Some(c) = self.perches.crews.get(&owner) else { return };
+        if from >= to || to > c.channel.len() { return; }
+        let (a, b, yaw) = (c.channel[from], c.channel[to - 1], c.channel_yaw);
+        let half = STRIPE_STEP / 2.0;
+        let reach = dist2d(a, b) + 2.0 * half;
+        let (at, yaw) = if back { (along(b, yaw, half), yaw + std::f32::consts::PI) } else { (along(a, yaw, -half), yaw) };
+        self.events.push(Event::GroundBurst { at, yaw, shape: "line", reach, arc: 0.0, width: STRIPE_RADIUS * 2.0, secs, colour: colour.into() });
+    }
+
+    /// The channel's mark, sent again each little while as long as it stands (`MARK_WILL`): the
+    /// whole of it while it only threatens; once the valve is open, what is alight in amber and
+    /// what is still to catch in the bright of the steam.
+    fn paint_channel(&mut self, owner: Id) {
+        let now = self.clock;
+        let Some(c) = self.perches.crews.get(&owner) else { return };
+        let n = c.channel.len();
+        if n == 0 || now < c.paint_at { return; }
+        let fire_at = c.fire_at;
+        let every = match c.stage {
+            Stage::ToValve { .. } | Stage::Working { .. } => {
+                self.channel_burst(owner, 0, n, false, WILL_SECS, MARK_WILL);
+                WILL_EVERY
+            }
+            Stage::Cooling { .. } => {
+                // The sections alight so far, and those of them burnt out.
+                let count = |since: f32| if since < 0.0 { 0 } else { ((since / STRIPE_GAP) as usize + 1).min(n) };
+                let (lit, out) = (count(now - fire_at), count(now - fire_at - STRIPE_BURN));
+                self.channel_burst(owner, out, lit, false, FIRE_SECS, MARK_FIRE);
+                self.channel_burst(owner, lit, n, false, SOON_SECS, MARK_SOON);
+                if lit == 0 { SOON_EVERY } else { STRIPE_GAP }
+            }
+            _ => return,
+        };
+        self.perches.crews.get_mut(&owner).unwrap().paint_at = now + every;
+    }
+
+    /// The mark goes out where it can be seen: the wisps one after another from the far end back
+    /// to the valve, under a last grey burst drawn back the same way.
+    fn channel_out(&mut self, owner: Id) {
+        let now = self.clock;
+        let Some(c) = self.perches.crews.get_mut(&owner) else { return };
+        let n = c.channel.len();
+        let wisps = std::mem::take(&mut c.wisps);
+        for (k, id) in wisps.into_iter().rev().enumerate() { c.timed.push((id, now + k as f32 * OUT_GAP)); }
+        self.channel_burst(owner, 0, n, true, OUT_SECS, MARK_OUT);
+    }
+
+    /// The valve is open: the whistle, steam the whole channel long until each section's fire
+    /// comes, then the fire, a section each `STRIPE_GAP` from `start`. Only ever down the marked
+    /// channel. The number of sections.
+    fn perch_fire(&mut self, owner: Id, start: f32) -> usize {
+        let now = self.clock;
+        let Some(c) = self.perches.crews.get_mut(&owner) else { return 0 };
+        let points = c.channel.clone();
+        let wisps = std::mem::take(&mut c.wisps);
+        c.fire_at = start;
+        c.paint_at = now;
+        for id in wisps { self.perch_gone(owner, id); }
+        for (n, p) in points.iter().copied().enumerate() {
+            let lands = start + n as f32 * STRIPE_GAP;
+            self.perch_visual(owner, p, STEAM, 1.4, 0.0, Some(lands));
+            let mark = self.mark_ground(p, STRIPE_RADIUS, lands - now, 0);
+            self.missiles.push(combat::Missile { owner, from: p, at: p, radius: STRIPE_RADIUS, damage: STRIPE_DAMAGE, blockable: false,
+                heavy: false, land_at: lands, mark, look: MOLTEN });
+            // Still burning where it came: it bites once more, then it's out.
+            if let Some(c) = self.perches.crews.get_mut(&owner) { c.later.push((lands, p, FIRE, 1.0, lands + STRIPE_BURN + 0.4)); }
+            let mark = self.mark_ground(p, STRIPE_RADIUS, lands + STRIPE_BURN - now, 0);
+            self.missiles.push(combat::Missile { owner, from: p, at: p, radius: STRIPE_RADIUS, damage: STRIPE_DAMAGE / 2, blockable: false,
+                heavy: false, land_at: lands + STRIPE_BURN, mark, look: 0 });
+        }
+        points.len()
+    }
+
+    /// Knocked off the valve with his hands on it: stopped for good. No fire, the mark goes
+    /// out, and he reels `VALVE_OPEN`, open to a riposte.
+    fn valve_stopped(&mut self, id: Id) {
+        let now = self.clock;
+        self.events.push(Event::CastEnd { caster: id });
+        self.channel_out(id);
+        self.stagger_mob(id, VALVE_OPEN, true);
+        if let Some(m) = self.mobs.get_mut(&id) {
+            m.posture = 0;
+            m.posture_guard = now + VALVE_OPEN + super::mobs::POSTURE_GRACE;
+        }
+        self.perches.crews.get_mut(&id).unwrap().stage = Stage::Open { until: now + VALVE_OPEN };
+        self.perch_say(id, LINE_STOPPED);
+    }
+
+    /// Kept from the valve: he gives it up. The mark goes out, no fire, and on to his finish.
+    fn leave_valve(&mut self, id: Id) {
+        self.events.push(Event::Log(format!("perch crew {id}: kept from the valve, he gives it up")));
+        self.channel_out(id);
+        self.perches.crews.get_mut(&id).unwrap().stage = Stage::Finished;
+        self.perch_say(id, LINE_HIMSELF);
+    }
+
+    /// The race for the valve. He runs to it and puts his hands on it `WORK_SECS`; then the
+    /// whistle, the steam and the fire down the channel. A stagger on the way only delays him.
+    /// A stagger with his hands on it stops it for good: no fire, the mark goes out and he reels
+    /// `VALVE_OPEN`, open (as a hit ends Sneed's repair for good, `sim::machinery`). Either way
+    /// his finish follows. He works it only standing at it: kept from it, he gives it up.
     pub(crate) fn step_perch_valve(&mut self, id: Id) -> bool {
         let Some(c) = self.perches.crews.get(&id) else { return false };
         let (stage, valve, stand, furnace) = (c.stage, c.valve, c.stand, c.furnace);
+        if matches!(stage, Stage::Crew | Stage::Finished) { return false; }
+        // Nobody left in his fight: his own mind sends him home, and the crew's cleanup takes
+        // the mark, the steam and the fire still to come with it.
+        if self.next_in_fight(id).is_none() { return false; }
         let now = self.clock;
         self.perch_lines(id);
-        if !matches!(stage, Stage::Crew | Stage::Finished)
-            && (self.disabled(id) || self.mobs[&id].stagger_until > now) {
-            self.halt(id);
-            if matches!(stage, Stage::Working { .. }) {
-                self.events.push(Event::CastEnd { caster: id });
-                self.perches.crews.get_mut(&id).unwrap().stage = Stage::ToValve { since: now };
-            }
-            return true;
-        }
+        let down = self.disabled(id) || self.mobs[&id].stagger_until > now;
         match stage {
-            Stage::ToValve { since } => {
-                if dist2d(self.mobs[&id].pos, stand) > 1.0 && now - since < 8.0 {
-                    self.go(id, stand, self.content.mobs[self.mobs[&id].def].run_speed);
-                } else {
+            Stage::ToValve { nearest, at } => {
+                let Some(stand) = stand else { self.leave_valve(id); return true };
+                let d = dist2d(self.mobs[&id].pos, stand);
+                if down {
+                    // Only delayed: time spent reeling isn't time he was kept from it.
+                    self.halt(id);
+                    self.perches.crews.get_mut(&id).unwrap().stage = Stage::ToValve { nearest, at: now };
+                } else if d <= 1.0 {
                     self.halt(id);
                     let m = self.mobs.get_mut(&id).unwrap();
                     m.facing = facing(m.pos, valve);
+                    // What knocks him off it counts from his hands going on: a stance broken on
+                    // the way doesn't shield him here, nor does one built in the fight break at
+                    // a touch.
+                    m.posture = 0;
+                    m.posture_from = now;
+                    m.posture_guard = 0.0;
                     self.events.push(Event::MobStop { id, pos: m.pos, facing: m.facing });
                     self.events.push(Event::Cast { caster: id, spell: WORK_VALVE, ms: (WORK_SECS * 1000.0) as u32 });
                     self.perches.crews.get_mut(&id).unwrap().stage = Stage::Working { until: now + WORK_SECS };
+                } else if now - at >= GIVE_UP {
+                    self.leave_valve(id);
+                } else {
+                    if d < nearest - 0.3 {
+                        self.perches.crews.get_mut(&id).unwrap().stage = Stage::ToValve { nearest: d, at: now };
+                    }
+                    self.go(id, stand, self.content.mobs[self.mobs[&id].def].run_speed);
                 }
                 true
             }
             Stage::Working { until } => {
                 self.halt(id);
-                if now >= until {
+                if down {
+                    self.valve_stopped(id);
+                } else if now >= until {
                     self.events.push(Event::CastEnd { caster: id });
-                    // The furnace glows, it whistles, steam runs along the channel, then the fire.
                     self.events.push(Event::Missile { caster: id, spell: MOLTEN, target: Target::Point(furnace) });
                     self.perch_visual(id, furnace, FIRE, 2.0, 0.0, Some(now + VENT_SECS + 2.0));
                     self.events.push(Event::Sound { id, sound: 3431 }); // Deadmines steam whistle.
-                    // At his foe if the floor runs that way, else straight out from the furnace.
-                    let pos = self.mobs[&id].pos;
-                    let aim = self.mobs[&id].state.foe().and_then(|f| self.foe_pos(f));
-                    let reach = STRIPE_STEP * (STRIPE_MOST - 1) as f32;
-                    let mut ways = aim.map(|a| facing(pos, a)).into_iter().chain([facing(furnace, pos)]);
-                    let (yaw, points) = ways.by_ref().map(|yaw| (yaw, self.perch_run_points(id, along(pos, yaw, 1.0), yaw, reach, STRIPE_STEP)))
-                        .find(|(_, p)| p.len() >= 4).unwrap_or((0.0, Vec::new()));
-                    let n = self.perch_run(id, &points, yaw, STRIPE_RADIUS, now + VENT_SECS, STRIPE_GAP, 30, STRIPE_BURN, true);
+                    let n = self.perch_fire(id, now + VENT_SECS);
                     let done = now + VENT_SECS + n as f32 * STRIPE_GAP + STRIPE_BURN + 0.2;
                     self.perches.crews.get_mut(&id).unwrap().stage = Stage::Cooling { until: done };
                 }
@@ -842,11 +1052,19 @@ impl Survival {
                 self.halt(id);
                 if now >= until {
                     self.perches.crews.get_mut(&id).unwrap().stage = Stage::Finished;
-                    self.perch_say(id, "Then we'll melt the lot!");
+                    self.perch_say(id, LINE_MELT);
                 }
                 true
             }
-            _ => false,
+            Stage::Open { until } => {
+                self.halt(id);
+                if now >= until {
+                    self.perches.crews.get_mut(&id).unwrap().stage = Stage::Finished;
+                    self.perch_say(id, LINE_HIMSELF);
+                }
+                true
+            }
+            Stage::Crew | Stage::Finished => false,
         }
     }
 
@@ -890,11 +1108,34 @@ impl Survival {
         if let Some(m) = self.mobs.get_mut(&id) { m.posed_until = until; }
     }
 
+    /// Where `owner`'s fire still to come will land (for the real-floor tests).
+    pub fn perch_fire_to_come(&self, owner: Id) -> Vec<Vec3> {
+        self.missiles.iter().filter(|m| m.owner == owner).map(|m| m.at).collect()
+    }
+
     /// Debug damage never counts toward his or his crew's posture.
     pub(crate) fn perch_posture_share(&self, id: Id, label: &str) -> f32 {
         let ours = self.perches.crews.contains_key(&id) || self.perches.workers.contains_key(&id)
             || self.mobs.get(&id).is_some_and(|m| self.content.mobs[m.def].perch_crew.is_some());
         if ours && label == "debug" { 0.0 } else { 1.0 }
+    }
+
+    /// `by`'s blow is a heavy one landing on him with his hands on the valve: that alone knocks
+    /// him off it, whatever it dealt and however many heroes are in his fight.
+    pub(crate) fn perch_knocked(&self, id: Id, by: Id, label: &str) -> bool {
+        self.perch_at_valve(id) && label == "Melee"
+            && self.players.get(&by).is_some_and(|p| matches!(&p.action, Action::Swing { strike, .. } if strike.heavy()))
+    }
+
+    /// His hands are on the valve now.
+    pub(crate) fn perch_at_valve(&self, id: Id) -> bool {
+        self.perches.crews.get(&id).is_some_and(|c| matches!(c.stage, Stage::Working { .. }))
+    }
+
+    /// A hero up on a plank or the ramp isn't in the fire, the spill or a blast on the pit
+    /// floor under them: what `owner` (he or one of his crew) lands at `at` passes below `pos`.
+    pub(crate) fn perch_over(&self, owner: Id, pos: Vec3, at: Vec3) -> bool {
+        pos[2] - at[2] > OVER && (self.perches.crews.contains_key(&owner) || self.perches.workers.contains_key(&owner))
     }
 
     pub(crate) fn remove_perch_crew(&mut self, owner: Id) {

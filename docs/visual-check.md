@@ -274,6 +274,19 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
 `tools/visual-check/camera-greenskin.txt` is the first: the warrior and Captain Greenskin on the
 landing's deck.
 
+Gilnid's valve (the race, `docs/gilnid-encounter.md`) has its own set, all sharing
+`_gilnid-valve-setup.txt` (the mine cleared but for him and his crew, markers off, and a timer
+that presses the hero's keys a set time after his line is heard):
+
+| Scenario | What it films |
+| --- | --- |
+| `gilnid-valve-stopped` | Dev setup, by the cameraman: his line, the marked channel, the run, a heavy blow at the valve, the mark going out, him open, the finish |
+| `gilnid-valve-fire` | Dev setup, by the cameraman from above: nobody stops him; the whistle, the steam, the hero stepping out, the fire down the channel |
+| `gilnid-valve-stopped-pov`, `gilnid-valve-fire-pov` | The same two on the hero's own screen |
+| `gilnid-valve-stood` | Dev setup, the hero's own screen: a hero who stays in the channel to the end |
+| `gilnid-valve-fight`, `gilnid-valve-fight-healed` | A real pull by a small player in the interface, no debug kills; the second healed throughout |
+| `gilnid-valve`, `gilnid-ledges`, `gilnid-plank` | The older takes: the valve left alone seen from the side, the crew on their planks, his wait under a plank |
+
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
 cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, 0093 for the
 longer hold, the cameraman hero (`setup` makes it), and a screen wide enough for both

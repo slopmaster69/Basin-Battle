@@ -2598,7 +2598,7 @@ impl Survival {
             let caught: Vec<Id> = self
                 .players
                 .iter()
-                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius)
+                .filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius && !self.perch_over(m.owner, p.pos, m.at))
                 .map(|(id, _)| *id)
                 .collect();
             for v in caught {

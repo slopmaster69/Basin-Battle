@@ -1,0 +1,14 @@
+# Shared by the gilnid-valve-* takes (DEV SETUP, all of it before the fight): travel, the mine
+# restocked and cleared but for Gilnid and his crew, floor markers off, and a small timer (GV)
+# in the interface that presses the hero's own keys a set time after Gilnid's line is heard.
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes gilnid
+11.5 lua GV = { q = {}, t0 = GetTime() } function GV.say(t) SendChatMessage(t, "SAY") end function GV.after(d, f) table.insert(GV.q, { GetTime() + d, f }) end function GV.log(t) if ProbeLog then ProbeLog(string.format("visual-check: gv %.2f %s hp %d", GetTime() - GV.t0, t, UnitHealth("player"))) end end
+11.5 lua GV.f = CreateFrame("Frame") GV.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(GV.q) do local a = GV.q[i] if now >= a[1] then table.remove(GV.q, i) a[2]() else i = i + 1 end end end)
+11.5 lua GV.y = CreateFrame("Frame") GV.y:RegisterEvent("CHAT_MSG_MONSTER_YELL") GV.y:SetScript("OnEvent", function() local t = arg1 or "" GV.log("he yells: " .. t) if string.find(t, "Useless") and GV.useless then GV.useless() end end)
+12 .es goto -178 -579 19.4 3.3

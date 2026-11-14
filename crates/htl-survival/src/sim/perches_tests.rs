@@ -285,87 +285,495 @@ fn a_hero_who_brought_one_down_first_gets_no_demonstration() {
     assert_eq!(s.perches.workers[&crew[1]].throws, 1, "the other took the first throw");
 }
 
-#[test]
-fn the_valve_follows_the_workforce_and_its_fire_runs_in_a_stripe_with_dry_ground_either_side() {
+/// The crew down (debug kills) and his line said: the race for the valve has begun.
+fn race() -> (Survival, Id, Id) {
     let (mut s, hero, boss, crew) = fight();
+    // (The pull's line is long past: his lines keep `LINE_GAP` apart.)
+    s.clock += 5.0;
     for id in crew { s.hurt_mob_as(id, hero, 10_000, "test"); }
     tick(&mut s, 0.1);
-    assert_eq!(s.mobs[&boss].health, s.mobs[&boss].max_health);
-    assert!(matches!(s.perches.crews[&boss].stage, Stage::ToValve { .. }));
-    assert!(until(&mut s, 4.0, |s| matches!(s.perches.crews[&boss].stage, Stage::Working { .. })));
-    let stand = s.perches.crews[&boss].stand;
-    assert!(dist2d(s.mobs[&boss].pos, stand) <= 1.0);
-    assert!(dist2d(stand, s.perches.crews[&boss].valve) < 1.5, "at the furnace's own valve");
-    assert!(s.events.iter().any(|e| matches!(e, Event::Cast { caster, spell: WORK_VALVE, ms: 2000 } if *caster == boss)));
-    // A second hero beside the line the fire will take.
-    let dry = s.join("dry", "Dry", None);
-    let gilnid = s.mobs[&boss].pos;
-    let yaw = facing(gilnid, s.players[&hero].pos);
-    let side = along(along(gilnid, yaw, 6.0), yaw + std::f32::consts::FRAC_PI_2, 3.2);
-    let p = s.players.get_mut(&dry).unwrap();
-    p.pos = side;
-    p.health = 1000;
-    p.max_health = 1000;
-    let before = (s.players[&hero].health, s.players[&dry].health);
-    assert!(until(&mut s, 2.2, |s| matches!(s.perches.crews[&boss].stage, Stage::Cooling { .. })));
-    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id, sound: 3431 } if *id == boss)), "a whistle");
-    let steam = s.perches.crews[&boss].visuals.iter().filter(|id| display(&s, **id) == Some(STEAM)).count();
-    assert!(steam >= 3, "steam along the channel");
-    let stripe: Vec<(Vec3, f32)> = s.missiles.iter().filter(|m| m.owner == boss && m.look == MOLTEN).map(|m| (m.at, m.land_at)).collect();
-    assert!(stripe.len() >= 6);
-    // It advances: each section later than the one before, along one line.
-    for w in stripe.windows(2) {
-        assert!(w[1].1 > w[0].1);
-        assert!(angle_between(facing(w[0].0, w[1].0), yaw) < 0.05);
-    }
-    assert!(stripe[0].1 - s.clock >= VENT_SECS - 0.1, "steam first, then fire");
-    // Drawn as a band its true width: both edges at once, the whole way, 3 yd apart, either side
-    // of the sections' line, and the fill laid two sections at a time as the fire arrives.
-    let edges: Vec<(Vec3, f32)> = s.events.iter().filter_map(|e| match e {
-        Event::GroundBurst { at, shape: "line", width, reach, colour, .. } if *width < 0.5 && colour == BAND_EDGE => Some((*at, *reach)),
+    assert_eq!(stage(&s, boss), "to valve");
+    assert!(said(&s, "Useless. Every one of you."));
+    (s, hero, boss)
+}
+
+fn stage(s: &Survival, boss: Id) -> &'static str {
+    s.perch_stage(boss).unwrap_or("gone")
+}
+
+/// The channel's bursts among `ev` in `colour`: where each begins, its way, reach, width, secs.
+fn marks(ev: &[Event], colour: &str) -> Vec<(Vec3, f32, f32, f32, f32)> {
+    ev.iter().filter_map(|e| match e {
+        Event::GroundBurst { at, yaw, shape: "line", reach, width, secs, colour: c, .. } if c == colour => Some((*at, *yaw, *reach, *width, *secs)),
         _ => None,
-    }).collect();
-    assert_eq!(edges.len(), 2, "both edges");
-    assert!((dist2d(edges[0].0, edges[1].0) - 2.0 * STRIPE_RADIUS).abs() < 0.05, "3 yd apart");
-    let run = dist2d(stripe[0].0, stripe[stripe.len() - 1].0);
-    assert!(edges.iter().all(|e| e.1 >= run + STRIPE_STEP - 0.01), "the whole way, past the end sections");
-    let mut fills: Vec<(f32, Vec3, f32)> = Vec::new();
+    }).collect()
+}
+
+/// How many bursts of the channel's mark, of any look, are among `ev`.
+fn marked(ev: &[Event]) -> usize {
+    [MARK_WILL, MARK_SOON, MARK_FIRE, MARK_OUT].iter().map(|c| marks(ev, c).len()).sum()
+}
+
+/// Steam and flames standing in the world.
+fn vapour(s: &Survival) -> usize {
+    s.objs.values().filter(|o| matches!(o.kind, ObjKind::Prop { display, .. } if display == STEAM || display == FIRE)).count()
+}
+
+fn friend(s: &mut Survival, key: &str, at: Vec3) -> Id {
+    let id = s.join(key, key, None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.pos = at;
+    p.health = 100_000;
+    p.max_health = 100_000;
+    id
+}
+
+fn said(s: &Survival, line: &str) -> bool {
+    s.events.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == line))
+}
+
+/// A hero beside him, facing him.
+fn beside(s: &mut Survival, hero: Id, boss: Id) {
+    let at = s.mobs[&boss].pos;
+    s.move_player(hero, [at[0] - 1.2, at[1], at[2]], 0.0, Moving::default());
+}
+
+#[test]
+fn the_fires_channel_is_fixed_in_the_world_and_marked_from_his_line() {
+    let (mut s, hero, boss, crew) = fight();
+    let (channel, yaw, half) = s.perch_channel(boss).unwrap();
+    let n = channel.len();
+    let valve = s.perches.crews[&boss].valve;
+    assert_eq!(n, STRIPE_MOST, "the whole of it on an open floor");
+    assert!((dist2d(channel[0], valve) - CHANNEL_OUT).abs() < 0.01, "from the valve");
+    let d = s.content.mobs[s.mobs[&boss].def].perch_crew.clone().unwrap().channel.unwrap();
+    assert!(angle_between(yaw, d[1].atan2(d[0])) < 0.5, "the content's way");
+    for w in channel.windows(2) {
+        assert!((dist2d(w[0], w[1]) - STRIPE_STEP).abs() < 0.01);
+        assert!(angle_between(facing(w[0], w[1]), yaw) < 0.5, "one straight line");
+    }
+    tick(&mut s, 1.0);
+    assert_eq!(marked(&s.events), 0, "nothing is marked while the crew stands");
+    assert!(s.perches.crews[&boss].wisps.is_empty());
+    // Wherever the heroes stand when his line comes, it's the same channel.
+    s.players.get_mut(&hero).unwrap().pos = [14.0, 9.0, 0.0];
+    s.events.clear();
+    for id in crew { s.hurt_mob_as(id, hero, 10_000, "test"); }
+    tick(&mut s, 0.1);
+    assert_eq!(stage(&s, boss), "to valve");
+    assert_eq!(s.perch_channel(boss).unwrap().0, channel);
+    // Marked from that moment: a pale band its true width the whole channel long, and a wisp of
+    // steam on every section.
+    let will = marks(&s.events, MARK_WILL);
+    assert!(!will.is_empty(), "marked as his line is said");
+    let whole = dist2d(channel[0], channel[n - 1]) + STRIPE_STEP;
+    for (at, way, reach, width, secs) in &will {
+        assert!(dist2d(*at, along(channel[0], yaw, -STRIPE_STEP / 2.0)) < 0.01);
+        assert!(angle_between(*way, yaw) < 0.5);
+        assert!((reach - whole).abs() < 0.01, "the whole channel");
+        assert!((width - 2.0 * half).abs() < 0.01, "its true width");
+        assert!(*secs <= 1.0, "never drawn longer than a moment ahead: it can go out");
+    }
+    let wisps = s.perches.crews[&boss].wisps.clone();
+    assert_eq!(wisps.len(), n);
+    for (id, p) in wisps.iter().zip(&channel) {
+        assert_eq!(display(&s, *id), Some(STEAM));
+        assert_eq!(s.objs[id].pos, *p);
+    }
+    assert!(!s.missiles.iter().any(|m| m.owner == boss), "nothing burns yet");
+    // It stays marked all his way to the valve and while his hands are on it.
+    s.events.clear();
     let t0 = s.clock;
-    while s.clock < t0 + VENT_SECS + 3.5 {
-        let ev = s.step(0.05);
-        for e in &ev {
-            if let Event::GroundBurst { at, shape: "line", width, reach, .. } = e {
-                if (*width - 2.0 * STRIPE_RADIUS).abs() < 0.01 { fills.push((s.clock, *at, *reach)); }
-            }
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    tick(&mut s, 1.0);
+    let sent = marks(&s.events, MARK_WILL).len() as f32;
+    assert!(sent >= (s.clock - t0) / WILL_EVERY - 1.5, "sent again each {WILL_EVERY} s: {sent} in {}", s.clock - t0);
+    assert_eq!(marked(&s.events) as f32, sent, "in the one look");
+    assert_eq!(s.perches.crews[&boss].wisps, wisps);
+}
+
+#[test]
+fn left_to_it_a_whistle_then_steam_then_fire_down_the_marked_channel_with_dry_ground_either_side() {
+    let (mut s, hero, boss) = race();
+    let (channel, yaw, half) = s.perch_channel(boss).unwrap();
+    let n = channel.len();
+    // One hero stands in the channel's middle and stays; another a step outside its edge.
+    s.players.get_mut(&hero).unwrap().pos = channel[n / 2];
+    let dry = friend(&mut s, "dry", along(channel[n / 2], yaw + std::f32::consts::FRAC_PI_2, half + 0.3));
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    let c = &s.perches.crews[&boss];
+    let stand = c.stand.unwrap();
+    assert!(dist2d(s.mobs[&boss].pos, stand) <= 1.0, "standing at it");
+    assert!(dist2d(stand, c.valve) < 1.5, "at the furnace's own valve");
+    let ms = (WORK_SECS * 1000.0) as u32;
+    assert!(s.events.iter().any(|e| matches!(e, Event::Cast { caster, spell: WORK_VALVE, ms: m } if *caster == boss && *m == ms)));
+    assert!(!s.missiles.iter().any(|m| m.owner == boss));
+    let before = (s.players[&hero].health, s.players[&dry].health);
+    assert!(until(&mut s, WORK_SECS + 0.2, |s| stage(s, boss) == "steam"));
+    let opened = s.clock;
+    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id, sound: 3431 } if *id == boss)), "a whistle");
+    assert!(s.perches.crews[&boss].wisps.is_empty(), "the wisps give way to the full steam");
+    let steam = s.perches.crews[&boss].visuals.iter().filter(|id| display(&s, **id) == Some(STEAM)).count();
+    assert_eq!(steam, n, "steam on every section");
+    // The fire is laid on the marked channel and nowhere else, a section after a section.
+    let stripe: Vec<(Vec3, f32)> = s.missiles.iter().filter(|m| m.owner == boss && m.look == MOLTEN).map(|m| (m.at, m.land_at)).collect();
+    assert_eq!(stripe.iter().map(|x| x.0).collect::<Vec<_>>(), channel);
+    assert!(s.missiles.iter().filter(|m| m.owner == boss).all(|m| channel.contains(&m.at)));
+    for (k, sec) in stripe.iter().enumerate() {
+        assert!((sec.1 - (opened + VENT_SECS + k as f32 * STRIPE_GAP)).abs() < 0.06, "the steam first, then a section each {STRIPE_GAP} s");
+    }
+    // The mark changes its look: bright where it's about to burn, amber where it burns.
+    s.events.clear();
+    let mut log: Vec<(f32, String, Vec3, f32, f32)> = Vec::new();
+    let mut from = 0;
+    loop {
+        for e in &s.events[from..] {
+            if let Event::GroundBurst { at, reach, colour, secs, shape: "line", .. } = e { log.push((s.clock, colour.clone(), *at, *reach, *secs)); }
         }
+        from = s.events.len();
+        if stage(&s, boss) == "finished" || s.clock > opened + 12.0 { break; }
+        tick(&mut s, 0.05);
     }
-    assert_eq!(fills.len(), stripe.len().div_ceil(2), "a fill each two sections");
-    for (k, f) in fills.iter().enumerate() {
-        assert!((f.0 - stripe[2 * k].1).abs() < 0.06, "laid as its first section catches");
-        assert!(dist2d(f.1, stripe[2 * k].0) <= STRIPE_STEP / 2.0 + 0.1, "starting at it");
+    assert_eq!(stage(&s, boss), "finished");
+    let whole = dist2d(channel[0], channel[n - 1]) + STRIPE_STEP;
+    let start = along(channel[0], yaw, -STRIPE_STEP / 2.0);
+    assert!(log.iter().all(|l| l.1 == MARK_SOON || l.1 == MARK_FIRE), "only those two looks once the valve is open");
+    let first = &log[0];
+    assert!(first.0 <= opened + 0.11 && first.1 == MARK_SOON && (first.3 - whole).abs() < 0.01, "the whole channel bright at the whistle");
+    let fire_at = opened + VENT_SECS;
+    assert!(log.iter().filter(|l| l.0 < fire_at - 0.06).all(|l| l.1 == MARK_SOON), "no amber before the fire");
+    assert!(log.iter().any(|l| l.1 == MARK_FIRE));
+    for l in &log {
+        // Each lies inside the channel, on its line.
+        let along_it = dist2d(start, l.2);
+        assert!(along_it < 0.01 || angle_between(facing(start, l.2), yaw) < 0.5, "{l:?}");
+        assert!(along_it + l.3 <= whole + 0.01, "{l:?}");
+        assert!(l.4 <= 1.0);
     }
-    assert!(fills.windows(2).all(|w| w[1].0 > w[0].0), "it advances");
-    assert!(until(&mut s, 8.0, |s| matches!(s.perches.crews[&boss].stage, Stage::Finished)));
-    assert!(s.players[&hero].health < before.0, "standing in its path takes it");
-    assert_eq!(s.players[&dry].health, before.1, "the dry side is dry");
-    assert!(s.events.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "Then we'll melt the lot!")));
+    // Amber only where a section has caught, the rest still bright.
+    for l in log.iter().filter(|l| l.1 == MARK_FIRE) {
+        let lit = (((l.0 - fire_at) / STRIPE_GAP) as usize + 1).min(n) as f32;
+        assert!(dist2d(start, l.2) + l.3 <= lit * STRIPE_STEP + 0.3, "{l:?}");
+    }
+    assert!(log.last().unwrap().0 <= fire_at + n as f32 * STRIPE_GAP + STRIPE_BURN + 0.1, "the mark doesn't outlast the fire");
+    let cost = before.0 - s.players[&hero].health;
+    assert!(cost > 0, "standing in it to the end costs");
+    assert_eq!(s.players[&dry].health, before.1, "a step outside its edge is dry");
+    assert!(said(&s, LINE_MELT) && !said(&s, LINE_STOPPED) && !said(&s, LINE_HIMSELF));
+    s.events.clear();
+    tick(&mut s, 1.5);
+    assert_eq!(marked(&s.events), 0);
+    assert_eq!(vapour(&s), 0, "steam and flames are out");
     assert_eq!(s.perches.workers.len(), 2, "no replacement workers");
     s.hurt_mob_as(boss, hero, 100_000, "test");
     assert!(s.perches.crews.is_empty() && s.perches.workers.is_empty());
 }
 
 #[test]
-fn a_stagger_delays_his_hands_on_the_valve() {
-    let (mut s, hero, boss, crew) = fight();
-    for id in crew { s.hurt_mob_as(id, hero, 10_000, "test"); }
-    assert!(until(&mut s, 4.0, |s| matches!(s.perches.crews[&boss].stage, Stage::Working { .. })));
+fn a_hero_in_the_channel_at_the_whistle_reaches_dry_floor_either_side_before_it_burns() {
+    let speed = Content::dev().player.run_speed;
+    for side in [1.0f32, -1.0] {
+        for k in [0usize, 4, 9] {
+            let (mut s, hero, boss) = race();
+            let (channel, yaw, half) = s.perch_channel(boss).unwrap();
+            s.players.get_mut(&hero).unwrap().pos = channel[k];
+            assert!(until(&mut s, 8.0, |s| stage(s, boss) == "steam"));
+            let before = s.players[&hero].health;
+            // Half a second to take the whistle in, then out the side at a run.
+            tick(&mut s, 0.5);
+            let out = yaw + side * std::f32::consts::FRAC_PI_2;
+            let mut gone = 0.0;
+            while gone < half + 0.5 {
+                gone += speed * 0.05;
+                s.players.get_mut(&hero).unwrap().pos = along(channel[k], out, gone);
+                tick(&mut s, 0.05);
+            }
+            assert!(until(&mut s, 8.0, |s| stage(s, boss) == "finished"));
+            assert_eq!(s.players[&hero].health, before, "section {k}, side {side}");
+        }
+    }
+}
+
+#[test]
+fn a_stagger_on_his_way_to_the_valve_only_delays_him() {
+    let (mut s, _, boss) = race();
+    let n = s.perch_channel(boss).unwrap().0.len();
+    // Longer than he'd take to give the valve up: time reeling isn't time kept from it.
+    s.stagger_mob(boss, GIVE_UP + 1.0, true);
+    s.mobs.get_mut(&boss).unwrap().posture_guard = s.clock + 20.0;
+    tick(&mut s, GIVE_UP + 0.5);
+    assert_eq!(stage(&s, boss), "to valve");
+    assert_eq!(s.perches.crews[&boss].wisps.len(), n, "still marked");
+    s.events.clear();
+    tick(&mut s, 0.6);
+    assert!(!marks(&s.events, MARK_WILL).is_empty());
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"), "on to the valve after");
+    assert!(!said(&s, LINE_HIMSELF) && !said(&s, LINE_STOPPED));
+    assert!(s.mobs[&boss].posture_guard <= s.clock, "a stance broken on the way doesn't shield him at the valve");
+}
+
+#[test]
+fn a_stagger_with_his_hands_on_the_valve_stops_it_for_good_and_leaves_him_open() {
+    let (mut s, hero, boss) = race();
+    let (channel, yaw, _) = s.perch_channel(boss).unwrap();
+    let n = channel.len();
+    // A hero standing in the channel: nothing may burn them now.
+    s.players.get_mut(&hero).unwrap().pos = channel[3];
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
     tick(&mut s, 1.0);
-    s.stagger_mob(boss, 2.0, false);
+    let before = s.players[&hero].health;
+    s.events.clear();
+    let t = s.clock;
+    s.stagger_mob(boss, 2.2, true);
     tick(&mut s, 0.1);
-    assert!(matches!(s.perches.crews[&boss].stage, Stage::ToValve { .. }));
-    assert!(!s.missiles.iter().any(|m| m.owner == boss), "no fire yet");
-    assert!(s.events.iter().any(|e| matches!(e, Event::CastEnd { caster } if *caster == boss)));
-    assert!(until(&mut s, 3.0, |s| matches!(s.perches.crews[&boss].stage, Stage::Working { .. })), "back to it after");
+    assert_eq!(stage(&s, boss), "open");
+    assert!(s.events.iter().any(|e| matches!(e, Event::CastEnd { caster } if *caster == boss)), "his hands come off it");
+    // The mark goes out where it can be seen: one grey burst drawn back toward the valve, and
+    // the wisps out one after another from the far end.
+    let out = marks(&s.events, MARK_OUT);
+    assert_eq!(out.len(), 1);
+    assert!(angle_between(out[0].1, yaw + std::f32::consts::PI) < 0.5, "drawn back toward the valve");
+    assert!(dist2d(out[0].0, along(channel[n - 1], yaw, STRIPE_STEP / 2.0)) < 0.01);
+    assert_eq!(marks(&s.events, MARK_WILL).len(), 0, "no more of the mark");
+    let left: Vec<Vec3> = s.perches.crews[&boss].visuals.iter().filter(|id| display(&s, **id) == Some(STEAM)).map(|id| s.objs[id].pos).collect();
+    assert!(!left.is_empty() && left.len() < n, "going out: {} left", left.len());
+    assert_eq!(left, channel[..left.len()], "the far end first");
+    let m = &s.mobs[&boss];
+    assert!(m.stagger_until >= t + VALVE_OPEN - 0.1 && m.riposte, "open");
+    tick(&mut s, 0.8);
+    assert_eq!(vapour(&s), 0, "every wisp out");
+    assert!(said(&s, LINE_STOPPED), "(his lines keep 2 s apart, so within that of the blow)");
+    assert_eq!(s.posture_of(boss), 0);
+    s.hurt_mob_as(boss, hero, 300, "Melee");
+    assert_eq!(s.posture_of(boss), 0, "one stop, not a chain of them");
+    assert!(until(&mut s, VALVE_OPEN, |s| stage(s, boss) == "finished"));
+    assert!((s.clock - t - VALVE_OPEN).abs() < 0.2, "open {VALVE_OPEN} s");
+    assert!(said(&s, LINE_HIMSELF) && !said(&s, LINE_MELT), "his line fits what happened");
+    let def = s.mobs[&boss].def;
+    let flurry = s.content.mobs[def].patterns.iter().find(|p| p.name == FINISH).unwrap().clone();
+    assert!(s.perch_pattern_allowed(boss, &flurry), "on to his finish");
+    // For good: no whistle, no steam, no fire, however long the fight goes on.
+    s.players.get_mut(&hero).unwrap().pos = channel[n - 1];
+    tick(&mut s, 8.0);
+    assert_eq!(stage(&s, boss), "finished");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Sound { sound: 3431, .. })));
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Cast { spell: WORK_VALVE, .. })), "he doesn't go back to it");
+    assert_eq!(marks(&s.events, MARK_SOON).len() + marks(&s.events, MARK_FIRE).len() + marks(&s.events, MARK_WILL).len(), 0);
+    assert_eq!(vapour(&s), 0);
+    assert!(s.players[&hero].health <= before, "(only his own blows since)");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Missile { spell: MOLTEN, .. })));
+}
+
+#[test]
+fn one_heavy_blow_knocks_him_off_the_valve_whatever_it_deals_and_light_blows_take_longer() {
+    // One heavy blow, begun as his hands go on it.
+    let (mut s, hero, boss) = race();
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    beside(&mut s, hero, boss);
+    let began = s.clock;
+    s.input(hero, Input::Heavy);
+    while stage(&s, boss) == "working" { s.step(0.05); }
+    let heavy = s.clock - began;
+    assert_eq!(stage(&s, boss), "open", "one heavy blow");
+    assert!(heavy < WORK_SECS - 0.5, "with time to spare: {heavy}");
+    // Two light blows don't.
+    let (mut s, hero, boss) = race();
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    beside(&mut s, hero, boss);
+    let mut jabs = 0;
+    while jabs < 2 && stage(&s, boss) == "working" {
+        if matches!(s.players[&hero].action, Action::Ready) { s.input(hero, Input::Attack); jabs += 1; }
+        s.step(0.05);
+    }
+    for _ in 0..12 { if stage(&s, boss) == "working" { s.step(0.05); } }
+    assert_ne!(stage(&s, boss), "open", "two jabs don't");
+    // Committed light blows from the moment his hands go on: about 2 s, as long as he needs.
+    let (mut s, hero, boss) = race();
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    s.perches.crews.get_mut(&boss).unwrap().stage = Stage::Working { until: s.clock + 10.0 };
+    beside(&mut s, hero, boss);
+    let began = s.clock;
+    while stage(&s, boss) == "working" && s.clock < began + 5.0 {
+        s.input(hero, Input::Attack);
+        s.step(0.05);
+    }
+    let light = s.clock - began;
+    assert_eq!(stage(&s, boss), "open");
+    assert!((1.2..=3.2).contains(&light), "light blows: {light}");
+    // A heavy blow that deals next to nothing still does it, and with four in his fight.
+    let (mut s, hero, boss) = race();
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    s.mobs.get_mut(&boss).unwrap().fighters = 4;
+    beside(&mut s, hero, boss);
+    s.input(hero, Input::Heavy);
+    s.step(0.05);
+    assert!(matches!(&s.players[&hero].action, Action::Swing { strike, .. } if strike.heavy()));
+    s.hurt_mob_as(boss, hero, 1, "Melee");
+    tick(&mut s, 0.05);
+    assert_eq!(stage(&s, boss), "open");
+    println!("at the valve: one heavy blow lands {heavy:.2} s after it's begun; light blows alone take {light:.2} s");
+}
+
+#[test]
+fn kept_from_the_valve_he_gives_it_up_and_never_works_it_from_where_he_stands() {
+    let (mut s, _, boss) = race();
+    let held = s.mobs[&boss].pos;
+    s.events.clear();
+    let t = s.clock;
+    // Held where he is, as a floor he can't cross would hold him.
+    while stage(&s, boss) == "to valve" && s.clock < t + 12.0 {
+        s.mobs.get_mut(&boss).unwrap().pos = held;
+        tick(&mut s, 0.05);
+    }
+    assert_eq!(stage(&s, boss), "finished", "he gives it up");
+    assert!((s.clock - t - GIVE_UP).abs() < 0.4, "after {GIVE_UP} s no nearer: {}", s.clock - t);
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Cast { spell: WORK_VALVE, .. })), "never worked from afar");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Sound { sound: 3431, .. })));
+    assert!(!s.missiles.iter().any(|m| m.owner == boss));
+    assert_eq!(marks(&s.events, MARK_OUT).len(), 1, "the mark goes out");
+    tick(&mut s, 0.1);
+    assert!(said(&s, LINE_HIMSELF));
+    s.events.clear();
+    tick(&mut s, 1.0);
+    assert_eq!(vapour(&s), 0);
+    assert_eq!(marked(&s.events), 0);
+}
+
+#[test]
+fn with_no_channel_or_nowhere_to_stand_at_the_valve_he_leaves_it_alone() {
+    for case in 0..2 {
+        let (mut s, hero, boss, crew) = fight();
+        let c = s.perches.crews.get_mut(&boss).unwrap();
+        if case == 0 { c.channel.truncate(CHANNEL_LEAST - 1); } else { c.stand = None; }
+        s.events.clear();
+        for id in crew { s.hurt_mob_as(id, hero, 10_000, "test"); }
+        tick(&mut s, 0.1);
+        assert_eq!(stage(&s, boss), "finished", "case {case}: straight on to his finish");
+        tick(&mut s, 6.0);
+        assert!(!s.events.iter().any(|e| matches!(e, Event::Cast { spell: WORK_VALVE, .. })), "a valve never worked for nothing");
+        assert!(!s.events.iter().any(|e| matches!(e, Event::Sound { sound: 3431, .. })));
+        assert_eq!(marked(&s.events), 0, "no mark, so no fire");
+        assert!(!s.events.iter().any(|e| matches!(e, Event::Missile { spell: MOLTEN, .. })));
+        assert_eq!(vapour(&s), 0);
+        assert!(said(&s, "Useless. Every one of you.") && said(&s, LINE_HIMSELF));
+    }
+}
+
+#[test]
+fn no_fire_comes_from_a_dead_man() {
+    for at in ["to valve", "working", "steam", "fire"] {
+        let (mut s, hero, boss) = race();
+        let (channel, ..) = s.perch_channel(boss).unwrap();
+        // At the far end, where it burns last.
+        s.players.get_mut(&hero).unwrap().pos = channel[channel.len() - 1];
+        assert!(until(&mut s, 8.0, |s| stage(s, boss) == at));
+        if at == "steam" || at == "fire" { assert!(s.missiles.iter().any(|m| m.owner == boss)); }
+        let marks_: Vec<_> = s.missiles.iter().filter(|m| m.owner == boss).map(|m| m.mark).collect();
+        let before = s.players[&hero].health;
+        s.hurt_mob_as(boss, hero, 100_000, "test");
+        assert!(s.perches.crews.is_empty());
+        assert!(!s.missiles.iter().any(|m| m.owner == boss), "{at}: the fire still to come goes with him");
+        assert!(marks_.iter().all(|id| s.mark_left(*id) == 0.0));
+        assert_eq!(vapour(&s), 0, "{at}: steam and flames go at once");
+        s.events.clear();
+        tick(&mut s, 5.0);
+        assert_eq!(marked(&s.events), 0, "{at}: no more of the mark");
+        assert_eq!(s.players[&hero].health, before, "{at}");
+    }
+}
+
+#[test]
+fn a_lost_fight_takes_the_mark_the_steam_and_the_fire_at_once() {
+    for at in ["to valve", "working", "steam", "fire"] {
+        let (mut s, hero, boss) = race();
+        assert!(until(&mut s, 8.0, |s| stage(s, boss) == at));
+        if at == "fire" { tick(&mut s, 0.6); }
+        assert!(vapour(&s) > 0);
+        s.players.get_mut(&hero).unwrap().health = 0;
+        s.foe_gone(hero);
+        s.events.clear();
+        tick(&mut s, 0.05);
+        assert!(s.perches.crews.is_empty(), "{at}");
+        assert!(!s.missiles.iter().any(|m| m.owner == boss), "{at}: the fire still to come");
+        assert_eq!(vapour(&s), 0, "{at}: steam and flames");
+        tick(&mut s, 5.0);
+        assert_eq!(marked(&s.events), 0, "{at}: the mark");
+    }
+    // The last hero walks out of the fight instead: the same.
+    for at in ["working", "steam"] {
+        let (mut s, hero, boss) = race();
+        assert!(until(&mut s, 8.0, |s| stage(s, boss) == at));
+        s.players.get_mut(&hero).unwrap().pos = [300.0, 300.0, 0.0];
+        assert!(until(&mut s, 3.0, |s| s.perches.crews.is_empty()), "{at}: he goes home");
+        assert!(!s.missiles.iter().any(|m| m.owner == boss));
+        assert_eq!(vapour(&s), 0);
+        s.events.clear();
+        tick(&mut s, 5.0);
+        assert_eq!(marked(&s.events), 0);
+    }
+}
+
+#[test]
+fn a_hero_who_falls_while_a_friend_fights_on_ends_nothing() {
+    let (mut s, first, boss) = race();
+    let (channel, yaw, half) = s.perch_channel(boss).unwrap();
+    let second = friend(&mut s, "second", along(channel[2], yaw + std::f32::consts::FRAC_PI_2, half + 1.0));
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    s.players.get_mut(&first).unwrap().health = 0;
+    s.foe_gone(first);
+    tick(&mut s, 0.1);
+    assert_eq!(stage(&s, boss), "working", "his hands stay on the valve");
+    assert_eq!(s.mobs[&boss].state.target(), Some(second));
+    assert_eq!(s.perches.crews[&boss].wisps.len(), channel.len(), "still marked");
+    let before = s.players[&second].health;
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "fire"));
+    assert!(until(&mut s, 8.0, |s| stage(s, boss) == "finished"));
+    assert_eq!(s.players[&second].health, before, "the friend, beside it, is dry");
+    // And the friend can still stop it.
+    let (mut s, first, boss) = race();
+    let second = friend(&mut s, "second", [3.0, 3.0, 0.0]);
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    s.players.get_mut(&first).unwrap().health = 0;
+    s.foe_gone(first);
+    tick(&mut s, 0.1);
+    beside(&mut s, second, boss);
+    s.input(second, Input::Heavy);
+    while stage(&s, boss) == "working" { s.step(0.05); }
+    assert_eq!(stage(&s, boss), "open");
+}
+
+#[test]
+fn two_heroes_one_at_the_valve_and_one_in_the_channel() {
+    let (mut s, a, boss) = race();
+    let (channel, ..) = s.perch_channel(boss).unwrap();
+    let b = friend(&mut s, "b", channel[5]);
+    s.join_fight(boss);
+    assert_eq!(s.mobs[&boss].fighters, 2);
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    let before = s.players[&b].health;
+    // One heavy blow from the one at the valve is still enough with two in his fight.
+    beside(&mut s, a, boss);
+    s.input(a, Input::Heavy);
+    while stage(&s, boss) == "working" { s.step(0.05); }
+    assert_eq!(stage(&s, boss), "open", "stopped by the one at the valve");
+    // The one in the channel never has to move.
+    assert!(until(&mut s, 6.0, |s| stage(s, boss) == "finished"));
+    assert_eq!(s.players[&b].health, before);
+}
+
+#[test]
+fn a_hero_up_on_a_plank_is_not_burned_by_the_fire_on_the_floor_below() {
+    let (mut s, hero, boss) = race();
+    let (channel, ..) = s.perch_channel(boss).unwrap();
+    let below = friend(&mut s, "below", channel[4]);
+    let mut up = channel[4];
+    up[2] += 8.6;
+    s.players.get_mut(&hero).unwrap().pos = up;
+    let before = (s.players[&hero].health, s.players[&below].health);
+    assert!(until(&mut s, 12.0, |s| stage(s, boss) == "fire"));
+    tick(&mut s, 3.0);
+    assert_eq!(s.players[&hero].health, before.0, "8.6 yd over it");
+    assert!(s.players[&below].health < before.1, "on the floor under them it burns");
 }
 
 #[test]
@@ -467,7 +875,8 @@ fn a_ledge_with_no_floor_of_his_under_it_is_omitted_without_stranding_the_encoun
     s.place_perch_crew(boss);
     assert!(s.perches.crews[&boss].workers.is_empty());
     s.step_perch_crews();
-    assert!(matches!(s.perches.crews[&boss].stage, Stage::ToValve { .. }));
+    // (That floor carries no channel either: no valve, straight on to his finish.)
+    assert!(matches!(s.perches.crews[&boss].stage, Stage::Finished));
 }
 
 #[test]

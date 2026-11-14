@@ -1,0 +1,21 @@
+# DEV SETUP: gilnid-valve-fire on the hero's own screen (no cameraman): the hero in the middle
+# of the channel, the crew brought down by debug, the hero healed. The line, the marked channel,
+# the whistle and the steam, the step out sideways 0.6 s after the whistle, the fire passing.
+hero warrior
+cam off
+include _gilnid-valve-setup
+12.5 lua GV.useless = function() GV.after(3.9, function() ActionDash(0.5, 7, "l") GV.log("steps out") end) end
+13 video
+14 .es goto -188 -580 21 3.6
+16 .es goto -203.75 -590.6 21 0.52
+18.4 .es heal
+18.6 .es in lock
+19 .es hurt 0 engineer
+19.3 .es hurt 0 engineer
+19.5 shots valve 30 0.3
+21 .es heal
+28.5 .es heal
+29 shots finish 10 0.5
+32 .es heal
+35 .es heal
+38 end
