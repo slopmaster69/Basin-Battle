@@ -24,7 +24,7 @@ on:
         default: true
 
 concurrency:
-  group: client-tests-${{ github.ref }}
+  group: client-tests-${{ github.ref }}-${{ inputs.patches }}
   cancel-in-progress: true
 
 jobs:
