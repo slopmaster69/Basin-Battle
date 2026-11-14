@@ -5,7 +5,7 @@ hero warrior
 cam off
 include _sneed-shredder-setup
 12.5 lua SV.on["company property"] = function() SV.after(0.5, function() SV.fight = true end) end
-12.5 lua SV.on["one... bolt"] = function() SV.fight = false SV.say(".es in unlock") SV.after(0.6, function() SV.go(-280.67, -497.2, 1.5, function() SV.after(0.05, function() SV.hit() SV.log("cuts the rope") end) SV.after(1.7, function() SV.fight = true end) end) end) end
+12.5 lua SV.on["one... bolt"] = function() local t = GetTime() SV.fight = false SV.say(".es in unlock") SV.after(0.6, function() SV.go(-280.67, -497.2, 1.5, function() SV.after(math.max(0.05, t + 2.2 - GetTime()), function() SV.hit() SV.log("cuts the rope") SV.after(1.6, function() SV.fight = true end) end) end) end) end
 13 .es heal
 13.5 video
 14.5 .es goto -279 -516 50.4 2.48

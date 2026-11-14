@@ -85,7 +85,7 @@ fn the_log_hangs_over_the_post_from_the_pull_its_drop_marked_and_its_tie_off_out
     let ev = run(&mut s, 1.2);
     let g = rig(&s);
     let (work, tie, crawl) = (g.work.unwrap(), g.tie.unwrap(), g.crawl.unwrap());
-    assert_eq!((props(&s, LOG), props(&s, STAKE)), (1, 1), "one log, one tie-off");
+    assert_eq!((props(&s, LOG), props(&s, STAKE)), (LOG_BUNDLE.len(), 1), "one log (three poles slung together), one tie-off");
     let log = g.log.unwrap();
     assert!(s.objs[&log].pos[2] - g.home[2] >= 5.5, "over the machine's head");
     assert!(s.collapse_piece_tilt(log).is_some() && s.collapse_piece_tilt(g.stake.unwrap()).is_some(), "drawn with no hull");
@@ -237,7 +237,7 @@ fn a_blow_on_the_tie_off_cuts_it_the_log_creaks_and_comes_down_once() {
     assert_eq!(rig(&s).state, "down");
     assert!(!after.iter().any(|e| matches!(e, Event::Sound { sound: CREAK_SOUND, .. })));
     assert!(!after.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", .. })), "no mark for a log that's down");
-    assert_eq!(props(&s, LOG), 1);
+    assert_eq!(props(&s, LOG), LOG_BUNDLE.len());
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn a_plain_hit_hurts_sneed_at_his_repair_and_does_not_stop_it_a_stagger_does_and
     run(&mut s, BODY_SECS + 1.0);
     assert!(!s.mobs.contains_key(&machine) && !s.mobs.contains_key(&driver), "no ghost wreck");
     assert!(rig(&s).lumber.is_empty() && props(&s, LUMBER) + props(&s, PLANK) == 0, "no lumber left lying");
-    assert_eq!((rig(&s).state, props(&s, LOG)), ("hung", 1));
+    assert_eq!((rig(&s).state, props(&s, LOG)), ("hung", LOG_BUNDLE.len()));
 }
 
 #[test]
@@ -560,7 +560,7 @@ fn a_lost_fight_at_any_stage_hangs_the_log_again_over_a_clean_floor_with_one_who
         let g = rig(&s);
         assert_eq!(g.state, "hung", "stage {stage}: hung again at once");
         assert!(g.lumber.is_empty(), "stage {stage}");
-        assert_eq!((props(&s, LOG), props(&s, STAKE), props(&s, LUMBER), props(&s, PLANK)), (1, 1, 0, 0), "stage {stage}");
+        assert_eq!((props(&s, LOG), props(&s, STAKE), props(&s, LUMBER), props(&s, PLANK)), (LOG_BUNDLE.len(), 1, 0, 0), "stage {stage}");
         assert!(live(&s, DRIVER).is_none(), "stage {stage}");
         // (A machine on its run goes home as any creature does, and is whole there.)
         run(&mut s, 8.0);
@@ -597,7 +597,7 @@ fn a_lamp_rest_rigs_the_log_again_with_nothing_left_over() {
     let g = rig(&s);
     assert_eq!(g.state, "hung");
     assert_ne!(g.log, old.log, "a fresh log");
-    assert_eq!((props(&s, LOG), props(&s, STAKE), props(&s, LUMBER), props(&s, PLANK)), (1, 1, 0, 0));
+    assert_eq!((props(&s, LOG), props(&s, STAKE), props(&s, LUMBER), props(&s, PLANK)), (LOG_BUNDLE.len(), 1, 0, 0));
     assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if Some(*id) == old.log)));
     assert_eq!((g.crash, g.work, g.tie), (old.crash, old.work, old.tie), "in the same places");
 }
@@ -633,4 +633,44 @@ fn a_log_cut_loose_after_the_fight_is_won_still_stuns_whoever_is_under_it_and_is
     assert!(stunned(&s, band[1]).is_some());
     run(&mut s, BODY_SECS + 0.5);
     assert_eq!(props(&s, LOG) + props(&s, PLANK), 0);
+}
+
+/// A blow by the stake: the hero a swing's reach outside it, Sneed (held still) a yard to the
+/// stake's side, the hero facing `at_him` or the stake. (the rig's state, Sneed's health lost).
+fn blow_by_the_stake(at_him: bool, sneed_there: bool) -> (&'static str, u32) {
+    let (mut s, band, machine) = fight(1, 6);
+    run(&mut s, 0.5);
+    let driver = broken(&mut s, machine, band[0]);
+    emerged(&mut s, driver);
+    let g = rig(&s);
+    let tie = g.tie.unwrap();
+    let mid = off(g.crash, g.across, g.len / 2.0);
+    let out = facing(mid, tie);
+    let stand = off(tie, out, 1.5);
+    let him = off(tie, out + std::f32::consts::FRAC_PI_2, 1.0);
+    let hp = s.mobs[&driver].health;
+    let aim = if at_him { him } else { tie };
+    put(&mut s, band[0], stand, aim);
+    s.input(band[0], Input::Attack);
+    for _ in 0..24 {
+        let now = s.clock;
+        let m = s.mobs.get_mut(&driver).expect("Sneed in the fight");
+        m.pos = if sneed_there { him } else { off(tie, out, 14.0) };
+        m.stagger_until = now + 1.0;
+        put(&mut s, band[0], stand, aim);
+        s.step(DT);
+    }
+    (rig(&s).state, hp.saturating_sub(s.mobs[&driver].health))
+}
+
+#[test]
+fn a_blow_at_sneed_beside_the_tie_off_leaves_the_rope_whole_and_a_blow_at_the_stake_cuts_it() {
+    // Filmed: a hero fighting Sneed by the stake cut the log loose without meaning to.
+    let (state, hurt) = blow_by_the_stake(true, true);
+    assert!(hurt > 0, "the blow lands on him");
+    assert_eq!(state, "hung", "a blow at Sneed by the stake leaves the rope whole");
+    // (The stake was in that blow's arc: the same blow with nobody there cuts it.)
+    assert_ne!(blow_by_the_stake(true, false).0, "hung", "the same blow at nobody cuts it");
+    // Aimed at the stake it cuts, whether or not it also catches him.
+    assert_ne!(blow_by_the_stake(false, true).0, "hung", "a blow at the stake cuts it, Sneed beside it or not");
 }

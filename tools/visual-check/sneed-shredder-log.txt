@@ -3,14 +3,14 @@
 # run back to its log pile and the crash, Sneed crawling out of the wreck and "That was company
 # property!", the hero on him (the hero's own keys: the lock, a blow every 0.75 s), "Just...
 # one... bolt...", his run to the wreck and his hammering, the hero to the stake 0.6 s after his
-# line (the lock let go, a run to 1.5 yd from it, one blow), the creak, the log landing on him,
+# line (the lock let go, a run to 1.5 yd from it, one blow 2.2 s after the line, his hands on the wreck), the creak, the log landing on him,
 # "Gah! Who cut that loose?!", and the hero's blows on him while he is down.
 hero warrior
 cam off
 camera wide Sneed's Shredder|Sneed
 include _sneed-shredder-setup
 12.5 lua SV.on["company property"] = function() SV.after(0.5, function() SV.fight = true end) end
-12.5 lua SV.on["one... bolt"] = function() SV.fight = false SV.say(".es in unlock") SV.after(0.6, function() SV.go(-280.67, -497.2, 1.5, function() SV.after(0.05, function() SV.hit() SV.log("cuts the rope") end) SV.after(1.7, function() SV.fight = true end) end) end) end
+12.5 lua SV.on["one... bolt"] = function() local t = GetTime() SV.fight = false SV.say(".es in unlock") SV.after(0.6, function() SV.go(-280.67, -497.2, 1.5, function() SV.after(math.max(0.05, t + 2.2 - GetTime()), function() SV.hit() SV.log("cuts the rope") SV.after(1.6, function() SV.fight = true end) end) end) end) end
 13 .es heal
 13.5 video
 14.5 .es goto -279 -516 50.4 2.48

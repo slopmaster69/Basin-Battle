@@ -1521,7 +1521,6 @@ impl Survival {
             self.swing_on_banners(id, w, strike.damage, f, strike.range, strike.arc);
             if strike.damage > 0.0 {
                 self.swing_on_perches(id, f, strike.range, strike.arc);
-                self.swing_on_rig(id, f, strike.range, strike.arc);
             }
         }
         let mut hits: Vec<(f32, Id)> = Vec::new();
@@ -1565,6 +1564,15 @@ impl Survival {
                 }
                 hits.push((d, hid));
             }
+        }
+        // A rigged log's rope parts to a blow meant for it: one that strikes nobody, or whose
+        // foes are all further off the hero's own line than the stake is. A fight beside the
+        // tie-off doesn't spend the log by accident (filmed: a blow at Sneed by the stake cut it).
+        if first && !strike.shove() && strike.damage > 0.0 {
+            let own = self.players[&id].facing;
+            let foes = hits.iter().filter_map(|(_, t)| self.mobs.get(t).map(|m| m.pos).or_else(|| self.players.get(t).map(|h| h.pos)))
+                .map(|at| angle_between(own, facing(pos, at))).fold(f32::INFINITY, f32::min);
+            self.swing_on_rig(id, f, strike.range, strike.arc, foes);
         }
         // The nearest first, as many as the weapon strikes in one swing (a shove, one).
         hits.sort_by(|a, b| a.0.total_cmp(&b.0));

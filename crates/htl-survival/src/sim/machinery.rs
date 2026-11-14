@@ -250,6 +250,12 @@ impl Survival {
         self.machinery.drivers.get(&id).is_some_and(|d| matches!(d.stage, RepairStage::Seeking { .. } | RepairStage::Working { .. }))
     }
 
+    /// The fight's turns in the server's log, by the sim's clock: what the films and a playtest's
+    /// "he never gave me time" are checked against.
+    pub(super) fn shredder_note(&mut self, what: &str) {
+        self.events.push(Event::Log(format!("shredder {:.2} s: {what}", self.clock)));
+    }
+
     /// One of the encounter's lines, never within 2 s of the last.
     fn machinery_say(&mut self, id: Id, text: &str) {
         let at = self.clock.max(self.machinery.last_line + LINE_GAP);
@@ -384,6 +390,7 @@ impl Survival {
             smoke_at: now + COLLAPSE,
             quiet: rebuilt.is_some().then_some(machine),
         });
+        self.shredder_note("the machine comes down, Sneed inside it");
     }
 
 
@@ -438,6 +445,7 @@ impl Survival {
         }
         d.stage = RepairStage::Spent;
         d.quiet = d.wreck.take();
+        self.shredder_note("Sneed's repair is stopped");
         self.events.push(Event::CastEnd { caster: id });
         self.halt(id);
         if let Some(m) = self.mobs.get_mut(&id) {
@@ -797,6 +805,7 @@ impl Survival {
             self.events.push(Event::MobSpawned { id });
             self.hold_open_pose(id, LIE_CLIP, LIE + 0.3);
             self.scrap_burst(id, to);
+            self.shredder_note("Sneed is seen in the wreck");
             e.up_at = Some(now + LIE);
         } else if e.up_at.is_some_and(|t| e.talk_at.is_none() && now >= t) {
             let pos = self.mobs[&id].pos;
@@ -810,6 +819,7 @@ impl Survival {
             e.talk_at = Some(now + RISE);
         } else if e.talk_at.is_some_and(|t| now >= t) {
             self.machinery_say(id, "That was company property!");
+            self.shredder_note("Sneed is on his feet");
             let d = self.machinery.drivers.get_mut(&id).unwrap();
             d.emerge = None;
             d.wrench_at = now + FIRST_BLOW;
@@ -890,6 +900,7 @@ impl Survival {
                 };
                 self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { at, until: now + SEEK_LIMIT, repath_at: now + 0.5 };
                 self.machinery_say(id, "Just... one... bolt...");
+                self.shredder_note("Sneed goes to mend his machine");
                 let m = self.mobs.get_mut(&id).unwrap();
                 m.pattern = None;
                 m.state = MobState::Chase { foe: foe.unwrap() };
@@ -908,6 +919,7 @@ impl Survival {
                     self.mobs.get_mut(&id).unwrap().facing = face;
                     self.events.push(Event::MobStop { id, pos, facing: face });
                     self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until: now + REPAIR, spark_at: now, beat: 0 };
+                    self.shredder_note("Sneed's hands are on the wreck");
                     self.events.push(Event::Cast { caster: id, spell: WORK, ms: (REPAIR * 1000.0) as u32 });
                 } else if !self.held_still(id) && self.mobs[&id].path.is_empty() && now >= repath_at {
                     self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { at, until, repath_at: now + 0.5 };
@@ -920,6 +932,7 @@ impl Survival {
                 if !free || dist2d(pos, at) > WORK_DRIFT || (pos[2] - at[2]).abs() >= 0.5 || self.land.footing(pos).is_none() {
                     self.abandon_repair(id, Some(LINE_STOPPED));
                 } else if now >= until {
+                    self.shredder_note("the machine stands again");
                     self.finish_repair(id, d.clone(), wreck, foe.unwrap());
                 } else if done >= 0.25 * (beat as f32 + 1.0) && beat < 3 {
                     // A quarter further on: the wreck coughs, sparks and smokes, louder each time.

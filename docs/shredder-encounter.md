@@ -63,14 +63,16 @@ the lumber and the fallen log go with his body.
 
 ## The rigged log
 
-From the pull a log hangs 6 yd over where the wreck will lie and Sneed will work (the dig
-site's barrier pole on its side, 9.5 yd long), one rope running down to a waist-high stake on the
+From the pull a log hangs 6 yd over where the wreck will lie and Sneed will work (three of the
+dig site's barrier poles slung together on their sides, 9.5 yd long), one rope running down to a waist-high stake on the
 floor, the tie-off, 4.8 yd from his work place and 3.2 yd outside the drop. The drop is marked on
 the floor from the pull: a quiet blue strip, 9.5 yd by 3.2, drawn by the client itself (not the
 add-on's optional floor marks).
 
 - **Cutting it.** A melee blow that reaches the stake cuts the rope: any hero's, light or heavy,
-  at any time in the fight. One log, one use a fight.
+  at any time in the fight. One log, one use a fight. A blow meant for a foe doesn't cut it: if
+  the blow strikes a foe nearer the hero's own line than the stake is, the rope holds (the first
+  filmed look lost the log to a blow at Sneed beside the stake).
 - **The fall.** The rope whips away, the log creaks 0.7 sec and comes down in 0.3; the drop's
   mark burns bright from the cut until it lands. A hero in the drop's middle who moves at the
   creak is out either side (1.6 yd).
@@ -112,7 +114,7 @@ fight only.
 | Debug damage counts as real | `machinery_debug`: debug damage builds no posture on either form and never stops the repair |
 | Second forms are instant swaps | Sneed hidden in the wreck until it has collapsed, then seen lying in its scrap and getting up 3 sec before his line; the rebuilt machine heaves up and waits 2 sec |
 | Deaths lag | Either form sends `HoldPose` 0 as it falls, letting go of a held slump, rev or hunch |
-| Yells collide | `machinery_say` keeps the encounter's lines at least 2 sec apart (the pull line included). So a machine broken within 2 sec of another of his lines says "No, no, not now!" as it runs, not as it breaks |
+| Yells collide | `machinery_say` keeps the encounter's lines at least 2 sec apart (the pull line included). So a machine broken within 2 sec of another of his lines says "No, no, not now!" as it runs, not as it breaks. One line is not held back: "Gah! Who cut that loose?!" is said as the log lands on him, over whatever was waiting (filmed behind "She's turning over!" it came 2 sec after the log had flattened him) |
 | Bodies overlap | `girth` on the machine: hero reach and the machine's stop are measured from its legs |
 
 The one-tint tell: the machine's wind-ups no longer tint its body. The server marks its
@@ -135,7 +137,8 @@ drawn three times its size, tumbling end over end, with an orange streak behind 
 `[[missile_look]]` in `content/survival.toml`): the bare model was a speck at 16 yd.
 
 The crawl is GoblinMale's Sleep (held 1 sec) and SleepUp (101, 2 sec). The log is the dig site's
-barrier pole (ExcavationBarrierPole, display 1508) on its side at a third of its size; the
+barrier pole (ExcavationBarrierPole, display 1508) on its side at a third of its size, three of
+them slung together (one alone read as a stick on film); the
 tie-off is the dig site's stake (ExcavationStake, 2270) at three times its size, waist high; the
 ropes are drawn lines from overhead to the stake and to the log either side of its middle. The
 crash's and the fallen log's lumber is DeadMineLumberPileSmall (1108) and loose planks (6481).

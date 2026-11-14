@@ -30,6 +30,9 @@ const LOG: u32 = 1508;
 const LOG_SCALE: f32 = 0.32;
 const LOG_MODEL_BACK: f32 = 5.77;
 pub(super) const LOG_LEN: f32 = 9.5;
+/// One pole reads as a stick from the floor (its shaft is a third of a yard; the 0.8 is its end
+/// fitting): three are slung together, two side by side and one on them (side, up, in yards).
+pub(super) const LOG_BUNDLE: [(f32, f32); 3] = [(-0.19, 0.0), (0.19, 0.0), (0.0, 0.31)];
 /// How high it hangs over the post's floor: over the machine's head (5 yd), under the mast.
 const LOG_UP: f32 = 6.0;
 /// Where its rope is made fast overhead: this far over the floor, a little behind the log.
@@ -104,6 +107,8 @@ pub(super) struct Rig {
     /// The drop's mark, in runs of one floor height: where each starts and how long it is.
     marks: Vec<(Vec3, f32)>,
     pub(super) log: Option<Id>,
+    /// The poles slung with it (`LOG_BUNDLE`'s second and third).
+    pub(super) bundle: Vec<Id>,
     pub(super) stake: Option<Id>,
     /// The tie rope first, then the log's two slings.
     pub(super) ropes: Vec<Id>,
@@ -295,7 +300,7 @@ impl Survival {
             work: work.filter(|_| rigged),
             tie: tie.filter(|_| rigged),
             marks,
-            log: None, stake: None, ropes: Vec::new(),
+            log: None, bundle: Vec::new(), stake: None, ropes: Vec::new(),
             state: RigState::Down,
             mark_at: 0.0, rope_at: 0.0,
             lumber: Vec::new(), crashed: false, clear_at: None, fought: false,
@@ -328,11 +333,17 @@ impl Survival {
         self.rig_clear(key);
         let Some(g) = self.machinery.rigs.get(&key).cloned() else { return };
         let Some(tie) = g.tie else { return };
-        let log = self.rig_prop(Self::rig_log_at(&g, g.home[2] + LOG_UP), LOG, LOG_SCALE, g.across, std::f32::consts::FRAC_PI_2);
+        let at = Self::rig_log_at(&g, g.home[2] + LOG_UP);
+        let logs: Vec<Id> = LOG_BUNDLE.iter().map(|(side, up)| {
+            let p = off(at, g.face, *side);
+            self.rig_prop([p[0], p[1], at[2] + up], LOG, LOG_SCALE, g.across, std::f32::consts::FRAC_PI_2)
+        }).collect();
+        let log = logs[0];
         let stake = self.rig_prop(tie, STAKE, STAKE_SCALE, g.face, 0.0);
         let ropes: Vec<Id> = (0..3).map(|_| self.alloc()).collect();
         let g = self.machinery.rigs.get_mut(&key).unwrap();
         g.log = Some(log);
+        g.bundle = logs[1..].to_vec();
         g.stake = Some(stake);
         g.ropes = ropes;
         g.state = RigState::Hung;
@@ -346,7 +357,7 @@ impl Survival {
     /// what fell.
     fn rig_clear(&mut self, key: usize) {
         let Some(g) = self.machinery.rigs.get_mut(&key) else { return };
-        let props: Vec<Id> = g.log.take().into_iter().chain(g.stake.take()).chain(std::mem::take(&mut g.lumber)).collect();
+        let props: Vec<Id> = g.log.take().into_iter().chain(std::mem::take(&mut g.bundle)).chain(g.stake.take()).chain(std::mem::take(&mut g.lumber)).collect();
         let ropes = std::mem::take(&mut g.ropes);
         g.state = RigState::Down;
         g.clear_at = None;
@@ -363,7 +374,7 @@ impl Survival {
     /// A lamp rest: every rig goes with the encounter, and is hung again when its machine is back.
     pub(super) fn rigs_gone(&mut self, rigs: BTreeMap<usize, Rig>) {
         for (_, g) in rigs {
-            for id in g.log.into_iter().chain(g.stake).chain(g.lumber) {
+            for id in g.log.into_iter().chain(g.bundle).chain(g.stake).chain(g.lumber) {
                 if self.objs.remove(&id).is_some() {
                     self.events.push(Event::ObjGone { id });
                 }
@@ -447,6 +458,7 @@ impl Survival {
         self.machinery.lines.clear();
         self.machinery.last_line = self.clock;
         self.yell(id, LINE_BREAK);
+        self.shredder_note(&format!("the machine breaks at ({:.1}, {:.1})", pos[0], pos[1]));
         // Its legs churn where it stands, smoke pouring, the engine failing.
         self.events.push(Event::React { id, anim: RUN_CLIP, from: pos, lean: 0.0, hold: SPUTTER, fit: 0.0 });
         self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
@@ -602,10 +614,11 @@ impl Survival {
     // --- the rigged log ---------------------------------------------------------------------------
 
     /// A hero's swing: the tie-off in reach and in its arc is cut.
-    pub(crate) fn swing_on_rig(&mut self, hero: Id, face: f32, range: f32, arc: f32) {
-        let Some(pos) = self.players.get(&hero).map(|p| p.pos) else { return };
+    pub(crate) fn swing_on_rig(&mut self, hero: Id, face: f32, range: f32, arc: f32, foes: f32) {
+        let Some((pos, own)) = self.players.get(&hero).map(|p| (p.pos, p.facing)) else { return };
         let cut: Vec<usize> = self.machinery.rigs.iter().filter(|(_, g)| g.state == RigState::Hung && g.tie.is_some_and(|t| {
             dist2d(pos, t) <= range + 0.6 && (pos[2] - t[2]).abs() < 2.0 && angle_between(face, facing(pos, t)) <= arc / 2.0
+                && angle_between(own, facing(pos, t)) <= foes
                 && crate::land::clear_line(self.land.as_ref(), pos, t)
         })).map(|(k, _)| *k).collect();
         for key in cut {
@@ -619,6 +632,7 @@ impl Survival {
         let Some(g) = self.machinery.rigs.get_mut(&key) else { return };
         if g.state != RigState::Hung { return; }
         g.state = RigState::Cut { creak_until: now + CREAK, lands_at: now + CREAK + FALL };
+        self.events.push(Event::Log(format!("shredder {now:.2} s: the log's rope is cut")));
         g.mark_at = now;
         let (stake, log, tie_rope) = (g.stake, g.log, g.ropes.first().copied());
         if let Some(rope) = tie_rope {
@@ -682,10 +696,11 @@ impl Survival {
         if g.clear_at.is_some_and(|t| now >= t) {
             // With Sneed's body: the lumber, and the log if it fell.
             let fallen = if g.state == RigState::Down { g.log } else { None };
-            for id in g.lumber.iter().copied().chain(fallen) { self.rig_prop_gone(id); }
+            let bundle = if fallen.is_some() { g.bundle.clone() } else { Vec::new() };
+            for id in g.lumber.iter().copied().chain(fallen).chain(bundle) { self.rig_prop_gone(id); }
             let g = self.machinery.rigs.get_mut(&key).unwrap();
             g.lumber.clear();
-            if fallen.is_some() { g.log = None; }
+            if fallen.is_some() { g.log = None; g.bundle.clear(); }
             g.clear_at = None;
             return;
         }
@@ -727,21 +742,26 @@ impl Survival {
                     self.machinery.rigs.get_mut(&key).unwrap().ropes.truncate(1);
                     let t = ((now - creak_until) / FALL).clamp(0.0, 1.0);
                     let (top, floor) = (g.home[2] + LOG_UP, self.rig_log_floor(&g));
-                    if let Some(l) = g.log {
-                        if let Some(o) = self.objs.get_mut(&l) {
-                            o.pos[2] = top - (top - floor) * t * t;
-                            self.events.push(Event::ObjChanged { id: l });
-                        }
-                    }
+                    self.rig_log_to(&g, top - (top - floor) * t * t);
                 }
             }
             RigState::Down => {}
         }
     }
 
+    /// The log and the poles slung with it, this high.
+    fn rig_log_to(&mut self, g: &Rig, z: f32) {
+        for (id, (_, up)) in g.log.into_iter().chain(g.bundle.iter().copied()).zip(LOG_BUNDLE) {
+            if let Some(o) = self.objs.get_mut(&id) {
+                o.pos[2] = z + up;
+                self.events.push(Event::ObjChanged { id });
+            }
+        }
+    }
+
     /// Where the fallen log lies: on the floor where Sneed works (its far end rests on the wreck).
     fn rig_log_floor(&self, g: &Rig) -> f32 {
-        g.work.map_or(g.crash[2], |w| w[2]) + 0.45
+        g.work.map_or(g.crash[2], |w| w[2]) + 0.3
     }
 
     fn rig_mark(&mut self, g: &Rig, colour: &str, secs: f32) {
@@ -760,11 +780,8 @@ impl Survival {
             self.events.push(Event::MarkGone { id: *rope });
         }
         let floor = self.rig_log_floor(&g);
+        self.rig_log_to(&g, floor);
         if let Some(l) = g.log {
-            if let Some(o) = self.objs.get_mut(&l) {
-                o.pos[2] = floor;
-                self.events.push(Event::ObjChanged { id: l });
-            }
             self.events.push(Event::Sound { id: l, sound: THUD_SOUND });
             self.events.push(Event::Sound { id: l, sound: WOOD_SOUND });
             for d in [1.5, LOG_LEN / 2.0, LOG_LEN - 1.5] {
@@ -817,7 +834,12 @@ impl Survival {
                 if self.mending(id) {
                     self.abandon_repair(id, None);
                 }
-                self.machinery_say(id, LINE_LOG);
+                // His own cry, at once, over whatever he was saying (filmed: behind "She's
+                // turning over!" it came 2 s after the log had flattened him).
+                self.machinery.lines.clear();
+                self.machinery.last_line = now;
+                self.say_line(id, LINE_LOG.to_string());
+                self.shredder_note("the log lands on Sneed");
                 self.events.push(Event::CastEnd { caster: id });
                 self.stagger_mob(id, LOG_STUN, true);
                 if let Some(m) = self.mobs.get_mut(&id) {
