@@ -470,12 +470,14 @@ fn left_alone_he_walks_to_his_work_clear_of_the_wreck_a_plain_hit_lands_and_stop
     for _ in 0..14 { mend(&mut s, hero); step(&mut s); }
     assert!(s.mobs[&him].health < hp, "a plain blow lands on him at his work");
     assert_eq!(s.shredder_stage(), "mending", "and does not stop it");
-    let hp = s.mobs[&him].health;
-    // Left to it, the machine stands where the wreck lay, at a third of its health.
+    // Left to it, the machine stands where the wreck lay, at a third of its health. (His health
+    // is read as he climbs in: a blow already swung lands after the hero is put away.)
     let far = floor_at(&s, [-289.0, -516.0, 0.0]);
     put(&mut s, hero, far, wreck);
+    let mut hp = s.mobs[&him].health;
     while live(&s, "dm_shredder").is_none() {
         assert!(s.clock < began + 4.2 + 0.2, "it stands when the repair is done");
+        hp = s.mobs[&him].health;
         mend(&mut s, hero);
         step(&mut s);
     }
@@ -495,7 +497,7 @@ fn left_alone_he_walks_to_his_work_clear_of_the_wreck_a_plain_hit_lands_and_stop
     }
     let again = live(&s, "dm_sneed").unwrap();
     assert_eq!(s.mobs[&again].health, hp);
-    let lies = s.mobs.values().find(|m| m.health == 0 && s.content.mobs[m.def].key == "dm_shredder").unwrap().pos;
+    let lies = s.mobs.values().find(|m| m.health == 0 && s.content.mobs[m.def].key == "dm_shredder").expect("the second wreck lies there as he gets up").pos;
     assert!(dist2d(lies, wreck) < 0.5, "the second wreck lies where the first did: {lies:?}");
     for _ in 0..300 {
         mend(&mut s, hero);

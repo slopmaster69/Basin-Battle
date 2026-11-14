@@ -418,6 +418,7 @@ fn the_repair_left_alone_is_seen_coming_on_and_stands_the_machine_up_and_its_sec
         assert!(!ev.iter().any(|e| matches!(e, Event::Cast { spell: WORK, .. })));
         assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == final_driver)), "he crawls out the same way");
         assert!(live(&s, MACHINE).is_none());
+        assert!(s.mobs.contains_key(&back), "the second wreck lies there while he fights on");
         s.hurt_mob(final_driver, band[0], u32::MAX);
         assert!(s.slain("sneed"));
         assert_eq!(s.camp.counts.get("kill:dm_sneed"), Some(&1));

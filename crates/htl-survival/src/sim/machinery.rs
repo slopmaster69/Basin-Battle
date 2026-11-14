@@ -361,10 +361,10 @@ impl Survival {
             let m = self.mobs.get_mut(&driver).unwrap();
             m.health = hp.min(m.max_health).max(1);
             self.events.push(Event::Health { id: driver, health: m.health, max: m.max_health });
-        } else {
-            // The body is the wreck, kept only while this driver's one attempt is available.
-            self.mobs.get_mut(&machine).unwrap().state = MobState::Dead { gone_at: f32::INFINITY };
         }
+        // The body is the wreck he crawls out of: it lies there until his body goes (a second
+        // wreck too, quiet from the start: its 4 s as a body ended while he was getting up).
+        self.mobs.get_mut(&machine).unwrap().state = MobState::Dead { gone_at: f32::INFINITY };
         // Not seen yet: the machine is still coming down.
         self.events.retain(|e| match e {
             Event::MobSpawned { id } | Event::Yell { id, .. } | Event::Visual { id, .. } | Event::Sound { id, .. } | Event::Emote { id, .. } => *id != driver,
@@ -382,7 +382,7 @@ impl Survival {
             emerge: Some(Emerge { out_at: now + COLLAPSE, up_at: None, talk_at: None }),
             wrench_at: 0.0,
             smoke_at: now + COLLAPSE,
-            quiet: None,
+            quiet: rebuilt.is_some().then_some(machine),
         });
     }
 
