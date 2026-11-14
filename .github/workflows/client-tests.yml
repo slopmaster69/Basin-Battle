@@ -80,6 +80,19 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
+      - name: TEMP dump
+        working-directory: benilla
+        env:
+          WOW_AMBIGUITY_DUMP: 1
+        run: |
+          cargo test -p benilla-app --lib the_schedules_have_no_more_undeclared -- --nocapture > ../dump.log 2>&1 || true
+
+      - name: Keep the dump
+        uses: actions/upload-artifact@v4
+        with:
+          name: dump
+          path: dump.log
+
       - name: Keep the log
         if: always()
         uses: actions/upload-artifact@v4
