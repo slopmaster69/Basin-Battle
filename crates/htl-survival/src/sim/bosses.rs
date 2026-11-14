@@ -190,6 +190,7 @@ const EMBED: f32 = 0.4;
 /// How far under its resting level a rock's own middle is put, for each yard of its size.
 fn rock_sink(display: u32) -> f32 {
     match display {
+        d if WRECK_PIECES.iter().any(|w| w.0 == d) => 0.05,
         BOULDER => BOULDER_BOTTOM + EMBED,
         PALE | PALE_TALL => 0.3,
         _ => ROCK_BOTTOM + EMBED,
@@ -402,7 +403,45 @@ pub(crate) struct Bosses {
     slams: BTreeMap<Id, Slam>,
     /// What the falling mine looks like.
     pub(crate) looks: Looks,
+    /// What a collapse has wrecked of the place (`wreck`), from its blow until the fight is lost
+    /// or the dungeon resets.
+    wreck: Option<Wreck>,
 }
+
+/// A collapse wrecking the place as it goes (`[mob.phase.collapse] wreck`).
+#[derive(Debug, Clone)]
+struct Wreck {
+    owner: Id,
+    /// The fight is on (from the blow to the kill): no lamp can be rested at.
+    fight: bool,
+    /// How many sections are down, and how many down take the ship with them.
+    fallen: usize,
+    ship_at: usize,
+    /// The collapse as it began (its route and sections: where each one's wreck lies).
+    plan: Collapse,
+    /// How many piles its wave has laid (every other one is topped with one of the works).
+    piles: usize,
+}
+
+/// What a collapse has wrecked so far, for whoever draws it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WreckView {
+    /// Sections down, of how many.
+    pub fallen: usize,
+    pub sections: usize,
+    /// The fight is on: no lamp can be rested at.
+    pub fight: bool,
+    /// The ship in the dry dock is gone.
+    pub ship_gone: bool,
+}
+
+/// What a hero is told at a lamp while a collapse's fight is on.
+pub const LAMPS_OUT: &str = "Not while the mine is coming down.";
+
+/// What comes down in a wrecking collapse's wave besides rock, lying on its piles: a mine cart,
+/// a board, lumber, a barrel, a crate, a barrow, a lumber pile (display, size). All of them the
+/// 1.12 client's own, the ruin's pieces (`aftermath::MODELS`).
+const WRECK_PIECES: [(u32, f32); 7] = [(1887, 1.0), (4651, 0.6), (1108, 1.0), (9, 1.0), (3791, 1.0), (215, 1.0), (1109, 0.8)];
 
 /// A boss bringing its phase on with its own body (`[mob.phase.slam]`), or pounding the floor
 /// where it stands as a later section goes.
@@ -818,6 +857,9 @@ impl Survival {
                 thud_at: f32::INFINITY,
                 pound_by: f32::INFINITY,
             };
+            if c.wreck {
+                self.wreck_begins(&col, c.wreck_ship);
+            }
             self.surge_begins(&mut col);
             self.bosses.collapse = Some(col);
         }
@@ -871,6 +913,7 @@ impl Survival {
         // The boss down: its faces stand until the dungeon resets.
         if m.health == 0 {
             self.bosses.collapse = None;
+            self.wreck_fight_over(boss);
             return;
         }
         // Its foe felled (by its own blow: it stands in that blow's recovery yet) or gone out of
@@ -1006,6 +1049,7 @@ impl Survival {
                 let name = self.content.mobs[self.mobs[&boss].def].name.clone();
                 let (k, n) = (c.section + 1, c.sections.len());
                 self.events.push(Event::Log(format!("{name}'s collapse: section {k} of {n} is down, its face at {line:.1} yd")));
+                self.wreck_section_down(boss, k);
                 let l = &self.bosses.looks;
                 self.events.push(Event::Log(format!(
                     "{name}'s collapse looks: {} loose pieces lying, {} in the air, {} face rocks and {} pale over them, {} lamps",
@@ -1345,6 +1389,82 @@ impl Survival {
     fn collapse_cleared(&mut self, owner: Id) {
         self.clear_looks(owner);
         self.bosses.faces.retain(|f| f.owner != owner);
+        self.wreck_put_back(owner);
+    }
+
+    /// A wrecking collapse begins: from now no lamp can be rested at, and they stand dark.
+    fn wreck_begins(&mut self, col: &Collapse, ship_at: usize) {
+        self.bosses.wreck = Some(Wreck { owner: col.boss, fight: true, fallen: 0, ship_at, plan: col.clone(), piles: 0 });
+        self.events.push(Event::Log(format!(
+            "the collapse wrecks the mine: no lamp can be rested at until the fight ends; the ship goes with {ship_at} of {} sections down",
+            col.sections.len()
+        )));
+        self.lamps_redrawn();
+    }
+
+    /// One more section of a wrecking collapse is down: its stretch lies as wreck from now.
+    fn wreck_section_down(&mut self, owner: Id, fallen: usize) {
+        let Some(w) = self.bosses.wreck.as_mut().filter(|w| w.owner == owner) else { return };
+        let had = w.fallen >= w.ship_at;
+        w.fallen = w.fallen.max(fallen);
+        if !had && w.fallen >= w.ship_at {
+            self.events.push(Event::Log(format!("the collapse wrecks the mine: the ship is gone from the dry dock, {fallen} sections down")));
+        }
+    }
+
+    /// The boss of a wrecking collapse is down: the lamps can be rested at again, and the wreck
+    /// lies until the dungeon resets.
+    fn wreck_fight_over(&mut self, owner: Id) {
+        let Some(w) = self.bosses.wreck.as_mut().filter(|w| w.owner == owner && w.fight) else { return };
+        w.fight = false;
+        self.lamps_redrawn();
+    }
+
+    /// A wrecking collapse's fight is lost (or its boss is gone from the world): the mine as it
+    /// was, its lamps lit again.
+    fn wreck_put_back(&mut self, owner: Id) {
+        if self.bosses.wreck.as_ref().is_some_and(|w| w.owner == owner) {
+            self.bosses.wreck = None;
+            self.lamps_redrawn();
+        }
+    }
+
+    /// Every lamp drawn again: lit or dark by whether it can be rested at.
+    fn lamps_redrawn(&mut self) {
+        let lamps: Vec<Id> = self.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Lamp { .. })).map(|(id, _)| *id).collect();
+        for id in lamps {
+            self.events.push(Event::ObjChanged { id });
+        }
+    }
+
+    /// No lamp can be rested at: a wrecking collapse's fight is on.
+    pub fn lamps_out(&self) -> bool {
+        self.bosses.wreck.as_ref().is_some_and(|w| w.fight)
+    }
+
+    /// What a wrecking collapse has wrecked so far (none: no wreck, or its fight was lost).
+    pub fn collapse_wreck(&self) -> Option<WreckView> {
+        self.bosses.wreck.as_ref().map(|w| WreckView {
+            fallen: w.fallen,
+            sections: w.plan.sections.len(),
+            fight: w.fight,
+            ship_gone: w.fallen >= w.ship_at,
+        })
+    }
+
+    /// Which section of the wrecking collapse a spot lies in (the first whose stretch holds it),
+    /// fallen or not, if it is more than `margin` behind that section's face.
+    pub fn collapse_wreck_section(&self, pos: Vec3, margin: f32) -> Option<usize> {
+        let w = self.bosses.wreck.as_ref()?;
+        let k = (0..w.plan.sections.len()).find(|k| w.plan.in_section(*k, pos, 0.0).is_some())?;
+        w.plan.in_section(k, pos, margin).map(|_| k)
+    }
+
+    /// How far a spot is from the wrecking collapse's route as it walks it (for whoever lays
+    /// its wreck: nothing on the way).
+    pub fn collapse_wreck_off_route(&self, pos: Vec3) -> Option<f32> {
+        let w = self.bosses.wreck.as_ref()?;
+        route_progress(&w.plan.route, &w.plan.along, pos).map(|(_, off)| off)
     }
 
     /// A collapse's fight is lost: the mine stands again for the next try (what came down is
@@ -1365,6 +1485,7 @@ impl Survival {
         // after, in its dust (well before anyone wakes at a lamp).
         self.bosses.faces.retain(|f| f.owner != boss);
         self.bosses.thrown.clear();
+        self.wreck_put_back(boss);
         self.looks_leave(boss);
         let Some(at) = self.bosses.began.get(&boss).copied() else { return };
         self.collapse_lets_go(boss);
@@ -1392,6 +1513,9 @@ impl Survival {
         self.bosses.fleeing.clear();
         self.bosses.thrown.clear();
         self.bosses.slams.clear();
+        if self.bosses.wreck.take().is_some() {
+            self.lamps_redrawn();
+        }
         self.bosses.looks = Looks { off, ..Default::default() };
     }
 
@@ -1807,6 +1931,8 @@ impl Survival {
         if self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id) {
             self.bosses.collapse = None;
         }
+        // (Its fight is over: the lamps can be rested at again.)
+        self.wreck_fight_over(id);
         self.fires_out(id);
     }
 
@@ -2588,9 +2714,17 @@ impl Survival {
             let land = now + ROW_SECS + (k % 4) as f32 * 0.08;
             // (No ring: the wave is no blow of its own. What it does to whoever it reaches is
             // the catch's.)
+            // A wrecking collapse brings down what the mine held with its rock: every other
+            // pile's last piece, the one on top where it's seen, is one of the works (in a
+            // rock's place: the count of pieces is as it was).
+            let works = self.bosses.wreck.as_mut().filter(|w| w.owner == c.boss).and_then(|w| {
+                w.piles += 1;
+                (w.piles % 2 == 0).then(|| WRECK_PIECES[(w.piles / 2) % WRECK_PIECES.len()])
+            });
             for layer in 0..layers {
                 let n = k as usize + layer * 3;
                 let (display, scale) = if n % 5 == 4 { (PALE_TALL, ROW_BOULDER) } else { (PALE, ROW_SCALES[n % 4]) };
+                let (display, scale) = works.filter(|_| layer + 1 == layers).unwrap_or((display, scale));
                 let crash = if n % 3 == 0 { SOUND_CRASH } else { 0 };
                 self.row_rock(c.boss, at, s.height, ROW_RISE * layer as f32, display, scale, land + ROW_LAYER_SECS * layer as f32, crash);
             }

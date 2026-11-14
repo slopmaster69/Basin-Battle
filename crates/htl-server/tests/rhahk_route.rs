@@ -883,3 +883,63 @@ fn fought_at_the_front_door_he_slams_its_frame_and_gets_out_from_under_the_wave(
     assert!(pos[0] < -30.0, "he is out from under the wave: {pos:?}");
     assert!(s.mobs[&boss].health > 0 && s.players[&hero].health > 0);
 }
+
+/// The dry dock's berth, the ship in it from its keel to over its masts (x, y, z least and most).
+const DOCK: [[f32; 3]; 2] = [[-130.0, -860.0, 10.0], [-2.0, -780.0, 60.0]];
+
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn no_point_of_the_collapses_route_sees_the_dry_dock() {
+    let (s, ..) = begun(17);
+    let (_, total) = s.collapse_lines().unwrap();
+    let mut looked = 0;
+    let mut d = 0.0;
+    while d <= total {
+        let at = s.collapse_route_point(d).unwrap();
+        let eye = [at[0], at[1], at[2] + 1.8];
+        for i in 0..=8 {
+            for j in 0..=4 {
+                for z in [DOCK[0][2], 25.0, 40.0, DOCK[1][2]] {
+                    let x = DOCK[0][0] + (DOCK[1][0] - DOCK[0][0]) * i as f32 / 8.0;
+                    let y = DOCK[0][1] + (DOCK[1][1] - DOCK[0][1]) * j as f32 / 4.0;
+                    assert!(!htl_survival::land::clear_line(s.land(), eye, [x, y, z]), "{d:.0} yd along the route sees the dock at {x:.0}, {y:.0}, {z:.0}");
+                    looked += 1;
+                }
+            }
+        }
+        d += 2.0;
+    }
+    println!("{looked} lines from the route to the dock, none clear: the ship goes out of sight of everyone in the fight");
+}
+
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn what_the_wrecking_wave_brings_down_lies_behind_its_line_and_stops_no_one() {
+    let (mut s, boss, hero, mut along) = begun(23);
+    assert!(s.lamps_out(), "the lamps out from the blow");
+    let works = [1887u32, 4651, 1108, 9, 3791, 215, 1109];
+    let mut seen: BTreeMap<Id, (u32, [f32; 3], usize)> = BTreeMap::new();
+    let started = s.clock;
+    while !s.collapse_front().is_some_and(|f| f.1) {
+        assert!(s.clock - started < 120.0, "never done: {:?}", s.collapse_state());
+        tick(&mut s, boss, hero, &mut along);
+        let (k, ..) = s.collapse_state().unwrap();
+        for o in s.objects() {
+            if let htl_survival::ObjKind::Prop { display, .. } = o.kind {
+                if works.contains(&display) && s.collapse_piece_tilt(o.id).is_some() {
+                    seen.entry(o.id).or_insert((display, o.pos, k));
+                }
+            }
+        }
+    }
+    let faces: std::collections::BTreeSet<Id> = s.collapse_faces().into_iter().collect();
+    let kinds: std::collections::BTreeSet<u32> = seen.values().map(|v| v.0).collect();
+    assert!(kinds.len() >= 6, "carts, timber, barrels and crates among the rock: {kinds:?}");
+    let (lines, _) = s.collapse_lines().unwrap();
+    for (id, (display, at, k)) in &seen {
+        assert!(!faces.contains(id), "display {display} is loose rubble, nothing solid");
+        let section = s.collapse_wreck_section(*at, 0.0);
+        assert!(section.is_some_and(|j| j <= *k), "display {display} at {at:?} lies in a section down by the time it lands (section {k}, line {:.0}): {section:?}", lines[*k]);
+    }
+    println!("{} of the works came down with the rock, {} kinds, every one behind its line and none solid", seen.len(), kinds.len());
+}

@@ -291,6 +291,8 @@ pub struct SurvivalGame {
     pub(crate) aftermath: Option<aftermath::Aftermath>,
     /// The collapsed map the aftermath is fitted to, read once from the installed data.
     pub(crate) aftermath_land: Option<Box<aftermath::Ground>>,
+    /// What a wrecking collapse has sent the clients (`aftermath_wreck.rs`).
+    pub(crate) wreck: aftermath::StagedWreck,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
@@ -417,6 +419,7 @@ impl SurvivalGame {
             watchers: BTreeMap::new(),
             aftermath: None,
             aftermath_land: None,
+            wreck: Default::default(),
         };
         g.bind_world();
         g
@@ -439,6 +442,7 @@ impl SurvivalGame {
                 let events = self.sim.step(TICK.as_secs_f32());
                 self.lab_trace(&events);
                 self.play(events);
+                self.wreck_tick();
                 self.keep_watchers_near();
                 self.ui_flush();
                 self.hold_clock();
@@ -939,6 +943,8 @@ impl SurvivalGame {
     /// A hero leaves for the other world: off this one (saved), and their connection with them.
     pub(crate) fn depart(&mut self, conn: ConnId) -> Option<(Session, PlayerSave, Carry)> {
         self.lend_watcher(conn);
+        // (Its client is gone: nothing of a collapse's wreck is owed it or taken back from it.)
+        self.wreck_forget(conn);
         let w = self.sessions.get_mut(&conn).and_then(|s| s.world.take())?;
         let carry = Carry {
             addon: w.addon,
@@ -1037,6 +1043,8 @@ impl SurvivalGame {
 
     pub(crate) fn leave_world(&mut self, conn: ConnId) {
         self.lend_watcher(conn);
+        // (Its client is gone: nothing of a collapse's wreck is owed it or taken back from it.)
+        self.wreck_forget(conn);
         // A login after this one plays, whatever this one did.
         if let Some(s) = self.sessions.get_mut(&conn) {
             s.watching = None;

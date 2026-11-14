@@ -2195,6 +2195,19 @@ death_text = "...VanCleef... never pay..."
     down = 1.0
     lead = 14.0
     hold = 0.26
+    # The collapse wrecks the mine as it goes (the owner's review, November 14: "it ends up
+    # looking like the destroyed mine", "the lamp ... so you can't use it mid boss gauntlet run",
+    # "the ship is gone ... much before" the last stand). From his blow to the end of the fight
+    # no lamp can be rested at; each section down lies as the ruin's own wreck behind its face;
+    # carts, timber, barrels and crates come down with the wave's rock. false: the collapse as
+    # it was before, rock alone, lamps as ever, nothing sent of the ruin.
+    wreck = true
+    # The ship is gone from the dry dock once this many sections are down (no point of his route
+    # has sight of the dock, so 1 is 3 sections before the last stand). With it every client's
+    # mine takes its wrecked look at once, a reload of the map on the clients as they are (the
+    # only way they have to lose the ship): 0 puts that at his first blow, 5 (more sections than
+    # there are) never during the fight.
+    wreck_ship = 1
     held_text = "Rhahk'Zor not die in a hole!"
     end_text = "No more mine. Only Rhahk'Zor!"
     # What shows it (chosen on film, on him, November 13). Held at 26%: a bright shell round him

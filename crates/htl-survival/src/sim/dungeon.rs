@@ -847,6 +847,11 @@ impl Survival {
             .next()
     }
 
+    /// A foe is fighting this hero (for the server: what it may do under them).
+    pub fn foes_on(&self, id: Id) -> bool {
+        self.in_fight(id)
+    }
+
     /// A foe is fighting this hero.
     fn in_fight(&self, id: Id) -> bool {
         self.mobs
@@ -856,6 +861,11 @@ impl Survival {
 
     /// A lamp, used: lit the first time, then its window (rest, travel, trade, home).
     pub(crate) fn use_lamp(&mut self, id: Id, key: &str, lamp: Id) {
+        // A collapse's fight is on: no lamp is lit or rested at until it ends.
+        if self.lamps_out() {
+            self.tell(id, bosses::LAMPS_OUT);
+            return;
+        }
         if !self.lit(key) {
             let name = self
                 .lamp_def(key)
@@ -889,6 +899,9 @@ impl Survival {
     pub fn rest(&mut self, id: Id) -> Result<(), String> {
         let p = self.players.get(&id).ok_or("No hero.")?;
         let lamp = self.lamp_near(p.pos).ok_or("Rest at a lamp.")?;
+        if self.lamps_out() {
+            return Err(bosses::LAMPS_OUT.into());
+        }
         if !self.lit(&lamp) {
             return Err("Light the lamp first.".into());
         }

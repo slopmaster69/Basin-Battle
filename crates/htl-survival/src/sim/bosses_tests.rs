@@ -1846,3 +1846,125 @@ fn the_slams_rock_goes_when_the_fight_is_lost() {
     let m = &s.mobs[&boss];
     assert_eq!(m.health, m.max_health, "and he is whole at his post");
 }
+
+/// `sectioned`, wrecking the mine as it goes.
+fn wrecking(rest: f32, ship: usize) -> Vec<EnrageDef> {
+    let mut p = sectioned(rest);
+    let c = p[0].collapse.as_mut().unwrap();
+    c.wreck = true;
+    c.wreck_ship = ship;
+    p
+}
+
+/// The lamp of `mine_at` (lit), and what it's drawn as.
+fn lamp_of(s: &Survival) -> (Id, u32) {
+    let v = s.objects().into_iter().find(|o| matches!(o.kind, ObjKind::Lamp { .. })).expect("a lamp");
+    (v.id, v.display)
+}
+
+#[test]
+fn no_lamp_can_be_rested_at_from_his_blow_until_he_is_down() {
+    let (mut s, boss, h) = mine_at(wrecking(2.0, 1), 23, POST);
+    let key = s.content.dungeon.as_ref().unwrap().lamps[0].key.clone();
+    let at = s.content.dungeon.as_ref().unwrap().lamps[0].at;
+    s.below.as_mut().unwrap().lit.insert(key);
+    let (lamp, lit) = lamp_of(&s);
+    assert!(!s.lamps_out() && s.collapse_wreck().is_none(), "nothing wrecked before his blow");
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    // From the blow: the lamp stands dark, and a hero at it is told why in a plain line.
+    assert!(s.lamps_out(), "out from the blow that brings the mine down");
+    assert_eq!(s.collapse_wreck(), Some(WreckView { fallen: 0, sections: 4, fight: true, ship_gone: false }));
+    let dark = lamp_of(&s).1;
+    assert_ne!(dark, lit, "the lamp is drawn dark");
+    // A friend at the lamp, far from the fight, nothing on them: still no rest, no window.
+    let friend = hero_at(&mut s, "Friend", at);
+    assert_eq!(s.rest(friend), Err(LAMPS_OUT.to_string()));
+    s.events.clear();
+    s.interact(friend, Some(lamp));
+    let ev = std::mem::take(&mut s.events);
+    assert!(ev.iter().any(|e| matches!(e, Event::Tell { player, text } if *player == friend && text == LAMPS_OUT)), "told why");
+    assert!(!ev.iter().any(|e| matches!(e, Event::StationOpen { .. })), "and the lamp's window stays shut");
+    // Through every section the same.
+    run_to(&mut s, h, (2, "rest"));
+    assert_eq!(s.rest(friend), Err(LAMPS_OUT.to_string()));
+    assert_eq!(s.collapse_wreck().map(|w| (w.fallen, w.fight, w.ship_gone)), Some((3, true, true)));
+    // He is down: the lamp is lit again and can be used; the wreck lies on.
+    s.events.clear();
+    let max = s.mobs[&boss].max_health;
+    run_out(&mut s, h);
+    s.hurt_mob(boss, h, max);
+    run_for(&mut s, 0.5);
+    assert_eq!(s.mobs[&boss].health, 0, "he is down");
+    assert!(!s.lamps_out(), "the lamps are back with the kill");
+    assert_eq!(lamp_of(&s).1, lit, "and lit again");
+    assert_eq!(s.collapse_wreck(), Some(WreckView { fallen: 4, sections: 4, fight: false, ship_gone: true }), "the wreck lies on");
+    assert_ne!(s.rest(friend), Err(LAMPS_OUT.to_string()), "a rest is no longer refused for the collapse");
+}
+
+#[test]
+fn a_lost_fight_puts_the_lamps_and_the_wreck_back() {
+    let (mut s, boss, h) = mine_at(wrecking(2.0, 1), 29, POST);
+    let key = s.content.dungeon.as_ref().unwrap().lamps[0].key.clone();
+    s.below.as_mut().unwrap().lit.insert(key);
+    let (lamp, lit) = lamp_of(&s);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "rest"));
+    assert_eq!(s.collapse_wreck().map(|w| (w.fallen, w.ship_gone)), Some((2, true)));
+    assert_ne!(lamp_of(&s).1, lit, "dark in the fight");
+    s.events.clear();
+    let hp = s.players[&h].health;
+    s.hurt_player_by(h, hp + 10_000, boss, "a blow");
+    let ev = run_for(&mut s, 0.5);
+    assert_eq!(s.collapse_wreck(), None, "nothing wrecked once the fight is lost");
+    assert!(!s.lamps_out());
+    assert_eq!(lamp_of(&s).1, lit, "the lamp lit as before");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjChanged { id } if *id == lamp)), "and drawn again for the clients");
+}
+
+#[test]
+fn the_ship_goes_with_the_section_content_names_and_never_after_the_last_stand_begins() {
+    for (ship, want) in [(0usize, [true, true, true, true]), (1, [false, true, true, true]), (3, [false, false, false, true])] {
+        let (mut s, boss, h) = mine_at(wrecking(2.0, ship), 31, POST);
+        begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+        let mut seen = vec![s.collapse_wreck().unwrap().ship_gone];
+        for k in 0..3 {
+            run_to(&mut s, h, (k, "rest"));
+            let w = s.collapse_wreck().unwrap();
+            assert_eq!(w.fallen, k + 1);
+            seen.push(w.ship_gone);
+        }
+        assert_eq!(seen, want, "wreck_ship = {ship}");
+        assert!(!s.collapse_front().unwrap().1, "all of it before the last section is down");
+    }
+}
+
+#[test]
+fn a_wrecking_wave_brings_down_more_than_rock_and_only_behind_its_faces() {
+    let (mut s, boss, h) = mine_at(wrecking(2.0, 1), 37, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    // Every one of the works seen on its way down or lying, as two sections go (the oldest of
+    // what lies is counted out with the rock, behind a face by then).
+    let mut works: BTreeMap<Id, (u32, Vec3)> = BTreeMap::new();
+    while s.collapse_state().map(|c| (c.0, c.1)) != Some((1, "rest")) {
+        assert!(s.clock < 200.0, "the collapse never reached its second rest");
+        past_the_line(&mut s, h);
+        s.step(DT);
+        for p in pieces(&s).into_iter().filter(|p| WRECK_PIECES.iter().any(|w| w.0 == p.1)) {
+            works.insert(p.0, (p.1, p.2));
+        }
+    }
+    let kinds: BTreeSet<u32> = works.values().map(|w| w.0).collect();
+    assert_eq!(kinds.len(), WRECK_PIECES.len(), "a cart, a board, lumber, a barrel, a crate, a barrow, a lumber pile among the rock: {kinds:?} of {}", works.len());
+    assert!(works.len() >= 20, "enough of them to be seen: {}", works.len());
+    for (d, at) in works.values() {
+        assert!(at[0] < LINES[1] - 0.5, "display {d} comes down behind the section's line, never on the clear floor: {at:?}");
+        assert!(s.collapse_wreck_section(*at, 0.0).is_some_and(|k| k <= 1), "in a section that is down: {at:?}");
+    }
+    // The same collapse without the switch: rock alone, as it was.
+    let (mut s, boss, h) = mine_at(sectioned(2.0), 37, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "rest"));
+    run_for(&mut s, 1.5);
+    assert!(!pieces(&s).iter().any(|p| WRECK_PIECES.iter().any(|w| w.0 == p.1)), "no works without the switch");
+    assert!(s.collapse_wreck().is_none() && !s.lamps_out(), "and no lamp out");
+}
