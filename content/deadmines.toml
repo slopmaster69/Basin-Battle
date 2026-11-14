@@ -2169,6 +2169,14 @@ death_text = "...VanCleef... never pay..."
     hold = 0.26
     held_text = "Rhahk'Zor not die in a hole!"
     end_text = "No more mine. Only Rhahk'Zor!"
+    # What shows it (chosen on film, on him, November 13). Held at 26%: a bright shell round him
+    # (Ice Barrier's; Divine Shield's gold was a faint outline on an ogre in a dark cave) from the
+    # first blow refused, and a spark off it at each blow after. The moment the last face stands
+    # the shell goes, he roars, turns red and stands 1.15 times his size, to the end of the fight.
+    held_aura = 11426
+    held_kit = 555
+    end_aura = 8599
+    end_grow = 1.15
     # The sections' front edges, each across a narrowing, wall to wall and a yard into the rock
     # at both ends. `reach` is how far to the side of the route the section's floor runs (its
     # pockets and side caves); `height` the roof over the floor there (measured on the land).
@@ -2213,7 +2221,10 @@ death_text = "...VanCleef... never pay..."
   pattern = "slam"
   text = "RHAHK'ZOR... SMASH!"
   kit = 38
-  burn = { radius = 3.0, damage = 9, secs = 7.0, look = 22191 }
+  # `aura`: what he wears while it burns, flames at both hands (chosen on film, on him,
+  # November 13: nothing sent from the server sets a weapon alight, so the fire is on the hands
+  # that hold it; the other looks tried were too faint on an ogre or wrapped him whole).
+  burn = { radius = 3.0, damage = 9, secs = 7.0, look = 22191, aura = 18499 }
   debris = [[-95.0, -377.0, 57.8], [-102.0, -384.0, 58.0], [-104.0, -378.0, 57.8]]
   # The last: he pounds the floor, and the maul sticks in it (`lodge`): haul it free he must.
   [[mob.phase]]

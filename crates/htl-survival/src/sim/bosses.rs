@@ -87,6 +87,19 @@ const RUN_HASTE: f32 = 1.6;
 const LEG_SLACK: f32 = 2.5;
 /// Burning ground bites a hero standing in it this often.
 const BURN_TICK: f32 = 1.0;
+/// How burning ground shows: its edge drawn at its true size (fire's colour, drawn anew every
+/// `FIRE_REDRAW` so it goes with the patch), a flame at its heart and `FIRE_FLAMES` round it at
+/// `FIRE_FLAMES_AT` of its radius. A patch smaller than `GROUND_LOOK_MIN` gets no ground spell:
+/// cast at a point those cover a whole room (filmed, November 13: `Heated Ground` for a 3 yd
+/// patch lit the whole cave floor as lava, so no patch could be told from the floor).
+const FIRE_COLOUR: &str = "FF7A1A";
+const FIRE_REDRAW: f32 = 0.5;
+const FIRE_FLAMES: usize = 3;
+const FIRE_FLAMES_AT: f32 = 0.55;
+/// A blow refused by a collapse's hold flashes on the boss at most this often.
+const HELD_FLASH_GAP: f32 = 0.6;
+/// The end of a collapse: dust thrown out along its last face, a cloud every this far.
+const END_DUST_GAP: f32 = 2.5;
 /// The collapse: how often it catches a hero behind the rubble, warns those in a section going,
 /// drops a lighter fall ahead of its wave, and raises dust.
 const CATCH_TICK: f32 = 0.25;
@@ -304,6 +317,8 @@ pub(crate) struct Bosses {
     began: BTreeMap<Id, Vec3>,
     /// Bosses whose heavy blows burn, and how.
     burning: BTreeMap<Id, BurnDef>,
+    /// Bosses hauling at a lodged weapon, and until when.
+    lodged: BTreeMap<Id, f32>,
     /// Burning ground.
     fires: Vec<Fire>,
     /// The place coming down behind the heroes, if a boss has brought it down.
@@ -414,6 +429,15 @@ struct Collapse {
     down: f32,
     end_text: String,
     held_text: String,
+    /// What shows on the boss while it is held (from the first blow refused until the last
+    /// section is down), on each blow refused, and from the end of the collapse on.
+    held_aura: u32,
+    held_kit: u32,
+    end_aura: u32,
+    end_kit: u32,
+    end_grow: f32,
+    /// When a refused blow next flashes on it.
+    flash_at: f32,
     /// Its last section is down: the last of the fight.
     done: bool,
     /// The heroes this surge has caught (each pays once a surge).
@@ -574,7 +598,9 @@ struct Fire {
     until: f32,
     bite_at: f32,
     owner: Id,
-    obj: Id,
+    /// Its flames, and when its edge is next drawn.
+    objs: Vec<Id>,
+    ring_at: f32,
 }
 
 impl Survival {
@@ -584,6 +610,8 @@ impl Survival {
         let Some(e) = self.content.mobs[def].phases.get(phase).cloned() else { return };
         if let Some(b) = e.burn {
             self.bosses.burning.insert(mid, b);
+            // Its weapon's heat shows on it from now.
+            self.events.push(Event::Auras { id: mid });
         }
         if !e.debris.is_empty() {
             let damage = self.boss_blow(mid, DEBRIS_SHARE);
@@ -648,6 +676,12 @@ impl Survival {
                 down: c.down.max(0.0),
                 end_text: c.end_text.clone(),
                 held_text: c.held_text.clone(),
+                held_aura: c.held_aura,
+                held_kit: c.held_kit,
+                end_aura: c.end_aura,
+                end_kit: c.end_kit,
+                end_grow: c.end_grow,
+                flash_at: now,
                 done: false,
                 caught: BTreeSet::new(),
                 catch_at: now + CATCH_TICK,
@@ -834,6 +868,7 @@ impl Survival {
                 self.yell(boss, c.end_text.clone());
                 let pos = self.mobs[&boss].pos;
                 self.mobs.get_mut(&boss).unwrap().home = pos;
+                self.collapse_ends(c, &s);
             }
             Stage::Rest { until } => {
                 if now >= c.dust_at {
@@ -1159,7 +1194,15 @@ impl Survival {
     /// gone, its faces and their stops with it), and the boss is back where its fight began, on
     /// its way to being whole there (home, a creature heals and its phases start over).
     fn collapse_lost(&mut self, boss: Id) {
+        // What its last stand put on it comes off: its own size again, no look of the fight.
+        let grown = self.bosses.collapse.as_ref().is_some_and(|c| c.boss == boss && c.done && c.end_grow > 0.0);
         self.bosses.collapse = None;
+        if let Some(def) = self.mobs.get(&boss).map(|m| m.def) {
+            if grown {
+                self.events.push(Event::Grow { id: boss, scale: self.content.mobs[def].scale });
+            }
+            self.events.push(Event::Auras { id: boss });
+        }
         // The faces' stops go at once, with every rule of it. What it looked like goes a moment
         // after, in its dust (well before anyone wakes at a lamp).
         self.bosses.faces.retain(|f| f.owner != boss);
@@ -1193,9 +1236,89 @@ impl Survival {
         self.bosses.looks = Looks { off, ..Default::default() };
     }
 
+    /// The end of a collapse is a turn anyone can see, with no line read: the last face throws
+    /// its dust out across the floor with a crash, and the boss turns on the heroes: it roars,
+    /// what held it breaks off it (`end_kit`), and from then until it falls it wears `end_aura`
+    /// and stands `end_grow` times its size.
+    fn collapse_ends(&mut self, c: &Collapse, last: &Section) {
+        let boss = c.boss;
+        if !self.bosses.looks.off {
+            let u = [last.b[0] - last.a[0], last.b[1] - last.a[1]];
+            let wide = (u[0] * u[0] + u[1] * u[1]).sqrt().max(1.0e-3);
+            let ahead = [-u[1] / wide * last.ahead, u[0] / wide * last.ahead];
+            let n = (wide / END_DUST_GAP).ceil().max(1.0) as usize;
+            // Two rows of it, at the face's foot and rolling out from it, low and at head height.
+            for row in [1.0_f32, 3.5] {
+                for k in 0..=n {
+                    let t = k as f32 / n as f32;
+                    let xy = [last.a[0] + u[0] * t + ahead[0] * row, last.a[1] + u[1] * t + ahead[1] * row];
+                    let at = self.floor_beside(last.at, xy);
+                    self.point_look(boss, at, LAND_DUST);
+                    self.point_look(boss, [at[0], at[1], at[2] + last.height * 0.5], LAND_DUST);
+                }
+            }
+            self.events.push(Event::GroundBurst {
+                at: last.at,
+                yaw: ahead[1].atan2(ahead[0]),
+                shape: "line",
+                reach: 9.0,
+                arc: 0.0,
+                width: wide,
+                secs: 1.2,
+                colour: DUST_COLOUR.into(),
+            });
+            let near: Vec<Id> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, last.at) <= 40.0).map(|(h, _)| *h).collect();
+            for h in near {
+                self.events.push(Event::Beat { player: h, beat: BEAT_ROCKFALL.into(), on: None });
+            }
+        }
+        self.events.push(Event::Sound { id: boss, sound: SOUND_CRASH });
+        self.events.push(Event::Emote { id: boss, emote: mobs::ROAR_EMOTE });
+        if c.end_kit != 0 {
+            self.events.push(Event::Visual { id: boss, kit: c.end_kit, by: None });
+        }
+        if c.end_grow > 0.0 {
+            let own = self.content.mobs[self.mobs[&boss].def].scale;
+            self.events.push(Event::Grow { id: boss, scale: own * c.end_grow });
+        }
+        // (The collapse is put back with `done` set after this step: its looks are read from it
+        // when this event is played, after the step.)
+        self.events.push(Event::Auras { id: boss });
+    }
+
+    /// What shows on a boss for where its fight stands (spells whose state the clients play):
+    /// held by its collapse, in its last stand, its weapon burning.
+    pub(crate) fn boss_looks(&self, id: Id) -> Vec<u32> {
+        let mut out = Vec::new();
+        if let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == id) {
+            if c.done {
+                out.push(c.end_aura);
+            } else if c.held {
+                out.push(c.held_aura);
+            }
+        }
+        if let Some(b) = self.bosses.burning.get(&id) {
+            out.push(b.aura);
+        }
+        // Its weapon lodged, the fire goes out of it: the look of its last stand and of its
+        // burning weapon are off it for as long as it hauls, and back as the weapon comes free.
+        // Filmed on Rhahk'Zor, November 13: the stun pose alone, the maul still in his hand,
+        // did not say "now", and none of 9 stuns' stars showed on an ogre. A hold stays on:
+        // a lodged boss that can't be brought lower must not look open.
+        if self.bosses.lodged.get(&id).is_some_and(|until| self.clock < *until) {
+            let held = self.bosses.collapse.as_ref().filter(|c| c.boss == id && !c.done && c.held).map(|c| c.held_aura);
+            out.retain(|a| Some(*a) == held);
+        }
+        out.retain(|a| *a != 0);
+        out
+    }
+
     /// A blow on a boss whose collapse is still coming down: it can't be brought below its hold
-    /// before the last section is down (the last of the fight is fought at its face).
-    pub(crate) fn boss_hold(&mut self, mid: Id, damage: u32) -> u32 {
+    /// before the last section is down (the last of the fight is fought at its face). The first
+    /// blow refused is said (`held_text`) and shown: `held_aura` on it from then until the hold
+    /// lifts, and `held_kit` flashed on it for each blow refused.
+    pub(crate) fn boss_hold(&mut self, mid: Id, by: Id, damage: u32) -> u32 {
+        let now = self.clock;
         let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == mid && !c.done && c.hold > 0.0) else { return damage };
         let Some(m) = self.mobs.get(&mid) else { return damage };
         let floor = (c.hold * m.max_health as f32).round() as u32;
@@ -1203,10 +1326,31 @@ impl Survival {
         if damage <= most {
             return damage;
         }
-        if !c.held {
+        let (first, kit, flash) = (!c.held, c.held_kit, now >= c.flash_at);
+        if first {
             let line = c.held_text.clone();
             self.bosses.collapse.as_mut().unwrap().held = true;
             self.yell(mid, line);
+            self.events.push(Event::Auras { id: mid });
+        }
+        if kit != 0 && flash {
+            self.bosses.collapse.as_mut().unwrap().flash_at = now + HELD_FLASH_GAP;
+            self.events.push(Event::Visual { id: mid, kit, by: None });
+        }
+        // The blow's own number says what it took, and a blow that took nothing glanced off
+        // (filmed, November 13: a hero at the hold saw 29 and 21 float off a health bar that
+        // never moved). Whoever strikes pushes the blow's `Swing` just before it hurts, so the
+        // number is the last `Swing` from `by` on this boss, and only if that is a hit of this
+        // size: a hurt with no `Swing` of its own (a bleed, a burn) rewrites nobody's blow.
+        if let Some(Event::Swing { damage: d, outcome, .. }) =
+            self.events.iter_mut().rev().find(|e| matches!(e, Event::Swing { attacker, victim: Some(v), .. } if *attacker == by && *v == mid))
+        {
+            if *outcome == Outcome::Hit && *d == damage {
+                *d = most;
+                if most == 0 {
+                    *outcome = Outcome::Blocked;
+                }
+            }
         }
         most
     }
@@ -1470,7 +1614,11 @@ impl Survival {
     /// where its fight began, whole, and its blows burn no more.
     pub(crate) fn boss_home(&mut self, id: Id) {
         self.bosses.runs.remove(&id);
-        self.bosses.burning.remove(&id);
+        let lodged = self.bosses.lodged.remove(&id).is_some();
+        if self.bosses.burning.remove(&id).is_some() || lodged {
+            self.events.push(Event::Auras { id });
+        }
+        self.fires_out(id);
         // (A lost collapse's rock is on its way out in its dust: `step_looks_leaving` takes it.)
         if self.bosses.looks.leaving.is_some_and(|l| l.0 == id) {
             self.bosses.faces.retain(|f| f.owner != id);
@@ -1485,14 +1633,27 @@ impl Survival {
         }
     }
 
-    /// A boss is down: its beats end (the ground it set burning burns out). What its collapse
-    /// brought down stays, its faces too, until the dungeon resets.
+    /// A boss is down: its beats end, and the ground it set burning goes out with it (filmed,
+    /// November 13: the floor burned on for 7 sec round his body and his drops). What its
+    /// collapse brought down stays, its faces too, until the dungeon resets.
     pub(crate) fn boss_gone(&mut self, id: Id) {
         self.bosses.runs.remove(&id);
         self.bosses.burning.remove(&id);
+        self.bosses.lodged.remove(&id);
         self.bosses.began.remove(&id);
         if self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id) {
             self.bosses.collapse = None;
+        }
+        self.fires_out(id);
+    }
+
+    /// The ground a boss set burning is out: its flames gone, nothing more bitten.
+    fn fires_out(&mut self, owner: Id) {
+        let gone: Vec<Id> = self.bosses.fires.iter().filter(|f| f.owner == owner).flat_map(|f| f.objs.clone()).collect();
+        self.bosses.fires.retain(|f| f.owner != owner);
+        for obj in gone {
+            self.objs.remove(&obj);
+            self.events.push(Event::ObjGone { id: obj });
         }
     }
 
@@ -1503,13 +1664,29 @@ impl Survival {
             if let Some(b) = self.bosses.burning.get(&id).cloned() {
                 let at = if arc >= 300.0 { pos } else { [pos[0] + facing.cos() * range * 0.7, pos[1] + facing.sin() * range * 0.7, pos[2]] };
                 let at = self.ground_near(at[0], at[1], at[2]);
-                if b.look != 0 {
+                if b.look != 0 && b.radius >= GROUND_LOOK_MIN {
                     self.events.push(Event::Missile { caster: id, spell: b.look, target: Target::Point(at) });
                 }
-                let obj = self.alloc();
-                self.objs.insert(obj, Obj { kind: ObjKind::Fire { on: 0 }, pos: at, facing: 0.0 });
-                self.events.push(Event::ObjSpawned { id: obj });
-                self.bosses.fires.push(Fire { at, radius: b.radius, damage: b.damage, until: now + b.secs, bite_at: now + BURN_TICK * 0.5, owner: id, obj });
+                // Flames across the patch: one at its heart, the rest round it.
+                let turn = (self.look_seq() % 6) as f32;
+                let mut objs = Vec::new();
+                for k in 0..=FIRE_FLAMES {
+                    let p = if k == 0 {
+                        at
+                    } else {
+                        let a = turn + k as f32 * std::f32::consts::TAU / FIRE_FLAMES as f32;
+                        let g = self.ground_near(at[0] + a.cos() * b.radius * FIRE_FLAMES_AT, at[1] + a.sin() * b.radius * FIRE_FLAMES_AT, at[2]);
+                        if !g[2].is_finite() || (g[2] - at[2]).abs() > 1.5 {
+                            continue;
+                        }
+                        g
+                    };
+                    let obj = self.alloc();
+                    self.objs.insert(obj, Obj { kind: ObjKind::Fire { on: 0 }, pos: p, facing: 0.0 });
+                    self.events.push(Event::ObjSpawned { id: obj });
+                    objs.push(obj);
+                }
+                self.bosses.fires.push(Fire { at, radius: b.radius, damage: b.damage, until: now + b.secs, bite_at: now + BURN_TICK * 0.5, owner: id, objs, ring_at: now });
             }
         }
     }
@@ -1522,9 +1699,26 @@ impl Survival {
         };
         self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
         self.stagger_mob(id, secs, false);
+        // Seen for as long as it lasts (`boss_looks`).
+        let until = self.bosses.lodged.get(&id).copied().unwrap_or(0.0).max(self.clock + secs);
+        self.bosses.lodged.insert(id, until);
+        self.events.push(Event::Auras { id });
         // A short lodge (the ordinary slam) must not shorten a longer normal recovery either.
         if let Some(Mob { state: MobState::Recover { until, .. }, .. }) = self.mobs.get_mut(&id) {
             *until = until.max(recovery);
+        }
+    }
+
+    /// A lodged weapon comes free: the look of it goes.
+    pub(crate) fn step_boss_lodges(&mut self) {
+        if self.bosses.lodged.is_empty() {
+            return;
+        }
+        let now = self.clock;
+        let free: Vec<Id> = self.bosses.lodged.iter().filter(|(_, until)| now >= **until).map(|(id, _)| *id).collect();
+        for id in free {
+            self.bosses.lodged.remove(&id);
+            self.events.push(Event::Auras { id });
         }
     }
 
@@ -1536,15 +1730,24 @@ impl Survival {
         let now = self.clock;
         let mut out = Vec::new();
         let mut bites = Vec::new();
+        let mut rings = Vec::new();
         for f in self.bosses.fires.iter_mut() {
             if now >= f.until {
-                out.push(f.obj);
+                out.extend(f.objs.iter().copied());
                 continue;
+            }
+            if now >= f.ring_at {
+                f.ring_at = now + FIRE_REDRAW;
+                rings.push((f.at, f.radius, (FIRE_REDRAW + 0.05).min(f.until - now)));
             }
             if now >= f.bite_at {
                 f.bite_at = now + BURN_TICK;
                 bites.push((f.at, f.radius, f.damage, f.owner));
             }
+        }
+        // Its edge, where it bites and no wider.
+        for (at, reach, secs) in rings {
+            self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach, arc: 360.0, width: 0.0, secs, colour: FIRE_COLOUR.into() });
         }
         self.bosses.fires.retain(|f| now < f.until);
         for obj in out {

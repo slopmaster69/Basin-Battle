@@ -449,3 +449,326 @@ fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
     assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_skin().is_empty(), "no rock left of it");
     println!("door side: caught at {when:.2} s and thrown to ({:.1}, {:.1}, {:.1}); felled at {fell:.2} s, its rules ended at once and its rock gone within 3.5 s; woke at {woke:.2} s and left alone", to[0], to[1], to[2]);
 }
+
+/// The fight brought to where the collapse ends: every section down, the hero three yards past
+/// the last line, Rhahk'Zor at the last face. The hero wakes at the Galleries lamp from here on
+/// (as one who walked in past it does).
+fn at_the_last_stand(seed: u64) -> (Survival, Id, Id) {
+    let (mut s, boss, hero, mut along) = begun(seed);
+    let at = s.players[&hero].pos;
+    s.arrive_at(hero, "galleries");
+    s.move_player(hero, at, 0.0, Default::default());
+    let mut reached = false;
+    for _ in 0..(120 * 20) {
+        if s.collapse_state().is_none() {
+            break;
+        }
+        let events = tick(&mut s, boss, hero, &mut along);
+        reached |= events.iter().any(|e| matches!(e, Event::Log(t) if t.contains("collapse reached its end")));
+        if reached {
+            break;
+        }
+    }
+    assert!(reached, "the last section came down");
+    assert_eq!(s.collapse_face_lines().len(), 4, "all four faces stand");
+    (s, boss, hero)
+}
+
+const GALLERIES_LAMP: [f32; 3] = [-112.5, -405.0, 59.9];
+
+fn cell(p: [f32; 3]) -> (i32, i32) {
+    ((p[0] * 2.0).floor() as i32, (p[1] * 2.0).floor() as i32)
+}
+
+/// Whether `p` is on (or a step from) floor that walks to where `open` was flooded from.
+fn walks(open: &BTreeMap<(i32, i32), [f32; 3]>, p: [f32; 3]) -> bool {
+    let (i, j) = cell(p);
+    (-2..=2).any(|di| (-2..=2).any(|dj| open.get(&(i + di, j + dj)).is_some_and(|q| (q[2] - p[2]).abs() < 3.0)))
+}
+
+fn whole(s: &mut Survival, hero: Id) {
+    let p = s.players.get_mut(&hero).unwrap();
+    p.health = p.max_health;
+}
+
+/// Point 6 of the last stand's review, on the real mine: a hero who takes all of it at the last
+/// face (every blow, the three falls, the burning iron, the pound's blast and its throws), one
+/// standing where the blows leave them and one walking into the face the whole time, is never
+/// behind the face, never under the floor, and always on floor that walks to the Galleries lamp.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_hero_who_takes_everything_at_the_last_face_is_never_stuck() {
+    for (seed, push) in [(21, false), (22, true)] {
+        let (mut s, boss, hero) = at_the_last_stand(seed);
+        let lamp = s.land().footing(GALLERIES_LAMP).expect("the lamp's floor");
+        let open = flood(&s, lamp, true);
+        let (mut thrown, mut far, mut struck) = (0, 0.0f32, 0);
+        let mut last = s.players[&hero].pos;
+        for n in 0..(60 * 20) {
+            if n == 5 * 20 {
+                s.dev_hurt(hero, 0.24, "rhahkzor").unwrap();
+            }
+            if n == 30 * 20 {
+                s.dev_hurt(hero, 0.11, "rhahkzor").unwrap();
+            }
+            whole(&mut s, hero);
+            let full = s.players[&hero].health;
+            if push {
+                // Into the face (east of them), a step a tick.
+                let p = s.players[&hero].pos;
+                s.move_player(hero, [p[0] + 0.35, p[1], p[2]], 0.0, Default::default());
+            }
+            for e in s.step(0.05) {
+                if let Event::Log(t) = e {
+                    assert!(!t.contains("put back") && !t.contains("fell through"), "{:.2} s: {t}", s.clock);
+                }
+            }
+            let at = s.players[&hero].pos;
+            struck += usize::from(s.players[&hero].health < full);
+            assert!(!s.collapse_behind(at), "behind the face at {:.2} s: {at:?}", s.clock);
+            let floor = s.land().footing(at).unwrap_or_else(|| panic!("no floor under them at {:.2} s: {at:?}", s.clock));
+            assert!(at[2] > floor[2] - 0.6, "under the floor at {:.2} s: {at:?} over {floor:?}", s.clock);
+            assert!(walks(&open, at), "cut off from the lamp at {:.2} s: {at:?}", s.clock);
+            let moved = dist2d(last, at);
+            if moved > 1.5 {
+                thrown += 1;
+                far = far.max(moved);
+            }
+            last = at;
+            assert!(s.mobs[&boss].state.foe().is_some(), "fight lost at {:.2} s", s.clock);
+        }
+        assert!(s.mobs[&boss].phase >= 4, "in his last phase: {}", s.mobs[&boss].phase);
+        assert!(struck > 10, "he fought them the whole time: struck on {struck} ticks");
+        let how = if push { "walking into the face" } else { "standing" };
+        println!(
+            "last stand, {how}: struck or burned on {struck} ticks, moved by a blow {thrown} times (farthest in a tick {far:.1} yd), ends at ({:.1}, {:.1}, {:.1}), {:.1} yd from the last face",
+            last[0],
+            last[1],
+            last[2],
+            -91.0 - last[0]
+        );
+    }
+}
+
+/// A blow's throw at the last stand (a heavy blow knocks a hero back 9 yd, the pound's blast
+/// with it; their own client flies it, to where the server says it ends): from every spot of
+/// floor within 12 yd of the last face, thrown any way, 6 yd or 9, a hero lands on the floor, on
+/// the fight's side of the face, on floor that walks to the Galleries lamp.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_hero_thrown_any_way_at_the_last_face_lands_on_the_fights_side() {
+    let (s, _, _) = at_the_last_stand(26);
+    let lamp = s.land().footing(GALLERIES_LAMP).expect("the lamp's floor");
+    let open = flood(&s, lamp, true);
+    let from: Vec<[f32; 3]> = open.values().filter(|p| p[0] < -91.0 && p[0] > -103.0 && (-383.0..=-368.0).contains(&p[1])).copied().collect();
+    assert!(from.len() > 300, "the floor before the last face: {} spots", from.len());
+    let (mut throws, mut stopped, mut short) = (0, 0, f32::MAX);
+    for p in &from {
+        for k in 0..16 {
+            let dir = k as f32 * std::f32::consts::TAU / 16.0;
+            for far in [6.0, 9.0] {
+                let end = s.slide_end(*p, dir, far);
+                throws += 1;
+                assert!(!s.collapse_behind(end), "thrown behind the face from {p:?} toward {dir:.2}: {end:?}");
+                assert!(s.face_crossing(*p, end).is_none(), "thrown through the face from {p:?} toward {dir:.2}: {end:?}");
+                let floor = s.land().footing(end).unwrap_or_else(|| panic!("thrown off the floor from {p:?} toward {dir:.2}: {end:?}"));
+                assert!((end[2] - floor[2]).abs() < 0.6, "set down off the floor from {p:?}: {end:?} over {floor:?}");
+                assert!(walks(&open, end), "thrown where nothing walks to the lamp, from {p:?} toward {dir:.2}: {end:?}");
+                // Toward the face (east): stopped at it.
+                if dir.cos() > 0.9 && p[0] + far > -90.0 && (-379.0..=-372.0).contains(&p[1]) {
+                    stopped += 1;
+                    short = short.min(-91.0 - end[0]);
+                    assert!(end[0] < -91.0, "stopped short of the face: {end:?}");
+                }
+            }
+        }
+    }
+    assert!(stopped > 100, "throws into the face tried: {stopped}");
+    println!("{throws} throws from {} spots: none behind the face, none off the floor, none cut off; {stopped} of them into the face, each stopped before it (nearest {short:.2} yd)", from.len());
+}
+
+/// The slam's three falls (25%) are each ringed 1.3 sec before they land, and between them is dry
+/// floor: from anywhere at the last stand that no ring covers a hero walks to the Galleries lamp
+/// through no ring, and from anywhere a ring covers dry floor is nearer than the warning allows.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn the_last_stands_three_falls_leave_dry_floor_to_the_galleries() {
+    let (mut s, boss, hero) = at_the_last_stand(23);
+    // (His ring of rocks at 45% first, and landed.)
+    s.dev_hurt(hero, 0.44, "rhahkzor").unwrap();
+    for _ in 0..60 {
+        whole(&mut s, hero);
+        s.step(0.05);
+    }
+    s.dev_hurt(hero, 0.24, "rhahkzor").unwrap();
+    let mut falls: Vec<[f32; 3]> = Vec::new();
+    for _ in 0..10 {
+        whole(&mut s, hero);
+        for e in s.step(0.05) {
+            if let Event::GroundBurst { at, shape: "ring", reach, secs, .. } = e {
+                if reach == 3.0 && (secs - 1.3).abs() < 0.01 {
+                    falls.push(at);
+                }
+            }
+        }
+    }
+    assert_eq!(falls.len(), 3, "three falls, each ringed for its 1.3 sec: {falls:?}");
+    let (him, them) = (s.mobs[&boss].pos, s.players[&hero].pos);
+    assert!(falls.iter().all(|f| dist2d(*f, him) < 16.0), "where he stands by then ({him:?}): {falls:?}");
+    let lamp = s.land().footing(GALLERIES_LAMP).expect("the lamp's floor");
+    let open = flood(&s, lamp, true);
+    let dry = |p: &[f32; 3]| falls.iter().all(|f| dist2d(*p, *f) > 3.0);
+    // From the lamp a step at a time: over any floor, and over dry floor only.
+    let spread = |rings: bool| {
+        let mut reached = std::collections::BTreeSet::from([cell(lamp)]);
+        let mut queue = std::collections::VecDeque::from([cell(lamp)]);
+        while let Some((i, j)) = queue.pop_front() {
+            let p = open[&(i, j)];
+            for (di, dj) in (-1..=1).flat_map(|di| (-1..=1).map(move |dj| (di, dj))) {
+                let n = (i + di, j + dj);
+                if reached.contains(&n) {
+                    continue;
+                }
+                if open.get(&n).is_some_and(|q| (!rings || dry(q)) && (q[2] - p[2]).abs() <= 1.5) {
+                    reached.insert(n);
+                    queue.push_back(n);
+                }
+            }
+        }
+        reached
+    };
+    let (stepped, reached) = (spread(false), spread(true));
+    let near: Vec<(&(i32, i32), &[f32; 3])> = open.iter().filter(|(_, p)| dist2d(**p, him) < 18.0 && p[0] < -91.0).collect();
+    assert!(near.len() > 400, "the last stand's floor: {} spots", near.len());
+    let (mut cut, mut ringed, mut worst) = (0, 0, 0.0f32);
+    for (k, p) in &near {
+        if dry(p) {
+            // (A ledge that only a hop reaches is not the rings' doing.)
+            cut += usize::from(stepped.contains(k) && !reached.contains(k));
+        } else {
+            ringed += 1;
+            let out = near.iter().filter(|(k, q)| dry(q) && reached.contains(k)).map(|(_, q)| dist2d(**p, **q)).fold(f32::MAX, f32::min);
+            worst = worst.max(out);
+        }
+    }
+    assert_eq!(cut, 0, "dry floor at the last stand that walks to the lamp only through a ring");
+    // (1.3 sec at a hero's 7 yd a second is 9 yd; a ring is 3 yd deep at most.)
+    assert!(worst <= 3.6, "dry floor within the warning from anywhere ringed: {worst:.1} yd");
+    println!(
+        "the three falls at {falls:?}; he at ({:.1}, {:.1}), the hero at ({:.1}, {:.1}); {ringed} of {} spots ringed, dry floor at most {worst:.1} yd off, every dry spot walks dry to the lamp",
+        him[0],
+        him[1],
+        them[0],
+        them[1],
+        near.len()
+    );
+}
+
+/// A hero felled alone at the last stand: the fight is lost at once, the mine is put back (no
+/// face, no rubble, no fire left), Rhahk'Zor goes back to his post whole, his own size and
+/// colour, and the hero wakes whole at the Galleries lamp and is left alone there.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_hero_felled_alone_at_the_last_stand_wakes_to_the_mine_standing_again() {
+    let (mut s, boss, hero) = at_the_last_stand(24);
+    // (His post: the collapse moves his home along with the fight.)
+    let home = [-40.0, -385.0, 55.9];
+    s.dev_hurt(hero, 0.24, "rhahkzor").unwrap();
+    for _ in 0..(6 * 20) {
+        whole(&mut s, hero);
+        s.step(0.05);
+    }
+    assert!(s.auras_of(boss).len() >= 2, "he wears his last stand and his maul's fire: {:?}", s.auras_of(boss));
+    let (mut fell, mut woke) = (None, None);
+    let mut health = 1;
+    for _ in 0..(90 * 20) {
+        if fell.is_none() {
+            s.players.get_mut(&hero).unwrap().health = 1;
+        }
+        for e in s.step(0.05) {
+            if let Event::Log(t) = e {
+                assert!(!t.contains("fell through"), "{t}");
+            }
+        }
+        let (now, t) = (s.players[&hero].health, s.clock);
+        match (fell, woke) {
+            (None, _) if now == 0 => fell = Some(t),
+            (None, _) => {}
+            (Some(at), _) if t <= at + 0.11 => {}
+            (Some(at), None) => {
+                assert_eq!(s.collapse_front(), None, "the collapse still on {:.2} s after the hero fell", t - at);
+                assert!(s.collapse_face_lines().is_empty(), "no face stops anyone any more");
+                assert!(!s.objs.values().any(|o| matches!(o.kind, htl_survival::ObjKind::Fire { .. })), "his fires out");
+                if t > at + 3.7 {
+                    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_skin().is_empty(), "the mine put back");
+                }
+                if now > 0 {
+                    woke = Some(t);
+                    let at = s.players[&hero].pos;
+                    assert!(dist2d(at, GALLERIES_LAMP) < 4.0, "at the Galleries lamp: {at:?}");
+                }
+            }
+            (Some(_), Some(_)) => {
+                assert!(now >= health, "struck after waking at the lamp, at {t:.2} s: {health} to {now}");
+                assert_eq!(s.collapse_front(), None, "no collapse begun again on a hero at their lamp");
+            }
+        }
+        health = now;
+    }
+    let (fell, woke) = (fell.expect("felled"), woke.expect("woken at the lamp"));
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, home) < 1.0 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}", m.pos);
+    assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, his fight to start over");
+    assert!(s.auras_of(boss).is_empty(), "no look of the fight left on him: {:?}", s.auras_of(boss));
+    assert_eq!(s.players[&hero].health, s.players[&hero].max_health, "the hero whole at the lamp");
+    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty() && s.collapse_face_skin().is_empty(), "no rock left of it");
+    println!("last stand lost: felled at {fell:.2} s, woke at the Galleries lamp at {woke:.2} s; he is back at his post whole");
+}
+
+/// A hero felled at the last stand while a friend fights on wakes at the Galleries lamp and
+/// walks up to the fight: every face of the collapse is behind the fight, none between the lamp
+/// and it.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_hero_who_wakes_at_the_galleries_lamp_walks_up_to_a_friends_fight() {
+    let (mut s, boss, hero) = at_the_last_stand(25);
+    let friend = s.join("friend", "Friend", None);
+    s.arrive_at(friend, "galleries");
+    let (mut fell, mut woke) = (None, None);
+    for _ in 0..(90 * 20) {
+        whole(&mut s, hero);
+        if fell.is_none() {
+            // Kept beside the hero, a blow from falling.
+            let at = s.players[&hero].pos;
+            if let Some(beside) = s.land().footing([at[0], at[1] + 1.0, at[2]]) {
+                s.move_player(friend, beside, 0.0, Default::default());
+            }
+            s.players.get_mut(&friend).unwrap().health = 1;
+        }
+        for e in s.step(0.05) {
+            if let Event::Log(t) = e {
+                assert!(!t.contains("put back") && !t.contains("fell through"), "{:.2} s: {t}", s.clock);
+            }
+        }
+        assert!(s.mobs[&boss].state.foe().is_some(), "the friend's fight goes on at {:.2} s", s.clock);
+        let now = s.players[&friend].health;
+        if fell.is_none() && now == 0 {
+            fell = Some(s.clock);
+        } else if fell.is_some() && now > 0 {
+            woke = Some(s.clock);
+            break;
+        }
+    }
+    let (fell, woke) = (fell.expect("the friend felled"), woke.expect("the friend woken"));
+    let at = s.players[&friend].pos;
+    assert!(dist2d(at, GALLERIES_LAMP) < 4.0, "woken at the Galleries lamp: {at:?}");
+    assert_eq!(s.players[&friend].health, s.players[&friend].max_health);
+    assert_eq!(s.collapse_face_lines().len(), 4, "the faces stand while the fight goes on");
+    let from = s.land().footing(at).expect("the lamp's floor");
+    let open = flood(&s, from, true);
+    let (fight, him) = (s.players[&hero].pos, s.mobs[&boss].pos);
+    assert!(walks(&open, fight), "from the lamp to the friend, no rubble in the way: {fight:?}");
+    assert!(walks(&open, him), "and to Rhahk'Zor: {him:?}");
+    assert!(!s.collapse_behind(at));
+    println!("felled at {fell:.2} s, woke at the lamp at {woke:.2} s, {:.0} yd from the fight, the way open", dist2d(at, fight));
+}

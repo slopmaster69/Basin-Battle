@@ -1871,8 +1871,23 @@ impl SurvivalGame {
             // `.es fx cast 75 1500` (a cast's start for that long), `.es fx stop 75`.
             "fx" => {
                 let n = arg2.parse::<u32>().unwrap_or(0);
-                let ms = words.next().and_then(|w| w.parse::<u32>().ok()).unwrap_or(1500);
-                if let Some(g) = self.guid_of(me) {
+                let third = words.next().unwrap_or("").to_lowercase();
+                let ms = third.parse::<u32>().ok().unwrap_or(1500);
+                // `.es fx aura <id> <name>`: on the nearest foe of that name, not the hero (a
+                // look sits differently on an ogre than on a hero).
+                let on = if arg == "aura" && !third.is_empty() {
+                    let at = self.sim.players.get(&me).map_or([0.0; 3], |p| p.pos);
+                    let near = |m: &htl_survival::sim::Mob| (m.pos[0] - at[0]).hypot(m.pos[1] - at[1]);
+                    self.sim
+                        .mobs
+                        .iter()
+                        .filter(|(_, m)| m.health > 0 && self.sim.content.mobs[m.def].name.to_lowercase().contains(&third))
+                        .min_by(|a, b| near(a.1).total_cmp(&near(b.1)))
+                        .map(|(id, _)| *id)
+                } else {
+                    Some(me)
+                };
+                if let Some(g) = on.and_then(|id| self.guid_of(id)) {
                     let p = match arg.as_str() {
                         "emote" => Some(packets::emote(g, n)),
                         "spell" => Some(packets::spell_go(g, n, packets::Aim::Caster, &[g], None)),
@@ -1883,11 +1898,20 @@ impl SurvivalGame {
                             f.set(idx::UNIT_NPC_EMOTESTATE, n);
                             Some(packets::update_object(&[], &[(g, &f)]))
                         }
+                        // A lasting look (a spell's state on a unit) in its last aura slot,
+                        // until the next or 0: for choosing a boss's lasting looks.
+                        "aura" => {
+                            let mut bar = [(0u32, 0u8); 48];
+                            bar[15] = (n, u8::from(n != 0));
+                            let mut f = Fields::new();
+                            fields::aura_words(&mut f, &bar, 15);
+                            Some(packets::update_object(&[], &[(g, &f)]))
+                        }
                         _ => None,
                     };
                     match p {
                         Some(p) => self.broadcast(&p),
-                        None => self.say_to(conn, "Try .es fx emote <id>, spell <id>, cast <id> [ms], stop <id> or pose <id> (0 ends it)."),
+                        None => self.say_to(conn, "Try .es fx emote <id>, spell <id>, cast <id> [ms], stop <id>, pose <id> or aura <id> [foe's name] (0 ends it)."),
                     }
                 }
                 Ok(())

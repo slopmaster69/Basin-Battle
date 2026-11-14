@@ -1044,3 +1044,354 @@ fn a_restock_after_clearfoes_stands_every_boss_again() {
     assert!(s.players.contains_key(&hero));
     assert!(s.below.as_ref().unwrap().open.contains("vancleef_quarters"), "found secrets stay");
 }
+
+// --- the hold, the end of the collapse, the burning iron: what is seen of them -----------------
+
+const HELD_LOOK: u32 = 11426;
+const HELD_FLASH: u32 = 555;
+const STAND_LOOK: u32 = 8599;
+const BURN_LOOK: u32 = 18499;
+
+/// `sectioned`, with the looks of its hold and of its end authored as the mine has them.
+fn dressed(rest: f32) -> Vec<EnrageDef> {
+    let mut p = sectioned(rest);
+    let c = p[0].collapse.as_mut().unwrap();
+    c.held_aura = HELD_LOOK;
+    c.held_kit = HELD_FLASH;
+    c.end_aura = STAND_LOOK;
+    c.end_grow = 1.15;
+    p
+}
+
+fn flashes(ev: &[Event], boss: Id) -> usize {
+    ev.iter().filter(|e| matches!(e, Event::Visual { id, kit: HELD_FLASH, .. } if *id == boss)).count()
+}
+
+/// Filmed, November 13: a hero hitting him at 26% saw one yell and then nothing, for up to 40
+/// sec. The hold is on him to see: from the first blow refused until the last section is down.
+#[test]
+fn a_held_boss_wears_his_hold_from_the_first_blow_refused_until_the_mine_is_down() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 23, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let max = s.mobs[&boss].max_health;
+    let floor = (0.26 * max as f32).round() as u32;
+    assert!(s.auras_of(boss).is_empty(), "nothing on him before he is held: {:?}", s.auras_of(boss));
+    // A blow that leaves him above his hold shows nothing.
+    run_to(&mut s, h, (1, "wave"));
+    s.events.clear();
+    s.hurt_mob(boss, h, max / 10);
+    assert!(s.mobs[&boss].health > floor);
+    assert!(s.auras_of(boss).is_empty() && flashes(&s.events, boss) == 0, "not held yet");
+    // The first blow refused: his line, the look on him, the blow seen to glance off.
+    s.events.clear();
+    s.hurt_mob(boss, h, max);
+    assert_eq!(s.mobs[&boss].health, floor);
+    assert_eq!(s.auras_of(boss), vec![HELD_LOOK], "held, and seen to be");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Auras { id } if *id == boss)), "the clients told");
+    assert_eq!(flashes(&s.events, boss), 1);
+    // Every blow refused glances off him, a flurry of them no more than a flash each 0.6 sec.
+    s.events.clear();
+    s.hurt_mob(boss, h, 50);
+    s.hurt_mob(boss, h, 50);
+    assert_eq!(flashes(&s.events, boss), 0, "not again within the gap");
+    run_for(&mut s, HELD_FLASH_GAP + 0.05);
+    past_the_line(&mut s, h);
+    s.events.clear();
+    s.hurt_mob(boss, h, 50);
+    assert_eq!((flashes(&s.events, boss), s.mobs[&boss].health), (1, floor));
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Yell { .. })), "his line only once");
+    // It stays on him through every section to come.
+    run_to(&mut s, h, (3, "wave"));
+    assert_eq!(s.auras_of(boss), vec![HELD_LOOK]);
+    // The last section down: the hold is off him in that moment, and the next blow bites.
+    let ev = run_out(&mut s, h);
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == boss)), "the clients told");
+    assert!(!s.auras_of(boss).contains(&HELD_LOOK), "the hold gone with the last section: {:?}", s.auras_of(boss));
+    s.events.clear();
+    s.hurt_mob(boss, h, 50);
+    assert_eq!((flashes(&s.events, boss), s.mobs[&boss].health), (0, floor - 50));
+}
+
+/// A boss never held (the heroes too slow to bring him to 26%) never wears the hold.
+#[test]
+fn a_boss_never_brought_to_his_hold_never_wears_it() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 24, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let mut seen = false;
+    while s.collapse_front().is_some_and(|f| !f.1) {
+        past_the_line(&mut s, h);
+        s.step(DT);
+        seen |= s.auras_of(boss).contains(&HELD_LOOK);
+    }
+    assert!(!seen);
+    assert_eq!(s.auras_of(boss), vec![STAND_LOOK], "his last stand, all the same");
+}
+
+/// Filmed, November 13: the last face stood, he said his line, and nothing on the screen changed.
+/// The end of the collapse is a turn seen with no line read: the last face throws its dust out
+/// with a crash, he roars, and from then on he stands larger and wears his rage.
+#[test]
+fn the_end_of_the_collapse_is_a_turn_that_is_seen() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 25, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let own = s.content.mobs[s.mobs[&boss].def].scale;
+    run_to(&mut s, h, (3, "wave"));
+    assert!(!s.auras_of(boss).contains(&STAND_LOOK));
+    let mut ev = Vec::new();
+    let mut turn = Vec::new();
+    while s.collapse_front().is_some_and(|f| !f.1) {
+        past_the_line(&mut s, h);
+        turn = s.step(DT);
+        ev.extend(turn.iter().cloned());
+    }
+    // All of it in the one step that ends it, with his line.
+    assert!(turn.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "No more mine.")));
+    assert!(turn.iter().any(|e| matches!(e, Event::Emote { id, emote } if *id == boss && *emote == mobs::ROAR_EMOTE)), "he roars");
+    assert!(turn.iter().any(|e| matches!(e, Event::Sound { id, sound: SOUND_CRASH } if *id == boss)), "a crash");
+    assert!(turn.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == boss && (*scale - own * 1.15).abs() < 1.0e-4)), "he stands larger");
+    assert!(turn.iter().any(|e| matches!(e, Event::Auras { id } if *id == boss)));
+    assert_eq!(s.auras_of(boss), vec![STAND_LOOK], "and wears it from then on");
+    // The last face's dust, wall to wall and out across the floor toward the heroes.
+    let dust: Vec<Vec3> = turn.iter().filter_map(|e| match e { Event::MissileFrom { spell: LAND_DUST, target: Target::Point(p), .. } => Some(*p), _ => None }).collect();
+    assert!(dust.len() >= 2 * 2 * 8, "two rows of dust, low and high: {}", dust.len());
+    assert!(dust.iter().all(|p| p[0] > LINES[3] && p[0] < LINES[3] + 5.0), "ahead of the last face, on the heroes' side");
+    assert!(dust.iter().any(|p| p[1] > 9.0) && dust.iter().any(|p| p[1] < -9.0), "from wall to wall");
+    assert!(turn.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", colour, width, .. } if colour == DUST_COLOUR && *width >= 19.0)), "its dust drawn across the floor");
+    assert!(turn.iter().any(|e| matches!(e, Event::Beat { player, beat, .. } if *player == h && beat == BEAT_ROCKFALL)), "the ground shakes");
+    // Once: nothing of it again while he fights on.
+    let after = run_for(&mut s, 5.0);
+    assert!(!after.iter().any(|e| matches!(e, Event::Grow { .. } | Event::Emote { emote: mobs::ROAR_EMOTE, .. })));
+    assert!(!after.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", .. })), "nothing more comes down");
+    // He falls: nothing shows on a body.
+    let left = s.mobs[&boss].health;
+    s.hurt_mob(boss, h, left);
+    run_for(&mut s, 0.2);
+    assert!(s.mobs.get(&boss).is_none_or(|m| m.health == 0));
+    assert!(s.auras_of(boss).is_empty(), "nothing burns on his body");
+    let _ = ev;
+}
+
+/// The fight lost in his last stand: he is his own size again and wears nothing, for the next try.
+#[test]
+fn a_last_stand_lost_puts_his_size_and_his_looks_back() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 26, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let own = s.content.mobs[s.mobs[&boss].def].scale;
+    run_out(&mut s, h);
+    assert_eq!(s.auras_of(boss), vec![STAND_LOOK]);
+    let hp = s.players[&h].health;
+    s.hurt_player_by(h, hp + 10_000, boss, "a blow");
+    let ev = run_for(&mut s, 0.5);
+    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == boss && (*scale - own).abs() < 1.0e-4)), "his own size again");
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == boss)));
+    assert!(s.auras_of(boss).is_empty(), "nothing on him: {:?}", s.auras_of(boss));
+    // A fight lost before the end never grew him: no size sent.
+    let (mut s, boss, h) = mine_at(dressed(2.0), 27, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "wave"));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, h, max);
+    assert_eq!(s.auras_of(boss), vec![HELD_LOOK]);
+    let hp = s.players[&h].health;
+    s.hurt_player_by(h, hp + 10_000, boss, "a blow");
+    let ev = run_for(&mut s, 0.5);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Grow { .. })));
+    assert!(s.auras_of(boss).is_empty(), "the hold off him too: {:?}", s.auras_of(boss));
+}
+
+/// A boss alone on a flat floor whose weapon burns from 90%.
+fn smith(seed: u64) -> (Survival, Id, Id) {
+    use crate::content::BurnDef;
+    let burn = BurnDef { radius: 3.0, damage: 6, secs: 7.0, look: 22191, aura: BURN_LOOK };
+    let (mut s, boss, h) = mine_at(vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, burn: Some(burn), ..Default::default() }], seed, POST);
+    assert!(s.auras_of(boss).is_empty());
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    (s, boss, h)
+}
+
+fn flames(s: &Survival) -> Vec<Vec3> {
+    s.objs.values().filter(|o| matches!(o.kind, ObjKind::Fire { .. })).map(|o| o.pos).collect()
+}
+
+/// Filmed, November 13: one patch of burning iron 3 yd across drew its spell over the whole cave
+/// floor (a ground spell cast at a point covers a room), so nobody could tell where it bit. A
+/// patch is drawn as wide as it bites: flames across it and its edge ringed, no room-wide spell.
+#[test]
+fn burning_iron_is_drawn_as_wide_as_it_bites() {
+    let (mut s, boss, h) = smith(31);
+    assert_eq!(s.auras_of(boss), vec![BURN_LOOK], "his weapon burns, on him to see");
+    let pos = s.mobs[&boss].pos;
+    s.move_player(h, [pos[0] - 30.0, pos[1], 0.0], 0.0, Moving::default());
+    s.events.clear();
+    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, true);
+    let heart = [pos[0] + 2.1, pos[1], pos[2]];
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Missile { spell: 22191, .. })), "no spell over the whole floor for a patch this small");
+    let lit = flames(&s);
+    assert_eq!(lit.len(), 1 + FIRE_FLAMES, "flames across it: {lit:?}");
+    assert!(lit.iter().all(|p| dist2d(*p, heart) < 3.0), "all inside where it bites: {lit:?}");
+    assert!(lit.iter().any(|p| dist2d(*p, heart) < 0.1) && lit.iter().filter(|p| dist2d(**p, heart) > 1.0).count() == FIRE_FLAMES);
+    let first: Vec<Id> = s.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Fire { .. })).map(|(id, _)| *id).collect();
+    // Its edge, ringed for as long as it burns, at the radius it bites.
+    let ev = run_for(&mut s, 7.5);
+    let rings: Vec<(f32, f32)> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::GroundBurst { at, shape: "ring", reach, secs, colour, .. } if colour == FIRE_COLOUR && dist2d(*at, heart) < 0.1 => Some((*reach, *secs)),
+            _ => None,
+        })
+        .collect();
+    assert!(rings.len() >= 13 && rings.len() <= 15, "redrawn each half second for its 7 sec: {}", rings.len());
+    assert!(rings.iter().all(|(reach, secs)| *reach == 3.0 && *secs <= FIRE_REDRAW + 0.06), "{rings:?}");
+    assert!(first.iter().all(|f| !s.objs.contains_key(f)), "burned out, every flame of it");
+    // A patch wide enough for the spell (a room's worth) still casts it.
+    s.bosses.burning.get_mut(&boss).unwrap().radius = GROUND_LOOK_MIN;
+    s.events.clear();
+    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, true);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Missile { spell: 22191, .. })));
+}
+
+/// Filmed, November 13: the floor burned on round his body and his drops for 7 sec after he fell.
+/// His fires go out with him, and when his fight is lost.
+#[test]
+fn his_fires_go_out_when_he_falls_and_when_his_fight_is_lost() {
+    let (mut s, boss, h) = smith(32);
+    let pos = s.mobs[&boss].pos;
+    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, true);
+    let heart = [pos[0] + 2.1, pos[1], pos[2]];
+    s.move_player(h, heart, 0.0, Moving::default());
+    assert_eq!(flames(&s).len(), 1 + FIRE_FLAMES);
+    let lit: Vec<Id> = s.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Fire { .. })).map(|(id, _)| *id).collect();
+    let left = s.mobs[&boss].health;
+    s.hurt_mob(boss, h, left);
+    let ev = run_for(&mut s, 0.1);
+    assert!(s.mobs.get(&boss).is_none_or(|m| m.health == 0), "he falls");
+    assert!(flames(&s).is_empty(), "no flame left by his body");
+    assert!(lit.iter().all(|f| ev.iter().any(|e| matches!(e, Event::ObjGone { id } if id == f))), "each taken from the clients");
+    let hp = s.players[&h].health;
+    let ev = run_for(&mut s, 8.0);
+    assert_eq!(s.players[&h].health, hp, "and nothing bites where it burned");
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. })), "nothing drawn there");
+    // The fight lost: the fires out too, and the look off him.
+    let (mut s, boss, h) = smith(33);
+    let pos = s.mobs[&boss].pos;
+    s.boss_blow_lands(boss, pos, 0.0, 3.0, 90.0, true);
+    let hp = s.players[&h].health;
+    s.hurt_player_by(h, hp + 10_000, boss, "a blow");
+    run_for(&mut s, 25.0);
+    assert!(flames(&s).is_empty(), "no flame left for the next try");
+    assert_eq!(s.mobs[&boss].health, s.mobs[&boss].max_health, "whole again");
+    assert!(s.auras_of(boss).is_empty(), "his weapon cold: {:?}", s.auras_of(boss));
+}
+
+/// Filmed, November 13, on the hero's own screen: blows on him at his hold floated their full
+/// numbers (29, 21) off a health bar that never moved. A blow says what it took: the one that
+/// brings him to his hold shows what was left to take, and every blow after shows none and is
+/// seen to glance off.
+#[test]
+fn a_blow_refused_at_the_hold_shows_what_it_took() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 29, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "wave"));
+    let max = s.mobs[&boss].max_health;
+    let floor = (0.26 * max as f32).round() as u32;
+    let blow = |s: &mut Survival, damage: u32| {
+        s.events.clear();
+        s.events.push(Event::Swing { attacker: h, victim: Some(boss), damage, outcome: Outcome::Hit, anim: false, style: Blow::Light });
+        s.hurt_mob(boss, h, damage);
+        s.events.iter().find_map(|e| match e {
+            Event::Swing { victim: Some(v), damage, outcome, .. } if *v == boss => Some((*damage, *outcome)),
+            _ => None,
+        })
+    };
+    // Above his hold a blow is what it is.
+    assert_eq!(blow(&mut s, 40), Some((40, Outcome::Hit)));
+    // The blow that reaches the hold: what was left to take.
+    let left = s.mobs[&boss].health - floor;
+    assert_eq!(blow(&mut s, left + 25), Some((left, Outcome::Hit)));
+    assert_eq!(s.mobs[&boss].health, floor);
+    // Every blow after: nothing, off him.
+    assert_eq!(blow(&mut s, 21), Some((0, Outcome::Blocked)));
+    assert_eq!(blow(&mut s, 29), Some((0, Outcome::Blocked)));
+    // The hold lifted, a blow is what it is again.
+    run_out(&mut s, h);
+    assert_eq!(blow(&mut s, 21), Some((21, Outcome::Hit)));
+}
+
+/// Two heroes at the hold in one tick: a hurt refused that has no blow of its own (a bleed, a
+/// burn) leaves another hero's blow of the same size as it was, and a hero's own refused blow
+/// is still the one rewritten when a friend's same-sized blow came before it.
+#[test]
+fn a_hurt_refused_at_the_hold_rewrites_nobody_elses_blow() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 29, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "wave"));
+    let friend = s.join("friend", "Friend", None);
+    let floor = (0.26 * s.mobs[&boss].max_health as f32).round() as u32;
+    let left = s.mobs[&boss].health - floor;
+    s.hurt_mob(boss, h, left - 29);
+    let swing = |by: Id| Event::Swing { attacker: by, victim: Some(boss), damage: 29, outcome: Outcome::Hit, anim: false, style: Blow::Light };
+    let shown = |s: &Survival, by: Id| {
+        s.events.iter().rev().find_map(|e| match e {
+            Event::Swing { attacker, victim: Some(v), damage, outcome, .. } if *attacker == by && *v == boss => Some((*damage, *outcome)),
+            _ => None,
+        })
+    };
+    // The friend's blow takes him to his hold, whole.
+    s.events.clear();
+    s.events.push(swing(friend));
+    s.hurt_mob(boss, friend, 29);
+    assert_eq!(s.mobs[&boss].health, floor);
+    // The hero's bleed of the same size is refused in the same tick: it has no blow to rewrite.
+    s.hurt_mob(boss, h, 29);
+    assert_eq!(shown(&s, friend), Some((29, Outcome::Hit)), "the friend's blow keeps its number");
+    // The hero's own blow of that size, refused: his is the one that glances off.
+    s.events.push(swing(h));
+    s.hurt_mob(boss, h, 29);
+    assert_eq!(shown(&s, h), Some((0, Outcome::Blocked)));
+    assert_eq!(shown(&s, friend), Some((29, Outcome::Hit)));
+    assert_eq!(s.mobs[&boss].health, floor);
+}
+
+/// Filmed, November 13: with his maul lodged he stood in a stun's pose, the maul still in his
+/// hand, and nothing said "now". The fire goes out of him for exactly as long as it is stuck:
+/// what he wears for his burning weapon and his last stand is off him, and back as it comes free.
+#[test]
+fn a_lodged_weapon_is_seen_for_as_long_as_it_is_stuck() {
+    let (mut s, boss, _) = smith(30);
+    assert_eq!(s.auras_of(boss), vec![BURN_LOOK]);
+    s.events.clear();
+    s.boss_weapon_lodges(boss, 3.0);
+    assert!(s.auras_of(boss).is_empty(), "out as it sticks: {:?}", s.auras_of(boss));
+    assert!(s.events.iter().any(|e| matches!(e, Event::Auras { id } if *id == boss)), "the clients told");
+    run_for(&mut s, 2.8);
+    assert!(s.auras_of(boss).is_empty(), "still stuck at 2.8 sec");
+    let ev = run_for(&mut s, 0.4);
+    assert_eq!(s.auras_of(boss), vec![BURN_LOOK], "free again, it burns again");
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == boss)), "the clients told");
+    // A shorter lodge inside a longer one doesn't free it early.
+    s.boss_weapon_lodges(boss, 3.0);
+    s.boss_weapon_lodges(boss, 1.2);
+    run_for(&mut s, 2.0);
+    assert!(s.auras_of(boss).is_empty(), "the longer lodge still holds");
+    run_for(&mut s, 1.2);
+    assert_eq!(s.auras_of(boss), vec![BURN_LOOK]);
+}
+
+/// A boss held by its collapse and lodged keeps the look of its hold: it is not open.
+#[test]
+fn a_lodged_boss_still_held_keeps_the_look_of_its_hold() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 29, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "wave"));
+    let hp = s.mobs[&boss].health;
+    s.hurt_mob(boss, h, hp);
+    assert_eq!(s.auras_of(boss), vec![HELD_LOOK]);
+    s.boss_weapon_lodges(boss, 3.0);
+    assert_eq!(s.auras_of(boss), vec![HELD_LOOK], "held and lodged");
+    // The collapse over, the look of his last stand is what a lodge takes off him.
+    run_out(&mut s, h);
+    run_for(&mut s, 3.2);
+    assert_eq!(s.auras_of(boss), vec![STAND_LOOK]);
+    s.boss_weapon_lodges(boss, 3.0);
+    assert!(s.auras_of(boss).is_empty(), "the fire out of him: {:?}", s.auras_of(boss));
+}

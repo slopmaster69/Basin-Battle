@@ -1,0 +1,39 @@
+# DEV SETUP, not a fight: lasting looks tried on the hero one after another (`.es fx aura`),
+# 3 s each from 18, to choose what Rhahk'Zor wears while he is held, in his last stand and with
+# his maul burning. In order: 642 498 710 11958 11426 17 1463 20594 871 543 8599 12880 18499 1719 23128 8269 2947 348 11129 7739 19483 13376.
+hero warrior
+cam off
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -108 -400 59.9 0.9
+12.6 lua ResetView(2) SetView(2)
+13 .es heal
+16 video
+18 .es fx aura 642
+21 .es fx aura 498
+24 .es fx aura 710
+27 .es fx aura 11958
+30 .es fx aura 11426
+33 .es fx aura 17
+36 .es fx aura 1463
+39 .es fx aura 20594
+42 .es fx aura 871
+45 .es fx aura 543
+48 .es fx aura 8599
+51 .es fx aura 12880
+54 .es fx aura 18499
+57 .es fx aura 1719
+60 .es fx aura 23128
+63 .es fx aura 8269
+66 .es fx aura 2947
+69 .es fx aura 348
+72 .es fx aura 11129
+75 .es fx aura 7739
+78 .es fx aura 19483
+81 .es fx aura 13376
+84 .es fx aura 0
+85.5 end
