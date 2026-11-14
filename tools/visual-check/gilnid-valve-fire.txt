@@ -1,0 +1,24 @@
+# DEV SETUP, not an unassisted clear: the hero put in the middle of the channel, the crew
+# brought down by debug at once (before a stick is lit), the hero healed. Nobody stops him.
+# What it shows, from above: his line, the channel marked pale blue with wisps from that moment,
+# his run to the valve and 2 s of work, the glow and the whistle, the mark bright with full
+# steam for 1.2 s, the hero stepping out sideways 3.9 s after the line (the hero's own key,
+# after the whistle), the fire coming down the marked channel from the valve with dry floor
+# either side, "Then we'll melt the lot!" and the finish.
+hero warrior
+cam off
+camera high Gilnid
+include _gilnid-valve-setup
+12.5 lua GV.useless = function() GV.after(3.6, function() GV.say(".es in unlock") end) GV.after(3.75, function() GV.turn(2.0) end) GV.after(3.9, function() ActionDash(0.5, 7, "l") GV.log("steps out") end) end
+13 video
+15 .es goto -203.75 -590.6 21 2.0
+15.3 .es in lock
+16 .es hurt 0 engineer
+16.25 .es hurt 0 engineer
+16.4 .es heal
+18 .es heal
+25 .es heal
+28 .es heal
+31 .es heal
+32 shots finish 2 0.5
+34 end

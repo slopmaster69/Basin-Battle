@@ -173,7 +173,7 @@ const CAMP_RETURNING: f32 = 60.0;
 const POSTURE_BREAK: f32 = 2.2;
 /// After a break it stands back up: its posture builds again only this long after the reel ends
 /// (else a group fills it again while it reels and it never stands).
-const POSTURE_GRACE: f32 = 4.0;
+pub(crate) const POSTURE_GRACE: f32 = 4.0;
 /// Heroes this near a creature's fight are in it.
 pub(crate) const FIGHT_RANGE: f32 = 25.0;
 /// A hero healing this near a foe on them draws its attack this soon.
@@ -680,7 +680,11 @@ impl Survival {
             let heft = heft * self.kitchen_posture_share(mid, by, label);
             // Smite's (`sim::arsenal`): struck kneeling at his rack, more.
             let heft = heft * self.arsenal_posture_share(mid);
-            if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
+            let built = (damage as f32 * heft).round() as u32;
+            // A heavy blow that lands on Gilnid with his hands on the valve knocks him off it,
+            // whatever it dealt (`sim::perches`).
+            let built = if built > 0 && self.perch_knocked(mid, by, label) { built.max(self.posture_limit(mid)) } else { built };
+            if self.build_posture(mid, by, built) {
                 return;
             }
         }
@@ -741,7 +745,10 @@ impl Survival {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
         // Greed leaves Cookie's hands occupied: about 2 s of a hero's blows, or one heavy blow,
         // spoils the scoop (`sim::kitchen`).
-        let limit = if self.kitchen_scooping(mid) { super::kitchen::SCOOP_POSTURE } else { self.content.mobs[m.def].posture };
+        // Gilnid's hands on the valve are occupied the same way (`sim::perches`).
+        let limit = if self.kitchen_scooping(mid) { super::kitchen::SCOOP_POSTURE }
+            else if self.perch_at_valve(mid) { super::perches::VALVE_POSTURE }
+            else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }

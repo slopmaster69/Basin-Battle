@@ -1,0 +1,26 @@
+# DEV SETUP, not an unassisted clear: the hero put by Gilnid's post, his crew brought down by
+# debug at once (before a stick is lit), the hero healed. What it shows, from above: "Useless.
+# Every one of you.", the channel marked pale blue with wisps of steam from that moment, his run
+# to the valve, the hero after him (the hero's own keys: at the line the lock let go, a run of
+# 8 yd to the dry spot beside the valve, clear of the pot's corner, the aim turned on him, a
+# heavy blow; the lock taken again once he reels), the blow landing with his hands on the valve, the mark going out, "No! You've
+# jammed the valve!", him reeling 4 s while the hero hits him, then "Then I'll break you
+# myself!" and his finish.
+hero warrior
+cam off
+camera high Gilnid
+include _gilnid-valve-setup
+12.5 lua GV.useless = function() GV.say(".es in unlock") GV.after(0.15, function() GV.go(-204.85, -584.86, 0, function() GV.turn(2.618) GV.after(0.05, function() GV.say(".es in h") GV.log("heavy blow") GV.after(0.6, function() GV.say(".es where") end) end) end) end) GV.after(2.8, function() GV.say(".es in lock") end) for k = 0, 3 do GV.after(3.3 + k * 0.8, function() GV.say(".es in a") GV.after(0.08, function() GV.say(".es in au") end) end) end end
+13 video
+15 .es goto -198 -589 21 2.6
+15.3 .es in lock
+16 .es hurt 0 engineer
+16.25 .es hurt 0 engineer
+16.4 .es heal
+19.5 .es heal
+23 .es heal
+26 .es heal
+29 .es heal
+32 .es heal
+33 shots finish 2 0.5
+35 end

@@ -1,0 +1,44 @@
+# DEV SETUP: the hero is healed through the whole fight (`.es heal` every 1.2 s). Otherwise
+# gilnid-valve-fight: a real pull of Gilnid to the kill, by the cameraman, the fighting, the
+# search for engineers in reach and the race to the valve the small player's (GB), nothing done
+# to Gilnid or his crew.
+hero warrior
+cam off
+camera wide Gilnid + Furnace Engineer
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes gilnid
+12 .es goto -178 -579 19.4 3.3
+12.4 lua GB = { q = {}, b = {}, on = false, t0 = GetTime(), nextHit = 0, nextDash = 0, nextLock = 0, lastHT = 0, tries = 0, hits = 0, dealt = 0, sawLO = false, locked = false, struck = 0, caught = 0, heal = false, nextHeal = 0, crew = false, probe = 0, race = false, won = false, miss = 0 }
+12.4 lua function GB.say(t) SendChatMessage(t, "SAY") end
+12.4 lua function GB.after(d, f) table.insert(GB.q, { GetTime() + d, f }) end
+12.4 lua function GB.log(t) if ProbeLog then ProbeLog(string.format("visual-check: bot %.1f %s hp %d", GetTime() - GB.t0, t, UnitHealth("player"))) end end
+12.4 lua function GB.hit() GB.tries = GB.tries + 1 GB.say(".es in a") GB.after(0.08, function() GB.say(".es in au") end) end
+12.4 lua function GB.dash(why, keys, secs) GB.nextDash = GetTime() + 0.55 ActionDash(secs or 0.4, 7, keys or "f") GB.log(why) end
+12.4 lua function GB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.4 lua function GB.turn(want) local d = math.mod((want - GetActionAim()) * 57.29578 + 900, 360) - 180 if math.abs(d) > 2 then FlipCameraYaw(d) end end
+12.4 lua function GB.hold(a, b) table.insert(GB.b, { a, b }) end
+12.4 lua function GB.busy(now) local i, busy = 1, false while i <= table.getn(GB.b) do local w = GB.b[i] if now >= w[2] then table.remove(GB.b, i) else if now >= w[1] then busy = true end i = i + 1 end end return busy end
+12.4 lua function GB.an(c, wind) local now = GetTime() local land = now + wind if GB.race then return end if wind >= 1.0 then GB.hold(land - 0.8, land + 0.45) GB.after(math.max(0, wind - 0.18), function() if not GB.race then GB.say(".es in d") GB.log("roll from " .. c) end end) GB.after(wind + 0.4, function() if not GB.race then GB.dash("back in after the roll") end end) else GB.hold(land - 0.8, land + 0.3) local d = math.max(0, wind - 0.13) GB.after(d, function() GB.say(".es in g") end) GB.after(d + 0.2, function() GB.say(".es in gu") end) end end
+12.4 lua function GB.wn(s) if GB.race or s < 0.5 then return end local now = GetTime() GB.hold(now + s - 0.8, now + s + 0.45) GB.after(math.max(0, s - 0.18), function() if not GB.race then GB.say(".es in d") GB.log("roll from a blast") end end) GB.after(s + 0.4, function() if not GB.race then GB.dash("back in after the blast") end end) end
+12.4 lua function GB.line(l) local f = GB.split(l) local v, now = f[1], GetTime() if v == "AN" and f[11] == "mob" then GB.an(tonumber(f[3]) or 0, tonumber(f[4]) or 0) elseif v == "WN" and (f[3] == nil or f[3] == "") then GB.wn(tonumber(f[2]) or 0) elseif v == "HT" then GB.lastHT = now GB.hits = GB.hits + 1 GB.dealt = GB.dealt + (tonumber(f[2]) or 0) if not GB.G then GB.G = GB.guid end GB.log("lands " .. GB.hits .. " of " .. GB.tries .. ": " .. tostring(f[2]) .. " " .. tostring(f[4]) .. ", dealt " .. GB.dealt .. (GB.guid == GB.G and "" or " (an engineer)")) elseif v == "IM" and f[7] == "1" then GB.struck = GB.struck + 1 if f[5] == "hit" then GB.caught = GB.caught + 1 end GB.log("struck " .. GB.struck .. " caught " .. GB.caught .. ": " .. tostring(f[4]) .. " " .. tostring(f[5])) elseif v == "LO" then GB.sawLO = true GB.locked = f[2] ~= nil and f[2] ~= "" and f[2] ~= "0x0" and f[2] ~= "0X0" and f[2] ~= "0" GB.guid = GB.locked and f[2] or nil if GB.locked then GB.miss = 0 end end end
+12.4 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) GB.line(l) return old(l) end
+12.4 lua function GB.toG(n) if n <= 0 or not GB.G or GB.guid == GB.G or GB.race then return end GB.say(".es in lock") GB.after(0.45, function() GB.toG(n - 1) end) end
+12.4 lua function GB.blow(n) if GB.won or not GB.race then return end GB.say(".es in h") GB.log("heavy blow at the valve, " .. n) end
+12.4 lua function GB.arrive() GB.turn(2.618) GB.after(0.05, function() GB.blow(1) end) GB.after(1.1, function() GB.blow(2) end) GB.after(2.35, function() if not GB.won and GB.race then GB.turn(0) ActionDash(0.4, 7, "f") GB.log("not stopped: steps back from the channel") end end) end
+12.4 lua function GB.step(x, y) local p = GB.path[1] local dx, dy = p[1] - x, p[2] - y local d = math.sqrt(dx * dx + dy * dy) if d <= (GB.path[2] and 0.8 or 0.4) or GetTime() > GB.till then table.remove(GB.path, 1) p = GB.path[1] if not p then GB.log(string.format("by the valve, at %.1f %.1f", x, y)) GB.arrive() return end dx, dy = p[1] - x, p[2] - y d = math.sqrt(dx * dx + dy * dy) end GB.turn(math.atan2(dy, dx)) local secs = math.min(d / 7, 0.4) ActionDash(secs, 7, "f") GB.after(secs + 0.03, function() if GB.race and not GB.won then GB.want = true GB.say(".es where") end end) end
+12.4 lua GB.w = CreateFrame("Frame") GB.w:RegisterEvent("CHAT_MSG_SYSTEM") GB.w:SetScript("OnEvent", function() local _, _, x, y = string.find(arg1 or "", "at ([%-%d%.]+), ([%-%d%.]+),") if not x or not GB.want then return end GB.want = nil if not GB.race or GB.won then return end x, y = tonumber(x), tonumber(y) if not GB.path then GB.path = { { -204.85, -584.86 } } if y > -585.2 and x > -202.5 then table.insert(GB.path, 1, { -200.5, -586.0 }) end GB.till = GetTime() + 4 GB.log(string.format("runs for the valve from %.1f %.1f", x, y)) end GB.step(x, y) end)
+12.4 lua function GB.resume(why) GB.race = false GB.b = {} GB.lastHT = GetTime() GB.nextLock = 0 GB.locked = false GB.sawLO = true GB.log(why) end
+12.4 lua GB.y = CreateFrame("Frame") GB.y:RegisterEvent("CHAT_MSG_MONSTER_YELL") GB.y:SetScript("OnEvent", function() local t = arg1 or "" GB.log("he yells: " .. t) if string.find(t, "Mind the equipment") then GB.after(5, function() GB.crew = true GB.probe = 0 end) elseif string.find(t, "Useless") then GB.crew = false GB.race = true GB.path = nil GB.q = {} GB.b = {} GB.say(".es in unlock") GB.want = true GB.after(0.05, function() GB.say(".es where") end) elseif string.find(t, "jammed") then GB.won = true GB.resume("the valve is stopped") elseif string.find(t, "melt the lot") then GB.resume("the fire has passed") elseif string.find(t, "break you myself") then if GB.race then GB.resume("he gave the valve up") end elseif string.find(t, "going to pay") then GB.on = false GB.heal = false GB.q = {} GB.say(".es in unlock") GB.log("he falls: " .. GB.hits .. " of " .. GB.tries .. " blows landed, dealt " .. GB.dealt .. ", struck " .. GB.struck .. ", caught " .. GB.caught) end end)
+12.4 lua GB.f = CreateFrame("Frame") GB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(GB.q) do local a = GB.q[i] if now >= a[1] then table.remove(GB.q, i) a[2]() else i = i + 1 end end if GB.heal and now >= GB.nextHeal then GB.nextHeal = now + 1.2 GB.say(".es heal") end if not GB.on or GB.race then return end if GB.sawLO and not GB.locked and now >= GB.nextLock then GB.nextLock = now + 2 GB.miss = GB.miss + 1 if GB.miss > 1 then FlipCameraYaw(120) end GB.after(0.3, function() GB.say(".es in lock") end) GB.log("lock on again") end if GB.crew and GB.locked and now >= GB.probe then if GB.guid ~= GB.G and now - GB.lastHT < 2 then GB.probe = now + 1.5 elseif GB.guid ~= GB.G then GB.probe = now + 6 GB.log("no engineer in reach: back to Gilnid") GB.toG(3) else GB.probe = now + 2.5 GB.say(".es in lock") GB.log("looks for an engineer") end end if GB.busy(now) then return end if now >= GB.nextHit then GB.nextHit = now + 0.75 GB.hit() end if now - GB.lastHT > 1.5 and now >= GB.nextDash then GB.dash("after him") end end)
+12.4 lua GB.d = CreateFrame("Frame") GB.d:SetScript("OnUpdate", function() if GB.on and UnitHealth("player") <= 0 then GB.on = false GB.heal = false GB.q = {} GB.log("the hero falls: " .. GB.hits .. " of " .. GB.tries .. " blows landed, dealt " .. GB.dealt .. ", struck " .. GB.struck .. ", caught " .. GB.caught) end end)
+13 .es heal
+16 video
+17 lua GB.turn(3.3) ActionDash(1.5, 7, "f")
+19 lua GB.lastHT = GetTime() GB.on = true GB.heal = true
+19.1 .es in lock
+300 end

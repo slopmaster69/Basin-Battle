@@ -2373,6 +2373,10 @@ pub struct PerchCrewDef {
     pub valve: [f32; 2],
     /// The furnace's mouth (x, y and height over his floor): it belches and glows.
     pub furnace: [f32; 3],
+    /// The way the fire's channel runs across the floor from the valve (x, y; any length). The
+    /// same every fight. Left out: straight out from the furnace, through the valve.
+    #[serde(default)]
+    pub channel: Option<[f32; 2]>,
 }
 
 /// A plank laid from a rail out over the drop, a support under it on the floor below.
