@@ -281,8 +281,13 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "ground" => out.push(format!("{} yd range · {} yd radius", n(d.range[1]), n(d.radius[1]))),
         "cone" => out.push(format!("{} yd cone", n(d.range[1]))),
         "line" => out.push(format!("{} yd line · {} yd width", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "beam" if d.around => out.push(format!("{} yd radius · {} sec duration", n(d.radius[1]), n(d.secs))),
         "beam" => out.push(format!("{} yd beam · {} yd width · {} sec duration", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
         "ally" => out.push("Ally or self".to_string()),
+        // Skyfall: it only rises (its range is the hop's, not a reach); the hang is what to say.
+        "leap" if d.hunt == "float" => out.push(format!("{} sec hang", n(htl_survival::sim::hunter::FLOAT_SECS))),
+        // Arcane Explosion's bursts: each one wider than the last.
+        "rhythm" => out.push(format!("{} yd radius", span(d.radius))),
         "leap" if d.back => out.push(format!("{} yd backward leap", n(d.range[1]))),
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap · {} yd landing radius", n(d.range[1]), n(d.radius[1]))),
         "trap" if d.launch > 0.0 => out.push(format!("{} yd placement range · {} yd launch · {} sec duration", n(d.range[1]), n(d.launch), n(d.secs))),
@@ -2555,6 +2560,33 @@ mod facts_tests {
         // An EX version shows no cooldown of its own (it shares its base's).
         let ex = facts("rending_axe");
         assert!(!ex.contains("cooldown"), "{ex}");
+    }
+
+    #[test]
+    fn a_spin_a_hang_and_a_rhythm_say_their_own_size() {
+        // A spin round the hero has no length: its radius, not "0 yd beam".
+        let storm = facts("warrior_bladestorm");
+        assert!(storm.contains("5 yd radius") && !storm.contains("beam") && !storm.contains("width"), "{storm}");
+        // Skyfall only rises (0.5 yd): what matters is its hang, from the sim's own number.
+        let sky = facts("skyfall");
+        let hang = format!("{} sec hang", htl_survival::sim::hunter::FLOAT_SECS);
+        assert!(sky.contains(&hang) && !sky.contains("0.5 yd"), "{sky}");
+        // Arcane Explosion's bursts widen: 6 to 8 yd.
+        assert!(facts("arcane_explosion").contains("6–8 yd radius"));
+    }
+
+    /// No ability's stat line is a zero or a leftover: "0 yd", "0 sec", "NaN", an empty `· ·`.
+    #[test]
+    fn no_stat_line_says_zero_or_nothing() {
+        let c = htl_survival::Content::builtin();
+        for (i, a) in c.abilities.iter().enumerate().filter(|(_, a)| a.on_board()) {
+            let base = (0..c.abilities.len()).find(|b| c.ex_of(*b) == Some(i)).map(|b| &c.abilities[b]);
+            let f = ability_facts(a, base, c.valor.max);
+            let said = format!(" {f} ");
+            for bad in [" 0 yd", " 0 sec", "NaN", "inf ", "· ·", "  "] {
+                assert!(!said.contains(bad), "{}: {bad:?} in {f}", a.name);
+            }
+        }
     }
 
     #[test]

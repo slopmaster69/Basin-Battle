@@ -105,7 +105,7 @@ const SCATTER_RING: f32 = 1.6;
 const VOLLEY_SECS: f32 = 1.0;
 /// Skyfall's hang: held at the leap's top this long, the bow drawn on the volley. The add-on
 /// looses it as it runs out; the rules a moment after (`HANG_GRACE`), at the last reticle heard.
-const FLOAT_SECS: f32 = 5.5;
+pub const FLOAT_SECS: f32 = 5.5;
 const HANG_GRACE: f32 = 0.5;
 /// The pose held through the hang: the Jump clip (38), a character's mid-air pose with the legs
 /// drawn up (1.12 has no hover of its own), played on the lower body only for the whole hang
