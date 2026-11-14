@@ -60,6 +60,8 @@ jobs:
       # The crates the patches touch (benilla-app is the one with the cameraman's tests).
       - name: Run the client's tests
         working-directory: benilla
+        env:
+          WOW_AMBIGUITY_DUMP: 1
         run: |
           set -o pipefail
           start=$(date +%s)
