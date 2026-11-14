@@ -247,6 +247,57 @@ fn rest_pressed_again_and_again_is_one_rest() {
 }
 
 #[test]
+fn a_rest_waits_while_a_friend_is_in_a_fight() {
+    let mut s = below();
+    let ayla = s.join("ayla", "Ayla", None);
+    let bren = s.join("bren", "Bren", None);
+    let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
+    s.interact(ayla, Some(lamp));
+    s.step(DT);
+    // Bren is in the warlord's room, mid-fight, and has hurt him.
+    s.move_player(bren, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s
+        .mobs
+        .keys()
+        .find(|m| s.content.mobs[s.mobs[*m].def].key == "warlord")
+        .unwrap();
+    s.engage(boss, mobs::Foe::Hero(bren));
+    s.hurt_mob(boss, bren, 50);
+    let hurt = s.mobs[&boss].health;
+    s.step(DT);
+    // Ayla's rest is refused, and the boss stays as he is.
+    assert_eq!(
+        s.rest(ayla),
+        Err("Not while a friend is in a fight.".to_string())
+    );
+    assert_eq!(s.mobs[&boss].health, hurt, "the boss isn't healed");
+    assert!(s.mobs[&boss].state.target() == Some(bren), "nor sent back to his post");
+}
+
+#[test]
+fn a_rest_with_no_friend_in_a_fight_still_stirs_the_mine() {
+    let mut s = below();
+    let ayla = s.join("ayla", "Ayla", None);
+    let _bren = s.join("bren", "Bren", None);
+    let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
+    s.interact(ayla, Some(lamp));
+    s.step(DT);
+    let grunt = *s
+        .mobs
+        .keys()
+        .find(|m| s.content.mobs[s.mobs[*m].def].key == "grunt")
+        .unwrap();
+    s.hurt_mob(grunt, ayla, 100_000);
+    assert!(s.mobs.get(&grunt).is_none_or(|m| m.health == 0));
+    s.rest(ayla).unwrap();
+    assert!(
+        s.mobs
+            .values()
+            .any(|m| s.content.mobs[m.def].key == "grunt" && m.health > 0),
+        "the mine stirs"
+    );
+}
+#[test]
 fn a_boss_stays_dead_and_its_fog_door_bars_the_room_while_it_fights() {
     let mut s = below();
     let id = s.join("ayla", "Ayla", None);

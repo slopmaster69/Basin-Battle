@@ -967,7 +967,8 @@ little: a tick with a hero at any of the places takes about a quarter of a milli
 Read the Smuggler's Logbook by the camp's chest to go down (its Proving
 Ring page is open from the start: see below). The run goes
 backwards through the instance, lamp to lamp (`content/deadmines.toml`); resting at a lamp fills
-your Miner's Draughts and puts every foe but the bosses back at their posts.
+your Miner's Draughts and puts every foe but the bosses back at their posts. A rest is refused while any hero in the mine
+has enemies on them ("Not while a friend is in a fight.").
 
 | Area | Lamp | Foes | Boss (trophy) |
 |---|---|---|---|
