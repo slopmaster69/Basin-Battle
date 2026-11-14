@@ -204,17 +204,21 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   their middle is in the void outside the map, and a camera measured out from there stood in the
   void (take 418).
 - **Out of view**: one of the two is hidden when most of five points on them (low, chest, head,
-  either side) can't be seen, so a thin post or a crate in front doesn't count. When either is
-  hidden for more than 0.3 s, and the camera has held its position at least 3 s, it cuts to its
-  clearest position, if that is clearly better: nothing hiding either, little in the foreground,
-  then the other side, square to the side, behind, then the same higher up. Both hidden for more
-  than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
+  either side) can't be seen, so a thin post or a crate in front doesn't count. A position that
+  has lost the hero (hidden for more than 0.3 s) is left once it has been held a second; the
+  boss alone has to be hidden for more than a second, and the position held 5 s, to move it
+  (patch 0093; before it, every position was held 3 s, and a boss under a plank was a cut every
+  3 s while the camera looked at fallen rock for the last 3 s of Rhahk'Zor's collapse). It cuts
+  to its clearest position, if that is clearly better: nothing hiding either, little in the
+  foreground, then the other side, square to the side, behind, then the same higher up. Both
+  hidden for more than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
   (`camera: spectate: t=12.3 ...`).
 - **A wall filling the picture** (patch 0092): of twenty lines across the picture, out to its
   edges and 85 hundredths of the way to the two, the world on six (three tenths: a cabin's
   corner, a beam, the rock of a bend; the floor under the two doesn't count) for a second is a
-  cut too, once the position has been held 3 s, to one clearly better (`the world on 9 of 20
-  lines of the foreground`). So is the hero or the boss cut off by the frame's edge (a wall
+  cut too, once the position has been held 5 s (a second, with the world on half the picture,
+  nine lines: it has lost the hero), to one clearly better (`the world on 9 of 20 lines of the
+  foreground`). So is the hero or the boss cut off by the frame's edge (a wall
   pulled the eye in close behind the hero, take 425: `1 of the two cut off by the frame`). Before it, a corner of
   VanCleef's cabin filled a third to half of his takes for a minute. The fight's axis, which the
   shot's positions turn with, follows the two over 1.5 s, so the camera doesn't swing round into
@@ -271,7 +275,8 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
 landing's deck.
 
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
-cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, the cameraman hero (`setup` makes it), and a screen wide enough for both
+cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, 0093 for the
+longer hold, the cameraman hero (`setup` makes it), and a screen wide enough for both
 windows side by side: the cameraman's (`resolution`) and the hero's (`hero_resolution`) on the
 `monitor` screen. The run stops with an error rather than put one over the other.
 
