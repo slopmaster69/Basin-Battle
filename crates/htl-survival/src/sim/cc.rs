@@ -1,7 +1,7 @@
 //! Crowd control, by one exact rule each (Battlerite's, with WoW's names): what a stun, a root, a
 //! panic does to a hero or a creature, how long, and the two rules that keep it fair: heroes get
 //! half the duration creatures do, and after a stun, incapacitate or panic a hero can't be given
-//! another of those three for a while (the grace).
+//! another of those (and Dominate Mind) for a while (the grace).
 
 use std::collections::VecDeque;
 
@@ -30,10 +30,12 @@ pub struct Cc {
     pub next_mark: f32,
 }
 
-/// The three that bring the grace after them.
-const HARD: [&str; 3] = ["stun", "incapacitate", "panic"];
+/// The four that bring the grace after them.
+const HARD: [&str; 4] = ["stun", "incapacitate", "panic", "dominated"];
 /// The ones that keep a unit from acting at all.
-const DISABLED: [&str; 4] = ["stun", "incapacitate", "petrify", "panic"];
+const DISABLED: [&str; 5] = ["stun", "incapacitate", "petrify", "panic", "dominated"];
+/// A dominated hero walks toward their master until this close (yards).
+pub(crate) const DOMINATED_STOP: f32 = 2.0;
 /// A panicked hero is driven a stride away this often.
 const PANIC_STRIDE: f32 = 0.5;
 /// How many lines of the crowd-control log a hero keeps.
@@ -197,6 +199,8 @@ impl Survival {
             "petrify" => self.content.cc.petrify_shield,
             "shield" | "overhealth" => amount,
             "panic" => self.max_health_of(target) as f32 * self.content.cc.panic_break,
+            // A tendril's health (Void Tendrils): what damage must wear down to break the hold.
+            "root" => amount.max(0.0),
             _ => 0.0,
         };
         let list = self.cc.entry(target).or_default();
@@ -272,6 +276,10 @@ impl Survival {
         } else if self.mobs.contains_key(&id) {
             if matches!(kind, "stun" | "incapacitate" | "petrify") {
                 self.stagger_mob(id, secs, false);
+            }
+            // Taken by a Priest's will: it fights for them until it ends.
+            if kind == "dominated" {
+                self.take_thrall(id, from, secs);
             }
             if kind == "panic" {
                 self.stagger_mob(id, 0.05, false);
@@ -377,6 +385,14 @@ impl Survival {
                     c.until = now;
                     ended.push(c.kind.clone());
                 }
+                // Held by a tendril: damage wears it down, and it breaks.
+                "root" if damage > 0 && c.amount > 0.0 => {
+                    c.left -= damage as f32;
+                    if c.left <= 0.0 {
+                        c.until = now;
+                        ended.push(c.kind.clone());
+                    }
+                }
                 "root" if damage > 0 && c.break_after > 0.0 && now - c.since >= c.break_after => {
                     c.until = now;
                     ended.push(c.kind.clone());
@@ -474,6 +490,7 @@ impl Survival {
                 self.cc_ended(id, &gone);
             }
             self.panic_run(id);
+            self.dominated_walk(id);
         }
         self.grace.retain(|_, t| *t > now);
     }
@@ -500,7 +517,12 @@ impl Survival {
             self.update_rooted(id);
             self.update_speed(id);
             self.events.push(Event::Effects { player: id });
-        } else if let Some(m) = self.mobs.get_mut(&id) {
+        } else if self.mobs.contains_key(&id) {
+            // Its own again: a creature taken by a Priest's will turns on whoever is near.
+            if kinds.iter().any(|k| k == "dominated") {
+                self.release_thrall(id);
+            }
+            let Some(m) = self.mobs.get_mut(&id) else { return };
             // Free again: a creature stunned takes up its fight at once.
             if kinds.iter().any(|k| matches!(k.as_str(), "stun" | "incapacitate" | "petrify" | "panic")) && m.stagger_until > now {
                 m.stagger_until = now;
@@ -527,6 +549,23 @@ impl Survival {
             self.events.push(Event::Swing { attacker: from, victim: Some(id), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
             self.hurt_mob_as(id, from, damage, source);
         }
+    }
+
+    /// A hero whose mind is taken (Dominate Mind) is walked toward whoever took it, a stride at a
+    /// time, and can't act meanwhile (a creature fights for them instead: `sim::thrall`).
+    fn dominated_walk(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(c) = self.cc_of(id).iter().find(|c| c.kind == "dominated" && c.until > now).cloned() else { return };
+        let Some(to) = self.unit_pos(c.from) else { return };
+        let Some(p) = self.players.get(&id) else { return };
+        // Close already: it stands before them.
+        if now - p.panic_stride < PANIC_STRIDE || dist2d(p.pos, to) <= DOMINATED_STOP {
+            return;
+        }
+        let dir = facing(p.pos, to);
+        self.players.get_mut(&id).unwrap().panic_stride = now;
+        let speed = self.content.cc.panic_speed;
+        self.events.push(Event::Hop { player: id, dir, speed, lift: 0.0, roll: false, style: "" });
     }
 
     /// A panicked unit runs from what scared it, out of control.

@@ -436,6 +436,7 @@ impl Survival {
                 drawn_off: None,
                 summoned_by: None,
                 friendly: self.content.mobs[def].friendly,
+                thrall: None,
             },
         );
         // An ambusher lies unseen until a hero comes near (or its chest is opened).

@@ -663,6 +663,10 @@ pub struct AbilityDef {
     pub returns: bool,
     #[serde(default = "full_share")]
     pub return_damage: f32,
+    /// A returning projectile that comes home to its caster's hands (not lost against a wall or
+    /// run out of time) is caught: this much Valor and the perfect (Divine Star).
+    #[serde(default)]
+    pub catch_valor: f32,
     /// A projectile lobbed in an arc to the reticle's point on the ground (within its range): it
     /// flies over bodies, its landing ring shown to everyone meanwhile, and lands after its flight
     /// (distance / `speed`) to burst `splash` wide there (then `linger`). Needs `splash`.
@@ -1191,6 +1195,10 @@ pub struct AbilityEffect {
     /// A root breaks on damage once it's held this long.
     #[serde(default)]
     pub break_after: f32,
+    /// How long a hero has it, in place of `secs` and the rules' share for heroes (Dominate
+    /// Mind: a creature is taken for `secs`, a hero for this). 0: the usual share of `secs`.
+    #[serde(default)]
+    pub hero_secs: f32,
     /// A snare on a foe already snared freezes it instead (Cone of Cold).
     #[serde(default)]
     pub freeze_if_snared: bool,
@@ -1229,14 +1237,17 @@ pub struct AbilityEffect {
 /// Crowd control and forced movement a foe that holds its ground shrugs off (an ultimate's
 /// aside): what takes away its control of itself or its place. A snare, a weakness, a burn and a
 /// mark still take.
-pub const CONTROL: [&str; 7] = ["stun", "incapacitate", "petrify", "panic", "root", "silence", "stagger"];
+pub const CONTROL: [&str; 8] = ["stun", "incapacitate", "petrify", "panic", "root", "silence", "stagger", "dominated"];
 
 /// The crowd control there is (Battlerite's rules, WoW's names): `stun` (nothing, damage doesn't
 /// break it), `incapacitate` (nothing, damage breaks it), `petrify` (nothing, shielded: a frozen
 /// foe), `panic` (runs, out of control, ended by enough damage), `root` (no moving), `snare`
 /// (slower by `amount`), `silence` (no abilities), `weaken` (deals and heals `amount` less),
-/// `stagger` (the attack or charge in hand is lost).
-pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "stagger"];
+/// `stagger` (the attack or charge in hand is lost), `dominated` (the Priest's Dominate Mind: a
+/// creature fights for whoever took it, a hero walks toward them and can't act). A `root` given an
+/// `amount` is held by a tendril of that much health: damage wears it down and it breaks (Void
+/// Tendrils).
+pub const CC_KINDS: [&str; 10] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "stagger", "dominated"];
 /// The other effects an ability can carry.
 /// `knockback` throws them `amount` yards away from where it came from (`pull`: up to `amount`
 /// yards toward it); `shield` soaks `amount` damage; `regen` heals `amount` of their health a
@@ -1266,7 +1277,7 @@ pub const BOONS: [&str; 17] = ["freedom", "steed", "wrath", "hallowed", "steadfa
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 14] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "exposed"];
+pub const HARMFUL: [&str; 15] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "exposed", "dominated"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius

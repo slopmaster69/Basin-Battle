@@ -3194,6 +3194,7 @@ local CC_WORDS = {
   incapacitate = { "Incapacitated", 1, 0.7, 0.3, true },
   petrify = { "Frozen solid", 0.6, 0.85, 1, true },
   panic = { "Panicked", 1, 0.45, 0.8, true },
+  dominated = { "Dominated", 0.75, 0.55, 1, true },
   root = { "Rooted", 0.55, 0.9, 0.45 },
   snare = { "Slowed", 0.6, 0.75, 1 },
   silence = { "Silenced", 0.8, 0.6, 1 },

@@ -152,11 +152,11 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Split Arrow* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
-| 3 | **Ultimate** | Bladestorm, or Rallying Cry | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Split Arrow* | Fan of Knives · *Crippling Throw* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Surge of Light*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Body and Soul*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Power Word: Barrier*, or Shadowguard · *Vampiric Touch* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
+| 3 | **Ultimate** | Bladestorm, or Rallying Cry | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Holy Word: Salvation, or Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
 it) to cast that for Valor instead. An ultimate has none: it is the bar's whole worth.
@@ -206,12 +206,17 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
   Smoke Bomb, a cloud at your feet that hides you and your friends in it and slows foes, Vanish
   hides you at once (your next blow counts as from behind); Death Mark.
-- **Priest**: steer the light. Penance, a lance of light held 1.5 s and swept as you turn, burns
-  the foes in it and heals the friends in it (its EX, Mind Blast, bursts at the reticle 0.6 s later
-  and terrifies); Holy Nova heals you and your friends as it burns foes; Leap of Faith pulls the
-  first body it touches to you, friend or foe; Power Word: Barrier, a dome where you and your
-  friends take a quarter less and can't be staggered (its EX shields a friend, or you); Void Rift
-  drags everyone in it to its middle.
+- **Priest**: Light and Shadow, a choice on every key (see `docs/priest-draft3.md` and
+  `docs/priest-draft4.md`). Q: Penance, rings that close on up to 3 bodies in front of you, a bolt
+  of light on each as you press on the beat (its EX, **Divine Star**, is a star of light 24 yd out
+  and back, 14 damage to each foe and 14 healing to each friend it passes each way; the key again
+  turns it early, and catching it as it comes home is 5 Valor); or Mind Blast, a sigil that erupts
+  0.9 s later. E: Holy Nova, or Psychic Scream (its EX, **Void Tendrils**, holds every foe within
+  8 yd for 3 s, heroes 1.5, by a tendril of 50 health that damage breaks). 1: Angelic Feather, or
+  Fade, a 5 yd sidestep (its EX, **Dominate Mind**, bends the creature under the reticle, 30 yd,
+  to fight for you for 6 s, never a boss; a hero it strikes walks toward you and can't act for
+  1.5 s). 2: Power Word: Shield, which parries a blow for a friend if given just as it lands, or
+  Shadowguard. 3: Holy Word: Salvation, or Void Rift.
 - **Shaman**: shape the field. Lava Burst, molten rock lobbed over everyone in the way to land
   where its ring shows and leave the ground burning (its EX, Chain Lightning, leaps on twice);
   Thunderstorm throws everyone round you 8 yd away; totems to slow or root, to heal, or to

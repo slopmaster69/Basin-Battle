@@ -308,15 +308,16 @@ fn penance_sends_a_bolt_to_the_body_whose_ring_q_lands_on_not_a_lance() {
 }
 
 #[test]
-fn greater_penance_is_penances_ex_five_rings() {
+fn divine_star_is_penances_ex_a_returning_star_not_rings() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let _m = grunt(&mut s, [12.0, 0.0, 0.0]);
+    assert_eq!(s.content.ex_of(idx(&s, "penance")), Some(idx(&s, "divine_star")), "Divine Star is its EX");
     cast(&mut s, p, "penance", true);
     assert!(!channelling(&s, p), "no channel");
     assert!((s.players[&p].valor - 75.0).abs() < 0.5, "a segment of Valor: {}", s.players[&p].valor);
-    let n = s.light.penances.iter().find(|x| x.owner == p).map(|x| x.rings.len());
-    assert_eq!(n, Some(5), "five rings");
+    assert!(s.light.penances.iter().all(|x| x.owner != p), "no rings: a different spell");
+    assert!(s.projectiles.iter().any(|x| x.owner == p && x.ability == idx(&s, "divine_star")), "a star in the air");
 }
 
 #[test]

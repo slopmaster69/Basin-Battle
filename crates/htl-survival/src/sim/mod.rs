@@ -54,6 +54,7 @@ mod hollow;
 mod penance;
 mod rift;
 mod shell;
+pub(crate) mod thrall;
 pub(crate) mod light;
 mod sigil;
 mod tactics;
@@ -1032,6 +1033,9 @@ pub struct Mob {
     /// a fight against a hero, their blows pass it by, and help aimed at a friend can reach it
     /// (unless it's a totem: [`Survival::takes_help`]).
     pub friendly: bool,
+    /// Taken by a Priest's will (Dominate Mind): whose, until when, and its next blow
+    /// (`sim::thrall`).
+    pub thrall: Option<thrall::Thrall>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1411,6 +1415,7 @@ impl Survival {
         self.step_beta();
         self.step_warlord();
         self.step_cc();
+        self.step_thralls();
         self.step_holds();
         self.step_dummies();
         self.step_missiles();
