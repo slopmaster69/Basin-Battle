@@ -131,7 +131,7 @@ impl Survival {
 
     /// How far along the ground from `from` toward `dir` a body slides before a wall, a drop or a
     /// climb stops it, up to `dist`.
-    pub(crate) fn slide_end(&self, from: Vec3, dir: f32, dist: f32) -> Vec3 {
+    pub fn slide_end(&self, from: Vec3, dir: f32, dist: f32) -> Vec3 {
         let (c, s) = (dir.cos(), dir.sin());
         let mut at = from;
         let mut d = 0.0f32;

@@ -2502,6 +2502,22 @@ pub struct CollapseDef {
     /// Yelled the first time a blow would have brought it below `hold` before the end.
     #[serde(default)]
     pub held_text: String,
+    /// What shows on it while it is held: a spell whose state the clients play, on it from the
+    /// first blow refused until the last section is down (0: none), and a flash on it for each
+    /// blow refused (`SpellVisualKit`; 0: none).
+    #[serde(default)]
+    pub held_aura: u32,
+    #[serde(default)]
+    pub held_kit: u32,
+    /// The end of the collapse on it: a flash as the last section lands (`SpellVisualKit`), a
+    /// spell whose state it wears from then until it falls, and its size from then (0: as it
+    /// was).
+    #[serde(default)]
+    pub end_kit: u32,
+    #[serde(default)]
+    pub end_aura: u32,
+    #[serde(default)]
+    pub end_grow: f32,
     /// The sections, in the order they come down. None: the whole route is one, its face a little
     /// short of the route's end.
     #[serde(rename = "section", default)]
@@ -2527,6 +2543,11 @@ impl Default for CollapseDef {
             hold: 0.0,
             end_text: String::new(),
             held_text: String::new(),
+            held_aura: 0,
+            held_kit: 0,
+            end_kit: 0,
+            end_aura: 0,
+            end_grow: 0.0,
             sections: Vec::new(),
             warn: collapse_warn(),
             rest: collapse_rest(),
@@ -2583,7 +2604,9 @@ pub(crate) fn collapse_height() -> f32 {
 }
 
 /// Burning ground a boss's heavy blow leaves (`[mob.phase.burn]`): how wide, what it does each
-/// second to a hero standing in it, how long it burns, and its look (a ground spell).
+/// second to a hero standing in it, how long it burns, and its look (a ground spell, played only
+/// for a patch wide enough for one: a smaller one shows by its drawn edge and its flames).
+/// `aura`: what the boss wears from then (a spell whose state the clients play; 0: nothing).
 #[derive(Debug, Clone, Deserialize)]
 pub struct BurnDef {
     pub radius: f32,
@@ -2591,6 +2614,8 @@ pub struct BurnDef {
     pub secs: f32,
     #[serde(default)]
     pub look: u32,
+    #[serde(default)]
+    pub aura: u32,
 }
 
 /// One of the journal's goals: done when the camp has `kind` (`bank`, `build`, `craft`, `kill`,

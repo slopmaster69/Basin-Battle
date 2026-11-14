@@ -700,6 +700,8 @@ impl Survival {
             if a != 0 {
                 out.push(a);
             }
+            // Where a boss's fight stands: held by its collapse, its last stand, a burning maul.
+            out.extend(self.boss_looks(id));
         }
         // A sticky projectile's fuse burning on them.
         out.extend(self.fuse_auras(id));

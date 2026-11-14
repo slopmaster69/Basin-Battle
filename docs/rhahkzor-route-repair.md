@@ -57,8 +57,9 @@ through his post and the foreman's chamber to where the galleries open. Its last
 6.4 yd short of the route's end, and the route ends 31 yd short of the Galleries lamp, so a hero
 who wakes there always walks up to the fight. The native route resolution, the ordered corner
 cursor and the walking test above still carry it. What follows is what was built
-(`sim::bosses`, `[mob.phase.collapse]` in `content/deadmines.toml`); none of its look has been
-seen in the client yet.
+(`sim::bosses`, `[mob.phase.collapse]` in `content/deadmines.toml`). Its first three sections
+were filmed for PR 347; the fourth, the end of the collapse, the hold, the last stand and the
+kill were filmed after it (November 13, "The end of the fight" below).
 
 Heroes come to him from the galleries; the buried door is behind him. So the rubble starts
 behind the boss and pushes everyone the way they came.
@@ -95,7 +96,9 @@ of equal length.
   November 13, as the third face stood, 250 loose pieces lay, with 41 face rocks, 41 pale rocks
   over them and 16 torches (348 things standing, 28 at most in the air; the third face ends at 55
   rocks in the route test), so nothing had been taken away and the first tunnel was as full then
-  as when it fell. The fourth section (13.5 yd of corridor) was not filmed or counted.
+  as when it fell. With all four down (filmed since, five takes): 265 to 280 loose pieces lying,
+  11 in the air, 55 face rocks, 55 pale rocks over them and 18 torches, so the cap of 400 loose
+  pieces is never reached and nothing is taken away.
   At the front edge a face is built to the roof, wall to wall. What's seen of a face is the pale
   rock, lit by its line's torches, with dust at its foot every 0.9 sec while he fights there; the
   hull behind it is the ruin's dark rock, as before.
@@ -131,17 +134,61 @@ of equal length.
 - **He falls:** the faces and the rubble stay until the dungeon resets. They are not saved: a
   server restarted in between comes back with the tunnel clear.
 
+### The end of the fight: what shows (filmed, November 13)
+
+The collapse's first three sections had been filmed; nobody had seen its end, the hold, the last
+stand or the kill. Filmed, judged and changed until each read without the chat line. No rule or
+number of the fight changed: only what is seen, and what a refused blow reports.
+
+- **The hold at 26% is seen.** From the first blow refused he wears a bright icy shell
+  (`held_aura`, Ice Barrier's look) until the last face stands, and each blow refused throws a
+  spark off it (`held_kit`, at most every 0.6 sec). A blow's own number says what it took: the
+  blow that reaches the hold shows what was left to take, and every blow after shows no number
+  and glances off him (a block). Before this a hero at the hold saw 29 and 21 float off a health
+  bar that never moved. His line ("Rhahk'Zor not die in a hole!") is said once, as before.
+- **The end of the collapse is a turn.** As the last face stands: dust rolls out along it in two
+  rows, the crash, the shake for heroes within 40 yd, the shell goes, he roars, turns red
+  (`end_aura`) and stands 1.15 times his size (`end_grow`) to the end of the fight.
+- **The burning maul (25%).** Flames at both his hands (`aura` in the phase's `burn`): a weapon
+  can't be made to burn from the server, so the fire is on the hands that hold it. Burning iron
+  is drawn as wide as it bites: an orange ring of its radius, redrawn while it burns, and 3
+  flames in it. (Its spell alone, cast at a point, lit the whole cave floor.) The slam's 3 falls
+  are ringed 1.3 sec before they land, as before; the route test checks that walkable floor
+  stays between them at the last face.
+- **The lodged maul (the slam, 1.2 sec; the pound's last step at 12%, 3 sec).** The fire goes
+  out of him: the red and the flames are off him for exactly as long as the maul is stuck, and
+  back as it comes free. (The stun pose alone, the maul still in his hand, did not say "now";
+  none of 9 stuns' looks read on an ogre.) A hold's shell stays on through a lodge: a boss
+  that can't be brought lower must not look open.
+- **He falls, or the fight is lost:** burning iron goes out at once, and nothing more falls. At
+  the kill his body lies 3 sec, then a strongbox stands where he fell; the last face, its rubble
+  and its torches stand behind it.
+- **Solo, the hold never comes up.** In a real pull by the scripted warrior (about 9 damage a
+  second) he is at 47% when the last face stands, so nothing is refused. The hold is met only by
+  heroes who take 44% of his health in the 62 sec after the yell. Not changed here.
+
 The checks: `sim::bosses` tests (the sim's rules on a flat floor), `tests_below.rs` (the fight
 lost) and, in the real mine with the game's data, `crates/htl-server/tests/rhahk_route.rs`: the
 route and its sections, nobody cut off on any floor the collapse reaches (a flood of the walkable
-floor after each face), the wipe, and a hero who does nothing on the door side.
+floor after each face), the wipe, and a hero who does nothing on the door side. At the last
+face: a hero who takes every blow, fall and burning patch there is never left off the floor,
+behind the face or cut off; a blow that throws a hero 9 yd from any side of him throws none
+behind the face; the slam's 3 falls leave dry floor within 2.8 yd; a hero felled alone wakes to
+the mine standing again and him whole at his post; a hero who wakes at the Galleries lamp walks
+34 yd up to a friend's fight.
 
 To film (`tools/visual-check/`): `rhahk-collapse-front` (a hero on the door side caught and
 thrown clear, the fight at the first face, the hero stopped at the face), `rhahk-collapse-pov`
 (the same on the hero's own screen), `rhahk-collapse-escape` (three surges outrun: the torches
 and the band, the rows, each face building), `rhahk-collapse-chamber` (the second section seen
 whole from clear floor past its line: warning, fall, the chamber left full) and
-`rhahk-collapse-wipe` (the hero felled and the mine put back).
+`rhahk-collapse-wipe` (the hero felled and the mine put back). The end of the fight:
+`rhahk-last-stand-fight` (a real pull to the kill, the warrior's keys pressed by a small player
+in the interface, nothing done to Rhahk'Zor), `rhahk-last-stand-fight-healed` (the same, the hero
+healed), `rhahk-last-stand-staged` (yell to kill in under 3 minutes: all 4 sections, the hold,
+the turn, the burning maul, the pound, the kill and what stands after it), `rhahk-last-stand-pov`
+(the same on the hero's own screen) and two palettes, `rhahk-last-stand-looks` and
+`rhahk-last-stand-looks-boss` (lasting looks tried on a hero and on him).
 
 On the client (filmed, November 13): every server teleport flashes the zone's name on the hero's
 screen. The catch no longer does (it is a knockback), but a hero the server stops at a face by

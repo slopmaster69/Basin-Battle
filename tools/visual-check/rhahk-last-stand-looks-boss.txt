@@ -1,0 +1,33 @@
+# DEV SETUP, not a fight: lasting looks tried on Rhahk'Zor himself one after another
+# (`.es fx aura <id> rhahk`), 3 s each from 20, to choose what he wears (a look sits differently
+# on an ogre than on a hero): first the stuns' stars for his lodged maul, then the three he
+# wears in the fight (held, maul burning, last stand). `.es heal` on a timer keeps the hero up;
+# nobody hits him. In order: 5530 1833 853 20549 56 12809 7922 408 5211 11426 18499 8599
+hero warrior
+cam off
+camera duel Rhahk'Zor
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -45 -377.3 55.5 5.29
+13 .es heal
+13.5 lua VC = CreateFrame("Frame") VC.th = 0 VC:SetScript("OnUpdate", function() local now = GetTime() if now >= VC.th then VC.th = now + 1.2 SendChatMessage(".es heal", "SAY") end end)
+16 video
+18 .es hurt 0.97 rhahk
+20 .es fx aura 5530 rhahk
+23 .es fx aura 1833 rhahk
+26 .es fx aura 853 rhahk
+29 .es fx aura 20549 rhahk
+32 .es fx aura 56 rhahk
+35 .es fx aura 12809 rhahk
+38 .es fx aura 7922 rhahk
+41 .es fx aura 408 rhahk
+44 .es fx aura 5211 rhahk
+47 .es fx aura 11426 rhahk
+50 .es fx aura 18499 rhahk
+53 .es fx aura 8599 rhahk
+56 .es fx aura 0 rhahk
+57.5 end

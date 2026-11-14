@@ -2048,7 +2048,7 @@ fn a_heated_bosss_heavy_blow_leaves_burning_ground_and_a_lodged_blow_holds_it() 
     c.mobs[w].posture = 0;
     c.mobs[w].attack.damage = 0;
     c.mobs[w].special = None;
-    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, burn: Some(BurnDef { radius: 3.0, damage: 6, secs: 3.0, look: 0 }), ..Default::default() }];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.9, speed: 1.0, might: 1.0, burn: Some(BurnDef { radius: 3.0, damage: 6, secs: 3.0, look: 0, aura: 0 }), ..Default::default() }];
     let lodged: SpecialDef = toml::from_str("lodge = 2.0").unwrap();
     c.mobs[w].patterns = vec![PatternDef { name: "slam".into(), weight: 0.0, min_range: 0.0, max_range: 40.0, below: 1.0, steps: vec![lodged] }];
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);

@@ -1254,6 +1254,7 @@ impl Survival {
         self.step_rises();
         self.step_lines();
         self.step_boss_fires();
+        self.step_boss_lodges();
         self.step_boss_collapse(dt);
         self.clean_machinery();
         self.clean_duels();
