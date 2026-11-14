@@ -62,7 +62,6 @@ pub const WILD_PRIMED_SECS: f32 = 4.0;
 /// issue").
 const BEAST_SHOW: f32 = 0.2;
 const BEAST_DASH: f32 = 0.3;
-const POUNCE_SECS: f32 = BEAST_SHOW + BEAST_DASH;
 const BEAST_STAYS: f32 = 1.8;
 /// Arrow Recall's call: `EMOTE_ONESHOT_POINT`, an arm held out; and its arrows' look flying home
 /// (the Hunter's arrow, 19434; the ability's own `spell` is 0, so the key plays no buff).

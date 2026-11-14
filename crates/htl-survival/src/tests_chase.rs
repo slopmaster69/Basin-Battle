@@ -112,7 +112,7 @@ fn a_creature_evading_on_its_way_home_slips_the_blow_with_no_word_over_it() {
     // Walking home from out here, the hero right beside it (held there, so the blows reach).
     s.mobs.get_mut(&g).unwrap().home = [-20.0, 0.0, 0.0];
     s.mobs.get_mut(&g).unwrap().state = MobState::Return;
-    let mut held = |s: &mut Survival, secs: f32| -> Vec<Event> {
+    let held = |s: &mut Survival, secs: f32| -> Vec<Event> {
         let mut out = Vec::new();
         for _ in 0..(secs / DT).round() as usize {
             let m = s.mobs.get_mut(&g).unwrap();

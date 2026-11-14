@@ -39,7 +39,6 @@ const BASH_REACH: f32 = 2.2;
 /// How well the hero plays.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Profile {
-    pub name: &'static str,
     /// From a wind-up starting (or a bolt flying) to the hero acting on it.
     pub reaction: f32,
     /// ...for a string's follow-up, its first already seen.
@@ -51,9 +50,9 @@ pub(crate) struct Profile {
 }
 
 /// One who knows the game and plays it cleanly.
-pub(crate) const CAREFUL: Profile = Profile { name: "careful", reaction: REACTION, follow: FOLLOW_REACTION, miss: 0.0, patient: true };
+pub(crate) const CAREFUL: Profile = Profile { reaction: REACTION, follow: FOLLOW_REACTION, miss: 0.0, patient: true };
 /// One still learning it: slower, misreads a quarter of the blows, swings when they shouldn't.
-pub(crate) const LEARNING: Profile = Profile { name: "learning", reaction: 0.45, follow: 0.3, miss: 0.25, patient: false };
+pub(crate) const LEARNING: Profile = Profile { reaction: 0.45, follow: 0.3, miss: 0.25, patient: false };
 
 /// What one fight cost.
 #[derive(Default, Debug)]

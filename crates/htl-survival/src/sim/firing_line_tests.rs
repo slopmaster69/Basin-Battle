@@ -750,7 +750,7 @@ fn clear_by_tells(seed: u64, crew_first: bool) -> Cleared {
         let mut acted = false;
         // A gun (or the harpoon) about to fire along a line through them: step off it, late.
         if aside.is_none() {
-            if let Some(&(shooter, fires, _)) = lines.iter().find(|(_, fires, seen)| now >= *seen && *fires - now < 0.4) {
+            if let Some(&(shooter, _, _)) = lines.iter().find(|(_, fires, seen)| now >= *seen && *fires - now < 0.4) {
                 if let (Some(sm), Some(f)) = (s.mobs.get(&shooter), faces.get(&shooter)) {
                     let (dx, dy) = (me[0] - sm.pos[0], me[1] - sm.pos[1]);
                     let side = -dx * f.sin() + dy * f.cos();
@@ -855,8 +855,6 @@ fn a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines() {
 
 // --- the starboard rail ------------------------------------------------------------------------
 
-const FENCE: u32 = 6151;
-
 /// The Deadmines as built, with a hero on the quarterdeck by its open side.
 fn deck(at: Vec3) -> (Survival, Id) {
     let mut s = Survival::new_dungeon(Content::dev(), Box::new(FlatLand::default()), 31, 0.0);
@@ -881,11 +879,6 @@ fn hop_yards(ev: &[Event], h: Id) -> Option<f32> {
         Event::Hop { player, speed, lift, .. } if *player == h => Some(speed * super::super::moves::airtime(*lift)),
         _ => None,
     })
-}
-
-/// How far `p` is from a rail's line, on the ground.
-fn off_line(r: &crate::content::RailDef, p: Vec3) -> f32 {
-    r.points.windows(2).map(|w| combat::along_segment(w[0], w[1], p).1).fold(f32::MAX, f32::min)
 }
 
 #[test]

@@ -4,7 +4,6 @@
 
 use crate::content::Content;
 use crate::land::FlatLand;
-use crate::sim::mobs::MobState;
 use crate::sim::*;
 
 const DT: f32 = 0.01;

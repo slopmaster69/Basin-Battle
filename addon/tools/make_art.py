@@ -196,7 +196,6 @@ def iconframe():
     out[:, :, :3] = frame[:, :, None]
     out[:, :, 3] = a
     save_tga("iconframe", out)
-    save_tga("iconmask", white(fill(sdf)))
 
 
 def bar():

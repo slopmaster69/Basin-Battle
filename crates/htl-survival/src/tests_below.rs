@@ -1530,7 +1530,7 @@ fn the_wagers_terms_turn_weekly_and_a_run_keeps_the_ones_it_was_taken_with() {
     // In a fight, the ground under a hero erupts: marked first, then it burns.
     let id = s.join("ayla", "Ayla", None);
     s.move_player(id, [28.0, 0.0, 0.0], 0.0, Moving::default());
-    let ev = run(&mut s, 1.0);
+    run(&mut s, 1.0);
     assert!(s.wager().unwrap().started.is_some(), "stepped off: the clock runs");
     let w = s.wager().unwrap();
     let e = w.embers.first().expect("an eruption under the hero");
