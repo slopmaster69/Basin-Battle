@@ -6319,6 +6319,8 @@ range = [30.0, 30.0]
 damage = [14.0, 14.0]
 mend = 14.0
 cooldown = 9.0
+# Its key again, with a Divine Star flying out, turns the star early (nothing else is recalled).
+recall = true
 penance = { beats = 3, targets = 3, cone = 70.0, first = 0.6, gap = 0.55, window = 0.16, crit = 18.0 }
 # Holy Wrath's bolt to each body, the hands taking turns; dead on, a holy flash on it; all landed,
 # the Priest's own perfect (`[priest] perfect_kit`). Holy Nova's flood on the last bolt read as
@@ -6327,23 +6329,29 @@ spell = 2812
 impact_kit = 3153
 beat_clips = [53, 54]
 
+# Divine Star (docs/priest-draft4.md), Penance's EX and a different spell: a star of light out
+# along the reticle and back, a boomerang that mends what it meets (a friend) and burns what it
+# doesn't. Penance's key again, while it flies out, turns it early (`recall` on Penance); it
+# coming home to your hands is the catch (`catch_valor`), the perfect.
 [[ability]]
-key = "greater_penance"
-name = "Greater Penance"
+key = "divine_star"
+name = "Divine Star"
 ex_of = "penance"
-text = "Penance with 5 rings, closing quicker: on up to 5 allies and enemies in front of you."
-icon = "Spell_Holy_Penance"
+text = "Throws a star of light 24 yd along your reticle, and it flies back to you. Going and coming, it deals 14 damage to each enemy it passes and heals each ally it passes for 14. Press Penance again to turn it early. Catch it as it returns for 5 Valor."
+icon = "Spell_Holy_SearingLight"
 slot = "ranged"
-kind = "penance"
-at_once = true
+kind = "projectile"
 valor = 25
-range = [30.0, 30.0]
+returns = true
+catch_valor = 5.0
 damage = [14.0, 14.0]
 mend = 14.0
-penance = { beats = 5, targets = 5, cone = 80.0, first = 0.55, gap = 0.45, window = 0.14, crit = 18.0 }
+range = [24.0, 24.0]
+radius = [0.6, 0.6]
+speed = 20.0
+# Penance's own bolt of holy light, flown out and home; a holy flash on whoever it strikes.
 spell = 2812
 impact_kit = 3153
-beat_clips = [53, 54]
 
 # E: standing together. Light bursts round you, stronger for every other hero inside. No timing
 # check: where you stand is the skill. Alone it's still a heal and a burst.
@@ -6560,19 +6568,23 @@ cooldown = 18.0
 spell = 8122
 effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 
+# Void Tendrils (docs/priest-draft4.md), Psychic Scream's EX and a different spell: no fear, a
+# hold. Each foe near is rooted by a tendril of 50 health (the root's `amount`): damage wears it
+# down and it breaks (Corey: 10 was one blow from anything). 3 sec: heroes get half (1.5). A boss
+# holds its ground, as against any control.
 [[ability]]
-key = "psychic_horror"
-name = "Psychic Horror"
+key = "void_tendrils"
+name = "Void Tendrils"
 ex_of = "psychic_scream"
-text = "Every enemy within 9 yd flees in terror for 3 sec (1.5 sec against heroes). Enough damage ends it early."
-icon = "Spell_Shadow_PsychicHorrors"
+text = "Tendrils of shadow burst from the ground around you. Every enemy within 8 yd is held where it stands for 3 sec (1.5 sec against heroes) by a tendril with 50 health, until the tendril is broken."
+icon = "Spell_Nature_StrangleVines"
 slot = "close"
 kind = "nova"
 valor = 25
-radius = [9.0, 9.0]
-spell = 8122
-# 3 sec: heroes get half (1.5, the board's most for a fear).
-effects = [{ kind = "panic", secs = [3.0, 3.0] }]
+radius = [8.0, 8.0]
+# Shadow Fissure's dark tear where it bursts; the foes' own hold is the root's look.
+spell = 27810
+effects = [{ kind = "root", secs = [3.0, 3.0], amount = 50.0 }]
 
 # 1: the sidestep (Corey: a dodge, not a Mage's blink). A quick step the way you're moving, in
 # Fade's shadow, nothing touching you for a moment. A blow that misses because of it: the striker
@@ -6603,26 +6615,27 @@ slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
 # aura, 586, was the look: its shimmer stayed on the body long after the step. Mind Blast's cast
 # in its place put a flame on the Priest's head for 2 sec. Corey: the animation played too long.)
 
+# Dominate Mind (docs/priest-draft4.md), Fade's EX and a different spell: a bolt that takes the
+# first creature along the reticle for 6 sec (`sim::thrall`: it fights for you, a boss can't be
+# taken). A hero it strikes walks toward you and can't act for 1.5 sec (`hero_secs`). Mind
+# Control's state look (605) on whoever is taken.
 [[ability]]
-key = "greater_fade"
-name = "Greater Fade"
+key = "dominate_mind"
+name = "Dominate Mind"
 ex_of = "fade"
-text = "Fade, 7 yd. An enemy whose blow misses you because of it is slowed by 40% for 2 sec and deals 20% less damage for 3 sec."
-icon = "Spell_Shadow_Twilight"
-perfect_kit = 117
+text = "Bends the first creature along your reticle, up to 30 yd away, to your will for 6 sec: it fights for you. Bosses can't be taken. A hero it strikes walks toward you and can't act for 1.5 sec."
+icon = "Spell_Shadow_ShadowWordDominate"
 slot = "utility"
-kind = "dash"
-sidestep = true
-at_once = true
-through = true
+kind = "projectile"
 valor = 25
-range = [7.0, 7.0]
-invulnerable = true
-secs = 0.4
-slip = true
-slip_hasten = 0.0
-slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }, { kind = "weaken", secs = [3.0, 3.0], amount = 0.2 }]
-slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
+damage = [0.0, 0.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+# Shadow Word: Death's slow violet streak and Mind Blast's dark flash, as that bolt shows.
+speed = 40.0
+spell = 29317
+impact_kit = 2709
+effects = [{ kind = "dominated", secs = [6.0, 6.0], hero_secs = 1.5, aura = 605 }]
 
 # 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
 # again (or its time up) throws it at the first foe along the reticle. Let go just after a blow

@@ -1,6 +1,6 @@
 //! The Shadow Priest, draft 3 (docs/priest-draft3.md): Mind Blast's sigil (lead your target, its
-//! heart the perfect) and Shadow Word: Death's judgement; Psychic Scream and Horror; Fade's
-//! sidestep; Shadowguard (take it, give it back) and Vampiric Touch; Void Rift (gather, then
+//! heart the perfect) and Shadow Word: Death's judgement; Psychic Scream and Void Tendrils; Fade's
+//! sidestep and Dominate Mind; Shadowguard (take it, give it back) and Vampiric Touch; Void Rift (gather, then
 //! implode); where Shadow is taught.
 
 use crate::content::Content;
@@ -403,7 +403,7 @@ fn the_free_death_waits_only_3_sec() {
     assert!(matches!(s.players[&p].action, Action::Aim { ability } if ability == mb), "3 sec on, the plain key is Mind Blast: {:?}", s.players[&p].action);
 }
 
-// --- Psychic Scream and Psychic Horror ---------------------------------------------------------------
+// --- Psychic Scream and Void Tendrils ---------------------------------------------------------------
 
 #[test]
 fn psychic_scream_panics_every_foe_within_6_yd_for_3_sec_and_damage_ends_it() {
@@ -423,18 +423,6 @@ fn psychic_scream_panics_every_foe_within_6_yd_for_3_sec_and_damage_ends_it() {
     s.hurt_mob(near, p, 20);
     assert_eq!(panicked_for(&s, near), 0.0, "broken by the blow");
     assert!(panicked_for(&s, back) > 0.0, "the other still runs");
-}
-
-#[test]
-fn psychic_horror_reaches_9_yd_for_3_sec() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
-    let g = grunt(&mut s, [8.5, 0.0, 0.0], false);
-    let far = grunt(&mut s, [10.5, 0.0, 0.0], false);
-    cast(&mut s, p, "psychic_scream", true);
-    let left = panicked_for(&s, g);
-    assert!(left > 2.9 && left <= 3.0 + 1.0e-3, "3 sec: {left}");
-    assert_eq!(panicked_for(&s, far), 0.0);
 }
 
 #[test]
@@ -458,13 +446,61 @@ fn a_hero_flees_the_scream_15_sec_and_then_cant_be_scared_again_for_3() {
 }
 
 #[test]
-fn psychic_horror_on_a_hero_is_held_to_15_sec_too() {
+fn void_tendrils_hold_every_foe_within_8_yd_for_3_sec_by_a_tendril_of_50_health() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let near = grunt(&mut s, [7.5, 0.0, 0.0], true);
+    let back = grunt(&mut s, [-6.0, 4.0, 0.0], true);
+    let far = grunt(&mut s, [9.6, 0.0, 0.0], true);
+    let tendrils = idx(&s, "void_tendrils");
+    assert!(s.content.abilities[tendrils].is_ex() && s.content.abilities[tendrils].valor == 25, "Psychic Scream's EX, 25 Valor");
+    cast(&mut s, p, "psychic_scream", true);
+    assert!((s.players[&p].valor - 75.0).abs() < 0.5, "25 Valor: {}", s.players[&p].valor);
+    for g in [near, back] {
+        let c = s.cc_of(g).iter().find(|c| c.kind == "root" && c.until > s.clock).cloned().expect("held");
+        assert!(c.until - s.clock > 2.9 && c.until - s.clock <= 3.0 + 1.0e-3, "3 sec: {}", c.until - s.clock);
+        assert_eq!((c.amount, c.left), (50.0, 50.0), "a tendril of 50 health");
+        assert!(s.held_still(g), "it can't move");
+    }
+    assert!(!s.has_cc(far, "root"), "not past 8 yd (and its body)");
+    assert_eq!(panicked_for(&s, near), 0.0, "no fear: a hold, a different spell");
+    // The numbers are the rules'.
+    let e = &s.content.abilities[tendrils].effects[0];
+    assert_eq!((e.secs[1], e.amount, s.content.abilities[tendrils].radius[1]), (3.0, 50.0, 8.0));
+    // It runs on Psychic Scream's 18 sec.
+    assert_eq!(s.content.abilities[idx(&s, "psychic_scream")].cooldown, 18.0);
+}
+
+#[test]
+fn a_void_tendril_holds_until_damage_has_broken_all_50_of_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let g = grunt(&mut s, [5.0, 0.0, 0.0], true);
+    cast(&mut s, p, "psychic_scream", true);
+    assert!(s.has_cc(g, "root"));
+    // 49 of 50 in two blows: still held.
+    s.hurt_mob(g, p, 30);
+    s.hurt_mob(g, p, 19);
+    assert!(s.has_cc(g, "root"), "49 isn't enough");
+    // The blow that breaks it.
+    s.hurt_mob(g, p, 1);
+    assert!(!s.has_cc(g, "root"), "broken: 50 taken");
+    // (Not before the tendril's first hit's grace: a root with no tendril isn't touched.)
+}
+
+#[test]
+fn void_tendrils_hold_a_hero_15_sec_and_a_boss_not_at_all() {
     let mut s = world_pvp();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
-    let h = hero(&mut s, "Bren", [4.0, 0.0, 0.0], WEST);
+    let h = hero(&mut s, "Bren", [5.0, 0.0, 0.0], WEST);
+    let boss = s.content.mobs.iter().position(|d| d.boss && !d.totem).expect("a boss");
+    let b = s.spawn_mob(boss, [-5.0, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&b).unwrap().state = MobState::Idle { wander_at: 1e9 };
     cast(&mut s, p, "psychic_scream", true);
-    let left = panicked_for(&s, h);
-    assert!(left > 1.4 && left <= 1.5 + 1.0e-3, "a hero: 1.5 sec, its words say: {left}");
+    let c = s.cc_of(h).iter().find(|c| c.kind == "root" && c.until > s.clock).cloned().expect("held");
+    assert!(c.until - s.clock > 1.4 && c.until - s.clock <= 1.5 + 1.0e-3, "a hero: 1.5 sec: {}", c.until - s.clock);
+    assert_eq!(c.left, 50.0, "the same tendril");
+    assert!(!s.has_cc(b, "root"), "a boss holds its ground");
 }
 
 // --- Fade -------------------------------------------------------------------------------------------
@@ -602,21 +638,88 @@ fn fade_long_before_the_bite_is_a_plain_sidestep() {
     assert!(!s.has_cc(p, "haste"), "and so does she");
 }
 
+// --- Dominate Mind ----------------------------------------------------------------------------------
+
+fn dominated_for(s: &Survival, u: Id) -> f32 {
+    s.cc_of(u).iter().find(|c| c.kind == "dominated" && c.until > s.clock).map_or(0.0, |c| c.until - s.clock)
+}
+
+/// A Priest facing east with Dominate Mind (Fade's EX) aimed level, and a grunt 10 yd along it.
+fn dominate_set_up(s: &mut Survival) -> (Id, Id) {
+    let p = hero(s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    let g = grunt(s, [10.0, 0.0, 0.0], false);
+    (p, g)
+}
+
 #[test]
-fn greater_fade_steps_7_yd_and_weakens_the_striker() {
+fn dominate_mind_takes_the_creature_under_the_reticle_for_6_sec() {
     let mut s = world();
-    let (p, k) = wolf_on(&mut s, "fade");
-    s.set_valor(p, 100.0);
-    until_bite(&mut s, k, 0.05);
-    let (mut ev, _, len) = fade(&mut s, p, true, true);
-    ev.extend(run(&mut s, 0.3));
-    assert!((len - 7.0).abs() < 0.2, "7 yd: {len}");
-    assert_eq!(perfects(&ev, p), vec![idx(&s, "greater_fade")]);
-    assert!(has_cc(&s, k, "snare", 0.4), "slowed");
-    assert!(has_cc(&s, k, "weaken", 0.2), "and dealing 20% less");
-    let left = s.cc_of(k).iter().find(|c| c.kind == "weaken").map(|c| c.until - s.clock).unwrap();
-    assert!(left > 2.5, "for 3 sec: {left}");
-    assert!(priest_burst(&s, &ev, p, "greater_fade") && !mage_burst(&ev));
+    let (p, g) = dominate_set_up(&mut s);
+    let dom = idx(&s, "dominate_mind");
+    assert!(s.content.abilities[dom].is_ex() && s.content.abilities[dom].valor == 25, "Fade's EX, 25 Valor");
+    assert_eq!(s.content.abilities[dom].range[1], 30.0);
+    cast(&mut s, p, "fade", true);
+    assert!((s.players[&p].valor - 75.0).abs() < 0.5, "25 Valor: {}", s.players[&p].valor);
+    run(&mut s, 0.5);
+    let left = dominated_for(&s, g);
+    assert!(left > 5.5 && left <= 6.0 + 1.0e-3, "6 sec: {left}");
+    let m = &s.mobs[&g];
+    assert!(m.friendly && m.thrall.as_ref().is_some_and(|t| t.owner == p), "on the Priest's side");
+    // No creature of its own side's rules turns on a hero meanwhile: it never takes up the fight.
+    s.engage(g, Foe::Hero(p));
+    assert!(matches!(s.mobs[&g].state, MobState::Idle { .. }), "it won't fight the hero: {:?}", s.mobs[&g].state);
+    assert_eq!(s.content.abilities[dom].effects[0].secs[1], 6.0, "the rules' 6");
+}
+
+#[test]
+fn a_dominated_creature_fights_the_nearest_foe_for_you_and_is_its_own_again_after() {
+    let mut s = world();
+    let (p, g) = dominate_set_up(&mut s);
+    // A foe of 1000 health that never swings, 4 yd from the one taken.
+    let victim = grunt(&mut s, [10.0, 4.0, 0.0], true);
+    cast(&mut s, p, "fade", true);
+    let mut ev = run_held(&mut s, 4.5, &[victim]);
+    assert!(hp(&s, victim) < 1000, "it struck the foe: {}", hp(&s, victim));
+    assert!(ev.iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(v), .. } if *attacker == g && *v == victim)), "swinging at it");
+    assert_eq!(s.players[&p].health, s.players[&p].max_health, "never at the Priest");
+    // 6 sec over: free, no longer on her side.
+    ev.extend(run_held(&mut s, 2.0, &[victim]));
+    assert_eq!(dominated_for(&s, g), 0.0);
+    assert!(!s.mobs[&g].friendly && s.mobs[&g].thrall.is_none(), "its own again");
+    let hurt = hp(&s, victim);
+    run_held(&mut s, 1.0, &[victim]);
+    assert_eq!(hp(&s, victim), hurt, "and no more blows at the foe once it is");
+}
+
+#[test]
+fn a_boss_cant_be_dominated() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    let boss = s.content.mobs.iter().position(|d| d.boss && !d.totem).expect("a boss");
+    let b = s.spawn_mob(boss, [10.0, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&b).unwrap().state = MobState::Idle { wander_at: 1e9 };
+    cast(&mut s, p, "fade", true);
+    run(&mut s, 0.6);
+    assert_eq!(dominated_for(&s, b), 0.0, "not taken");
+    assert!(!s.mobs[&b].friendly && s.mobs[&b].thrall.is_none());
+}
+
+#[test]
+fn a_hero_dominated_walks_toward_the_priest_and_cant_act_for_15_sec() {
+    let mut s = world_pvp();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    let h = hero(&mut s, "Bren", [10.0, 0.0, 0.0], WEST);
+    let mut ev = cast(&mut s, p, "fade", true);
+    ev.extend(run(&mut s, 0.6));
+    let left = dominated_for(&s, h);
+    assert!(left > 0.9 && left <= 1.5 + 1.0e-3, "a hero: 1.5 sec: {left}");
+    assert!(s.disabled(h), "can't act");
+    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, dir, .. } if *player == h && (dir - WEST).abs() < 0.1)), "walked toward her");
+    run(&mut s, 1.2);
+    assert!(!s.disabled(h), "free after");
 }
 
 // --- Shadowguard and Vampiric Touch ---------------------------------------------------------------

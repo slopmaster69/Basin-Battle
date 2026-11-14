@@ -320,6 +320,9 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.returns {
         out.push("Returning projectile".to_string());
     }
+    if d.catch_valor > 0.0 {
+        out.push(format!("Catch it for {} Valor", n(d.catch_valor)));
+    }
     if d.lob {
         out.push("Arcs over enemies".to_string());
     }
@@ -350,6 +353,10 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
             "knockback" => out.push(format!("{} yd knockback", n(e.amount))),
             "cheat_death" => out.push(format!("Survive at 1 health · {}% healing", pct(e.amount))),
             "shield" if !e.pop.is_empty() => out.push("Bursts when the shield ends".to_string()),
+            // Void Tendrils: the hold, and the tendril that holds it.
+            "root" if e.amount > 0.0 => out.push(format!("{} sec hold · {} health tendril", n(e.secs[1]), n(e.amount))),
+            // Dominate Mind: how long a creature fights for you, and how long a hero is held.
+            "dominated" => out.push(format!("{} sec · {} sec on heroes", n(e.secs[1]), n(e.hero_secs))),
             "pull" => out.push(if e.from_caster { "Pulls targets to you".to_string() } else { format!("{} yd pull", n(e.amount)) }),
             _ => {}
         }

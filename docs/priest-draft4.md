@@ -10,6 +10,13 @@ Vampiric Embrace heals the lowest-health ally near the Priest (or the Priest), w
 draft 3 ruling that vampiric effects heal the Priest only. Taking a friend's damage is a
 Paladin's (Shadow Covenant is kept for them). Penance is aimed, never an auto hit.
 
+**Built (Nov 14 2026):** Divine Star, Dominate Mind and Void Tendrils, each the EX of the key the
+table puts it on and replacing the EX that stood there (Greater Penance, Greater Fade, Psychic
+Horror). They are marked **Built** below with what was chosen where this page left it open. The
+rest of this draft (the fling, Lightwell, Power Infusion, Pain Suppression, Psychic Ward, Holy
+Word: Sanctuary, the new Shield, Vampiric Embrace, Fade's lost-creatures rule and the others) is
+still to build.
+
 **Gone:** Greater Penance, Surge of Light, Angelic Feather (its look moves to the new 1 key),
 Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
 
@@ -28,9 +35,11 @@ Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
   way you flicked, up to 3; it strikes the first body in its path, 14 to a foe or 14 healing to a
   friend, 18 dead on a body's middle. The faster the flick, the faster and farther the bolt (up to
   30 yd); a lazy flick lobs it short. Three clean bolts on three bodies is the perfect.
-- **Divine Star** (EX, 25). A star of light flies 24 yd along the reticle and comes back to you.
+- **Divine Star** (EX, 25). **Built.** A star of light flies 24 yd along the reticle and comes back to you.
   Going and coming, it deals 14 to each foe and heals each friend 14. Q again turns it early;
-  caught as it reaches you, 5 Valor (the perfect).
+  caught as it reaches you, 5 Valor (the perfect). *As built:* it is Penance's EX as Penance stands
+  now (the rings; the fling is not built), and it is caught whenever it comes home to your hands,
+  which a wall or a lost star does not (no timing check on the catch).
 - **Holy Word: Sanctuary** (EX, 25). A wall of light 6 yd round you for 4 sec: foes who touch it
   are thrown out 4 yd and slowed 50% for 1.5 sec; friends inside are healed 4 a sec.
 - **Lightwell** (cooldown 18 sec). A well of light at the reticle (20 yd) for 15 sec: any friend
@@ -59,11 +68,17 @@ Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
 
 - **Fade** (cooldown 10 sec). Draft 3's 5 yd sidestep, and creatures attacking you lose you for 3
   sec and turn to someone else.
-- **Dominate Mind** (EX, 25). The creature under the reticle (30 yd) fights for you for 6 sec;
-  bosses can't be taken. A hero walks toward you and can't act for 1.5 sec.
-- **Void Tendrils** (EX, 25). Tendrils of shadow burst from the ground round you: each foe within
+- **Dominate Mind** (EX, 25). **Built.** The creature under the reticle (30 yd) fights for you for 6 sec;
+  bosses can't be taken. A hero walks toward you and can't act for 1.5 sec. *As built:* a bolt (40
+  yd a sec) takes the first creature it meets. A taken creature is on your side: nothing hits it,
+  it strikes the nearest creature within 14 yd with its own blow at its own pace (never a boss, a
+  totem or a critter), and follows you when there is none; the creatures it hurts turn on you.
+  Free, it turns on whoever is near. A champion, a totem and a creature in an unstoppable wind-up
+  shrug it off like any control. It gives the grace a hero gets after a stun.
+- **Void Tendrils** (EX, 25). **Built.** Tendrils of shadow burst from the ground round you: each foe within
   8 yd is held where it stands for 3 sec (heroes 1.5) by a tendril of 50 health, until the tendril
-  is broken (Corey: 10 was one blow from anything).
+  is broken (Corey: 10 was one blow from anything). *As built:* the hold is a root whose tendril
+  every point of damage wears down; a champion holds its ground and is not held.
 - **Psychic Ward** (EX, 25). The friend under the reticle, or you, for 6 sec: the first foe to
   strike them is struck back in the mind, 20 damage and horrified 1.5 sec (creatures 3 sec).
 - **Vampiric Embrace** (cooldown 15 sec). For 6 sec, half of all the shadow you deal heals the

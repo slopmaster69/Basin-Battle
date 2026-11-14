@@ -1,4 +1,4 @@
-//! The Light Priest, draft 3 (docs/priest-draft3.md): Penance's rings and their timing, Holy Nova
+//! The Light Priest, draft 3 (docs/priest-draft3.md): Penance's rings and their timing, Divine Star, Holy Nova
 //! and Surge of Light (stronger for every hero inside), Angelic Feather and Body and Soul (the road
 //! out, taken by choice), and Holy Word: Salvation (the group's beat, the caster aloft).
 
@@ -294,11 +294,6 @@ fn penance_with_no_one_in_front_is_refused_and_costs_nothing() {
     assert!(s.light.penances.is_empty(), "no rings");
     assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == p && text.contains("No one"))), "told why");
     assert_eq!(s.cooldown(p, idx(&s, "penance")).charges, 1, "cooldown given back");
-    // Greater Penance: its Valor given back too.
-    let ev = cast(&mut s, p, "penance", true);
-    assert!(s.light.penances.is_empty());
-    assert!((s.players[&p].valor - 100.0).abs() < 1.0e-3, "Valor given back: {}", s.players[&p].valor);
-    assert_eq!(s.cooldown(p, idx(&s, "penance")).charges, 1);
     let _ = ev;
 }
 
@@ -330,22 +325,71 @@ fn the_priest_moves_strikes_and_rolls_while_the_rings_close() {
     assert_eq!(hd - hp(&s, d), 36, "the camera swung away, the bolts still go");
 }
 
+/// A Priest facing east with the star's reticle level, a creature of 1000 health 10 yd out and a
+/// hurt friend 14 yd out, both on the line; the creature held where it is.
+fn star_set_up(s: &mut Survival) -> (Id, Id, Id, [(Id, Vec3); 1]) {
+    let p = hero(s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    let d = post(s, [10.0, 0.0, 0.0]);
+    let f = hero(s, "Bren", [14.0, 0.0, 0.0], std::f32::consts::PI);
+    halve(s, f);
+    (p, d, f, [(d, [10.0, 0.0, 0.0])])
+}
+
 #[test]
-fn greater_penance_has_five_rings_closing_quicker() {
+fn divine_star_flies_24_yd_and_back_burning_foes_and_healing_friends_each_way() {
     let mut s = world();
-    let (p, d, f) = penance_set_up(&mut s);
-    let (hd, hf) = (hp(&s, d), s.players[&f].health);
-    let ev = cast(&mut s, p, "penance", true);
-    let r = rings(&s, p);
-    assert_eq!(r.len(), 5, "five rings");
-    assert!((r[1].0 - r[0].0 - 0.45).abs() < 0.02, "0.45 apart");
-    assert_eq!(r.iter().filter(|x| x.2).count(), 2, "friend and foe in turn: {r:?}");
-    let mut ev = ev;
-    ev.extend(keep_time(&mut s, p, &[Some(0.0); 5], &[]));
-    assert_eq!(hd - hp(&s, d), 54, "three on the dummy");
-    assert_eq!(s.players[&f].health, hf + 36, "two on Bren");
-    assert_eq!(perfects(&ev, p), 1);
-    assert!(priest_burst(&s, &ev, p, "greater_penance") && !mage_burst(&ev));
+    let (p, d, f, pins) = star_set_up(&mut s);
+    let far = post(&mut s, [26.0, 0.0, 0.0]);
+    let (hd, hf, hfar) = (hp(&s, d), s.players[&f].health, hp(&s, far));
+    let pins = [pins[0], (far, [26.0, 0.0, 0.0])];
+    let star = idx(&s, "divine_star");
+    assert!(s.content.abilities[star].is_ex() && s.content.abilities[star].valor == 25, "Penance's EX, 25 Valor");
+    let mut ev = cast(&mut s, p, "penance", true);
+    assert!((s.players[&p].valor - 75.0).abs() < 0.5, "25 Valor: {}", s.players[&p].valor);
+    // Going out: 14 to the foe, 14 healing to the friend.
+    ev.extend(run(&mut s, 0.9, &pins));
+    assert_eq!(hd - hp(&s, d), 14, "14 to the foe on the way out");
+    assert_eq!(s.players[&f].health, hf + 14, "14 healing on the way out");
+    // And coming back, again.
+    ev.extend(run(&mut s, 2.5, &pins));
+    assert_eq!(hd - hp(&s, d), 28, "14 more coming back");
+    assert_eq!(s.players[&f].health, hf + 28, "14 more healing coming back");
+    assert_eq!(hp(&s, far), hfar, "24 yd and no farther");
+    assert!(s.projectiles.is_empty(), "home and gone");
+    // The numbers are the rules'.
+    let def = &s.content.abilities[star];
+    assert_eq!((def.damage[1], def.mend, def.range[1]), (14.0, 14.0, 24.0));
+    let _ = ev;
+}
+
+#[test]
+fn divine_star_caught_coming_home_is_5_valor_and_the_perfect() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    let mut ev = cast(&mut s, p, "penance", true);
+    ev.extend(run(&mut s, 0.5, &[]));
+    assert_eq!(perfects(&ev, p), 0, "not yet: still flying");
+    assert!((s.players[&p].valor - 75.0).abs() < 0.5, "25 Valor spent: {}", s.players[&p].valor);
+    ev.extend(run(&mut s, 2.5, &[]));
+    assert_eq!(perfects(&ev, p), 1, "caught: the perfect");
+    assert!((s.players[&p].valor - 80.0).abs() < 0.5, "75 and 5 for the catch: {}", s.players[&p].valor);
+    assert!(priest_burst(&s, &ev, p, "divine_star") && !mage_burst(&ev));
+}
+
+#[test]
+fn divine_star_turns_early_on_the_key_again() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    let mut ev = cast(&mut s, p, "penance", true);
+    ev.extend(run(&mut s, 0.25, &[]));
+    // 5 yd out: the plain key turns it.
+    ev.extend(press(&mut s, p, "ranged"));
+    ev.extend(run(&mut s, 0.9, &[]));
+    assert_eq!(perfects(&ev, p), 1, "home well before a whole flight (2.4 sec) was over");
+    assert!((s.players[&p].valor - 80.0).abs() < 0.5, "caught: {}", s.players[&p].valor);
 }
 
 // --- Holy Nova and Surge of Light -------------------------------------------------------------------

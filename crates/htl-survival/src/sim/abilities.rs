@@ -2093,6 +2093,21 @@ impl Survival {
         p.stage = Stage::Back { anchor };
     }
 
+    /// A returning projectile that comes home to its thrower's hands (`catch_valor`): its Valor and
+    /// the perfect, as any perfect is shown.
+    fn caught(&mut self, owner: Id, ability: usize) {
+        let valor = self.content.abilities[ability].catch_valor;
+        if valor <= 0.0 || !self.players.get(&owner).is_some_and(|p| p.health > 0) {
+            return;
+        }
+        self.gain_valor(owner, valor);
+        let kit = self.perfect_kit_of(ability);
+        if kit != 0 {
+            self.events.push(Event::Visual { id: owner, kit, by: None });
+        }
+        self.events.push(Event::Perfect { player: owner, ability });
+    }
+
     /// A boomerang flies back toward where its thrower is now, striking each foe it passes once.
     /// It ends in their hands, at a wall, swallowed by a grounding totem, or when its time is up
     /// (false: it's done, and its look's anchor goes).
@@ -2123,7 +2138,11 @@ impl Survival {
                 } else {
                     p.pos = t.point;
                     // Caught.
-                    dist - step <= HERO_SIZE
+                    let caught = dist - step <= HERO_SIZE;
+                    if caught {
+                        self.caught(p.owner, p.ability);
+                    }
+                    caught
                 }
             }
             _ => true,
@@ -2756,6 +2775,8 @@ impl Survival {
     pub(crate) fn apply_effects(&mut self, owner: Id, victim: Id, effects: &[crate::content::AbilityEffect], share: f32, source: &str) {
         for e in effects {
             let secs = AbilityDef::at(e.secs, share);
+            // A hero has it this long (the rules' share for heroes applied after, so said back up).
+            let secs = if e.hero_secs > 0.0 && self.players.contains_key(&victim) { e.hero_secs / self.content.cc.player_share.max(0.01) } else { secs };
             // An ultimate's take on bosses too: said to `apply_cc` for this effect alone.
             let was = std::mem::replace(&mut self.fx_vs_bosses, e.vs_bosses);
             self.apply_effect(owner, victim, e, secs, source);
