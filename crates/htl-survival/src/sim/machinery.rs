@@ -14,7 +14,19 @@ const GRIND: f32 = 0.9;
 const DISTANCE: f32 = 6.0;
 const HALF_WIDTH: f32 = 1.5;
 const STALL: f32 = 3.5;
-const REPAIR: f32 = 4.0;
+/// The repair is a race to the log's tie-off, sized on the Mast Room's floor (`shredder_rig.rs`):
+/// his hands are on the wreck 0.6 s after his line; a warrior on him is 4 yd from the stake and
+/// the log lands 2.0 s after they go for it (0.55 s of run, 0.45 s of swing, the creak and the
+/// fall). At 4.2 s whoever goes within 2.5 s of his line wins and whoever waits 3 s loses. No
+/// longer than that: the stake is a few yards from him, so a longer repair is won at a stroll.
+const REPAIR: f32 = 4.2;
+/// His stance from his line until the repair is done or dropped: his hands are on the wreck, not
+/// up (as Cookie's at her scoop and Gilnid's at his valve, 120). With the log spent a broken
+/// stance is the one stop short of killing him, and at his own 160 no warrior breaks it in 4.2 s
+/// from nothing (light blows reach 97, heavy 67: `shredder_rig.rs`). At 100 light blows without
+/// a gap from the moment his hands are on it break it 3.35 s in, heavy ones 3.95 s in: possible,
+/// and hard. At 120 it is 3.95 s for light blows and never for heavy.
+pub(crate) const MEND_POSTURE: u32 = 100;
 const SEEK_LIMIT: f32 = 6.0;
 const SEEK_SPEED: f32 = 5.0;
 const WORK_ARRIVAL: f32 = 0.2;
@@ -55,13 +67,15 @@ const TURN: f32 = 0.8;
 const WALK_IN: f32 = 2.5;
 /// Between cuts at its post.
 const LOG_EVERY: f32 = 3.2;
-/// The break: GoblinShredder's Death lands at 2.5 s; Sneed flies out over 0.6 s, speaks a second
-/// after he lands, and strikes no sooner than 2 s after he lands.
+/// The break: GoblinShredder's Death lands at 2.5 s. Then scrap bursts off the wreck and Sneed
+/// lies in it 1 s (GoblinMale's Sleep), gets up over 2 s (SleepUp, its own length), says his
+/// line, and strikes no sooner than 1 s after it: 4 s in view before he can act.
 const COLLAPSE: f32 = 2.5;
-const THROWN: f32 = 0.6;
-const THROWN_LIFT: f32 = 2.5;
-const TALK_AFTER: f32 = 1.0;
-const FIRST_BLOW: f32 = 2.0;
+const LIE_CLIP: u16 = 100;
+const LIE: f32 = 1.0;
+const RISE_CLIP: u16 = 101;
+const RISE: f32 = 2.0;
+const FIRST_BLOW: f32 = 1.0;
 /// On foot: a wrench every 6 s; he backs off to 8 yd, and up close (cornered) he flurries.
 const WRENCH_EVERY: f32 = 6.0;
 const KEEP: f32 = 8.0;
@@ -73,6 +87,11 @@ const REPAIR_AFTER: f32 = 6.0;
 const REBUILT_WAIT: f32 = 2.0;
 /// No two of the encounter's lines closer than this.
 const LINE_GAP: f32 = 2.0;
+/// His repair's lines: half way, stopped by a broken stance, and with no way to the wreck. (The
+/// log's is its own: `machinery_rig.rs`.) He never gives it up without a word.
+const LINE_HALF: &str = "She's turning over!";
+const LINE_STOPPED: &str = "Bah! Forget the heap. I'll do this by hand!";
+const LINE_NO_WAY: &str = "Bah! Can't get at her. By hand, then!";
 
 #[derive(Default)]
 pub(crate) struct Machinery {
@@ -94,6 +113,11 @@ pub(crate) struct Machinery {
     /// Lines waiting their turn, and when the last one was said.
     lines: Vec<(f32, Id, String)>,
     last_line: f32,
+    /// Each post's rigged log, a broken machine on its run back, and the props drawn with no
+    /// hull at a tilt (the log, its stake, the crash's lumber).
+    rigs: BTreeMap<usize, rig::Rig>,
+    runaways: BTreeMap<Id, rig::Runaway>,
+    tilts: BTreeMap<Id, f32>,
 }
 
 #[derive(Clone)]
@@ -146,12 +170,13 @@ struct Driver {
     quiet: Option<Id>,
 }
 
-/// Thrown out of the collapsing machine: hidden in it until `out_at`, in the air to `land_at`,
-/// his line at `talk_at`.
+/// Out of the wreck: hidden in it until `out_at`, then seen lying in its scrap until he gets up
+/// at `up_at`, on his feet with his line at `talk_at`. Nothing reaches him, and he strikes
+/// nobody, until then.
 #[derive(Clone, Copy)]
 struct Emerge {
     out_at: f32,
-    land_at: Option<f32>,
+    up_at: Option<f32>,
     talk_at: Option<f32>,
 }
 
@@ -159,7 +184,7 @@ struct Emerge {
 enum RepairStage {
     Fighting { after: f32 },
     Seeking { at: Vec3, until: f32, repath_at: f32 },
-    Working { at: Vec3, until: f32, spark_at: f32 },
+    Working { at: Vec3, until: f32, spark_at: f32, beat: u8 },
     Spent,
 }
 
@@ -213,9 +238,22 @@ impl Survival {
         label == "debug" && self.is_machinery(id)
     }
 
-    /// Sneed inside the falling machine or in the air out of it: nothing reaches him yet.
+    /// Sneed inside the wreck or getting up out of it, and the broken machine on its run back:
+    /// nothing reaches them.
     pub(crate) fn machinery_shielded(&self, id: Id) -> bool {
-        self.machinery.drivers.get(&id).and_then(|d| d.emerge).is_some_and(|e| e.land_at.is_none_or(|t| self.clock < t))
+        self.machinery.runaways.contains_key(&id) || self.machinery.drivers.get(&id).is_some_and(|d| d.emerge.is_some())
+    }
+
+    /// Sneed on his way to the wreck or hammering at it (he steps back from no blow then:
+    /// `evade_heavy`).
+    pub(crate) fn mending(&self, id: Id) -> bool {
+        self.machinery.drivers.get(&id).is_some_and(|d| matches!(d.stage, RepairStage::Seeking { .. } | RepairStage::Working { .. }))
+    }
+
+    /// The fight's turns in the server's log, by the sim's clock: what the films and a playtest's
+    /// "he never gave me time" are checked against.
+    pub(super) fn shredder_note(&mut self, what: &str) {
+        self.events.push(Event::Log(format!("shredder {:.2} s: {what}", self.clock)));
     }
 
     /// One of the encounter's lines, never within 2 s of the last.
@@ -315,7 +353,7 @@ impl Survival {
     }
 
     /// The normal `then` handoff has spawned the driver, with his pack and original home. He
-    /// stays inside the machine until it has collapsed, then is thrown out the far side.
+    /// stays inside the machine until it has collapsed, then crawls out of the wreck.
     pub(crate) fn machinery_handoff(&mut self, machine: Id, driver: Id) {
         if !self.is_machine(machine) || self.content.mobs[self.mobs[&driver].def].key != DRIVER {
             return;
@@ -329,10 +367,10 @@ impl Survival {
             let m = self.mobs.get_mut(&driver).unwrap();
             m.health = hp.min(m.max_health).max(1);
             self.events.push(Event::Health { id: driver, health: m.health, max: m.max_health });
-        } else {
-            // The body is the wreck, kept only while this driver's one attempt is available.
-            self.mobs.get_mut(&machine).unwrap().state = MobState::Dead { gone_at: f32::INFINITY };
         }
+        // The body is the wreck he crawls out of: it lies there until his body goes (a second
+        // wreck too, quiet from the start: its 4 s as a body ended while he was getting up).
+        self.mobs.get_mut(&machine).unwrap().state = MobState::Dead { gone_at: f32::INFINITY };
         // Not seen yet: the machine is still coming down.
         self.events.retain(|e| match e {
             Event::MobSpawned { id } | Event::Yell { id, .. } | Event::Visual { id, .. } | Event::Sound { id, .. } | Event::Emote { id, .. } => *id != driver,
@@ -347,18 +385,14 @@ impl Survival {
             machine: def,
             max_health,
             stage,
-            emerge: Some(Emerge { out_at: now + COLLAPSE, land_at: None, talk_at: None }),
+            emerge: Some(Emerge { out_at: now + COLLAPSE, up_at: None, talk_at: None }),
             wrench_at: 0.0,
             smoke_at: now + COLLAPSE,
-            quiet: None,
+            quiet: rebuilt.is_some().then_some(machine),
         });
+        self.shredder_note("the machine comes down, Sneed inside it");
     }
 
-    pub(crate) fn machinery_hurt(&mut self, id: Id, damage: u32, label: &str) {
-        if damage > 0 && label != "debug" && self.machinery.drivers.get(&id).is_some_and(|d| matches!(d.stage, RepairStage::Working { .. })) {
-            self.abandon_repair(id);
-        }
-    }
 
     pub(crate) fn machinery_died(&mut self, id: Id) {
         let dying = self.mobs.get(&id).is_some_and(|m| m.health == 0);
@@ -366,9 +400,8 @@ impl Survival {
             // Whatever pose it held (a slump, a rev, a hunch) stops as it falls.
             self.events.push(Event::HoldPose { id, clip: 0, secs: 0.0, from: None });
         }
-        if dying && self.is_machine(id) {
-            self.machinery_say(id, "No, no, not now!");
-        }
+        // Its last words were said as it broke, before its run back (`start_runaway`).
+        self.machinery.runaways.remove(&id);
         self.machinery.pressure.remove(&id);
         self.machinery.steam_at.remove(&id);
         self.machinery.grinds.remove(&id);
@@ -394,26 +427,37 @@ impl Survival {
                     self.dismiss(wreck);
                 }
             }
+            if dying {
+                // The crash's lumber and a fallen log go with his body too.
+                self.rig_body_gone(id, self.clock + BODY_SECS);
+            }
         }
     }
 
-    /// A hit (or a stagger) stops the repair for good. The wreck goes quiet where it lies (no
-    /// smoke, no sparks) until Sneed's body goes or a wipe clears the floor. (It used to vanish
-    /// 6 s later: Nov 9 filming.)
-    fn abandon_repair(&mut self, id: Id) {
+    /// The repair is stopped for good: by the log, a stagger, or no way to the wreck. Never
+    /// without a word: `line` is what he says (the log has its own). The wreck goes quiet where
+    /// it lies (no smoke, no sparks) until Sneed's body goes or a wipe clears the floor.
+    fn abandon_repair(&mut self, id: Id, line: Option<&str>) {
         let now = self.clock;
-        if let Some(d) = self.machinery.drivers.get_mut(&id) {
-            d.stage = RepairStage::Spent;
-            d.quiet = d.wreck.take();
+        let Some(d) = self.machinery.drivers.get_mut(&id) else { return };
+        if matches!(d.stage, RepairStage::Spent) {
+            return;
         }
+        d.stage = RepairStage::Spent;
+        d.quiet = d.wreck.take();
+        self.shredder_note("Sneed's repair is stopped");
         self.events.push(Event::CastEnd { caster: id });
         self.halt(id);
         if let Some(m) = self.mobs.get_mut(&id) {
             if let Some(foe) = m.state.foe() {
-                m.state = MobState::Recover { foe, until: now + 1.2 };
-                m.ready_at = now + 1.2;
+                // Reeling already (a broken stance): that holds him, and longer.
+                m.state = MobState::Recover { foe, until: (now + 1.2).max(m.stagger_until) };
+                m.ready_at = (now + 1.2).max(m.stagger_until);
                 m.think = 0.0;
             }
+        }
+        if let Some(text) = line {
+            self.machinery_say(id, text);
         }
     }
 
@@ -424,6 +468,8 @@ impl Survival {
             self.events.push(Event::CastEnd { caster: id });
             for wreck in d.wreck.into_iter().chain(d.quiet) { self.dismiss(wreck); }
         }
+        // The log, its ropes and what fell go too; the log is hung again when the machine is back.
+        self.rigs_gone(old.rigs);
     }
 
     pub(crate) fn clean_machinery(&mut self) {
@@ -441,6 +487,7 @@ impl Survival {
         self.machinery.approach.retain(|id, _| keep.contains(id));
         self.machinery.approached.retain(|id| keep.contains(id));
         let keep: Vec<Id> = self.mobs.keys().copied().filter(|id| alive(self, id)).collect();
+        self.machinery.runaways.retain(|id, _| keep.contains(id));
         self.machinery.grinds.retain(|id, _| keep.contains(id));
         self.machinery.logs.retain(|id, _| keep.contains(id));
         let winding: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && matches!(m.state, MobState::Windup { .. })).map(|(id, _)| *id).collect();
@@ -458,6 +505,7 @@ impl Survival {
         if self.machinery.drivers.is_empty() && !self.mobs.values().any(|m| m.health > 0 && m.state.foe().is_some() && self.content.mobs[m.def].key == MACHINE) {
             self.machinery.lines.clear();
         }
+        self.step_rigs();
     }
 
     /// Runs after walking but before generic AI/CC checks, so a stun cannot finish a repair or
@@ -474,6 +522,12 @@ impl Survival {
 
     fn step_machine(&mut self, id: Id) -> bool {
         let now = self.clock;
+        // Broken: it runs back to its post and does nothing else.
+        if self.machinery.runaways.contains_key(&id) {
+            self.step_runaway(id);
+            return true;
+        }
+        self.rig_ensure(id);
         if matches!(self.mobs[&id].state, MobState::Idle { .. }) {
             self.work_log(id);
             return false;
@@ -535,20 +589,7 @@ impl Survival {
             }
             if stopped || now >= g.until {
                 self.halt(id);
-                if let Some(foe) = self.mobs[&id].state.foe() {
-                    let m = self.mobs.get_mut(&id).unwrap();
-                    m.state = MobState::Recover { foe, until: now + STALL };
-                    m.ready_at = now + STALL;
-                    self.machinery.stalls.insert(id, Stall { until: now + STALL, smoke_at: now + STALL_SMOKE_EVERY, spark_at: now + 0.15, sputter_at: now + 0.4, sputters: 0 });
-                    self.machinery_say(id, "C'mon, you heap of junk!");
-                    self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
-                    // Slumped where it stopped, facing the way it drove: its legs buckle and it's
-                    // held there, no flinch standing it up, until it heaves itself up at the end.
-                    self.events.push(Event::React { id, anim: SLUMP_CLIP, from: g.last, lean: 0.0, hold: 0.1, fit: 0.0 });
-                    self.freeze_open_pose(id, SLUMP_AT, STALL - SLUMP_AT - SLUMP_RISE);
-                    self.mobs.get_mut(&id).unwrap().posed_until = now + STALL;
-                    self.events.push(Event::Sound { id, sound: STALL_SOUND });
-                }
+                self.stall_machine(id, g.last);
             } else {
                 self.machinery.grinds.insert(id, g);
             }
@@ -560,6 +601,25 @@ impl Survival {
             return false;
         }
         self.machine_footwork(id)
+    }
+
+    /// The engine stalls (after a Grind, or under the fallen log): slumped and open for `STALL`,
+    /// smoke pouring. `from` is where the blow that stalled it came from (the way it drove).
+    fn stall_machine(&mut self, id: Id, from: Vec3) {
+        let now = self.clock;
+        let Some(foe) = self.mobs[&id].state.foe() else { return };
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.state = MobState::Recover { foe, until: now + STALL };
+        m.ready_at = now + STALL;
+        self.machinery.stalls.insert(id, Stall { until: now + STALL, smoke_at: now + STALL_SMOKE_EVERY, spark_at: now + 0.15, sputter_at: now + 0.4, sputters: 0 });
+        self.machinery_say(id, "C'mon, you heap of junk!");
+        self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
+        // Slumped where it stopped, facing the way it drove: its legs buckle and it's
+        // held there, no flinch standing it up, until it heaves itself up at the end.
+        self.events.push(Event::React { id, anim: SLUMP_CLIP, from, lean: 0.0, hold: 0.1, fit: 0.0 });
+        self.freeze_open_pose(id, SLUMP_AT, STALL - SLUMP_AT - SLUMP_RISE);
+        self.mobs.get_mut(&id).unwrap().posed_until = now + STALL;
+        self.events.push(Event::Sound { id, sound: STALL_SOUND });
     }
 
     /// At its post between fights, it cuts at the log in front of it: a swing every few seconds
@@ -715,7 +775,9 @@ impl Survival {
         if let (Some(w), Some(_)) = (d.wreck, wreck) {
             if now >= d.smoke_at {
                 self.events.push(Event::Missile { caster: w, spell: SMOKE, target: Target::Unit(w) });
-                self.machinery.drivers.get_mut(&id).unwrap().smoke_at = now + 1.6;
+                // Thicker and thicker as his repair comes on.
+                let done = match d.stage { RepairStage::Working { until, .. } => (1.0 - (until - now) / REPAIR).clamp(0.0, 1.0), _ => 0.0 };
+                self.machinery.drivers.get_mut(&id).unwrap().smoke_at = now + 1.6 - 1.2 * done;
             }
         }
         if let Some(wreck) = wreck {
@@ -726,39 +788,46 @@ impl Survival {
         self.driver_footwork(id)
     }
 
-    /// Hidden in the collapsing machine, then thrown out the side away from his foe, landing in
-    /// dust; a second later, his line; his first blow no sooner than 2 s after he lands.
+    /// Hidden in the collapsing machine, then seen coming out of it: scrap bursts off the wreck
+    /// and he lies in it, gets up, and says his line; his first blow no sooner than 1 s after
+    /// that. Nothing reaches him and he strikes nobody until he's up (`machinery_shielded`).
     fn emerge(&mut self, id: Id, mut e: Emerge) {
         let now = self.clock;
         let foe = self.mobs[&id].state.foe().or_else(|| self.next_in_fight(id).map(Foe::Hero));
-        if e.land_at.is_none() && now >= e.out_at {
-            let to = self.bail_point(id, foe);
+        if e.up_at.is_none() && now >= e.out_at {
+            let (to, lie) = self.crawl_point(id, foe);
             let m = self.mobs.get_mut(&id).unwrap();
+            m.pos = to;
+            m.facing = lie;
+            m.path.clear();
+            m.speed = 0.0;
             m.hidden = false;
             self.events.push(Event::MobSpawned { id });
-            self.throw_mob(id, to, THROWN, None, THROWN_LIFT);
-            e.land_at = Some(now + THROWN);
-        } else if let Some(land) = e.land_at.filter(|t| e.talk_at.is_none() && now >= *t) {
-            let _ = land;
-            self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+            self.hold_open_pose(id, LIE_CLIP, LIE + 0.3);
+            self.scrap_burst(id, to);
+            self.shredder_note("Sneed is seen in the wreck");
+            e.up_at = Some(now + LIE);
+        } else if e.up_at.is_some_and(|t| e.talk_at.is_none() && now >= t) {
             let pos = self.mobs[&id].pos;
             if let Some(at) = foe.and_then(|f| self.foe_pos(f)) {
                 let face = facing(pos, at);
                 self.mobs.get_mut(&id).unwrap().facing = face;
                 self.events.push(Event::MobStop { id, pos, facing: face });
             }
-            e.talk_at = Some(now + TALK_AFTER);
+            self.hold_open_pose(id, 0, 0.0);
+            self.events.push(Event::React { id, anim: RISE_CLIP, from: pos, lean: 0.0, hold: 0.0, fit: RISE });
+            e.talk_at = Some(now + RISE);
+        } else if e.talk_at.is_some_and(|t| now >= t) {
+            self.machinery_say(id, "That was company property!");
+            self.shredder_note("Sneed is on his feet");
             let d = self.machinery.drivers.get_mut(&id).unwrap();
+            d.emerge = None;
             d.wrench_at = now + FIRST_BLOW;
             if matches!(d.stage, RepairStage::Fighting { .. }) {
                 d.stage = RepairStage::Fighting { after: now + REPAIR_AFTER };
             }
             let m = self.mobs.get_mut(&id).unwrap();
             m.ready_at = now + FIRST_BLOW;
-        } else if e.talk_at.is_some_and(|t| now >= t) {
-            self.machinery_say(id, "That was company property!");
-            self.machinery.drivers.get_mut(&id).unwrap().emerge = None;
-            let m = self.mobs.get_mut(&id).unwrap();
             if let Some(f) = foe {
                 m.state = MobState::Chase { foe: f };
             }
@@ -768,7 +837,22 @@ impl Survival {
         self.machinery.drivers.get_mut(&id).unwrap().emerge = Some(e);
     }
 
-    /// Where Sneed lands, thrown out: past the wreck's far edge from his foe, on dry footing.
+    /// Where Sneed comes out, and the way he lies: the post's own place beside the wreck (open
+    /// floor, toward where he'll work), lying away from it; a wreck anywhere else (a land with
+    /// no way back to the post), past its far edge from his foe.
+    fn crawl_point(&self, id: Id, foe: Option<Foe>) -> (Vec3, f32) {
+        let pos = self.mobs[&id].pos;
+        if let Some(g) = self.rig_of(id).and_then(|k| self.machinery.rigs.get(&k)) {
+            if let Some(at) = g.crawl.filter(|_| dist2d(pos, g.crash) <= 1.5) {
+                return (at, g.across);
+            }
+        }
+        let at = self.bail_point(id, foe);
+        (at, facing(pos, at))
+    }
+
+    /// Where Sneed comes out of a wreck away from its post: past its far edge from his foe, on
+    /// dry footing.
     fn bail_point(&self, id: Id, foe: Option<Foe>) -> Vec3 {
         let wreck = self.machinery.drivers[&id].wreck.and_then(|w| self.mobs.get(&w));
         let (origin, face, scale) = match wreck {
@@ -797,8 +881,10 @@ impl Survival {
             origin[1] + face.sin() * p[0] + face.cos() * p[1], origin[2]])
     }
 
-    /// His one repair: run to the wreck's far edge from his foe, 4 s of hammering, any hit
-    /// stops it. `Some(owned)` while this beat decides what he does.
+    /// His one repair: a run to his place at the wreck, under the log, and `REPAIR` s of
+    /// hammering. A plain hit hurts him and no more: the log on him, a broken stance or his death
+    /// stop it, for good. It's seen coming on: his sparks faster and faster, the wreck coughing
+    /// and smoking more at each quarter. `Some(owned)` while this beat decides what he does.
     fn step_repair(&mut self, id: Id, d: &Driver, wreck: Vec3) -> Option<bool> {
         let now = self.clock;
         let m = &self.mobs[&id];
@@ -809,11 +895,12 @@ impl Survival {
                 let boundary = matches!(m.state, MobState::Chase { .. }) || matches!(m.state, MobState::Recover { until, .. } if now >= until && m.pattern.is_none());
                 if now < after || !boundary || !free { return None; }
                 let Some(at) = self.repair_work_point(id, d.wreck.unwrap(), foe.unwrap()) else {
-                    self.abandon_repair(id);
+                    self.abandon_repair(id, Some(LINE_NO_WAY));
                     return Some(true);
                 };
                 self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { at, until: now + SEEK_LIMIT, repath_at: now + 0.5 };
                 self.machinery_say(id, "Just... one... bolt...");
+                self.shredder_note("Sneed goes to mend his machine");
                 let m = self.mobs.get_mut(&id).unwrap();
                 m.pattern = None;
                 m.state = MobState::Chase { foe: foe.unwrap() };
@@ -821,29 +908,49 @@ impl Survival {
                 Some(true)
             }
             RepairStage::Seeking { at, until, repath_at } => {
-                if now >= until {
-                    self.abandon_repair(id);
-                } else if free && dist2d(pos, at) <= WORK_ARRIVAL && (pos[2] - at[2]).abs() < 0.5 && self.land.footing(pos).is_some() {
+                if !free {
+                    // Staggered on his way to it: that's the repair, too.
+                    self.abandon_repair(id, Some(LINE_STOPPED));
+                } else if now >= until {
+                    self.abandon_repair(id, Some(LINE_NO_WAY));
+                } else if dist2d(pos, at) <= WORK_ARRIVAL && (pos[2] - at[2]).abs() < 0.5 && self.land.footing(pos).is_some() {
                     self.halt(id);
                     let face = facing(pos, wreck);
                     self.mobs.get_mut(&id).unwrap().facing = face;
                     self.events.push(Event::MobStop { id, pos, facing: face });
-                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until: now + REPAIR, spark_at: now };
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until: now + REPAIR, spark_at: now, beat: 0 };
+                    self.shredder_note("Sneed's hands are on the wreck");
                     self.events.push(Event::Cast { caster: id, spell: WORK, ms: (REPAIR * 1000.0) as u32 });
-                } else if free && !self.held_still(id) && self.mobs[&id].path.is_empty() && now >= repath_at {
+                } else if !self.held_still(id) && self.mobs[&id].path.is_empty() && now >= repath_at {
                     self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Seeking { at, until, repath_at: now + 0.5 };
                     self.go(id, at, SEEK_SPEED);
                 }
                 Some(true)
             }
-            RepairStage::Working { at, until, spark_at } => {
+            RepairStage::Working { at, until, spark_at, beat } => {
+                let done = (1.0 - (until - now) / REPAIR).clamp(0.0, 1.0);
                 if !free || dist2d(pos, at) > WORK_DRIFT || (pos[2] - at[2]).abs() >= 0.5 || self.land.footing(pos).is_none() {
-                    self.abandon_repair(id);
+                    self.abandon_repair(id, Some(LINE_STOPPED));
                 } else if now >= until {
+                    self.shredder_note("the machine stands again");
                     self.finish_repair(id, d.clone(), wreck, foe.unwrap());
+                } else if done >= 0.25 * (beat as f32 + 1.0) && beat < 3 {
+                    // A quarter further on: the wreck coughs, sparks and smokes, louder each time.
+                    if let Some(w) = d.wreck {
+                        self.events.push(Event::Sound { id: w, sound: SPUTTER_SOUND });
+                        self.events.push(Event::Visual { id: w, kit: combat::KIT_PARRY, by: None });
+                        for _ in 0..=beat {
+                            self.events.push(Event::Missile { caster: w, spell: SMOKE, target: Target::Unit(w) });
+                        }
+                    }
+                    if beat == 1 {
+                        self.machinery_say(id, LINE_HALF);
+                    }
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until, spark_at, beat: beat + 1 };
                 } else if now >= spark_at {
+                    // His hammer's sparks, faster as it comes on: one every 0.8 s, then every 0.25.
                     self.events.push(Event::Visual { id, kit: combat::KIT_PARRY, by: None });
-                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until, spark_at: now + 0.75 };
+                    self.machinery.drivers.get_mut(&id).unwrap().stage = RepairStage::Working { at, until, spark_at: now + 0.8 - 0.55 * done, beat };
                 }
                 Some(true)
             }
@@ -904,6 +1011,14 @@ impl Survival {
         let m = &self.mobs[&wreck];
         let (origin, face, scale) = (m.pos, m.facing, self.content.mobs[m.def].scale);
         let from = self.mobs[&driver].pos;
+        // At its post the wreck lies under the rigged log, and he works at one fixed place there.
+        if let Some(g) = self.rig_of(driver).and_then(|k| self.machinery.rigs.get(&k)) {
+            if let Some(at) = g.work.filter(|_| dist2d(origin, g.crash) <= 1.5) {
+                let route = crate::land::walking_route(self.land.as_ref(), &[from, at])?;
+                let length: f32 = route.windows(2).map(|p| dist2d(p[0], p[1])).sum();
+                return (length <= SEEK_LIMIT * SEEK_SPEED).then_some(at);
+            }
+        }
         let hero = self.foe_pos(foe)?;
         let clearance = 0.5 * self.content.mobs[self.mobs[&driver].def].scale + 0.5;
         let mut candidates = self.wreck_edges(origin, face, scale, clearance);
@@ -954,6 +1069,10 @@ impl Survival {
         self.machinery.rebuilt.insert(id, hp);
     }
 }
+
+#[path = "machinery_rig.rs"]
+mod rig;
+pub use rig::ShredderRig;
 
 #[cfg(test)]
 #[path = "machinery_tests.rs"]

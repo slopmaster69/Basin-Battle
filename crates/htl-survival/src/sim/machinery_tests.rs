@@ -1,9 +1,9 @@
 use super::*;
 use crate::land::{FlatLand, Land};
 
-const DT: f32 = 0.05;
+pub(super) const DT: f32 = 0.05;
 
-fn content() -> Content {
+pub(super) fn content() -> Content {
     let mut c = Content::dev();
     c.pvp = Default::default();
     let d = c.dungeon.as_mut().unwrap();
@@ -14,7 +14,7 @@ fn content() -> Content {
     c
 }
 
-fn fight(heroes: usize, seed: u64) -> (Survival, Vec<Id>, Id) {
+pub(super) fn fight(heroes: usize, seed: u64) -> (Survival, Vec<Id>, Id) {
     let mut s = Survival::new_dungeon(content(), Box::new(FlatLand::default()), seed, 1_000_000.0);
     let machine = live(&s, MACHINE).unwrap();
     let mut band = Vec::new();
@@ -30,16 +30,28 @@ fn fight(heroes: usize, seed: u64) -> (Survival, Vec<Id>, Id) {
     (s, band, machine)
 }
 
-fn live(s: &Survival, key: &str) -> Option<Id> {
+pub(super) fn live(s: &Survival, key: &str) -> Option<Id> {
     s.mobs.iter().find(|(_, m)| m.health > 0 && s.content.mobs[m.def].key == key).map(|(id, _)| *id)
 }
 
-fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
+pub(super) fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
     (0..(secs / DT).round() as usize).flat_map(|_| s.step(DT)).collect()
 }
 
-/// Steps until Sneed has been thrown out, landed and spoken: on his feet in the fight.
-fn emerged(s: &mut Survival, driver: Id) {
+/// The machine broken: its run back to its post and its crash there, Sneed inside the wreck.
+pub(super) fn broken(s: &mut Survival, machine: Id, by: Id) -> Id {
+    s.hurt_mob(machine, by, u32::MAX);
+    for _ in 0..400 {
+        if let Some(d) = live(s, DRIVER) {
+            return d;
+        }
+        s.step(DT);
+    }
+    panic!("the broken machine never crashed");
+}
+
+/// Steps until Sneed has crawled out of the wreck, got up and spoken: on his feet in the fight.
+pub(super) fn emerged(s: &mut Survival, driver: Id) {
     for _ in 0..200 {
         s.step(DT);
         if s.machinery.drivers.get(&driver).is_none_or(|d| d.emerge.is_none()) {
@@ -49,21 +61,21 @@ fn emerged(s: &mut Survival, driver: Id) {
     panic!("Sneed never came out of his machine");
 }
 
-fn working(s: &mut Survival, driver: Id) -> f32 {
+pub(super) fn working(s: &mut Survival, driver: Id) -> f32 {
     for _ in 0..800 {
         let ev = s.step(DT);
-        if ev.iter().any(|e| matches!(e, Event::Cast { caster, spell: WORK, ms: 4000 } if *caster == driver)) {
+        if ev.iter().any(|e| matches!(e, Event::Cast { caster, spell: WORK, ms } if *caster == driver && *ms == (REPAIR * 1000.0) as u32)) {
             return s.clock;
         }
     }
     panic!("Sneed did not reach his wreck and start working");
 }
 
-fn yells(ev: &[(f32, Event)]) -> Vec<(f32, String)> {
+pub(super) fn yells(ev: &[(f32, Event)]) -> Vec<(f32, String)> {
     ev.iter().filter_map(|(t, e)| match e { Event::Yell { text, .. } => Some((*t, text.clone())), _ => None }).collect()
 }
 
-fn timed(s: &mut Survival, secs: f32) -> Vec<(f32, Event)> {
+pub(super) fn timed(s: &mut Survival, secs: f32) -> Vec<(f32, Event)> {
     let mut out = Vec::new();
     for _ in 0..(secs / DT).round() as usize {
         let ev = s.step(DT);
@@ -205,46 +217,14 @@ fn shredder_debug_damage_builds_no_posture() {
 }
 
 #[test]
-fn shredder_break_throws_sneed_out_the_far_side_and_his_lines_wait_their_turn() {
-    for seed in [1, 2] {
-        let (mut s, band, machine) = fight(1, seed);
-        run(&mut s, 2.0);
-        let wreck_at = s.mobs[&machine].pos;
-        let start = s.clock;
-        s.hurt_mob(machine, band[0], u32::MAX);
-        let driver = live(&s, DRIVER).unwrap();
-        assert!(s.mobs[&driver].hidden, "inside the machine as it collapses");
-        s.hurt_mob(driver, band[0], 50);
-        assert_eq!(s.mobs[&driver].health, s.mobs[&driver].max_health, "nothing reaches him in it");
-        let mut ev = timed(&mut s, COLLAPSE + THROWN + 0.2);
-        let out = ev.iter().find(|(_, e)| matches!(e, Event::MobSpawned { id } if *id == driver)).map(|(t, _)| *t).expect("thrown out");
-        assert!(out - start >= COLLAPSE - 0.06, "once the machine has landed");
-        let hero = s.players[&band[0]].pos;
-        let landed = s.mobs[&driver].pos;
-        ev.extend(timed(&mut s, 6.0));
-        assert!(dist2d(landed, hero) > dist2d(wreck_at, hero) + 2.0, "out the far side");
-        assert!(dist2d(landed, wreck_at) > 5.0, "clear of the wreck");
-        let lines = yells(&ev);
-        let words: Vec<&str> = lines.iter().map(|(_, t)| t.as_str()).collect();
-        assert!(words.contains(&"That was company property!"));
-        let said = lines.iter().find(|(_, t)| t == "That was company property!").unwrap().0;
-        assert!(said - out >= THROWN + TALK_AFTER - 0.06);
-        let first = ev.iter().find(|(_, e)| matches!(e, Event::MobWindup { id, .. } | Event::Cast { caster: id, .. } if *id == driver)).map(|(t, _)| *t);
-        if let Some(t) = first {
-            assert!(t - (out + THROWN) >= FIRST_BLOW - 0.06, "2 sec before his first blow");
-        }
-        assert!(ev.iter().any(|(_, e)| matches!(e, Event::Missile { caster, spell: SMOKE, .. } if *caster == machine)), "the wreck smokes");
-    }
-}
-
-#[test]
 fn shredder_encounter_lines_are_never_closer_than_two_seconds() {
     let (mut s, band, machine) = fight(1, 23);
     let mut ev = timed(&mut s, 14.0);
     s.hurt_mob(machine, band[0], u32::MAX);
-    ev.extend(timed(&mut s, 30.0));
+    ev.extend(timed(&mut s, 40.0));
     let lines = yells(&ev);
-    assert!(lines.len() >= 4, "{lines:?}");
+    assert!(lines.len() >= 5, "{lines:?}");
+    assert!(lines.iter().any(|(_, t)| t == "No, no, not now!") && lines.iter().any(|(_, t)| t == "That was company property!"), "{lines:?}");
     for w in lines.windows(2) {
         assert!(w[1].0 - w[0].0 >= LINE_GAP - 0.06, "{lines:?}");
     }
@@ -253,8 +233,7 @@ fn shredder_encounter_lines_are_never_closer_than_two_seconds() {
 #[test]
 fn sneed_keeps_his_distance_and_flurries_when_cornered_then_is_open() {
     let (mut s, band, machine) = fight(1, 29);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     emerged(&mut s, driver);
     // Put off his repair: this is his footwork.
     s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Spent;
@@ -280,121 +259,12 @@ fn sneed_keeps_his_distance_and_flurries_when_cornered_then_is_open() {
 }
 
 #[test]
-fn shredder_repair_runs_to_the_far_edge_takes_four_seconds_preserves_driver_health_and_cannot_repeat() {
-    for heroes in [1, 2] {
-        let (mut s, band, machine) = fight(heroes, 13);
-        s.hurt_mob(machine, band[0], u32::MAX);
-        let driver = live(&s, DRIVER).unwrap();
-        emerged(&mut s, driver);
-        assert!(!s.slain("sneed"));
-        s.hurt_mob(driver, band[0], 20);
-        let driver_hp = s.mobs[&driver].health;
-        let hero = s.players[&band[0]].pos;
-        let wreck = s.mobs[&machine].pos;
-        let began = working(&mut s, driver);
-        assert!(dist2d(s.mobs[&driver].pos, hero) > dist2d(wreck, hero), "the wreck's far edge from his foe");
-        assert!(s.mobs.contains_key(&machine), "wreck stays for the repair");
-        run(&mut s, 3.85);
-        assert!(live(&s, MACHINE).is_none(), "no early rebuild");
-        assert!(!s.slain("sneed"));
-        let ev = run(&mut s, 0.25);
-        let back = live(&s, MACHINE).expect("repair succeeds");
-        assert!(s.clock - began >= REPAIR);
-        assert_eq!(s.mobs[&back].health, s.mobs[&back].max_health / 3);
-        assert!(dist2d(s.mobs[&back].pos, wreck) < 0.1, "where the wreck lay");
-        assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim: HEAVE_CLIP, .. } if *id == back)), "it heaves up");
-        assert!(!ev.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "Clear the floor!")), "not a fresh machine's pull");
-        assert!(matches!(s.mobs[&back].state, MobState::Recover { until, .. } if until - s.clock >= REBUILT_WAIT - 0.3));
-        assert!(!s.mobs.contains_key(&driver) && !s.mobs.contains_key(&machine));
-        assert!(!s.slain("sneed"));
-        s.hurt_mob(back, band[0], u32::MAX);
-        let final_driver = live(&s, DRIVER).unwrap();
-        assert_eq!(s.mobs[&final_driver].health, driver_hp);
-        let ev = run(&mut s, 20.0);
-        assert!(!ev.iter().any(|e| matches!(e, Event::Cast { spell: WORK, .. })));
-        assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == final_driver)), "he bails out the same way");
-        assert!(live(&s, MACHINE).is_none());
-        s.hurt_mob(final_driver, band[0], u32::MAX);
-        assert!(s.slain("sneed"));
-        assert_eq!(s.camp.counts.get("kill:dm_sneed"), Some(&1));
-        run(&mut s, 7.0);
-        assert!(!s.mobs.values().any(|m| matches!(s.content.mobs[m.def].key.as_str(), MACHINE | DRIVER)), "no ghost body");
-        assert!(s.machinery.drivers.is_empty() && s.machinery.rebuilt.is_empty());
-    }
-}
-
-#[test]
-fn shredder_repair_is_interrupted_by_an_ordinary_melee_swing_without_a_loadout() {
-    let (mut s, band, machine) = fight(1, 17);
-    let h = band[0];
-    s.players.get_mut(&h).unwrap().loadout.clear();
-    s.hurt_mob(machine, h, u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
-    working(&mut s, driver);
-    let pos = s.mobs[&driver].pos;
-    s.move_player(h, [pos[0] + 1.2, pos[1], pos[2]], std::f32::consts::PI, Moving::default());
-    let hp = s.mobs[&driver].health;
-    s.input(h, Input::Attack);
-    let ev = run(&mut s, 1.4);
-    assert!(s.mobs[&driver].health < hp, "the ordinary swing landed");
-    assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
-    assert!(s.machinery.drivers[&driver].wreck.is_none());
-    // The wreck goes quiet where it lies: no more smoke or sparks, and it stays.
-    let quiet = ev.iter().rposition(|e| matches!(e, Event::CastEnd { caster } if *caster == driver)).unwrap();
-    assert!(!ev[quiet..].iter().any(|e| matches!(e, Event::Missile { caster, spell: SMOKE, .. } if *caster == machine)));
-    let at = s.mobs[&machine].pos;
-    let ev = run(&mut s, 18.0);
-    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_infinite()), "the wreck stays");
-    assert_eq!(s.mobs[&machine].pos, at, "where it lay");
-    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } | Event::Visual { id: caster, .. } | Event::MobGone { id: caster } if *caster == machine)), "quiet: no smoke, no sparks");
-    assert!(!ev.iter().any(|e| matches!(e, Event::Cast { spell: WORK, .. })));
-    assert!(live(&s, MACHINE).is_none() && !s.slain("sneed"));
-    // Sneed down, the wreck goes with his body.
-    s.hurt_mob(driver, h, u32::MAX);
-    assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_finite()));
-    run(&mut s, BODY_SECS + 1.0);
-    assert!(!s.mobs.contains_key(&machine) && !s.mobs.contains_key(&driver), "no ghost wreck");
-}
-
-#[test]
 fn shredder_debug_damage_does_not_stop_the_repair() {
     let (mut s, band, machine) = fight(1, 18);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     working(&mut s, driver);
     s.hurt_mob_as(driver, band[0], 10, "debug");
     assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Working { .. }));
-}
-
-#[test]
-fn shredder_repair_stagger_aborts_and_wipe_restores_exactly_one_whole_machine() {
-    let (mut s, band, machine) = fight(1, 6);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
-    working(&mut s, driver);
-    s.stagger_mob(driver, 1.0, false);
-    s.step(DT);
-    assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
-    s.hurt_player_by(band[0], u32::MAX, driver, "test wipe");
-    s.step(DT);
-    assert!(live(&s, DRIVER).is_none());
-    let back = live(&s, MACHINE).unwrap();
-    assert_eq!(s.mobs[&back].health, s.mobs[&back].max_health);
-    assert_eq!(s.mobs.values().filter(|m| s.content.mobs[m.def].key == MACHINE).count(), 1);
-    assert!(s.machinery.drivers.is_empty() && s.machinery.rebuilt.is_empty());
-    assert!(!s.slain("sneed"));
-}
-
-#[test]
-fn shredder_wipe_while_sneed_is_still_inside_restores_one_machine() {
-    let (mut s, band, machine) = fight(1, 7);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    s.step(DT);
-    s.hurt_player_by(band[0], u32::MAX, machine, "test wipe");
-    run(&mut s, 0.2);
-    assert!(live(&s, DRIVER).is_none());
-    assert_eq!(s.mobs.values().filter(|m| s.content.mobs[m.def].key == MACHINE).count(), 1);
-    assert!(live(&s, MACHINE).is_some() && !s.slain("sneed"));
 }
 
 struct NoRoute;
@@ -407,17 +277,19 @@ impl Land for NoRoute {
 #[test]
 fn shredder_unreachable_wreck_has_a_bounded_attempt_and_no_teleport() {
     let (mut s, band, machine) = fight(1, 8);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     emerged(&mut s, driver);
     let away = [8.0, 0.0, 0.0];
     s.mobs.get_mut(&driver).unwrap().pos = away;
     s.mobs.get_mut(&driver).unwrap().path.clear();
     s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Seeking { at: [4.6, 0.0, 0.0], until: s.clock + SEEK_LIMIT, repath_at: s.clock };
     s.land = Box::new(NoRoute);
-    run(&mut s, SEEK_LIMIT + 0.1);
+    let mut ev = run(&mut s, SEEK_LIMIT + 0.1);
     assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent));
-    assert!(dist2d(s.mobs[&driver].pos, away) < 0.1);
+    assert!(dist2d(s.mobs[&driver].pos, away) < 3.0, "no teleport to the wreck");
+    assert!(dist2d(s.mobs[&driver].pos, [4.6, 0.0, 0.0]) > 0.5);
+    ev.extend(run(&mut s, LINE_GAP));
+    assert!(ev.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == driver && text == LINE_NO_WAY)), "never given up without a word");
     assert!(matches!(s.mobs[&machine].state, MobState::Dead { gone_at } if gone_at.is_infinite()), "the wreck stays, quiet");
     assert_eq!(s.machinery.drivers[&driver].quiet, Some(machine));
     assert!(live(&s, MACHINE).is_none());
@@ -426,15 +298,18 @@ fn shredder_unreachable_wreck_has_a_bounded_attempt_and_no_teleport() {
 #[test]
 fn shredder_uses_another_edge_when_the_farthest_is_blocked_and_never_falls_back_to_center() {
     let (mut s, band, machine) = fight(1, 8);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     emerged(&mut s, driver);
     let foe = Foe::Hero(band[0]);
+    // A post with no dry place for its fixed work point (so no log hung) falls back on the
+    // wreck's edges.
+    for g in s.machinery.rigs.values_mut() { g.work = None; }
     // (Off to one side, clear of every edge.)
-    s.mobs.get_mut(&driver).unwrap().pos = [0.0, 9.0, 0.0];
+    let wreck = s.mobs[&machine].pos;
+    s.mobs.get_mut(&driver).unwrap().pos = [wreck[0], wreck[1] + 9.0, 0.0];
+    s.move_player(band[0], [wreck[0] + 4.0, wreck[1], 0.0], std::f32::consts::PI, Moving::default());
     let first = s.repair_work_point(driver, machine, foe).unwrap();
     let hero = s.players[&band[0]].pos;
-    let wreck = s.mobs[&machine].pos;
     assert!(dist2d(first, hero) > dist2d(wreck, hero), "the far edge first");
     s.land = Box::new(FlatLand { walls: vec![([first[0], first[1]], 0.8)], ..Default::default() });
     let other = s.repair_work_point(driver, machine, foe).expect("another reachable edge");
@@ -474,8 +349,7 @@ fn shredder_stalls_at_a_wall_and_a_posture_break_cannot_shorten_the_opening() {
 #[test]
 fn shredder_zero_damage_does_not_cancel_work_but_a_departed_party_resets_it() {
     let (mut s, band, machine) = fight(1, 21);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     working(&mut s, driver);
     s.hurt_mob(driver, band[0], 0);
     assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Working { .. }));
@@ -490,8 +364,7 @@ fn shredder_zero_damage_does_not_cancel_work_but_a_departed_party_resets_it() {
 #[test]
 fn shredder_driver_commits_his_wrench_before_retreating() {
     let (mut s, band, machine) = fight(1, 31);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     emerged(&mut s, driver);
     let p = s.mobs[&driver].pos;
     let stand = [p[0] + 8.0, p[1], p[2]];
@@ -520,8 +393,7 @@ fn shredder_driver_commits_his_wrench_before_retreating() {
 #[test]
 fn shredder_death_lets_go_of_any_held_pose() {
     let (mut s, band, machine) = fight(1, 12);
-    s.hurt_mob(machine, band[0], u32::MAX);
-    let driver = live(&s, DRIVER).unwrap();
+    let driver = broken(&mut s, machine, band[0]);
     emerged(&mut s, driver);
     s.machinery.drivers.get_mut(&driver).unwrap().stage = RepairStage::Spent;
     let before = s.events.len();

@@ -543,7 +543,8 @@ fn a_machine_that_falls_lets_its_driver_out_and_comes_back_whole_if_he_wins() {
     s.engage(shredder, mobs::Foe::Hero(id));
     s.step(DT);
     s.hurt_mob(shredder, id, 1_000_000);
-    s.step(DT);
+    // (Broken, it runs back to its post and crashes there: `sim::machinery`.)
+    run(&mut s, 4.0);
     let sneed = find(&s, "dm_sneed").expect("Sneed climbs out");
     assert!(!s.slain("boss"), "the pack stands while Sneed does");
     assert!(!s.door_is_open("fog"), "and the fog holds");
@@ -567,10 +568,10 @@ fn a_machine_that_falls_lets_its_driver_out_and_comes_back_whole_if_he_wins() {
     // Beaten both ways: gone for good.
     s.engage(back, mobs::Foe::Hero(id));
     s.hurt_mob(back, id, 1_000_000);
-    s.step(DT);
+    run(&mut s, 4.0);
     let sneed = find(&s, "dm_sneed").unwrap();
-    // (Thrown out of the wreck, he can be struck once he has landed: `sim::machinery`.)
-    run(&mut s, 3.5);
+    // (He crawls out of the wreck, and can be struck once he is up: `sim::machinery`.)
+    run(&mut s, 7.0);
     s.hurt_mob(sneed, id, 1_000_000);
     s.step(DT);
     assert!(s.slain("boss"));

@@ -644,6 +644,9 @@ impl Survival {
         let damage = self.cc_on_damage(mid, damage);
         // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
         let damage = self.boss_hold(mid, by, damage);
+        // The Shredder broken is left a breath: it runs back to its post and dies in its crash
+        // there (`sim::machinery`).
+        let damage = self.machinery_hold(mid, by, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
         if m.health == 0 {
             return;
@@ -666,7 +669,6 @@ impl Survival {
         // didn't earn (Nov 8 review: every filmed posture break came from it).
         let earned = label != DEBUG_LABEL;
         if damage > 0 && earned { self.arsenal_hurt(mid); }
-        self.machinery_hurt(mid, damage, label);
         // A champion's posture: enough damage in a short while breaks its stance (heavier
         // weapons count more, and a blow in its recovery more again).
         if earned && self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 && !self.machinery_debug(mid, label) {
@@ -751,6 +753,8 @@ impl Survival {
         // Gilnid's hands on the valve are occupied the same way (`sim::perches`).
         let limit = if self.kitchen_scooping(mid) { super::kitchen::SCOOP_POSTURE }
             else if self.perch_at_valve(mid) { super::perches::VALVE_POSTURE }
+            // Sneed's, on the wreck (`sim::machinery`).
+            else if self.mending(mid) { super::machinery::MEND_POSTURE }
             else { self.content.mobs[m.def].posture };
         let fighters = m.fighters.max(1);
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
@@ -1002,7 +1006,7 @@ impl Survival {
         }
     }
 
-    fn mob_died(&mut self, mid: Id, killer: Id) {
+    pub(crate) fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
         self.drop_perch(mid);
         self.remove_perch_crew(mid);
@@ -1864,10 +1868,13 @@ impl Survival {
         let near: Vec<Id> = self
             .mobs
             .iter()
-            .filter(|(_, m)| {
+            .filter(|(id, m)| {
                 m.health > 0
                     && self.content.mobs[m.def].evade > 0.0
                     && matches!(m.state, MobState::Chase { .. })
+                    // Sneed at his wreck has his hands full: a step back would end his repair
+                    // with no blow landed (`sim::machinery`).
+                    && !self.mending(**id)
                     && m.stagger_until <= self.clock
                     && dist2d(m.pos, pos) <= 4.5
                     && angle_between(f, facing(pos, m.pos)) <= 60.0

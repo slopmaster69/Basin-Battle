@@ -1,0 +1,36 @@
+# Sneed's repair stopped by a broken stance, the log spent (DEV SETUP: the mine cleared but for
+# him, the hero placed and healed, the machine broken by a debug blow). The hero cuts the log
+# with nobody under it, the machine is broken, the hero waits beside Sneed's work place and
+# strikes nothing until "Just... one... bolt...", then light blows without a gap. By the measure
+# on the real floor (`shredder_rig.rs`) his stance of 100 breaks about 3.4 s into his 4.2 s.
+hero warrior
+cam off
+camera wide Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+12.5 lua SV.on["not now"] = function() SV.say(".es in unlock") SV.after(0.5, function() SV.go(-278.7, -502.0, 0.3, function() SV.turn(3.1416) SV.log("waits by his work") end) end) end
+12.5 lua function SV.mash(n) if n <= 0 then return end SV.hit() SV.after(0.35, function() SV.mash(n - 1) end) end
+12.5 lua SV.on["one... bolt"] = function() SV.turn(3.1416) SV.say(".es in lock") SV.log("goes at him") SV.after(0.3, function() SV.mash(20) end) end
+12.5 lua SV.on["by hand"] = function() SV.log("his stance is broken") end
+12.5 lua SV.on["turning over"] = function() SV.log("half done") end
+13 .es heal
+13.5 video
+14.5 .es goto -279 -516 50.4 2.48
+15 .es in lock
+16 .es heal
+19 .es heal
+19.7 .es in unlock
+20 .es goto -280.67 -495.7 50.4 4.712
+20.3 lua SV.turn(-1.5708)
+20.6 lua SV.hit() SV.log("cuts the rope")
+22 .es heal
+22.3 .es hurt 0 dm_shredder
+25 .es heal
+28 .es heal
+31 .es heal
+34 .es heal
+37 .es heal
+40 .es heal
+43 .es heal
+46 .es heal
+49 .es heal
+52 end

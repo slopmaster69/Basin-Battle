@@ -1,0 +1,26 @@
+# DEV SETUP: the Shredder pulled 17 yd from its post and broken there by debug, the hero healed.
+# What it shows, from close by: "No, no, not now!", the machine's run back to its log pile and
+# the crash, the hero running after it (their own keys) to 8 yd south of the wreck, Sneed
+# crawling out of the wreck and getting up, "That was company property!", and the hero's blows
+# on him. Written for a closer look at the crawl (from the wide camera Sneed in the wreck is a
+# few pixels); not yet run in the client.
+hero warrior
+cam off
+camera duel Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+12.5 lua SV.on["not now"] = function() SV.say(".es in unlock") SV.after(0.4, function() SV.go(-281.2, -509.5, 0.3, function() SV.turn(1.5708) SV.log("watches the wreck") end) end) end
+12.5 lua SV.on["company property"] = function() SV.after(0.5, function() SV.fight = true end) end
+13 .es heal
+13.5 video
+14.5 .es goto -279 -516 50.4 2.48
+15 .es in lock
+22.5 .es hurt 0 dm_shredder
+16 .es heal
+19 .es heal
+22 .es heal
+25 .es heal
+28 .es heal
+31 .es heal
+34 .es heal
+37 .es heal
+40 end
