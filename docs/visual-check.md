@@ -288,6 +288,18 @@ of 0.4 sec, reading his place after each):
 | `gilnid-valve-fight`, `gilnid-valve-fight-healed` | A real pull by a small player in the interface, no debug kills; the second healed throughout |
 | `gilnid-valve`, `gilnid-ledges`, `gilnid-plank` | The older takes: the valve left alone seen from the side, the crew on their planks, his wait under a plank |
 
+Rhahk'Zor's slam (how he brings the mine down at 70%: `content/deadmines.toml`,
+`[mob.phase.slam]`) has its own, beside the older `rhahk-collapse-*` and `rhahk-last-stand-*`:
+
+| Scenario | What it films |
+| --- | --- |
+| `rhahk-slam` | Dev setup, by the cameraman: his yell in his chamber, the turn to the wall beside his post, the slam, the rock coming loose, the first face |
+| `rhahk-slam-pov` | The same on the hero's own screen, where the slam's shake is felt |
+| `rhahk-slam-rock-stood-in`, `rhahk-slam-rock-stepped-out` | Dev setup, the hero's own screen: the rock marked under the hero, stood in and stepped out of |
+| `rhahk-slam-run` | Dev setup, by the cameraman: the yell in the chamber and sections 1 to 3 going (the lines of `rhahk-last-stand-staged`, ended at 78 s) |
+| `rhahk-slam-fight`, `rhahk-slam-fight-healed` | A real pull by a small player in the interface through the opening, no debug kills; the second healed throughout |
+| `rhahk-slam-clips` | Dev setup: the ogre model's clips played one after another on a Rhahk'Zor stood still at Goldshire (`.es fx clip <id> rhahk`), to choose one by eye |
+
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
 cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, 0093 for the
 longer hold, the cameraman hero (`setup` makes it), and a screen wide enough for both

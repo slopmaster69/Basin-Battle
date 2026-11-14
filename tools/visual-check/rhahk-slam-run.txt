@@ -1,0 +1,62 @@
+# DEV SETUP, a stretch of the run from Rhahk'Zor's collapse, by the cameraman: his yell and
+# slam in the chamber, then sections 1, 2 and 3 going. The hero is healed throughout (`.es heal`
+# every 1.2 s) and `.es hurt` brings the yell on; the fighting and the runs are the small
+# player's (RB, as in rhahk-last-stand-fight). The same lines as rhahk-last-stand-staged up to
+# its 78 s, so the two films lie side by side second for second.
+#   20     `.es hurt` to 69%: his yell. He runs at the chamber's nearest wall.
+#   22     the slam; the wave starts at the door, 43 yd behind him
+#   28     the first face stands (a shake on the hero's screen as it lands, if within 32 yd)
+#   40     section 2's warning: he pounds the floor where he stands (when no blow of his own
+#          is under way, and only 8 yd and more ahead of where the wave starts), the wave runs
+#          at 42, its face stands about 45
+#   57.5   section 3's warning and pound; its face about 63
+#   77     section 4's warning and pound
+#   78     the end
+# What to look for, him and the rock on the run: each rock seen falling, striking, hopping and
+# rolling to rest (none popping in, none stopping dead); rows not all of one size and one
+# rhythm; no lit hands at any section; him not idle with his back to the fall.
+hero warrior
+cam off
+camera duel Rhahk'Zor
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -62 -382 53.9 6.11
+12.4 lua RB = { q = {}, b = {}, on = false, t0 = GetTime(), nextHit = 0, nextDash = 0, nextLock = 0, lastHT = 0, tries = 0, hits = 0, dealt = 0, sawLO = false, locked = false, struck = 0, caught = 0, stand = false, nextWhere = 0, heal = false, nextHeal = 0 }
+12.4 lua function RB.say(t) SendChatMessage(t, "SAY") end
+12.4 lua function RB.after(d, f) table.insert(RB.q, { GetTime() + d, f }) end
+12.4 lua function RB.log(t) if ProbeLog then ProbeLog(string.format("visual-check: bot %.1f %s hp %d", GetTime() - RB.t0, t, UnitHealth("player"))) end end
+12.4 lua function RB.hit() RB.tries = RB.tries + 1 RB.say(".es in a") RB.after(0.08, function() RB.say(".es in au") end) end
+12.4 lua function RB.dash(why, keys, secs) RB.nextDash = GetTime() + 0.55 ActionDash(secs or 0.4, 7, keys or "f") RB.log(why) end
+12.4 lua function RB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.4 lua function RB.turn(want) local d = math.mod((want - GetActionAim()) * 57.29578 + 900, 360) - 180 if math.abs(d) > 2 then FlipCameraYaw(d) end end
+12.4 lua function RB.hold(a, b) table.insert(RB.b, { a, b }) end
+12.4 lua function RB.busy(now) local i, busy = 1, false while i <= table.getn(RB.b) do local w = RB.b[i] if now >= w[2] then table.remove(RB.b, i) else if now >= w[1] then busy = true end i = i + 1 end end return busy end
+# His blows (AN: the clip, its take, when it lands). Rolled: the overhead (58), the stomp and the
+# pound (54), the roar (55), the rush (18, take 0). Guarded as they land: the swings (18, 17, 59).
+# The hero's own blows stop 0.8 s before his lands. In the last stand (after "SMASH"), a step
+# round him after each blow, off the burning iron.
+12.4 lua function RB.an(c, take, land) local now = GetTime() if RB.run then return end if c == 58 or c == 54 or c == 55 or (c == 18 and take == 0) then RB.hold(land - 0.8, land + 0.45) RB.after(math.max(0, land - 0.18 - now), function() RB.say(".es in d") RB.log("roll from " .. c) end) RB.after(math.max(0, land + 0.4 - now), function() if not RB.run then RB.dash("back in after the roll") end end) else RB.hold(land - 0.8, land + 0.3) local d = math.max(0, land - 0.13 - now) RB.after(d, function() RB.say(".es in g") end) RB.after(d + 0.2, function() RB.say(".es in gu") end) RB.log("guard " .. c) end if RB.stand then RB.after(math.max(0, land + 0.85 - now), function() if not RB.run then RB.dash("round him, off the iron", "l", 0.8) end end) end end
+# A fall or a blast warned with no creature's blow (WN, no guid): rolled as it lands.
+12.4 lua function RB.wn(s) local now = GetTime() if RB.run or s < 0.5 then return end RB.hold(now + s - 0.8, now + s + 0.45) RB.after(math.max(0, s - 0.18), function() RB.say(".es in d") RB.log("roll from a fall") end) RB.after(s + 0.4, function() if not RB.run then RB.dash("back in after the fall") end end) end
+12.4 lua function RB.line(l) local f = RB.split(l) local v, now = f[1], GetTime() if v == "AN" and f[11] == "mob" then RB.an(tonumber(f[3]) or 0, tonumber(f[8]) or 0, now + (tonumber(f[4]) or 0)) elseif v == "WN" and (f[3] == nil or f[3] == "") then RB.wn(tonumber(f[2]) or 0) elseif v == "HT" then RB.lastHT = now RB.hits = RB.hits + 1 RB.dealt = RB.dealt + (tonumber(f[2]) or 0) RB.log("lands " .. RB.hits .. " of " .. RB.tries .. ": " .. tostring(f[2]) .. " " .. tostring(f[4]) .. ", dealt " .. RB.dealt) elseif v == "IM" and f[7] == "1" then RB.struck = RB.struck + 1 if f[5] == "hit" then RB.caught = RB.caught + 1 end RB.log("struck " .. RB.struck .. " caught " .. RB.caught .. ": " .. tostring(f[4]) .. " " .. tostring(f[5])) elseif v == "LO" then RB.sawLO = true RB.locked = f[2] ~= nil and f[2] ~= "" and f[2] ~= "0x0" and f[2] ~= "0X0" and f[2] ~= "0" if RB.locked then RB.miss = 0 end end end
+12.4 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) RB.line(l) return old(l) end
+# The collapse: from his yell, 0.2 to 0.3 s after each later section's warning begins, the hero
+# lets go of him and runs to floor past that section's line (where it is read from `.es where`,
+# which changes nothing), then turns back the way it came and locks on again (a lock that does
+# not take is tried again every 2 s, looking another way). Once he is dead the same steering walks the hero
+# up to the last face and stops there, to show it standing.
+12.4 lua function RB.go(w, look) RB.run = w RB.wi = 1 RB.nextWhere = 0 RB.look = look if not look then RB.say(".es in unlock") end RB.log(look and "walks to the last face" or "runs from the collapse") end
+12.4 lua RB.w = CreateFrame("Frame") RB.w:RegisterEvent("CHAT_MSG_SYSTEM") RB.w:SetScript("OnEvent", function() local _, _, x, y = string.find(arg1 or "", "at ([%-%d%.]+), ([%-%d%.]+),") if not x or not RB.run then return end x, y = tonumber(x), tonumber(y) local w, n = RB.run[RB.wi], RB.run[RB.wi + 1] local dx, dy = w[1] - x, w[2] - y local d = math.sqrt(dx * dx + dy * dy) if n then local ex, ey = n[1] - x, n[2] - y local e = math.sqrt(ex * ex + ey * ey) local gx, gy = n[1] - w[1], n[2] - w[2] if d < 1.5 or e < math.sqrt(gx * gx + gy * gy) then RB.wi = RB.wi + 1 dx, dy, d = ex, ey, e end end if d < 1.5 then local b = RB.run[1] RB.run = nil RB.log("stands again at " .. x .. " " .. y) if RB.look then RB.turn(0) else RB.turn(math.atan2(b[2] - y, b[1] - x)) RB.after(0.3, function() RB.say(".es in lock") end) RB.nextLock = GetTime() + 2.3 RB.lastHT = GetTime() end return end RB.turn(math.atan2(dy, dx)) ActionDash(math.min(d / 7, 0.8), 7, "f") end)
+12.4 lua RB.y = CreateFrame("Frame") RB.y:RegisterEvent("CHAT_MSG_MONSTER_YELL") RB.y:SetScript("OnEvent", function() local t = arg1 or "" RB.log("he yells: " .. t) if string.find(t, "whole mine") then RB.after(20.4, function() RB.go({ { -45, -377.3 }, { -62, -382 } }) end) RB.after(37.5, function() RB.go({ { -62, -382 }, { -82.4, -377 } }) end) RB.after(57.2, function() RB.go({ { -82.4, -377 }, { -97.5, -373.5 } }) end) elseif string.find(t, "SMASH") then RB.stand = true elseif string.find(t, "never pay") then RB.on = false RB.heal = false RB.q = {} RB.say(".es in unlock") RB.after(7, function() RB.go({ { -94.5, -376 } }, true) end) end end)
+12.4 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end if RB.heal and now >= RB.nextHeal then RB.nextHeal = now + 1.2 RB.say(".es heal") end if RB.run then if now >= RB.nextWhere then RB.nextWhere = now + 0.7 RB.say(".es where") end return end if not RB.on then return end if RB.sawLO and not RB.locked and now >= RB.nextLock then RB.nextLock = now + 2 RB.miss = (RB.miss or 0) + 1 if RB.miss > 1 then FlipCameraYaw(120) end RB.after(0.3, function() RB.say(".es in lock") end) RB.log("lock on again") end if RB.busy(now) then return end if now >= RB.nextHit then RB.nextHit = now + 0.75 RB.hit() end if now - RB.lastHT > 1.5 and now >= RB.nextDash then RB.dash("after him") end end)
+13 .es heal
+16 video
+17 lua RB.turn(6.11) ActionDash(1.3, 7, "f")
+18.5 lua RB.lastHT = GetTime() RB.on = true RB.heal = true
+18.6 .es in lock
+20 .es hurt 0.69 rhahk
+78 end

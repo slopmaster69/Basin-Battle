@@ -1,0 +1,34 @@
+# DEV SETUP, the rock Rhahk'Zor's slam marks under a hero, on the hero's own screen, not a
+# fight: `.es hurt` pulls him (14) and brings the collapse on (70%, at 18); the hero is healed
+# for the last time at 17.8 and then stands still. The same start as rhahk-slam-pov.
+#   20     the blow: a ring on the floor under the hero, 3 yd across each way, for 1.3 s
+#   21.3   its rock lands on the hero: 24 damage (0.6 of his blow), read off the health bar;
+#          not thrown down, not stunned: the run from the wave is still to come
+#   23.4   the end (the wave stops at its face, 7 yd short of the hero)
+# What to look for: the ring seen for a second and more before the rock; the rock seen falling
+# onto it; the health lost at the moment it lands and not before. Beside it:
+# rhahk-slam-rock-stepped-out, the same with a sidestep.
+hero warrior
+cam off
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -45 -383 55.4 0.3
+12.6 lua ResetView(2) SetView(2)
+13 .es heal
+13.2 lua function VCTurn(want) local d = math.mod((want - GetActionAim()) * 57.29578 + 900, 360) - 180 if math.abs(d) > 2 then FlipCameraYaw(d) end end
+13.4 lua VCTurn(0.45)
+13.5 video
+14 .es hurt 0.97 rhahk
+15 .es heal
+16.5 .es heal
+17.5 lua VCTurn(0.45)
+17.8 .es heal
+18 .es hurt 0.69 rhahk
+19.9 shots ring 12 0.15
+21.9 .es where
+22.4 .es heal
+23.4 end

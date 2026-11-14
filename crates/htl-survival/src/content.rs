@@ -2480,6 +2480,102 @@ pub struct EnrageDef {
     /// along a route, each left full of rubble behind a face of it.
     #[serde(default)]
     pub collapse: Option<CollapseDef>,
+    /// How the phase begins on the creature's own body (`sim::bosses`'s slam): it runs to a wall
+    /// and drives itself into it, the place shakes for everyone in it and rock comes loose.
+    #[serde(default)]
+    pub slam: Option<SlamDef>,
+}
+
+/// A phase begun with the creature's own body (`[mob.phase.slam]`): from the yell it runs to the
+/// frame of the collapse's first door if that is near enough, else to the nearest wall, swings
+/// into it and strikes it `secs` after the yell. Nothing stops it; it can be hit all the while.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SlamDef {
+    /// Seconds from the yell to the blow on the wall.
+    #[serde(default = "slam_secs")]
+    pub secs: f32,
+    /// The clip it swings with (the model's own), its take, how long into the clip its blow
+    /// lands, and how long the clip runs on after that.
+    pub clip: u16,
+    #[serde(default)]
+    pub take: u32,
+    pub swing: f32,
+    #[serde(default = "slam_recover")]
+    pub recover: f32,
+    /// How far it will go for a wall (yards), how far from the wall it stands to strike it, and
+    /// from how far it makes for the first door's frame instead (the seconds it would take at
+    /// its own run).
+    #[serde(default = "slam_reach")]
+    pub reach: f32,
+    #[serde(default = "slam_stand")]
+    pub stand: f32,
+    #[serde(default = "slam_door_secs")]
+    pub door_secs: f32,
+    /// The rock that comes loose from the blow, over `volley` seconds: this many for show round
+    /// it and at the door (they hurt nobody), and one marked on the floor under each hero within
+    /// `near` of it, which strikes whoever stays for `share` of its own blow.
+    #[serde(default = "slam_volley")]
+    pub volley: f32,
+    #[serde(default = "slam_rocks")]
+    pub rocks: usize,
+    #[serde(default = "slam_door_rocks")]
+    pub door_rocks: usize,
+    #[serde(default = "slam_near")]
+    pub near: f32,
+    #[serde(default = "slam_share")]
+    pub share: f32,
+}
+
+impl Default for SlamDef {
+    /// The ogre's overhead blow (`Special2H`, landing 0.8 s in), and every number its own default.
+    fn default() -> Self {
+        SlamDef {
+            secs: slam_secs(),
+            clip: 58,
+            take: 0,
+            swing: 0.8,
+            recover: slam_recover(),
+            reach: slam_reach(),
+            stand: slam_stand(),
+            door_secs: slam_door_secs(),
+            volley: slam_volley(),
+            rocks: slam_rocks(),
+            door_rocks: slam_door_rocks(),
+            near: slam_near(),
+            share: slam_share(),
+        }
+    }
+}
+
+fn slam_secs() -> f32 {
+    2.0
+}
+fn slam_recover() -> f32 {
+    0.7
+}
+fn slam_reach() -> f32 {
+    12.0
+}
+fn slam_stand() -> f32 {
+    2.2
+}
+fn slam_door_secs() -> f32 {
+    2.5
+}
+fn slam_volley() -> f32 {
+    1.5
+}
+fn slam_rocks() -> usize {
+    9
+}
+fn slam_door_rocks() -> usize {
+    4
+}
+fn slam_near() -> f32 {
+    30.0
+}
+fn slam_share() -> f32 {
+    0.6
 }
 
 /// A collapse (`[mob.phase.collapse]`): the place comes down in `sections` along `route`, which

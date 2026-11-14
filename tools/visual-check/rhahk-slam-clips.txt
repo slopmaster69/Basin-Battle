@@ -1,0 +1,19 @@
+# The ogre's own clips, one after another on a Rhahk'Zor put up to stand still in daylight at
+# Goldshire, for choosing by eye what he does at his yell (`.es fx clip <clip> <foe's name>`).
+# In order, 3 sec apart from 1 sec into the video: 58 (the two-handed overhead blow: the slam
+# chosen), 59, 118, 95 (kick), 55 (roar), 18, 54 (the stomp of his pound).
+hero warrior
+cam 1.1 -6 13
+include _setup
+4.2 .es dummy clear
+4.4 .es target dm_rhahkzor 9 still
+7 video
+7.5 shots still 2 1
+8 .es fx clip 58 rhahk
+11 .es fx clip 59 rhahk
+14 .es fx clip 118 rhahk
+17 .es fx clip 95 rhahk
+20 .es fx clip 55 rhahk
+23 .es fx clip 18 rhahk
+26 .es fx clip 54 rhahk
+29.5 end
