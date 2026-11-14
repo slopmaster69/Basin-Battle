@@ -1,0 +1,751 @@
+From 4abc8c1d807c5d1766357bb08f1bb51502c72ccb Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 08:26:10 -0600
+Subject: [PATCH] The client's own tests and guards keep up with the series
+
+The client-tests run found 16 tests failing on the pinned benilla with the series applied. Each
+one is either a guard that counts what the series adds, a test written against an older state of
+the code, or a real gap.
+
+Real gaps:
+- `SetMissileLook`'s own speed was read from the tenth argument; the add-on and the doc's
+  signature put it ninth (0040).
+- The new look's cloud layer (`LookSkyMaterial`) had no warm rig, so its first sight was a live
+  pipeline compile (0068).
+- Six systems that name `SelfPlayer` ran before the Net stage that tags it (0003, 0004, 0031),
+  `dress_missiles` wrote transforms the lanes' drain also writes (0030), and four systems of
+  `OnExit(InWorld)` ran outside the session's end order (0003, 0027, 0054, 0059).
+- The three systems that learn of a new UI VM now read `ui_script::VmGeneration`, so only the
+  feed layer names the VM (the wall's count was 44 against 42).
+
+Guards that count what the series adds, updated with the reason: the 50 globals past 1.12 (the
+add-on's seams, grouped by patch), the world API wall (the new look is published, 39 other items
+filed as leaks), the four look passes the warm pass exempts, the surface golden of the VM parity
+test, and the actionable-pair ceiling of the `Update` schedule.
+
+Stale tests: the afterimage's deepened tint (0027), the water grain's default (0085), and the
+torn-down unit's build, which needs `PreviewTint` (0017).
+---
+ .../benilla-app/src/creature_anim/action.rs   |  24 ++--
+ .../src/creature_anim/action/afterimage.rs    |   4 +-
+ crates/benilla-app/src/entities/attach/mod.rs |   1 +
+ crates/benilla-app/src/entities/missile.rs    |   4 +-
+ crates/benilla-app/src/missile_look.rs        |   3 +-
+ crates/benilla-app/src/pipe_warm/menagerie.rs |  33 ++++-
+ crates/benilla-app/src/player.rs              |   2 +-
+ crates/benilla-app/src/player/camera.rs       |  17 ++-
+ crates/benilla-app/src/target/mod.rs          |   4 +-
+ crates/benilla-app/src/target/world_mist.rs   |   8 +-
+ crates/benilla-app/src/ui_script/mod.rs       |  21 +++
+ crates/benilla-app/src/unit_rope.rs           |   5 +-
+ crates/benilla-app/src/world_console.rs       |   3 +-
+ crates/benilla-app/tests/world_api_wall.rs    | 125 +++++++++++++++++-
+ crates/benilla-ui/src/action_combat.rs        |  11 +-
+ .../src/script/tests/reference_surface.rs     |  71 +++++++++-
+ .../benilla-ui/tests/vm_parity_surface.golden |   4 +-
+ 17 files changed, 300 insertions(+), 40 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index d8863461..34f4ef44 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1807,12 +1807,14 @@ fn blend_while_layer_live(inertia: Option<ResMut<benilla_world::rig_anim::PoseIn
+ /// A new UI VM (a `ReloadUI`, an add-on turned off): what the old one's add-on held is let go, as
+ /// nothing is left to undo it; an add-on that wants it again asks again.
+ pub(super) fn reset_action_on_new_vm(
+-    script: Option<NonSend<benilla_ui::script::UiScript>>,
++    vm: Res<crate::ui_script::VmGeneration>,
+     mut seen: Local<u64>,
+     mut lock: ResMut<LockOn>,
+ ) {
+-    let Some(script) = script else { return };
+-    let now = script.session();
++    let now = vm.0;
++    if now == 0 {
++        return;
++    }
+     if *seen != 0 && now != *seen {
+         action_combat::reset();
+         lock.0 = None;
+@@ -2019,11 +2021,12 @@ pub(super) fn plugin(app: &mut App) {
+                 apply_hit_stops
+                     .after(super::drive_animations)
+                     .after(crate::aura_visual::apply_aura_anim_rate),
+-                aim_pitch,
+-                aim_own_arrow,
+-                collect_occluders,
+-                collect_nearby,
+-                track_lock_on,
++                // These name `SelfPlayer`: after the Net stage, whose `tag_self_player` tags it.
++                aim_pitch.after(benilla_world::schedule::WorldStage::Net),
++                aim_own_arrow.after(benilla_world::schedule::WorldStage::Net),
++                collect_occluders.after(benilla_world::schedule::WorldStage::Net),
++                collect_nearby.after(benilla_world::schedule::WorldStage::Net),
++                track_lock_on.after(benilla_world::schedule::WorldStage::Net),
+                 shuffle_on_lock_turn.after(drain_action_calls),
+                 flurry::step_flurries.before(drain_action_calls),
+                 afterimage::spawn_afterimages.after(flurry::step_flurries),
+@@ -2031,7 +2034,7 @@ pub(super) fn plugin(app: &mut App) {
+                 strike_trail::fire_strike_trails
+                     .after(drain_action_calls)
+                     .before(crate::weapon_trail::fire_weapon_trails),
+-                reset_action_on_new_vm,
++                reset_action_on_new_vm.after(crate::ui_script::publish_vm_generation),
+                 blend_while_layer_live,
+             ),
+         )
+@@ -2041,7 +2044,8 @@ pub(super) fn plugin(app: &mut App) {
+         .add_observer(on_feet_cvar)
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+-            (reset_action_on_world_exit, afterimage::clear_afterimages),
++            (reset_action_on_world_exit, afterimage::clear_afterimages)
++                .in_set(crate::ui_script::SessionEnd::Clears),
+         )
+         .add_systems(
+             PostUpdate,
+diff --git a/crates/benilla-app/src/creature_anim/action/afterimage.rs b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+index e80f6363..6fd5e903 100644
+--- a/crates/benilla-app/src/creature_anim/action/afterimage.rs
++++ b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+@@ -214,7 +214,9 @@ mod tests {
+             .copied()
+             .expect("the first cut asks for a copy");
+         assert!((due.at - 0.15).abs() < 1.0e-3, "as the wind-up lands: {}", due.at);
+-        assert_eq!(due.tint, Some([0xC8, 0xE8, 0xF0]));
++        // The ghost is the trail's colour deepened (`Flurry::image`): red scaled by 0.55, green by
++        // 0.8, blue as it is, of 0xC8E8F0.
++        assert_eq!(due.tint, Some([110, 185, 0xF0]));
+         // Not yet: the ask waits for its time.
+         app.world_mut().resource_mut::<Time<()>>().advance_by(Duration::from_millis(100));
+         app.update();
+diff --git a/crates/benilla-app/src/entities/attach/mod.rs b/crates/benilla-app/src/entities/attach/mod.rs
+index 4295b716..51e1d1f1 100644
+--- a/crates/benilla-app/src/entities/attach/mod.rs
++++ b/crates/benilla-app/src/entities/attach/mod.rs
+@@ -1067,6 +1067,7 @@ mod tests {
+             .init_resource::<benilla_world::mat_anim_table::MatAnimTable>()
+             .init_resource::<benilla_world::rig_palette::RigPalettes>()
+             .init_resource::<benilla_world::collision::ColliderEpoch>()
++            .init_resource::<super::super::preview::PreviewTint>()
+             .insert_resource(CubeAssets {
+                 mesh: Handle::default(),
+                 player_mesh: Handle::default(),
+diff --git a/crates/benilla-app/src/entities/missile.rs b/crates/benilla-app/src/entities/missile.rs
+index 881a91fe..5dc288e7 100644
+--- a/crates/benilla-app/src/entities/missile.rs
++++ b/crates/benilla-app/src/entities/missile.rs
+@@ -149,7 +149,7 @@ pub(crate) struct MissileSpin {
+     pub(crate) tumble: bool,
+ }
+ 
+-/// Basin Battle: the most a missile's own speed (`SetMissileLook`'s tenth number) flies it at,
++/// Basin Battle: the most a missile's own speed (`SetMissileLook`'s ninth argument) flies it at,
+ /// over [`DUE_SPEED`]'s cap.
+ const OWN_SPEED_MOST: f32 = 400.0;
+ 
+@@ -189,7 +189,7 @@ pub(crate) struct Missile {
+ }
+ 
+ impl Missile {
+-    /// Basin Battle: fly the rest of the way at `speed` yards a second (`SetMissileLook`'s tenth
++    /// Basin Battle: fly the rest of the way at `speed` yards a second (`SetMissileLook`'s ninth
+     /// number), over the speed the launch fitted and its [`DUE_SPEED`] cap, up to
+     /// [`OWN_SPEED_MOST`]. The yards left are what the fitted flight had left; a flight already due
+     /// (nothing left) stays due. Nothing happens for a speed of 0 or less.
+diff --git a/crates/benilla-app/src/missile_look.rs b/crates/benilla-app/src/missile_look.rs
+index 736d910b..98e70cb0 100644
+--- a/crates/benilla-app/src/missile_look.rs
++++ b/crates/benilla-app/src/missile_look.rs
+@@ -267,7 +267,8 @@ pub(crate) struct MissileLookPlugin;
+ impl Plugin for MissileLookPlugin {
+     fn build(&self, app: &mut App) {
+         app.add_systems(Startup, init_trail_white)
+-            .add_systems(Update, dress_missiles)
++            // Over the lanes' drain, which writes the same transforms (a unit edit's).
++            .add_systems(Update, dress_missiles.after(crate::lanes::UiLanes))
+             .add_systems(
+                 PostUpdate,
+                 draw_missile_trails
+diff --git a/crates/benilla-app/src/pipe_warm/menagerie.rs b/crates/benilla-app/src/pipe_warm/menagerie.rs
+index 68d907ec..fe88ac6e 100644
+--- a/crates/benilla-app/src/pipe_warm/menagerie.rs
++++ b/crates/benilla-app/src/pipe_warm/menagerie.rs
+@@ -11,6 +11,7 @@ use bevy::render::render_resource::Buffer;
+ 
+ use benilla_assets::materials::{LiquidMaterial, WowModelMaterial};
+ use benilla_world::clouds::CloudMaterial;
++use benilla_world::look::sky::LookSkyMaterial;
+ use benilla_world::model_render::{
+     far_twin_of, model_material, zfill_material, MaterialCache, ShadeSel,
+ };
+@@ -34,6 +35,9 @@ pub(super) struct WarmLanes<'w> {
+     stars: ResMut<'w, Assets<StarMaterial>>,
+     clouds: ResMut<'w, Assets<CloudMaterial>>,
+     sky: ResMut<'w, Assets<SkyMaterial>>,
++    /// The new look's cloud layer (`benilla_world::look::sky`), spawned at `Startup`, hidden until
++    /// the look's sky is on.
++    look_sky: ResMut<'w, Assets<LookSkyMaterial>>,
+     liquid: ResMut<'w, Assets<LiquidMaterial>>,
+     /// For representatives of the on-demand nameplate and raid-mark materials.
+     standard: ResMut<'w, Assets<StandardMaterial>>,
+@@ -453,6 +457,19 @@ pub(super) fn spawn_menagerie(
+             &mut count,
+         );
+     }
++    // The new look's cloud layer (patch 0068), on the same dome: its first sight is a switch of
++    // the look or of its sky, not a world entry.
++    for mat in lane_handles(&mut lanes.look_sky) {
++        spawn_lane_rig(
++            commands,
++            cam,
++            None,
++            &plain_mesh,
++            plain_aabb.as_ref(),
++            mat,
++            &mut count,
++        );
++    }
+     // Liquid: every material on both grid layouts. An interior WMO pool bakes `MOMT.diffColor`
+     // into `ATTRIBUTE_COLOR`, read behind `#ifdef VERTEX_COLORS` (`liquid.wgsl:275`), a separate
+     // pipeline.
+@@ -777,7 +794,21 @@ mod tests {
+         // `FfxCombinePipeline` compiles covered the same way (first frame, pre-world, a bake's
+         // fixed format; a world view's pair every frame in `prepare_textures`); this mention of
+         // its name is what passes it here.
+-        let exempt = ["UiGammaPipeline"];
++        // - AoPipeline, WaterCopyPipeline, FogPipeline and LookPipeline (`benilla_world::look`, the
++        //   new look's passes: 0053, 0064, 0066, 0084): one fullscreen shader each, specialised by
++        //   its `prepare_*_views` for every view carrying `LookView` and the pipelines kept on it.
++        //   The world camera carries it from the spawn (`player/setup.rs`), look on or off, so they
++        //   compile on its first frame, behind the entry cover. Their only axes are the view's
++        //   multisample flag and, for `LookPipeline`, its target format, which a booth's
++        //   `Msaa::Off` cannot reach; a change of `gxMultisample` in the world re-specialises the
++        //   one shader live, as it does Bevy's own view passes.
++        let exempt = [
++            "UiGammaPipeline",
++            "AoPipeline",
++            "WaterCopyPipeline",
++            "FogPipeline",
++            "LookPipeline",
++        ];
+         let own_src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+         let warm_src = std::fs::read_to_string(own_src.join("pipe_warm/mod.rs")).unwrap()
+             + &std::fs::read_to_string(own_src.join("pipe_warm/menagerie.rs")).unwrap();
+diff --git a/crates/benilla-app/src/player.rs b/crates/benilla-app/src/player.rs
+index e73ea228..e3d0958d 100644
+--- a/crates/benilla-app/src/player.rs
++++ b/crates/benilla-app/src/player.rs
+@@ -367,7 +367,7 @@ impl Plugin for PlayerPlugin {
+         // ends on the way out, so the glue gets a free, shown pointer.
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+-            camera::release_look_on_world_exit,
++            camera::release_look_on_world_exit.in_set(crate::ui_script::SessionEnd::Clears),
+         )
+         // The posture queue (the `/sit` family), which `control` alone executes.
+         .add_message::<StandStateRequest>()
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index 4674d866..8722a6d6 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -826,15 +826,18 @@ pub(super) fn latch_world_mouse(
+     mut hosted_vm: crate::script_calls::HostedVm,
+     cover: Option<Res<crate::loading_screen::LoadingScreen>>,
+     // Basin Battle: the VM whose script holds the look, so a new one (a `ReloadUI`, the add-on
+-    // turned off) doesn't inherit a `MouselookStart` nothing is left to stop.
+-    mut vm_seen: Local<u64>,
++    // turned off) doesn't inherit a `MouselookStart` nothing is left to stop. The flag is whether
++    // any VM was seen before: the first one is no swap.
++    mut vm_seen: Local<(bool, crate::ui_script::VmMemo<()>)>,
+ ) {
+     hosted_vm.run(|mut script| {
+-        let session = script.as_ref().map_or(0, |s| s.session());
+-        let swapped = *vm_seen != 0 && session != 0 && session != *vm_seen;
+-        if session != 0 {
+-            *vm_seen = session;
+-        }
++        let swapped = script.as_deref().is_some_and(|s| {
++            let (seen_any, memo) = &mut *vm_seen;
++            let (_, new_vm) = memo.get_reset(s);
++            let swapped = new_vm && *seen_any;
++            *seen_any = true;
++            swapped
++        });
+         let calls = script
+             .as_mut()
+             .map(|s| s.take_look_calls())
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index 6c55e5ee..3291407c 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -473,7 +473,8 @@ impl Plugin for TargetPlugin {
+                         .run_if(resource_exists::<benilla_world::lighting::FogOverride>),
+                     // The add-on's call for mist, for the new look's mist resolve (the same).
+                     (
+-                        world_mist::release_world_mist_on_new_vm,
++                        world_mist::release_world_mist_on_new_vm
++                            .after(crate::ui_script::publish_vm_generation),
+                         world_mist::apply_world_mist,
+                     )
+                         .chain()
+@@ -484,6 +485,7 @@ impl Plugin for TargetPlugin {
+             .add_systems(
+                 OnExit(crate::client_state::ClientState::InWorld),
+                 world_mist::reset_world_mist
++                    .in_set(crate::ui_script::SessionEnd::Clears)
+                     .run_if(resource_exists::<benilla_world::look::WorldMist>),
+             )
+             .add_systems(PostUpdate, highlight::apply_highlight)
+diff --git a/crates/benilla-app/src/target/world_mist.rs b/crates/benilla-app/src/target/world_mist.rs
+index 44bc1d5b..6dd1f179 100644
+--- a/crates/benilla-app/src/target/world_mist.rs
++++ b/crates/benilla-app/src/target/world_mist.rs
+@@ -30,12 +30,14 @@ pub(super) fn reset_world_mist(mut mist: ResMut<WorldMist>) {
+ /// A new UI VM (a `ReloadUI`, an add-on turned off): nothing is left to clear the old add-on's
+ /// event, so it eases out; an add-on that wants it again asks again.
+ pub(super) fn release_world_mist_on_new_vm(
+-    script: Option<NonSend<benilla_ui::script::UiScript>>,
++    vm: Res<crate::ui_script::VmGeneration>,
+     mut seen: Local<u64>,
+     mut mist: ResMut<WorldMist>,
+ ) {
+-    let Some(script) = script else { return };
+-    let now = script.session();
++    let now = vm.0;
++    if now == 0 {
++        return;
++    }
+     if *seen != 0 && now != *seen && mist.active() {
+         mist.request(MistEvent::Clear { secs: None });
+     }
+diff --git a/crates/benilla-app/src/ui_script/mod.rs b/crates/benilla-app/src/ui_script/mod.rs
+index 92537dd8..cba636b1 100644
+--- a/crates/benilla-app/src/ui_script/mod.rs
++++ b/crates/benilla-app/src/ui_script/mod.rs
+@@ -418,6 +418,8 @@ impl Plugin for UiScriptPlugin {
+             // (`0x482ea0`), so an `OnUpdate` reads the frames before its own.
+             .init_resource::<WorldFrameTimes>()
+             .add_systems(Update, feed_framerate.in_set(UiFeed))
++            .init_resource::<VmGeneration>()
++            .add_systems(Update, publish_vm_generation.in_set(UiFeed))
+             .add_systems(
+                 Update,
+                 record_world_frame_time
+@@ -568,6 +570,25 @@ fn feed_framerate(mut hosted_vm: crate::script_calls::HostedVm, times: Res<World
+     })
+ }
+ 
++/// Which VM is up, [`benilla_ui::script::UiScript::session`], or 0 with none: how a system that
++/// holds nothing of the VM learns a new one has been seated (a `ReloadUI`, an add-on turned off)
++/// and lets go of what the old one's add-on held. Only the feed layer names the VM
++/// (`tests/ui_script_wall.rs`), so such a system reads this instead.
++#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
++pub(crate) struct VmGeneration(pub(crate) u64);
++
++/// [`VmGeneration`] as the feed phase finds it, before the tick and so before anything that reads
++/// it this frame.
++pub(crate) fn publish_vm_generation(
++    script: Option<NonSend<benilla_ui::script::UiScript>>,
++    mut generation: ResMut<VmGeneration>,
++) {
++    let now = script.map_or(0, |s| s.session());
++    if generation.0 != now {
++        generation.0 = now;
++    }
++}
++
+ /// One world frame's step into the ring (`0x672700`), the elapsed every `OnUpdate` was handed;
+ /// [`feed_framerate`] hands the VM the rate before the next tick reads it.
+ fn record_world_frame_time(
+diff --git a/crates/benilla-app/src/unit_rope.rs b/crates/benilla-app/src/unit_rope.rs
+index 8e5167cd..5250b794 100644
+--- a/crates/benilla-app/src/unit_rope.rs
++++ b/crates/benilla-app/src/unit_rope.rs
+@@ -216,7 +216,10 @@ impl Plugin for UnitRopePlugin {
+     fn build(&self, app: &mut App) {
+         app.init_resource::<Ropes>()
+             .add_systems(Startup, init_rope_white)
+-            .add_systems(Update, drain_ropes)
++            .add_systems(
++                Update,
++                drain_ropes.after(benilla_world::schedule::WorldStage::Net),
++            )
+             .add_systems(
+                 PostUpdate,
+                 draw_ropes
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 642e6fba..4c35db75 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -1689,7 +1689,8 @@ mod tests {
+         assert_eq!(held(&mut app).0[k::GRAIN], KNOBS[k::GRAIN].default);
+         run(&mut app, "lookwater tune milk grade");
+         assert_eq!(held(&mut app), SurfaceTune::default());
+-        assert!(run(&mut app, "lookwater tune")[0].contains("grain_speed 0.04"));
++        assert!(run(&mut app, "lookwater tune")[0]
++            .contains(&format!("grain_speed {}", KNOBS[k::GRAIN_SPEED].default)));
+         run(&mut app, "lookwater tune rain 1.5");
+         assert_eq!(
+             run(&mut app, "lookwater tune grade")[0],
+diff --git a/crates/benilla-app/tests/world_api_wall.rs b/crates/benilla-app/tests/world_api_wall.rs
+index 7971f477..2ae65634 100644
+--- a/crates/benilla-app/tests/world_api_wall.rs
++++ b/crates/benilla-app/tests/world_api_wall.rs
+@@ -80,6 +80,9 @@ fn is_instrument_consumer(rel: &str) -> bool {
+ 
+ /// The designed API: every engine item game code may name, with the record that published it
+ /// (`wall`: published without one). Adding a row is a claim made in review, with its record.
++/// `patch`: Basin Battle's new look (`benilla_world::look`, patches 0051 to 0085). Its resources,
++/// knobs and commands are how the console, the cvars and the add-on's seams (`SetWorldFog`,
++/// `SetWorldMist`) reach the look, which is its designed handle, not a crossing to close.
+ const PUBLISHED: &[(&str, &str)] = &[
+     ("bgwin::BgWinPlugin", "wall"),
+     ("bgwin::background_run", "record"),
+@@ -122,6 +125,82 @@ const PUBLISHED: &[(&str, &str)] = &[
+     ("lighting::LightBlob", "record"),
+     ("lighting::WorldTime", "record"),
+     ("lighting::WowLighting", "record"),
++    ("look::LookAir", "patch"),
++    ("look::LookAo", "patch"),
++    ("look::LookBloomTune", "patch"),
++    ("look::LookGlare", "patch"),
++    ("look::LookLife", "patch"),
++    ("look::LookLight", "patch"),
++    ("look::LookLightTune", "patch"),
++    ("look::LookMist", "patch"),
++    ("look::LookMistTune", "patch"),
++    ("look::LookPulse", "patch"),
++    ("look::LookShadows", "patch"),
++    ("look::LookSky", "patch"),
++    ("look::LookView", "patch"),
++    ("look::LookWakes", "patch"),
++    ("look::LookWater", "patch"),
++    ("look::LookWeather", "patch"),
++    ("look::LookWind", "patch"),
++    ("look::MistEvent", "patch"),
++    ("look::ShadowFrame", "patch"),
++    ("look::WakeStats", "patch"),
++    ("look::WeatherLook", "patch"),
++    ("look::WorldLook", "patch"),
++    ("look::WorldMist", "patch"),
++    ("look::air::FogCommand", "patch"),
++    ("look::air::fog_quality", "patch"),
++    ("look::air::windows_now", "patch"),
++    ("look::life::Life", "patch"),
++    ("look::lights::LookLightSlots", "patch"),
++    ("look::lights::school_color", "patch"),
++    ("look::lights::school_flickers", "patch"),
++    ("look::lights::spell_light_hue", "patch"),
++    ("look::lights::tune::AREA_HEIGHT", "patch"),
++    ("look::lights::tune::AREA_INTENSITY", "patch"),
++    ("look::lights::tune::AREA_MAX_RADIUS", "patch"),
++    ("look::lights::tune::AREA_MIN_RADIUS", "patch"),
++    ("look::lights::tune::AREA_PAD", "patch"),
++    ("look::lights::tune::AURA_BREATH", "patch"),
++    ("look::lights::tune::AURA_BREATH_HZ", "patch"),
++    ("look::lights::tune::AURA_INTENSITY", "patch"),
++    ("look::lights::tune::AURA_RADIUS", "patch"),
++    ("look::lights::tune::AURA_RISE", "patch"),
++    ("look::lights::tune::CAST_FALL", "patch"),
++    ("look::lights::tune::CAST_INTENSITY", "patch"),
++    ("look::lights::tune::CAST_MAX_SECS", "patch"),
++    ("look::lights::tune::CAST_RADIUS", "patch"),
++    ("look::lights::tune::CAST_RISE", "patch"),
++    ("look::lights::tune::FLAME_FLICKER", "patch"),
++    ("look::lights::tune::FLAME_FLICKER_HZ", "patch"),
++    ("look::lights::tune::GROUND_HEIGHT", "patch"),
++    ("look::lights::tune::HEAL_FALL", "patch"),
++    ("look::lights::tune::HEAL_HOLD", "patch"),
++    ("look::lights::tune::HEAL_INTENSITY", "patch"),
++    ("look::lights::tune::HEAL_RADIUS", "patch"),
++    ("look::lights::tune::HEAL_RISE", "patch"),
++    ("look::lights::tune::IMPACT_FALL", "patch"),
++    ("look::lights::tune::IMPACT_HOLD", "patch"),
++    ("look::lights::tune::IMPACT_INTENSITY", "patch"),
++    ("look::lights::tune::IMPACT_RADIUS", "patch"),
++    ("look::lights::tune::IMPACT_RISE", "patch"),
++    ("look::lights::tune::MAX_FLASHES_PER_CAST", "patch"),
++    ("look::lights::tune::MISSILE_FLICKER", "patch"),
++    ("look::lights::tune::MISSILE_FLICKER_HZ", "patch"),
++    ("look::lights::tune::MISSILE_INTENSITY", "patch"),
++    ("look::lights::tune::MISSILE_RADIUS", "patch"),
++    ("look::lights::tune::TRAIL_ONLY_SCALE", "patch"),
++    ("look::lights::tune::UNIT_HEIGHT", "patch"),
++    ("look::mist::day_roll", "patch"),
++    ("look::wakes::SHOW_WORDS", "patch"),
++    ("look::wakes::WakesCommand", "patch"),
++    ("look::water_surface::KNOBS", "patch"),
++    ("look::water_surface::SurfaceTune", "patch"),
++    ("look::water_surface::TuneCommand", "patch"),
++    ("look::water_surface::k::MILK_ALL", "patch"),
++    ("look::weather::WeatherCommand", "patch"),
++    ("look::weather::tune::THUNDER_AFTER_MAX_S", "patch"),
++    ("look::weather::tune::THUNDER_AFTER_MIN_S", "patch"),
+     ("mac_quit::MacQuitPlugin", "record"),
+     ("mat_anim_table::MatAnimMirrors", "record"),
+     ("mat_anim_table::MatAnimTable", "record"),
+@@ -193,7 +272,11 @@ const PUBLISHED: &[(&str, &str)] = &[
+ /// `CLOSE/invert`: the engine publishes the fact instead of the game reaching in;
+ /// `CLOSE/move-engine`: engine code in a game file moves engine-side; `CLOSE/move-game`: gameplay
+ /// moves out of the engine. Closing a leak is deleting its row.
++/// 39 of the rows are what the series' patches outside the new look (0003 to 0087) reached for
++/// from game code: the pick, the rig, the fade, the fog override, the slope under a body.
+ const SORTED_LEAKS: &[(&str, &str)] = &[
++    ("art_scope::ArtScope", "CLOSE/absorb"),
++    ("art_scope::ArtSlot", "CLOSE/absorb"),
+     ("billboard::BillboardJointRig", "CLOSE/absorb"),
+     ("billboard::BillboardPlace", "CLOSE/absorb"),
+     ("billboard::billboard_basis", "CLOSE/move-engine"),
+@@ -201,6 +284,7 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("clutter::ClutterConfig", "CLOSE/absorb"),
+     ("collision::PickOccluder", "CLOSE/absorb"),
+     ("decal::DecalFrame", "CLOSE/absorb"),
++    ("dev_state::DebugState", "CLOSE/absorb"),
+     ("doodad_anim::DoodadAnimTier", "CLOSE/absorb"),
+     ("doodad_anim::TintAnimMaterials", "CLOSE/move-engine"),
+     ("doodad_anim::UvAnimMaterials", "CLOSE/move-engine"),
+@@ -209,22 +293,31 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("doodad_anim::wants_rig", "CLOSE/move-engine"),
+     ("entity_shade::GroundShade", "CLOSE/absorb"),
+     ("ffx_glow::FfxDeathFade", "CLOSE/absorb"),
++    ("ground_fx::spawn_ground_fx_decal", "CLOSE/absorb"),
+     ("instance_tint::IDENTITY", "CLOSE/absorb"),
+     ("instance_tint::pack", "CLOSE/absorb"),
++    ("interact::CreaturePickPart", "CLOSE/absorb"),
++    ("interact::GoPickPart", "CLOSE/absorb"),
+     ("interact::PickBox", "CLOSE/absorb"),
++    ("interact::PickParts", "CLOSE/absorb"),
+     ("interact::WorldClick", "CLOSE/move-game"),
+     ("interact::WorldRightClick", "CLOSE/move-game"),
+     ("interact::WorldRightPress", "CLOSE/move-game"),
+     ("interact::cast_pick_ray_inflated", "CLOSE/absorb"),
++    ("interact::ray_mesh_bounds", "CLOSE/absorb"),
++    ("interact::ray_posed_mesh", "CLOSE/absorb"),
+     ("interior::BodyBakeCenter", "CLOSE/absorb"),
+     ("interior::ContainmentAttach", "CLOSE/absorb"),
+     ("interior::InteriorLit", "CLOSE/invert"),
+     ("interior::InteriorReauthor", "CLOSE/invert"),
+     ("interior::classify_entity_interior", "CLOSE/absorb"),
+     ("interior::part_interior_lit", "CLOSE/absorb"),
++    ("lighting::FogLook", "CLOSE/absorb"),
++    ("lighting::FogOverride", "CLOSE/absorb"),
+     ("lighting::GameClock", "CLOSE/absorb"),
+     ("lighting::PropProbeSlot", "CLOSE/move-engine"),
+     ("lighting::PropProbes", "CLOSE/move-engine"),
++    ("lighting::WorldPointLight", "CLOSE/absorb"),
+     ("liquid::WaterChunkInfo", "CLOSE/absorb"),
+     ("map_proj::WorldProj", "CLOSE/move-game"),
+     ("map_proj::ZoneRect", "CLOSE/move-game"),
+@@ -232,19 +325,25 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("map_proj::world_uv", "CLOSE/move-game"),
+     ("map_proj::zone_uv", "CLOSE/move-game"),
+     ("map_proj::zone_world", "CLOSE/move-game"),
++    ("mesh_tag::alpha_of", "CLOSE/absorb"),
+     ("mesh_tag::describe", "CLOSE/absorb"),
++    ("mesh_tag::spawn_tag", "CLOSE/absorb"),
+     ("mesh_tag::with_alpha", "CLOSE/invert"),
+     ("model_fade::DespawnFade", "CLOSE/move-game"),
++    ("model_fade::EffectTint", "CLOSE/absorb"),
++    ("model_fade::FadeCurve", "CLOSE/absorb"),
+     ("model_fade::FadeMaterials", "CLOSE/absorb"),
+     ("model_fade::FadeSet", "CLOSE/absorb"),
+     ("model_fade::JoinedFade", "CLOSE/absorb"),
+     ("model_fade::MAX_MODEL_CHAIN", "CLOSE/invert"),
+     ("model_fade::PartFade", "CLOSE/absorb"),
+     ("model_fade::PendingAppearFade", "CLOSE/invert"),
++    ("model_fade::SELF_FADE_WINDOW", "CLOSE/absorb"),
+     ("model_fade::UnitAppearFade", "CLOSE/move-game"),
+     ("model_fade::apply_render_fade", "CLOSE/absorb"),
+     ("model_fade::fade_alpha", "CLOSE/absorb"),
+     ("model_fade::join_unit_appear_fade", "CLOSE/absorb"),
++    ("model_fade::self_model_fade_alpha", "CLOSE/absorb"),
+     ("model_render::FarSideOfWater", "CLOSE/invert"),
+     ("model_render::FarSideTwins", "CLOSE/invert"),
+     ("model_render::ModelVisSet", "CLOSE/absorb"),
+@@ -266,12 +365,26 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("ribbons::RibbonSeq", "CLOSE/absorb"),
+     ("ribbons::RibbonTrail", "CLOSE/invert"),
+     ("ribbons::spawn_ribbon", "CLOSE/absorb"),
++    ("rig_anim::Bones", "CLOSE/absorb"),
++    ("rig_anim::ExtraClips", "CLOSE/absorb"),
++    ("rig_anim::PoseCurves", "CLOSE/absorb"),
++    ("rig_anim::PoseEval", "CLOSE/absorb"),
++    ("rig_anim::PoseExtra", "CLOSE/absorb"),
++    ("rig_anim::PoseInertia", "CLOSE/absorb"),
++    ("rig_anim::finalize_rig_worlds", "CLOSE/absorb"),
++    ("rig_anim::map_bones", "CLOSE/absorb"),
++    ("rig_anim::retarget", "CLOSE/absorb"),
++    ("rig_anim::striking_link", "CLOSE/absorb"),
+     ("rig_palette::RigPaletteMirrors", "CLOSE/absorb"),
+     ("rig_palette::RigPart", "CLOSE/absorb"),
+     ("rig_palette::RigStarved", "CLOSE/invert"),
+     ("rig_palette::rig_cost_enabled", "CLOSE/absorb"),
++    ("rig_palette::spawn_joints", "CLOSE/absorb"),
++    ("rig_rider::AimedChild", "CLOSE/absorb"),
++    ("rig_rider::RiderAimAt", "CLOSE/absorb"),
+     ("terrain_stream::AreaAuthoritySet", "CLOSE/absorb"),
+     ("terrain_stream::CurrentArea", "CLOSE/absorb"),
++    ("terrain_stream::DeadminesAftermath", "CLOSE/absorb"),
+     ("terrain_stream::PendingCollider", "CLOSE/move-engine"),
+     ("terrain_stream::PropLobeLight", "CLOSE/move-engine"),
+     ("terrain_stream::ShadeResolve", "CLOSE/move-engine"),
+@@ -289,16 +402,24 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ),
+     ("terrain_stream::point_light", "CLOSE/absorb"),
+     ("terrain_stream::spawn_model_entities", "CLOSE/move-engine"),
++    ("terrain_stream::terrain_height_under", "CLOSE/absorb"),
++    ("view::CAM_FAR", "CLOSE/absorb"),
+     ("view::CAM_FOVY", "CLOSE/absorb"),
+     ("view::FARCLIP_RANGE", "CLOSE/absorb"),
++    ("view::MSAA_RANGE", "CLOSE/absorb"),
+     ("view::NEARCLIP_DEFAULT", "CLOSE/absorb"),
++    ("wmo_portal::INTERIOR_PROBE_HEIGHT", "CLOSE/absorb"),
+     ("wmo_portal::UnitWmoRoom", "CLOSE/absorb"),
+     ("wmo_portal::WmoPortalInstance", "CLOSE/absorb"),
+     ("wmo_portal::WmoPvsSet", "CLOSE/absorb"),
++    ("wmo_portal::down_ray_seeds", "CLOSE/absorb"),
++    ("wmo_portal::terrain_z_local", "CLOSE/absorb"),
++    ("world_unit::Bobber", "CLOSE/absorb"),
+ ];
+ 
+-/// The gate on the leak count. Lower it when a leak closes.
+-const LEAK_CEILING: usize = 111;
++/// The gate on the leak count. Lower it when a leak closes. 131: the 92 the table already filed
++/// that are still named, and the 39 the series' patches outside the new look added (above).
++const LEAK_CEILING: usize = 131;
+ 
+ /// How far under [`LEAK_CEILING`] the count may sit before the test asks for the ceiling to be
+ /// lowered: one closure does not fail the gate, a whole stage of work cannot go unrecorded.
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index f4295ec5..54cfc322 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -253,10 +253,10 @@
+ //!   half a yard across at the top of its model, pulsing, and a small white light there, lighting
+ //!   the ground under it (`benilla-app`'s `go_glow`: an arrow planted in the grass, found at
+ //!   night). Without the bit, nothing.
+-//! - `SetMissileLook(spellId, colour, width, seconds, scale, spin, caster, axis, speed)`: a tenth
++//! - `SetMissileLook(spellId, colour, width, seconds, scale, spin, caster, axis, speed)`: a ninth
+ //!   argument flies the dressed missile at that many yards a second from where it is, over the
+ //!   speed its spell gives it and over the 100 yd/s cap the launch keeps (up to 400). `0` or
+-//!   nothing keeps the spell's own; a line with nine arguments reads as before.
++//!   nothing keeps the spell's own; a line with eight arguments reads as before.
+ //!
+ //! The twenty-fourth (`HasActionCombat() >= 24`): the Mage's skill checks, patches 0041 to 0044:
+ //! rings on the ground (`SetGroundRing`), recoloured spell looks (`SetEffectTint`), an orb rolling
+@@ -1976,8 +1976,9 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 spin: number(v.get(5), -20.0, 20.0).unwrap_or(0.0),
+                 // The eighth argument names the spin's axis: "side" tumbles, anything else is flat.
+                 tumble: text(v.get(7)).is_some_and(|a| a.eq_ignore_ascii_case("side")),
+-                // The tenth is its own speed (yd/s); nothing, or 0, keeps the spell's.
+-                speed: number(v.get(9), 0.0, 400.0).unwrap_or(0.0),
++                // The ninth (index 8, after the spell) is its own speed (yd/s); nothing, or 0, keeps
++                // the spell's.
++                speed: number(v.get(8), 0.0, 400.0).unwrap_or(0.0),
+             };
+             match (spell, unit_guid(v.get(6))) {
+                 (Some(spell), Some(caster)) => {
+@@ -2201,7 +2202,7 @@ mod tests {
+         )
+         .exec()
+         .unwrap();
+-        // The tenth number is the missile's own speed; a nine-argument line keeps the spell's (0).
++        // The ninth argument is the missile's own speed; an eight-argument line keeps the spell's (0).
+         let thrown = missile_look(2764).unwrap();
+         assert!(thrown.tumble && (thrown.speed - 160.0).abs() < 1.0e-5);
+         let shot = missile_look(3018).unwrap();
+diff --git a/crates/benilla-ui/src/script/tests/reference_surface.rs b/crates/benilla-ui/src/script/tests/reference_surface.rs
+index ba9b5b0b..7b6c63ec 100644
+--- a/crates/benilla-ui/src/script/tests/reference_surface.rs
++++ b/crates/benilla-ui/src/script/tests/reference_surface.rs
+@@ -8,8 +8,75 @@ use std::collections::HashSet;
+ 
+ use super::common::script;
+ 
+-/// Globals the engine exposes that 1.12 does not, each with its reason. The list is exact.
+-const BEYOND_1_12: &[&str] = &[];
++/// Globals the engine exposes that 1.12 does not, each with its reason. The list is exact. Every
++/// name here is Basin Battle's own, from the patch series (`patches/benilla`) and its add-on.
++const BEYOND_1_12: &[&str] = &[
++    // Basin Battle's action combat (patches 0001 to 0005): the add-on steers its hero's mouse, aim
++    // camera, action animation layer, hit reactions and lock-on through `benilla_ui::action_combat`.
++    // 1.12 has no such seam, and `HasActionCombat()` is how the add-on tells a client that has it from
++    // one that does not.
++    "ActionDash",
++    "ActionKit",
++    "ActionMoveKeys",
++    "ActionProbe",
++    "CameraKick",
++    "GetActionAim",
++    "HasActionCombat",
++    "HitStop",
++    "PlayUnitAnimation",
++    "PlayUnitVocal",
++    "ReactUnit",
++    "RollUnit",
++    "SetActionMouse",
++    "SetAimCamera",
++    "SetCameraUnitCollision",
++    "SetLockOn",
++    "ShakeCamera",
++    "StopUnitAnimation",
++    "TakeActionMarkers",
++    // The aim read back (patches 0006, 0046, 0047, 0059): where the hero aims, where the crosshair
++    // meets the ground, how far its shoulders turn to the aim, which shoulder the camera looks over.
++    "GetAimPoint",
++    "GetReticlePoint",
++    "SetAimTurn",
++    "SetCameraShoulder",
++    // Marks the add-on lays in the world (patches 0006, 0008, 0011, 0026, 0041, 0043, 0045): aim and
++    // ground markers, blow telegraphs, ground bursts, rings, orbs and unit sprites, drawn by the
++    // client because a frame cannot draw on the terrain.
++    "ClearGroundMarker",
++    "ClearGroundRing",
++    "ClearTelegraph",
++    "ClearUnitSprite",
++    "PlayGroundBurst",
++    "PlayGroundOrb",
++    "SetAimMarker",
++    "SetGroundMarker",
++    "SetGroundRing",
++    "SetGroundRingOnUnit",
++    "SetTelegraph",
++    "SetTelegraphAt",
++    "SetUnitSprite",
++    "StopGroundOrb",
++    // Looks the add-on gives spells and units (patches 0007, 0015, 0025, 0030, 0031, 0042, 0044,
++    // 0058): weapon glow, flurries of cuts, clips from another model, missile ribbons and origins,
++    // ropes, recoloured effects, attached spell models. The model's own data, which no 1.12 frame
++    // reaches.
++    "ClearUnitRope",
++    "PlayUnitFlurry",
++    "PreloadAnimationSource",
++    "SetEffectTint",
++    "SetMissileLook",
++    "SetSpellAttach",
++    "SetUnitMissileOrigin",
++    "SetUnitRope",
++    "SetUnitWeaponGlow",
++    // The add-on's weather for the world's look (patches 0018, 0054): outdoor fog and mist the add-on
++    // sets and clears, for the new look's air.
++    "ClearWorldFog",
++    "ClearWorldMist",
++    "SetWorldFog",
++    "SetWorldMist",
++];
+ 
+ /// `reference/lua_globals.tsv`'s names.
+ fn reference() -> HashSet<String> {
+diff --git a/crates/benilla-ui/tests/vm_parity_surface.golden b/crates/benilla-ui/tests/vm_parity_surface.golden
+index e1f45b68..74ef444e 100644
+--- a/crates/benilla-ui/tests/vm_parity_surface.golden
++++ b/crates/benilla-ui/tests/vm_parity_surface.golden
+@@ -1,2 +1,2 @@
+-pairs_globals	1132: PickupTradeMoney TaxiNodeSetCurrent GetTrainerServiceTypeFilter SetTrainerServiceTypeFilter UnitRace UnitClass CancelLogout CursorHasItem EnableAddOn Screenshot ClickAuctionSellItemButton debugbreak ExpandCraftSkillLine GetBlockChance SetSendMailMoney GetSendMailMoney GetCurrentMapZone CollapseFactionHeader SelectGossipActiveQuest IsAddOnLoadOnDemand RegisterCVar LoggingChat GetContainerItemCooldown PickupMacro RandomRoll GetMinigameType ClearTarget FollowUnit CheckSpiritHealerDist GetPVPLastWeekStats ClickSendMailItemButton UnitXPMax SetTradeSkillSubClassFilter GetActionText AcceptResurrect UnitCharacterPoints AddTradeMoney UnitPlayerOrPetInRaid GetChatWindowInfo CloseLottery collectgarbage GetTradeSkillSubClassFilter CloseItemText GetMoney ClearInspectPlayer CheckPetUntrainerDist SetGuildInfoText GetZonePVPInfo GetTradeTargetItemInfo GetLootSlotInfo DisableAddOn ConfirmBinder GetCVarDefault GetNumBankSlots GetGuildInfoText GetQuestLogRewardSpell SaveView PickupBagFromSlot TogglePerformanceDisplay gcinfo GetAuctionHouseDepositRate IsSpellPassive MoveViewOutStop GuildControlSetRankFlag LoadBindings PickupInventoryItem EditMacro UnitDamage UnitInParty PickupAction GetBattlefieldInstanceExpiration ChannelBan GuildSetLeaderByName GuildControlDelRank ChannelMute strchar PitchUpStop CanJoinBattlefieldAsGroup ListChannelByName GetBagName SelectQuestLogEntry BankButtonIDToInvSlotID ShowBuybackSellCursor ConfirmSummon ldexp PlaceAuctionBid deg GetPetExperience PetAttack next ToggleRun GetQuestLogLeaderBoard CanSendAuctionQuery GuildSetMOTD BOOKTYPE_SPELL exp IsShiftKeyDown sort CloseTrainer GetInboxHeaderInfo UnitIsDead ItemTextGetCreator SetChannelOwner GetMinimapZoneText ExpandTrainerSkillLine GetTargetTradeMoney ResetView ShowBattlefieldList CanViewOfficerNote PetAbandon GetRefreshRates GetTalentPrereqs MoveViewDownStart DeclineQuest RequestBattlefieldScoreData sqrt GuildRosterSetPublicNote MoveViewInStart GetJackpotAmount PutItemInBackpack FlagTutorial GetAddOnDependencies TurnLeftStop UpdateGMTicket ChannelModerate NotWhileDeadError GetPVPLifetimeStats CameraZoomOut ResetChatColors GetSelectedFriend IsLinuxClient GuildControlAddRank UnitFactionGroup SetChatWindowLocked HideNameplates SetSelectedFriend GetMeetingStoneStatusText GetCraftDescription LeaveChannelByName GetTradeSkillNumMade UnitRangedAttack GetGossipAvailableQuests IsTrainerServiceSkillStep BuyTrainerService HasInspectHonorData IsTrainerServiceLearnSpell GetSelectedStablePet GetBattlefieldInstanceRunTime IsPartyLeader ipairs GetRaidTargetIndex PI GetNumStableSlots GetNumTalents GetQuestLogSelection CanEditOfficerNote GetTrainerServiceStepIncrease GMSurveyCommentSubmit CheckInbox DelIgnore GuildLeave GetChatTypeIndex SetScreenResolution UnitIsUnit SpellCanTargetUnit GetGMTicketCategories UseSoulstone MoveBackwardStop GetMouseFocus GetCraftSkillLine PetRename CreateWorldMapArrowFrame RemoveQuestWatch UnitIsTapped RestartGx GetResSicknessDuration GetCurrentBindingSet SetWorldDetail GuildRoster GetQuestItemInfo GetLootThreshold GetMoneyPrizes ClickTargetTradeButton GetComboPoints TakeInboxTextItem GetBattlefieldMapIconScale GetBattlefieldStatData GetAddOnMetadata MakeMinigameMove ResetTutorials unpack GetDamageBonusStat DeleteFile ChannelKick GetAvailableLevel GuildControlGetRankFlags GetGMTicket LeaveParty AddFriend GetTradeSkillLine GetPetTrainingPoints StrafeRightStop IsResting CanShowResetInstances CloseGossip GetNumTradeSkills GetAuctionItemClasses ResurrectHasSickness AddChatWindowMessages PlaySound AcceptDuel SendAddonMessage UnitArmor HideRepairCursor strbyte IsAutoRepeatAction GetGameTime DeclineGuild InviteByName SetBagPortaitTexture GetTabardCreationCost SplitContainerItem GetBattlefieldFlagPosition ToggleMouseMove GetRaidRosterSelection PickupPlayerMoney GetTrainerServiceAbilityReq QuestLogPushQuest UnitIsDeadOrGhost GetInventoryItemCooldown GetAvailableTitle GetTradeSkillIcon SetSendMailCOD CastShapeshiftForm GetSpellCooldown LoggingCombat GetPlayerMapPosition CheckTalentMasterDist CastSpell PetFollow GetMerchantItemLink UnitAttackSpeed SelectAvailableQuest BuyRandomPicks UnitPlayerControlled UnitStat debugload UnitCanAttack SetSelectedFaction SitOrStand GetGuildRecruitmentMode UnitIsCorpse SetGuildRecruitmentMode GetRealmName MoveViewInStop log SetWhoToUI AssistUnit MoveViewDownStop GetScreenResolutions GetPetLoyalty ContainerIDToInventoryID getfenv IsTrainerServiceTradeSkill CloseMerchant GetBattlefieldInstanceInfo PitchDownStop TurnRightStop seterrorhandler CheckReadyCheckTime GetMapOverlayInfo foreach AppendToFile GetSubZoneText GetTradePlayerItemInfo TaxiNodePosition ClearTutorials GetSavedInstanceInfo AttackTarget HasSoulstone TurnOrActionStart GetLanguageByIndex GMSurveyQuestion GetInboxInvoiceInfo GetTradeTargetItemLink __pow __framescript_meta GetChatWindowChannels GetCoinIcon GetProgressText RemoveChatWindowChannel CursorHasMoney GetActionBarToggles rawequal PlayMusic GetSpellTexture IsVendorActive ToggleCollision GetBuildInfo RequestRaidInfo geterrorhandler UnitName GetFirstTradeSkill DoEmote BindEnchant ResetPerformanceValues GetNumWhoResults GetRealZoneText setfenv UnitIsPartyLeader GetSpellAutocast GetWorldLocMapPosition ConfirmTalentWipe GetGossipActiveQuests JoinBattlefield CloseGuildRoster CameraOrSelectOrMoveStop GetSendMailPrice frexp CanMerchantRepair pairs DropCursorMoney FactionToggleAtWar AddOrDelIgnore ExpandTradeSkillSubClass EnumerateServerChannels GetParryChance GetCraftButtonToken EquipPendingItem MoveViewUpStop DeleteInboxItem UnitIsPlusMob GetInspectPVPRankProgress GetGuildRosterInfo GetLootRollItemInfo log10 GetBattlefieldStatInfo TutorialsEnabled GetFriendInfo GetNextStableSlotCost GetBillingTimeRested TaxiGetDestX tinsert GetNumMacroIcons string GetNumGuildMembers GetSkillLineInfo PrevView GetTradeSkillSubClasses InRepairMode TogglePVP GetLFGResults UnitCanAssist LFGQuery ShowInspectCursor strlower GetTalentInfo GetBattlefieldInfo SetTrainerSkillLineFilter PromoteToAssistant SetTerrainMip GetPetitionInfo GetTerrainMip SetPortraitTexture SetTradeMoney ChannelUnban DisplayChannelOwner LootSlotIsItem UnitExists GetNumRaidMembers GetPastDrawResult GetWeaponEnchantInfo TaxiNodeCost UninviteFromRaid MoveViewLeftStart GetLocale SignPetition ConsoleExec CanGuildRemove DeleteCursorItem GetNumLaguages GetPVPYesterdayStats ItemTextGetPage FrameXML_Debug GetMacroInfo PositionMiniWorldMapArrowFrame GetCorpseRecoveryDelay GetPVPRankProgress HasFullControl MoveViewRightStop ExpandFactionHeader TogglePetAutocast BuyStableSlot SetRaidSubgroup GetCorpseMapPosition strrep GetInstanceBootTimeRemaining BuyGuildCharter GetPVPRankInfo EnableAllAddOns
+-global_surface	AbandonQuest:function AbandonSkill:function AcceptAreaSpiritHeal:function AcceptBattlefieldPort:function AcceptDuel:function AcceptGroup:function AcceptGuild:function AcceptQuest:function AcceptResurrect:function AcceptSkillUps:function AcceptTrade:function AcceptXPLoss:function ActionHasRange:function AddChatWindowChannel:function AddChatWindowMessages:function AddFriend:function AddIgnore:function AddOrDelIgnore:function AddQuestWatch:function AddSkillUp:function AddTradeMoney:function AppendToFile:function AssistByName:function AssistUnit:function AttackTarget:function AutoEquipCursorItem:function BOOKTYPE_PET:string BOOKTYPE_SPELL:string BankButtonIDToInvSlotID:function BeginTrade:function BindEnchant:function BuyGuildCharter:function BuyMerchantItem:function BuyRandomPicks:function BuySkillTier:function BuyStableSlot:function BuyTrainerService:function BuybackItem:function CalculateAuctionDeposit:function CameraOrSelectOrMoveStart:function CameraOrSelectOrMoveStop:function CameraZoomIn:function CameraZoomOut:function CanEditGuildInfo:function CanEditMOTD:function CanEditOfficerNote:function CanEditPublicNote:function CanGuildDemote:function CanGuildInvite:function CanGuildPromote:function CanGuildRemove:function CanInspect:function CanJoinBattlefieldAsGroup:function CanMerchantRepair:function CanSendAuctionQuery:function CanShowResetInstances:function CanSignPetition:function CanViewOfficerNote:function CancelAreaSpiritHeal:function CancelAuction:function CancelDuel:function CancelLogout:function CancelMeetingStoneRequest:function CancelPendingEquip:function CancelPlayerBuff:function CancelSkillUps:function CancelTrackingBuff:function CancelTrade:function CancelTradeAccept:function CastPetAction:function CastShapeshiftForm:function CastSpell:function CastSpellByName:function ChangeActionBarPage:function ChangeChatColor:function ChannelBan:function ChannelInvite:function ChannelKick:function ChannelModerate:function ChannelModerator:function ChannelMute:function ChannelToggleAnnouncements:function ChannelUnban:function ChannelUnmoderator:function ChannelUnmute:function CheckBinderDist:function CheckInbox:function CheckInteractDistance:function CheckPetUntrainerDist:function CheckReadyCheckTime:function CheckSpiritHealerDist:function CheckTalentMasterDist:function ClearCursor:function ClearInspectPlayer:function ClearSendMail:function ClearTarget:function ClearTutorials:function ClickAuctionSellItemButton:function ClickSendMailItemButton:function ClickStablePet:function ClickTargetTradeButton:function ClickTradeButton:function CloseAuctionHouse:function CloseBankFrame:function CloseBattlefield:function CloseCraft:function CloseGossip:function CloseGuildRegistrar:function CloseGuildRoster:function CloseItemText:function CloseLoot:function CloseLottery:function CloseMail:function CloseMerchant:function ClosePetStables:function ClosePetition:function CloseQuest:function CloseTabardCreation:function CloseTaxiMap:function CloseTrade:function CloseTradeSkill:function CloseTrainer:function CollapseCraftSkillLine:function CollapseFactionHeader:function CollapseQuestHeader:function CollapseSkillHeader:function CollapseTradeSkillSubClass:function CollapseTrainerSkillLine:function CompleteQuest:function ConfirmAcceptQuest:function ConfirmBindOnUse:function ConfirmBinder:function ConfirmLootRoll:function ConfirmPetUnlearn:function ConfirmReadyCheck:function ConfirmSummon:function ConfirmTalentWipe:function ConsoleExec:function ContainerIDToInventoryID:function ConvertToRaid:function CreateFont:function CreateFrame:function CreateMacro:function CreateMiniWorldMapArrowFrame:function CreateWorldMapArrowFrame:function CursorCanGoInSlot:function CursorHasItem:function CursorHasMoney:function CursorHasSpell:function DeclineGroup:function DeclineGuild:function DeclineQuest:function DeclineResurrect:function DelIgnore:function DeleteCursorItem:function DeleteFile:function DeleteGMTicket:function DeleteInboxItem:function DeleteMacro:function DemoteAssistant:function DisableAddOn:function DisableAllAddOns:function DisplayChannelOwner:function DoCraft:function DoEmote:function DoReadyCheck:function DoTradeSkill:function DropCursorMoney:function DropItemOnUnit:function EditMacro:function EnableAddOn:function EnableAllAddOns:function EnumerateFrames:function EnumerateServerChannels:function EquipCursorItem:function EquipPendingItem:function ExpandCraftSkillLine:function ExpandFactionHeader:function ExpandQuestHeader:function ExpandSkillHeader:function ExpandTradeSkillSubClass:function ExpandTrainerSkillLine:function FactionToggleAtWar:function FlagTutorial:function FlipCameraYaw:function FollowByName:function FollowUnit:function ForceLogout:function ForceQuit:function FrameXML_Debug:function GMRequestPlayerInfo:function GMSurveyAnswerSubmit:function GMSurveyCommentSubmit:function GMSurveyQuestion:function GMSurveySubmit:function GetAbandonQuestItems:function GetAbandonQuestName:function GetActionAutocast:function GetActionBarToggles:function GetActionCooldown:function GetActionCount:function GetActionText:function GetActionTexture:function GetActiveLevel:function GetActiveTitle:function GetAddOnDependencies:function GetAddOnInfo:function GetAddOnMetadata:function GetAdjustedSkillPoints:function GetAreaSpiritHealerTime:function GetAuctionHouseDepositRate:function GetAuctionInvTypes:function GetAuctionItemClasses:function GetAuctionItemInfo:function GetAuctionItemLink:function GetAuctionItemSubClasses:function GetAuctionItemTimeLeft:function GetAuctionSellItemInfo:function GetAvailableLevel:function GetAvailableTitle:function GetBagName:function GetBankSlotCost:function GetBaseMip:function GetBattlefieldEstimatedWaitTime:function GetBattlefieldFlagPosition:function GetBattlefieldInfo:function GetBattlefieldInstanceExpiration:function GetBattlefieldInstanceInfo:function GetBattlefieldInstanceRunTime:function GetBattlefieldMapIconScale:function GetBattlefieldPortExpiration:function GetBattlefieldPosition:function GetBattlefieldScore:function GetBattlefieldStatData:function GetBattlefieldStatInfo:function GetBattlefieldStatus:function GetBattlefieldTimeWaited:function GetBattlefieldWinner:function GetBidderAuctionItems:function GetBillingTimeRested:function GetBindLocation:function GetBinding:function GetBindingAction:function GetBindingKey:function GetBlockChance:function GetBonusBarOffset:function GetBuildInfo:function GetBuybackItemInfo:function GetCVar:function GetCVarDefault:function GetChannelList:function GetChannelName:function GetChatTypeIndex:function GetChatWindowChannels:function GetChatWindowInfo:function GetChatWindowMessages:function GetCoinIcon:function GetComboPoints:function GetContainerItemCooldown:function GetContainerItemInfo:function GetContainerItemLink:function GetContainerNumSlots:function GetCorpseMapPosition:function GetCorpseRecoveryDelay:function GetCraftButtonToken:function GetCraftDescription:function GetCraftDisplaySkillLine:function GetCraftIcon:function GetCraftInfo:function GetCraftItemLink:function GetCraftName:function GetCraftNumReagents:function GetCraftReagentInfo:function GetCraftReagentItemLink:function GetCraftSelectionIndex:function GetCraftSkillLine:function GetCraftSpellFocus:function GetCurrentBindingSet:function GetCurrentMapContinent:function GetCurrentMapZone:function GetCurrentMultisampleFormat:function GetCurrentResolution:function GetCursorMoney:function GetCursorPosition:function GetDamageBonusStat:function GetDebugStats:function GetDefaultLanguage:function GetDodgeChance:function GetDoodadAnim:function GetFactionInfo:function GetFarclip:function GetFirstTradeSkill:function GetFramerate:function GetFriendInfo:function GetGMStatus:function GetGMTicket:function GetGMTicketCategories:function GetGameTime:function GetGamma:function GetGossipActiveQuests:function GetGossipAvailableQuests:function GetGossipOptions:function GetGossipText:function GetGreetingText:function GetGuildCharterCost:function GetGuildInfo:function GetGuildInfoText:function GetGuildRecruitmentMode:function GetGuildRosterInfo:function GetGuildRosterLastOnline:function GetGuildRosterMOTD:function GetGuildRosterSelection:function GetGuildRosterShowOffline:function GetIgnoreName:function GetInboxHeaderInfo:function GetInboxInvoiceInfo:function GetInboxItem:function GetInboxNumItems:function GetInboxText:function GetInspectHonorData:function GetInspectPVPRankProgress:function GetInstanceBootTimeRemaining:function GetInventoryAlertStatus:function GetInventoryItemBroken:function GetInventoryItemCooldown:function GetInventoryItemCount:function GetInventoryItemLink:function GetInventoryItemQuality:function GetInventoryItemTexture:function GetInventorySlotInfo:function GetItemInfo:function GetItemQualityColor:function GetJackpotAmount:function GetLFGResults:function GetLFGTypeEntries:function GetLFGTypes:function GetLanguageByIndex:function GetLastLotteryNumbers:function GetLocale:function GetLookingForGroup:function GetLootMethod:function GetLootRollItemInfo:function GetLootRollItemLink:function GetLootRollTimeLeft:function GetLootSlotInfo:function GetLootSlotLink:function GetLootThreshold:function GetLotteryPrizeInfo:function GetMacroIconInfo:function GetMacroIndexByName:function GetMacroInfo:function GetMapContinents:function GetMapInfo:function GetMapLandmarkInfo:function GetMapOverlayInfo:function GetMapZones:function GetMasterLootCandidate:function GetMeetingStoneStatusText:function GetMerchantItemInfo:function GetMerchantItemLink:function GetMerchantItemMaxStack:function GetMerchantNumItems:function GetMinigameState:function GetMinigameType:function GetMinimapZoneText:function GetMoney:function GetMoneyPrizes:function GetMouseFocus:function GetMultisampleFormats:function GetNetStats:function GetNextDrawTime:function GetNextStableSlotCost:function GetNumActiveQuests:function GetNumAddOns:function GetNumAuctionItems:function GetNumAvailableQuests:function GetNumBankSlots:function GetNumBattlefieldFlagPositions:function GetNumBattlefieldPositions:function GetNumBattlefieldScores:function GetNumBattlefieldStats:function GetNumBattlefields:function GetNumBindings:function GetNumBuybackItems:function GetNumCrafts:function GetNumFactions:function GetNumFrames:function GetNumFriends:function GetNumGuildMembers:function GetNumIgnores:function GetNumLFGResults:function GetNumLaguages:function GetNumLootItems:function GetNumLotteryPrizes:function GetNumMacroIcons:function GetNumMacros:function GetNumMapLandmarks:function GetNumMapOverlays:function GetNumPackages:function GetNumPartyMembers:function GetNumPastDrawResults:function GetNumPetitionNames:function GetNumQuestChoices:function GetNumQuestItems:function GetNumQuestLeaderBoards:function GetNumQuestLogChoices:function GetNumQuestLogEntries:function GetNumQuestLogRewards:function GetNumQuestRewards:function GetNumQuestWatches:function GetNumRaidMembers:function GetNumRoutes:function GetNumSavedInstances:function GetNumShapeshiftForms:function GetNumSkillLines:function GetNumSpellTabs:function GetNumStablePets:function GetNumStableSlots:function GetNumStationeries:function GetNumTalentTabs:function GetNumTalents:function GetNumTradeSkills:function GetNumTrainerServices:function GetNumWhoResults:function GetNumWorldStateUI:function GetObjectiveText:function GetOwnerAuctionItems:function GetPVPLastWeekStats:function GetPVPLifetimeStats:function GetPVPRankInfo:function GetPVPRankProgress:function GetPVPSessionStats:function GetPVPThisWeekStats:function GetPVPYesterdayStats:function GetPackageInfo:function GetParryChance:function GetPartyLeaderIndex:function GetPartyMember:function GetPastDrawResult:function GetPetActionCooldown:function GetPetActionInfo:function GetPetActionsUsable:function GetPetExperience:function GetPetFoodTypes:function GetPetHappiness:function GetPetIcon:function GetPetLoyalty:function GetPetTimeRemaining:function GetPetTrainingPoints:function GetPetitionInfo:function GetPetitionNameInfo:function GetPlayerBuff:function GetPlayerBuffApplications:function GetPlayerBuffDispelType:function GetPlayerBuffTexture:function GetPlayerBuffTimeLeft:function GetPlayerMapPosition:function GetPlayerTradeMoney:function GetProgressText:function GetQuestBackgroundMaterial:function GetQuestGreenRange:function GetQuestIndexForTimer:function GetQuestIndexForWatch:function GetQuestItemInfo:function GetQuestItemLink:function GetQuestLogChoiceInfo:function GetQuestLogItemLink:function GetQuestLogLeaderBoard:function GetQuestLogPushable:function GetQuestLogQuestText:function GetQuestLogRequiredMoney:function GetQuestLogRewardInfo:function GetQuestLogRewardMoney:function GetQuestLogRewardSpell:function GetQuestLogSelection:function GetQuestLogTimeLeft:function GetQuestLogTitle:function GetQuestMoneyToGet:function GetQuestReward:function GetQuestText:function GetQuestTimers:function GetRaidRosterInfo:function GetRaidRosterSelection:function GetRaidTargetIndex:function GetRealZoneText:function GetRealmName:function GetRefreshRates:function GetReleaseTimeRemaining:function GetRepairAllCost:function GetResSicknessDuration:function GetRestState:function GetRewardMoney:function GetRewardSpell:function GetRewardText:function GetSavedInstanceInfo:function GetScreenHeight:function GetScreenResolutions:function GetScreenWidth:function GetSelectedAuctionItem:function GetSelectedBattlefield:function GetSelectedFaction:function GetSelectedFriend:function GetSelectedIgnore:function GetSelectedSkill:function GetSelectedStablePet:function GetSelectedStationeryTexture:function GetSendMailCOD:function GetSendMailItem:function GetSendMailMoney:function GetSendMailPrice:function GetShapeshiftFormCooldown:function GetShapeshiftFormInfo:function GetSkillLineInfo:function GetSpellAutocast:function GetSpellCooldown:function GetSpellName:function GetSpellTabInfo:function GetSpellTexture:function GetStablePetFoodTypes:function GetStablePetInfo:function GetStationeryInfo:function GetSubZoneText:function GetSummonConfirmAreaName:function GetSummonConfirmSummoner:function GetSummonConfirmTimeLeft:function GetTabardCreationCost:function GetTabardInfo:function GetTalentInfo:function GetTalentPrereqs:function GetTalentTabInfo:function GetTargetTradeMoney:function GetTerrainMip:function GetTexLodBias:function GetTime:function GetTimeToWellRested:function GetTitleText:function GetTrackingTexture:function GetTradePlayerItemInfo:function GetTradePlayerItemLink:function GetTradeSkillCooldown:function GetTradeSkillIcon:function GetTradeSkillInfo:function GetTradeSkillInvSlotFilter:function GetTradeSkillInvSlots:function GetTradeSkillItemLink:function GetTradeSkillItemStats:function GetTradeSkillLine:function GetTradeSkillNumMade:function GetTradeSkillNumReagents:function GetTradeSkillReagentInfo:function GetTradeSkillReagentItemLink:function GetTradeSkillSelectionIndex:function GetTradeSkillSubClassFilter:function GetTradeSkillSubClasses:function GetTradeSkillTools:function GetTradeTargetItemInfo:function GetTradeTargetItemLink:function GetTradeskillRepeatCount:function GetTrainerGreetingText:function GetTrainerSelectionIndex:function GetTrainerServiceAbilityReq:function GetTrainerServiceCost:function GetTrainerServiceDescription:function GetTrainerServiceIcon:function GetTrainerServiceInfo:function GetTrainerServiceLevelReq:function GetTrainerServiceNumAbilityReq:function GetTrainerServiceSkillLine:function GetTrainerServiceSkillReq:function GetTrainerServiceStepIncrease:function GetTrainerServiceStepReq:function GetTrainerServiceTypeFilter:function GetTrainerSkillLineFilter:function GetTrainerSkillLines:function GetVideoCaps:function GetWatchedFactionInfo:function GetWaterDetail:function GetWeaponEnchantInfo:function GetWhoInfo:function GetWorldDetail:function GetWorldLocMapPosition:function GetWorldStateUIInfo:function GetXPExhaustion:function GetZonePVPInfo:function GetZoneText:function GiveMasterLoot:function GuildControlAddRank:function GuildControlDelRank:function GuildControlGetNumRanks:function GuildControlGetRankFlags:function GuildControlGetRankName:function GuildControlSaveRank:function GuildControlSetRank:function GuildControlSetRankFlag:function GuildDemoteByName:function GuildDisband:function GuildInfo:function GuildInviteByName:function GuildLeave:function GuildPromoteByName:function GuildRoster:function GuildRosterSetOfficerNote:function GuildRosterSetPublicNote:function GuildSetLeaderByName:function GuildSetMOTD:function GuildUninviteByName:function HasAction:function HasFullControl:function HasInspectHonorData:function HasKey:function HasNewMail:function HasPetSpells:function HasPetUI:function HasSoulstone:function HasWandEquipped:function HideFriendNameplates:function HideNameplates:function HideRepairCursor:function InCinematic:function InRepairMode:function InboxItemCanDelete:function InitiateTrade:function InviteByName:function InviteToParty:function IsActionInRange:function IsAddOnLoadOnDemand:function IsAddOnLoaded:function IsAltKeyDown:function IsAttackAction:function IsAuctionSortReversed:function IsAutoRepeatAction:function IsConsumableAction:function IsControlKeyDown:function IsCurrentAction:function IsCurrentCast:function IsCurrentQuestFailed:function IsEquippedAction:function IsFactionInactive:function IsFishingLoot:function IsGuildLeader:function IsInGuild:function IsInInstance:function IsInMeetingStoneQueue:function IsInventoryItemLocked:function IsLinuxClient:function IsMacClient:function IsMouselooking:function IsPartyLeader:function IsPetAttackActive:function IsQuestCompletable:function IsQuestWatched:function IsRaidLeader:function IsRaidOfficer:function IsResting:function IsShiftKeyDown:function IsSpellPassive:function IsTalentTrainer:function IsTradeskillTrainer:function IsTrainerServiceLearnSpell:function IsTrainerServiceSkillStep:function IsTrainerServiceTradeSkill:function IsUnitOnQuest:function IsUsableAction:function IsVendorActive:function IsWindowsClient:function ItemTextGetCreator:function ItemTextGetItem:function ItemTextGetMaterial:function ItemTextGetPage:function ItemTextGetText:function ItemTextHasNextPage:function ItemTextNextPage:function ItemTextPrevPage:function JoinBattlefield:function JoinChannelByName:function Jump:function KeyRingButtonIDToInvSlotID:function LFGQuery:function LearnTalent:function LeaveBattlefield:function LeaveChannelByName:function LeaveParty:function ListChannelByName:function ListChannels:function LoadAddOn:function LoadBindings:function LoggingChat:function LoggingCombat:function Logout:function LootSlot:function LootSlotIsCoin:function LootSlotIsItem:function MakeMinigameMove:function MouselookStart:function MouselookStop:function MoveBackwardStart:function MoveBackwardStop:function MoveForwardStart:function MoveForwardStop:function MoveViewDownStart:function MoveViewDownStop:function MoveViewInStart:function MoveViewInStop:function MoveViewLeftStart:function MoveViewLeftStop:function MoveViewOutStart:function MoveViewOutStop:function MoveViewRightStart:function MoveViewRightStop:function MoveViewUpStart:function MoveViewUpStop:function NewGMTicket:function NextView:function NoPlayTime:function NotWhileDeadError:function NotifyInspect:function NumTaxiNodes:function OfferPetition:function OffhandHasWeapon:function OpenTrainer:function OpeningCinematic:function PI:number PartialPlayTime:function PetAbandon:function PetAggressiveMode:function PetAttack:function PetCanBeAbandoned:function PetCanBeRenamed:function PetDefensiveMode:function PetDismiss:function PetFollow:function PetHasActionBar:function PetPassiveMode:function PetRename:function PetStopAttack:function PetWait:function PickupAction:function PickupBagFromSlot:function PickupContainerItem:function PickupInventoryItem:function PickupMacro:function PickupMerchantItem:function PickupPetAction:function PickupPlayerMoney:function PickupSpell:function PickupStablePet:function PickupTradeMoney:function PitchDownStart:function PitchDownStop:function PitchUpStart:function PitchUpStop:function PlaceAction:function PlaceAuctionBid:function PlayMusic:function PlaySound:function PlaySoundFile:function PlayerHasSpells:function PositionMiniWorldMapArrowFrame:function PositionWorldMapArrowFrame:function PrevView:function ProcessMapClick:function PromoteByName:function PromoteToAssistant:function PromoteToPartyLeader:function PurchaseSlot:function PutItemInBackpack:function PutItemInBag:function QueryAuctionItems:function QuestChooseRewardError:function QuestLogPushQuest:function Quit:function RandomRoll:function ReadFile:function RegisterCVar:function RegisterForSave:function ReloadUI:function RemoveChatWindowChannel:function RemoveChatWindowMessages:function RemoveFriend:function RemoveQuestWatch:function RemoveSkillUp:function RenamePetition:function RepairAllItems:function ReplaceEnchant:function ReplaceTradeEnchant:function RepopMe:function RequestBattlefieldPositions:function RequestBattlefieldScoreData:function RequestInspectHonorData:function RequestRaidInfo:function RequestTimePlayed:function ResetChatColors:function ResetCursor:function ResetDisabledAddOns:function ResetInstances:function ResetPerformanceValues:function ResetTutorials:function ResetView:function RestartGx:function RestoreVideoDefaults:function ResurrectHasSickness:function ResurrectHasTimer:function RetrieveCorpse:function ReturnInboxItem:function RollOnLoot:function RunBinding:function RunScript:function SaveBindings:function SaveView:function Screenshot:function SelectActiveQuest:function SelectAvailableQuest:function SelectCraft:function SelectGossipActiveQuest:function SelectGossipAvailableQuest:function SelectGossipOption:function SelectPackage:function SelectQuestLogEntry:function SelectStationery:function SelectTradeSkill:function SelectTrainerService:function SendAddonMessage:function SendChatMessage:function SendMail:function SendWho:function SetAbandonQuest:function SetActionBarToggles:function SetBagPortaitTexture:function SetBaseMip:function SetBattlefieldScoreFaction:function SetBinding:function SetCVar:function SetChannelOwner:function SetChannelPassword:function SetChatWindowAlpha:function SetChatWindowColor:function SetChatWindowDocked:function SetChatWindowLocked:function SetChatWindowName:function SetChatWindowShown:function SetChatWindowSize:function SetConsoleKey:function SetCursor:function SetDoodadAnim:function SetEuropeanNumbers:function SetFactionActive:function SetFactionInactive:function SetFarclip:function SetGamma:function SetGuildInfoText:function SetGuildRecruitmentMode:function SetGuildRosterSelection:function SetGuildRosterShowOffline:function SetInventoryPortaitTexture:function SetLayoutMode:function SetLookingForGroup:function SetLootMethod:function SetLootPortrait:function SetLootThreshold:function SetMapToCurrentZone:function SetMapZoom:function SetMultisampleFormat:function SetPetStablePaperdoll:function SetPortraitTexture:function SetPortraitToTexture:function SetRaidRosterSelection:function SetRaidSubgroup:function SetRaidTarget:function SetScreenResolution:function SetSelectedAuctionItem:function SetSelectedBattlefield:function SetSelectedFaction:function SetSelectedFriend:function SetSelectedIgnore:function SetSelectedSkill:function SetSendMailCOD:function SetSendMailMoney:function SetTaxiMap:function SetTerrainMip:function SetTexLodBias:function SetTradeMoney:function SetTradeSkillInvSlotFilter:function SetTradeSkillSubClassFilter:function SetTrainerServiceTypeFilter:function SetTrainerSkillLineFilter:function SetView:function SetWatchedFactionIndex:function SetWaterDetail:function SetWhoToUI:function SetWorldDetail:function SetupFullscreenScale:function ShowBattlefieldList:function ShowBuybackSellCursor:function ShowCloak:function ShowContainerSellCursor:function ShowFriendNameplates:function ShowFriends:function ShowHelm:function ShowInspectCursor:function ShowInventorySellCursor:function ShowMerchantSellCursor:function ShowMiniWorldMapArrowFrame:function ShowNameplates:function ShowRepairCursor:function ShowWorldMapArrowFrame:function ShowingCloak:function ShowingHelm:function SignPetition:function SitOrStand:function SortAuctionItems:function SortGuildRoster:function SortWho:function SpellCanTargetUnit:function SpellIsTargeting:function SpellStopCasting:function SpellStopTargeting:function SpellTargetUnit:function SplitContainerItem:function StablePet:function StartAuction:function StartDuel:function StartDuelUnit:function StopCinematic:function StopMusic:function StrafeLeftStart:function StrafeLeftStop:function StrafeRightStart:function StrafeRightStop:function Stuck:function SubmitNumbers:function SwapRaidSubgroup:function TakeInboxItem:function TakeInboxMoney:function TakeInboxTextItem:function TakeTaxiNode:function TargetByName:function TargetLastEnemy:function TargetLastTarget:function TargetNearestEnemy:function TargetNearestFriend:function TargetNearestPartyMember:function TargetNearestRaidMember:function TargetUnit:function TaxiGetDestX:function TaxiGetDestY:function TaxiGetSrcX:function TaxiGetSrcY:function TaxiNodeCost:function TaxiNodeGetType:function TaxiNodeName:function TaxiNodePosition:function TaxiNodeSetCurrent:function ToggleAutoRun:function ToggleCollision:function ToggleCollisionDisplay:function ToggleMouseMove:function TogglePVP:function TogglePerformanceDisplay:function TogglePerformanceValues:function TogglePetAutocast:function TogglePlayerBounds:function TogglePortals:function ToggleRun:function ToggleSheath:function ToggleSpellAutocast:function ToggleTris:function TurnInGuildCharter:function TurnLeftStart:function TurnLeftStop:function TurnOrActionStart:function TurnOrActionStop:function TurnRightStart:function TurnRightStop:function TutorialsEnabled:function UninviteByName:function UninviteFromParty:function UninviteFromRaid:function UnitAffectingCombat:function UnitArmor:function UnitAttackBothHands:function UnitAttackPower:function UnitAttackSpeed:function UnitBuff:function UnitCanAssist:function UnitCanAttack:function UnitCanCooperate:function UnitCharacterPoints:function UnitClass:function UnitClassification:function UnitCreatureFamily:function UnitCreatureType:function UnitDamage:function UnitDebuff:function UnitDefense:function UnitExists:function UnitFactionGroup:function UnitHasRelicSlot:function UnitHealth:function UnitHealthMax:function UnitInParty:function UnitInRaid:function UnitIsCharmed:function UnitIsCivilian:function UnitIsConnected:function UnitIsCorpse:function UnitIsDead:function UnitIsDeadOrGhost:function UnitIsEnemy:function UnitIsFriend:function UnitIsGhost:function UnitIsPVP:function UnitIsPVPFreeForAll:function UnitIsPartyLeader:function UnitIsPlayer:function UnitIsPlusMob:function UnitIsTapped:function UnitIsTappedByPlayer:function UnitIsTrivial:function UnitIsUnit:function UnitIsVisible:function UnitLevel:function UnitMana:function UnitManaMax:function UnitName:function UnitOnTaxi:function UnitPVPName:function UnitPVPRank:function UnitPlayerControlled:function UnitPlayerOrPetInParty:function UnitPlayerOrPetInRaid:function UnitPowerType:function UnitRace:function UnitRangedAttack:function UnitRangedAttackPower:function UnitRangedDamage:function UnitReaction:function UnitResistance:function UnitSex:function UnitStat:function UnitXP:function UnitXPMax:function UnstablePet:function UpdateGMTicket:function UpdateInventoryAlertStatus:function UpdateMapHighlight:function UpdateSpells:function UpdateWorldMapArrowFrames:function UseAction:function UseContainerItem:function UseInventoryItem:function UseSoulstone:function __framescript_meta:table __pow:function abs:function acos:function asin:function assert:function atan2:function atan:function bit:table ceil:function collectgarbage:function cos:function date:function debugbreak:function debugdump:function debuginfo:function debugload:function debugprint:function debugprofilestart:function debugprofilestop:function debugstack:function debugtimestamp:function deg:function error:function exp:function floor:function foreach:function foreachi:function format:function frexp:function gcinfo:function geterrorhandler:function getfenv:function getglobal:function getmetatable:function getn:function gsub:function ipairs:function ldexp:function loadstring:function log10:function log:function math:table max:function min:function mod:function next:function pairs:function pcall:function rad:function random:function randomseed:function rawequal:function rawget:function rawset:function seterrorhandler:function setfenv:function setglobal:function setmetatable:function sin:function sort:function sqrt:function strbyte:function strchar:function strfind:function string:table strlen:function strlower:function strrep:function strsub:function strupper:function table:table tan:function time:function tinsert:function tonumber:function tostring:function tremove:function type:function unpack:function xpcall:function
++pairs_globals	1182: PickupTradeMoney TaxiNodeSetCurrent GetTrainerServiceTypeFilter SetTrainerServiceTypeFilter UnitRace UnitClass CancelLogout CursorHasItem EnableAddOn Screenshot ClickAuctionSellItemButton debugbreak SetAimTurn GetBlockChance SetSendMailMoney GetSendMailMoney GetCurrentMapZone GetCraftNumReagents SelectGossipActiveQuest IsAddOnLoadOnDemand RegisterCVar LoggingChat GetContainerItemCooldown PickupMacro RandomRoll GetMinigameType ClearTarget FollowUnit CheckSpiritHealerDist GetPVPLastWeekStats ClickSendMailItemButton UnitXPMax TargetNearestFriend GetActionText AcceptResurrect UnitCharacterPoints AddTradeMoney UnitPlayerOrPetInRaid GetChatWindowInfo CloseLottery collectgarbage UnitDebuff SetGroundRingOnUnit CloseItemText GetMoney ClearInspectPlayer CheckPetUntrainerDist PlayGroundOrb GetZonePVPInfo GetTradeTargetItemInfo GetLootSlotInfo DisableAddOn ConfirmBinder GetCVarDefault GetNumBankSlots GetGuildInfoText GetQuestLogRewardSpell SaveView PickupBagFromSlot TogglePerformanceDisplay gcinfo GetAuctionHouseDepositRate IsSpellPassive MoveViewOutStop GuildControlSetRankFlag LoadBindings PickupInventoryItem EditMacro UnitDamage UnitInParty PickupAction GetBattlefieldInstanceExpiration ChannelBan GuildSetLeaderByName GuildControlDelRank ChannelMute strchar PitchUpStop CanJoinBattlefieldAsGroup SetWorldMist GetBagName SelectQuestLogEntry BankButtonIDToInvSlotID ShowBuybackSellCursor ConfirmSummon ldexp PlaceAuctionBid deg SpellStopCasting PetAttack AddChatWindowChannel ToggleRun GetQuestLogLeaderBoard CanSendAuctionQuery GuildSetMOTD BOOKTYPE_SPELL exp IsShiftKeyDown sort CanSignPetition GetInboxHeaderInfo PlayGroundBurst ItemTextGetCreator SetChannelOwner GetAimPoint ExpandTrainerSkillLine GetTargetTradeMoney ResetView ShowBattlefieldList CanViewOfficerNote tostring GetRefreshRates GetTalentPrereqs MoveViewDownStart DeclineQuest RequestBattlefieldScoreData SetBinding GuildRosterSetPublicNote MoveViewInStart GetJackpotAmount ShowingHelm FlagTutorial GetAddOnDependencies TurnLeftStop UpdateGMTicket GetBinding NotWhileDeadError GetPVPLifetimeStats CameraZoomOut ResetChatColors GetSelectedFriend ShakeCamera IsLinuxClient GuildControlAddRank UnitFactionGroup SetChatWindowLocked HideNameplates SetSelectedFriend GetMeetingStoneStatusText GetCraftDescription UnitIsPVPFreeForAll GetTradeSkillNumMade UnitRangedAttack GetGossipAvailableQuests table CameraKick HasInspectHonorData ClearTelegraph GetSelectedStablePet GetBattlefieldInstanceRunTime SetCameraUnitCollision ipairs GetRaidTargetIndex PI IsRaidLeader GetNumTalents GetQuestLogSelection CanEditOfficerNote GetTrainerServiceStepIncrease ActionProbe CheckInbox DelIgnore GuildLeave GetChatTypeIndex SetScreenResolution UnitIsUnit SpellCanTargetUnit GetGMTicketCategories UseSoulstone MoveBackwardStop GetMouseFocus GetCraftSkillLine PetRename CreateWorldMapArrowFrame RemoveQuestWatch GetSpellTabInfo ActionKit RestartGx GetResSicknessDuration GetCurrentBindingSet SetWorldDetail GuildRoster GetQuestItemInfo SetActionMouse GetLootThreshold GetMoneyPrizes ClickTargetTradeButton GetComboPoints TakeInboxTextItem ActionMoveKeys SetCameraShoulder StopUnitAnimation GetBattlefieldStatData GetAddOnMetadata MakeMinigameMove ResetTutorials unpack GetDamageBonusStat DeleteFile ChannelKick GetAvailableLevel GuildControlGetRankFlags GetGMTicket LeaveParty AddFriend GetTradeSkillLine GetPetTrainingPoints StrafeRightStop IsResting CanShowResetInstances GetWorldDetail GetNumTradeSkills GetAuctionItemClasses ResurrectHasSickness AddChatWindowMessages PlaySound AcceptDuel SendAddonMessage UnitArmor IsMouselooking strbyte IsAutoRepeatAction GetGameTime DeclineGuild InviteByName SetBagPortaitTexture GetTabardCreationCost SplitContainerItem GetBattlefieldFlagPosition ToggleMouseMove GetRaidRosterSelection PickupPlayerMoney GetActionAim GetTrainerServiceAbilityReq QuestLogPushQuest UnitIsDeadOrGhost GetInventoryItemCooldown GetAvailableTitle GetTradeSkillIcon SetSendMailCOD CastShapeshiftForm GetSpellCooldown LoggingCombat GetPlayerMapPosition CheckTalentMasterDist CastSpell PetFollow GetMerchantItemLink UnitAttackSpeed SelectAvailableQuest BuyRandomPicks UnitPlayerControlled UnitStat debugload UnitCanAttack SetLockOn SetMissileLook SitOrStand ShowNameplates UnitIsCorpse SetGuildRecruitmentMode GetRealmName MoveViewInStop log SetWhoToUI AssistUnit MoveViewDownStop GetScreenResolutions GetPetLoyalty ContainerIDToInventoryID getfenv IsTrainerServiceTradeSkill CloseMerchant GetBattlefieldInstanceInfo PitchDownStop TurnRightStop seterrorhandler CheckReadyCheckTime GetMapOverlayInfo foreach AppendToFile SetConsoleKey GetTradePlayerItemInfo TaxiNodePosition ClearTutorials GetSavedInstanceInfo AttackTarget JoinChannelByName TurnOrActionStart GetLanguageByIndex GMSurveyQuestion GetInboxInvoiceInfo GetTradeTargetItemLink __pow __framescript_meta GetChatWindowChannels GetCoinIcon GetProgressText RemoveChatWindowChannel CursorHasMoney GetActionBarToggles rawequal PlayMusic GetSpellTexture FlipCameraYaw ToggleCollision GetBuildInfo RequestRaidInfo geterrorhandler UnitName GetFirstTradeSkill DoEmote BindEnchant ResetPerformanceValues IsEquippedAction GetRealZoneText setfenv UnitIsPartyLeader GetSpellAutocast GetWorldLocMapPosition ConfirmTalentWipe GetGossipActiveQuests JoinBattlefield CloseGuildRoster CameraOrSelectOrMoveStop GetSendMailPrice frexp CanMerchantRepair pairs DropCursorMoney FactionToggleAtWar AddOrDelIgnore ExpandTradeSkillSubClass EnumerateServerChannels GetParryChance GetCraftButtonToken EquipPendingItem MoveViewUpStop DeleteInboxItem UnitIsPlusMob GetInspectPVPRankProgress PlayUnitFlurry GetGuildRosterInfo GetLootRollItemInfo log10 GetBattlefieldStatInfo TutorialsEnabled GetFriendInfo GetNextStableSlotCost GetBillingTimeRested TaxiGetDestX tinsert GetNumMacroIcons string ReactUnit GetSkillLineInfo PrevView ClearUnitSprite InRepairMode TogglePVP GetLFGResults UnitCanAssist LFGQuery ShowInspectCursor strlower GetTalentInfo GetNumLFGResults SetTelegraph SetTrainerSkillLineFilter PromoteToAssistant SetTerrainMip ClearWorldFog time GetTerrainMip SetPortraitTexture SetTradeMoney ChannelUnban DisplayChannelOwner LootSlotIsItem UnitExists GetNumRaidMembers GetPastDrawResult GetWeaponEnchantInfo TaxiNodeCost UninviteFromRaid MoveViewLeftStart OpeningCinematic SignPetition ConsoleExec CanGuildRemove DeleteCursorItem GetNumLaguages GetPVPYesterdayStats ItemTextGetPage FrameXML_Debug GetMacroInfo PositionMiniWorldMapArrowFrame GetCorpseRecoveryDelay GetPVPRankProgress HasFullControl
++global_surface	AbandonQuest:function AbandonSkill:function AcceptAreaSpiritHeal:function AcceptBattlefieldPort:function AcceptDuel:function AcceptGroup:function AcceptGuild:function AcceptQuest:function AcceptResurrect:function AcceptSkillUps:function AcceptTrade:function AcceptXPLoss:function ActionDash:function ActionHasRange:function ActionKit:function ActionMoveKeys:function ActionProbe:function AddChatWindowChannel:function AddChatWindowMessages:function AddFriend:function AddIgnore:function AddOrDelIgnore:function AddQuestWatch:function AddSkillUp:function AddTradeMoney:function AppendToFile:function AssistByName:function AssistUnit:function AttackTarget:function AutoEquipCursorItem:function BOOKTYPE_PET:string BOOKTYPE_SPELL:string BankButtonIDToInvSlotID:function BeginTrade:function BindEnchant:function BuyGuildCharter:function BuyMerchantItem:function BuyRandomPicks:function BuySkillTier:function BuyStableSlot:function BuyTrainerService:function BuybackItem:function CalculateAuctionDeposit:function CameraKick:function CameraOrSelectOrMoveStart:function CameraOrSelectOrMoveStop:function CameraZoomIn:function CameraZoomOut:function CanEditGuildInfo:function CanEditMOTD:function CanEditOfficerNote:function CanEditPublicNote:function CanGuildDemote:function CanGuildInvite:function CanGuildPromote:function CanGuildRemove:function CanInspect:function CanJoinBattlefieldAsGroup:function CanMerchantRepair:function CanSendAuctionQuery:function CanShowResetInstances:function CanSignPetition:function CanViewOfficerNote:function CancelAreaSpiritHeal:function CancelAuction:function CancelDuel:function CancelLogout:function CancelMeetingStoneRequest:function CancelPendingEquip:function CancelPlayerBuff:function CancelSkillUps:function CancelTrackingBuff:function CancelTrade:function CancelTradeAccept:function CastPetAction:function CastShapeshiftForm:function CastSpell:function CastSpellByName:function ChangeActionBarPage:function ChangeChatColor:function ChannelBan:function ChannelInvite:function ChannelKick:function ChannelModerate:function ChannelModerator:function ChannelMute:function ChannelToggleAnnouncements:function ChannelUnban:function ChannelUnmoderator:function ChannelUnmute:function CheckBinderDist:function CheckInbox:function CheckInteractDistance:function CheckPetUntrainerDist:function CheckReadyCheckTime:function CheckSpiritHealerDist:function CheckTalentMasterDist:function ClearCursor:function ClearGroundMarker:function ClearGroundRing:function ClearInspectPlayer:function ClearSendMail:function ClearTarget:function ClearTelegraph:function ClearTutorials:function ClearUnitRope:function ClearUnitSprite:function ClearWorldFog:function ClearWorldMist:function ClickAuctionSellItemButton:function ClickSendMailItemButton:function ClickStablePet:function ClickTargetTradeButton:function ClickTradeButton:function CloseAuctionHouse:function CloseBankFrame:function CloseBattlefield:function CloseCraft:function CloseGossip:function CloseGuildRegistrar:function CloseGuildRoster:function CloseItemText:function CloseLoot:function CloseLottery:function CloseMail:function CloseMerchant:function ClosePetStables:function ClosePetition:function CloseQuest:function CloseTabardCreation:function CloseTaxiMap:function CloseTrade:function CloseTradeSkill:function CloseTrainer:function CollapseCraftSkillLine:function CollapseFactionHeader:function CollapseQuestHeader:function CollapseSkillHeader:function CollapseTradeSkillSubClass:function CollapseTrainerSkillLine:function CompleteQuest:function ConfirmAcceptQuest:function ConfirmBindOnUse:function ConfirmBinder:function ConfirmLootRoll:function ConfirmPetUnlearn:function ConfirmReadyCheck:function ConfirmSummon:function ConfirmTalentWipe:function ConsoleExec:function ContainerIDToInventoryID:function ConvertToRaid:function CreateFont:function CreateFrame:function CreateMacro:function CreateMiniWorldMapArrowFrame:function CreateWorldMapArrowFrame:function CursorCanGoInSlot:function CursorHasItem:function CursorHasMoney:function CursorHasSpell:function DeclineGroup:function DeclineGuild:function DeclineQuest:function DeclineResurrect:function DelIgnore:function DeleteCursorItem:function DeleteFile:function DeleteGMTicket:function DeleteInboxItem:function DeleteMacro:function DemoteAssistant:function DisableAddOn:function DisableAllAddOns:function DisplayChannelOwner:function DoCraft:function DoEmote:function DoReadyCheck:function DoTradeSkill:function DropCursorMoney:function DropItemOnUnit:function EditMacro:function EnableAddOn:function EnableAllAddOns:function EnumerateFrames:function EnumerateServerChannels:function EquipCursorItem:function EquipPendingItem:function ExpandCraftSkillLine:function ExpandFactionHeader:function ExpandQuestHeader:function ExpandSkillHeader:function ExpandTradeSkillSubClass:function ExpandTrainerSkillLine:function FactionToggleAtWar:function FlagTutorial:function FlipCameraYaw:function FollowByName:function FollowUnit:function ForceLogout:function ForceQuit:function FrameXML_Debug:function GMRequestPlayerInfo:function GMSurveyAnswerSubmit:function GMSurveyCommentSubmit:function GMSurveyQuestion:function GMSurveySubmit:function GetAbandonQuestItems:function GetAbandonQuestName:function GetActionAim:function GetActionAutocast:function GetActionBarToggles:function GetActionCooldown:function GetActionCount:function GetActionText:function GetActionTexture:function GetActiveLevel:function GetActiveTitle:function GetAddOnDependencies:function GetAddOnInfo:function GetAddOnMetadata:function GetAdjustedSkillPoints:function GetAimPoint:function GetAreaSpiritHealerTime:function GetAuctionHouseDepositRate:function GetAuctionInvTypes:function GetAuctionItemClasses:function GetAuctionItemInfo:function GetAuctionItemLink:function GetAuctionItemSubClasses:function GetAuctionItemTimeLeft:function GetAuctionSellItemInfo:function GetAvailableLevel:function GetAvailableTitle:function GetBagName:function GetBankSlotCost:function GetBaseMip:function GetBattlefieldEstimatedWaitTime:function GetBattlefieldFlagPosition:function GetBattlefieldInfo:function GetBattlefieldInstanceExpiration:function GetBattlefieldInstanceInfo:function GetBattlefieldInstanceRunTime:function GetBattlefieldMapIconScale:function GetBattlefieldPortExpiration:function GetBattlefieldPosition:function GetBattlefieldScore:function GetBattlefieldStatData:function GetBattlefieldStatInfo:function GetBattlefieldStatus:function GetBattlefieldTimeWaited:function GetBattlefieldWinner:function GetBidderAuctionItems:function GetBillingTimeRested:function GetBindLocation:function GetBinding:function GetBindingAction:function GetBindingKey:function GetBlockChance:function GetBonusBarOffset:function GetBuildInfo:function GetBuybackItemInfo:function GetCVar:function GetCVarDefault:function GetChannelList:function GetChannelName:function GetChatTypeIndex:function GetChatWindowChannels:function GetChatWindowInfo:function GetChatWindowMessages:function GetCoinIcon:function GetComboPoints:function GetContainerItemCooldown:function GetContainerItemInfo:function GetContainerItemLink:function GetContainerNumSlots:function GetCorpseMapPosition:function GetCorpseRecoveryDelay:function GetCraftButtonToken:function GetCraftDescription:function GetCraftDisplaySkillLine:function GetCraftIcon:function GetCraftInfo:function GetCraftItemLink:function GetCraftName:function GetCraftNumReagents:function GetCraftReagentInfo:function GetCraftReagentItemLink:function GetCraftSelectionIndex:function GetCraftSkillLine:function GetCraftSpellFocus:function GetCurrentBindingSet:function GetCurrentMapContinent:function GetCurrentMapZone:function GetCurrentMultisampleFormat:function GetCurrentResolution:function GetCursorMoney:function GetCursorPosition:function GetDamageBonusStat:function GetDebugStats:function GetDefaultLanguage:function GetDodgeChance:function GetDoodadAnim:function GetFactionInfo:function GetFarclip:function GetFirstTradeSkill:function GetFramerate:function GetFriendInfo:function GetGMStatus:function GetGMTicket:function GetGMTicketCategories:function GetGameTime:function GetGamma:function GetGossipActiveQuests:function GetGossipAvailableQuests:function GetGossipOptions:function GetGossipText:function GetGreetingText:function GetGuildCharterCost:function GetGuildInfo:function GetGuildInfoText:function GetGuildRecruitmentMode:function GetGuildRosterInfo:function GetGuildRosterLastOnline:function GetGuildRosterMOTD:function GetGuildRosterSelection:function GetGuildRosterShowOffline:function GetIgnoreName:function GetInboxHeaderInfo:function GetInboxInvoiceInfo:function GetInboxItem:function GetInboxNumItems:function GetInboxText:function GetInspectHonorData:function GetInspectPVPRankProgress:function GetInstanceBootTimeRemaining:function GetInventoryAlertStatus:function GetInventoryItemBroken:function GetInventoryItemCooldown:function GetInventoryItemCount:function GetInventoryItemLink:function GetInventoryItemQuality:function GetInventoryItemTexture:function GetInventorySlotInfo:function GetItemInfo:function GetItemQualityColor:function GetJackpotAmount:function GetLFGResults:function GetLFGTypeEntries:function GetLFGTypes:function GetLanguageByIndex:function GetLastLotteryNumbers:function GetLocale:function GetLookingForGroup:function GetLootMethod:function GetLootRollItemInfo:function GetLootRollItemLink:function GetLootRollTimeLeft:function GetLootSlotInfo:function GetLootSlotLink:function GetLootThreshold:function GetLotteryPrizeInfo:function GetMacroIconInfo:function GetMacroIndexByName:function GetMacroInfo:function GetMapContinents:function GetMapInfo:function GetMapLandmarkInfo:function GetMapOverlayInfo:function GetMapZones:function GetMasterLootCandidate:function GetMeetingStoneStatusText:function GetMerchantItemInfo:function GetMerchantItemLink:function GetMerchantItemMaxStack:function GetMerchantNumItems:function GetMinigameState:function GetMinigameType:function GetMinimapZoneText:function GetMoney:function GetMoneyPrizes:function GetMouseFocus:function GetMultisampleFormats:function GetNetStats:function GetNextDrawTime:function GetNextStableSlotCost:function GetNumActiveQuests:function GetNumAddOns:function GetNumAuctionItems:function GetNumAvailableQuests:function GetNumBankSlots:function GetNumBattlefieldFlagPositions:function GetNumBattlefieldPositions:function GetNumBattlefieldScores:function GetNumBattlefieldStats:function GetNumBattlefields:function GetNumBindings:function GetNumBuybackItems:function GetNumCrafts:function GetNumFactions:function GetNumFrames:function GetNumFriends:function GetNumGuildMembers:function GetNumIgnores:function GetNumLFGResults:function GetNumLaguages:function GetNumLootItems:function GetNumLotteryPrizes:function GetNumMacroIcons:function GetNumMacros:function GetNumMapLandmarks:function GetNumMapOverlays:function GetNumPackages:function GetNumPartyMembers:function GetNumPastDrawResults:function GetNumPetitionNames:function GetNumQuestChoices:function GetNumQuestItems:function GetNumQuestLeaderBoards:function GetNumQuestLogChoices:function GetNumQuestLogEntries:function GetNumQuestLogRewards:function GetNumQuestRewards:function GetNumQuestWatches:function GetNumRaidMembers:function GetNumRoutes:function GetNumSavedInstances:function GetNumShapeshiftForms:function GetNumSkillLines:function GetNumSpellTabs:function GetNumStablePets:function GetNumStableSlots:function GetNumStationeries:function GetNumTalentTabs:function GetNumTalents:function GetNumTradeSkills:function GetNumTrainerServices:function GetNumWhoResults:function GetNumWorldStateUI:function GetObjectiveText:function GetOwnerAuctionItems:function GetPVPLastWeekStats:function GetPVPLifetimeStats:function GetPVPRankInfo:function GetPVPRankProgress:function GetPVPSessionStats:function GetPVPThisWeekStats:function GetPVPYesterdayStats:function GetPackageInfo:function GetParryChance:function GetPartyLeaderIndex:function GetPartyMember:function GetPastDrawResult:function GetPetActionCooldown:function GetPetActionInfo:function GetPetActionsUsable:function GetPetExperience:function GetPetFoodTypes:function GetPetHappiness:function GetPetIcon:function GetPetLoyalty:function GetPetTimeRemaining:function GetPetTrainingPoints:function GetPetitionInfo:function GetPetitionNameInfo:function GetPlayerBuff:function GetPlayerBuffApplications:function GetPlayerBuffDispelType:function GetPlayerBuffTexture:function GetPlayerBuffTimeLeft:function GetPlayerMapPosition:function GetPlayerTradeMoney:function GetProgressText:function GetQuestBackgroundMaterial:function GetQuestGreenRange:function GetQuestIndexForTimer:function GetQuestIndexForWatch:function GetQuestItemInfo:function GetQuestItemLink:function GetQuestLogChoiceInfo:function GetQuestLogItemLink:function GetQuestLogLeaderBoard:function GetQuestLogPushable:function GetQuestLogQuestText:function GetQuestLogRequiredMoney:function GetQuestLogRewardInfo:function GetQuestLogRewardMoney:function GetQuestLogRewardSpell:function GetQuestLogSelection:function GetQuestLogTimeLeft:function GetQuestLogTitle:function GetQuestMoneyToGet:function GetQuestReward:function GetQuestText:function GetQuestTimers:function GetRaidRosterInfo:function GetRaidRosterSelection:function GetRaidTargetIndex:function GetRealZoneText:function GetRealmName:function GetRefreshRates:function GetReleaseTimeRemaining:function GetRepairAllCost:function GetResSicknessDuration:function GetRestState:function GetReticlePoint:function GetRewardMoney:function GetRewardSpell:function GetRewardText:function GetSavedInstanceInfo:function GetScreenHeight:function GetScreenResolutions:function GetScreenWidth:function GetSelectedAuctionItem:function GetSelectedBattlefield:function GetSelectedFaction:function GetSelectedFriend:function GetSelectedIgnore:function GetSelectedSkill:function GetSelectedStablePet:function GetSelectedStationeryTexture:function GetSendMailCOD:function GetSendMailItem:function GetSendMailMoney:function GetSendMailPrice:function GetShapeshiftFormCooldown:function GetShapeshiftFormInfo:function GetSkillLineInfo:function GetSpellAutocast:function GetSpellCooldown:function GetSpellName:function GetSpellTabInfo:function GetSpellTexture:function GetStablePetFoodTypes:function GetStablePetInfo:function GetStationeryInfo:function GetSubZoneText:function GetSummonConfirmAreaName:function GetSummonConfirmSummoner:function GetSummonConfirmTimeLeft:function GetTabardCreationCost:function GetTabardInfo:function GetTalentInfo:function GetTalentPrereqs:function GetTalentTabInfo:function GetTargetTradeMoney:function GetTerrainMip:function GetTexLodBias:function GetTime:function GetTimeToWellRested:function GetTitleText:function GetTrackingTexture:function GetTradePlayerItemInfo:function GetTradePlayerItemLink:function GetTradeSkillCooldown:function GetTradeSkillIcon:function GetTradeSkillInfo:function GetTradeSkillInvSlotFilter:function GetTradeSkillInvSlots:function GetTradeSkillItemLink:function GetTradeSkillItemStats:function GetTradeSkillLine:function GetTradeSkillNumMade:function GetTradeSkillNumReagents:function GetTradeSkillReagentInfo:function GetTradeSkillReagentItemLink:function GetTradeSkillSelectionIndex:function GetTradeSkillSubClassFilter:function GetTradeSkillSubClasses:function GetTradeSkillTools:function GetTradeTargetItemInfo:function GetTradeTargetItemLink:function GetTradeskillRepeatCount:function GetTrainerGreetingText:function GetTrainerSelectionIndex:function GetTrainerServiceAbilityReq:function GetTrainerServiceCost:function GetTrainerServiceDescription:function GetTrainerServiceIcon:function GetTrainerServiceInfo:function GetTrainerServiceLevelReq:function GetTrainerServiceNumAbilityReq:function GetTrainerServiceSkillLine:function GetTrainerServiceSkillReq:function GetTrainerServiceStepIncrease:function GetTrainerServiceStepReq:function GetTrainerServiceTypeFilter:function GetTrainerSkillLineFilter:function GetTrainerSkillLines:function GetVideoCaps:function GetWatchedFactionInfo:function GetWaterDetail:function GetWeaponEnchantInfo:function GetWhoInfo:function GetWorldDetail:function GetWorldLocMapPosition:function GetWorldStateUIInfo:function GetXPExhaustion:function GetZonePVPInfo:function GetZoneText:function GiveMasterLoot:function GuildControlAddRank:function GuildControlDelRank:function GuildControlGetNumRanks:function GuildControlGetRankFlags:function GuildControlGetRankName:function GuildControlSaveRank:function GuildControlSetRank:function GuildControlSetRankFlag:function GuildDemoteByName:function GuildDisband:function GuildInfo:function GuildInviteByName:function GuildLeave:function GuildPromoteByName:function GuildRoster:function GuildRosterSetOfficerNote:function GuildRosterSetPublicNote:function GuildSetLeaderByName:function GuildSetMOTD:function GuildUninviteByName:function HasAction:function HasActionCombat:function HasFullControl:function HasInspectHonorData:function HasKey:function HasNewMail:function HasPetSpells:function HasPetUI:function HasSoulstone:function HasWandEquipped:function HideFriendNameplates:function HideNameplates:function HideRepairCursor:function HitStop:function InCinematic:function InRepairMode:function InboxItemCanDelete:function InitiateTrade:function InviteByName:function InviteToParty:function IsActionInRange:function IsAddOnLoadOnDemand:function IsAddOnLoaded:function IsAltKeyDown:function IsAttackAction:function IsAuctionSortReversed:function IsAutoRepeatAction:function IsConsumableAction:function IsControlKeyDown:function IsCurrentAction:function IsCurrentCast:function IsCurrentQuestFailed:function IsEquippedAction:function IsFactionInactive:function IsFishingLoot:function IsGuildLeader:function IsInGuild:function IsInInstance:function IsInMeetingStoneQueue:function IsInventoryItemLocked:function IsLinuxClient:function IsMacClient:function IsMouselooking:function IsPartyLeader:function IsPetAttackActive:function IsQuestCompletable:function IsQuestWatched:function IsRaidLeader:function IsRaidOfficer:function IsResting:function IsShiftKeyDown:function IsSpellPassive:function IsTalentTrainer:function IsTradeskillTrainer:function IsTrainerServiceLearnSpell:function IsTrainerServiceSkillStep:function IsTrainerServiceTradeSkill:function IsUnitOnQuest:function IsUsableAction:function IsVendorActive:function IsWindowsClient:function ItemTextGetCreator:function ItemTextGetItem:function ItemTextGetMaterial:function ItemTextGetPage:function ItemTextGetText:function ItemTextHasNextPage:function ItemTextNextPage:function ItemTextPrevPage:function JoinBattlefield:function JoinChannelByName:function Jump:function KeyRingButtonIDToInvSlotID:function LFGQuery:function LearnTalent:function LeaveBattlefield:function LeaveChannelByName:function LeaveParty:function ListChannelByName:function ListChannels:function LoadAddOn:function LoadBindings:function LoggingChat:function LoggingCombat:function Logout:function LootSlot:function LootSlotIsCoin:function LootSlotIsItem:function MakeMinigameMove:function MouselookStart:function MouselookStop:function MoveBackwardStart:function MoveBackwardStop:function MoveForwardStart:function MoveForwardStop:function MoveViewDownStart:function MoveViewDownStop:function MoveViewInStart:function MoveViewInStop:function MoveViewLeftStart:function MoveViewLeftStop:function MoveViewOutStart:function MoveViewOutStop:function MoveViewRightStart:function MoveViewRightStop:function MoveViewUpStart:function MoveViewUpStop:function NewGMTicket:function NextView:function NoPlayTime:function NotWhileDeadError:function NotifyInspect:function NumTaxiNodes:function OfferPetition:function OffhandHasWeapon:function OpenTrainer:function OpeningCinematic:function PI:number PartialPlayTime:function PetAbandon:function PetAggressiveMode:function PetAttack:function PetCanBeAbandoned:function PetCanBeRenamed:function PetDefensiveMode:function PetDismiss:function PetFollow:function PetHasActionBar:function PetPassiveMode:function PetRename:function PetStopAttack:function PetWait:function PickupAction:function PickupBagFromSlot:function PickupContainerItem:function PickupInventoryItem:function PickupMacro:function PickupMerchantItem:function PickupPetAction:function PickupPlayerMoney:function PickupSpell:function PickupStablePet:function PickupTradeMoney:function PitchDownStart:function PitchDownStop:function PitchUpStart:function PitchUpStop:function PlaceAction:function PlaceAuctionBid:function PlayGroundBurst:function PlayGroundOrb:function PlayMusic:function PlaySound:function PlaySoundFile:function PlayUnitAnimation:function PlayUnitFlurry:function PlayUnitVocal:function PlayerHasSpells:function PositionMiniWorldMapArrowFrame:function PositionWorldMapArrowFrame:function PreloadAnimationSource:function PrevView:function ProcessMapClick:function PromoteByName:function PromoteToAssistant:function PromoteToPartyLeader:function PurchaseSlot:function PutItemInBackpack:function PutItemInBag:function QueryAuctionItems:function QuestChooseRewardError:function QuestLogPushQuest:function Quit:function RandomRoll:function ReactUnit:function ReadFile:function RegisterCVar:function RegisterForSave:function ReloadUI:function RemoveChatWindowChannel:function RemoveChatWindowMessages:function RemoveFriend:function RemoveQuestWatch:function RemoveSkillUp:function RenamePetition:function RepairAllItems:function ReplaceEnchant:function ReplaceTradeEnchant:function RepopMe:function RequestBattlefieldPositions:function RequestBattlefieldScoreData:function RequestInspectHonorData:function RequestRaidInfo:function RequestTimePlayed:function ResetChatColors:function ResetCursor:function ResetDisabledAddOns:function ResetInstances:function ResetPerformanceValues:function ResetTutorials:function ResetView:function RestartGx:function RestoreVideoDefaults:function ResurrectHasSickness:function ResurrectHasTimer:function RetrieveCorpse:function ReturnInboxItem:function RollOnLoot:function RollUnit:function RunBinding:function RunScript:function SaveBindings:function SaveView:function Screenshot:function SelectActiveQuest:function SelectAvailableQuest:function SelectCraft:function SelectGossipActiveQuest:function SelectGossipAvailableQuest:function SelectGossipOption:function SelectPackage:function SelectQuestLogEntry:function SelectStationery:function SelectTradeSkill:function SelectTrainerService:function SendAddonMessage:function SendChatMessage:function SendMail:function SendWho:function SetAbandonQuest:function SetActionBarToggles:function SetActionMouse:function SetAimCamera:function SetAimMarker:function SetAimTurn:function SetBagPortaitTexture:function SetBaseMip:function SetBattlefieldScoreFaction:function SetBinding:function SetCVar:function SetCameraShoulder:function SetCameraUnitCollision:function SetChannelOwner:function SetChannelPassword:function SetChatWindowAlpha:function SetChatWindowColor:function SetChatWindowDocked:function SetChatWindowLocked:function SetChatWindowName:function SetChatWindowShown:function SetChatWindowSize:function SetConsoleKey:function SetCursor:function SetDoodadAnim:function SetEffectTint:function SetEuropeanNumbers:function SetFactionActive:function SetFactionInactive:function SetFarclip:function SetGamma:function SetGroundMarker:function SetGroundRing:function SetGroundRingOnUnit:function SetGuildInfoText:function SetGuildRecruitmentMode:function SetGuildRosterSelection:function SetGuildRosterShowOffline:function SetInventoryPortaitTexture:function SetLayoutMode:function SetLockOn:function SetLookingForGroup:function SetLootMethod:function SetLootPortrait:function SetLootThreshold:function SetMapToCurrentZone:function SetMapZoom:function SetMissileLook:function SetMultisampleFormat:function SetPetStablePaperdoll:function SetPortraitTexture:function SetPortraitToTexture:function SetRaidRosterSelection:function SetRaidSubgroup:function SetRaidTarget:function SetScreenResolution:function SetSelectedAuctionItem:function SetSelectedBattlefield:function SetSelectedFaction:function SetSelectedFriend:function SetSelectedIgnore:function SetSelectedSkill:function SetSendMailCOD:function SetSendMailMoney:function SetSpellAttach:function SetTaxiMap:function SetTelegraph:function SetTelegraphAt:function SetTerrainMip:function SetTexLodBias:function SetTradeMoney:function SetTradeSkillInvSlotFilter:function SetTradeSkillSubClassFilter:function SetTrainerServiceTypeFilter:function SetTrainerSkillLineFilter:function SetUnitMissileOrigin:function SetUnitRope:function SetUnitSprite:function SetUnitWeaponGlow:function SetView:function SetWatchedFactionIndex:function SetWaterDetail:function SetWhoToUI:function SetWorldDetail:function SetWorldFog:function SetWorldMist:function SetupFullscreenScale:function ShakeCamera:function ShowBattlefieldList:function ShowBuybackSellCursor:function ShowCloak:function ShowContainerSellCursor:function ShowFriendNameplates:function ShowFriends:function ShowHelm:function ShowInspectCursor:function ShowInventorySellCursor:function ShowMerchantSellCursor:function ShowMiniWorldMapArrowFrame:function ShowNameplates:function ShowRepairCursor:function ShowWorldMapArrowFrame:function ShowingCloak:function ShowingHelm:function SignPetition:function SitOrStand:function SortAuctionItems:function SortGuildRoster:function SortWho:function SpellCanTargetUnit:function SpellIsTargeting:function SpellStopCasting:function SpellStopTargeting:function SpellTargetUnit:function SplitContainerItem:function StablePet:function StartAuction:function StartDuel:function StartDuelUnit:function StopCinematic:function StopGroundOrb:function StopMusic:function StopUnitAnimation:function StrafeLeftStart:function StrafeLeftStop:function StrafeRightStart:function StrafeRightStop:function Stuck:function SubmitNumbers:function SwapRaidSubgroup:function TakeActionMarkers:function TakeInboxItem:function TakeInboxMoney:function TakeInboxTextItem:function TakeTaxiNode:function TargetByName:function TargetLastEnemy:function TargetLastTarget:function TargetNearestEnemy:function TargetNearestFriend:function TargetNearestPartyMember:function TargetNearestRaidMember:function TargetUnit:function TaxiGetDestX:function TaxiGetDestY:function TaxiGetSrcX:function TaxiGetSrcY:function TaxiNodeCost:function TaxiNodeGetType:function TaxiNodeName:function TaxiNodePosition:function TaxiNodeSetCurrent:function ToggleAutoRun:function ToggleCollision:function ToggleCollisionDisplay:function ToggleMouseMove:function TogglePVP:function TogglePerformanceDisplay:function TogglePerformanceValues:function TogglePetAutocast:function TogglePlayerBounds:function TogglePortals:function ToggleRun:function ToggleSheath:function ToggleSpellAutocast:function ToggleTris:function TurnInGuildCharter:function TurnLeftStart:function TurnLeftStop:function TurnOrActionStart:function TurnOrActionStop:function TurnRightStart:function TurnRightStop:function TutorialsEnabled:function UninviteByName:function UninviteFromParty:function UninviteFromRaid:function UnitAffectingCombat:function UnitArmor:function UnitAttackBothHands:function UnitAttackPower:function UnitAttackSpeed:function UnitBuff:function UnitCanAssist:function UnitCanAttack:function UnitCanCooperate:function UnitCharacterPoints:function UnitClass:function UnitClassification:function UnitCreatureFamily:function UnitCreatureType:function UnitDamage:function UnitDebuff:function UnitDefense:function UnitExists:function UnitFactionGroup:function UnitHasRelicSlot:function UnitHealth:function UnitHealthMax:function UnitInParty:function UnitInRaid:function UnitIsCharmed:function UnitIsCivilian:function UnitIsConnected:function UnitIsCorpse:function UnitIsDead:function UnitIsDeadOrGhost:function UnitIsEnemy:function UnitIsFriend:function UnitIsGhost:function UnitIsPVP:function UnitIsPVPFreeForAll:function UnitIsPartyLeader:function UnitIsPlayer:function UnitIsPlusMob:function UnitIsTapped:function UnitIsTappedByPlayer:function UnitIsTrivial:function UnitIsUnit:function UnitIsVisible:function UnitLevel:function UnitMana:function UnitManaMax:function UnitName:function UnitOnTaxi:function UnitPVPName:function UnitPVPRank:function UnitPlayerControlled:function UnitPlayerOrPetInParty:function UnitPlayerOrPetInRaid:function UnitPowerType:function UnitRace:function UnitRangedAttack:function UnitRangedAttackPower:function UnitRangedDamage:function UnitReaction:function UnitResistance:function UnitSex:function UnitStat:function UnitXP:function UnitXPMax:function UnstablePet:function UpdateGMTicket:function UpdateInventoryAlertStatus:function UpdateMapHighlight:function UpdateSpells:function UpdateWorldMapArrowFrames:function UseAction:function UseContainerItem:function UseInventoryItem:function UseSoulstone:function __framescript_meta:table __pow:function abs:function acos:function asin:function assert:function atan2:function atan:function bit:table ceil:function collectgarbage:function cos:function date:function debugbreak:function debugdump:function debuginfo:function debugload:function debugprint:function debugprofilestart:function debugprofilestop:function debugstack:function debugtimestamp:function deg:function error:function exp:function floor:function foreach:function foreachi:function format:function frexp:function gcinfo:function geterrorhandler:function getfenv:function getglobal:function getmetatable:function getn:function gsub:function ipairs:function ldexp:function loadstring:function log10:function log:function math:table max:function min:function mod:function next:function pairs:function pcall:function rad:function random:function randomseed:function rawequal:function rawget:function rawset:function seterrorhandler:function setfenv:function setglobal:function setmetatable:function sin:function sort:function sqrt:function strbyte:function strchar:function strfind:function string:table strlen:function strlower:function strrep:function strsub:function strupper:function table:table tan:function time:function tinsert:function tonumber:function tostring:function tremove:function type:function unpack:function xpcall:function
+-- 
+2.56.0.windows.4
+
