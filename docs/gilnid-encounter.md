@@ -87,7 +87,9 @@ fallback when a ledge can't be placed are kept.
      hands go on (what was built before doesn't count, and a stance broken on the way doesn't
      shield him). No fire. The mark goes out, he shouts "No! You've jammed the valve!" and reels
      4 sec, open. Then "Then I'll break you myself!" and his finish. (As a hit ends Sneed's repair
-     for good.)
+     for good.) Anything else that takes his hands off it stops it the same way: a stun,
+     incapacitate, petrify or panic that takes on him. He is a boss, so only an effect marked
+     `vs_bosses` does; the rest he shrugs off and the valve runs its course.
    - **Only delay it**: a stagger while he runs costs him the time he reels, nothing more.
    - **Let it come and step aside**: both sides of the channel are dry, 0.33 sec at a run from
      its middle. After the fire he shouts "Then we'll melt the lot!".
@@ -182,7 +184,7 @@ the pit floor; the valve and the channel on his floor.
 
 ## Seen in the client
 
-The valve was filmed on Nov 14 with the scenarios `gilnid-valve-*` (`docs/visual-check.md`), from
+The valve was filmed on Nov 13 with the scenarios `gilnid-valve-*` (`docs/visual-check.md`), from
 above and on the hero's own screen, muted. What the footage shows:
 
 - **The quiet mark**: from his line on, a pale blue band from the pot's foot, its true size, with

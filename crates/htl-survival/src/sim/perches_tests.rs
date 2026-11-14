@@ -565,6 +565,36 @@ fn a_stagger_with_his_hands_on_the_valve_stops_it_for_good_and_leaves_him_open()
 }
 
 #[test]
+fn a_stun_that_takes_on_him_at_the_valve_stops_it_as_a_stagger_does_and_one_he_shrugs_off_does_not() {
+    // He is a boss: control without `vs_bosses` is shrugged off, and the valve runs its course.
+    let (mut s, hero, boss) = race();
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    tick(&mut s, 0.5);
+    assert!(!s.apply_cc(boss, hero, "stun", 2.0, 0.0, 0.0, "test"));
+    tick(&mut s, 0.1);
+    assert_eq!(stage(&s, boss), "working", "shrugged off: still at it");
+    assert!(until(&mut s, 3.0, |s| stage(s, boss) == "steam"), "the fire comes");
+    // One that works on bosses takes his hands off it: stopped for good, the same as a stagger.
+    let (mut s, hero, boss) = race();
+    assert!(until(&mut s, 4.0, |s| stage(s, boss) == "working"));
+    tick(&mut s, 0.5);
+    s.events.clear();
+    s.fx_vs_bosses = true;
+    assert!(s.apply_cc(boss, hero, "stun", 2.0, 0.0, 0.0, "test"));
+    s.fx_vs_bosses = false;
+    tick(&mut s, 0.1);
+    assert_eq!(stage(&s, boss), "open");
+    assert_eq!(marks(&s.events, MARK_OUT).len(), 1, "the mark goes out");
+    tick(&mut s, 0.8);
+    assert!(said(&s, LINE_STOPPED));
+    assert!(until(&mut s, VALVE_OPEN, |s| stage(s, boss) == "finished"));
+    tick(&mut s, 8.0);
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Sound { sound: 3431, .. })), "no whistle");
+    assert_eq!(marks(&s.events, MARK_FIRE).len(), 0, "no fire");
+    assert!(!said(&s, LINE_MELT));
+}
+
+#[test]
 fn one_heavy_blow_knocks_him_off_the_valve_whatever_it_deals_and_light_blows_take_longer() {
     // One heavy blow, begun as his hands go on it.
     let (mut s, hero, boss) = race();
