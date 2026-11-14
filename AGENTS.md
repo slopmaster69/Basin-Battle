@@ -91,7 +91,8 @@ Every pull request gets two automatic looks besides CI:
   settings file, zip, executable or secret in the branch, or two client patches with the same
   number; notes on the files flag an edited patch, an add-on line-format change without the
   add-on, and Lua the 1.12 client can't run. Run it yourself before you push.
-- **Claude review**, once the pull request is out of draft and after each push to it: comments on
+- **Claude review**, once when the pull request goes out of draft (to have it look again after
+  more pushes, mark the pull request draft and then ready): comments on
   bugs and on breaking other people's work, nothing else. It never approves or merges.
 
 Read the review comments and either fix what they point at or answer why it's fine, in a reply on
