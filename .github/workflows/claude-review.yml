@@ -1,5 +1,6 @@
-# Claude reads each pull request once it's ready for review (not while it's a draft), and again
-# after every push to it, and leaves comments: a summary on the pull request and notes on the
+# Claude reads each pull request once, when it's ready for review (not while it's a draft), and
+# again only if it's put back to draft and marked ready (pushes alone don't rerun it, to save
+# usage). It leaves comments: a summary on the pull request and notes on the
 # lines that need them. It never approves, merges or pushes; CI and the merge rules on main decide
 # what merges. Its comments are advice for the author, human or agent, to act on or answer.
 #
@@ -12,7 +13,7 @@ name: Claude review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review]
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -83,7 +84,7 @@ jobs:
                change touches what a test could cover and none was added, say so.
 
             Don't comment on style or taste the code already follows elsewhere, and don't repeat
-            what CI checks already report. If EVENT is "synchronize", earlier review comments
+            what CI checks already report. If earlier review comments
             are on the pull request (`gh pr view --comments`): review what changed since, and
             don't repeat a point already made unless it's still unaddressed.
 
