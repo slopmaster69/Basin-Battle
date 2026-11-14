@@ -213,6 +213,15 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
   foreground, then the other side, square to the side, behind, then the same higher up. Both
   hidden for more than 0.3 s cuts at once. Each cut is in `run.txt` with its time and reason
   (`camera: spectate: t=12.3 ...`).
+- **A crowded deck** (patch 0095): when every one of the shot's positions is hidden or in the
+  foreground (VanCleef's deck, with its cannons, masts and crew, hid the hero from all of them
+  and the camera held one shot for minutes, `no clearer position, holding`), a search that has
+  found nothing clearer for 2 s widens. It tries a ring round the fight (12 bearings, two
+  distances, two heights), scored like the shot's positions, and cuts to the best if it is clearly
+  better; failing that it rises over the cover, 7 yd above the point it looks at, to look down
+  past it. The `run.txt` line says which: `the shot's positions all hidden: ring position` or `up
+  over it`. It keeps that bearing, following the fight, until a cut to one of the shot's
+  positions. The ground, inside-the-world and clear-of-bodies rules hold for every one.
 - **A wall filling the picture** (patch 0092): of twenty lines across the picture, out to its
   edges and 85 hundredths of the way to the two, the world on six (three tenths: a cabin's
   corner, a beam, the rock of a bend; the floor under the two doesn't count) for a second is a
@@ -318,7 +327,7 @@ the tie-off at "Just... one... bolt..."):
 
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
 cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, 0093 for the
-longer hold, the cameraman hero (`setup` makes it), and a screen wide enough for both
+longer hold, 0095 for the widened search on a crowded deck, the cameraman hero (`setup` makes it), and a screen wide enough for both
 windows side by side: the cameraman's (`resolution`) and the hero's (`hero_resolution`) on the
 `monitor` screen. The run stops with an error rather than put one over the other.
 
