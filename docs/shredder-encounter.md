@@ -21,13 +21,23 @@ is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (t
 4. **Grind,** at full heat. It plants and stops turning, its legs churning in place (its Run,
    held 1.4 sec, the engine racing and smoking): "That'll cut it!" Then it drives 6 yd straight in
    0.9 sec, its legs running, chips and sparks off the floor every 0.2 sec. Its 3 yd lane checks
-   the swept path and hits each hero once; walls stop it. Step aside during the rev.
-5. **Stall,** 3.5 sec, facing the way it drove: its legs buckle and it slumps (JumpEnd's landing
-   crouch, caught 0.25 sec in with the body at half its height and tipped about 30°, and held
-   still), smoke pouring (a puff every 0.25 sec) and sparks flying (every 0.4 sec) the whole time,
-   the engine sputtering (its own clanks at uneven gaps). 0.45 sec before the end the engine
-   catches and it heaves itself up. Hits don't flinch it out of the slump.
-   "C'mon, you heap of junk!" A posture break may lengthen it, never shorten it.
+   the swept path and hits each hero once. Step aside during the rev. A wall, a pile or the
+   floor's edge stops it short: it keeps its pace, so it stops sooner, and that is a crash (below).
+5. **Stall,** 4.5 sec, facing the way it drove, with a start, a middle and an end.
+   - **The backfire,** the moment the drive ends: one bang (a mace on metal) over the machine's
+     own cry, a burst of smoke and sparks at once, and its legs buckle. It is in its slump inside
+     0.25 sec (JumpEnd's landing crouch, the body at half its height and tipped about 30°, held
+     still). "C'mon, you heap of junk!"
+   - **Open,** 3.5 sec: smoke pouring (a puff every 0.25 sec), sparks flying (every 0.4 sec), the
+     engine sputtering (its own clanks at uneven gaps). Hits don't flinch it out of the slump. A
+     posture break may lengthen the stall, never shorten it.
+   - **The catch,** the last 1 sec: the sputter turns to the engine's steady roar and the smoke
+     and sparks stop; 0.45 sec before the end it heaves itself up. It winds up as soon as it
+     stands and that blow lands 1.05 sec after, as before: 2.05 sec after the catch (it was 1.5
+     sec after the heave, the only warning).
+   - **Into a wall.** A drive stopped more than 0.2 yd short of its 6 yd is a crash: a heavy thud
+     and dust with the backfire, and the stall is 6 sec (1.5 longer, all of it open). A drive a
+     stagger or a stun stops is a plain stall.
 6. **Break.** "No, no, not now!" Its legs churn where it stands 0.7 sec, smoke and sparks pouring,
    then it careers back to its post out of control (its Run, smoke and sparks every 0.2 sec) and
    crashes into the log pile it was cutting: a bang, dust, lumber thrown. The run is no attack: it
@@ -77,10 +87,26 @@ add-on's optional floor marks).
   mark burns bright from the cut until it lands. A hero in the drop's middle who moves at the
   creak is out either side (1.6 yd).
 - **Under it.** A hero is knocked down 2 sec and takes no damage. Sneed is stunned 4 sec, open,
-  and a repair is over. The machine is thrown into its own stall (3.5 sec, the Grind's, not
-  retuned).
+  and a repair is over. The machine is thrown into its own stall (4.5 sec, the Grind's), with
+  its backfire. On a machine already stalled it is one stall, never two added together: it ends
+  at the later of its own end and 4.5 sec from the landing. So a stall with less than that left
+  starts over from the landing (smoking again if its engine had caught, its line not said twice)
+  and a crash's stall with more left is untouched.
 - **After.** The log lies broken in the drop as lumber nobody collides with: it walls nobody in,
   pins nobody and blocks no path. A lost fight or a lamp rest hangs it again.
+
+### The stall, by measure (`machinery_stall_tests.rs`; a warrior reacting 0.3 sec after the backfire)
+
+| What | Measure | So |
+| --- | --- | --- |
+| Blows in the stall as it was (3.5 sec, 0.45 of warning) | A stride off the lane: 7 light blows, or a heavy one and 4 light. One who ran the whole rev (9.8 yd off, 0.7 sec back): 4 light before the warning, or a heavy one and 2 light, the last landing as the warning began (3.05 sec) | Already enough for a prompt hero, with nothing to spare for a far one and no time to leave |
+| Blows in the stall now (4.5 sec, the last 1 the catch) | A stride off: 7 light before the catch, or a heavy one and 4 light. From 9.8 yd: 6 light, or a heavy one and 3 light | **4.5 sec**: the 3.5 sec to strike in kept whole, the catch added after it. Shorter than the 5 sec expected |
+| A crash | A stride off: 10 light blows before the catch, against 7 | 1.5 sec is worth 3 light blows |
+| Leaving at the catch | It stands 1 sec later and its blow lands 1.05 sec after that. A hero who turns at the catch is 10.2 yd off as it stands, 8.1 yd if 0.3 sec late; its blows reach 4.3 yd | Never hit |
+| A hero between it and a wall | Stepping aside in the rev: not hit. Staying: hit once. Either way 10 light blows in its crash | Nobody is pinned |
+| The fight to the break, one scripted warrior | Striking whenever in reach: 31.2, 31.3, 30.8 sec (it was 32.3, 29.6, 28.7). Striking only in stalls: 54.2, 52.4, 53.3 sec and 4 Grinds (it was 60.9, 60.9, 61.3 and 5) | No health retuned |
+| 2 heroes | Both strike in one stall (5 and 9 light blows before the catch) and both are clear at its blow | |
+| On the real floor (`shredder_rig.rs`) | A hero with their back to the room's end 8 ways out from the post, 2 Grinds each: 8 crashed (drove 0 to 4.8 yd), 8 drove the whole 6 yd. Each time the hero a stride off the lane was not hit, was in reach within 0.2 sec of the backfire and landed 8 to 11 light blows before the catch | A crashed machine is always where a hero can reach and strike it |
 
 ### The numbers, by measure (`shredder_rig.rs`, on the real Mast Room floor)
 
@@ -110,7 +136,7 @@ fight only.
 
 | Shared fix | Here |
 | --- | --- |
-| Punish windows look like idling | The stall's slump: JumpEnd caught with the legs buckled and held still (`freeze_open_pose`, the add-on's `FZ`), smoke, sparks and a sputter the whole 3.5 sec; Sneed's open 1.4 sec holds GoblinMale's StandWound (`hold_open_pose` 8). Neither is flinched out of by the hits that punish it |
+| Punish windows look like idling | The stall's slump: JumpEnd caught with the legs buckled and held still (`freeze_open_pose`, the add-on's `FZ`), a backfire, then smoke, sparks and a sputter until the engine catches 1 sec before the end; Sneed's open 1.4 sec holds GoblinMale's StandWound (`hold_open_pose` 8). Neither is flinched out of by the hits that punish it |
 | Debug damage counts as real | `machinery_debug`: debug damage builds no posture on either form and never stops the repair |
 | Second forms are instant swaps | Sneed hidden in the wreck until it has collapsed, then seen lying in its scrap and getting up 3 sec before his line; the rebuilt machine heaves up and waits 2 sec |
 | Deaths lag | Either form sends `HoldPose` 0 as it falls, letting go of a held slump, rev or hunch |
@@ -130,8 +156,9 @@ StandWound, Death ($DTH at 2.50 sec), Walkbackwards, Swim and the jumps. No stun
 and StandWound keeps the body at full height (measured on its bones: head and body never under
 0.95 of standing), so the stall is JumpEnd held at its landing crouch (0.18 to 0.34 sec in, the
 body at 0.49 to 0.55 of its height) and the heave is JumpEnd played through. Sounds: GoblinShredderAttack 1977 (saw),
-GoblinShredder 3700 (engine), GoblinShredderWoundCrit 1979 (stall), SteamGeyserVar1 4858 (vent
-hiss). Smoke is Vanish's puff (spell 1856), sparks the parry kit (555), dust 5649. Sneed's wrench
+GoblinShredder 3700 (engine: the rev, and the catch), GoblinShredderWoundCrit 1979 (stall),
+GoblinShredderWound 1978 (sputter), 971 (the backfire: a mace on metal), 921 (a crash's thud),
+SteamGeyserVar1 4858 (vent hiss). Smoke is Vanish's puff (spell 1856), sparks the parry kit (555), dust 5649. Sneed's wrench
 is spell 13398 (`Spells\Missile_Wrench.mdx`, speed 14) on GoblinMale's AttackThrown 107,
 drawn three times its size, tumbling end over end, with an orange streak behind it (its
 `[[missile_look]]` in `content/survival.toml`): the bare model was a speck at 16 yd.
@@ -159,12 +186,16 @@ dev-command demonstration (forced breaks, repeated heals): it shows the moves, n
 ## Tests
 
 `cargo test -p htl-survival machinery` covers each beat on flat ground: the move order and each
-move's look, the walk in and where it stops, the lane and the stall, the run back and the crash,
+move's look, the walk in and where it stops, the lane and the stall (its backfire, its length by
+blows landed, a crash into a wall, a hero between it and the wall, the catch and getting clear, a
+stall at 1 health, a break at any moment of a stall, 2 heroes, the log on a stalled machine, a
+fight lost in a stall), the run back and the crash,
 Sneed's crawl, the 2 sec lines, his footwork, the log (the cut, the creak, who it stuns, the
 marks, one use, a hero under it beside a live machine, hung again after a wipe or a lamp rest), the repair (his one work place, 4.2
 sec, what stops it and what doesn't, the heave, health kept, no second repair), wipes at every
 stage and debug damage. `shredder_rig` (ignored without `WOW_DATA`) runs it on the real Mast Room
 floor: where the wreck, his work place and the tie-off stand and that each is reached, the run
 back from every yard of the room, the race for the log from four stands, the stance break with
-the log spent, and the repair left alone:
+the log spent, the repair left alone, and the Grind driven at a hero with their back to the
+room's walls:
 `cargo test --release -j1 -p htl-server --test shredder_rig -- --ignored --nocapture --test-threads=1`.

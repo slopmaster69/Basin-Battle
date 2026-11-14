@@ -13,7 +13,24 @@ const DRIVER: &str = "dm_sneed";
 const GRIND: f32 = 0.9;
 const DISTANCE: f32 = 6.0;
 const HALF_WIDTH: f32 = 1.5;
-const STALL: f32 = 3.5;
+/// The stall is the fight's reward, and its length is set by measure (`machinery_stall_tests.rs`),
+/// not by feel. A warrior a stride off the lane is in reach as it stops; one who ran from it the
+/// whole rev (9.8 yd off) walks back 0.7 s. Reacting 0.3 s after the backfire, that far hero
+/// lands a heavy blow and 2 light ones 3.05 s into the stall, or 4 light ones 2.55 s in. The
+/// engine catches `CATCH` before the end and that second is for getting clear, so 4.5 s: 3.5 s
+/// to strike in, as long as the whole stall used to be. (It was 3.5 s with 0.45 s of warning:
+/// the far hero's third blow landed as the warning began. 3.5 s with the 1 s catch inside it
+/// would put that blow in the catch.)
+const STALL: f32 = 4.5;
+/// Driven into a wall (a drive stopped more than `CRASH_SHORT` short of its 6 yd) the backfire
+/// is bigger and the stall this much longer: the one rule a hero can use, make it crash. Worth
+/// about 3 more light blows.
+const CRASH_STALL: f32 = 1.5;
+const CRASH_SHORT: f32 = 0.2;
+/// The stall ends on a count: this long before its end the engine catches (a steady roar, the
+/// smoke, sparks and sputter stop), and `SLUMP_RISE` before the end it heaves itself up. It was
+/// 0.45 s, the heave alone: no time to see it and get out of reach.
+const CATCH: f32 = 1.0;
 /// The repair is a race to the log's tie-off, sized on the Mast Room's floor (`shredder_rig.rs`):
 /// his hands are on the wreck 0.6 s after his line; a warrior on him is 4 yd from the stake and
 /// the log lands 2.0 s after they go for it (0.55 s of run, 0.45 s of swing, the creak and the
@@ -38,8 +55,8 @@ const WORK: u32 = 2575;
 /// GoblinShredder's own clips: Run (churning in place for the rev, then the drive) and JumpEnd
 /// (heaving up off the ground, rebuilt). The stall's slump is JumpEnd too: its landing crouch,
 /// caught `SLUMP_AT` in with the legs buckled (the body at half its height, tipped about 30
-/// degrees) and held still until the engine catches `SLUMP_RISE` before the stall's end and it
-/// heaves itself up. (StandWound, the slump before, kept the body at full height: the Nov 9
+/// degrees) and held still until it heaves itself up `SLUMP_RISE` before the stall's end (the
+/// engine caught `CATCH` before it). (StandWound, the slump before, kept the body at full height: the Nov 9
 /// filming read the stall as idling.)
 const RUN_CLIP: u16 = 5;
 const SLUMP_CLIP: u16 = 39;
@@ -53,6 +70,9 @@ const OPEN_CLIP: u16 = 8;
 const SAW_SOUND: u32 = 1977;
 const ENGINE_SOUND: u32 = 3700;
 const STALL_SOUND: u32 = 1979;
+/// The backfire as a stall begins: a mace on metal (Cookie's pot uses it), over the machine's own
+/// cry. Into a wall, the heavy thud of its crash at the log pile with it.
+const BACKFIRE_SOUND: u32 = 971;
 const HISS_SOUND: u32 = 4858;
 /// The stalled engine's sputter: the machine's own clanks (GoblinShredderWound), at uneven gaps.
 const SPUTTER_SOUND: u32 = 1978;
@@ -129,11 +149,15 @@ struct Grind {
     hit: BTreeSet<Id>,
     fx_at: f32,
     fx: u8,
+    /// A wall cuts this drive short: it ends in a crash.
+    crash: bool,
 }
 
 #[derive(Clone, Copy)]
 struct Stall {
     until: f32,
+    /// The engine catches at `until - CATCH`: no smoke, sparks or sputter from then.
+    caught: bool,
     smoke_at: f32,
     spark_at: f32,
     sputter_at: f32,
@@ -315,11 +339,16 @@ impl Survival {
             if name == "grind" {
                 let (pos, dir) = (m.pos, m.facing);
                 let to = self.slide_end(pos, dir, DISTANCE);
+                // A wall (a rail, an edge) in its way: it drives at the pace it always does and
+                // crashes there, sooner than 0.9 s. (It used to crawl the shorter way in the
+                // same 0.9 s and just stop.)
+                let way = dist2d(pos, to);
+                let crash = way < DISTANCE - CRASH_SHORT;
                 self.machinery.pressure.insert(id, 0);
                 self.machinery.steam_at.remove(&id);
-                self.machinery.grinds.insert(id, Grind { last: pos, facing: dir, until: now + GRIND, damage, hit: BTreeSet::new(), fx_at: now, fx: 0 });
+                self.machinery.grinds.insert(id, Grind { last: pos, facing: dir, until: now + GRIND * way / DISTANCE, damage, hit: BTreeSet::new(), fx_at: now, fx: 0, crash });
                 // Straight only: a grind never follows a navigation detour around its victim.
-                self.flee_to(id, to, dist2d(pos, to) / GRIND);
+                self.flee_to(id, to, DISTANCE / GRIND);
             } else {
                 let heat = self.machinery.pressure.entry(id).or_default();
                 *heat = (*heat + 1).min(2);
@@ -483,7 +512,15 @@ impl Survival {
         self.machinery.steam_at.retain(|id, _| keep.contains(id));
         let keep: Vec<Id> = self.mobs.keys().copied().filter(|id| fighting(self, id)).collect();
         self.machinery.rebuilt.retain(|id, _| keep.contains(id));
-        self.machinery.stalls.retain(|id, _| keep.contains(id));
+        // A fight lost in a stall: its smoke, sparks and sputter end here, and the held slump
+        // lets go with them.
+        let lost: Vec<Id> = self.machinery.stalls.keys().copied().filter(|id| !keep.contains(id)).collect();
+        for id in lost {
+            self.machinery.stalls.remove(&id);
+            if self.mobs.contains_key(&id) {
+                self.freeze_open_pose(id, 0.0, 0.0);
+            }
+        }
         self.machinery.approach.retain(|id, _| keep.contains(id));
         self.machinery.approached.retain(|id| keep.contains(id));
         let keep: Vec<Id> = self.mobs.keys().copied().filter(|id| alive(self, id)).collect();
@@ -540,7 +577,19 @@ impl Survival {
                     // A posture break during the opening may extend it, never shorten it.
                     m.state = MobState::Recover { foe, until: st.until.max(m.stagger_until) };
                     m.pattern = None;
-                    // Slumped, smoke pouring and sparks flying the whole stall, the engine
+                    // The count out: the engine catches, a steady roar, and what poured from it
+                    // stops. It heaves itself up `SLUMP_RISE` before the end (the held slump
+                    // lets go by itself).
+                    if !st.caught && now >= st.until - CATCH {
+                        st.caught = true;
+                        self.events.push(Event::Sound { id, sound: ENGINE_SOUND });
+                        self.shredder_note("the engine catches");
+                    }
+                    if st.caught {
+                        self.machinery.stalls.insert(id, st);
+                        return true;
+                    }
+                    // Slumped, smoke pouring and sparks flying until then, the engine
                     // sputtering.
                     if now >= st.smoke_at {
                         self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
@@ -589,7 +638,8 @@ impl Survival {
             }
             if stopped || now >= g.until {
                 self.halt(id);
-                self.stall_machine(id, g.last);
+                // (Stopped by a stun or a broken stance, it wasn't the wall that stopped it.)
+                self.stall_machine(id, g.last, g.crash && !stopped);
             } else {
                 self.machinery.grinds.insert(id, g);
             }
@@ -604,22 +654,38 @@ impl Survival {
     }
 
     /// The engine stalls (after a Grind, or under the fallen log): slumped and open for `STALL`,
-    /// smoke pouring. `from` is where the blow that stalled it came from (the way it drove).
-    fn stall_machine(&mut self, id: Id, from: Vec3) {
+    /// smoke pouring, `CRASH_STALL` longer if it `crash`ed into a wall. `from` is where the blow
+    /// that stalled it came from (the way it drove). It starts with a bang: the backfire, smoke
+    /// and sparks at once, and the slump `SLUMP_AT` in. Stalled already (the log on it,
+    /// `stall_under_log`), the one stall starts over and its line is not said twice.
+    fn stall_machine(&mut self, id: Id, from: Vec3, crash: bool) {
         let now = self.clock;
         let Some(foe) = self.mobs[&id].state.foe() else { return };
+        let secs = if crash { STALL + CRASH_STALL } else { STALL };
+        let again = self.machinery.stalls.remove(&id).is_some();
         let m = self.mobs.get_mut(&id).unwrap();
-        m.state = MobState::Recover { foe, until: now + STALL };
-        m.ready_at = now + STALL;
-        self.machinery.stalls.insert(id, Stall { until: now + STALL, smoke_at: now + STALL_SMOKE_EVERY, spark_at: now + 0.15, sputter_at: now + 0.4, sputters: 0 });
-        self.machinery_say(id, "C'mon, you heap of junk!");
+        m.state = MobState::Recover { foe, until: now + secs };
+        m.ready_at = now + secs;
+        self.machinery.stalls.insert(id, Stall { until: now + secs, caught: false, smoke_at: now + STALL_SMOKE_EVERY, spark_at: now + STALL_SPARK_EVERY, sputter_at: now + 0.4, sputters: 0 });
+        if again {
+            self.freeze_open_pose(id, 0.0, 0.0);
+        } else {
+            self.machinery_say(id, "C'mon, you heap of junk!");
+        }
+        self.shredder_note(&format!("{} {secs:.1} s", if crash { "the machine crashes and stalls" } else { "the machine stalls" }));
+        self.events.push(Event::Sound { id, sound: BACKFIRE_SOUND });
+        self.events.push(Event::Sound { id, sound: STALL_SOUND });
         self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
+        self.events.push(Event::Visual { id, kit: combat::KIT_PARRY, by: None });
+        if crash {
+            self.events.push(Event::Sound { id, sound: rig::THUD_SOUND });
+            self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+        }
         // Slumped where it stopped, facing the way it drove: its legs buckle and it's
         // held there, no flinch standing it up, until it heaves itself up at the end.
         self.events.push(Event::React { id, anim: SLUMP_CLIP, from, lean: 0.0, hold: 0.1, fit: 0.0 });
-        self.freeze_open_pose(id, SLUMP_AT, STALL - SLUMP_AT - SLUMP_RISE);
-        self.mobs.get_mut(&id).unwrap().posed_until = now + STALL;
-        self.events.push(Event::Sound { id, sound: STALL_SOUND });
+        self.freeze_open_pose(id, SLUMP_AT, secs - SLUMP_AT - SLUMP_RISE);
+        self.mobs.get_mut(&id).unwrap().posed_until = now + secs;
     }
 
     /// At its post between fights, it cuts at the log in front of it: a swing every few seconds
@@ -1077,3 +1143,7 @@ pub use rig::ShredderRig;
 #[cfg(test)]
 #[path = "machinery_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "machinery_stall_tests.rs"]
+mod stall_tests;

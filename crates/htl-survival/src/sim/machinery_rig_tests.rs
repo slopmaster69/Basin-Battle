@@ -674,3 +674,124 @@ fn a_blow_at_sneed_beside_the_tie_off_leaves_the_rope_whole_and_a_blow_at_the_st
     // Aimed at the stake it cuts, whether or not it also catches him.
     assert_ne!(blow_by_the_stake(false, true).0, "hung", "a blow at the stake cuts it, Sneed beside it or not");
 }
+
+/// The log dropped on a machine about `into` s into a stall (a crash's, or a plain one) under it:
+/// the fight, the machine, when its stall began, when that stall was to end, when the log landed,
+/// and every event from the stall's start to half a second after the landing.
+fn log_on_a_stall(crash: bool, into: f32) -> (Survival, Id, f32, f32, f32, Vec<(f32, Event)>) {
+    // How long the rope's cutting and the log's fall take.
+    let fall = {
+        let (mut s, band, _) = fight(1, 9);
+        run(&mut s, 3.0);
+        let t = s.clock;
+        cut(&mut s, band[0]);
+        landed(&mut s);
+        s.clock - t
+    };
+    let (mut s, band, machine) = fight(1, 9);
+    run(&mut s, 3.0);
+    let g = rig(&s);
+    let under = off(g.crash, g.across, g.len / 2.0);
+    s.machine_let_go(machine);
+    let m = s.mobs.get_mut(&machine).unwrap();
+    m.pos = under;
+    m.path.clear();
+    s.stall_machine(machine, under, crash);
+    let (t0, until) = (s.clock, s.machinery.stalls[&machine].until);
+    let mut ev = timed(&mut s, (into - fall).max(0.0));
+    ev.extend(cut(&mut s, band[0]));
+    ev.extend(landed(&mut s));
+    let at = s.clock;
+    ev.extend(timed(&mut s, 0.5));
+    (s, machine, t0, until, at, ev)
+}
+
+fn heard(ev: &[(f32, Event)], id: Id, which: u32) -> usize {
+    ev.iter().filter(|(_, e)| matches!(e, Event::Sound { id: who, sound } if *who == id && *sound == which)).count()
+}
+
+fn junk(ev: &[(f32, Event)], id: Id) -> usize {
+    ev.iter().filter(|(_, e)| matches!(e, Event::Yell { id: who, text } if *who == id && text.contains("heap of junk"))).count()
+}
+
+fn smoking(ev: &[(f32, Event)], id: Id) -> usize {
+    ev.iter().filter(|(_, e)| matches!(e, Event::Missile { caster, spell: SMOKE, .. } if *caster == id)).count()
+}
+
+/// The rule: the log on a stalled machine makes one stall, which ends at the later of its own
+/// end and a plain stall's length from the landing. Never the two added together, never its
+/// line twice.
+#[test]
+fn the_log_on_a_stalled_machine_is_one_stall_ending_at_the_later_end_never_two_added_together() {
+    let wound = |ev: &[(f32, Event)], id: Id| ev.iter().any(|(_, e)| matches!(e, Event::MobWindup { id: who, .. } if *who == id));
+
+    // Early in a plain stall: it starts over from the landing, which is the later end.
+    let (mut s, id, t0, until, at, mut ev) = log_on_a_stall(false, 0.0);
+    println!("the log lands {:.2} s into a plain stall", at - t0);
+    assert!(at - t0 < STALL - CATCH, "{}", at - t0);
+    let now = s.machinery.stalls[&id].until;
+    assert!((now - (at + STALL)).abs() <= DT + 1e-3, "it ends {:.2} s after the landing", now - at);
+    assert!(now > until && now < until + STALL - 0.5, "the later end, not the 2 added: {:.2} s in all", now - t0);
+    let rest = now - s.clock - 0.1;
+    ev.extend(timed(&mut s, rest));
+    assert_eq!((heard(&ev, id, BACKFIRE_SOUND), junk(&ev, id)), (2, 1), "a bang for each start, its line once");
+    assert_eq!(heard(&ev, id, ENGINE_SOUND), 1, "one catch, at the one stall's end");
+    assert!(!wound(&ev, id), "open the whole of it");
+    assert!(matches!(s.mobs[&id].state, MobState::Recover { until: end, .. } if (end - now).abs() < 1e-3));
+
+    // On a crashed machine with more than a plain stall left: the stall it is in is the later
+    // end, and nothing starts over.
+    let (mut s, id, t0, until, at, mut ev) = log_on_a_stall(true, 0.0);
+    println!("the log lands {:.2} s into a crash's stall", at - t0);
+    assert!(until - at >= STALL, "{}", until - at);
+    assert_eq!(s.machinery.stalls[&id].until, until);
+    let rest = until - s.clock - 0.1;
+    ev.extend(timed(&mut s, rest));
+    assert_eq!((heard(&ev, id, BACKFIRE_SOUND), junk(&ev, id)), (1, 1));
+    assert_eq!(heard(&ev, id, ENGINE_SOUND), 1);
+    assert!(!wound(&ev, id));
+
+    // Late in a crash's stall: a plain stall from the landing is the later end.
+    let (s, id, _, until, at, _) = log_on_a_stall(true, 3.0);
+    assert!(until - at < STALL);
+    let now = s.machinery.stalls[&id].until;
+    assert!((now - (at + STALL)).abs() <= DT + 1e-3 && now > until, "{:.2} s after the landing", now - at);
+
+    // As the engine catches: it stalls again, pouring again, and the count comes again at its end.
+    let (mut s, id, t0, until, at, mut ev) = log_on_a_stall(false, STALL - 0.5);
+    println!("the log lands {:.2} s into a plain stall, in its catch", at - t0);
+    assert!(at > until - CATCH && at < until, "{}", at - t0);
+    let now = s.machinery.stalls[&id].until;
+    assert!((now - (at + STALL)).abs() <= DT + 1e-3 && !s.machinery.stalls[&id].caught);
+    assert!(smoking(&timed(&mut s, 1.0), id) >= 3, "smoking again");
+    let rest = now - s.clock - 0.1;
+    ev.extend(timed(&mut s, rest));
+    assert_eq!((heard(&ev, id, ENGINE_SOUND), junk(&ev, id)), (2, 1), "caught, stalled again, caught again");
+    assert!(!wound(&ev, id));
+}
+
+#[test]
+fn a_fight_lost_in_a_stall_ends_its_smoke_and_its_sound_at_once() {
+    for (crash, at) in [(false, 1.0), (true, 2.0), (false, STALL - 0.5)] {
+        let (mut s, band, machine) = mortal(1, 30, 0);
+        run(&mut s, 0.5);
+        let p = s.mobs[&machine].pos;
+        s.machine_let_go(machine);
+        s.stall_machine(machine, p, crash);
+        let before = timed(&mut s, at);
+        assert!(smoking(&before, machine) >= 3 && heard(&before, machine, BACKFIRE_SOUND) == 1);
+        lost(&mut s, band[0], machine);
+        let mut ev = timed(&mut s, DT);
+        let after = timed(&mut s, 8.0);
+        assert!(s.machinery.stalls.is_empty(), "{at} s in");
+        assert_eq!(smoking(&after, machine), 0, "{at} s in: no smoke from the step after the loss");
+        for sound in [SPUTTER_SOUND, ENGINE_SOUND, BACKFIRE_SOUND, STALL_SOUND] {
+            assert_eq!(heard(&after, machine, sound), 0, "{at} s in: sound {sound}");
+        }
+        ev.extend(after);
+        assert!(!ev.iter().any(|(_, e)| matches!(e, Event::Log(t) if t.contains("engine catches"))), "{at} s in: no catch after the loss");
+        assert!(ev.iter().any(|(_, e)| matches!(e, Event::Freeze { id, secs, .. } if *id == machine && *secs == 0.0)), "{at} s in: the held slump lets go");
+        let machines: Vec<&Mob> = s.mobs.values().filter(|m| s.content.mobs[m.def].key == MACHINE).collect();
+        assert!(machines.len() == 1 && machines[0].health == machines[0].max_health && dist2d(machines[0].pos, rig(&s).home) < 1.0, "{at} s in: one whole machine at its post");
+    }
+}

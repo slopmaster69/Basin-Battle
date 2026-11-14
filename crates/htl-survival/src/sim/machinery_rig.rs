@@ -62,7 +62,7 @@ pub(super) const LOG_STUN: f32 = 4.0;
 const LUMBER: u32 = 1108;
 const PLANK: u32 = 6481;
 const WOOD_SOUND: u32 = 3720;
-const THUD_SOUND: u32 = 921;
+pub(super) const THUD_SOUND: u32 = 921;
 const CREAK_SOUND: u32 = 3360;
 /// A spell's dust laid at a spot (the falling mine's).
 const DUST: u32 = 22792;
@@ -431,6 +431,22 @@ impl Survival {
         let m = self.mobs.get_mut(&id).unwrap();
         m.pattern = None;
         m.special = false;
+    }
+
+    /// The fallen log on a machine in the fight: one stall, never two added together. Stalled
+    /// already, the stall it is in runs on to its own end or to a plain stall's length from the
+    /// log's landing, whichever is later; only the later one starts it over (the bang, the
+    /// slump), and its line is not said twice.
+    fn stall_under_log(&mut self, id: Id, at: Vec3) {
+        let now = self.clock;
+        match self.machinery.stalls.get(&id).map(|st| st.until) {
+            Some(until) if until >= now + STALL => {}
+            Some(_) => self.stall_machine(id, at, false),
+            None => {
+                self.machine_let_go(id);
+                self.stall_machine(id, at, false);
+            }
+        }
     }
 
     fn start_runaway(&mut self, id: Id, by: Id) {
@@ -824,10 +840,10 @@ impl Survival {
             }
             self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
             if machine {
-                // Its engine stalls under it: the stall it has, nothing new.
+                // Its engine stalls under it: the stall it has, nothing new, and one stall
+                // however it was caught (`stall_under_log`).
                 if self.mobs[&id].state.foe().is_some() {
-                    self.machine_let_go(id);
-                    self.stall_machine(id, pos);
+                    self.stall_under_log(id, pos);
                 }
             } else {
                 // Sneed, flattened: he's open, and a repair in hand is over.

@@ -410,7 +410,7 @@ fn shredder_stall_holds_through_hits_and_lets_go_as_it_breaks() {
     let foe = Foe::Hero(h);
     let now = s.clock;
     s.mobs.get_mut(&id).unwrap().state = MobState::Recover { foe, until: now + STALL };
-    s.machinery.grinds.insert(id, Grind { last: s.mobs[&id].pos, facing: 0.0, until: now, damage: 0, hit: BTreeSet::new(), fx_at: now, fx: 0 });
+    s.machinery.grinds.insert(id, Grind { last: s.mobs[&id].pos, facing: 0.0, until: now, damage: 0, hit: BTreeSet::new(), fx_at: now, fx: 0, crash: false });
     let ev = run(&mut s, 0.1);
     assert!(ev.iter().any(|e| matches!(e, Event::Freeze { id: who, .. } if *who == id)));
     assert!(s.posed(id));
