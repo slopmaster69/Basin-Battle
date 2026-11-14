@@ -60,8 +60,6 @@ jobs:
       # The crates the patches touch (benilla-app is the one with the cameraman's tests).
       - name: Run the client's tests
         working-directory: benilla
-        env:
-          WOW_AMBIGUITY_DUMP: 1
         run: |
           set -o pipefail
           start=$(date +%s)
@@ -79,19 +77,6 @@ jobs:
             grep -E '^test .* \.\.\. FAILED' ../test.log | sed 's/^/    /' || echo "    none"
           } >> "$GITHUB_STEP_SUMMARY"
           exit $status
-
-      - name: TEMP dump
-        working-directory: benilla
-        env:
-          WOW_AMBIGUITY_DUMP: 1
-        run: |
-          cargo test -p benilla-app --lib the_schedules_have_no_more_undeclared -- --nocapture > ../dump.log 2>&1 || true
-
-      - name: Keep the dump
-        uses: actions/upload-artifact@v4
-        with:
-          name: dump
-          path: dump.log
 
       - name: Keep the log
         if: always()
