@@ -1,0 +1,44 @@
+# DEV SETUP, how Rhahk'Zor brings the mine down on the hero's own screen (no cameraman: the
+# video is the hero's client, the way a player sees it, and the slam's shake is felt here), not
+# a fight: `.es hurt` pulls him (14) and brings the collapse on (70%, at 18), `.es heal` keeps
+# the hero up. The same start as rhahk-slam, the hero standing still in his chamber; only the
+# view turns (`cam off`, turned by the scenario) to keep him in it. Times are the scenario's:
+#   18     his yell; he turns to the wall beside his post
+#   20     the blow: the screen shakes hard (10 in, 0.75 s: he is within 12 yd), dust off the
+#          wall, a ring on the floor under the hero, rock coming loose round him for 1.5 s
+#   21.3   the marked rock lands on the hero (24 damage; they are not thrown down)
+#   26.2   the first face stands across the tunnel's mouth (a smaller shake: within 14 yd)
+#   28     the end
+# What to look for: the shake on the blow's own frame and not before; whether it is too much
+# or too little beside a heavy blow's (8.5 in); the ring read in time to step out of.
+# The client keeps the view's tilt from its last run: put it back to the game's own second view.
+# Dev setup too: healed until the yell and after the marked rock, so his blows do not end the
+# film early.
+hero warrior
+cam off
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -45 -383 55.4 0.3
+12.6 lua ResetView(2) SetView(2)
+13 .es heal
+13.2 lua function VCTurn(want) local d = math.mod((want - GetActionAim()) * 57.29578 + 900, 360) - 180 if math.abs(d) > 2 then FlipCameraYaw(d) end end
+13.4 lua VCTurn(0.45)
+13.5 video
+14 .es hurt 0.97 rhahk
+17.5 lua VCTurn(0.45)
+18 .es hurt 0.69 rhahk
+18.2 shots yell 6 0.3
+19.9 shots blow 10 0.15
+24.5 shots wave 6 0.35
+15 .es heal
+16.5 .es heal
+17.8 .es heal
+22 .es heal
+23.5 .es heal
+25 .es heal
+26.5 .es heal
+28 end

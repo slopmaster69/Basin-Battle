@@ -512,7 +512,10 @@ pub(crate) const VERSION: u32 = 2;
 /// Gilnid's stuck spanner).
 /// 63: the `FZ` holds last their whole time (a timer set from inside a timer was dropped).
 /// 64: the add-on says `ac30`: the collapsed Deadmines' own doodads knocked over (patch 0091).
-pub(crate) const ADDON_NEWEST: u32 = 64;
+/// 65: `CU` beats for Rhahk'Zor's slam (`slam_near`, `slam_mid`, `slam_far`: the mine shaken for
+/// every hero in it, by how near him) and a section's face landing (`face_near`, `face_far`). An
+/// older add-on knows none of them and shows nothing for them.
+pub(crate) const ADDON_NEWEST: u32 = 65;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1880,14 +1883,16 @@ impl SurvivalGame {
                 _ => Err("Ring the alarm bell at the camp to call the raid.".into()),
             },
             // Trying a look on yourself, for tuning: `.es fx emote 54`, `.es fx spell 845`,
-            // `.es fx cast 75 1500` (a cast's start for that long), `.es fx stop 75`.
+            // `.es fx cast 75 1500` (a cast's start for that long), `.es fx stop 75`. And one of a
+            // model's own clips on the nearest foe of a name, for choosing a boss's moves by eye:
+            // `.es fx clip 58 rhahk` (its take after the name, if not its first).
             "fx" => {
                 let n = arg2.parse::<u32>().unwrap_or(0);
                 let third = words.next().unwrap_or("").to_lowercase();
                 let ms = third.parse::<u32>().ok().unwrap_or(1500);
                 // `.es fx aura <id> <name>`: on the nearest foe of that name, not the hero (a
                 // look sits differently on an ogre than on a hero).
-                let on = if arg == "aura" && !third.is_empty() {
+                let on = if (arg == "aura" || arg == "clip") && !third.is_empty() {
                     let at = self.sim.players.get(&me).map_or([0.0; 3], |p| p.pos);
                     let near = |m: &htl_survival::sim::Mob| (m.pos[0] - at[0]).hypot(m.pos[1] - at[1]);
                     self.sim
@@ -1899,7 +1904,11 @@ impl SurvivalGame {
                 } else {
                     Some(me)
                 };
-                if let Some(g) = on.and_then(|id| self.guid_of(id)) {
+                if let ("clip", Some(id)) = (arg.as_str(), on) {
+                    let take = words.next().and_then(|w| w.parse::<u32>().ok()).unwrap_or(0);
+                    let body = htl_survival::sim::ClipBody::Full;
+                    self.sim.events.push(htl_survival::sim::Event::Clip { id, clip: n as u16, take, from: None, secs: 1.5, at: 0.75, body });
+                } else if let Some(g) = on.and_then(|id| self.guid_of(id)) {
                     let p = match arg.as_str() {
                         "emote" => Some(packets::emote(g, n)),
                         "spell" => Some(packets::spell_go(g, n, packets::Aim::Caster, &[g], None)),
@@ -1923,7 +1932,7 @@ impl SurvivalGame {
                     };
                     match p {
                         Some(p) => self.broadcast(&p),
-                        None => self.say_to(conn, "Try .es fx emote <id>, spell <id>, cast <id> [ms], stop <id>, pose <id> or aura <id> [foe's name] (0 ends it)."),
+                        None => self.say_to(conn, "Try .es fx emote <id>, spell <id>, cast <id> [ms], stop <id>, pose <id>, aura <id> [foe's name] (0 ends it) or clip <id> [foe's name] [take]."),
                     }
                 }
                 Ok(())

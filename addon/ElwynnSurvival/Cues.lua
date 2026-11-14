@@ -43,6 +43,16 @@ ES.CUE = {
   -- them jolts the view. Shakes alone: no stop, nothing held, the hero runs on.
   rumble = { shake = { 1.4, 0.75 } },
   rockfall = { shake = { 4.5, 0.32 } },
+  -- Rhahk'Zor's slam (he drives his maul into a wall to bring the mine down): one blow, felt by
+  -- every hero in the mine by how near him they stand. Beside him it is past the hardest blow a
+  -- hero takes (8.5) and twice as long: the mine itself moves. A later section's pound where he
+  -- stands is the two smaller ones.
+  slam_near = { shake = { 10.0, 0.75 } },
+  slam_mid = { shake = { 6.0, 0.6 } },
+  slam_far = { shake = { 3.0, 0.5 } },
+  -- A section's face landing: more than one rock beside the hero, less than his slam.
+  face_near = { shake = { 5.5, 0.5 } },
+  face_far = { shake = { 2.5, 0.45 } },
   -- Valor given back, and every cooldown readied: on the HUD (below), not the camera.
   valor = { hud = "valor" },
   readied = { hud = "keys" },

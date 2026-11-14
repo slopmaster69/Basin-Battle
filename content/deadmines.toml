@@ -2093,9 +2093,11 @@ respawn = 0.0
 # boss, Corey Nov 8: "the final boss needs to feel like a final boss"). Three acts, all at the
 # mine's mouth:
 # 1. The front door: a broad sweep, an overhead that sticks a moment, a shoulder rush.
-# 2. At 70% he brings the mine down, from the buried front door inward: section after section,
-#    each left full of rubble behind a face of it, pushing the fight back toward the galleries
-#    (the collapse below). He can't be brought below 26% until the last section is down.
+# 2. At 70% he brings the mine down with his own body (he runs at a wall and drives his maul
+#    into it: the mine shakes and rock comes loose), from the buried front door inward: section
+#    after section, each left full of rubble behind a face of it, pushing the fight back toward
+#    the galleries (the collapse below). He can not be brought below 26% until the last
+#    section is down.
 # 3. The last stand, where the collapse stopped, short of the Galleries lamp: his maul catches
 #    fire and every heavy blow leaves burning iron; a slam brings the roof down over three spots
 #    (a dry way between); at the last the pound, and the maul lodges in the floor: the best
@@ -2153,9 +2155,25 @@ death_text = "...VanCleef... never pay..."
   at = 0.7
   speed = 0.95
   text = "Rhahk'Zor bring whole mine down on you!"
-  # No falls of his own at the yell (there were three in the tunnel behind him): the collapse's
-  # warning is a beat with nothing landing in it, only the line lit, dust from the roof and the
-  # shaking. The first rock down is the wave's.
+  # He brings it down with his own body, not a cast (Corey on the film of the yell, Nov 14: "He
+  # shouldn't be casting, but roaring or body slamming the wall, which should shake the screen
+  # and multiple more rocks should come down"). From the yell he runs to the frame of the front
+  # door if the fight is within 2.5 sec of it at his run (16 yd), else to the nearest wall, and
+  # drives his maul into it 2 sec after the yell: the moment the first wave starts at the door,
+  # so the collapse's own times are as they were. On that one frame every hero in the mine is
+  # shaken (hardest near him), dust bursts off the wall and rock comes loose over 1.5 sec: 3 off
+  # the wall, up to 9 round him and 4 at the door (fewer where heroes stand close: the bigger
+  # the rock, the wider it keeps of them), in three sizes, for show (no ring: they hurt
+  # nobody), and one marked on the floor under each hero within 30 yd, 1.3 sec before it lands
+  # (out of the ring, or struck for 0.6 of his blow; not thrown down). He can be hit all the
+  # while; no stagger, break or hold stops it. Each later section goes as he pounds the floor
+  # where he stands (a smaller shake, no rock of its own).
+    [mob.phase.slam]
+    secs = 2.0
+    # The ogre's overhead blow with the maul: 1.5 sec, landing 0.8 sec in.
+    clip = 58
+    swing = 0.8
+    recover = 0.7
     [mob.phase.collapse]
     # From the buried front door (its floor begins at x -6), down the tunnel, across the
     # foreman's chamber and up the corridor to where the galleries open: 94.6 yd as the land

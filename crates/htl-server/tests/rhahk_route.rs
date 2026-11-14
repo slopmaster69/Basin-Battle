@@ -27,6 +27,12 @@ fn real_land() -> DeadminesLand {
 /// The mine with Rhahk'Zor alone in it, a hero who fights him from the Galleries side (a few
 /// yards past his post along the collapse's route), and the collapse begun.
 fn begun(seed: u64) -> (Survival, Id, Id, f32) {
+    let (s, boss, hero, along, _) = begun_seen(seed);
+    (s, boss, hero, along)
+}
+
+/// As `begun`, with what the step of the yell showed.
+fn begun_seen(seed: u64) -> (Survival, Id, Id, f32, Vec<Event>) {
     let land = real_land();
     let mut c = content();
     let def = c.mob("dm_rhahkzor").unwrap();
@@ -40,13 +46,14 @@ fn begun(seed: u64) -> (Survival, Id, Id, f32) {
     s.move_player(hero, at, 0.0, Default::default());
     s.dev_hurt(hero, 0.68, "rhahkzor").unwrap();
     let mut began = false;
+    let mut seen = Vec::new();
     for _ in 0..100 {
-        let events = s.step(0.05);
-        began |= events.iter().any(|e| matches!(e, Event::Log(t) if t.contains("brings the place down")));
+        seen = s.step(0.05);
+        began |= seen.iter().any(|e| matches!(e, Event::Log(t) if t.contains("brings the place down")));
         if began { break; }
     }
     assert!(began, "the collapse begins");
-    (s, boss, hero, 36.0)
+    (s, boss, hero, 36.0, seen)
 }
 
 /// One tick of the fight: the hero walks the route (7 yd/s at most, never back) to three yards
@@ -442,7 +449,8 @@ fn a_hero_felled_at_the_first_face_wakes_to_the_mine_standing_again() {
     assert!(to[0] < -37.0 - 2.0 && dist2d(to, at) > 10.0, "thrown out ahead of the first face, not left behind it: {to:?}");
     assert!(when + 1.3 < fell);
     let m = &s.mobs[&boss];
-    assert!(dist2d(m.pos, home) < 1.0 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}", m.pos);
+    // (At rest there he wanders as any creature does, up to 4 yd from his post.)
+    assert!(dist2d(m.home, home) < 0.1 && dist2d(m.pos, home) < 4.5 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}, home {:?}", m.pos, m.home);
     assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, his fight to start over");
     assert!((1..=2).contains(&resets), "bounded wipe reset: {resets}");
     assert_eq!(s.players[&hero].health, s.players[&hero].max_health, "the hero whole at the lamp");
@@ -717,7 +725,8 @@ fn a_hero_felled_alone_at_the_last_stand_wakes_to_the_mine_standing_again() {
     }
     let (fell, woke) = (fell.expect("felled"), woke.expect("woken at the lamp"));
     let m = &s.mobs[&boss];
-    assert!(dist2d(m.pos, home) < 1.0 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}", m.pos);
+    // (At rest there he wanders as any creature does, up to 4 yd from his post.)
+    assert!(dist2d(m.home, home) < 0.1 && dist2d(m.pos, home) < 4.5 && (m.pos[2] - home[2]).abs() < 1.0, "back at his post: {:?}, home {:?}", m.pos, m.home);
     assert_eq!((m.health, m.phase), (m.max_health, 0), "whole, his fight to start over");
     assert!(s.auras_of(boss).is_empty(), "no look of the fight left on him: {:?}", s.auras_of(boss));
     assert_eq!(s.players[&hero].health, s.players[&hero].max_health, "the hero whole at the lamp");
@@ -771,4 +780,106 @@ fn a_hero_who_wakes_at_the_galleries_lamp_walks_up_to_a_friends_fight() {
     assert!(walks(&open, him), "and to Rhahk'Zor: {him:?}");
     assert!(!s.collapse_behind(at));
     println!("felled at {fell:.2} s, woke at the lamp at {woke:.2} s, {:.0} yd from the fight, the way open", dist2d(at, fight));
+}
+
+/// His slam on the real floor: from his post he finds a wall of the mine to strike (not the
+/// floor), gets to it on walkable ground, and the blow lands 2 s after the yell with rock coming
+/// loose and a rock marked under the hero beside him.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn he_slams_a_wall_of_the_real_mine_two_seconds_after_the_yell() {
+    for seed in [7, 11, 23] {
+        let (mut s, boss, hero, _, began) = begun_seen(seed);
+        let yell = s.clock;
+        let from = s.mobs[&boss].pos;
+        let goes = began.iter().find_map(|e| match e {
+            Event::Log(t) if t.contains("goes to slam") => Some(t.clone()),
+            _ => None,
+        });
+        let goes = goes.expect("he goes to slam something at the yell");
+        println!("seed {seed}: at ({:.1}, {:.1}, {:.1}): {goes}", from[0], from[1], from[2]);
+        assert!(goes.contains("a wall") || goes.contains("the door's frame"), "a wall in reach of his post: {goes}");
+        let mut blow = None;
+        let mut marks = 0;
+        let stood = s.players[&hero].pos;
+        while blow.is_none() && s.clock - yell < 4.0 {
+            let before = s.mobs[&boss].pos;
+            let events = s.step(0.05);
+            let at = s.mobs[&boss].pos;
+            assert!(s.land().footing(at).is_some(), "he keeps to the floor: {at:?}");
+            assert!(dist2d(before, at) <= 14.0 * 0.05 + 0.05, "no leap to the wall: {before:?} to {at:?}");
+            for e in &events {
+                match e {
+                    Event::Log(t) if t.contains(" slams ") => blow = Some(t.clone()),
+                    Event::Log(t) => assert!(!t.contains("put back") && !t.contains("fell through"), "{t}"),
+                    Event::GroundBurst { at, shape: "ring", secs, .. } if dist2d(*at, stood) < 0.5 && *secs >= 1.0 => marks += 1,
+                    _ => {}
+                }
+            }
+        }
+        let blow = blow.expect("the blow lands");
+        let took = s.clock - yell;
+        let at = s.mobs[&boss].pos;
+        println!("seed {seed}: {took:.2} s after the yell, {:.1} yd from where he yelled: {blow}", dist2d(from, at));
+        assert!((took - 2.0).abs() <= 0.11, "2 s after the yell: {took}");
+        assert!(blow.contains("slams a wall") || blow.contains("slams the door's frame"), "he reached it: {blow}");
+        assert!(!blow.contains(": 0 rocks") && !blow.contains(", 0 marked"), "rock for show, and one marked under the hero: {blow}");
+        assert_eq!(marks, 1, "one ring, under the hero, a second and more before its rock lands");
+        assert_eq!(s.collapse_state().map(|c| c.0), Some(0), "the first section, as before");
+        assert!(s.players[&hero].health > 0);
+    }
+}
+
+/// Fought at the buried front door, he slams the door's own frame: he is there on the real
+/// floor for the blow 2 s after the yell, and is out from under the first wave after it (the
+/// hero who stays is thrown clear, as the collapse's own rule has it).
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn fought_at_the_front_door_he_slams_its_frame_and_gets_out_from_under_the_wave() {
+    let land = real_land();
+    let mut c = content();
+    let def = c.mob("dm_rhahkzor").unwrap();
+    c.dungeon.as_mut().unwrap().packs.retain(|p| p.mob == "dm_rhahkzor");
+    let mut s = Survival::new_dungeon(c, Box::new(land), 7, 0.0);
+    let boss = *s.mobs.iter().find(|(_, m)| m.def == def).unwrap().0;
+    let hero = s.join("routeproof", "Routeproof", None);
+    let at = (0..12).find_map(|k| s.land().footing([-12.0, -375.5, 59.0 + k as f32 * 0.5])).expect("the tunnel's floor by the door");
+    s.move_player(hero, at, 0.0, Default::default());
+    s.dev_hurt(hero, 0.97, "rhahk").unwrap();
+    // He comes down the tunnel to the hero.
+    for _ in 0..200 {
+        s.step(0.05);
+        s.players.get_mut(&hero).unwrap().health = 200;
+        if dist2d(s.mobs[&boss].pos, at) < 6.0 {
+            break;
+        }
+    }
+    assert!(dist2d(s.mobs[&boss].pos, at) < 6.0, "he came to the hero at the door: {:?}", s.mobs[&boss].pos);
+    s.dev_hurt(hero, 0.69, "rhahk").unwrap();
+    let yell = s.clock;
+    let (mut goes, mut blow) = (None, None);
+    while s.clock - yell < 8.0 {
+        let events = s.step(0.05);
+        s.players.get_mut(&hero).unwrap().health = 200;
+        let pos = s.mobs[&boss].pos;
+        assert!(s.land().footing(pos).is_some(), "he keeps to the floor: {pos:?}");
+        for e in events {
+            match e {
+                Event::Log(t) if t.contains("goes to slam") => goes = Some(t),
+                Event::Log(t) if t.contains(" slams ") => blow = Some((s.clock - yell, t)),
+                _ => {}
+            }
+        }
+    }
+    let goes = goes.expect("he goes to slam something");
+    assert!(goes.contains("the door's frame"), "{goes}");
+    let (took, blow) = blow.expect("the blow lands");
+    println!("{goes}
+{took:.2} s after the yell: {blow}");
+    assert!((took - 2.0).abs() <= 0.11, "2 s after the yell: {took}");
+    assert!(blow.contains("slams the door's frame"), "he reached it: {blow}");
+    // 6 s after the blow the wave (5 yd a second from the door) is 30 yd in: he is ahead of it.
+    let pos = s.mobs[&boss].pos;
+    assert!(pos[0] < -30.0, "he is out from under the wave: {pos:?}");
+    assert!(s.mobs[&boss].health > 0 && s.players[&hero].health > 0);
 }

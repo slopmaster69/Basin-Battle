@@ -1,0 +1,26 @@
+# The ogre's own clips, one after another on a Rhahk'Zor put up to stand still in his own mine
+# (the real one and every other creature taken away first), for choosing by eye what he does at
+# his yell (`.es fx clip <clip> <foe's name>`). From the cameraman. In order, 3 sec apart from
+# 1 sec into the video: 58 (the two-handed overhead blow: the slam chosen), 59, 118, 95 (kick),
+# 55 (roar), 18, 54 (the stomp of his pound).
+hero warrior
+cam off
+camera duel Rhahk'Zor
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+11.5 .es clearfoes
+12 .es goto -62 -382 53.9 6.11
+12.6 .es target dm_rhahkzor 7 still
+13 .es heal
+14 video
+15 .es fx clip 58 rhahk
+18 .es fx clip 59 rhahk
+21 .es fx clip 118 rhahk
+24 .es fx clip 95 rhahk
+27 .es fx clip 55 rhahk
+30 .es fx clip 18 rhahk
+33 .es fx clip 54 rhahk
+36.5 end

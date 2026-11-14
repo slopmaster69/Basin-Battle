@@ -28,6 +28,19 @@
 //!   - Every other foe on the stretch runs for it as a surge begins, and is gone.
 //!   - A fight lost puts the place back: every rock and face gone, the boss whole at its post.
 //!     The boss dead, the faces stand until the dungeon resets.
+//! - **The slam** (`slam`): the phase begins on the boss's own body, not as a cast (Corey on the
+//!   film of Rhahk'Zor's yell, Nov 14: "He shouldn't be casting, but roaring or body slamming the
+//!   wall, which should shake the screen and multiple more rocks should come down"). From the
+//!   yell it runs to the frame of the collapse's first door if it can be there in time, else to
+//!   the nearest wall, swings (`clip`) and strikes it `secs` after the yell. On that one frame
+//!   the wall throws dust, every hero in the place is shaken (hardest near it) and rock comes
+//!   loose over `volley` seconds: small and middling rocks for show round it and at the door
+//!   (no ring, no blow: they hurt nobody), and one rock marked on the floor under each hero near
+//!   it, `DEBRIS_WARN` before it lands (step out, or be thrown down). It can be hit all the
+//!   while; no stagger, break or hold stops it. With `secs` the collapse's `warn`, the blow is
+//!   the moment the first wave starts: the collapse's own times are as they were. Each later
+//!   section goes as it pounds the floor where it stands (the same clip, a smaller shake, no
+//!   rock of its own), unless a blow of its own is winding up.
 //!
 //! Each danger shows before it lands (dust before rocks, the flames where they burn), with or
 //! without the floor markers.
@@ -47,7 +60,10 @@
 //!   and then (`BEAM_STEP`). What falls stays: the section is left full.
 //! - A face is built as the wave reaches the line: rocks side by side from wall to wall, layer
 //!   on layer to the roof. Each is solid from the moment it lands (a twin with its hull takes
-//!   its place: a piece that moves has none).
+//!   its place: a piece that moves has none). As its first layer lands the heroes near it are
+//!   shaken (`BEAT_FACE_NEAR`, `BEAT_FACE_FAR`): a section coming down has weight.
+//! - A loose rock doesn't stop dead where it strikes: it hops once, rolls on a little and comes
+//!   to rest (`settle`). A face's rocks don't: they stand where they land.
 //! - The 45% ring (`rocks_round`) brings a beam down over each of its falls, a ring of timbers
 //!   round the boss.
 //! - Everything that came down stays until the fight is lost or the dungeon resets: at most
@@ -59,7 +75,7 @@ use std::collections::VecDeque;
 
 use super::mobs::MobState;
 use super::*;
-use crate::content::BurnDef;
+use crate::content::{BurnDef, SlamDef};
 
 #[cfg(test)]
 #[path = "bosses_tests.rs"]
@@ -112,6 +128,9 @@ const WAVE_SLACK: f32 = 0.5;
 const BOSS_SLACK: f32 = 1.5;
 /// In a wave the boss walks out to this far past the section's line.
 const BOSS_CLEAR: f32 = 3.0;
+/// A later section's pound (a boss with a slam) is begun no nearer than this to the end the
+/// section's wave starts at: at the wave's speed, the time it has to walk out after.
+const POUND_AHEAD: f32 = 8.0;
 /// ...faster than the wave by this much at the least, whatever slows it (nothing holds it in
 /// its own falling mine).
 const BOSS_OUTRUN: f32 = 1.3;
@@ -186,10 +205,21 @@ const ROW_SCALES: [f32; 4] = [0.29, 0.34, 0.25, 0.38];
 const ROW_BOULDER: f32 = 0.3;
 pub(crate) const BEAM_SCALE: f32 = 0.3;
 /// Rock falls from this high over the floor (lower where a floor lies overhead, never under
-/// `DROP_LOW`), in the last `ROCK_SECS` before its blow lands.
+/// `DROP_LOW`), in the last `ROCK_SECS` before its blow lands (0.45 s read on film as a rock
+/// appearing on the floor: a 5 yd fall from rest takes about 0.7 s).
 const DROP_HIGH: f32 = 5.0;
 const DROP_LOW: f32 = 2.0;
-pub(crate) const ROCK_SECS: f32 = 0.45;
+pub(crate) const ROCK_SECS: f32 = 0.7;
+/// A loose rock that has struck the floor hops this high once and rolls on, at rest
+/// `SETTLE_SECS` later (a fall's rock, a row's on the floor, a row's on the pile).
+const SETTLE_SECS: f32 = 0.3;
+const HOP_FALL: f32 = 0.35;
+/// How far a settling rock rolls on from where it struck, for each yard of its hop, and how far
+/// it turns as it does (radians).
+const SETTLE_ROLL: f32 = 1.6;
+const SETTLE_TURN: f32 = 0.7;
+const HOP_ROW: f32 = 0.22;
+const HOP_PILE: f32 = 0.1;
 /// A beam shows cracked overhead `BEAM_HOLD`, then comes down over `BEAM_SECS`: its loose end
 /// swings to the floor (the first `BEAM_SWING` of it), then the rest crashes down flat.
 const BEAM_HOLD: f32 = 0.3;
@@ -206,7 +236,7 @@ const ROW_FIRST: f32 = 1.5;
 const ROW_SHORT: f32 = 4.5;
 const ROW_GAP: f32 = 4.5;
 const ROW_SIDE: usize = 9;
-const ROW_SECS: f32 = 0.6;
+const ROW_SECS: f32 = 0.8;
 /// A row is piled: further layers of rock on its first, each this far over the one below and
 /// landing this long after it, a layer for every `ROW_FILLS` of roof (at most `ROW_LAYERS`). The
 /// stretch behind the wave fills toward its roof as you watch.
@@ -214,8 +244,9 @@ pub(crate) const ROW_RISE: f32 = 2.3;
 const ROW_LAYER_SECS: f32 = 0.35;
 const ROW_FILLS: f32 = 3.0;
 pub(crate) const ROW_LAYERS: usize = 3;
-/// Seconds a row's rock is on its way down from the roof.
-const ROW_FALL_SECS: f32 = 0.6;
+/// Seconds a row's rock is on its way down from the roof (it lands as the wave reaches it, as
+/// before: it starts down sooner).
+const ROW_FALL_SECS: f32 = 0.8;
 pub(crate) const BEAM_STEP: f32 = 14.0;
 /// A face of rubble, of the broken rock (5.7 by 7.7 yd and 3.2 high at full size) sized by the
 /// roof (`FACE_ROOF` yards of roof to a rock of full size): its long side along the face, one
@@ -267,7 +298,7 @@ const FACE_DUST_EVERY: f32 = 0.9;
 /// The most loose pieces left lying (the oldest, farthest behind, goes first), and in the air
 /// at once (a face's rocks beside).
 pub(crate) const RUBBLE_MOST: usize = 400;
-const FALLING_MOST: usize = 96;
+const FALLING_MOST: usize = 160;
 /// `Plant Thornling`'s ground look (`DustCloud_Land.mdx`, Charge's dust, nothing but dust): the
 /// dust rolling ahead of the front, and thrown up where a piece lands. From an unseen stand-in on
 /// the spot (its own cast pose isn't anyone's). Not `Rocky Ground Impact` (26271): on film (take
@@ -291,6 +322,44 @@ pub(crate) const BEAT_ROCKFALL: &str = "rockfall";
 const RUMBLE_NEAR: f32 = 20.0;
 const SHAKE_NEAR: f32 = 6.0;
 const SHAKE_GAP: f32 = 0.3;
+/// A section's face landing shakes the heroes this near it (and less, this near): the wave has
+/// come all the way down.
+pub(crate) const BEAT_FACE_NEAR: &str = "face_near";
+pub(crate) const BEAT_FACE_FAR: &str = "face_far";
+const FACE_SHAKE_NEAR: f32 = 14.0;
+const FACE_SHAKE_FAR: f32 = 32.0;
+/// The slam's blow shakes every hero in the place, by how far from it they stand (the add-on's
+/// `Cues.lua`: the hardest is past the hardest blow a hero takes). A later section's pound is
+/// one size down.
+pub(crate) const BEAT_SLAM_NEAR: &str = "slam_near";
+pub(crate) const BEAT_SLAM_MID: &str = "slam_mid";
+pub(crate) const BEAT_SLAM_FAR: &str = "slam_far";
+const SLAM_NEAR: f32 = 12.0;
+const SLAM_MID: f32 = 35.0;
+/// (On open land, with no place round it: nobody farther than this is shaken.)
+const SLAM_FAR: f32 = 120.0;
+/// Running to its wall it goes no faster than this, and has arrived this near its spot; walls
+/// are looked for this many ways round it, a step of `SLAM_STEP` at a time; the first door's
+/// frame is looked for this far behind the route's start; a wall toward the door counts as this
+/// much nearer than one away from it; the wall is struck this high over its foot.
+const SLAM_RUN_MOST: f32 = 14.0;
+const SLAM_ARRIVE: f32 = 0.4;
+const SLAM_WAYS: usize = 16;
+const SLAM_STEP: f32 = 0.5;
+const SLAM_DOOR_LOOK: f32 = 8.0;
+const SLAM_DOOR_LEAN: f32 = 2.0;
+const SLAM_HIGH: f32 = 2.2;
+/// The rock it shakes loose, for show: the collapse's pale rock in three sizes (display, scale,
+/// its hop as it settles), about 1.2, 2 and 3 yd across. Each is `LOOSE_SECS` on its way down,
+/// lands no nearer a hero than `LOOSE_CLEAR` (as they stood at the blow; `LOOSE_WIDER` more for
+/// each size up) nor nearer the lit band than `LOOSE_BAND`, and none is marked: it has no blow.
+const LOOSE: [(u32, f32, f32); 3] = [(PALE, 0.07, 0.5), (PALE_TALL, 0.1, 0.32), (PALE, 0.16, 0.16)];
+const LOOSE_SECS: f32 = 0.75;
+const LOOSE_CLEAR: f32 = 3.0;
+const LOOSE_WIDER: f32 = 2.5;
+const LOOSE_BAND: f32 = 3.5;
+/// The marked rocks: one under each hero near it, at most this many.
+const SLAM_MARKED: usize = 5;
 /// The catch throws its hero clear through the air: at about this speed, in the air no less and
 /// no longer than this, and only where the floor between is open to within `THROW_MISS` of the
 /// landing (anywhere else they are set down there, as before). A throw shorter than
@@ -329,8 +398,38 @@ pub(crate) struct Bosses {
     fleeing: Vec<(Id, f32)>,
     /// Heroes a collapse's catch has thrown, in the air on their way clear.
     thrown: BTreeMap<Id, Thrown>,
+    /// Bosses that began a phase with their own body (`slam`), from the yell on.
+    slams: BTreeMap<Id, Slam>,
     /// What the falling mine looks like.
     pub(crate) looks: Looks,
+}
+
+/// A boss bringing its phase on with its own body (`[mob.phase.slam]`), or pounding the floor
+/// where it stands as a later section goes.
+#[derive(Debug, Clone)]
+struct Slam {
+    def: SlamDef,
+    /// The spot it strikes (on the wall, or the floor before it) and where it stands to do it.
+    wall: Vec3,
+    stand: Vec3,
+    what: Struck,
+    /// When its blow lands, and until when it is at nothing else.
+    strike_at: f32,
+    until: f32,
+    swung: bool,
+    struck: bool,
+    /// The yell's own: the whole place shakes and rock comes loose. A later section's pound
+    /// shakes less and brings nothing down of its own.
+    opening: bool,
+}
+
+/// What a slam strikes: the frame of the collapse's first door, a wall, or (no wall in reach,
+/// or a later section's pound) the floor before it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Struck {
+    Door,
+    Wall,
+    Floor,
 }
 
 /// A hero thrown clear by a collapse's catch: when they land (and are thrown down there), and
@@ -395,6 +494,11 @@ struct Falling {
     face: bool,
     /// A face's rock's hull, standing from when it lands: display, scale, where, facing.
     hull: Option<(u32, f32, Vec3, f32)>,
+    /// Having struck the floor (`land`: its dust, crash and shaking are then), it hops `hop`
+    /// high and rolls on for `settle` seconds before it lies still (0: it stays where it struck).
+    settle: f32,
+    hop: f32,
+    struck: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -461,6 +565,14 @@ struct Collapse {
     rowed: f32,
     beamed: f32,
     rumble_at: f32,
+    /// The boss's slam, if its phase has one: each later section goes as it pounds the floor.
+    slam: Option<SlamDef>,
+    /// When the face just built lands its first layer (the heroes near it shaken then).
+    thud_at: f32,
+    /// A later section's pound still owed (the boss was winding up a blow of its own when the
+    /// section's warning began): begun the moment it is free, if its blow can still land by
+    /// the wave. Infinite: none owed.
+    pound_by: f32,
 }
 
 /// One section of a collapse, laid on its route.
@@ -634,6 +746,12 @@ impl Survival {
                 self.beam_falls(mid, hinge, yaw, land, true);
             }
         }
+        // Its slam begins before its collapse does: the first surge is brought on by its body,
+        // not roared down.
+        if let Some(sl) = &e.slam {
+            let door = e.collapse.as_ref().filter(|c| c.route.len() >= 2).map(|c| (c.route[0], c.route[1]));
+            self.slam_begins(mid, sl, door, true);
+        }
         if let Some(c) = e.collapse.filter(|c| c.route.len() >= 2) {
             let name = self.content.mobs[def].name.clone();
             let Some(route) = crate::land::walking_route(self.land.as_ref(), &c.route) else {
@@ -696,6 +814,9 @@ impl Survival {
                 rowed: 0.0,
                 beamed: 0.0,
                 rumble_at: now,
+                slam: e.slam.clone(),
+                thud_at: f32::INFINITY,
+                pound_by: f32::INFINITY,
             };
             self.surge_begins(&mut col);
             self.bosses.collapse = Some(col);
@@ -738,6 +859,7 @@ impl Survival {
         self.step_falling_looks();
         self.step_thrown();
         self.step_collapse_fled();
+        self.step_boss_slams();
         let Some(mut c) = self.bosses.collapse.clone() else { return };
         let now = self.clock;
         let boss = c.boss;
@@ -782,6 +904,34 @@ impl Survival {
         if !c.done && !matches!(c.stage, Stage::Rest { .. }) {
             self.collapse_beats(&mut c);
         }
+        if now >= c.thud_at {
+            c.thud_at = f32::INFINITY;
+            self.face_thuds(&c);
+        }
+        if c.pound_by.is_finite() {
+            let wave = match c.stage {
+                Stage::Warn { until } if now <= c.pound_by => Some(until),
+                _ => None,
+            };
+            let free = self.mobs.get(&boss).is_some_and(|m| !matches!(m.state, MobState::Windup { .. })) && !self.disabled(boss) && !self.boss_slamming(boss);
+            // Only from where the wave leaves it time to walk out after: past the section's
+            // line already, or `POUND_AHEAD` and more from the end the wave starts at.
+            let from = if c.section == 0 { 0.0 } else { c.sections[c.section - 1].line };
+            let line = c.sections[c.section.min(c.sections.len() - 1)].line;
+            let ahead = self.mobs.get(&boss).and_then(|m| route_progress(&c.route, &c.along, m.pos)).is_some_and(|(at, _)| at >= line + BOSS_CLEAR || at - from >= POUND_AHEAD);
+            match (wave, c.slam.clone()) {
+                (Some(wave), Some(sl)) if free && ahead => {
+                    c.pound_by = f32::INFINITY;
+                    self.slam_begins(boss, &sl, None, false);
+                    // (Off again as the wave starts: it may be standing in the section going.)
+                    if let Some(e) = self.bosses.slams.get_mut(&boss) {
+                        e.until = e.until.min(wave).max(e.strike_at);
+                    }
+                }
+                (Some(_), Some(_)) => {}
+                _ => c.pound_by = f32::INFINITY,
+            }
+        }
         // Nobody is left behind the rubble (the last face too, for as long as the fight lasts).
         if now >= c.catch_at {
             c.catch_at = now + CATCH_TICK;
@@ -807,9 +957,15 @@ impl Survival {
         let boss = c.boss;
         let Some(m) = self.mobs.get(&boss) else { return };
         let name = self.content.mobs[m.def].name.clone();
-        // It roars it down (unless a blow of its own is winding up: that keeps its look).
-        if !matches!(m.state, MobState::Windup { .. }) {
-            self.events.push(Event::Emote { id: boss, emote: mobs::ROAR_EMOTE });
+        // It roars it down (unless a blow of its own is winding up: that keeps its look). One
+        // with a slam brings it down with its body: the yell's own slam is under way for the
+        // first section, and it pounds the floor where it stands for each one after (the moment
+        // it is free of a blow of its own, while the pound can still land by the wave).
+        let winding = matches!(m.state, MobState::Windup { .. });
+        match &c.slam {
+            None if !winding => self.events.push(Event::Emote { id: boss, emote: mobs::ROAR_EMOTE }),
+            Some(sl) if !self.boss_slamming(boss) => c.pound_by = now + (c.warn - sl.swing).max(0.0),
+            _ => {}
         }
         self.events.push(Event::Log(format!(
             "{name}'s collapse: section {} of {} goes, {from:.1} to {line:.1} yd, its wave in {:.1} s",
@@ -844,6 +1000,7 @@ impl Survival {
                 let s = c.sections[c.section].clone();
                 self.bosses.faces.push(Face { owner: boss, a: s.a, b: s.b, z: s.at[2], height: s.height });
                 self.face_builds(boss, &s);
+                c.thud_at = now + FACE_FIRST;
                 // (Nobody behind it from this very step.)
                 c.catch_at = now;
                 let name = self.content.mobs[self.mobs[&boss].def].name.clone();
@@ -1197,6 +1354,7 @@ impl Survival {
         // What its last stand put on it comes off: its own size again, no look of the fight.
         let grown = self.bosses.collapse.as_ref().is_some_and(|c| c.boss == boss && c.done && c.end_grow > 0.0);
         self.bosses.collapse = None;
+        self.bosses.slams.remove(&boss);
         if let Some(def) = self.mobs.get(&boss).map(|m| m.def) {
             if grown {
                 self.events.push(Event::Grow { id: boss, scale: self.content.mobs[def].scale });
@@ -1233,6 +1391,7 @@ impl Survival {
         self.bosses.faces.clear();
         self.bosses.fleeing.clear();
         self.bosses.thrown.clear();
+        self.bosses.slams.clear();
         self.bosses.looks = Looks { off, ..Default::default() };
     }
 
@@ -1450,7 +1609,11 @@ impl Survival {
             if now >= c.hurl_at {
                 c.hurl_at = now + HURL_EVERY;
                 let damage = self.boss_blow(id, DEBRIS_SHARE);
-                self.events.push(Event::Emote { id, emote: mobs::ROAR_EMOTE });
+                // (One with a slam swings for it; any other roars.)
+                match self.bosses.collapse.as_ref().and_then(|c| c.slam.clone()) {
+                    Some(sl) => self.events.push(Event::Clip { id, clip: sl.clip, take: sl.take, from: None, secs: sl.swing + sl.recover, at: sl.swing, body: ClipBody::Full }),
+                    None => self.events.push(Event::Emote { id, emote: mobs::ROAR_EMOTE }),
+                }
                 self.rocks_fall(id, hero, DEBRIS_RADIUS, DEBRIS_WARN, damage, true);
             }
         }
@@ -1833,6 +1996,361 @@ impl Survival {
         Ok(format!("Took away {} creatures.", gone.len()))
     }
 
+    /// Whether this boss is at its slam (running to its wall, swinging, or only just struck): it
+    /// is at nothing else, and nothing stops it.
+    pub(crate) fn boss_slamming(&self, id: Id) -> bool {
+        self.bosses.slams.get(&id).is_some_and(|s| self.clock < s.until)
+    }
+
+    /// The floor's edge from `from` the way `dir` points: the last spot with footing before a
+    /// wall (no floor on, or none a walker could step to) and how far off it is. `None` with no
+    /// wall within `most`, or where the floor only drops away (a ledge is no wall).
+    fn slam_march(&self, from: Vec3, dir: [f32; 2], most: f32) -> Option<(Vec3, f32)> {
+        let mut last = self.land.footing(from)?;
+        let mut d = SLAM_STEP;
+        while d <= most {
+            let p = [from[0] + dir[0] * d, from[1] + dir[1] * d, last[2]];
+            match self.land.footing(p) {
+                Some(g) if self.land.walk_clear(last, g) => last = g,
+                // (Floor there, but nothing walks onto it: a rock face, a pillar.)
+                Some(_) => return Some((last, d - SLAM_STEP)),
+                None => {
+                    // (Floor a little below it: a drop, not a wall.)
+                    let drop = (1..=4).any(|k| self.land.footing([p[0], p[1], last[2] - 1.5 * k as f32]).is_some());
+                    return (!drop).then_some((last, d - SLAM_STEP));
+                }
+            }
+            d += SLAM_STEP;
+        }
+        None
+    }
+
+    /// Where a slam at the wall `d` yards from `from` the way `dir` points (its floor's edge at
+    /// `last`) is struck, and where the boss stands to strike it: `stand` short of it.
+    fn slam_spot(&self, from: Vec3, dir: [f32; 2], last: Vec3, d: f32, stand: f32) -> (Vec3, Vec3) {
+        let sd = (d + SLAM_STEP * 0.5 - stand).max(0.0);
+        let xy = [from[0] + dir[0] * sd, from[1] + dir[1] * sd];
+        let at = self.land.footing([xy[0], xy[1], last[2]]).or_else(|| self.land.footing([xy[0], xy[1], from[2]])).unwrap_or(last);
+        ([last[0] + dir[0] * SLAM_STEP, last[1] + dir[1] * SLAM_STEP, last[2] + SLAM_HIGH], at)
+    }
+
+    /// The frame of a collapse's first door (its route from `a` on toward `b`): the wall behind
+    /// the route's start or to either side of it, whichever the boss at `pos` is nearest, if it
+    /// can be there in the slam's `door_secs` at its own run.
+    fn slam_door(&self, pos: Vec3, a: Vec3, b: Vec3, def: &SlamDef, run: f32) -> Option<(Vec3, Vec3, Struck)> {
+        let a = self.land.footing(a)?;
+        let v = [b[0] - a[0], b[1] - a[1]];
+        let len = (v[0] * v[0] + v[1] * v[1]).sqrt();
+        if len < 1.0e-3 {
+            return None;
+        }
+        let on = [v[0] / len, v[1] / len];
+        let mut best: Option<(f32, Vec3, Vec3)> = None;
+        for dir in [[-on[0], -on[1]], [-on[1], on[0]], [on[1], -on[0]]] {
+            let Some((last, d)) = self.slam_march(a, dir, SLAM_DOOR_LOOK) else { continue };
+            let (wall, stand) = self.slam_spot(a, dir, last, d, def.stand);
+            let far = dist3(pos, stand);
+            if far <= run * def.door_secs && best.as_ref().is_none_or(|b| far < b.0) {
+                best = Some((far, wall, stand));
+            }
+        }
+        best.map(|(_, wall, stand)| (wall, stand, Struck::Door))
+    }
+
+    /// The nearest wall to the boss at `pos` within the slam's reach, one toward `door` counted
+    /// a little nearer than it is (the collapse comes from there).
+    fn slam_wall(&self, pos: Vec3, door: Option<Vec3>, def: &SlamDef) -> Option<(Vec3, Vec3, Struck)> {
+        let toward = door.map(|d| {
+            let v = [d[0] - pos[0], d[1] - pos[1]];
+            let len = (v[0] * v[0] + v[1] * v[1]).sqrt().max(1.0e-3);
+            [v[0] / len, v[1] / len]
+        });
+        let mut best: Option<(f32, Vec3, Vec3)> = None;
+        for k in 0..SLAM_WAYS {
+            let a = k as f32 / SLAM_WAYS as f32 * std::f32::consts::TAU;
+            let dir = [a.cos(), a.sin()];
+            let Some((last, d)) = self.slam_march(pos, dir, def.reach + def.stand) else { continue };
+            let score = d - toward.map_or(0.0, |t| SLAM_DOOR_LEAN * (dir[0] * t[0] + dir[1] * t[1]));
+            if best.as_ref().is_none_or(|b| score < b.0) {
+                let (wall, stand) = self.slam_spot(pos, dir, last, d, def.stand);
+                best = Some((score, wall, stand));
+            }
+        }
+        best.map(|(_, wall, stand)| (wall, stand, Struck::Wall))
+    }
+
+    /// The boss begins a slam. `opening`: the yell's own, at the first door's frame (`door`: the
+    /// collapse's route, its first two points) if it can be there in time, else at the nearest
+    /// wall, else on the floor before it; its blow lands `secs` after the yell. Otherwise a later
+    /// section's pound: the floor where it stands, at once.
+    fn slam_begins(&mut self, boss: Id, def: &SlamDef, door: Option<(Vec3, Vec3)>, opening: bool) {
+        let Some(m) = self.mobs.get(&boss) else { return };
+        let now = self.clock;
+        let (pos, facing) = (m.pos, m.facing);
+        let run = self.content.mobs[m.def].run_speed;
+        let name = self.content.mobs[m.def].name.clone();
+        let before = self.floor_beside(pos, [pos[0] + facing.cos() * def.stand, pos[1] + facing.sin() * def.stand]);
+        let floor = (before, pos, Struck::Floor);
+        let (wall, stand, what) = if opening {
+            door.and_then(|(a, b)| self.slam_door(pos, a, b, def, run)).or_else(|| self.slam_wall(pos, door.map(|d| d.0), def)).unwrap_or(floor)
+        } else {
+            floor
+        };
+        let strike_at = now + if opening { def.secs.max(def.swing) } else { def.swing };
+        // (At the door the wave starts under it: it is off the sooner.)
+        let recover = if what == Struck::Door { def.recover.min(0.35) } else { def.recover };
+        self.bosses.slams.insert(boss, Slam { def: def.clone(), wall, stand, what, strike_at, until: strike_at + recover, swung: false, struck: false, opening });
+        if opening {
+            let what = match what {
+                Struck::Door => "the door's frame",
+                Struck::Wall => "a wall",
+                Struck::Floor => "the floor (no wall in reach)",
+            };
+            self.events.push(Event::Log(format!("{name} goes to slam {what} at ({:.1}, {:.1}), {:.1} yd off, in {:.1} s", wall[0], wall[1], dist3(pos, stand), strike_at - now)));
+        }
+    }
+
+    /// The slams, each step: the run to the wall, the swing, the blow. Over, one stays known
+    /// until the fight is: lost, what it shook loose goes.
+    fn step_boss_slams(&mut self) {
+        if self.bosses.slams.is_empty() {
+            return;
+        }
+        let now = self.clock;
+        let ids: Vec<Id> = self.bosses.slams.keys().copied().collect();
+        for id in ids {
+            let s = self.bosses.slams[&id].clone();
+            let Some(m) = self.mobs.get(&id).filter(|m| m.health > 0) else {
+                self.bosses.slams.remove(&id);
+                continue;
+            };
+            if matches!(m.state, MobState::Return | MobState::Idle { .. }) {
+                self.bosses.slams.remove(&id);
+                // (A collapse's own loss takes its looks with it.)
+                if !self.bosses.collapse.as_ref().is_some_and(|c| c.boss == id) {
+                    self.looks_leave(id);
+                }
+                continue;
+            }
+            if s.struck {
+                continue;
+            }
+            let (pos, run) = (m.pos, self.content.mobs[m.def].run_speed);
+            let swing_at = s.strike_at - s.def.swing;
+            if !s.swung && now < swing_at {
+                // On its way: as fast as gets it there for the swing.
+                let far = dist2d(pos, s.stand);
+                if far > SLAM_ARRIVE {
+                    let heading = m.path.last().is_some_and(|end| dist3(*end, s.stand) <= 0.5);
+                    if !heading {
+                        let speed = (far / (swing_at - now - 0.1).max(0.05)).clamp(run, SLAM_RUN_MOST.max(run));
+                        self.go(id, s.stand, speed);
+                    }
+                } else {
+                    self.hold_facing(id, s.wall);
+                }
+                continue;
+            }
+            if !s.swung {
+                // The swing: where it stands, at its wall (short of it, held or slowed on the
+                // way: at the floor before it).
+                self.halt(id);
+                let (mut wall, mut what) = (s.wall, s.what);
+                if what != Struck::Floor && dist2d(pos, s.stand) > 2.0 {
+                    let face = facing(pos, s.wall);
+                    wall = self.floor_beside(pos, [pos[0] + face.cos() * s.def.stand, pos[1] + face.sin() * s.def.stand]);
+                    what = Struck::Floor;
+                }
+                let face = facing(pos, wall);
+                if let Some(m) = self.mobs.get_mut(&id) {
+                    m.facing = face;
+                }
+                self.events.push(Event::MobStop { id, pos, facing: face });
+                self.events.push(Event::Clip { id, clip: s.def.clip, take: s.def.take, from: None, secs: s.def.swing + s.def.recover, at: s.def.swing, body: ClipBody::Full });
+                let e = self.bosses.slams.get_mut(&id).unwrap();
+                (e.wall, e.what, e.swung) = (wall, what, true);
+            }
+            if now >= s.strike_at {
+                let e = self.bosses.slams.get_mut(&id).unwrap();
+                e.struck = true;
+                let s = e.clone();
+                self.slam_strikes(id, &s);
+            }
+        }
+    }
+
+    /// The slam's blow lands: the one frame of it. The wall throws dust, every hero in the place
+    /// is shaken by how near they stand, and (the yell's own) rock comes loose.
+    fn slam_strikes(&mut self, id: Id, s: &Slam) {
+        let Some(m) = self.mobs.get(&id) else { return };
+        let now = self.clock;
+        let pos = m.pos;
+        let name = self.content.mobs[m.def].name.clone();
+        let below = self.is_below();
+        let floor = s.what == Struck::Floor;
+        let foot = if floor { s.wall } else { [s.wall[0], s.wall[1], s.wall[2] - SLAM_HIGH] };
+        self.events.push(Event::Sound { id, sound: SOUND_CRASH });
+        // Everyone in the place feels it, hardest beside it. (A later section's pound: one size
+        // down, and only those within sight of it.)
+        let heroes: Vec<(Id, Vec3)> = self.players.iter().filter(|(_, p)| p.health > 0).map(|(h, p)| (*h, p.pos)).collect();
+        let (near, mid) = if s.opening { (BEAT_SLAM_NEAR, BEAT_SLAM_MID) } else { (BEAT_SLAM_MID, BEAT_SLAM_FAR) };
+        for (h, at) in &heroes {
+            let far = dist3(pos, *at);
+            let beat = if far <= SLAM_NEAR {
+                near
+            } else if far <= SLAM_MID {
+                mid
+            } else if s.opening && (below || far <= SLAM_FAR) {
+                BEAT_SLAM_FAR
+            } else {
+                continue;
+            };
+            self.events.push(Event::Beat { player: *h, beat: beat.into(), on: None });
+        }
+        if !self.bosses.looks.off {
+            // Dust off the wall where it struck, from its foot up, and across the floor.
+            let ups: &[f32] = if floor { &[0.0] } else { &[0.0, SLAM_HIGH, SLAM_HIGH * 2.0] };
+            for up in ups {
+                self.point_look(id, [foot[0], foot[1], foot[2] + up], LAND_DUST);
+            }
+            let reach = if s.opening { 4.5 } else { 3.0 };
+            self.events.push(Event::GroundBurst { at: foot, yaw: 0.0, shape: "ring", reach, arc: 360.0, width: 0.0, secs: 0.6, colour: DUST_COLOUR.into() });
+        }
+        if !s.opening {
+            return;
+        }
+        // The lit band of the section it brings down: nothing lands on it, or hides it.
+        let band = self.bosses.collapse.as_ref().filter(|c| c.boss == id).map(|c| {
+            let s = &c.sections[c.section.min(c.sections.len() - 1)];
+            (s.a, s.b, c.route.first().copied())
+        });
+        let off_band = |at: Vec3, by: f32| band.as_ref().is_none_or(|(a, b, _)| seg_far([at[0], at[1]], *a, *b) >= by);
+        // A rock marked on the floor under each hero near it (the nearest few): out of its ring
+        // before it lands, or struck by it (hurt, not thrown down: the run is still to come).
+        let mut under: Vec<(f32, Vec3)> = heroes.iter().map(|(_, at)| (dist3(pos, *at), *at)).filter(|(far, at)| *far <= s.def.near && off_band(*at, LOOSE_BAND)).collect();
+        under.sort_by(|a, b| a.0.total_cmp(&b.0));
+        under.truncate(SLAM_MARKED);
+        let damage = self.boss_blow(id, s.def.share);
+        for (_, at) in &under {
+            self.rocks_fall_as(id, *at, DEBRIS_RADIUS, DEBRIS_WARN, damage, false, DUST);
+        }
+        // The rock for show: off the wall itself first, then round it and at the door, small
+        // ones and bigger, one after another over `volley` seconds. No ring and no blow.
+        let mut loose = 0;
+        if !self.bosses.looks.off {
+            if !floor {
+                let toward = facing(foot, pos);
+                for j in 0..3 {
+                    let side = toward + (j as f32 - 1.0) * 0.9;
+                    let at = self.floor_beside(pos, [foot[0] + side.cos() * (1.0 + 0.5 * j as f32), foot[1] + side.sin() * (1.0 + 0.5 * j as f32)]);
+                    if !off_band(at, LOOSE_BAND) {
+                        continue;
+                    }
+                    let from = [foot[0], foot[1], foot[2] + SLAM_HIGH + 0.8 * j as f32];
+                    self.rock_comes_loose(id, at, Some(from), 0, now + 0.4 + 0.1 * j as f32, 0.4);
+                    loose += 1;
+                }
+            }
+            // (The bigger the rock, the farther from every hero: none comes down between a hero
+            // and their own view of the fight.)
+            let clear = |at: Vec3, kind: usize| heroes.iter().all(|(_, h)| dist3(*h, at) >= LOOSE_CLEAR + LOOSE_WIDER * kind as f32) && off_band(at, LOOSE_BAND + kind as f32);
+            let span = (s.def.volley - LOOSE_SECS).max(0.0);
+            // Round where it stands: spread by the golden angle, 4 to 12 yd out.
+            let (want, mut got, mut tries) = (s.def.rocks, 0, 0);
+            while got < want && tries < want * 4 {
+                let (angle, out) = (tries as f32 * 2.399 + 0.6, 4.0 + (tries * 5 % 9) as f32);
+                tries += 1;
+                // (The biggest fall first, the small ones last.)
+                let kind = (LOOSE.len() - 1).saturating_sub(got * LOOSE.len() / want.max(1));
+                let Some(at) = self.land.footing([pos[0] + angle.cos() * out, pos[1] + angle.sin() * out, pos[2]]) else { continue };
+                if !self.land.walk_clear(pos, at) || !clear(at, kind) {
+                    continue;
+                }
+                let land = now + LOOSE_SECS + span * got as f32 / want.max(1) as f32;
+                self.rock_comes_loose(id, at, None, kind, land, LOOSE_SECS);
+                got += 1;
+            }
+            loose += got;
+            // At the door, to either side of the way in: the collapse starts there.
+            if let Some(door) = band.as_ref().and_then(|b| b.2).and_then(|d| self.land.footing(d)) {
+                let (want, mut got, mut tries) = (s.def.door_rocks, 0, 0);
+                while got < want && tries < want * 4 {
+                    let (angle, out) = (tries as f32 * 2.399 + 1.9, 2.0 + (tries * 3 % 5) as f32);
+                    tries += 1;
+                    let kind = got % LOOSE.len();
+                    let Some(at) = self.land.footing([door[0] + angle.cos() * out, door[1] + angle.sin() * out, door[2]]) else { continue };
+                    if !self.land.walk_clear(door, at) || !clear(at, kind) {
+                        continue;
+                    }
+                    let land = now + LOOSE_SECS + span * (got as f32 + 0.5) / want.max(1) as f32;
+                    self.rock_comes_loose(id, at, None, kind, land, LOOSE_SECS);
+                    got += 1;
+                }
+                loose += got;
+            }
+        }
+        let what = match s.what {
+            Struck::Door => "the door's frame",
+            Struck::Wall => "a wall",
+            Struck::Floor => "the floor",
+        };
+        self.events.push(Event::Log(format!("{name} slams {what}: {loose} rocks come loose for show, {} marked under heroes", under.len())));
+    }
+
+    /// A rock shaken loose for show comes down on `at` (one of `LOOSE`'s sizes), landing at
+    /// `land` after `secs` on its way: from the roof over it, or from `from` (off a wall). It is
+    /// seen falling, strikes, hops and rolls to rest; it has no ring and no blow.
+    fn rock_comes_loose(&mut self, owner: Id, at: Vec3, from: Option<Vec3>, kind: usize, land: f32, secs: f32) {
+        if self.bosses.looks.off || self.bosses.looks.falling.len() >= FALLING_MOST {
+            return;
+        }
+        let (display, scale, hop) = LOOSE[kind % LOOSE.len()];
+        let k = self.look_seq();
+        let yaw = (k as f32 * 2.399) % std::f32::consts::TAU;
+        let to = [at[0], at[1], at[2] - rock_sink(display) * scale];
+        let from = from.unwrap_or_else(|| [to[0] + yaw.cos() * 0.9, to[1] + yaw.sin() * 0.9, at[2] + self.drop_height(at)]);
+        let tilt = (0.5 + (k % 5) as f32 * 0.15, (k % 3) as f32 * 0.04);
+        let start = (land - secs).max(self.clock);
+        self.bosses.looks.falling.push(Falling {
+            owner,
+            id: None,
+            shows: start,
+            start,
+            land,
+            display,
+            scale,
+            path: Path::Drop { from, to, yaw, tilt },
+            at,
+            ring: 0.0,
+            crack: 0,
+            crash: if k % 3 == 0 { SOUND_CRASH } else { 0 },
+            landed: false,
+            face: false,
+            hull: None,
+            settle: SETTLE_SECS + 0.1,
+            hop,
+            struck: false,
+        });
+    }
+
+    /// A section's face lands its first layer: the heroes near it are shaken, by how near.
+    fn face_thuds(&mut self, c: &Collapse) {
+        let s = &c.sections[c.section.min(c.sections.len() - 1)];
+        let z = s.at[2];
+        let shaken: Vec<(Id, &str)> = self
+            .players
+            .iter()
+            .filter(|(_, p)| p.health > 0 && (p.pos[2] - z).abs() <= FACE_SHAKE_NEAR)
+            .filter_map(|(h, p)| {
+                let far = seg_far([p.pos[0], p.pos[1]], s.a, s.b);
+                (far <= FACE_SHAKE_FAR).then(|| (*h, if far <= FACE_SHAKE_NEAR { BEAT_FACE_NEAR } else { BEAT_FACE_FAR }))
+            })
+            .collect();
+        for (h, beat) in shaken {
+            self.events.push(Event::Beat { player: h, beat: beat.into(), on: None });
+        }
+    }
+
     /// This share of the boss's own blow (as hard as its fight has grown).
     fn boss_blow(&self, id: Id, share: f32) -> u32 {
         let d = self.mobs.get(&id).map_or(0, |m| self.content.mobs[m.def].attack.damage);
@@ -1950,6 +2468,9 @@ impl Survival {
             landed: false,
             face: false,
             hull: None,
+            settle: SETTLE_SECS,
+            hop: HOP_FALL,
+            struck: false,
         });
     }
 
@@ -1983,6 +2504,9 @@ impl Survival {
             landed: false,
             face: false,
             hull: None,
+            settle: 0.0,
+            hop: 0.0,
+            struck: false,
         });
     }
 
@@ -2104,6 +2628,9 @@ impl Survival {
             landed: false,
             face: false,
             hull: None,
+            settle: SETTLE_SECS,
+            hop: if rise > 0.0 { HOP_PILE } else { HOP_ROW },
+            struck: false,
         });
     }
 
@@ -2186,6 +2713,9 @@ impl Survival {
                     landed: false,
                     face: true,
                     hull: Some((ROCK, scale, hull, yaw)),
+                    settle: 0.0,
+                    hop: 0.0,
+                    struck: false,
                 });
             }
         }
@@ -2335,14 +2865,17 @@ impl Survival {
                 }
             }
         }
-        let mut landed = Vec::new();
+        let (mut struck, mut landed) = (Vec::new(), Vec::new());
         for k in 0..self.bosses.looks.falling.len() {
             let f = self.bosses.looks.falling[k].clone();
             if now < f.shows {
                 continue;
             }
             let t = if f.land > f.start { ((now - f.start) / (f.land - f.start)).clamp(0.0, 1.0) } else { 1.0 };
-            let (pos, facing, tilt) = f.path.pose(t);
+            // (Down: it hops and rolls to rest.)
+            let settling = t >= 1.0 && f.settle > 0.0;
+            let hop = if f.settle > 0.0 { f.hop } else { 0.0 };
+            let (pos, facing, tilt) = if settling { f.path.settle(((now - f.land) / f.settle).clamp(0.0, 1.0), hop) } else { f.path.pose(t, hop) };
             match f.id {
                 None => {
                     let id = self.alloc();
@@ -2365,11 +2898,17 @@ impl Survival {
                 Some(_) => {}
             }
             if t >= 1.0 && now >= f.start {
-                self.bosses.looks.falling[k].landed = true;
-                landed.push(k);
+                if !f.struck {
+                    self.bosses.looks.falling[k].struck = true;
+                    struck.push(k);
+                }
+                if now >= f.land + f.settle {
+                    self.bosses.looks.falling[k].landed = true;
+                    landed.push(k);
+                }
             }
         }
-        for k in landed {
+        for k in struck {
             let f = self.bosses.looks.falling[k].clone();
             let Some(id) = f.id else { continue };
             // Dust thrown up where it struck, its ring on the floor (a fall's own), its crash.
@@ -2391,10 +2930,14 @@ impl Survival {
                 self.bosses.looks.shook.insert(h, now);
                 self.events.push(Event::Beat { player: h, beat: BEAT_ROCKFALL.into(), on: None });
             }
+        }
+        for k in landed {
+            let f = self.bosses.looks.falling[k].clone();
+            let Some(id) = f.id else { continue };
             if f.face {
                 // Solid from here: its hull stands behind it, drawn with one (a piece that moves
                 // has none). The pale rock that fell stays over it.
-                let (pos, facing, tilt) = f.path.pose(1.0);
+                let (pos, facing, tilt) = f.path.pose(1.0, 0.0);
                 let (display, scale, pos, facing) = f.hull.unwrap_or((f.display, f.scale, pos, facing));
                 let twin = self.alloc();
                 self.objs.insert(twin, Obj { kind: ObjKind::Prop { display, scale }, pos, facing });
@@ -2544,15 +3087,46 @@ impl Survival {
 
 impl Path {
     /// Where its prop stands `t` of the way down (0 to 1, falling faster as it goes): its
-    /// position, facing and tilt (about the model's own Y after its facing, the drawing's).
-    fn pose(&self, t: f32) -> (Vec3, f32, f32) {
+    /// position, facing and tilt (about the model's own Y after its facing, the drawing's). A
+    /// rock that settles (`hop` over 0) strikes the floor short of its resting place by its roll.
+    fn pose(&self, t: f32, hop: f32) -> (Vec3, f32, f32) {
         match *self {
             Path::Drop { from, to, yaw, tilt } => {
                 let u = t * t;
+                let short = self.roll(hop);
+                let to = [to[0] - short[0], to[1] - short[1], to[2]];
                 let pos = [from[0] + (to[0] - from[0]) * u, from[1] + (to[1] - from[1]) * u, from[2] + (to[2] - from[2]) * u];
-                (pos, yaw + (1.0 - u) * 1.3, tilt.0 + (tilt.1 - tilt.0) * u)
+                let turn = if hop > 0.0 { SETTLE_TURN } else { 0.0 };
+                (pos, yaw + turn + (1.0 - u) * 1.3, tilt.0 + (tilt.1 - tilt.0) * u)
             }
             Path::Beam { .. } => beam_pose(self, t),
+        }
+    }
+
+    /// How far a dropped rock rolls as it settles, on the way it came: `hop` times `SETTLE_ROLL`.
+    fn roll(&self, hop: f32) -> [f32; 2] {
+        let Path::Drop { from, to, .. } = *self else { return [0.0; 2] };
+        let d = [to[0] - from[0], to[1] - from[1]];
+        let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
+        if len < 1.0e-3 || hop <= 0.0 {
+            return [0.0; 2];
+        }
+        [d[0] / len * hop * SETTLE_ROLL, d[1] / len * hop * SETTLE_ROLL]
+    }
+
+    /// Where a dropped rock is `u` of the way through settling after it struck the floor (0 to
+    /// 1): one hop `hop` high, rolling on the way it came and turning as it goes, slower and
+    /// slower, to rest on its resting place (the path's end).
+    fn settle(&self, u: f32, hop: f32) -> (Vec3, f32, f32) {
+        match *self {
+            Path::Drop { to, yaw, tilt, .. } => {
+                let short = self.roll(hop);
+                let left = (1.0 - u) * (1.0 - u);
+                let up = hop * 4.0 * u * (1.0 - u);
+                let pos = [to[0] - short[0] * left, to[1] - short[1] * left, to[2] + up];
+                (pos, yaw + SETTLE_TURN * left, tilt.1 + 0.6 * up)
+            }
+            Path::Beam { .. } => beam_pose(self, 1.0),
         }
     }
 }
@@ -2588,6 +3162,14 @@ fn route_pose(route: &[Vec3], along: &[f32], d: f32) -> (Vec3, f32) {
     let b = route_point(route, along, d + 0.5);
     let yaw = (b[1] - a[1]).atan2(b[0] - a[0]);
     (route_point(route, along, d), yaw)
+}
+
+/// How far `p` is from the stretch `a` to `b`, on the flat.
+fn seg_far(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
+    let (u, v) = ([b[0] - a[0], b[1] - a[1]], [p[0] - a[0], p[1] - a[1]]);
+    let t = ((u[0] * v[0] + u[1] * v[1]) / (u[0] * u[0] + u[1] * u[1]).max(1.0e-6)).clamp(0.0, 1.0);
+    let d = [v[0] - u[0] * t, v[1] - u[1] * t];
+    (d[0] * d[0] + d[1] * d[1]).sqrt()
 }
 
 fn dist3(a: Vec3, b: Vec3) -> f32 {

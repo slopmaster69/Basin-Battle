@@ -782,7 +782,8 @@ impl Survival {
         if limit == 0 || m.health == 0 || now < m.posture_guard || amount == 0 {
             return false;
         }
-        let built = self.posture_of(mid) + amount;
+        // (A boss at its slam is hit like any other, but doesn't break until it's done.)
+        let built = (self.posture_of(mid) + amount).min(if self.boss_slamming(mid) { limit - 1 } else { u32::MAX });
         let m = self.mobs.get_mut(&mid).unwrap();
         m.posture_from = now;
         if built < limit {
@@ -811,7 +812,8 @@ impl Survival {
     pub(crate) fn stagger_mob(&mut self, mid: Id, secs: f32, riposte: bool) {
         let now = self.clock;
         let Some(m) = self.mobs.get(&mid) else { return };
-        if m.health == 0 {
+        // (Nothing staggers a boss at its slam: `sim::bosses`.)
+        if m.health == 0 || self.boss_slamming(mid) {
             return;
         }
         // A cast cut off ends (the step's own: a fighter's hex too).
@@ -911,7 +913,10 @@ impl Survival {
             self.events.push(Event::Visual { id: s, kit: combat::KIT_DUST, by: None });
             self.engage(s, foe);
         }
-        self.events.push(Event::Emote { id: mid, emote: ROAR_EMOTE });
+        // (One that brings its phase on with its body roars with that, not with its hands up.)
+        if e.slam.is_none() {
+            self.events.push(Event::Emote { id: mid, emote: ROAR_EMOTE });
+        }
         let sound = if e.sound != 0 { e.sound } else { self.content.mobs[def].enrage_sound };
         if sound != 0 {
             self.events.push(Event::Sound { id: mid, sound });
@@ -1328,8 +1333,10 @@ impl Survival {
             }
             // Rooted or stunned: no walking; stunned, frozen or panicked: no thinking (a panic runs
             // by itself).
+            // (A boss at its slam is held by nothing: `sim::bosses`.)
             let thrown = self.mobs[&id].thrown_until > now;
-            if self.held_still(id) && !thrown {
+            let slamming = self.boss_slamming(id);
+            if self.held_still(id) && !thrown && !slamming {
                 if !self.mobs[&id].path.is_empty() {
                     self.halt(id);
                 }
@@ -1350,6 +1357,11 @@ impl Survival {
             if self.step_firing_captain(id) { continue; }
             if self.step_kitchen(id) { continue; }
             if self.step_vancleef(id) { continue; }
+            // A boss at its slam: the run to its wall and the swing are all it does, stunned or
+            // not.
+            if slamming {
+                continue;
+            }
             if self.disabled(id) {
                 continue;
             }
