@@ -27,6 +27,9 @@ mod layout;
 mod piles;
 #[path = "aftermath_shapes.rs"]
 mod shapes;
+#[path = "aftermath_wreck.rs"]
+mod wreck;
+pub(crate) use wreck::StagedWreck;
 #[cfg(test)]
 #[path = "aftermath_tests.rs"]
 mod tests;

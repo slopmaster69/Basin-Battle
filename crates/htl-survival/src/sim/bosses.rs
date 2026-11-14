@@ -1452,11 +1452,12 @@ impl Survival {
         })
     }
 
-    /// Which section of the wrecking collapse a spot lies in (the first whose stretch holds it,
-    /// more than `margin` behind its face), fallen or not.
+    /// Which section of the wrecking collapse a spot lies in (the first whose stretch holds it),
+    /// fallen or not, if it is more than `margin` behind that section's face.
     pub fn collapse_wreck_section(&self, pos: Vec3, margin: f32) -> Option<usize> {
         let w = self.bosses.wreck.as_ref()?;
-        (0..w.plan.sections.len()).find(|k| w.plan.in_section(*k, pos, margin).is_some())
+        let k = (0..w.plan.sections.len()).find(|k| w.plan.in_section(*k, pos, 0.0).is_some())?;
+        w.plan.in_section(k, pos, margin).map(|_| k)
     }
 
     /// How far a spot is from the wrecking collapse's route as it walks it (for whoever lays

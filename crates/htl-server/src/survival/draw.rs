@@ -1156,6 +1156,8 @@ impl SurvivalGame {
 
     /// Draw the whole world for a hero who just arrived.
     pub(crate) fn send_world_to(&mut self, conn: ConnId, me: Id) {
+        // (A new world on the client: whatever of a collapse's wreck it had is gone with the old.)
+        self.wreck_forget(conn);
         let others: Vec<Id> = self.sim.players.keys().copied().filter(|id| *id != me && self.guids.contains_key(id)).collect();
         for id in others {
             let p = self.player_create(id, false);

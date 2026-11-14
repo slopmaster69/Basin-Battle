@@ -847,6 +847,11 @@ impl Survival {
             .next()
     }
 
+    /// A foe is fighting this hero (for the server: what it may do under them).
+    pub fn foes_on(&self, id: Id) -> bool {
+        self.in_fight(id)
+    }
+
     /// A foe is fighting this hero.
     fn in_fight(&self, id: Id) -> bool {
         self.mobs

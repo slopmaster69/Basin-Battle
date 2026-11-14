@@ -31,6 +31,38 @@ Client patch work, if required to remove built-in ship geometry, will be coordin
 Claude's existing patch claims before implementation. Full spectator filming will be a
 separate task after this finished environment is established.
 
+## In the fight: Rhahk'Zor's collapse leaves it behind
+
+With `wreck = true` in Rhahk'Zor's `[mob.phase.collapse]` (the default; `false` turns all of
+this off and the collapse is rock alone, as before) the collapse wrecks the mine as it goes:
+
+- **Lamps.** From his slam to the end of the fight no lamp in the mine can be lit or rested at:
+  all three stand dark (none stands in the collapse's sections; the Galleries lamp is 31 yd past
+  its end) and a hero who tries is told "Not while the mine is coming down." His death lights
+  them again, and so does a lost fight or a reset.
+- **The wave.** Every other pile its rows lay is topped by one of the ruin's pieces in a rock's
+  place: a mine cart, a board, lumber, a barrel, a crate, a barrow, a lumber pile. They are loose
+  rubble (no hull), lying behind the wave's line.
+- **Each section's ruin.** `aftermath_wreck.rs` fits this ruin from the installed data on a
+  thread of its own when the first wrecking collapse begins, and 3 sec after a section is down
+  sends the pieces that lie more than 2 yd plus their own reach behind its face (nobody can be
+  there while the face stands). A client that comes in late is sent what is down. Without
+  installed data nothing is laid.
+- **The ship.** The rules count it gone once `wreck_ship` sections are down (1). The only way
+  the clients have to lose it is this preview's marker (0087), which reloads the whole mine on
+  the client, and on 0091's round also hides the mine's own doodads (their knocked copies go
+  with it) and puts out its lanterns. So each client gets the marker only when its hero is out
+  of the fight: a friend more than 60 yd from the route with no foe on them at once, a hero in
+  the fight the moment Rhahk'Zor is down. Nobody near the berth gets it until they leave. No
+  point of the route has sight of the dock (`rhahk_route.rs`), so nobody in the fight sees it go.
+- **A lost fight** takes every piece and the marker back; after a kill the wreck stays until the
+  dungeon resets.
+
+Not done yet (needs a client patch): putting out the lanterns on the route while the fight is
+on. Those on it are the mine's doodads 414, 421, 422 and 424 at the front door, 186, 184 and 162
+in the foreman's chamber, and 217 and 199 by the last stand; 0091 darkens only 162 and 184, and
+only with the whole-mine marker. There is no forge on the route.
+
 ## Inspecting the authored state
 
 Use a client built with the ship-removal patch 0087 and a matching server. The preview is a

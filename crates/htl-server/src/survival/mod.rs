@@ -291,6 +291,8 @@ pub struct SurvivalGame {
     pub(crate) aftermath: Option<aftermath::Aftermath>,
     /// The collapsed map the aftermath is fitted to, read once from the installed data.
     pub(crate) aftermath_land: Option<Box<aftermath::Ground>>,
+    /// What a wrecking collapse has sent the clients (`aftermath_wreck.rs`).
+    pub(crate) wreck: aftermath::StagedWreck,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
@@ -417,6 +419,7 @@ impl SurvivalGame {
             watchers: BTreeMap::new(),
             aftermath: None,
             aftermath_land: None,
+            wreck: Default::default(),
         };
         g.bind_world();
         g
@@ -439,6 +442,7 @@ impl SurvivalGame {
                 let events = self.sim.step(TICK.as_secs_f32());
                 self.lab_trace(&events);
                 self.play(events);
+                self.wreck_tick();
                 self.keep_watchers_near();
                 self.ui_flush();
                 self.hold_clock();
