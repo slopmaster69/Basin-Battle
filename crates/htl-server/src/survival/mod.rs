@@ -943,6 +943,8 @@ impl SurvivalGame {
     /// A hero leaves for the other world: off this one (saved), and their connection with them.
     pub(crate) fn depart(&mut self, conn: ConnId) -> Option<(Session, PlayerSave, Carry)> {
         self.lend_watcher(conn);
+        // (Its client is gone: nothing of a collapse's wreck is owed it or taken back from it.)
+        self.wreck_forget(conn);
         let w = self.sessions.get_mut(&conn).and_then(|s| s.world.take())?;
         let carry = Carry {
             addon: w.addon,
@@ -1041,6 +1043,8 @@ impl SurvivalGame {
 
     pub(crate) fn leave_world(&mut self, conn: ConnId) {
         self.lend_watcher(conn);
+        // (Its client is gone: nothing of a collapse's wreck is owed it or taken back from it.)
+        self.wreck_forget(conn);
         // A login after this one plays, whatever this one did.
         if let Some(s) = self.sessions.get_mut(&conn) {
             s.watching = None;
