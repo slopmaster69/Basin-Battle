@@ -2208,6 +2208,15 @@ death_text = "...VanCleef... never pay..."
     # only way they have to lose the ship): 0 puts that at his first blow, 5 (more sections than
     # there are) never during the fight.
     wreck_ship = 1
+    # The route's lanterns go out as each section comes down (client patch 0096; a client of an
+    # older round has them lit as ever). false: no lantern is asked to go out.
+    wreck_lamps = true
+    # By section, the mine's own lanterns (their place in its WMO, found by
+    # `native_each_route_lantern_carries_a_light_no_other_lit_lantern_shares` in htl-map) that go
+    # out when it is down, where each hangs along the route (x, going in): the front door's four
+    # (-15 to -31) with the first, 162 (-51) with the second, 186 and 184 (-58, -67) with the
+    # third, 217 and 199 (-91, -100) with the last.
+    wreck_lamp_sections = [[414, 421, 422, 424], [162], [186, 184], [217, 199]]
     held_text = "Rhahk'Zor not die in a hole!"
     end_text = "No more mine. Only Rhahk'Zor!"
     # What shows it (chosen on film, on him, November 13). Held at 26%: a bright shell round him

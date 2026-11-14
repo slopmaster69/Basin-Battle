@@ -58,10 +58,31 @@ this off and the collapse is rock alone, as before) the collapse wrecks the mine
 - **A lost fight** takes every piece and the marker back; after a kill the wreck stays until the
   dungeon resets.
 
-Not done yet (needs a client patch): putting out the lanterns on the route while the fight is
-on. Those on it are the mine's doodads 414, 421, 422 and 424 at the front door, 186, 184 and 162
-in the foreman's chamber, and 217 and 199 by the last stand; 0091 darkens only 162 and 184, and
-only with the whole-mine marker. There is no forge on the route.
+- **The route's lanterns** (client patch 0096, round 31, `.es hello <version> ac31`). The mine's
+  lanterns on the collapse's route go out as each section comes down, to every client of that
+  round (the fighters too: it is a light, not a reload). They are the mine's doodads (MODD indices,
+  `htl_map::deadmines::aftermath::ROUTE_LANTERNS`), listed by section in `wreck_lamp_sections`:
+  414, 421, 422 and 424 at the front door (x -15 to -31) with the first section, 162 (-51) with
+  the second, 186 and 184 (-58, -67) with the third, 217 and 199 (-91, -100) with the fourth.
+  Each is one model-less game object of entry 500099 (`LAMP_ENTRY`), its GUID's low 24 bits the
+  lantern's index; the client keeps the mine's own light (MOLT, or a light the lantern's model
+  carries) within 1.6 yd of that lantern's pivot at intensity 0 for as long as the object stands,
+  and puts it back when it goes (state derived from the snapshot, as 0087's marker, so a late join
+  or a reconnect needs nothing more). A client of an older round is sent none and has them lit as
+  ever; `wreck_lamps = false` sends none to anyone. A lost fight or a reset destroys the objects.
+  The lantern's model stays where it hangs and its glass still glows (0091 found the glass lit
+  whatever is near: only hiding the doodad, which needs the reload, hides it); its pool of light
+  goes. 162 and 184 are also 0091's: with the aftermath marker they are hidden and dark as before.
+- **Why the ship does not go mid-fight, and the reload does not go away.** Hiding the dry dock's
+  ship on a message, without reloading the mine, was looked at for patch 0096 and is not a small
+  patch. The ship is 15 groups of the mine's own WMO plus its first 64 doodads plus 61 placed
+  fixtures; the client merges those groups into the placement's static batches and its retained
+  draw regions, keys the portal visibility on them, and takes collision, interior and light
+  ownership from the model's tables, so only a variant model (0087's) is complete and only a reload
+  of the mine swaps it. The server therefore still sends the marker only to a hero out of the
+  fight. Making that reload cheap enough to take under a hero, or loading the variant ahead of the
+  marker, is the way to the owner's "gone well before the last stand"; it is a client change of its
+  own.
 
 ## Inspecting the authored state
 

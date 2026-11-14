@@ -16,6 +16,14 @@
 //! in it. No point of the collapse's route has sight of the dock (`rhahk_route.rs`), and the
 //! dock lies behind the faces' far side, so nobody sees it go.
 //!
+//! The route's lanterns go out section by section (client patch 0096, a client of
+//! [`LAMPS_LEVEL`]'s round: each is a model-less game object of entry [`LAMP_ENTRY`] whose GUID
+//! names the lantern, sent when its section is down and destroyed when the wreck is taken back).
+//! An older client is sent none and has its lanterns as ever. `wreck_lamps = false` sends none.
+//! Hiding the ship the same way, without the reload, is not in that patch: the ship is the mine
+//! WMO's own groups, merged into the placement's static batches and its retained draw regions, with
+//! the prop, light and collision tables around them, which only a reload of the mine rebuilds.
+//!
 //! A lost fight or a reset takes all of it back; a client that comes in (or comes back) is sent
 //! what is down.
 
@@ -29,6 +37,10 @@ use super::*;
 const SHOW_AFTER: f32 = 3.0;
 /// How far behind its section's face a piece of the ruin lies to be laid with it (yd).
 pub(super) const BEHIND: f32 = 2.0;
+/// The lantern marker's entry (client patch 0096): just under the ship's marker, below the ruin's.
+pub(super) const LAMP_ENTRY: u32 = 500_099;
+/// The client level that puts a lantern out on a marker (patch 0096's round).
+pub(crate) const LAMPS_LEVEL: u8 = 31;
 /// A hero this far (yd) from the collapse's route, with no foe on them, is out of its fight.
 const OUT_OF_FIGHT: f32 = 60.0;
 /// The ship's berth, and round it as far as it is seen from (x and y, least and most): a hero in
@@ -53,6 +65,13 @@ pub(crate) struct StagedWreck {
     down_at: Vec<f32>,
     /// What each client has: how many sections' pieces, and whether the ship is gone for it.
     sent: BTreeMap<ConnId, (usize, bool)>,
+    /// The lanterns each client has been asked to put out (a prefix of what is out).
+    lamps: BTreeMap<ConnId, Vec<u32>>,
+}
+
+/// A lantern marker's GUID: the entry, then the lantern's place in the mine's WMO.
+pub(super) fn lamp_guid(lantern: u32) -> u64 {
+    (0xF110_u64 << 48) | (u64::from(LAMP_ENTRY) << 24) | u64::from(lantern)
 }
 
 /// A piece of the wreck's GUID: the ruin's entries, numbered apart from the preview's.
@@ -144,6 +163,7 @@ impl SurvivalGame {
         while self.wreck.down_at.len() < view.fallen {
             self.wreck.down_at.push(self.sim.clock);
         }
+        let lamps = self.sim.collapse_wreck_lamps();
         let ready = self.wreck.down_at.iter().filter(|t| self.sim.clock - **t >= SHOW_AFTER).count();
         let clients: Vec<(ConnId, Id, u8)> = self.in_world().map(|(c, _, w)| (*c, w.id, w.level)).collect();
         for (conn, id, level) in clients {
@@ -182,7 +202,29 @@ impl SurvivalGame {
             if now != (had, ship) {
                 self.wreck.sent.insert(conn, now);
             }
+            if level >= LAMPS_LEVEL {
+                self.wreck_lamps_to(conn, &lamps);
+            }
         }
+    }
+
+    /// The lanterns `out` that `conn` has not been asked to put out yet, asked (a client of
+    /// [`LAMPS_LEVEL`]'s round only).
+    fn wreck_lamps_to(&mut self, conn: ConnId, out: &[u32]) {
+        let had = self.wreck.lamps.get(&conn).map_or(0, Vec::len);
+        if had >= out.len() {
+            return;
+        }
+        if had == 0 {
+            self.send(conn, packets::gameobject_query_response(LAMP_ENTRY, GENERIC, 0, ""));
+        }
+        for &lantern in &out[had..] {
+            let guid = lamp_guid(lantern);
+            let f = go_fields(guid, LAMP_ENTRY, 0, [0.0; 3], 1.0, [0.0, 0.0, 0.0, 1.0], 0.0);
+            self.send(conn, packets::update_object(&[Create { guid, object_type: packets::TYPE_GAMEOBJECT,
+                is_self: false, placement: Placement::At { pos: [0.0; 3], facing: 0.0 }, fields: &f }], &[]));
+        }
+        self.wreck.lamps.insert(conn, out.to_vec());
     }
 
     /// Whether a hero can lose the ship now: no foe on them, out of the collapse's fight (or the
@@ -227,6 +269,11 @@ impl SurvivalGame {
     fn wreck_take_back(&mut self) {
         self.wreck.down_at.clear();
         let laid = self.wreck.laid.take();
+        for (conn, lamps) in std::mem::take(&mut self.wreck.lamps) {
+            for lantern in lamps {
+                self.send(conn, packets::destroy_object(lamp_guid(lantern)));
+            }
+        }
         if self.wreck.sent.is_empty() {
             return;
         }
@@ -256,6 +303,7 @@ impl SurvivalGame {
     /// A client sent its world again (it came in, or back): it has none of the wreck now.
     pub(crate) fn wreck_forget(&mut self, conn: ConnId) {
         self.wreck.sent.remove(&conn);
+        self.wreck.lamps.remove(&conn);
     }
 }
 
