@@ -1,0 +1,17 @@
+# DEV SETUP only in where the hero starts (put north of the stake, 10 yd from the machine at its
+# post, and healed): the pull, "Clear the floor!", the machine walking in under its own log, the
+# hero's one blow on the stake 0.8 s after its line, the creak, the log landing on the machine,
+# its stall (3.5 s, slumped and smoking) and the hero's blows on it.
+hero warrior
+cam off
+camera wide Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+12.5 lua SV.on["Clear the floor"] = function() SV.turn(-1.5708) SV.after(0.8, function() SV.hit() SV.log("cuts the rope") end) SV.after(2.6, function() SV.fight = true end) end
+13 .es heal
+13.5 video
+15 .es goto -280.67 -495.7 50.4 4.712
+18 .es heal
+21 .es heal
+24 .es heal
+27 .es heal
+30 end

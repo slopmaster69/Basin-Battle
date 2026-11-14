@@ -1,0 +1,16 @@
+# A real pull of Sneed's Shredder, from the pull to Sneed's death or the hero's fall, filmed by
+# the cameraman. Dev setup, all before the video: travel, the mine cleared but for the machine,
+# the warrior whole, before the Mast Room's door. From the video on nothing touches the fight: no
+# debug kill, heal or placement. The warrior is played by the small player in
+# `_sneed-shredder-bot.txt` (what it does is listed there).
+hero warrior
+cam off
+camera wide Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+include _sneed-shredder-bot
+12.5 .es goto -290 -527 50.6 1.48
+14 .es heal
+16 video
+17 lua SV.turn(1.48) ActionDash(1.0, 7, "f")
+18.5 lua SV.lastHT = GetTime() SB.on = true SB.was = true
+300 end

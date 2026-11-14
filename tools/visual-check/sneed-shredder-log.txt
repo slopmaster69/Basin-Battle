@@ -1,0 +1,31 @@
+# DEV SETUP, not an unassisted clear: the Shredder pulled 17 yd from its post and broken there
+# by debug, the hero healed. What it shows, by the cameraman: "No, no, not now!", the machine's
+# run back to its log pile and the crash, Sneed crawling out of the wreck and "That was company
+# property!", the hero on him (the hero's own keys: the lock, a blow every 0.75 s), "Just...
+# one... bolt...", his run to the wreck and his hammering, the hero to the stake 0.6 s after his
+# line (the lock let go, a run to 1.5 yd from it, one blow 2.2 s after the line, his hands on the wreck), the creak, the log landing on him,
+# "Gah! Who cut that loose?!", and the hero's blows on him while he is down.
+hero warrior
+cam off
+camera wide Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+12.5 lua SV.on["company property"] = function() SV.after(0.5, function() SV.fight = true end) end
+12.5 lua SV.on["one... bolt"] = function() local t = GetTime() SV.fight = false SV.say(".es in unlock") SV.after(0.6, function() SV.go(-280.67, -497.2, 1.5, function() SV.after(math.max(0.05, t + 2.2 - GetTime()), function() SV.hit() SV.log("cuts the rope") SV.after(1.6, function() SV.fight = true end) end) end) end) end
+13 .es heal
+13.5 video
+14.5 .es goto -279 -516 50.4 2.48
+15 .es in lock
+22.5 .es hurt 0 dm_shredder
+16 .es heal
+19 .es heal
+22 .es heal
+25 .es heal
+28 .es heal
+31 .es heal
+34 .es heal
+37 .es heal
+40 .es heal
+43 .es heal
+46 .es heal
+49 .es heal
+50 end

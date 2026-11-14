@@ -1222,7 +1222,9 @@ boss = "sneed"
 bars = [[-244.0, -468.0], [-244.0, -497.0]]
 text = "Sneed is beaten. The Mast Room's north door opens on the galleries."
 
-# Sneed in his shredder, cutting at a log with its back to the door; thrown out of the wreck.
+# Sneed in his shredder, cutting at a log with its back to the door. Broken, it runs back and
+# crashes into its log pile, and he crawls out of the wreck. A log hangs rigged over the place
+# (sim/machinery_rig): a blow on its tie-off drops it on whoever is under it.
 [[dungeon.pack]]
 key = "sneed"
 mob = "dm_shredder"
@@ -1553,7 +1555,8 @@ respawn = 0.0
 
 # Sneed's machine (docs/shredder-encounter.md): saw sweep, stamp and rake, then the grind (a rev in
 # place, a straight drive) and a slumped stall. sim/machinery owns this cycle, the walk in, the break
-# and the one repair, regardless of either form's health. Its lines are said there, 2 sec apart.
+# (its run back to the log pile, sim/machinery_rig) and the one repair, regardless of either form's
+# health. Its lines are said there, 2 sec apart.
 [[mob]]
 key = "dm_shredder"
 name = "Sneed's Shredder"

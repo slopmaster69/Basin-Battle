@@ -1874,10 +1874,11 @@ impl Survival {
 
     // --- how the falling mine looks --------------------------------------------------------------
 
-    /// A piece of the falling mine (on its way down or lying where it fell), and its tilt: the
-    /// server draws it at once with no hull, moved in place as it falls.
+    /// A piece of the falling mine (on its way down or lying where it fell), or of the Shredder's
+    /// rigged log and its crash (`sim::machinery`), and its tilt: the server draws it at once
+    /// with no hull, moved in place as it falls.
     pub fn collapse_piece_tilt(&self, id: Id) -> Option<f32> {
-        self.bosses.looks.tilt.get(&id).copied()
+        self.bosses.looks.tilt.get(&id).copied().or_else(|| self.rig_piece_tilt(id))
     }
 
     /// The loose pieces lying where they fell (for tests and the log).

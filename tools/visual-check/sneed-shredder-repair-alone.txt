@@ -1,0 +1,27 @@
+# DEV SETUP: the Shredder pulled 17 yd from its post and broken there by debug, the hero healed
+# and standing off. What it shows: the break, the run back and the crash, Sneed crawling out,
+# "Just... one... bolt...", his run to the wreck under the hung log, his hammering left alone
+# (the wreck coughing 3 times, his sparks quicker, "She's turning over!"), and the machine
+# heaving up again at a third of its health.
+hero warrior
+cam off
+camera wide Sneed's Shredder|Sneed
+include _sneed-shredder-setup
+13 .es heal
+13.5 video
+14.5 .es goto -279 -516 50.4 2.48
+15 .es in lock
+22.5 .es hurt 0 dm_shredder
+16 .es heal
+19 .es heal
+22 .es heal
+25 .es heal
+28 .es heal
+31 .es heal
+34 .es heal
+37 .es heal
+40 .es heal
+43 .es heal
+46 .es heal
+49 .es heal
+48 end

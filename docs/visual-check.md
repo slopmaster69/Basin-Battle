@@ -288,6 +288,22 @@ of 0.4 sec, reading his place after each):
 | `gilnid-valve-fight`, `gilnid-valve-fight-healed` | A real pull by a small player in the interface, no debug kills; the second healed throughout |
 | `gilnid-valve`, `gilnid-ledges`, `gilnid-plank` | The older takes: the valve left alone seen from the side, the crew on their planks, his wait under a plank |
 
+Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
+`docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine
+cleared but for him, and the same kind of timer) and, for the real pulls, `_sneed-shredder-bot.txt`
+(a small player in the interface: guards the saws, rolls the stamp, sidesteps the Grind, goes for
+the tie-off at "Just... one... bolt..."):
+
+| Scenario | What it films |
+| --- | --- |
+| `sneed-shredder-log` | Dev setup, by the cameraman: the machine broken away from its post, its run back and crash, Sneed crawling out, his repair, the hero's cut at the tie-off, the log landing on him |
+| `sneed-shredder-log-pov` | The same on the hero's own screen |
+| `sneed-shredder-repair-alone` | Dev setup: nobody stops him; the repair to its end and the machine standing again |
+| `sneed-shredder-under-log` | Dev setup: a hero who cuts the log and stands under it beside a live machine |
+| `sneed-shredder-stagger` | Dev setup: the log spent, light blows without a gap from his line break his stance |
+| `sneed-shredder-log-machine` | Dev setup: the log dropped on the machine as it walks in |
+| `sneed-shredder-fight`, `sneed-shredder-fight-healed` | A real pull by the small player from the door to Sneed's death, no debug kills; the second healed throughout |
+
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
 cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, 0093 for the
 longer hold, the cameraman hero (`setup` makes it), and a screen wide enough for both
