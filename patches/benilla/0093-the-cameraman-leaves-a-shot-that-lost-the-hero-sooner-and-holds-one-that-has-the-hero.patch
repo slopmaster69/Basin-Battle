@@ -1,15 +1,15 @@
-From 01cf5aa94261538cdb2b54ef8b7c243a2a6a79c7 Mon Sep 17 00:00:00 2001
+From 0430e15cf130ecf3dcdccee48d2338056366899d Mon Sep 17 00:00:00 2001
 From: Corios00 <52224974+Corios00@users.noreply.github.com>
 Date: Fri, 13 Nov 2026 17:41:52 -0600
 Subject: [PATCH] The cameraman leaves a shot that has lost the hero after a
  second, and holds one that still has the hero 5 s
 
 ---
- crates/benilla-app/src/player/spectator.rs | 110 ++++++++++++++-------
- 1 file changed, 74 insertions(+), 36 deletions(-)
+ crates/benilla-app/src/player/spectator.rs | 127 ++++++++++++++-------
+ 1 file changed, 87 insertions(+), 40 deletions(-)
 
 diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
-index d47c6d78..a31ab2b2 100644
+index d47c6d78..37bacb9e 100644
 --- a/crates/benilla-app/src/player/spectator.rs
 +++ b/crates/benilla-app/src/player/spectator.rs
 @@ -28,16 +28,20 @@
@@ -142,7 +142,7 @@ index d47c6d78..a31ab2b2 100644
      if state.blocked == 0.0 && state.cluttered == 0.0 {
          state.told = false;
      }
-@@ -980,14 +1008,15 @@ fn film(
+@@ -980,16 +1008,26 @@ fn film(
          }
          state.retry = RETRY_URGENT_SECS;
      } else if urgent.is_none()
@@ -152,16 +152,31 @@ index d47c6d78..a31ab2b2 100644
          && state.retry <= 0.0
      {
          let here = scene.score(&collide, eye, state.look, order(shot, state.pick), want.is_some_and(|w| w.1));
-         let (what, secs) = match (sub_hidden, hero_hidden) {
-             (true, true) => ("both hidden".to_string(), state.blocked),
+-        let (what, secs) = match (sub_hidden, hero_hidden) {
+-            (true, true) => ("both hidden".to_string(), state.blocked),
 -            (true, false) => ("the subject hidden".to_string(), state.blocked),
 -            (false, true) => ("the hero hidden".to_string(), state.blocked),
-+            (true, false) => ("the subject hidden".to_string(), state.subject_blocked),
-+            (false, true) => ("the hero hidden".to_string(), state.hero_blocked),
-             _ if clutter >= CLUTTER_AT => (format!("the world on {clutter} of 20 lines of the foreground"), state.cluttered),
-             _ => (format!("{cut_off} of the two cut off by the frame"), state.cluttered),
+-            _ if clutter >= CLUTTER_AT => (format!("the world on {clutter} of 20 lines of the foreground"), state.cluttered),
+-            _ => (format!("{cut_off} of the two cut off by the frame"), state.cluttered),
++        // The reason that moved it, in the order they move it soonest (patch 0093: the subject
++        // hidden a moment no longer reads as the reason when half the picture was the world).
++        let held = state.held;
++        let (what, secs) = if state.both > BLOCKED_SECS {
++            ("both hidden".to_string(), state.both)
++        } else if time_to_cut(state.hero_blocked, 0.0, 0.0, held) {
++            ("the hero hidden".to_string(), state.hero_blocked)
++        } else if clutter_to_cut(0.0, state.heavy, held) {
++            (format!("the world on {clutter} of 20 lines of the foreground"), state.heavy)
++        } else if time_to_cut(0.0, state.subject_blocked, 0.0, held) {
++            ("the subject hidden".to_string(), state.subject_blocked)
++        } else if clutter >= CLUTTER_AT {
++            (format!("the world on {clutter} of 20 lines of the foreground"), state.cluttered)
++        } else {
++            (format!("{cut_off} of the two cut off by the frame"), state.cluttered)
          };
-@@ -1012,10 +1041,13 @@ fn film(
+         match scene.best(&collide, shot, state.axis, Some(state.pick)) {
+             Some(spot) if spot.score + BETTER_BY < here => {
+@@ -1012,10 +1050,13 @@ fn film(
          state.unsure = !spot.score.is_finite();
          state.walled = 0.0;
          state.cluttered = 0.0;
@@ -175,7 +190,7 @@ index d47c6d78..a31ab2b2 100644
          state.outside = 0.0;
          state.told = false;
          (spot.eye, spot.look)
-@@ -1233,22 +1265,28 @@ mod tests {
+@@ -1233,22 +1274,28 @@ mod tests {
          assert!(!body(0.0, 3.0).on_line(high.0, high.1), "the line passes over its head");
      }
  
