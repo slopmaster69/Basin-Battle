@@ -1,0 +1,79 @@
+# The client's own unit tests (the cameraman's in crates/benilla-app/src/player/spectator.rs, and
+# the rest of the crates our patches touch), run against the pinned benilla with every patch in
+# patches/benilla applied. The other checks only build the client; its tests can't run on the
+# team's Windows laptops (a test binary that links Bevy crashes at start), so they run here, on
+# Linux.
+#
+# Runs on main and by hand (Actions -> Client tests -> Run workflow, or
+# `gh workflow run client-tests.yml --ref <branch>`), not on pull requests: a pull request's
+# checks are only "builds on each OS" and "merges cleanly".
+#
+# A failing test fails the run, and the run's summary lists the failing tests. The run goes
+# through every test either way (--no-fail-fast), so one failure doesn't hide the others.
+name: Client tests
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: client-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  client-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      # What Bevy links against on Linux: sound, input devices, and the windowing libraries.
+      - name: Install the system libraries Bevy needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev \
+            libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxinerama-dev
+
+      - name: Fetch the pinned benilla and apply the patches
+        run: |
+          rev=$(sed -n 's/^BENILLA_REV="\(.*\)"/\1/p' scripts/common.sh)
+          repo=$(sed -n 's/^BENILLA_REPO="\(.*\)"/\1/p' scripts/common.sh)
+          git clone -q "$repo" benilla
+          git -C benilla checkout -q "$rev"
+          for p in patches/benilla/*.patch; do
+            git -C benilla apply --whitespace=nowarn "$GITHUB_WORKSPACE/$p"
+          done
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: benilla
+
+      # The crates the patches touch (benilla-app is the one with the cameraman's tests).
+      - name: Run the client's tests
+        working-directory: benilla
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          status=0
+          cargo test --no-fail-fast \
+            -p benilla-app -p benilla-world -p benilla-ui -p benilla-assets -p benilla-formats \
+            2>&1 | tee ../test.log || status=$?
+          {
+            echo "## Client tests: $(( $(date +%s) - start )) sec"
+            echo
+            grep -E '^test result:' ../test.log | sed 's/^/    /' || true
+            echo
+            echo "Failing tests:"
+            echo
+            grep -E '^test .* \.\.\. FAILED' ../test.log | sed 's/^/    /' || echo "    none"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-tests-log
+          path: test.log
