@@ -2159,7 +2159,8 @@ death_text = "...VanCleef... never pay..."
   # drives his maul into it 2 sec after the yell: the moment the first wave starts at the door,
   # so the collapse's own times are as they were. On that one frame every hero in the mine is
   # shaken (hardest near him), dust bursts off the wall and rock comes loose over 1.5 sec: 3 off
-  # the wall, 9 round him and 4 at the door, in three sizes, for show (no ring: they hurt
+  # the wall, up to 9 round him and 4 at the door (fewer where heroes stand close: the bigger
+  # the rock, the wider it keeps of them), in three sizes, for show (no ring: they hurt
   # nobody), and one marked on the floor under each hero within 30 yd, 1.3 sec before it lands
   # (out of the ring, or struck for 0.6 of his blow; not thrown down). He can be hit all the
   # while; no stagger, break or hold stops it. Each later section goes as he pounds the floor

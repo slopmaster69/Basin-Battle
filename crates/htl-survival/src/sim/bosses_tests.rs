@@ -1669,6 +1669,8 @@ fn the_slam_shakes_rock_loose_for_show_and_marks_one_under_each_hero_near() {
     for id in seen.keys() {
         assert!(s.collapse_rubble().contains(id), "each lies where it fell");
     }
+    // Loose rock has no hull: only a face's rocks are solid, and the slam makes none.
+    assert!(s.collapse_faces().is_empty(), "nothing of the slam is solid: it blocks no way out and walls nobody in");
 }
 
 #[test]
