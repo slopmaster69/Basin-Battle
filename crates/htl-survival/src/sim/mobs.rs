@@ -640,7 +640,7 @@ impl Survival {
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
-        let damage = self.boss_hold(mid, damage);
+        let damage = self.boss_hold(mid, by, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
         if m.health == 0 {
             return;

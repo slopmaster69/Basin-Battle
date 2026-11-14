@@ -1317,6 +1317,41 @@ fn a_blow_refused_at_the_hold_shows_what_it_took() {
     assert_eq!(blow(&mut s, 21), Some((21, Outcome::Hit)));
 }
 
+/// Two heroes at the hold in one tick: a hurt refused that has no blow of its own (a bleed, a
+/// burn) leaves another hero's blow of the same size as it was, and a hero's own refused blow
+/// is still the one rewritten when a friend's same-sized blow came before it.
+#[test]
+fn a_hurt_refused_at_the_hold_rewrites_nobody_elses_blow() {
+    let (mut s, boss, h) = mine_at(dressed(2.0), 29, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "wave"));
+    let friend = s.join("friend", "Friend", None);
+    let floor = (0.26 * s.mobs[&boss].max_health as f32).round() as u32;
+    let left = s.mobs[&boss].health - floor;
+    s.hurt_mob(boss, h, left - 29);
+    let swing = |by: Id| Event::Swing { attacker: by, victim: Some(boss), damage: 29, outcome: Outcome::Hit, anim: false, style: Blow::Light };
+    let shown = |s: &Survival, by: Id| {
+        s.events.iter().rev().find_map(|e| match e {
+            Event::Swing { attacker, victim: Some(v), damage, outcome, .. } if *attacker == by && *v == boss => Some((*damage, *outcome)),
+            _ => None,
+        })
+    };
+    // The friend's blow takes him to his hold, whole.
+    s.events.clear();
+    s.events.push(swing(friend));
+    s.hurt_mob(boss, friend, 29);
+    assert_eq!(s.mobs[&boss].health, floor);
+    // The hero's bleed of the same size is refused in the same tick: it has no blow to rewrite.
+    s.hurt_mob(boss, h, 29);
+    assert_eq!(shown(&s, friend), Some((29, Outcome::Hit)), "the friend's blow keeps its number");
+    // The hero's own blow of that size, refused: his is the one that glances off.
+    s.events.push(swing(h));
+    s.hurt_mob(boss, h, 29);
+    assert_eq!(shown(&s, h), Some((0, Outcome::Blocked)));
+    assert_eq!(shown(&s, friend), Some((29, Outcome::Hit)));
+    assert_eq!(s.mobs[&boss].health, floor);
+}
+
 /// Filmed, November 13: with his maul lodged he stood in a stun's pose, the maul still in his
 /// hand, and nothing said "now". The fire goes out of him for exactly as long as it is stuck:
 /// what he wears for his burning weapon and his last stand is off him, and back as it comes free.

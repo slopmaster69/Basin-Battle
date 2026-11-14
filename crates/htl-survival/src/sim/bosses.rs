@@ -1317,7 +1317,7 @@ impl Survival {
     /// before the last section is down (the last of the fight is fought at its face). The first
     /// blow refused is said (`held_text`) and shown: `held_aura` on it from then until the hold
     /// lifts, and `held_kit` flashed on it for each blow refused.
-    pub(crate) fn boss_hold(&mut self, mid: Id, damage: u32) -> u32 {
+    pub(crate) fn boss_hold(&mut self, mid: Id, by: Id, damage: u32) -> u32 {
         let now = self.clock;
         let Some(c) = self.bosses.collapse.as_ref().filter(|c| c.boss == mid && !c.done && c.hold > 0.0) else { return damage };
         let Some(m) = self.mobs.get(&mid) else { return damage };
@@ -1339,13 +1339,17 @@ impl Survival {
         }
         // The blow's own number says what it took, and a blow that took nothing glanced off
         // (filmed, November 13: a hero at the hold saw 29 and 21 float off a health bar that
-        // never moved).
+        // never moved). Whoever strikes pushes the blow's `Swing` just before it hurts, so the
+        // number is the last `Swing` from `by` on this boss, and only if that is a hit of this
+        // size: a hurt with no `Swing` of its own (a bleed, a burn) rewrites nobody's blow.
         if let Some(Event::Swing { damage: d, outcome, .. }) =
-            self.events.iter_mut().rev().find(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Hit, damage: d, .. } if *v == mid && *d == damage))
+            self.events.iter_mut().rev().find(|e| matches!(e, Event::Swing { attacker, victim: Some(v), .. } if *attacker == by && *v == mid))
         {
-            *d = most;
-            if most == 0 {
-                *outcome = Outcome::Blocked;
+            if *outcome == Outcome::Hit && *d == damage {
+                *d = most;
+                if most == 0 {
+                    *outcome = Outcome::Blocked;
+                }
             }
         }
         most
