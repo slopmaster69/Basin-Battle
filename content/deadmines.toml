@@ -1605,11 +1605,12 @@ then = "dm_sneed"
   name = "stamp and rake"
   steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.9, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
   # Plants and churns its legs in place (its Run, held) as the engine races 1.4 sec, then drives
-  # 6 yd straight in 0.9 sec and stalls, slumped, for 3.5 sec.
+  # 6 yd straight in 0.9 sec and stalls, slumped, for 4.5 sec (6 into a wall): sim/machinery's
+  # STALL, set by measure. The recovery here is the drive and that stall.
   [[mob.pattern]]
   name = "grind"
   max_range = 8.0
-  steps = [ { clip = 5, take = 0, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 4.4, sound = 1982 } ]
+  steps = [ { clip = 5, take = 0, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 5.4, sound = 1982 } ]
 
 # Fragile on foot: he keeps his distance, a wrench every 6 sec covering a scramble; cornered, three
 # blows and then he's open (hunched) 1.4 sec. sim/machinery moves him, and his one repair.

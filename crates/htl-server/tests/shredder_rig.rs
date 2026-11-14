@@ -505,3 +505,131 @@ fn left_alone_he_walks_to_his_work_clear_of_the_wreck_a_plain_hit_lands_and_stop
     }
     assert!(!s.slain("sneed"));
 }
+
+/// The last yard of floor on the way from the post through `toward`: a hero standing there has
+/// their back to whatever ends the floor (a wall, a pile, a ledge).
+fn cornered(s: &Survival, g: &ShredderRig, toward: f32) -> Vec3 {
+    let mut at = g.home;
+    for k in 1..80 {
+        let p = along(g.home, toward, k as f32 * 0.5);
+        let Some(p) = s.land().footing([p[0], p[1], at[2] + 0.5]) else { break };
+        if (p[2] - at[2]).abs() > 1.0 || s.land().blocked_near(p[0], p[1], p[2]) || walk(s, g.home, p).is_none() {
+            break;
+        }
+        at = p;
+    }
+    at
+}
+
+/// One Grind met by a warrior: `crash`, it was stopped short and stalls longer; `drove` yd;
+/// `unhurt` by the drive; in reach again `back` s after it stalled; `blows` light ones landed
+/// before its engine caught, `caught` s into the stall.
+struct Ground {
+    crash: bool,
+    drove: f32,
+    unhurt: bool,
+    back: f32,
+    blows: usize,
+    caught: f32,
+}
+
+/// A warrior standing their ground at `at` with the machine pulled to them. Each time it revs
+/// they step a stride off its lane, to whichever side has floor, and as it stalls they go
+/// straight back to it and strike until its engine catches. The first `n` Grinds.
+fn grinds_at(at: Vec3, n: usize) -> Vec<Ground> {
+    let (mut s, hero, machine) = mine(Some(1_000_000));
+    let g = rig(&s);
+    put(&mut s, hero, at, g.home);
+    s.dev_hurt(hero, 0.99, "dm_shredder").unwrap();
+    let start = s.clock;
+    let mut out = Vec::new();
+    while out.len() < n {
+        assert!(s.clock - start < 150.0, "at {at:.0?}: {} Grinds in 150 s", out.len());
+        let it = s.mobs[&machine].pos;
+        run_to(&mut s, hero, at, it);
+        mend(&mut s, hero);
+        // (Its Run held in place 1.4 s: the Grind's rev.)
+        if !step(&mut s).iter().any(|e| matches!(e, Event::React { id, hold, .. } if *id == machine && (*hold - 1.4).abs() < 0.01)) {
+            continue;
+        }
+        let (from, me) = (s.mobs[&machine].pos, s.players[&hero].pos);
+        let lane = facing(from, me);
+        let safe = [1.0f32, -1.0].iter().find_map(|k| {
+            let p = along(me, lane + k * std::f32::consts::FRAC_PI_2, 2.5);
+            let p = s.land().footing([p[0], p[1], me[2] + 0.5])?;
+            ((p[2] - me[2]).abs() < 1.5 && walk(&s, me, p).is_some_and(|d| d < 4.0)).then_some(p)
+        });
+        let safe = safe.unwrap_or_else(|| panic!("at {at:.0?}: a hero at {me:.1?} has nowhere to step off the lane"));
+        let health = s.players[&hero].health;
+        let mut crash = None;
+        while crash.is_none() {
+            assert!(s.clock - start < 150.0, "at {at:.0?}: it revved and never stalled");
+            let it = s.mobs[&machine].pos;
+            run_to(&mut s, hero, safe, it);
+            for e in step(&mut s) {
+                match e {
+                    Event::Log(t) if t.contains("the machine crashes and stalls") => crash = Some(true),
+                    Event::Log(t) if t.contains("the machine stalls") => crash = Some(false),
+                    _ => {}
+                }
+            }
+        }
+        let (t0, stop) = (s.clock, s.mobs[&machine].pos);
+        let unhurt = s.players[&hero].health == health;
+        assert!(s.land().footing(stop).is_some_and(|p| (p[2] - stop[2]).abs() < 0.6), "at {at:.0?}: it stalls on the floor: {stop:?}");
+        let (mut back, mut blows, mut left) = (None, 0, s.mobs[&machine].health);
+        let caught = loop {
+            assert!(s.clock - t0 < 8.0 && s.shredder_stage() == "machine", "at {at:.0?}: {} s into the stall, stage {}", s.clock - t0, s.shredder_stage());
+            let me = s.players[&hero].pos;
+            put(&mut s, hero, me, stop);
+            if s.foes_in_reach(hero) >= 1 {
+                back.get_or_insert(s.clock - t0);
+                s.input(hero, Input::Attack);
+            } else {
+                run_to(&mut s, hero, stop, stop);
+            }
+            let ev = step(&mut s);
+            if s.mobs[&machine].health < left {
+                blows += 1;
+                left = s.mobs[&machine].health;
+            }
+            if ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("the engine catches"))) {
+                break s.clock - t0;
+            }
+        };
+        out.push(Ground { crash: crash.unwrap(), drove: dist2d(from, stop), unhurt, back: back.unwrap_or(f32::INFINITY), blows, caught });
+    }
+    out
+}
+
+/// The Grind driven at a hero with their back to the room's own walls, piles and ledges, from
+/// the post out every way: stopped short it crashes and stalls longer, and it always stalls
+/// where a hero who stepped off the lane walks straight back to it and strikes it.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_grind_stopped_by_the_rooms_walls_crashes_where_a_hero_walks_back_to_it_and_strikes_it() {
+    let (s, _, _) = mine(Some(1_000_000));
+    let g = rig(&s);
+    let (mut crashes, mut plain) = (0, 0);
+    for k in 0..8 {
+        let at = cornered(&s, &g, k as f32 * std::f32::consts::FRAC_PI_4);
+        for (n, d) in grinds_at(at, 2).iter().enumerate() {
+            println!(
+                "back to the room's end {:.0} yd from the post at {at:.0?}, Grind {}: drove {:.1} yd, {}; the hero {}, in reach {:.2} s after it stalled, {} light blows before its engine caught {:.2} s in",
+                dist2d(at, g.home), n + 1, d.drove, if d.crash { "crashed" } else { "stalled" }, if d.unhurt { "unhurt" } else { "hit" }, d.back, d.blows, d.caught
+            );
+            assert!(d.unhurt, "at {at:.0?}: a stride off the lane is safe with a wall behind");
+            assert!(d.back <= 1.0, "at {at:.0?}: back in reach {} s after it stalled", d.back);
+            assert!(d.blows >= 4, "at {at:.0?}: {} blows", d.blows);
+            if d.crash {
+                crashes += 1;
+                assert!(d.drove < 5.9 && (d.caught - 5.0).abs() < 0.11, "at {at:.0?}: drove {}, caught {} s in", d.drove, d.caught);
+            } else {
+                plain += 1;
+                assert!(d.drove > 5.7 && (d.caught - 3.5).abs() < 0.11, "at {at:.0?}: drove {}, caught {} s in", d.drove, d.caught);
+            }
+        }
+    }
+    println!("{crashes} Grinds crashed, {plain} drove their whole 6 yd");
+    assert!(crashes >= 4, "the room's walls stop it: {crashes} crashes");
+}
