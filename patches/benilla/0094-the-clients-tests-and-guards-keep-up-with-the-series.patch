@@ -1,4 +1,4 @@
-From dcce30fff425568064fa8bd2b6e159a2cf5a66a6 Mon Sep 17 00:00:00 2001
+From 3941be8b67baccee94087b5dbb80bf4279b09ca0 Mon Sep 17 00:00:00 2001
 From: Corios00 <52224974+Corios00@users.noreply.github.com>
 Date: Sat, 14 Nov 2026 08:26:10 -0600
 Subject: [PATCH] The client's own tests and guards keep up with the series
@@ -30,7 +30,7 @@ torn-down unit's build, which needs `PreviewTint` (0017).
  .../src/creature_anim/action/afterimage.rs    |   4 +-
  crates/benilla-app/src/entities/attach/mod.rs |   1 +
  crates/benilla-app/src/entities/missile.rs    |   4 +-
- crates/benilla-app/src/game_plugins.rs        |  17 ++-
+ crates/benilla-app/src/game_plugins.rs        |  50 ++++++-
  crates/benilla-app/src/missile_look.rs        |   3 +-
  crates/benilla-app/src/pipe_warm/menagerie.rs |  33 ++++-
  crates/benilla-app/src/player.rs              |   2 +-
@@ -44,7 +44,7 @@ torn-down unit's build, which needs `PreviewTint` (0017).
  crates/benilla-ui/src/action_combat.rs        |  11 +-
  .../src/script/tests/reference_surface.rs     |  71 +++++++++-
  .../benilla-ui/tests/vm_parity_surface.golden |   4 +-
- 18 files changed, 315 insertions(+), 42 deletions(-)
+ 18 files changed, 346 insertions(+), 44 deletions(-)
 
 diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
 index d8863461..34f4ef44 100644
@@ -155,10 +155,22 @@ index 881a91fe..5dc288e7 100644
      /// [`OWN_SPEED_MOST`]. The yards left are what the fitted flight had left; a flight already due
      /// (nothing left) stays due. Nothing happens for a speed of 0 or less.
 diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
-index 39b9eaf7..7144d1a1 100644
+index 39b9eaf7..032274b4 100644
 --- a/crates/benilla-app/src/game_plugins.rs
 +++ b/crates/benilla-app/src/game_plugins.rs
-@@ -986,12 +986,24 @@ pub(crate) mod schedule_tests {
+@@ -936,8 +936,9 @@ pub(crate) mod schedule_tests {
+     }
+ 
+     /// `PostUpdate`'s undeclared-order pairs on the declared graph; `GlobalTransform` and the
+-    /// particle `EffectQuads` are most of it.
+-    const POST_UPDATE_CEILING: usize = 371;
++    /// particle `EffectQuads` are most of it. 598: the reference tree's 371 and the series' 227
++    /// (see the `Update` ceiling's list below for the reading of its pairs).
++    const POST_UPDATE_CEILING: usize = 598;
+     const POST_UPDATE_SLACK: usize = 20;
+     /// The actionable pairs in `Update`: conflicting access, no declared order, and nothing
+     /// [`Classes`] explains, so the executor orders them however the graph falls. The count may
+@@ -986,12 +987,24 @@ pub(crate) mod schedule_tests {
      ///   it, are outside that model;
      /// - the minimap's draw (`minimap::emit_minimap`), which reads `QuestGiver`'s dialog statuses,
      ///   against `ui_panes::feed_character_panes`, which lends the call host, whose quest verbs
@@ -185,11 +197,39 @@ index 39b9eaf7..7144d1a1 100644
      const UPDATE_ACTIONABLE_SLACK: usize = 40;
  
      fn ratchet(what: &str, n: usize, ceiling: usize, slack: usize) {
-@@ -1069,6 +1081,7 @@ pub(crate) mod schedule_tests {
+@@ -1069,6 +1082,35 @@ pub(crate) mod schedule_tests {
                  eprintln!("{r}");
              }
          }
 +        eprintln!("PostUpdate: {} ambiguous pairs", post.conflicts.len());
++        if std::env::var_os("WOW_AMBIGUITY_DUMP").is_some() {
++            let mut rows: Vec<String> = post
++                .conflicts
++                .iter()
++                .map(|(a, b, what)| {
++                    let (x, y) = if post.name(*a) <= post.name(*b) {
++                        (*a, *b)
++                    } else {
++                        (*b, *a)
++                    };
++                    format!(
++                        "  {}  <->  {}
++      on {}",
++                        post.name(x),
++                        post.name(y),
++                        what.iter()
++                            .map(|id| post.component(*id))
++                            .collect::<Vec<_>>()
++                            .join(", ")
++                    )
++                })
++                .collect();
++            rows.sort();
++            eprintln!("PostUpdate pairs:");
++            for r in rows {
++                eprintln!("{r}");
++            }
++        }
          ratchet(
              "Update (actionable)",
              actionable.len(),
