@@ -32,10 +32,12 @@ fallback when a ledge can't be placed are kept.
   1.3 yd off, on his post's side, and nowhere else. The pot's mouth is the furnace that belches
   and glows.
 - **The channel** his fire takes is one place in the pit, always the same: from the pot's foot by
-  the valve 16 yd out across the floor, 3 yd wide, 30 degrees east of straight out (`channel` in
-  `content/deadmines.toml`), 10 sections of 1.6 yd. It lies whole on the pit floor, with no pole,
-  no landing and no raised floor over it, and dry floor 2.3 yd from its middle on both sides (at
-  its first section, against the pot, on one side).
+  the valve 17.4 yd out across the floor, 3 yd wide, 30 degrees east of straight out (`channel` in
+  `content/deadmines.toml`), 10 sections 1.6 yd apart. Each section burns 1.5 yd around its
+  middle, and the mark reaches as far as the end sections bite, so no floor that burns lies off
+  it. It lies whole on the pit floor, with no pole, no landing and no raised floor over it, and
+  dry floor 2.3 yd from its middle on both sides (at its first section, against the pot, on one
+  side).
 
 ## The seven beats
 
@@ -65,16 +67,20 @@ fallback when a ledge can't be placed are kept.
    steps back off his plank onto the ramp (1 sec) and walks down it to fight.
 5. **Workers on foot** fight with wrenches. When the last is down: "Useless. Every one of you."
 6. **The valve: a race.** At "Useless. Every one of you." he starts for the valve, and from that
-   moment the channel is marked. It has three looks, and a fourth as it goes out:
+   moment the channel is marked. The line, the mark and his run start together: if his last line
+   is less than 2 sec old he waits for it where he stands, so the mark never shows before the
+   words. It has three looks, and a fourth as it goes out:
    - **It will burn if he finishes** (quiet): a pale blue band on the floor its true size, and a
      thin wisp of steam over each section. Nothing hurts.
    - **It burns in 1.2 sec**: the furnace glows, a whistle (3431), the band turns bright and full
      steam stands on every section.
    - **It is burning**: flames, a section every 0.25 sec from the valve's end out, the band amber
-     where they burn. Each section bites as it lights (30) and once more 1.2 sec later (15).
+     where they burn. Each section bites as it lights (30) and once more 1.2 sec later (15); on
+     a lone warrior that's 41 and 20 of his 200. Sections overlap, so a hero between two
+     middles, which is most of the channel, is bitten by both.
    - **It's out**: one grey band drawn back from the far end to the valve, the wisps going with it.
 
-   He runs to the valve (1 to 1.7 sec from anywhere in his pit) and puts his hands on it for 2 sec
+   He runs to the valve (0.95 to 1.75 sec from anywhere in his pit) and puts his hands on it for 2 sec
    (the goblin's standing use, with a cast bar). What a hero can do:
    - **Stop it for good**: stagger him while his hands are on the valve. One heavy blow that lands
      on him there does it whatever it deals; so does 120 posture built on him from the moment his
@@ -111,13 +117,14 @@ On the installed map (`crates/htl-server/tests/gilnid_valve.rs`), a warrior alon
 
 | Measure | Result |
 | --- | --- |
-| Gilnid to the valve, from 6 places in his pit (6.8 to 11.7 yd) | 0.95 to 1.70 sec |
+| Gilnid to the valve, from 6 places in his pit (6.8 to 11.9 yd) | 0.95 to 1.75 sec |
 | From his line to the whistle, from the second landing (8.1 yd) | 3.15 sec (hands on at 1.15) |
 | A heavy blow, from its start to landing | 0.50 sec |
 | A hero 8.8 yd from the valve who goes at once | stops him 1.70 sec after the line |
-| The same hero 0.5, 1.0, 1.5 sec late | stops him at 1.90, 2.35, 2.85 sec |
+| The same hero 0.5, 1.0, 1.5 sec late | stops him at 1.90, 2.35, 2.80 sec |
 | The same hero 2.0 sec late or more | too late: the whistle |
-| Standing in the channel's middle to the end | 61 of 200 health |
+| Standing on a section's middle to the end | 61 of 200 health |
+| Standing between two sections' middles to the end | 122 of 200 health |
 | Stepping out 0.5 sec after the whistle, either side, sections 1, 5 and 9 | 0 |
 
 So the race is won by a hero who answers the line within about 1.5 sec and lost by one who
@@ -147,14 +154,15 @@ are Gilnid's versions, for it to fold in:
 
 ## Tests
 
-`perches_tests.rs` (33 sim tests): the planks, poles and heights; the fuse, the arc's two legs,
+`perches_tests.rs` (35 sim tests): the planks, poles and heights; the fuse, the arc's two legs,
 the stick's sit and blast and the heavy-blow hold; the demonstration (belch, spill to the pole,
 fire, line, fall outward, sit, get up, fight); one fall per man from a projectile, a pole blow
 and a blow from the ramp; splash, burns and zero damage don't count; a corpse still falls; the
 second man's three throws and climb; no demonstration once a hero has dropped a man; his lines
 2 sec apart; the finish's flurry and stuck pose; debug posture; wipe, death and party handoff
 cleanup; a ledge without floor is left out and the fight goes on. The valve: the channel fixed in
-the world and marked from his line; whistle, steam, then fire only on the mark with dry ground
+the world and marked from his line, never before it; the mark as long as the fire bites;
+whistle, steam, then fire only on the mark with dry ground
 either side; a hero in it at the whistle reaches dry floor either side; a stagger on the way only
 delays; a stagger at the valve stops it for good and leaves him open; one heavy blow does it
 whatever it deals, light blows take longer; kept from the valve he gives it up; no channel or no
@@ -170,8 +178,39 @@ who stays pays; a hero on a plank or the ramp is out of the fire and the valve r
 
 `gilnid_native.rs` (installed data, `--ignored`): his post seen from the way in; both ledges and
 their pieces on the real ramp and pit; the first stick and the furnace's lesson, the fall onto
-the pit floor; the valve and the 16 yd channel on his floor.
+the pit floor; the valve and the channel on his floor.
 
 ## Seen in the client
 
-FILMED_PLACEHOLDER
+The valve was filmed on Nov 14 with the scenarios `gilnid-valve-*` (`docs/visual-check.md`), from
+above and on the hero's own screen, muted. What the footage shows:
+
+- **The quiet mark**: from his line on, a pale blue band from the pot's foot, its true size, with
+  a small red vent and a wisp on each section. It's there while he runs and works.
+- **The whistle**: the band turns bright and the vents stand up as red boxes in steam. It's told
+  apart from the quiet mark at a glance.
+- **The fire**: flames a section at a time from the valve's end, dry floor on both sides. A hero
+  who steps out 0.6 sec after the whistle takes 0. One who stays between 2 sections loses 122 of
+  200 and lives.
+- **The stop**: the heavy blow lands on him at the valve 2.05 sec after his line from 8 yd (dev
+  setup), 2.2 sec from 10 yd (a real pull, no debug help) and 2.9 sec from 15 yd (a real pull,
+  healed). Steam bursts and the band is gone within 0.6 sec.
+- **A real pull** by the scripted warrior with no help: the crew down in 42 sec, the valve
+  stopped, then the hero fell at 13 health to the finish's first blow. Healed throughout: pull
+  to kill in 105 sec.
+
+What reads weak, or wasn't seen:
+
+- The mark going out is a fade under the steam. The grey band isn't seen as grey.
+- His 4 sec open after the stop look like an ordinary exchange: he stands bent by the pot and
+  nothing marks him as open.
+- The valve has no part that moves. He stands at the pot's corner with his hands up.
+- He stands in the channel's first section while he works, and the fire starts around him. It
+  doesn't hurt him.
+- On the hero's own screen, fighting him against the pot puts the camera inside both bodies.
+- A `GroundBurst` can't be recalled, so the mark's last pulse stays up to 1 sec after a stop,
+  his death or a lost fight. A client line that clears bursts would end it at once; none is
+  written.
+- Not filmed, tests only: the give-up when he's kept from the valve, a stagger on the way, 2
+  heroes, his death during the work or the steam, a hero on a plank while the fire runs.
+- The whistle wasn't heard: the takes are muted.

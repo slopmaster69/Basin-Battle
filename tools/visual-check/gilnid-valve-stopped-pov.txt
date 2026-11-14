@@ -1,22 +1,20 @@
-# DEV SETUP: gilnid-valve-stopped on the hero's own screen (no cameraman): the crew brought down
-# by debug, the hero healed. The line, the marked channel, the run after him, the heavy blow at
-# the valve, the mark going out, him reeling, the finish.
+# DEV SETUP: gilnid-valve-stopped on the hero's own screen (no cameraman): the hero put by his
+# post, the crew brought down by debug, the hero healed; the run to the valve and the heavy blow
+# are the hero's own keys.
 hero warrior
 cam off
 include _gilnid-valve-setup
-12.5 lua GV.useless = function() GV.after(0.4, function() ActionDash(1.0, 7, "f") GV.log("after him") end) GV.after(1.6, function() GV.say(".es in h") GV.log("heavy blow") end) for k = 0, 3 do GV.after(2.9 + k * 0.8, function() GV.say(".es in a") GV.after(0.08, function() GV.say(".es in au") end) end) end end
+12.5 lua GV.useless = function() GV.say(".es in unlock") GV.after(0.15, function() GV.go(-204.85, -584.86, 0, function() GV.turn(2.618) GV.after(0.05, function() GV.say(".es in h") GV.log("heavy blow") GV.after(0.6, function() GV.say(".es where") end) end) end) end) GV.after(2.8, function() GV.say(".es in lock") end) for k = 0, 3 do GV.after(3.3 + k * 0.8, function() GV.say(".es in a") GV.after(0.08, function() GV.say(".es in au") end) end) end end
 13 video
-14 .es goto -188 -580 21 3.6
-16 .es goto -197 -585 21 3.8
-16.6 .es in lock
-17 .es hurt 0 engineer
-17.3 .es hurt 0 engineer
-17.4 .es heal
-17.5 shots valve 24 0.3
-20.5 .es heal
-24 .es heal
-25 shots finish 12 0.5
-27 .es heal
-30 .es heal
-33 .es heal
-36 end
+15 .es goto -198 -589 21 2.6
+15.3 .es in lock
+16 .es hurt 0 engineer
+16.25 .es hurt 0 engineer
+16.4 .es heal
+19.5 .es heal
+23 .es heal
+26 .es heal
+29 .es heal
+32 .es heal
+33 shots finish 2 0.5
+35 end

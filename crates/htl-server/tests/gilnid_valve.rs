@@ -71,8 +71,13 @@ fn race_from(at: [f32; 2], secs: f32) -> (Survival, Id, Id) {
     while s.clock < t + secs && dist2d(s.mobs[&boss].pos, at) > 3.5 { step(&mut s); }
     for _ in 0..2 { s.dev_hurt(hero, 0.0, "engineer").ok(); }
     let t = s.clock;
-    while stage(&s, boss) == "crew" && s.clock < t + 1.0 { step(&mut s); }
+    // (At his line, which waits until the pull's line is 2 sec past.)
+    while stage(&s, boss) == "crew" && s.clock < t + 3.0 { step(&mut s); }
     assert_eq!(stage(&s, boss), "to valve", "his crew down, he starts for the valve");
+    // Whole again, so that what the hero loses from here on is the valve's alone (and nothing
+    // of what he dealt meanwhile mends during the measure).
+    let p = s.players.get_mut(&hero).unwrap();
+    p.health = p.max_health;
     (s, hero, boss)
 }
 
@@ -214,11 +219,13 @@ fn the_race_for_the_valve_is_won_by_a_hero_who_goes_at_once_and_lost_by_one_who_
 #[test]
 #[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
 fn a_hero_in_the_channel_at_the_whistle_walks_out_dry_either_side_and_one_who_stays_pays() {
-    for (k, side) in [(1usize, 1.0f32), (1, -1.0), (5, 1.0), (5, -1.0), (9, 1.0), (9, -1.0), (5, 0.0)] {
+    // (The last two stand still: on a section's middle, and between two sections, where both bite.)
+    for (k, side, seam) in [(1usize, 1.0f32, false), (1, -1.0, false), (5, 1.0, false), (5, -1.0, false), (9, 1.0, false), (9, -1.0, false), (5, 0.0, false), (5, 0.0, true)] {
         let (mut s, hero, boss) = race_from([-199.0, -585.0], 6.0);
         let run = s.content.player.run_speed;
         let (channel, yaw, half) = s.perch_channel(boss).unwrap();
-        put(&mut s, hero, channel[k], channel[0]);
+        let at = if seam { along(channel[k], yaw, dist2d(channel[k], channel[k + 1]) / 2.0) } else { channel[k] };
+        put(&mut s, hero, at, channel[0]);
         let t0 = s.clock;
         while stage(&s, boss) != "steam" && s.clock < t0 + 10.0 { step(&mut s); }
         assert_eq!(stage(&s, boss), "steam");
@@ -239,9 +246,10 @@ fn a_hero_in_the_channel_at_the_whistle_walks_out_dry_either_side_and_one_who_st
         let cost = before - s.players[&hero].health;
         if side == 0.0 {
             let health = s.content.player.health;
-            println!("stood in section {k} to the end: {cost} health of {health}");
-            // The fire, then its last bite: it costs, and it's survived.
-            assert!(cost >= 45 && cost * 2 < health, "{cost} of {health}");
+            println!("stood {} to the end: {cost} health of {health}", if seam { "between sections 5 and 6" } else { "on section 5's middle" });
+            // The fire, then its last bite (from 2 sections, between them): it costs, and from
+            // full health it's survived.
+            assert!(cost >= 45 && cost < health * 2 / 3, "{cost} of {health}");
         } else {
             assert_eq!(cost, 0, "section {k}, side {side}: out dry");
         }

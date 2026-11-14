@@ -276,11 +276,12 @@ landing's deck.
 
 Gilnid's valve (the race, `docs/gilnid-encounter.md`) has its own set, all sharing
 `_gilnid-valve-setup.txt` (the mine cleared but for him and his crew, markers off, and a timer
-that presses the hero's keys a set time after his line is heard):
+that presses the hero's keys a set time after his line is heard, and runs him to a spot in dashes
+of 0.4 sec, reading his place after each):
 
 | Scenario | What it films |
 | --- | --- |
-| `gilnid-valve-stopped` | Dev setup, by the cameraman: his line, the marked channel, the run, a heavy blow at the valve, the mark going out, him open, the finish |
+| `gilnid-valve-stopped` | Dev setup, by the cameraman from above: his line, the marked channel, the run, a heavy blow at the valve, the mark going out, him open, the finish |
 | `gilnid-valve-fire` | Dev setup, by the cameraman from above: nobody stops him; the whistle, the steam, the hero stepping out, the fire down the channel |
 | `gilnid-valve-stopped-pov`, `gilnid-valve-fire-pov` | The same two on the hero's own screen |
 | `gilnid-valve-stood` | Dev setup, the hero's own screen: a hero who stays in the channel to the end |

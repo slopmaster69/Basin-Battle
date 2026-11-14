@@ -104,11 +104,12 @@ const GIVE_UP: f32 = 3.0;
 /// The channel's mark, drawn whatever the floor markers, in short bursts sent again and again:
 /// the client can't take a drawn burst back, so a mark that must go out when he's stopped, falls
 /// or loses his foe can't be drawn longer than a moment ahead. Three looks: it will burn if he
-/// finishes (pale steam-blue, slow, with small wisps of steam, from his line), it burns in
+/// finishes (pale steam-blue with small wisps of steam, from his line; sent 4 times a second, as
+/// a burst is all but gone by half its time and a slower mark blinks), it burns in
 /// `VENT_SECS` (bright, quick, under the whistle and the full steam), it is burning (amber,
 /// under the flames).
 const MARK_WILL: &str = "8FB4D8";
-const WILL_EVERY: f32 = 0.5;
+const WILL_EVERY: f32 = 0.25;
 const WILL_SECS: f32 = 1.0;
 const MARK_SOON: &str = "FFF2C8";
 const SOON_EVERY: f32 = 0.3;
@@ -528,6 +529,11 @@ impl Survival {
             if self.step_perch_demo(owner) { continue; }
             let alive = |s: &Self, id: &Id| s.mobs.get(id).is_some_and(|m| m.health > 0);
             if ids.iter().all(|id| !alive(self, id)) {
+                // His line starts the race, so he doesn't start for the valve before it can be
+                // said: a line of his less than `LINE_GAP` old holds both back, never the line
+                // alone (the channel marked and him on his way a second before he says so).
+                let c = &self.perches.crews[&owner];
+                if !c.lines.is_empty() || c.said_at.is_some_and(|t| now - t < LINE_GAP) { continue; }
                 self.perch_say(owner, "Useless. Every one of you.");
                 self.stagger_mob(owner, 0.05, false); // Let go of the current blow before running.
                 self.begin_valve(owner);
@@ -894,7 +900,9 @@ impl Survival {
         let Some(c) = self.perches.crews.get(&owner) else { return };
         if from >= to || to > c.channel.len() { return; }
         let (a, b, yaw) = (c.channel[from], c.channel[to - 1], c.channel_yaw);
-        let half = STRIPE_STEP / 2.0;
+        // As far past its end sections' middles as their fire bites (a circle each), so no
+        // floor that burns lies off the mark's ends.
+        let half = STRIPE_RADIUS;
         let reach = dist2d(a, b) + 2.0 * half;
         let (at, yaw) = if back { (along(b, yaw, half), yaw + std::f32::consts::PI) } else { (along(a, yaw, -half), yaw) };
         self.events.push(Event::GroundBurst { at, yaw, shape: "line", reach, arc: 0.0, width: STRIPE_RADIUS * 2.0, secs, colour: colour.into() });

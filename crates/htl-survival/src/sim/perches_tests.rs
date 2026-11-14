@@ -352,7 +352,7 @@ fn the_fires_channel_is_fixed_in_the_world_and_marked_from_his_line() {
         assert!((dist2d(w[0], w[1]) - STRIPE_STEP).abs() < 0.01);
         assert!(angle_between(facing(w[0], w[1]), yaw) < 0.5, "one straight line");
     }
-    tick(&mut s, 1.0);
+    tick(&mut s, 2.5);
     assert_eq!(marked(&s.events), 0, "nothing is marked while the crew stands");
     assert!(s.perches.crews[&boss].wisps.is_empty());
     // Wherever the heroes stand when his line comes, it's the same channel.
@@ -366,9 +366,9 @@ fn the_fires_channel_is_fixed_in_the_world_and_marked_from_his_line() {
     // steam on every section.
     let will = marks(&s.events, MARK_WILL);
     assert!(!will.is_empty(), "marked as his line is said");
-    let whole = dist2d(channel[0], channel[n - 1]) + STRIPE_STEP;
+    let whole = dist2d(channel[0], channel[n - 1]) + 2.0 * STRIPE_RADIUS;
     for (at, way, reach, width, secs) in &will {
-        assert!(dist2d(*at, along(channel[0], yaw, -STRIPE_STEP / 2.0)) < 0.01);
+        assert!(dist2d(*at, along(channel[0], yaw, -STRIPE_RADIUS)) < 0.01);
         assert!(angle_between(*way, yaw) < 0.5);
         assert!((reach - whole).abs() < 0.01, "the whole channel");
         assert!((width - 2.0 * half).abs() < 0.01, "its true width");
@@ -435,8 +435,8 @@ fn left_to_it_a_whistle_then_steam_then_fire_down_the_marked_channel_with_dry_gr
         tick(&mut s, 0.05);
     }
     assert_eq!(stage(&s, boss), "finished");
-    let whole = dist2d(channel[0], channel[n - 1]) + STRIPE_STEP;
-    let start = along(channel[0], yaw, -STRIPE_STEP / 2.0);
+    let whole = dist2d(channel[0], channel[n - 1]) + 2.0 * STRIPE_RADIUS;
+    let start = along(channel[0], yaw, -STRIPE_RADIUS);
     assert!(log.iter().all(|l| l.1 == MARK_SOON || l.1 == MARK_FIRE), "only those two looks once the valve is open");
     let first = &log[0];
     assert!(first.0 <= opened + 0.11 && first.1 == MARK_SOON && (first.3 - whole).abs() < 0.01, "the whole channel bright at the whistle");
@@ -453,7 +453,7 @@ fn left_to_it_a_whistle_then_steam_then_fire_down_the_marked_channel_with_dry_gr
     // Amber only where a section has caught, the rest still bright.
     for l in log.iter().filter(|l| l.1 == MARK_FIRE) {
         let lit = (((l.0 - fire_at) / STRIPE_GAP) as usize + 1).min(n) as f32;
-        assert!(dist2d(start, l.2) + l.3 <= lit * STRIPE_STEP + 0.3, "{l:?}");
+        assert!(dist2d(start, l.2) + l.3 <= (lit - 1.0) * STRIPE_STEP + 2.0 * STRIPE_RADIUS + 0.3, "{l:?}");
     }
     assert!(log.last().unwrap().0 <= fire_at + n as f32 * STRIPE_GAP + STRIPE_BURN + 0.1, "the mark doesn't outlast the fire");
     let cost = before.0 - s.players[&hero].health;
@@ -533,7 +533,7 @@ fn a_stagger_with_his_hands_on_the_valve_stops_it_for_good_and_leaves_him_open()
     let out = marks(&s.events, MARK_OUT);
     assert_eq!(out.len(), 1);
     assert!(angle_between(out[0].1, yaw + std::f32::consts::PI) < 0.5, "drawn back toward the valve");
-    assert!(dist2d(out[0].0, along(channel[n - 1], yaw, STRIPE_STEP / 2.0)) < 0.01);
+    assert!(dist2d(out[0].0, along(channel[n - 1], yaw, STRIPE_RADIUS)) < 0.01);
     assert_eq!(marks(&s.events, MARK_WILL).len(), 0, "no more of the mark");
     let left: Vec<Vec3> = s.perches.crews[&boss].visuals.iter().filter(|id| display(&s, **id) == Some(STEAM)).map(|id| s.objs[id].pos).collect();
     assert!(!left.is_empty() && left.len() < n, "going out: {} left", left.len());
@@ -646,6 +646,7 @@ fn with_no_channel_or_nowhere_to_stand_at_the_valve_he_leaves_it_alone() {
         let c = s.perches.crews.get_mut(&boss).unwrap();
         if case == 0 { c.channel.truncate(CHANNEL_LEAST - 1); } else { c.stand = None; }
         s.events.clear();
+        s.clock += 5.0;
         for id in crew { s.hurt_mob_as(id, hero, 10_000, "test"); }
         tick(&mut s, 0.1);
         assert_eq!(stage(&s, boss), "finished", "case {case}: straight on to his finish");
@@ -777,6 +778,56 @@ fn a_hero_up_on_a_plank_is_not_burned_by_the_fire_on_the_floor_below() {
 }
 
 #[test]
+fn the_mark_reaches_as_far_as_the_fire_bites_at_the_channels_far_end() {
+    let (mut s, _, boss) = race();
+    let (channel, yaw, half) = s.perch_channel(boss).unwrap();
+    let n = channel.len();
+    // One hero just inside the fire's reach past the last section's middle, one a step past it.
+    let inside = friend(&mut s, "inside", along(channel[n - 1], yaw, half - 0.1));
+    let past = friend(&mut s, "past", along(channel[n - 1], yaw, half + 0.2));
+    let before = (s.players[&inside].health, s.players[&past].health);
+    // The mark covers the first and stops short of the second.
+    let (at, way, reach, ..) = marks(&s.events, MARK_WILL)[0];
+    let end = along(at, way, reach);
+    assert!(dist2d(end, along(channel[n - 1], yaw, half)) < 0.01, "the mark ends where the fire's reach does");
+    assert!(until(&mut s, 20.0, |s| stage(s, boss) == "finished"));
+    assert!(s.players[&inside].health < before.0, "burned, on the mark");
+    assert_eq!(s.players[&past].health, before.1, "dry, off the mark");
+}
+
+#[test]
+fn he_starts_for_the_valve_at_his_line_never_before_it() {
+    // The crew down half a second after the pull, his pull line still in the air: the line and
+    // the race wait for each other.
+    let (mut s, hero, boss, crew) = fight();
+    s.events.clear();
+    tick(&mut s, 0.5);
+    for id in crew { s.hurt_mob_as(id, hero, 10_000, "test"); }
+    let pulled = s.clock - 0.5;
+    let mut seen = 0;
+    let (mut line, mut mark) = (None, None);
+    for _ in 0..80 {
+        tick(&mut s, 0.05);
+        let new = &s.events[seen..];
+        if line.is_none() && new.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "Useless. Every one of you.")) {
+            line = Some(s.clock);
+        }
+        if mark.is_none() && marked(new) > 0 { mark = Some(s.clock); }
+        if line.is_none() {
+            assert_eq!(stage(&s, boss), "crew", "not on his way before his line");
+            assert!(mark.is_none(), "no mark before his line");
+            assert_eq!(vapour(&s), 0);
+        } else if line == Some(s.clock) {
+            assert_eq!(stage(&s, boss), "to valve", "on his way as he says it");
+        }
+        seen = s.events.len();
+    }
+    let (line, mark) = (line.expect("his line"), mark.expect("the mark"));
+    assert!(mark >= line && mark - line <= 0.06, "marked as he says it: {} s after", mark - line);
+    assert!(line - pulled >= LINE_GAP - 0.01 && line - pulled <= LINE_GAP + 0.11, "{} s after the pull's line", line - pulled);
+}
+
+#[test]
 fn his_lines_never_come_closer_than_two_seconds() {
     let (mut s, hero, boss, crew) = fight();
     s.events.clear();
@@ -874,6 +925,9 @@ fn a_ledge_with_no_floor_of_his_under_it_is_omitted_without_stranding_the_encoun
     s.land = Box::new(FlatLand { z: 30.0, ..Default::default() });
     s.place_perch_crew(boss);
     assert!(s.perches.crews[&boss].workers.is_empty());
+    // (He goes on at his own line, once the pull's line is 2 sec past.)
+    s.step_perch_crews();
+    s.clock += 5.0;
     s.step_perch_crews();
     // (That floor carries no channel either: no valve, straight on to his finish.)
     assert!(matches!(s.perches.crews[&boss].stage, Stage::Finished));

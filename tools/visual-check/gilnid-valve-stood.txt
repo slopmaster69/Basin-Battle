@@ -1,21 +1,20 @@
 # DEV SETUP: a hero who stands in the middle of the channel from the line to the end and does
 # not move, on the hero's own screen: the crew brought down by debug, the hero healed before the
-# whistle and not again until the fire is out, so what the health bar loses is the fire's alone
-# (61 of 200 by the real-floor test). Gilnid stands at the valve the whole time.
+# whistle and not again until the fire is out, so what the health bar loses is the fire's alone.
+# Gilnid stands at the valve the whole time.
 hero warrior
 cam off
 include _gilnid-valve-setup
+12.5 lua GV.useless = function() GV.log("stays") for k = 1, 18 do GV.after(k * 0.5, function() GV.log("in the channel") end) end end
 13 video
-14 .es goto -188 -580 21 3.6
-16 .es goto -203.75 -590.6 21 0.52
-18.4 .es heal
-18.6 .es in lock
-19 .es hurt 0 engineer
-19.3 .es hurt 0 engineer
-19.5 shots valve 30 0.3
-20.5 .es heal
-28.5 .es heal
-29 shots finish 10 0.5
-32 .es heal
-35 .es heal
-38 end
+15 .es goto -203.75 -590.6 21 2.0
+15.3 .es in lock
+16 .es hurt 0 engineer
+16.25 .es hurt 0 engineer
+16.4 .es heal
+18 .es heal
+26.5 .es heal
+29 .es heal
+31.5 .es heal
+32 shots finish 2 0.5
+34 end
