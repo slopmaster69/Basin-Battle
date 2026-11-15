@@ -1984,12 +1984,12 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
     // size, with no ring under it (a hero's own circles are floor clutter, Corey's review).
     c.chat(".es slot q aimed_arrow");
     c.drain(0.2);
-    for _ in 0..2 {
+    for n in 1..=2 {
         c.chat(".es in ab 0 0 0.0 -0.15");
         c.chat(".es in a 0.0 -0.15");
         c.drain(0.5);
         c.chat(".es in au 0.0 -0.15");
-        c.drain(1.2);
+        assert!(c.until(10.0, |c| objects_with(c, 2630).len() == n), "arrow {n} stands in the ground");
     }
     let arrows = objects_with(&c, 2630);
     assert_eq!(arrows.len(), 2, "two arrows in the ground");
@@ -2019,7 +2019,7 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
         "an arrow flies"
     );
     // Home, the stand-ins go.
-    c.drain(2.5);
+    assert!(c.until(10.0, |c| home.iter().chain(&back).all(|(g, _)| c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)))), "the stand-ins go");
     for (g, _) in home.iter().chain(&back) {
         assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)), "its stand-in {g:#x} goes");
     }
