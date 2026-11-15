@@ -554,7 +554,7 @@ impl Survival {
     }
 
     /// A trap gone (sprung, faded, or the oldest of too many): its mark and the trap itself.
-    fn clear_trap(&mut self, t: &Trap) {
+    pub(crate) fn clear_trap(&mut self, t: &Trap) {
         self.unmark(t.mark);
         if let Some(o) = t.obj {
             if self.objs.remove(&o).is_some() {
