@@ -312,7 +312,7 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 - **Push into the trap**: Thunderstorm, Typhoon or Heroic Leap throw a foe onto
   an Explosive or Freezing Trap; Hurricane keeps them off a point.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
-  stun (Divine Steed's Hammer of Justice, Shadowfury, Prowl, Capacitor Totem, Earthquake) or a freeze makes Mind
+  stun (the Paladin's two-handed Hammer of Justice, Shadowfury, Prowl, Capacitor Totem, Earthquake) or a freeze makes Mind
   Blast and Meteor land.
 - **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab, and Fan of
   Knives Marks them so it crits; a kill under Death Mark readies everything again.
@@ -400,25 +400,28 @@ page last (1 or 2), so an add-on from before them simply doesn't show them.
 | --- | --- | --- |
 | Q | Ricochet · *Pinball* | A spike that bounces to three more foes within 8 yd, each bounce ×1.25 (7, 9, 11, 14). EX: five bounces, each stunning 0.75 s. |
 | Q | Gravity Lance · *Collapse* | A heavy bolt: every foe within 5 yd of the one it strikes is dragged into it, all take 14. EX: 6 yd, 16, and they're slowed 70% for 2 s. |
+| Q | Displacer Orb · *Displacer Pulse* | A slow orb, 22 yd: whatever it touches, foe or friend, trades places with you; a foe takes 6. EX: 8, and the foe is slowed 40% for 2 s, stranded where you were. |
 | E | Whirlwind · *Bladestorm* | Spin 2 s, still moving at about 70%: 5 every half second to everything within 4 yd in front and to your sides. EX: 3 s, and nothing staggers you. |
 | E | Siphon Blade · *Soul Rend* | A 4 yd slash, 12 to each foe, and you heal 60% of all it deals. EX: wider, 16, and you heal all of it. |
+| E | Wall Slam · *Haymaker* | A shove 4 yd ahead: 8 and knocked back 6 yd; a foe thrown into a wall is stunned 1.5 s. EX: 10, 10 yd, stun 2 s. |
 | 1 | Blink Dagger · *Phase Strike* | Blink 12 yd, and again within 3 s. EX: each blink lands with 8 to everyone within 3 yd. |
 | 1 | Phase Dash · *Searing Dash* | Dash 10 yd through foes, untouchable: each takes 4 and burns 4 a second for 3 s. EX: 14 yd, and they're slowed 40% too. |
+| 1 | Rewind · *Paradox* | Leaves an echo; press again within 4 s to snap back to it with the health you had there, never less than now. EX: everything within 4 yd of the echo takes 10 as you arrive. |
+| 1 | Jump Pad · *Launch Rig* | A pad at the reticle (8 yd, 8 s, 2 at a time): you or a friend who steps on it is launched 14 yd the way they face; foes can't use it. EX: 20 yd, and the landing shoves foes for 6. |
 | 2 | Riposte · *Counterstrike* | A 0.8 s parry: the first blow or bolt is turned aside, and an attacker within 6 yd is staggered and bleeds 7 a second for 4 s. EX: 1.2 s, and it stuns them 1.2 s. |
+| 2 | Cheat Death · *Undying* | For 6 s, a blow that would kill you leaves you at 1 health and you mend 25% over 3 s; ends once it saves you. EX: 10 s, and the save heals 40%. |
+| 2 | Reflect · *Prism* | A mirror for 1 s: bolts, arrows and spells that would hit you fly back at full damage; melee still lands. EX: 1.5 s, and nothing staggers you while you hold it. |
 | 2 | Bubble · *Hard Bubble* | A shield on the friend under the reticle, or on you: soaks 40 for 4 s. EX: 70. |
 | 3 | Black Hole | Lobbed 26 yd: for 3 s it drags every foe within 7 yd 3 yd to its middle each second, 6 a second. |
 | 3 | Earthsplitter | A 30 yd fissure along your aim, drawn for everyone, bursts 0.8 s later: 30 and stunned 1.5 s. |
-| 3 | Avatar | 8 s of Onslaught, 20% faster and 20% less damage taken. |
+| 3 | Soul Chain | A chain 20 yd along the reticle binds the foe it strikes and up to 2 more within 6 yd of them to you for 5 s: 14 each; one that strays past 8 yd is yanked back and stunned 1.5 s. |
 
 Where the engine can't do what the design asked yet, a card does the closest thing and says so in
 its comment: Ricochet's EX stuns on every bounce, not just the last; Collapse slows instead of
 rooting (a root or stun after a pull stops a creature where it stands); Whirlwind is a beam, so it
 reaches round your front and sides but not right behind you; Siphon Blade steals no boons; Phase
 Dash burns the foes it passes instead of leaving a trail; Riposte's cut is a bleed and there's no
-step behind the attacker; Avatar's extra damage is Onslaught's unblockable heavies (no boon adds
-damage). Ultimates have no EX version (no key for one, and the bar is spent). Bubble's pop and
-Black Hole's collapse, and the cards that need new engine pieces (Grappling Hook, Displacer Orb,
-Wall Slam, Rewind, Jump Pad, Cheat Death, Reflect, Soul Chain), come with them.
+step behind the attacker. Ultimates have no EX version (no key for one, and the bar is spent).
 
 ### The action-combat client
 

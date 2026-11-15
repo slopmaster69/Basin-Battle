@@ -4343,7 +4343,9 @@ cooldown = 14.0
 spell = 23214
 effects = [{ kind = "steed", secs = [4.0, 4.0], amount = 1.0 }]
 
-# Divine Steed's second press. (`hammer_of_justice` was the 1 card before: a save naming it gets
+# Avenger's Shield's two-handed throw (an inner ability: no card of its own). Divine Steed's
+# recast was dropped on purpose in the Paladin redesign (#83): the steed is a mount now, and
+# attacking dismounts you. (`hammer_of_justice` was the 1 card before: a save naming it gets
 # Divine Steed, the card in its place.)
 [[ability]]
 key = "hammer_of_justice"
