@@ -53,6 +53,13 @@ const LEGS: usize = 4;
 const LEG_TICK: f32 = 0.05;
 /// A shape on the ground is drawn again this often, so it ends soon after what it shows does.
 const REDRAW: f32 = 0.5;
+/// What tells a pour's spot and a breath's cone with the floor markers off: steam gathering
+/// there through the wind-up (small puffs, where the full ones stand once it lands or blows).
+/// `WARN_PUFFS` along the pour's edge, and the breath's six places (as a fraction of its range,
+/// and of half its arc).
+const WARN_PUFFS: usize = 8;
+const WARN_SCALE: f32 = 0.8;
+const CONE_PUFFS: [(f32, f32); 6] = [(0.3, 0.0), (0.55, -0.6), (0.55, 0.6), (0.85, -0.75), (0.85, 0.0), (0.85, 0.75)];
 
 /// Throw Dark Iron Ale: a flying mug at 30 yd/s.
 const MUG: u32 = 14814;
@@ -143,6 +150,9 @@ struct Cook {
     legs: Vec<(f32, Vec3, Vec3)>,
     /// Short-lived steam (a breath's cone) and when each puff goes.
     puffs: Vec<(Id, f32)>,
+    /// Steam gathering over what is about to hit (a pour's spot, a breath's cone), the tell with
+    /// the floor markers off; gone when the blow lands, blows or is broken off.
+    warn: Vec<Id>,
     hand: Hand,
     thrown_until: f32,
     /// Gorged's drawn size now (Cookie's own stays as authored).
@@ -209,7 +219,7 @@ impl Survival {
     /// Particle-only cues must show now. The cauldron keeps its normal fade and collision hull.
     pub fn is_kitchen_prop(&self, prop: Id) -> bool {
         self.kitchen.cooks.values().any(|c| c.patch.as_ref().is_some_and(|p| p.props.contains(&prop))
-            || c.puffs.iter().any(|(id, _)| *id == prop))
+            || c.puffs.iter().any(|(id, _)| *id == prop) || c.warn.contains(&prop))
             || self.kitchen.pots.values().any(|p| p.stew.contains(&prop))
     }
 
@@ -318,6 +328,7 @@ impl Survival {
         }
         if let Some(p) = c.patch { for prop in p.props { self.kitchen_drop_prop(prop); } }
         for (prop, _) in c.puffs { self.kitchen_drop_prop(prop); }
+        for prop in c.warn { self.kitchen_drop_prop(prop); }
         let alive = self.mobs.get(&id).is_some_and(|m| m.health > 0);
         if c.stage.is_some() && alive { self.events.push(Event::HoldPose { id, clip: 0, secs: 0.0, from: None }); }
         if c.hand != Hand::Own && alive { self.events.push(Event::MobGear { id }); }
@@ -385,16 +396,32 @@ impl Survival {
         if name == "serve it hot" {
             let c = self.kitchen.cooks.get_mut(&id).unwrap();
             c.patch = None;
-            if let Some(at) = c.aim.take() {
-                c.patch = Some(Patch { at, props: Vec::new(), hot_at: None, next_tick: 0.0, damage: a.damage, landed: false, next_ring: now + REDRAW });
-                // Where it will land, drawn at its true size from the first moment, markers or not.
-                self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0,
+            let aim = c.aim.take();
+            if let Some(at) = aim {
+                self.kitchen.cooks.get_mut(&id).unwrap().patch = Some(Patch { at, props: Vec::new(), hot_at: None, next_tick: 0.0, damage: a.damage, landed: false, next_ring: now + REDRAW });
+                // Steam gathers along the spot's edge from the first moment (the tell with the
+                // markers off); its ring on the floor is the optional extra.
+                for k in 0..WARN_PUFFS {
+                    let t = k as f32 / WARN_PUFFS as f32 * std::f32::consts::TAU;
+                    let p = self.ground_near(at[0] + t.cos() * (RADIUS - 0.2), at[1] + t.sin() * (RADIUS - 0.2), at[2]);
+                    let prop = self.kitchen_prop(p, STEAM, WARN_SCALE);
+                    self.kitchen.cooks.get_mut(&id).unwrap().warn.push(prop);
+                }
+                self.events.push(Event::GroundWarn { at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0,
                     width: 0.0, secs: REDRAW + 0.05, colour: HAZARD_COLOUR.into() });
             }
             self.events.push(Event::Sound { id, sound: BUBBLING });
         } else {
-            // The cone drawn to the reach and width that hit, the whole wind-up.
-            self.events.push(Event::GroundBurst { at: pos, yaw: dir, shape: "wedge", reach: a.range + 0.4, arc: a.arc,
+            // The cone drawn to the reach and width that hit, the whole wind-up (the optional
+            // floor mark); with the markers off steam gathers at the places the breath fills.
+            let half = a.arc.to_radians() / 2.0;
+            for (r, k) in CONE_PUFFS {
+                let (r, yaw) = (r * a.range, dir + k * half);
+                let at = self.ground_near(pos[0] + yaw.cos() * r, pos[1] + yaw.sin() * r, pos[2]);
+                let prop = self.kitchen_prop(at, STEAM, WARN_SCALE);
+                self.kitchen.cooks.get_mut(&id).unwrap().warn.push(prop);
+            }
+            self.events.push(Event::GroundWarn { at: pos, yaw: dir, shape: "wedge", reach: a.range + 0.4, arc: a.arc,
                 width: 0.0, secs: a.windup, colour: HAZARD_COLOUR.into() });
             if name == "belch" { self.kitchen.cooks.get_mut(&id).unwrap().pulse = Some((now, now)); }
         }
@@ -418,7 +445,7 @@ impl Survival {
                 width: 0.0, secs: 0.8, colour: colour.into() });
             // Steam through the whole cone, not down its middle.
             let half = a.arc.to_radians() / 2.0;
-            for (r, k) in [(0.3, 0.0), (0.55, -0.6), (0.55, 0.6), (0.85, -0.75), (0.85, 0.0), (0.85, 0.75)] {
+            for (r, k) in CONE_PUFFS {
                 let (r, yaw) = (r * a.range, dir + k * half);
                 let at = self.ground_near(pos[0] + yaw.cos() * r, pos[1] + yaw.sin() * r, pos[2]);
                 let prop = self.kitchen_prop(at, STEAM, 1.3);
@@ -567,6 +594,12 @@ impl Survival {
             let anchor = self.alloc();
             self.events.push(Event::MissileFrom { anchor, caster: id, spell: MUG, from, target: Target::Point(to) });
         }
+        // The gathering steam goes when the blow lands, blows or is broken off.
+        let gathering = self.kitchen_winding(id, "steam") || self.kitchen_winding(id, "belch")
+            || self.kitchen.cooks[&id].patch.as_ref().is_some_and(|p| !p.landed);
+        if !gathering {
+            for p in std::mem::take(&mut self.kitchen.cooks.get_mut(&id).unwrap().warn) { self.kitchen_drop_prop(p); }
+        }
         let c = self.kitchen.cooks.get_mut(&id).unwrap();
         let expired: Vec<_> = c.puffs.iter().filter(|(_, end)| now >= *end).map(|(p, _)| *p).collect();
         c.puffs.retain(|(_, end)| now < *end);
@@ -604,7 +637,7 @@ impl Survival {
             if self.kitchen_winding(id, "serve it hot") {
                 if now >= patch.next_ring {
                     patch.next_ring = now + REDRAW;
-                    self.events.push(Event::GroundBurst { at: patch.at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0,
+                    self.events.push(Event::GroundWarn { at: patch.at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0,
                         width: 0.0, secs: REDRAW + 0.05, colour: HAZARD_COLOUR.into() });
                 }
                 self.kitchen.cooks.get_mut(&id).unwrap().patch = Some(patch);
@@ -618,11 +651,12 @@ impl Survival {
         }
         if now >= patch.next_ring {
             patch.next_ring = now + REDRAW;
-            self.events.push(Event::GroundBurst { at: patch.at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0,
+            self.events.push(Event::GroundWarn { at: patch.at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0,
                 width: 0.0, secs: (REDRAW + 0.05).min(end - now), colour: HAZARD_COLOUR.into() });
         }
         if now >= start && !patch.landed {
             patch.landed = true;
+            for p in std::mem::take(&mut self.kitchen.cooks.get_mut(&id).unwrap().warn) { self.kitchen_drop_prop(p); }
             let at = patch.at;
             self.events.push(Event::Sound { id, sound: SPLASH });
             self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: RADIUS, arc: 360.0, width: 0.0,
@@ -889,6 +923,6 @@ fn length(a: Vec3, b: Vec3) -> f32 {
 impl Cook {
     fn new(pot: Option<Id>, scale: f32) -> Self {
         Cook { pot, began: false, pulled: false, turn: 0, since: 0, scoops: 0, healed: 0, stage: None, patch: None,
-            aim: None, legs: Vec::new(), puffs: Vec::new(), hand: Hand::Own, thrown_until: 0.0, scale, pulse: None }
+            aim: None, legs: Vec::new(), puffs: Vec::new(), warn: Vec::new(), hand: Hand::Own, thrown_until: 0.0, scale, pulse: None }
     }
 }

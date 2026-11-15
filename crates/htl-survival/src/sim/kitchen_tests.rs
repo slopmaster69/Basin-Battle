@@ -81,7 +81,7 @@ fn move_beside_locked_blow(s: &mut Survival, band: &[Id], id: Id) {
 
 fn bursts(ev: &[Event], colour: &str) -> Vec<(Vec3, f32, &'static str, f32, f32, f32)> {
     ev.iter().filter_map(|e| match e {
-        Event::GroundBurst { at, yaw, shape, reach, arc, secs, colour: c, .. } if c == colour => Some((*at, *yaw, *shape, *reach, *arc, *secs)),
+        Event::GroundBurst { at, yaw, shape, reach, arc, secs, colour: c, .. } | Event::GroundWarn { at, yaw, shape, reach, arc, secs, colour: c, .. } if c == colour => Some((*at, *yaw, *shape, *reach, *arc, *secs)),
         _ => None,
     }).collect()
 }
@@ -265,6 +265,10 @@ fn serve_it_hot_lifts_a_tankard_and_throws_it_in_a_visible_arc_onto_where_the_he
         let warn = bursts(&ev, HAZARD_COLOUR);
         assert!(warn.iter().any(|b| b.2 == "ring" && dist2d(b.0, at) < 0.01 && (b.3 - RADIUS).abs() < 0.01),
             "where it lands drawn at its true size from the start, markers or not");
+        // With the markers off the spot is told by steam gathering along its edge.
+        let gather = s.kitchen.cooks[&id].warn.clone();
+        assert_eq!(gather.len(), WARN_PUFFS, "steam gathers at the spot through the wind-up");
+        assert!(gather.iter().all(|p| (dist2d(s.objs[p].pos, at) - (RADIUS - 0.2)).abs() < 0.05 && s.is_kitchen_prop(*p)));
         // He follows the hero no more: the spot stays.
         s.move_player(band[0], [stand, 4.0, 0.0], 0.0, Moving::default());
         let mut ev = until(&mut s, id, 2.5, |s, id| s.kitchen.cooks[&id].patch.as_ref().is_some_and(|p| p.hot_at.is_some()));
@@ -287,6 +291,7 @@ fn serve_it_hot_lifts_a_tankard_and_throws_it_in_a_visible_arc_onto_where_the_he
         assert!(legs[0][2] > at[2] + HAND + 0.5, "up first");
         assert_eq!(*legs.last().unwrap(), at, "and down onto the spot");
         assert_eq!(sounded(&ev, id, SPLASH), 1, "a splash as it lands");
+        assert!(s.kitchen.cooks[&id].warn.is_empty() && gather.iter().all(|p| !s.objs.contains_key(p)), "the gathering steam gives way to the puddle's");
         assert!(bursts(&ev, STEW_COLOUR).iter().any(|b| dist2d(b.0, at) < 0.01 && (b.3 - RADIUS).abs() < 0.01 && b.5 >= 1.0), "a tan ring at its true edge, held over a second");
         let patch = s.kitchen.cooks[&id].patch.as_ref().unwrap();
         assert_eq!(patch.props.len(), EDGE_PUFFS);
@@ -337,9 +342,13 @@ fn a_pour_broken_off_in_its_windup_leaves_nothing_behind() {
     let (mut s, band, id) = fight(COOKIE, 1);
     s.kitchen.cooks.get_mut(&id).unwrap().turn = 2;
     until(&mut s, id, 8.0, |s, id| s.kitchen_winding(id, "serve it hot"));
+    let gather = s.kitchen.cooks[&id].warn.clone();
+    assert_eq!(gather.len(), WARN_PUFFS);
     s.stagger_mob(id, 1.0, false);
     run(&mut s, DT);
     assert!(s.kitchen.cooks[&id].patch.is_none());
+    run(&mut s, DT);
+    assert!(gather.iter().all(|p| !s.objs.contains_key(p)), "the gathering steam goes with it");
     let ev = run(&mut s, 0.9);
     assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } if *caster == id)));
     assert!(bursts(&ev, HAZARD_COLOUR).iter().all(|b| b.2 != "ring"), "its warning stops being drawn");
@@ -468,6 +477,9 @@ fn a_scoop_left_alone_heals_then_breathes_a_steam_cone_drawn_to_its_shape_and_af
         assert!(warn.iter().any(|b| b.2 == "wedge" && (b.3 - 5.4).abs() < 0.01 && (b.4 - 65.0).abs() < 0.01 && (b.5 - 1.6).abs() < 0.01),
             "the cone drawn at the reach and width it hits, the whole wind-up: {warn:?}");
         assert!(held(&ev, id).contains(&(HOLD_CLIP, 1.6)), "the breath drawn in, held");
+        let gather = s.kitchen.cooks[&id].warn.clone();
+        assert_eq!(gather.len(), CONE_PUFFS.len(), "with the markers off, steam gathers through the cone");
+        assert!(gather.iter().all(|p| { let q = s.objs[p].pos; dist2d(q, pos) <= 5.4 && angle_between(dir, facing(pos, q)) <= 33.0 }));
         // One beside the cone, one just inside its far edge.
         s.move_player(band[0], [pos[0] - dir.sin() * 3.0, pos[1] + dir.cos() * 3.0, pos[2]], 0.0, Moving::default());
         let hp = s.players[&band[0]].health;
@@ -475,6 +487,7 @@ fn a_scoop_left_alone_heals_then_breathes_a_steam_cone_drawn_to_its_shape_and_af
         assert_eq!(s.players[&band[0]].health, hp, "beside the cone is safe");
         assert_eq!(s.mobs[&id].facing, dir);
         assert!(ev.iter().any(|e| matches!(e, Event::Visual { id: who, kit: STEAM_KIT, .. } if *who == id)));
+        assert!(s.kitchen.cooks[&id].warn.is_empty() && gather.iter().all(|p| !s.objs.contains_key(p)), "the gathering steam gives way to the breath's");
         let puffs = &s.kitchen.cooks[&id].puffs;
         assert_eq!(puffs.len(), 6);
         assert!(puffs.iter().all(|(p, _)| { let q = s.objs[p].pos; dist2d(q, pos) <= 5.4 && angle_between(dir, facing(pos, q)) <= 33.0 }), "the steam fills the cone");
@@ -900,7 +913,7 @@ fn dinner_by_tells(seed: u64, secret: bool) -> Dinner {
         for e in s.step(DT) {
             let seen = s.clock + reaction;
             match e {
-                Event::GroundBurst { at, yaw, shape, reach, arc, secs, colour, .. } if colour == HAZARD_COLOUR => {
+                Event::GroundBurst { at, yaw, shape, reach, arc, secs, colour, .. } | Event::GroundWarn { at, yaw, shape, reach, arc, secs, colour, .. } if colour == HAZARD_COLOUR => {
                     drawn.push(Drawn { at, yaw, ring: shape == "ring", reach, arc, seen, until: s.clock + secs });
                 }
                 Event::HoldPose { id: who, clip: OPEN_CLIP, secs, .. } if who == boss => {
