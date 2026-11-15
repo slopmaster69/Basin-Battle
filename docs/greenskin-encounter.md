@@ -22,8 +22,8 @@ lines.** The code is `crates/htl-survival/src/sim/firing_line.rs`; the line's hi
    shoulder (ReadyRifle 48) held 1.6 sec, and the aim locks there: it no longer turns. Then the
    shot (AttackRifle 49): a puff of dust at his feet (kit 5930), the bang (spell 8682's cast kit:
    AttackRifle and GunRelease 1148), a tracer (Fire Shot's bolt, 6980, with a pale smoke streak,
-   flown at 20 yd/s), the 1 yd-wide line flashed on the deck for the ball's flight (a ground
-   burst, drawn with the floor markers off), and a dust burst where it stops (22786, Irritating
+   flown at 20 yd/s), the 1 yd-wide line flashed on the deck for the ball's flight (a floor marker, `GroundWarn`,
+   drawn only with the floor markers on; with them off the lock of the aim, the click, the bang and the tracer tell it), and a dust burst where it stops (22786, Irritating
    Spores; Rocky Ground Impact's debris filmed as pink boulders that lingered, take 336). The ball strikes each hero on its line as it reaches them, along the barrel to its
    full 32 yd or the first thing in the way. Step out of the line the barrel points along, or
    block facing the gunner.

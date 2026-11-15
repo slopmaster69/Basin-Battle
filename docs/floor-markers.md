@@ -55,11 +55,12 @@ Status: pass (tells with markers off already), fixed (this sweep), open (found, 
 | Rhahk'Zor: the wave's rows | None (no ring, by design) | n/a | Rock dropping, dust rolling at the front | Pass | None |
 | Rhahk'Zor: burning ground (burning maul, lodged pound) | Fire-coloured ring at the true edge, redrawn every 0.5 sec (`GB`) | No | The flames themselves: one at the heart and 3 round it at 0.55 of the radius | Marker fail, tell passes | Ring is `GroundWarn` |
 | Rhahk'Zor: dust ring where a rock struck, at the slam's wall, the end dust line | A brief dust-coloured shape after the strike (`GB`, 0.5 to 1.2 sec) | No | Not a warning: it follows the blow, with real dust beside it | Pass (an effect) | None |
-| Gilnid, Greenskin, Cookie, Smite, VanCleef, the Shredder, other enemies | Warning shapes sent as `GB` regardless: see below | No | Per boss, in its own pull request | Open | Each in its own pull request |
+| Greenskin: a gunner's firing line and the harpoon's line | The 1 yd line along the shot for the ball's flight (`GB`) | No | The gunner's load click, the gun held at the shoulder 1.6 sec with the aim locked (it no longer turns), the harpoon pose 1.7 sec; then the bang, the puff, the tracer or net flying the line | Marker fail, tell passes | Line is `GroundWarn`. The line only shows once the shot is fired, so no floor tell came before it |
+| Gilnid, Cookie, Smite, VanCleef, the Shredder, other enemies | Warning shapes sent as `GB` regardless: see below | No | Per boss, in its own pull request | Open | Each in its own pull request |
 
 Sites still to move to `GroundWarn` (found in the audit, each warning-only and sent as `GB`):
 Cookie's scoop wedge, pot ring and patch ring (`sim/kitchen.rs`), Gilnid's valve lane, stripes and
-stick ring (`sim/perches.rs`), Greenskin's firing line (`sim/firing_line.rs`), the Shredder's
+stick ring (`sim/perches.rs`), the Shredder's
 Grind lane and tie ring (`sim/machinery_rig.rs`), small splashes of other enemies
 (`sim/mobs.rs`, noted "so it reads with the floor markers off" on Nov 8, before this rule).
 Smite's stomp and slam and VanCleef's strings use `TG`/`TA`/`MK` lines, which the setting already

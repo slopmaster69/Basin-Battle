@@ -224,8 +224,8 @@ fn a_shot_loads_with_a_click_locks_at_the_shoulder_and_fires_along_its_line() {
     let from = s.mobs[&g].pos;
     assert!((dist2d(from, end) - 32.0).abs() < 0.1, "to its full range");
     assert!(angle_between(facing(from, end), locked) < 0.5, "along the barrel");
-    assert!(ev.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", width, reach, .. } if (*width - 1.0).abs() < 1e-3 && (*reach - 16.0).abs() < 0.1)),
-        "its 1 yd line drawn with the markers off");
+    assert!(ev.iter().any(|e| matches!(e, Event::GroundWarn { shape: "line", width, reach, .. } if (*width - 1.0).abs() < 1e-3 && (*reach - 16.0).abs() < 0.1)),
+        "its 1 yd line is a floor mark, through the markers setting");
     let fired = s.clock;
     while s.clock - fired < 32.0 / 20.0 + 0.1 {
         ev.extend(s.step(DT));
