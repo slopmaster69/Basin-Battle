@@ -1744,6 +1744,18 @@ impl Survival {
             let skip = if self.content.abilities[p.ability].friends_only { self.passes_by(p.owner, &p.hits) } else { p.hits.clone() };
             // (A grappling hook meets the land's solid shapes too: a rock, a fence, a roof.)
             let t = self.catch_solid(p.ability, p.pos, p.dir, self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &skip));
+            // A shot that finds an engineer's pole first drops him (Gilnid's crew); the pole stops it.
+            let pole = if p.allies || !self.players.contains_key(&p.owner) { None }
+                else { self.perch_pole_shot(p.pos, p.dir, go, p.radius).filter(|(_, d)| *d <= t.dist) };
+            if let Some((worker, d)) = pole {
+                p.pos = add(p.pos, p.dir, d);
+                self.perch_pole_struck(worker, p.owner);
+                let splash = self.content.abilities[p.ability].splash;
+                self.plant_at_end(p.owner, p.ability, p.pos, p.dir, false);
+                self.drop_look(&p);
+                if splash > 0.0 { self.burst(&p, p.pos, None); }
+                continue;
+            }
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
@@ -2412,11 +2424,6 @@ impl Survival {
             let before = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
             self.burst(p, p.pos, Some(victim));
             let after = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
-            // A bursting projectile still directly struck this body. Nearby splash victims
-            // don't bring down a perch; only its actual contact does.
-            if before.zip(after).is_some_and(|(before, after)| after < before) {
-                self.drop_perch(victim);
-            }
             // A critical's own effects on the one it struck, as without a burst (a perfect
             // Fireball's longer burn); not if the burst came to nothing on them (dodged, guarded).
             if p.critical && !d.crit_effects.is_empty() && self.alive(victim) && after != before {
@@ -2679,9 +2686,6 @@ impl Survival {
         self.ability_after(owner, mid, ability, share, damage, killed);
         self.fx_from = was;
         if how != HitKind::Area && damage > 0 { self.vancleef_hit(mid, owner, from); }
-        if how == HitKind::Projectile && damage > 0 {
-            self.drop_perch(mid);
-        }
         if killed {
             // The kill's weight: its sound from the foe's spot (everyone near hears it there),
             // and its beat on the killer's own screen alone.

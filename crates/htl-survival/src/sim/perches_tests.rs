@@ -152,16 +152,16 @@ fn after_the_first_stick_the_furnace_sets_the_first_pole_alight_and_he_falls_lan
 }
 
 #[test]
-fn one_projectile_drops_once_then_lands_sitting_as_a_melee_worker() {
+fn one_strike_on_the_pole_drops_him_once_then_he_lands_sitting_as_a_melee_worker() {
     let (mut s, hero, _, crew) = fight();
     let id = crew[1];
     let from = s.mobs[&id].pos;
     let landing = s.perches.workers[&id].landing;
-    shot(&mut s, hero, id, 1.0, HitKind::Projectile);
-    let since = match s.perches.workers[&id].state { Place::Falling { since, .. } => since, _ => panic!("one hit drops it") };
+    s.perch_pole_struck(id, hero);
+    let since = match s.perches.workers[&id].state { Place::Falling { since, .. } => since, _ => panic!("one strike drops him") };
     tick(&mut s, 0.4);
     assert!(s.mobs[&id].pos[2] < from[2] && s.mobs[&id].pos[2] > landing[2]);
-    shot(&mut s, hero, id, 1.0, HitKind::Projectile);
+    s.perch_pole_struck(id, hero);
     assert!(matches!(s.perches.workers[&id].state, Place::Falling { since: t, .. } if t == since));
     tick(&mut s, 0.55);
     let m = &s.mobs[&id];
@@ -174,27 +174,48 @@ fn one_projectile_drops_once_then_lands_sitting_as_a_melee_worker() {
 }
 
 #[test]
-fn area_damage_and_zero_damage_do_not_count_as_a_direct_shot() {
+fn a_shot_a_burst_or_a_burn_on_the_man_himself_hurts_him_and_leaves_him_up() {
     let (mut s, hero, _, crew) = fight();
+    let before = s.mobs[&crew[0]].health;
+    shot(&mut s, hero, crew[0], 1.0, HitKind::Projectile);
     shot(&mut s, hero, crew[0], 1.0, HitKind::Area);
-    shot(&mut s, hero, crew[0], 0.0, HitKind::Projectile);
     s.hurt_mob_as(crew[0], hero, 1, "burning");
-    assert!(perched(&s, crew[0]));
+    assert!(s.mobs[&crew[0]].health < before, "it hurt him");
+    assert!(perched(&s, crew[0]), "and the pole is the only way down");
 }
 
 #[test]
-fn a_real_fireball_drops_its_contact_but_not_a_nearby_splash_victim() {
+fn a_real_fireball_through_the_pole_drops_him_and_stops_there() {
+    let (mut s, hero, _, crew) = fight();
+    // The pole nearer the hero along +x is the one it meets; the other's man stays up.
+    let (near, far) = if s.perches.workers[&crew[0]].base[0] < s.perches.workers[&crew[1]].base[0] { (crew[0], crew[1]) } else { (crew[1], crew[0]) };
+    let base = s.perches.workers[&near].base;
+    let p = s.players.get_mut(&hero).unwrap();
+    p.pos = [base[0] - 6.0, base[1], base[2] + 2.0];
+    p.facing = 0.0;
+    let ability = s.content.ability("fireball").unwrap();
+    s.launch(hero, ability, 0.0);
+    for _ in 0..30 { s.clock += 0.05; s.step_projectiles(0.05); }
+    assert!(matches!(s.perches.workers[&near].state, Place::Falling { .. }), "the pole took it");
+    assert!(perched(&s, far), "and only that man's");
+    assert!(s.projectiles.is_empty(), "the pole stopped it");
+}
+
+#[test]
+fn a_real_fireball_at_the_man_does_not_drop_him_and_shots_wide_or_over_the_pole_miss_it() {
     let (mut s, hero, _, crew) = fight();
     let at = s.mobs[&crew[0]].pos;
     s.players.get_mut(&hero).unwrap().pos = [at[0] - 6.0, at[1], at[2]];
     s.players.get_mut(&hero).unwrap().facing = 0.0;
-    s.mobs.get_mut(&crew[1]).unwrap().pos = [at[0], at[1] + 1.5, at[2]];
     let ability = s.content.ability("fireball").unwrap();
     s.launch(hero, ability, 0.0);
     for _ in 0..20 { s.clock += 0.05; s.step_projectiles(0.05); }
-    assert!(s.mobs[&crew[1]].health < s.mobs[&crew[1]].max_health, "the neighbor took splash damage");
-    assert!(matches!(s.perches.workers[&crew[0]].state, Place::Falling { .. }));
-    assert!(perched(&s, crew[1]));
+    assert!(s.mobs[&crew[0]].health < s.mobs[&crew[0]].max_health, "it hit him");
+    assert!(perched(&s, crew[0]), "level with him, over his pole");
+    let base = s.perches.workers[&crew[1]].base;
+    assert!(s.perch_pole_shot([base[0] - 6.0, base[1] + 3.0, base[2] + 2.0], [1.0, 0.0, 0.0], 12.0, 0.2).is_none(), "3 yd wide of it");
+    assert!(s.perch_pole_shot([base[0] - 6.0, base[1], base[2] + 20.0], [1.0, 0.0, 0.0], 12.0, 0.2).is_none(), "over its top");
+    assert!(s.perch_pole_shot([base[0] - 6.0, base[1], base[2] + 2.0], [1.0, 0.0, 0.0], 12.0, 0.2).is_some());
 }
 
 #[test]
@@ -219,7 +240,7 @@ fn a_blow_on_his_pole_cracks_it_from_the_same_floor_in_reach_and_facing() {
 }
 
 #[test]
-fn a_blow_on_the_man_himself_from_the_ramp_behind_him_knocks_him_off() {
+fn a_blow_on_the_man_himself_from_the_ramp_behind_him_leaves_him_up() {
     let (mut s, hero, _, crew) = fight();
     let id = crew[1];
     let w = &s.perches.workers[&id];
@@ -229,7 +250,7 @@ fn a_blow_on_the_man_himself_from_the_ramp_behind_him_knocks_him_off() {
     s.players.get_mut(&hero).unwrap().pos = [behind[0], behind[1], stand[2] - 1.6];
     let face = facing(s.players[&hero].pos, stand);
     s.swing_on_perches(hero, face, 3.0, 90.0);
-    assert!(matches!(s.perches.workers[&id].state, Place::Falling { .. }));
+    assert!(perched(&s, id), "only the pole brings him down");
 }
 
 #[test]
@@ -250,34 +271,103 @@ fn a_lethal_shot_leaves_a_falling_corpse_and_never_resurrects_it() {
 }
 
 #[test]
-fn left_alone_the_second_man_throws_three_sticks_then_climbs_down_the_ramp() {
+fn left_alone_the_second_man_throws_six_sticks_then_jumps_hurt_never_climbing_down() {
     let (mut s, _, boss, crew) = fight();
+    let max = s.mobs[&crew[1]].max_health;
     let mut live_most = 0;
     let mut saw_demo = false;
-    for _ in 0..1100 {
+    let mut up_while_he_has_sticks = true;
+    for _ in 0..2400 {
         tick(&mut s, 0.05);
         let c = &s.perches.crews[&boss];
         let winding = crew.iter().filter(|id| s.perch_controlled(**id)
             && s.mobs.get(id).is_some_and(|m| matches!(m.state, MobState::Windup { .. }))).count();
         live_most = live_most.max(c.sticks.len() + winding);
         saw_demo |= c.demo.is_some();
-        if matches!(s.perches.workers[&crew[1]].state, Place::Ground) { break; }
+        if s.perches.workers[&crew[1]].throws < STICKS_IN_HAND { up_while_he_has_sticks &= perched(&s, crew[1]); }
+        if !perched(&s, crew[1]) { break; }
     }
     assert_eq!(live_most, 1, "one stick at a time");
     assert!(saw_demo);
+    assert!(up_while_he_has_sticks, "no timer takes him down while he has sticks");
     assert_eq!(s.perches.workers[&crew[0]].throws, 1, "the first man throws once, then the furnace takes him");
-    assert_eq!(s.perches.workers[&crew[1]].throws, THROWS_BEFORE_CLIMB);
-    let w = &s.perches.workers[&crew[1]];
-    assert!(matches!(w.state, Place::Ground), "he came down");
-    assert_eq!(s.mobs[&crew[1]].pos, w.climb, "by the ramp, not a fall");
+    assert_eq!(s.perches.workers[&crew[1]].throws, STICKS_IN_HAND);
+    assert!(matches!(s.perches.workers[&crew[1]].state, Place::Falling { .. }), "he jumps, a fall and not a climb");
+    let lost = max - s.mobs[&crew[1]].health;
+    assert_eq!(lost, (max as f32 * JUMP_COST) as u32, "hurt by the jump");
+    assert!(s.mobs[&crew[1]].health > 0);
+    tick(&mut s, 1.0);
+    assert!(matches!(s.perches.workers[&crew[1]].state, Place::Ground));
     assert_eq!(s.content.mobs[s.mobs[&crew[1]].def].weapon, 1610);
-    assert!(s.objs.contains_key(&w.plank), "his plank is still there");
+    assert!(!s.objs.contains_key(&s.perches.workers[&crew[1]].plank), "his plank went with him");
+}
+
+#[test]
+fn a_man_already_near_death_survives_his_jump_with_one_health() {
+    let (mut s, _, _, crew) = fight();
+    s.mobs.get_mut(&crew[1]).unwrap().health = 3;
+    s.jump_down(crew[1]);
+    assert_eq!(s.mobs[&crew[1]].health, 1);
+    assert!(matches!(s.perches.workers[&crew[1]].state, Place::Falling { .. }));
+}
+
+#[test]
+fn each_pole_is_lit_by_a_torch_at_its_foot_until_the_plank_goes() {
+    let (mut s, hero, boss, crew) = fight();
+    for id in &crew {
+        let w = &s.perches.workers[id];
+        let lamp = w.lamp.expect("a torch on every pole");
+        assert_eq!(display(&s, lamp), Some(crate::sim::bosses::LINE_LAMP));
+        assert!(dist2d(s.objs[&lamp].pos, w.base) < 2.0, "at the pole's foot");
+        assert!(s.is_perch_visual_prop(lamp), "no hull, shown at once, the encounter's");
+    }
+    let lamp = s.perches.workers[&crew[0]].lamp.unwrap();
+    s.perch_pole_struck(crew[0], hero);
+    assert!(!s.objs.contains_key(&lamp), "the torch goes with the pole");
+    assert!(s.perches.workers[&crew[1]].lamp.is_some_and(|l| s.objs.contains_key(&l)), "the other still stands lit");
+    s.remove_perch_crew(boss);
+    assert!(s.objs.values().all(|o| !matches!(o.kind, ObjKind::Prop { display, .. } if display == crate::sim::bosses::LINE_LAMP)));
+}
+
+#[test]
+fn his_pole_flares_with_flames_up_its_length_from_each_throw_until_after_the_stick_blows() {
+    let (mut s, _, boss, crew) = fight();
+    let base = s.perches.workers[&crew[0]].base;
+    s.events.clear();
+    assert!(until(&mut s, 5.0, |s| !s.perches.crews[&boss].sticks.is_empty()), "thrown");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::GroundBurst { at, .. } if *at == base)),
+        "no floor ring carries the tell: it reads with the markers off");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Mark { pos, .. } if *pos == base)), "the floor mark is the optional extra, through the markers setting");
+    let flame = s.perches.crews[&boss].visuals.iter().copied().find(|id| display(&s, *id) == Some(FIRE) && s.objs[id].pos == base);
+    let flame = flame.expect("flames at the pole's foot");
+    let top = s.perches.workers[&crew[0]].stand[2] - PLANK_THICK;
+    let up = s.perches.crews[&boss].visuals.iter().filter(|id| display(&s, **id) == Some(FIRE)
+        && dist2d(s.objs[*id].pos, base) < 0.01 && s.objs[*id].pos[2] > base[2] + 1.0 && s.objs[*id].pos[2] < top).count();
+    assert!(up >= 2, "and up its length, so it glows from the far side of the pit: {up}");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id, sound: 1484 } if *id == flame)), "with a sound");
+    let blows = s.perches.crews[&boss].sticks[0].blows;
+    assert!(s.perches.crews[&boss].timed.iter().any(|(id, t)| *id == flame && *t >= blows + FLARE_LONGER - 0.1), "it burns past the blast");
+    // The other man's pole flares at his own throws, not the first's.
+    let other = s.perches.workers[&crew[1]].base;
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Mark { pos, .. } if *pos == other)));
+}
+
+#[test]
+fn the_furnaces_spill_gives_the_first_pole_the_same_flare_a_throw_does() {
+    let (mut s, _, boss, crew) = fight();
+    let base = s.perches.workers[&crew[0]].base;
+    assert!(until(&mut s, 10.0, |s| s.perches.crews[&boss].first_blown));
+    s.events.clear();
+    assert!(until(&mut s, 6.0, |s| s.events.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "Mind the equipment!"))));
+    assert!(s.events.iter().any(|e| matches!(e, Event::Mark { pos, .. } if *pos == base)), "the same optional mark");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { sound: 1484, .. })), "the same sound");
+    assert!(s.perches.crews[&boss].visuals.iter().any(|id| display(&s, *id) == Some(FIRE) && s.objs[id].pos == base), "the same flames");
 }
 
 #[test]
 fn a_hero_who_brought_one_down_first_gets_no_demonstration() {
     let (mut s, hero, boss, crew) = fight();
-    shot(&mut s, hero, crew[0], 1.0, HitKind::Projectile);
+    s.perch_pole_struck(crew[0], hero);
     assert!(until(&mut s, 12.0, |s| s.perches.crews[&boss].first_blown));
     tick(&mut s, 3.0);
     assert!(s.perches.crews[&boss].demo.is_none());
@@ -945,7 +1035,7 @@ fn wiping_removes_crew_props_and_projectiles_and_repull_creates_only_one_crew() 
     s.step_perch_crews();
     s.step_perch_crews();
     assert_eq!(s.perches.workers.len(), 2);
-    assert_eq!(s.perches.crews[&boss].props.len(), 4, "two planks, two poles");
+    assert_eq!(s.perches.crews[&boss].props.len(), 6, "two planks, two poles, two torches");
 }
 
 #[test]
@@ -992,7 +1082,7 @@ fn a_surviving_party_member_keeps_the_same_crew_and_can_drop_a_worker() {
     assert_eq!(s.mobs[&boss].state.target(), Some(second));
     assert_eq!(s.perches.crews[&boss].workers, crew);
     assert!(crew.iter().all(|id| s.mobs[id].state.target() == Some(second)));
-    shot(&mut s, second, crew[0], 1.0, HitKind::Projectile);
+    s.perch_pole_struck(crew[0], second);
     assert!(matches!(s.perches.workers[&crew[0]].state, Place::Falling { .. }));
     assert_eq!(s.perches.workers.len(), 2);
 }
