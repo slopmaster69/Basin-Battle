@@ -6370,21 +6370,24 @@ per_hero = [0.25, 0.75]
 cooldown = 9.0
 spell = 15237
 
+# Guardian Spirit (Corey's EX rule: niche, never a greater nova), Holy Nova's EX and a different
+# spell: no burst at all, a last chance for one friend. The friend nearest the reticle (else you)
+# has death held off for 6 sec (the `cheat_death` boon, Cheat Death's own rules): a blow that would
+# kill them leaves them at 1 health and they mend 60% of their health, once.
 [[ability]]
-key = "surge_of_light"
-name = "Surge of Light"
+key = "guardian_spirit"
+name = "Guardian Spirit"
 ex_of = "holy_nova"
-text = "A greater nova: 24 damage to enemies within 10 yd and 24 healing to you and your allies in it, stronger for each other hero inside as Holy Nova is. Your allies in it run 30% faster for 3 sec."
-icon = "Spell_Holy_SurgeOfLight"
+text = "Sends a guardian spirit to the ally nearest your reticle, up to 30 yd away, or to you. For 6 sec, a blow that would kill them leaves them at 1 health instead and heals them for 60% of their health. Ends once it saves them."
+icon = "Spell_Holy_GuardianSpirit"
 slot = "close"
-kind = "nova"
+kind = "ally"
 valor = 25
-radius = [10.0, 10.0]
-damage = [24.0, 24.0]
-mend = 24.0
-per_hero = [0.25, 0.75]
-spell = 15237
-ally_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.3 }]
+range = [30.0, 30.0]
+# The 3.x spell 47788 is not in the 1.12 client: Flash Heal's holy light on them, and Holy
+# Strength's gold glow (20007, as Holy Light's stack) while the spirit watches.
+spell = 2061
+effects = [{ kind = "cheat_death", secs = [6.0, 6.0], amount = 0.6, aura = 20007 }]
 
 # 1: the road out. A feather of light at the reticle; the first hero to touch it (you or a friend,
 # by choice) runs faster and is freed of slows and roots. No one is moved who didn't step on it.
@@ -6408,20 +6411,23 @@ spell = 1706
 burst_spell = 1706
 impact_kit = 6095
 
+# Leap of Faith (Corey's EX rule: niche, never a group feather), Angelic Feather's EX and a
+# different spell: not a road for anyone, a rescue. The ally nearest the reticle is hauled to your
+# side (the Priest's own pull, `fetch`), however far off they are.
 [[ability]]
-key = "body_and_soul"
-name = "Body and Soul"
+key = "faithful_leap"
+name = "Leap of Faith"
 ex_of = "angelic_feather"
-text = "You and every ally within 10 yd run 40% faster for 4 sec and are freed of slows and roots."
-icon = "Spell_Holy_SymbolOfHope"
+text = "Pulls the ally nearest your reticle, up to 30 yd away, to your side. It needs an ally."
+icon = "Spell_Holy_DivineSpirit"
 slot = "utility"
-kind = "nova"
+kind = "ally"
 valor = 25
-radius = [10.0, 10.0]
-cleanse = true
-ally_effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }]
-self_effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }]
+range = [30.0, 30.0]
+fetch = true
+# Levitate's light on them as they come (Angelic Feather's look).
 spell = 1706
+effects = [{ kind = "pull", amount = 30.0, lift = 5.0, from_caster = true }]
 
 # Power Word: Shield, the heart of the class (Corey's ruling): the only way a Priest saves a friend
 # from a blow. On the friend under the reticle, else on you. Given to a friend just as a blow lands

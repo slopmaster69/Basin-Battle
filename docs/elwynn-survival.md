@@ -153,8 +153,8 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Split Arrow* | Fan of Knives · *Crippling Throw* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Surge of Light*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Body and Soul*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Leap of Faith*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Power Word: Barrier*, or Shadowguard · *Vampiric Touch* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
 | 3 | **Ultimate** | Bladestorm, or Rallying Cry | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Holy Word: Salvation, or Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
@@ -212,7 +212,10 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   and back, 14 damage to each foe and 14 healing to each friend it passes each way; the key again
   turns it early, and catching it as it comes home is 5 Valor); or Mind Blast, a sigil that erupts
   0.9 s later. E: Holy Nova, or Psychic Scream (its EX, **Void Tendrils**, holds every foe within
-  8 yd for 3 s, heroes 1.5, by a tendril of 50 health that damage breaks). 1: Angelic Feather, or
+  8 yd for 3 s, heroes 1.5, by a tendril of 50 health that damage breaks); Holy Nova's EX is
+  **Guardian Spirit**, no burst but a last chance: for 6 s a blow that would kill the ally nearest
+  your reticle (or you) leaves them at 1 health and heals them 60%, once. 1: Angelic Feather (its
+  EX, **Leap of Faith**, pulls the ally nearest your reticle, up to 30 yd, to your side), or
   Fade, a 5 yd sidestep (its EX, **Dominate Mind**, bends the creature under the reticle, 30 yd,
   to fight for you for 6 s, never a boss; a hero it strikes walks toward you and can't act for
   1.5 s). 2: Power Word: Shield, which parries a blow for a friend if given just as it lands, or
@@ -299,7 +302,7 @@ you, or the circle where it will land. Traps and anchors show as green circles.
   Blast and Meteor land.
 - **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab, and Fan of
   Knives Marks them so it crits; a kill under Death Mark readies everything again.
-- **Stay alive**: Power Word: Barrier, Barkskin and Healing Stream stack with Holy Nova and
+- **Stay alive**: Guardian Spirit, Barkskin and Healing Stream stack with Holy Nova and
   Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
 
 **PvP**: every card keeps to a budget a test holds it to (`tests_classes.rs`): a ranged poke does

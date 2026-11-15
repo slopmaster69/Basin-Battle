@@ -4369,6 +4369,9 @@ impl Content {
             if a.tether.is_some() && a.kind != "channel" {
                 bail!("{what}: only a channel is a tether (`tether`)");
             }
+            if a.fetch && (a.kind != "ally" || !a.effects.iter().any(|e| e.kind == "pull" && e.from_caster)) {
+                bail!("{what}: only an `ally` with a `pull` from the caster fetches a friend (`fetch`)");
+            }
             if a.parry_for && (a.kind != "ally" || !a.effects.iter().any(|e| e.kind == "shield")) {
                 bail!("{what}: only a shield given to a friend (`ally` with a `shield`) parries for them (`parry_for`)");
             }

@@ -667,6 +667,10 @@ pub struct AbilityDef {
     /// run out of time) is caught: this much Valor and the perfect (Divine Star).
     #[serde(default)]
     pub catch_valor: f32,
+    /// An `ally` ability that fetches the friend it lands on to the caster's side with its
+    /// `pull` effect (Leap of Faith): another hero only, never the caster (it's refused then).
+    #[serde(default)]
+    pub fetch: bool,
     /// A projectile lobbed in an arc to the reticle's point on the ground (within its range): it
     /// flies over bodies, its landing ring shown to everyone meanwhile, and lands after its flight
     /// (distance / `speed`) to burst `splash` wide there (then `linger`). Needs `splash`.
