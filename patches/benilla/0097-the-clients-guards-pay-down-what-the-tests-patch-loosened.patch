@@ -1,0 +1,445 @@
+From cf1ad4a890454314fd9531df0caf54fd24733b9f Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 00:08:17 -0600
+Subject: [PATCH] The client's guards pay down what the tests patch loosened
+
+Patch 0094 raised the world API wall's ceiling, exempted four look passes from the warm-pass
+test and raised the schedule ceilings. This takes back what can be taken back without changing
+play or looks.
+
+Warm pass: AoPipeline, WaterCopyPipeline, FogPipeline and LookPipeline are no longer exempt. The
+exemption said a change of `gxMultisample` in the world compiles their shader live, but the world
+camera reads it once at spawn, its target is always HDR and no booth carries `LookView`, so the
+one variant each pass specialises on the camera's first frame, under the cover, is the only one.
+`pipe_warm` now says so and names them.
+
+World API wall, 131 to 121: ten crossings become methods on types already published, with the
+same values and the same arithmetic. `WorldCamera::projection` and `zoomed_fovy` (CAM_FAR,
+CAM_FOVY, NEARCLIP_DEFAULT), `ViewDistance::set_farclip` (FARCLIP_RANGE),
+`MsaaSetting::in_range` (MSAA_RANGE), `RenderFade::self_body_alpha` (SELF_FADE_WINDOW,
+self_model_fade_alpha), `WmoPortalInstance::down_ray_group` and `WorldPoint::interior_probe_eye`
+(down_ray_seeds, terrain_z_local, INTERIOR_PROBE_HEIGHT).
+
+Left alone: the schedule ceilings (Update 2,347, PostUpdate 598). They count undeclared-order
+pairs, which a run condition does not change, and the pairs that remain are the effect drawers'
+shared `EffectQuads` stream and `Transform` writers on disjoint lanes; declaring an order there
+could change draw order.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/minimap/mod.rs         | 11 ++-----
+ crates/benilla-app/src/pipe_warm/menagerie.rs | 21 ++++--------
+ crates/benilla-app/src/pipe_warm/mod.rs       |  9 ++++++
+ crates/benilla-app/src/player/camera.rs       | 10 ++----
+ crates/benilla-app/src/player/scoped_view.rs  |  5 +--
+ crates/benilla-app/src/player/setup.rs        | 16 +++-------
+ crates/benilla-app/src/video.rs               |  5 ++-
+ crates/benilla-app/tests/world_api_wall.rs    | 18 +++--------
+ crates/benilla-world/src/model_fade.rs        |  8 +++++
+ crates/benilla-world/src/view.rs              | 32 +++++++++++++++++++
+ crates/benilla-world/src/wmo_portal/mod.rs    | 18 +++++++++++
+ crates/benilla-world/src/world_point.rs       |  6 ++++
+ 12 files changed, 98 insertions(+), 61 deletions(-)
+
+diff --git a/crates/benilla-app/src/minimap/mod.rs b/crates/benilla-app/src/minimap/mod.rs
+index eb2573be..af6e857e 100644
+--- a/crates/benilla-app/src/minimap/mod.rs
++++ b/crates/benilla-app/src/minimap/mod.rs
+@@ -37,9 +37,7 @@ use crate::player::Player;
+ use crate::ui_pass::{UiQuad, UiQuadAppend, UiQuadMask, UiQuads, UvRect};
+ use benilla_assets::MapCatalogRes;
+ use benilla_assets::{AssetSet, LockRecover, LooseOpen, WorldAssets};
+-use benilla_world::wmo_portal::{
+-    down_ray_seeds, terrain_z_local, WmoPortalInstance, INTERIOR_PROBE_HEIGHT,
+-};
++use benilla_world::wmo_portal::WmoPortalInstance;
+ use benilla_world::world_map::CurrentMap;
+ 
+ /// Yards per ADT tile.
+@@ -327,7 +325,7 @@ fn minimap_interior<'a>(
+     if !player.active || player.detached || world.area_interior().is_none() {
+         return None;
+     }
+-    let eye = player.pos + Vec3::Y * INTERIOR_PROBE_HEIGHT;
++    let eye = benilla_world::world_point::WorldPoint::interior_probe_eye(player.pos);
+     // The down-ray races the terrain, as the zone tracker does: grass above a mine is not in it.
+     let terrain = world.terrain_height_under(eye);
+     instances.iter().find_map(|(entity, inst)| {
+@@ -335,10 +333,7 @@ fn minimap_interior<'a>(
+         if model.wmo_id == 0 {
+             return None;
+         }
+-        let local_from_world = inst.world_from_local.inverse();
+-        let eye_local = bevy_to_wow(local_from_world.transform_point3(eye));
+-        let terrain_local = terrain.map(|z| terrain_z_local(&local_from_world, eye, z));
+-        let in_group = down_ray_seeds(model, eye_local, terrain_local).in_group?;
++        let in_group = inst.down_ray_group(model, eye, terrain)?;
+         let stem = asset_server
+             .get_path(inst.handle.id())
+             .and_then(|p| wmo_minimap_stem(&p.path().to_string_lossy()))?;
+diff --git a/crates/benilla-app/src/pipe_warm/menagerie.rs b/crates/benilla-app/src/pipe_warm/menagerie.rs
+index fe88ac6e..54408174 100644
+--- a/crates/benilla-app/src/pipe_warm/menagerie.rs
++++ b/crates/benilla-app/src/pipe_warm/menagerie.rs
+@@ -794,21 +794,12 @@ mod tests {
+         // `FfxCombinePipeline` compiles covered the same way (first frame, pre-world, a bake's
+         // fixed format; a world view's pair every frame in `prepare_textures`); this mention of
+         // its name is what passes it here.
+-        // - AoPipeline, WaterCopyPipeline, FogPipeline and LookPipeline (`benilla_world::look`, the
+-        //   new look's passes: 0053, 0064, 0066, 0084): one fullscreen shader each, specialised by
+-        //   its `prepare_*_views` for every view carrying `LookView` and the pipelines kept on it.
+-        //   The world camera carries it from the spawn (`player/setup.rs`), look on or off, so they
+-        //   compile on its first frame, behind the entry cover. Their only axes are the view's
+-        //   multisample flag and, for `LookPipeline`, its target format, which a booth's
+-        //   `Msaa::Off` cannot reach; a change of `gxMultisample` in the world re-specialises the
+-        //   one shader live, as it does Bevy's own view passes.
+-        let exempt = [
+-            "UiGammaPipeline",
+-            "AoPipeline",
+-            "WaterCopyPipeline",
+-            "FogPipeline",
+-            "LookPipeline",
+-        ];
++        // The new look's four passes (`AoPipeline`, `WaterCopyPipeline`, `FogPipeline`,
++        // `LookPipeline`) are not exempt: `pipe_warm/mod.rs` names them and says why the one
++        // variant each compiles on the world camera's first frame, under the cover, is the only
++        // one (the camera's multisample flag and target format are fixed for the session), and
++        // the name search below holds that note in place.
++        let exempt = ["UiGammaPipeline"];
+         let own_src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+         let warm_src = std::fs::read_to_string(own_src.join("pipe_warm/mod.rs")).unwrap()
+             + &std::fs::read_to_string(own_src.join("pipe_warm/menagerie.rs")).unwrap();
+diff --git a/crates/benilla-app/src/pipe_warm/mod.rs b/crates/benilla-app/src/pipe_warm/mod.rs
+index b0e323ea..9fa7f665 100644
+--- a/crates/benilla-app/src/pipe_warm/mod.rs
++++ b/crates/benilla-app/src/pipe_warm/mod.rs
+@@ -10,6 +10,15 @@
+ //! - [`watch_pipelines`]: the tripwire, a `warn!` for every pipeline compiled uncovered, which
+ //!   means the menagerie has a coverage hole.
+ //! - `WOW_PIPE_TRACE=<path>`: one line per pipeline created, with its full variant identity.
++//!
++//! The new look's four fullscreen passes (`benilla_world::look`: `AoPipeline`,
++//! `WaterCopyPipeline`, `FogPipeline`, `LookPipeline`) need no rig of their own. Each draws on the
++//! world camera, which the menagerie already waits for, and each one's `prepare_*_views`
++//! specialises its one shader for that view the first time it sees it, behind the entry cover.
++//! A view has two axes, its multisample flag and (for `LookPipeline`) its target format, and
++//! neither moves in a session: the world camera reads `gxMultisample` once at spawn
++//! (`player/setup.rs`, `video::on_cvar`), its target is always HDR, and a booth's `Msaa::Off`
++//! view never carries `LookView`. So the variant compiled at load is the only one there is.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+ use std::sync::Arc;
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index 8722a6d6..aa89083b 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -14,9 +14,7 @@ use crate::creature_anim::wrap_pi;
+ use crate::net::Embodied;
+ use benilla_assets::materials::WowModelMaterial;
+ use benilla_world::interact::{WorldClick, WorldRightClick, WorldRightPress};
+-use benilla_world::model_fade::{
+-    self_model_fade_alpha, FadeMaterials, PendingAppearFade, RenderFade, SELF_FADE_WINDOW,
+-};
++use benilla_world::model_fade::{FadeMaterials, PendingAppearFade, RenderFade};
+ 
+ /// The reference's up-edge click predicate (`0x514ae0`): a click is a release within 200 ms, or
+ /// within 800 ms under 2.25° of yaw and 2.0° of pitch travel (ms from `GetTickCount`, `[0x7ff310]`,
+@@ -1539,11 +1537,7 @@ pub(super) fn seat_camera(
+ 
+     // Fade by the realized camera-to-pivot distance from the seated eye, not the bobbed one, and
+     // the live `nearclip`: the fade finishes where the near plane starts cutting.
+-    rig.self_fade_alpha = self_model_fade_alpha(
+-        (seated - pivot).length(),
+-        dynamics.nearclip,
+-        SELF_FADE_WINDOW,
+-    );
++    rig.self_fade_alpha = RenderFade::self_body_alpha((seated - pivot).length(), dynamics.nearclip);
+     // The fade's byte, truncated (`0x50efc0`), sets the own-model flag (`0x482c3a`-`0x482c41`).
+     rig.own_model_hidden = (rig.self_fade_alpha * 255.0) as u8 == 0;
+ }
+diff --git a/crates/benilla-app/src/player/scoped_view.rs b/crates/benilla-app/src/player/scoped_view.rs
+index 3febad7c..5585f735 100644
+--- a/crates/benilla-app/src/player/scoped_view.rs
++++ b/crates/benilla-app/src/player/scoped_view.rs
+@@ -14,7 +14,7 @@ use bevy::prelude::*;
+ 
+ use crate::net::{ObjectStore, SelfPlayer};
+ use crate::ui_action::Spells;
+-use benilla_world::view::{WorldCamera, CAM_FOVY};
++use benilla_world::view::WorldCamera;
+ 
+ /// `0x4c`, the aura name the reference's effect walk matches.
+ const SPELL_AURA_FAR_SIGHT: u32 = 76;
+@@ -67,7 +67,7 @@ pub(super) fn apply_scoped_view(
+     let Ok(mut projection) = projections.single_mut() else {
+         return;
+     };
+-    let want = CAM_FOVY * scoped.zoom.unwrap_or(1.0);
++    let want = WorldCamera::zoomed_fovy(scoped.zoom.unwrap_or(1.0));
+     if let Projection::Perspective(PerspectiveProjection { fov, .. }) = &mut *projection {
+         if (*fov - want).abs() > f32::EPSILON {
+             *fov = want;
+@@ -78,6 +78,7 @@ pub(super) fn apply_scoped_view(
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use benilla_world::view::CAM_FOVY;
+ 
+     #[test]
+     fn the_spyglass_narrows_our_own_field_of_view_six_fold() {
+diff --git a/crates/benilla-app/src/player/setup.rs b/crates/benilla-app/src/player/setup.rs
+index 314d655d..ad7d2ead 100644
+--- a/crates/benilla-app/src/player/setup.rs
++++ b/crates/benilla-app/src/player/setup.rs
+@@ -1,7 +1,7 @@
+ //! Startup: spawns the world camera and seeds the avatar resources [`super::control`] drives.
+ 
+ use avian3d::prelude::*;
+-use bevy::camera::{CameraOutputMode, PerspectiveProjection, Projection};
++use bevy::camera::CameraOutputMode;
+ use bevy::core_pipeline::tonemapping::Tonemapping;
+ use bevy::prelude::*;
+ use bevy::render::view::Hdr;
+@@ -10,7 +10,7 @@ use benilla_assets::coords::wow_to_bevy;
+ 
+ use benilla_assets::{RenderConfig, WorldAssets};
+ use benilla_world::terrain_stream::SPAWN_XY;
+-use benilla_world::view::{WorldCamera, CAM_FAR, CAM_FOVY, NEARCLIP_DEFAULT};
++use benilla_world::view::WorldCamera;
+ 
+ use super::{
+     CameraControl, FlyCam, MoveSpeed, Player, PlayerCapsule, CAM_DIST_DEFAULT, CAPSULE_HEIGHT,
+@@ -89,7 +89,6 @@ pub(super) fn setup_player(
+     // Above the spawn until `control` seats it. The far plane is the horizon (`view::CAM_FAR`); the
+     // detailed world ends at `farclip`, by the wall.
+     let spawn = wow_to_bevy([SPAWN_XY.0, SPAWN_XY.1, 100.0]);
+-    let cam_far = CAM_FAR;
+     let mut world_cam = commands.spawn((
+         Camera3d::default(),
+         // The portrait booths are `Camera3d`s too: viewer queries filter on this marker.
+@@ -97,14 +96,9 @@ pub(super) fn setup_player(
+         // `gxMultisample` is read once: the reference latches it, pending until the next launch,
+         // and a live swap would mismatch our post passes. `$WOW_MSAA` overrides it for a session.
+         msaa.level(),
+-        Projection::from(PerspectiveProjection {
+-            far: cam_far,
+-            // Frame zero only: `view::stamp_near_clip` re-stamps the live `nearclip` every frame,
+-            // as `0x511bc0` overwrites the reference camera's `[cam+0x38]`.
+-            near: NEARCLIP_DEFAULT,
+-            fov: CAM_FOVY,
+-            ..default()
+-        }),
++        // Its near plane is for frame zero only: `view::stamp_near_clip` re-stamps the live
++        // `nearclip` every frame, as `0x511bc0` overwrites the reference camera's `[cam+0x38]`.
++        WorldCamera::projection(),
+         // A linear `Rgba16Float` target without tonemapping: the shaders light in clamped gamma
+         // space, so the output matches an 8-bit target.
+         Hdr,
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 14f926d0..fa2323ad 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -381,7 +381,6 @@ pub(crate) fn on_cvar(
+     (ao, shadows, water, wind, sky, look_weather, life, air): LookSwitches,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+-    use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+     let v = ev.num();
+     match ev.key().as_str() {
+         // A value that is not a size is ignored with a warning.
+@@ -507,7 +506,7 @@ pub(crate) fn on_cvar(
+         }
+         // The registry refuses a value outside the callback's range (`0x688d40`); the clamp only
+         // keeps the knob in it.
+-        "farclip" => view.farclip = v.clamp(*FARCLIP_RANGE.start(), *FARCLIP_RANGE.end()),
++        "farclip" => view.set_farclip(v),
+         // Clamped, where the reference refuses an out-of-range write and keeps the value
+         // (`0x688d90` echoes "NearClip must be in range 0.01 - 0.33" and returns 0).
+         "nearclip" => view.set_nearclip(v),
+@@ -515,7 +514,7 @@ pub(crate) fn on_cvar(
+         // an unoffered count is a wgpu validation error on the first frame. The camera reads it
+         // once, at spawn.
+         "gxmultisample" => {
+-            let asked = (v as u32).clamp(*MSAA_RANGE.start(), *MSAA_RANGE.end());
++            let asked = benilla_world::view::MsaaSetting::in_range(v as u32);
+             let granted = msaa_formats.clamp(asked);
+             if granted != asked {
+                 warn!("cvar gxMultisample: this GPU does not offer {asked}x multisampling — using {granted}x");
+diff --git a/crates/benilla-app/tests/world_api_wall.rs b/crates/benilla-app/tests/world_api_wall.rs
+index 2ae65634..9e47355b 100644
+--- a/crates/benilla-app/tests/world_api_wall.rs
++++ b/crates/benilla-app/tests/world_api_wall.rs
+@@ -272,7 +272,7 @@ const PUBLISHED: &[(&str, &str)] = &[
+ /// `CLOSE/invert`: the engine publishes the fact instead of the game reaching in;
+ /// `CLOSE/move-engine`: engine code in a game file moves engine-side; `CLOSE/move-game`: gameplay
+ /// moves out of the engine. Closing a leak is deleting its row.
+-/// 39 of the rows are what the series' patches outside the new look (0003 to 0087) reached for
++/// 32 of the rows are what the series' patches outside the new look (0003 to 0087) reached for
+ /// from game code: the pick, the rig, the fade, the fog override, the slope under a body.
+ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("art_scope::ArtScope", "CLOSE/absorb"),
+@@ -338,12 +338,10 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("model_fade::MAX_MODEL_CHAIN", "CLOSE/invert"),
+     ("model_fade::PartFade", "CLOSE/absorb"),
+     ("model_fade::PendingAppearFade", "CLOSE/invert"),
+-    ("model_fade::SELF_FADE_WINDOW", "CLOSE/absorb"),
+     ("model_fade::UnitAppearFade", "CLOSE/move-game"),
+     ("model_fade::apply_render_fade", "CLOSE/absorb"),
+     ("model_fade::fade_alpha", "CLOSE/absorb"),
+     ("model_fade::join_unit_appear_fade", "CLOSE/absorb"),
+-    ("model_fade::self_model_fade_alpha", "CLOSE/absorb"),
+     ("model_render::FarSideOfWater", "CLOSE/invert"),
+     ("model_render::FarSideTwins", "CLOSE/invert"),
+     ("model_render::ModelVisSet", "CLOSE/absorb"),
+@@ -403,23 +401,15 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("terrain_stream::point_light", "CLOSE/absorb"),
+     ("terrain_stream::spawn_model_entities", "CLOSE/move-engine"),
+     ("terrain_stream::terrain_height_under", "CLOSE/absorb"),
+-    ("view::CAM_FAR", "CLOSE/absorb"),
+-    ("view::CAM_FOVY", "CLOSE/absorb"),
+-    ("view::FARCLIP_RANGE", "CLOSE/absorb"),
+-    ("view::MSAA_RANGE", "CLOSE/absorb"),
+-    ("view::NEARCLIP_DEFAULT", "CLOSE/absorb"),
+-    ("wmo_portal::INTERIOR_PROBE_HEIGHT", "CLOSE/absorb"),
+     ("wmo_portal::UnitWmoRoom", "CLOSE/absorb"),
+     ("wmo_portal::WmoPortalInstance", "CLOSE/absorb"),
+     ("wmo_portal::WmoPvsSet", "CLOSE/absorb"),
+-    ("wmo_portal::down_ray_seeds", "CLOSE/absorb"),
+-    ("wmo_portal::terrain_z_local", "CLOSE/absorb"),
+     ("world_unit::Bobber", "CLOSE/absorb"),
+ ];
+ 
+-/// The gate on the leak count. Lower it when a leak closes. 131: the 92 the table already filed
+-/// that are still named, and the 39 the series' patches outside the new look added (above).
+-const LEAK_CEILING: usize = 131;
++/// The gate on the leak count. Lower it when a leak closes. 121: the 89 the table already filed
++/// that are still named, and the 32 the series' patches outside the new look added (above).
++const LEAK_CEILING: usize = 121;
+ 
+ /// How far under [`LEAK_CEILING`] the count may sit before the test asks for the ceiling to be
+ /// lowered: one closure does not fail the gate, a whole stage of work cannot go unrecorded.
+diff --git a/crates/benilla-world/src/model_fade.rs b/crates/benilla-world/src/model_fade.rs
+index 98bb7571..90b4eccb 100644
+--- a/crates/benilla-world/src/model_fade.rs
++++ b/crates/benilla-world/src/model_fade.rs
+@@ -456,6 +456,14 @@ pub fn self_model_fade_alpha(dist: f32, nearclip: f32, window: f32) -> f32 {
+     0.5 * (1.0 - (std::f32::consts::PI * d / window).cos())
+ }
+ 
++impl RenderFade {
++    /// The player's own body alpha at `dist` from the camera to its pivot, over the reference's
++    /// fade window ([`SELF_FADE_WINDOW`]): [`self_model_fade_alpha`] with that window.
++    pub fn self_body_alpha(dist: f32, nearclip: f32) -> f32 {
++        self_model_fade_alpha(dist, nearclip, SELF_FADE_WINDOW)
++    }
++}
++
+ /// Drive every live [`RenderFade`]: write its alpha into the `MeshTag`, draw the blend twin of the
+ /// part's live light law ([`crate::interior::InteriorLit`]) while `α < 1`, resolved every frame so
+ /// a part that classifies mid-ramp follows its room, and remove an appear fade once opaque.
+diff --git a/crates/benilla-world/src/view.rs b/crates/benilla-world/src/view.rs
+index 654d5bf3..81640818 100644
+--- a/crates/benilla-world/src/view.rs
++++ b/crates/benilla-world/src/view.rs
+@@ -139,6 +139,14 @@ pub struct MsaaSetting {
+ /// `0x63b250`.
+ pub const MSAA_RANGE: std::ops::RangeInclusive<u32> = 1..=16;
+ 
++impl MsaaSetting {
++    /// A requested sample count held to [`MSAA_RANGE`], before the device's own ceiling
++    /// ([`MsaaFormats::clamp`]) is applied.
++    pub fn in_range(requested: u32) -> u32 {
++        requested.clamp(*MSAA_RANGE.start(), *MSAA_RANGE.end())
++    }
++}
++
+ impl Default for MsaaSetting {
+     /// `$WOW_MSAA` overrides the default for the session; `off`, `0` and `1` all mean none.
+     fn default() -> Self {
+@@ -298,6 +306,11 @@ impl ViewDistance {
+     pub fn set_nearclip(&mut self, v: f32) {
+         self.nearclip = v.clamp(*NEARCLIP_RANGE.start(), *NEARCLIP_RANGE.end());
+     }
++
++    /// Set the far wall from a `farclip` write, clamped to [`FARCLIP_RANGE`].
++    pub fn set_farclip(&mut self, v: f32) {
++        self.farclip = v.clamp(*FARCLIP_RANGE.start(), *FARCLIP_RANGE.end());
++    }
+ }
+ 
+ impl Default for ViewDistance {
+@@ -338,6 +351,25 @@ pub fn within_farclip(
+ #[derive(Component)]
+ pub struct WorldCamera;
+ 
++impl WorldCamera {
++    /// The lens the world camera spawns with: the far plane [`CAM_FAR`], the near plane
++    /// [`NEARCLIP_DEFAULT`] for frame zero only (`stamp_near_clip` re-stamps the live `nearclip`
++    /// every frame) and the field of view [`CAM_FOVY`].
++    pub fn projection() -> Projection {
++        Projection::from(PerspectiveProjection {
++            far: CAM_FAR,
++            near: NEARCLIP_DEFAULT,
++            fov: CAM_FOVY,
++            ..default()
++        })
++    }
++
++    /// The vertical field of view at `zoom` times the normal one (a spyglass narrows it).
++    pub fn zoomed_fovy(zoom: f32) -> f32 {
++        CAM_FOVY * zoom
++    }
++}
++
+ /// The `$WOW_MSAA` knob as a Bevy `Msaa` level, 4x when unset. `8` falls back to 4x:
+ /// `Rgba16Float` is only guaranteed `[1, 4]` samples, and there is no adapter to ask here.
+ pub fn msaa_from_env() -> bevy::render::view::Msaa {
+diff --git a/crates/benilla-world/src/wmo_portal/mod.rs b/crates/benilla-world/src/wmo_portal/mod.rs
+index 19214c24..3edb4212 100644
+--- a/crates/benilla-world/src/wmo_portal/mod.rs
++++ b/crates/benilla-world/src/wmo_portal/mod.rs
+@@ -162,6 +162,24 @@ pub fn room_admits(room: Option<&WmoGroupVis>, instance: Option<&WmoPortalInstan
+     }
+ }
+ 
++impl WmoPortalInstance {
++    /// The group of `model` (this placement's building) the down-ray from `eye` (Bevy world
++    /// space) lands in, with the terrain surface at `terrain_wow_z` (raw WoW `z`, `None` off-tile
++    /// or over a hole) racing it: the flood seed [`down_ray_seeds`] names, for a caller that
++    /// only has the placement. `None` when the ray ends outside every group.
++    pub fn down_ray_group(
++        &self,
++        model: &WmoModel,
++        eye: Vec3,
++        terrain_wow_z: Option<f32>,
++    ) -> Option<usize> {
++        let local_from_world = self.world_from_local.inverse();
++        let eye_local = bevy_to_wow(local_from_world.transform_point3(eye));
++        let terrain_local = terrain_wow_z.map(|z| terrain_z_local(&local_from_world, eye, z));
++        down_ray_seeds(model, eye_local, terrain_local).in_group
++    }
++}
++
+ /// One placed WMO's portal-cull state, spawned with its geometry and despawned with the placement.
+ #[derive(Component)]
+ pub struct WmoPortalInstance {
+diff --git a/crates/benilla-world/src/world_point.rs b/crates/benilla-world/src/world_point.rs
+index 0c3058eb..51ac903c 100644
+--- a/crates/benilla-world/src/world_point.rs
++++ b/crates/benilla-world/src/world_point.rs
+@@ -102,6 +102,12 @@ pub struct NearestLiquid {
+ }
+ 
+ impl WorldPoint<'_, '_> {
++    /// Where the zone-text and minimap down-ray starts for a body at `pos` (Bevy world space): the
++    /// reference's probe height above it ([`crate::wmo_portal::INTERIOR_PROBE_HEIGHT`]).
++    pub fn interior_probe_eye(pos: Vec3) -> Vec3 {
++        pos + Vec3::Y * crate::wmo_portal::INTERIOR_PROBE_HEIGHT
++    }
++
+     /// Whose liquid answers for `who`.
+     pub fn claim(&self, who: Subject) -> LiquidClaim {
+         match who {
+-- 
+2.56.0.windows.4
+
