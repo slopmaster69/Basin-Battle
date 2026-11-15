@@ -1,5 +1,5 @@
 //! The Warrior's two trees (the designer's layout, Nov 4). The Warlord, the commander who holds
-//! the line: War Banner and Intimidating Roar, Cleave and Rising Cut, Tackle and Intervene,
+//! the line: War Banner and Intimidating Roar, Cleave and Piercing Howl, Tackle and Intervene,
 //! Retaliation and Shield Wall, Rallying Cry. The Juggernaut, the berserker: Axe Throw, Shockwave,
 //! Charge, Berserker Rage and Blood Fury, Bladestorm, and Momentum.
 
@@ -137,7 +137,7 @@ fn every_warrior_key_has_the_juggernaut_first_and_the_warlord_second() {
         let n = s.content.abilities.iter().filter(|a| a.on_board() && a.school == "warrior" && a.slot == slot).count();
         assert_eq!(n, 2, "two Warrior cards on the {slot} key");
     }
-    for (ex, base) in [("rending_axe", "hurled_axe"), ("intimidating_roar", "war_banner"), ("sundering_blow", "shockwave"), ("rising_cut", "cleave"), ("heroic_leap", "charge"), ("intervene", "tackle"), ("blood_fury", "berserker_rage"), ("shield_wall", "retaliation")] {
+    for (ex, base) in [("rending_axe", "hurled_axe"), ("intimidating_roar", "war_banner"), ("sundering_blow", "shockwave"), ("piercing_howl", "cleave"), ("heroic_leap", "charge"), ("intervene", "tackle"), ("blood_fury", "berserker_rage"), ("shield_wall", "retaliation")] {
         let x = s.content.ability(ex).unwrap();
         assert_eq!(s.content.abilities[x].ex_of, base);
         // An EX shares its key's cooldown.
@@ -587,7 +587,7 @@ fn a_cowed_hero_is_cowed_half_as_long() {
     assert!((s.blow_share(b) - 0.75).abs() < 1e-3, "his blows 25% softer: {}", s.blow_share(b));
 }
 
-// --- Cleave, Rising Cut -----------------------------------------------------------------------------------
+// --- Cleave, Piercing Howl -----------------------------------------------------------------------------------
 
 #[test]
 fn cleave_hits_an_opened_enemy_for_250_percent() {
@@ -608,16 +608,13 @@ fn cleave_hits_an_opened_enemy_for_250_percent() {
 }
 
 #[test]
-fn opened_means_staggered_stunned_knocked_down_exposed_or_a_boss_stance_broken() {
+fn opened_means_staggered_stunned_knocked_down_or_a_boss_stance_broken() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
     assert!(!s.opened(k));
     s.apply_cc(k, p, "stun", 2.0, 0.0, 0.0, "test");
     assert!(s.opened(k), "stunned");
-    let x = mob(&mut s, "brave", [3.0, -5.0, 0.0]);
-    s.apply_cc(x, p, "exposed", 2.0, 0.2, 0.0, "test");
-    assert!(s.opened(x), "Exposed");
     let w = mob(&mut s, "warlord", [3.0, 5.0, 0.0]);
     s.stagger_mob(w, 1.0, false);
     assert!(!s.opened(w), "a boss is opened only by a broken stance");
@@ -627,63 +624,72 @@ fn opened_means_staggered_stunned_knocked_down_exposed_or_a_boss_stance_broken()
 }
 
 #[test]
-fn rising_cut_cannot_be_staggered_in_its_windup() {
+fn piercing_howl_slows_every_enemy_within_10_yd_hard_for_6_sec_and_deals_nothing() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let k = mob(&mut s, "brave", [2.5, 0.0, 0.0]);
-    s.set_valor(p, 25.0);
-    cast(&mut s, p, "cleave", true, 0.0, 0.0);
-    assert!(matches!(s.players[&p].action, Action::Cast { .. }), "winding up");
-    assert!(!s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "a stagger doesn't take");
-    assert!(matches!(s.players[&p].action, Action::Cast { .. }), "still winding up");
-    let ev = run(&mut s, 0.6);
-    assert_eq!(struck(&ev, k).len(), 1, "and it cuts");
+    let d = s.content.abilities[s.content.ability("piercing_howl").unwrap()].clone();
+    let (reach, e) = (d.radius[1], d.effects[0].clone());
+    assert_eq!((reach, e.kind.as_str(), e.secs[1], e.amount), (10.0, "snare", 6.0, 0.6));
+    // All round: in front, behind, and out at the edge; one past it.
+    let near = mob(&mut s, "brave", [4.0, 0.0, 0.0]);
+    let behind = mob(&mut s, "brave", [-7.0, 1.0, 0.0]);
+    let edge = mob(&mut s, "brave", [0.0, reach - 0.5, 0.0]);
+    let past = mob(&mut s, "brave", [reach + 2.0, 0.0, 0.0]);
+    let before: Vec<u32> = [near, behind, edge, past].iter().map(|m| hp(&s, *m)).collect();
+    s.set_valor(p, 100.0);
+    let ev = press(&mut s, p, "cleave", true);
+    for m in [near, behind, edge] {
+        assert!((left(&s, m, "snare") - e.secs[1]).abs() < 0.2, "6 sec: {}", left(&s, m, "snare"));
+        assert!((s.speed_share(m) - (1.0 - e.amount)).abs() < 1e-3, "60% slower: {}", s.speed_share(m));
+        assert!(struck(&ev, m).is_empty(), "no damage");
+    }
+    assert!(!s.has_cc(past, "snare"), "nothing past 10 yd");
+    let after: Vec<u32> = [near, behind, edge, past].iter().map(|m| hp(&s, *m)).collect();
+    assert_eq!(before, after, "nobody hurt");
+    assert_eq!(s.players[&p].valor, 75.0, "25 Valor");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 12323, .. })), "Piercing Howl's look");
+    // It wears off after its 6 sec.
+    run(&mut s, 6.3);
+    assert!(!s.has_cc(near, "snare"), "and it's over");
 }
 
 #[test]
-fn rising_cut_exposes_what_it_hits_for_5_sec_a_boss_for_2_5() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let k = mob(&mut s, "brave", [2.5, 1.0, 0.0]);
-    let w = mob(&mut s, "warlord", [2.5, -1.5, 0.0]);
-    let behind = mob(&mut s, "brave", [-2.5, 0.0, 0.0]);
-    s.set_valor(p, 25.0);
-    cast(&mut s, p, "cleave", true, 0.0, 0.0);
-    run(&mut s, 0.5);
-    assert!((left(&s, k, "exposed") - 5.0).abs() < 0.2, "5 sec: {}", left(&s, k, "exposed"));
-    assert!((left(&s, w, "exposed") - 2.5).abs() < 0.2, "a boss's 2.5: {}", left(&s, w, "exposed"));
-    assert!(!s.has_cc(behind, "exposed"), "only in front");
-    assert!(s.auras_of(k).contains(&8647), "the Exposed look on it");
-}
-
-#[test]
-fn an_exposed_enemy_takes_20_percent_more_and_reels_30_percent_longer() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let k = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
-    assert!((s.taken_share(k) - 1.0).abs() < 1e-4);
-    s.apply_cc(k, p, "exposed", 5.0, 0.2, 0.0, "test");
-    assert!((s.taken_share(k) - 1.2).abs() < 1e-4, "20% more: {}", s.taken_share(k));
-    assert!((s.stagger_share(p, k, false) - 1.3).abs() < 1e-4, "30% longer staggers");
-    let now = s.clock;
-    s.apply_cc(k, p, "stagger", 1.0, 0.0, 0.0, "test");
-    assert!((s.mobs[&k].stagger_until - now - 1.3).abs() < 0.01, "a 1 sec stagger is 1.3: {}", s.mobs[&k].stagger_until - now);
-}
-
-#[test]
-fn an_exposed_hero_cannot_block_a_heros_blow() {
+fn piercing_howl_slows_a_hero_for_half_as_long() {
     let mut s = world_on(true, FlatLand::default());
-    let pi = std::f32::consts::PI;
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], pi);
-    s.input(b, Input::Guard);
-    run(&mut s, 0.6);
+    let b = hero(&mut s, "Bren", [6.0, 0.0, 0.0], std::f32::consts::PI);
     let h = s.players[&b].health;
-    light(&mut s, a);
-    assert_eq!(s.players[&b].health, h, "guarded, the blow is blocked");
-    s.apply_cc(b, a, "exposed", 5.0, 0.2, 0.0, "test");
-    let ev = light(&mut s, a);
-    assert!(s.players[&b].health < h, "Exposed, it lands through the guard: {:?}", struck(&ev, b));
+    s.set_valor(a, 100.0);
+    press(&mut s, a, "cleave", true);
+    assert!((left(&s, b, "snare") - 3.0).abs() < 0.2, "3 sec on a hero: {}", left(&s, b, "snare"));
+    assert!((s.speed_share(b) - 0.4).abs() < 1e-3, "60% slower");
+    assert_eq!(s.players[&b].health, h, "no damage");
+}
+
+#[test]
+fn piercing_howl_does_not_take_on_a_boss_though_a_plain_slow_does() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let w = mob(&mut s, "warlord", [5.0, 0.0, 0.0]);
+    let k = mob(&mut s, "brave", [-5.0, 0.0, 0.0]);
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "cleave", true);
+    assert!(s.has_cc(k, "snare"), "a creature is slowed");
+    assert!(!s.has_cc(w, "snare"), "a boss holds its ground, as against any control");
+    assert!((s.speed_share(w) - 1.0).abs() < 1e-3);
+    // The effect is what's shrugged off: a slow of anything else still takes on a boss.
+    assert!(s.apply_cc(w, p, "snare", 2.0, 0.3, 0.0, "test"), "a plain slow takes");
+}
+
+#[test]
+fn piercing_howls_words_say_what_the_data_does() {
+    let s = world();
+    let d = &s.content.abilities[s.content.ability("piercing_howl").unwrap()];
+    let e = &d.effects[0];
+    assert!(d.text.contains(&format!("within {} yd", d.radius[1])), "{}", d.text);
+    assert!(d.text.contains(&format!("slowed by {}% for {} sec", (e.amount * 100.0).round(), e.secs[1])), "{}", d.text);
+    assert!(d.text.contains(&format!("({} sec against heroes)", e.secs[1] * s.content.cc.player_share)), "{}", d.text);
+    assert_eq!(d.valor, 25);
 }
 
 // --- Rallying Cry ------------------------------------------------------------------------------------------

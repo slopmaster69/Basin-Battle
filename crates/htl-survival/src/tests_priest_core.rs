@@ -1075,7 +1075,7 @@ fn a_draft_2_save_loads_with_draft_3s_cards() {
 
 #[test]
 fn every_priest_card_keeps_to_the_boards_budgets() {
-    use crate::tests_classes::{board, hard_cc, worth, worth_with_spray};
+    use crate::tests_classes::{board, hard_cc, worth};
     let s = world();
     let c = &s.content;
     let mut wrong = Vec::new();
@@ -1101,7 +1101,7 @@ fn every_priest_card_keeps_to_the_boards_budgets() {
             if hard_cc(card) > 1.5 + 1.0e-3 {
                 wrong.push(format!("{}: {} s of hard crowd control on a hero", card.key, hard_cc(card)));
             }
-            if card.is_ex() && (![25, 50].contains(&card.valor) || worth_with_spray(c, card) > worth(d) * 1.8 + 20.0) {
+            if card.is_ex() && (![25, 50].contains(&card.valor) || worth(card) > worth(d) * 1.8 + 20.0) {
                 wrong.push(format!("{}: an EX out of its league", card.key));
             }
         }

@@ -194,31 +194,187 @@ fn a_seed_of_corruption_sticks_then_bursts_round_its_carrier_and_leaves_them_rot
     assert!(s.projectiles.is_empty());
 }
 
+/// How long an effect of `kind` has left on `u`.
+fn left(s: &Survival, u: Id, kind: &str) -> f32 {
+    s.cc_of(u).iter().find(|c| c.kind == kind).map_or(0.0, |c| c.until - s.clock)
+}
+
+/// A rot of the Warlock's (Seed of Corruption's: 4 damage a second for 4 sec) set on a foe.
+fn rot(s: &mut Survival, from: Id, on: Id) {
+    assert!(s.apply_cc_look(on, from, "burn", 4.0, 4.0, 0.0, "Seed of Corruption", 172));
+}
+
 #[test]
-fn chaos_bolt_held_a_second_tears_through_every_foe_in_its_line_and_let_go_early_is_lost() {
+fn soul_swap_copies_the_warlocks_rot_from_the_foe_at_the_reticle_onto_each_foe_within_10_yd() {
+    let mut s = world(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "seed_of_corruption");
+    s.set_cooldowns(p, true);
+    // The one under the reticle; two within 10 yd of it, one of them a hero; one past it.
+    let src = boar(&mut s, [14.0, 0.0, 0.0]);
+    let near = boar(&mut s, [14.0, 8.0, 0.0]);
+    let edge = boar(&mut s, [14.0, -9.5, 0.0]);
+    let far = boar(&mut s, [14.0, 14.0, 0.0]);
+    let foe = hero(&mut s, "Bren", [8.0, -4.0, 0.0], std::f32::consts::PI);
+    let pins = [(src, [14.0, 0.0, 0.0]), (near, [14.0, 8.0, 0.0]), (edge, [14.0, -9.5, 0.0]), (far, [14.0, 14.0, 0.0])];
+    let d = s.content.abilities[idx(&s, "soul_swap")].clone();
+    assert_eq!((d.range[1], d.splash, d.valor, d.kind.as_str()), (30.0, 10.0, 25, "spread"));
+    rot(&mut s, p, src);
+    s.set_valor(p, 25.0);
+    run_pinned(&mut s, 1.0, &pins);
+    let was = left(&s, src, "burn");
+    press(&mut s, p, "ranged", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "soul_swap")), "Ctrl: the EX version");
+    let ev = hold(&mut s, p, 0.0, &pins);
+    assert!(missile(&ev, 686), "its look flies to them");
+    for m in [near, edge] {
+        let c = s.cc_of(m).iter().find(|c| c.kind == "burn").expect("the rot is on it");
+        assert_eq!((c.from, c.amount, c.source.as_str(), c.aura), (p, 4.0, "Seed of Corruption", 172));
+        assert!((left(&s, m, "burn") - left(&s, src, "burn")).abs() < 0.2, "the time it had left: {} and {}", left(&s, m, "burn"), left(&s, src, "burn"));
+    }
+    assert!(left(&s, near, "burn") < 3.2 && left(&s, near, "burn") > 2.0, "what was left of 4 sec, not a new 4: {}", left(&s, near, "burn"));
+    assert!(left(&s, src, "burn") <= was, "the foe it came from keeps its own, no longer");
+    assert!(s.has_cc(src, "burn"));
+    assert!(!s.has_cc(far, "burn"), "past 10 yd of it nothing");
+    // The hero within 10 yd of it takes it too (shortened as any effect is on a hero, but with the
+    // time the rot had left).
+    assert!((left(&s, foe, "burn") - left(&s, src, "burn")).abs() < 0.2, "a hero: {} and {}", left(&s, foe, "burn"), left(&s, src, "burn"));
+    assert_eq!(s.players[&p].valor, 0.0, "25 Valor");
+    // It deals nothing itself: only the rot ticks.
+    let ev: Vec<Event> = ev.into_iter().filter(|e| matches!(e, Event::Swing { style: Blow::Arrow(_) | Blow::Heavy | Blow::Light, .. })).collect();
+    assert!(ev.is_empty(), "no blow of its own: {ev:?}");
+}
+
+#[test]
+fn soul_swap_takes_only_the_warlocks_own_rot_and_spends_nothing_when_there_is_none() {
+    let mut s = world(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let other = hero(&mut s, "Bren", [-5.0, 0.0, 0.0], 0.0);
+    learn(&mut s, p, "seed_of_corruption");
+    s.set_cooldowns(p, true);
+    let src = boar(&mut s, [14.0, 0.0, 0.0]);
+    let near = boar(&mut s, [14.0, 6.0, 0.0]);
+    let pins = [(src, [14.0, 0.0, 0.0]), (near, [14.0, 6.0, 0.0])];
+    // No rot at all.
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "ranged", true);
+    let ev = hold(&mut s, p, 0.0, &pins);
+    assert!(flashed(&ev, p, "Nothing to spread"), "said so");
+    assert!(!s.has_cc(near, "burn"));
+    assert_eq!(s.players[&p].valor, 25.0, "nothing paid");
+    // Someone else's rot on it is not the Warlock's to spread.
+    rot(&mut s, other, src);
+    run_pinned(&mut s, 1.0, &pins);
+    press(&mut s, p, "ranged", true);
+    let ev = hold(&mut s, p, 0.0, &pins);
+    assert!(flashed(&ev, p, "Nothing to spread"));
+    assert!(!s.has_cc(near, "burn"), "not theirs");
+    assert_eq!(s.players[&p].valor, 25.0);
+    // With no other foe near the one with the rot, there is nothing to give it to.
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     learn(&mut s, p, "seed_of_corruption");
     s.set_cooldowns(p, true);
-    // Close enough that the bolt, rising a little toward the reticle, is still at their height.
-    let at = [[5.0, 0.0, 0.0], [8.0, 0.0, 0.0], [11.0, 0.0, 0.0]];
-    let foes: Vec<Id> = at.iter().map(|a| boar(&mut s, *a)).collect();
-    let pins: Vec<(Id, Vec3)> = foes.iter().copied().zip(at).collect();
-    // Let go after half a second: lost, and nothing paid.
+    let lone = boar(&mut s, [14.0, 0.0, 0.0]);
+    let pins = [(lone, [14.0, 0.0, 0.0])];
+    rot(&mut s, p, lone);
     s.set_valor(p, 25.0);
     press(&mut s, p, "ranged", true);
-    assert_eq!(aiming(&s, p), Some(idx(&s, "chaos_bolt")), "Ctrl: the EX version");
-    let ev = hold(&mut s, p, 0.5, &pins);
-    assert!(!missile(&ev, 26006) && s.players[&p].action == Action::Ready, "lost");
+    let ev = hold(&mut s, p, 0.0, &pins);
+    assert!(flashed(&ev, p, "No other enemies near"));
     assert_eq!(s.players[&p].valor, 25.0, "nothing paid");
-    // Held its second: through all three.
-    press(&mut s, p, "ranged", true);
-    let mut ev = hold(&mut s, p, 1.1, &pins);
-    assert!(missile(&ev, 26006), "it flies");
-    ev.extend(run_pinned(&mut s, 1.0, &pins));
-    for m in &foes {
-        assert_eq!(hits(&ev, p, *m), vec![36], "each struck once, for 36");
+}
+
+#[test]
+fn soul_swaps_words_say_what_the_data_does() {
+    let s = world(false);
+    let d = &s.content.abilities[idx(&s, "soul_swap")];
+    assert!(d.text.contains(&format!("up to {} yd away", d.range[1])), "{}", d.text);
+    assert!(d.text.contains(&format!("within {} yd of it", d.splash)), "{}", d.text);
+    assert_eq!(s.content.ex_of(idx(&s, "seed_of_corruption")), Some(idx(&s, "soul_swap")));
+}
+
+#[test]
+fn howl_of_terror_sends_every_foe_within_10_yd_fleeing_for_4_sec_a_hero_for_1_5() {
+    let mut s = world(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "shadowfury");
+    let d = s.content.abilities[idx(&s, "howl_of_terror")].clone();
+    let e = d.effects[0].clone();
+    assert_eq!((d.radius[1], d.valor, e.kind.as_str(), e.secs[1], e.hero_secs, e.break_after), (10.0, 25, "panic", 4.0, 1.5, 1.0));
+    let near = boar(&mut s, [3.0, 0.0, 0.0]);
+    let behind = boar(&mut s, [-9.0, 0.0, 0.0]);
+    let past = boar(&mut s, [11.5, 0.0, 0.0]);
+    let foe = hero(&mut s, "Bren", [0.0, 6.0, 0.0], 0.0);
+    s.set_valor(p, 25.0);
+    let ev = press(&mut s, p, "close", true);
+    assert!(missile(&ev, 5484), "Howl of Terror's look");
+    for m in [near, behind] {
+        assert!((left(&s, m, "panic") - 4.0).abs() < 0.2, "4 sec: {}", left(&s, m, "panic"));
     }
+    assert!((left(&s, foe, "panic") - 1.5).abs() < 0.2, "a hero 1.5 sec: {}", left(&s, foe, "panic"));
+    assert!(!s.has_cc(past, "panic"), "nothing past 10 yd");
+    assert_eq!(s.players[&p].valor, 0.0, "25 Valor");
+    // They run: in a second and a half the one near is well away from where it stood.
+    run_pinned(&mut s, 1.5, &[]);
+    assert!(dist2d(s.mobs[&near].pos, ORIGIN) > 5.0, "it fled: {:?}", s.mobs[&near].pos);
+    run_pinned(&mut s, 3.0, &[]);
+    assert!(!s.has_cc(near, "panic"), "over after its 4 sec");
+}
+
+#[test]
+fn howl_of_terror_breaks_on_enough_damage_but_not_in_its_first_second() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "shadowfury");
+    let a = boar(&mut s, [3.0, 0.0, 0.0]);
+    let b = boar(&mut s, [-3.0, 0.0, 0.0]);
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "close", true);
+    let max = s.mobs[&a].max_health;
+    let share = (max as f32 * s.content.cc.panic_break).ceil() as u32 + 1;
+    // In the first second even a blow that would break any fear doesn't.
+    assert_eq!(s.cc_on_damage(a, share), share, "it takes the blow");
+    assert!(s.has_cc(a, "panic"), "still fleeing: the grace");
+    // After it, the same blow ends it.
+    run_pinned(&mut s, 1.1, &[]);
+    s.cc_on_damage(b, share);
+    assert!(!s.has_cc(b, "panic"), "enough damage ends it early");
+    // A small blow doesn't, whenever it comes.
+    let c = boar(&mut s, [0.0, 3.0, 0.0]);
+    s.apply_cc(c, p, "panic", 4.0, 0.0, 1.0, "test");
+    run_pinned(&mut s, 1.1, &[]);
+    s.cc_on_damage(c, 1);
+    assert!(s.has_cc(c, "panic"), "a scratch doesn't");
+}
+
+#[test]
+fn howl_of_terror_does_not_take_on_a_boss() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "shadowfury");
+    let boss = {
+        let def = s.content.mob("warlord").unwrap();
+        let id = s.spawn_mob(def, [4.0, 0.0, 0.0], None, false);
+        s.mobs.get_mut(&id).unwrap().state = MobState::Idle { wander_at: 1e9 };
+        id
+    };
+    let k = boar(&mut s, [-4.0, 0.0, 0.0]);
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "close", true);
+    assert!(s.has_cc(k, "panic"));
+    assert!(!s.has_cc(boss, "panic"), "a boss holds its ground, as against any control");
+}
+
+#[test]
+fn howl_of_terrors_words_say_what_the_data_does() {
+    let s = world(false);
+    let d = &s.content.abilities[idx(&s, "howl_of_terror")];
+    let e = &d.effects[0];
+    assert!(d.text.contains(&format!("within {} yd", d.radius[1])), "{}", d.text);
+    assert!(d.text.contains(&format!("for {} sec ({} sec against heroes)", e.secs[1], e.hero_secs)), "{}", d.text);
+    assert!(d.text.contains(&format!("not in the first {} sec", e.break_after)), "{}", d.text);
+    assert_eq!(s.content.ex_of(idx(&s, "shadowfury")), Some(idx(&s, "howl_of_terror")));
 }
 
 #[test]

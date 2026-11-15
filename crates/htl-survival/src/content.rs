@@ -4173,6 +4173,9 @@ impl Content {
             if a.at_self && !matches!(a.kind.as_str(), "ground" | "trap") {
                 bail!("{what}: only ground and traps are laid `at_self`");
             }
+            if a.kind == "spread" && (a.range[1] <= 0.0 || a.splash <= 0.0) {
+                bail!("{what}: a spread needs its reach (`range`) and the radius it spreads over (`splash`)");
+            }
             if a.kind == "trap" && (a.radius[1] <= 0.0 || a.secs <= 0.0) {
                 bail!("{what}: a trap needs its reach (`radius`) and its life (`secs`)");
             }
@@ -4188,7 +4191,7 @@ impl Content {
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
                 bail!("{what}: only a cone, a nova or a strip winds up (`cast`)");
             }
-            if (a.pierce > 0 || a.full_pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" {
+            if (a.pierce > 0 || a.full_pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" && a.kind != "spread" {
                 bail!("{what}: pierce, chain and splash are a projectile's");
             }
             // One boon, or several joined with `+` (Hallowed Ground's `hallowed+steadfast`).
@@ -4276,12 +4279,6 @@ impl Content {
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
             }
-            if !a.splits.is_empty() {
-                match self.ability(&a.splits).map(|k| &self.abilities[k]) {
-                    Some(s) if a.kind == "projectile" && s.inner && s.kind == "projectile" && s.splits.is_empty() => {}
-                    _ => bail!("{what}: a projectile splits into an `inner` projectile that doesn't split again (`splits` {})", a.splits),
-                }
-            }
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
             }
@@ -4304,8 +4301,8 @@ impl Content {
             }
             // The beta page's mechanics.
             let tether = a.tether_secs > 0.0;
-            if a.yank && !matches!(a.kind.as_str(), "projectile" | "shot") {
-                bail!("{what}: only a projectile or a shot pulls its caster after it (`yank`)");
+            if a.yank && a.kind != "projectile" {
+                bail!("{what}: only a projectile pulls its caster after it (`yank`)");
             }
             if (a.swap || tether) && a.kind != "projectile" {
                 bail!("{what}: only a projectile swaps places (`swap`) or binds (`tether_secs`)");

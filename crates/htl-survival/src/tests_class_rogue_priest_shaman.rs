@@ -153,8 +153,104 @@ fn fan_of_knives_lands_all_three_knives_point_blank_one_from_afar_and_none_past_
     ev.extend(run_pinned(&mut s, 1.0, &pins));
     assert_eq!(hits(&ev, p, out), 0);
     assert_eq!(hp(&s, out), before, "out of its reach");
-    // Its EX version is still the long throw that goes through.
-    assert_eq!(s.content.ex_of(idx(&s, "fan_of_knives")), Some(idx(&s, "crippling_throw")));
+    // Its EX version is Kidney Shot, a close one.
+    assert_eq!(s.content.ex_of(idx(&s, "fan_of_knives")), Some(idx(&s, "kidney_shot")));
+}
+
+/// How long an effect of `kind` has left on `u`.
+fn left(s: &Survival, u: Id, kind: &str) -> f32 {
+    s.cc_of(u).iter().find(|c| c.kind == kind).map_or(0.0, |c| c.until - s.clock)
+}
+
+/// Fan of Knives learned and its EX pressed (Ctrl), the blow let land.
+fn kidney(s: &mut Survival, p: Id, pins: &[(Id, Vec3)]) -> Vec<Event> {
+    learn(s, p, "fan_of_knives");
+    s.set_valor(p, 100.0);
+    s.set_cooldowns(p, true);
+    let mut ev = press(s, p, "ranged", true);
+    ev.extend(run_pinned(s, 0.8, pins));
+    ev
+}
+
+#[test]
+fn kidney_shot_stuns_only_the_nearest_foe_in_reach_for_3_sec() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let d = s.content.abilities[idx(&s, "kidney_shot")].clone();
+    assert_eq!((d.kind.as_str(), d.slot.as_str(), d.valor, d.effects[0].kind.as_str(), d.effects[0].secs[1], d.marked_more), ("art", "ranged", 25, "stun", 3.0, 1.0));
+    // Two in front of it, one past its reach.
+    let near = grunt(&mut s, [1.8, 0.0, 0.0]);
+    let next = grunt(&mut s, [2.0, 0.4, 0.0]);
+    let out = grunt(&mut s, [7.0, 0.0, 0.0]);
+    let pins = [(near, [1.8, 0.0, 0.0]), (next, [2.0, 0.4, 0.0]), (out, [7.0, 0.0, 0.0])];
+    let before = (hp(&s, near), hp(&s, next));
+    let ev = kidney(&mut s, p, &pins);
+    assert_eq!(hits(&ev, p, near), 1, "the nearest stabbed once");
+    assert!(hp(&s, near) < before.0, "for something");
+    assert!(s.has_cc(near, "stun"), "stunned");
+    assert!(left(&s, near, "stun") > 1.9 && left(&s, near, "stun") <= 3.0, "about 3 sec, less the swing already gone: {}", left(&s, near, "stun"));
+    assert_eq!((hits(&ev, p, next), hp(&s, next)), (0, before.1), "only one foe, the other untouched");
+    assert!(!s.has_cc(next, "stun") && !s.has_cc(out, "stun"));
+    // 25 Valor paid of the 100, and a little earned back for the blow landing.
+    assert!((75.0..90.0).contains(&s.players[&p].valor), "25 Valor: {}", s.players[&p].valor);
+}
+
+#[test]
+fn kidney_shot_stuns_a_hero_for_half_as_long() {
+    let mut s = world(true);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], std::f32::consts::PI);
+    let ev = kidney(&mut s, a, &[]);
+    let _ = ev;
+    assert!(s.has_cc(b, "stun"), "stunned");
+    assert!(left(&s, b, "stun") > 0.5 && left(&s, b, "stun") <= 1.5, "at most 1.5 sec: {}", left(&s, b, "stun"));
+}
+
+#[test]
+fn kidney_shot_stuns_a_marked_foe_1_sec_longer_and_uses_up_the_mark() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let marked = grunt(&mut s, [1.8, 0.0, 0.0]);
+    let plain = grunt(&mut s, [-1.8, 0.0, 0.0]);
+    let pins = [(marked, [1.8, 0.0, 0.0]), (plain, [-1.8, 0.0, 0.0])];
+    // Fan of Knives' own Mark (6 sec, 10% more from the next hit).
+    assert!(s.apply_cc(marked, p, "mark", 6.0, 0.1, 0.0, "Fan of Knives"));
+    let _ = kidney(&mut s, p, &pins);
+    let with = left(&s, marked, "stun");
+    assert!(with > 2.9 && with <= 4.0, "3 and 1 more: {with}");
+    assert!(!s.has_cc(marked, "mark"), "the Mark is used up");
+    // Without it, the plain 3 sec: face the other way and do it again.
+    s.move_player(p, ORIGIN, std::f32::consts::PI, Moving::default());
+    run_pinned(&mut s, 4.5, &pins);
+    let _ = kidney(&mut s, p, &pins);
+    let without = left(&s, plain, "stun");
+    assert!(without > 1.9 && without <= 3.0, "3: {without}");
+    assert!(with - without > 0.5, "the Marked one longer: {with} and {without}");
+}
+
+#[test]
+fn kidney_shot_does_not_stun_a_boss() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let def = s.content.mob("warlord").unwrap();
+    let boss = s.spawn_mob(def, [2.0, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&boss).unwrap().state = MobState::Idle { wander_at: 1e9 };
+    let k = grunt(&mut s, [-2.0, 0.0, 0.0]);
+    s.move_player(p, ORIGIN, 0.0, Moving::default());
+    let pins = [(k, [-2.0, 0.0, 0.0])];
+    let _ = kidney(&mut s, p, &pins);
+    assert!(!s.has_cc(boss, "stun"), "a boss holds its ground, as against any control");
+}
+
+#[test]
+fn kidney_shots_words_say_what_the_data_does() {
+    let s = world(false);
+    let d = &s.content.abilities[idx(&s, "kidney_shot")];
+    let e = &d.effects[0];
+    assert!(d.text.contains(&format!("{} sec windup", d.windup)), "{}", d.text);
+    assert!(d.text.contains(&format!("for {}% weapon damage", (d.weapon * 100.0).round())), "{}", d.text);
+    assert!(d.text.contains(&format!("stuns it for {} sec ({} sec against heroes)", e.secs[1], e.secs[1] * s.content.cc.player_share)), "{}", d.text);
+    assert!(d.text.contains(&format!("for {} sec longer if the enemy is Marked", d.marked_more)), "{}", d.text);
 }
 
 #[test]

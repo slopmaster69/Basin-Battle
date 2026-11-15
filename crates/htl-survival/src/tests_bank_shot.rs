@@ -1,6 +1,6 @@
-//! Bank Shot and Split Arrow (#110): an arrow seen the whole way, every ricochet flown on from
-//! where it struck (no burst there: a bounce isn't an explosion, Corey's review), and the arrow
-//! planted where it ends; Split Arrow's long flight and its burst.
+//! Bank Shot (#110): an arrow seen the whole way, every ricochet flown on from where it struck (no
+//! burst there: a bounce isn't an explosion, Corey's review), and the arrow planted where it ends;
+//! and its EX, Scatter Shot.
 
 use crate::content::Content;
 use crate::land::{FlatLand, Land};
@@ -9,12 +9,12 @@ use crate::sim::*;
 
 const DT: f32 = 0.05;
 const ORIGIN: Vec3 = [0.0, 0.0, 0.0];
-/// Aimed Shot's arrow, Bank Shot's look; Split Arrow's burst where it splits; its glowing arrow.
+/// Aimed Shot's arrow, Bank Shot's look.
 const ARROW: u32 = 19434;
+/// The burst of fire a bounce has none of.
 const FLASH: u32 = 5162;
 /// The splash of earth where it skips off the ground (not the wall's fire: Corey's review).
 const SPLASH: u32 = 26271;
-const GLOW: u32 = 3044;
 
 /// Level ground with walls: everything at or past `east` is solid, and with `west`, everything at
 /// or short of it too (a corridor).
@@ -247,70 +247,94 @@ fn bank_shot_aimed_steeply_down_plants_where_it_lands() {
     assert!(planted[0][0] < 5.0, "in the ground where it came down: {planted:?}");
 }
 
+// --- Scatter Shot ------------------------------------------------------------------------------
+
+/// How long an effect of `kind` has left on `u`.
+fn left(s: &Survival, u: Id, kind: &str) -> f32 {
+    s.cc_of(u).iter().find(|c| c.kind == kind).map_or(0.0, |c| c.until - s.clock)
+}
+
 #[test]
-fn split_arrow_flies_long_then_bursts_into_a_spray() {
+fn scatter_shot_disorients_the_first_foe_it_meets_for_4_sec_and_deals_nothing() {
     let mut s = world(Box::new(FlatLand::default()));
     let p = hero(&mut s, ORIGIN);
-    // One far off, another behind it.
-    let a = mob(&mut s, [30.0, 0.0, 0.0]);
-    let b = mob(&mut s, [36.0, 0.0, 0.0]);
+    let d = s.content.abilities[s.content.ability("scatter_shot").unwrap()].clone();
+    let e = d.effects[0].clone();
+    assert_eq!((d.range[1], d.valor, e.kind.as_str(), e.secs[1], e.hero_secs, d.damage[1]), (10.0, 25, "disorient", 4.0, 1.5, 0.0));
+    // One in reach, one behind it, one past its 10 yd.
+    let a = mob(&mut s, [7.0, 0.0, 0.0]);
+    let b = mob(&mut s, [9.0, 0.0, 0.0]);
+    let out = mob(&mut s, [14.0, 3.0, 0.0]);
+    let before = (s.mobs[&a].health, s.mobs[&b].health, s.mobs[&out].health);
     let mut ev = shoot(&mut s, p, true, (0.0, 0.0));
-    // One arrow goes, nothing else, for its long flight.
-    let loosed = ev.iter().filter(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == p && *spell == GLOW)).count();
-    assert_eq!(loosed, 1, "one arrow");
-    let mut burst_after = None;
-    for k in 0..40 {
-        let step = run_pinned(&mut s, DT, &[a, b]);
-        if burst_after.is_none() && !flashes(&step, FLASH).is_empty() {
-            burst_after = Some(k as f32 * DT);
-        }
-        ev.extend(step);
+    ev.extend(run_pinned(&mut s, 0.6, &[a, b, out]));
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 19503, .. } if *caster == p)), "its look flies");
+    assert!(s.has_cc(a, "disorient"), "the first foe it meets");
+    assert!(left(&s, a, "disorient") > 3.0 && left(&s, a, "disorient") <= 4.0, "4 sec less the flight: {}", left(&s, a, "disorient"));
+    assert!(!s.has_cc(b, "disorient") && !s.has_cc(out, "disorient"), "one foe, and nothing past 10 yd");
+    assert!(s.auras_of(a).contains(&19503), "it shows");
+    assert_eq!((s.mobs[&a].health, s.mobs[&b].health, s.mobs[&out].health), before, "no damage");
+    assert!(hits(&ev, p, a).is_empty());
+    // 25 Valor paid of the 100, and a little earned back for the shot landing.
+    assert!((75.0..90.0).contains(&s.players[&p].valor), "25 Valor: {}", s.players[&p].valor);
+}
+
+#[test]
+fn a_disoriented_foe_wanders_cannot_act_and_any_damage_ends_it() {
+    let mut s = world(Box::new(FlatLand::default()));
+    let p = hero(&mut s, ORIGIN);
+    let a = mob(&mut s, [6.0, 0.0, 0.0]);
+    shoot(&mut s, p, true, (0.0, 0.0));
+    run_pinned(&mut s, 0.3, &[]);
+    assert!(s.has_cc(a, "disorient"));
+    assert!(s.disabled(a), "it can't act");
+    assert!(!s.held_still(a), "but it isn't held: it wanders");
+    // It wanders, not away from the hero in particular: it ends up somewhere other than where it
+    // stood, in a few seconds, and the hero is the one it never goes for.
+    let start = s.mobs[&a].pos;
+    let mut walked = 0.0f32;
+    let mut at = start;
+    for _ in 0..30 {
+        run_pinned(&mut s, 0.1, &[]);
+        walked += dist2d(at, s.mobs[&a].pos);
+        at = s.mobs[&a].pos;
     }
-    let after = burst_after.expect("it bursts");
-    assert!(after > 0.35, "after a long flight: {after}");
-    // At the first foe: struck, and the spray fanned out from there, by unseen anchors.
-    let f = flashes(&ev, FLASH);
-    assert_eq!(f.len(), 1, "{f:?}");
-    assert!((f[0].1[0] - 29.5).abs() < 1.0, "the burst where it struck: {:?}", f[0].1);
-    let l = legs(&ev, p, GLOW);
-    assert_eq!(l.len(), 6, "a spray of 6: {l:?}");
-    assert!(l.iter().all(|(_, from, _)| (from[0] - 29.5).abs() < 1.0), "out of the burst");
-    assert!(l.iter().any(|(id, ..)| *id == f[0].0), "the burst shown by one of their anchors");
-    let ways: Vec<f32> = l.iter().map(|(_, from, to)| (to[1] - from[1]).atan2(to[0] - from[0])).collect();
-    let spread = ways.iter().cloned().fold(f32::MIN, f32::max) - ways.iter().cloned().fold(f32::MAX, f32::min);
-    assert!(spread > 0.8, "fanned wide: {ways:?}");
-    // The one it burst in takes the arrow and the spray through it; the one behind, some of it.
-    let (ha, hb) = (hits(&ev, p, a), hits(&ev, p, b));
-    let arrow = ha.iter().copied().max().unwrap_or(0);
-    assert!(ha.iter().filter(|d| **d < arrow).count() >= 3, "the arrow and the spray: {ha:?}");
-    assert!(!hb.is_empty() && hb.iter().all(|d| *d < arrow), "the spray on through: {hb:?}");
-    // Every arrow of the spray planted; the one that burst didn't.
-    assert_eq!(s.planted_of(p).len(), 6, "{:?}", s.planted_of(p));
+    assert!(walked > 1.0, "it wandered: {walked}");
+    assert!(!matches!(s.mobs[&a].state, MobState::Windup { .. }), "and it never swings");
+    // Any damage ends it (even a scratch), and the foe is its own again.
+    assert_eq!(s.cc_on_damage(a, 1), 1);
+    assert!(!s.has_cc(a, "disorient"), "damage breaks it");
 }
 
 #[test]
-fn split_arrow_with_nothing_in_the_way_bursts_at_the_end_of_its_flight() {
+fn scatter_shot_on_a_hero_lasts_1_5_sec_and_a_boss_shrugs_it_off() {
     let mut s = world(Box::new(FlatLand::default()));
     let p = hero(&mut s, ORIGIN);
-    let mut ev = shoot(&mut s, p, true, (0.0, 0.0));
-    ev.extend(run_pinned(&mut s, 1.5, &[]));
-    let f = flashes(&ev, FLASH);
-    assert_eq!(f.len(), 1);
-    assert!(f[0].1[0] > 34.0, "far out: {:?}", f[0].1);
-    assert_eq!(legs(&ev, p, GLOW).len(), 6);
-    let planted = s.planted_of(p);
-    assert_eq!(planted.len(), 6);
-    assert!(planted.iter().all(|a| a[0] > 40.0), "the spray on past the burst: {planted:?}");
+    let b = s.join("bren", "Bren", None);
+    s.move_player(b, [6.0, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+    let _ = s.step(0.0);
+    let d = s.content.abilities[s.content.ability("scatter_shot").unwrap()].clone();
+    s.apply_effects(p, b, &d.effects, 1.0, "Scatter Shot");
+    assert!((left(&s, b, "disorient") - 1.5).abs() < 0.1, "a hero 1.5 sec: {}", left(&s, b, "disorient"));
+    assert!(s.disabled(b), "and can't act");
+    // Not again straight after: the grace that follows any hard control.
+    run_pinned(&mut s, 1.6, &[]);
+    assert!(!s.has_cc(b, "disorient"));
+    assert!(!s.apply_cc(b, p, "disorient", 4.0, 0.0, 0.0, "again"), "the grace");
+    // A boss holds its ground.
+    let def = s.content.mob("warlord").unwrap();
+    let boss = s.spawn_mob(def, [8.0, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&boss).unwrap().state = MobState::Idle { wander_at: 1e9 };
+    s.apply_effects(p, boss, &d.effects, 1.0, "Scatter Shot");
+    assert!(!s.has_cc(boss, "disorient"), "a boss shrugs it off");
 }
 
 #[test]
-fn split_arrow_against_a_wall_sprays_back_off_it() {
-    let mut s = world(Box::new(Walls { east: 15.0, west: None }));
-    let p = hero(&mut s, ORIGIN);
-    let mut ev = shoot(&mut s, p, true, (0.0, 0.0));
-    ev.extend(run_pinned(&mut s, 1.5, &[]));
-    let l = legs(&ev, p, GLOW);
-    assert_eq!(l.len(), 6);
-    assert!(l.iter().all(|(_, from, to)| from[0] < 15.0 && to[0] < from[0]), "back off the wall: {l:?}");
-    assert!(s.planted_of(p).iter().all(|a| a[0] < 15.0));
+fn scatter_shots_words_say_what_the_data_does() {
+    let s = world(Box::new(FlatLand::default()));
+    let d = &s.content.abilities[s.content.ability("scatter_shot").unwrap()];
+    let e = &d.effects[0];
+    assert!(d.text.contains(&format!("up to {} yd", d.range[1])), "{}", d.text);
+    assert!(d.text.contains(&format!("for {} sec ({} sec against heroes)", e.secs[1], e.hero_secs)), "{}", d.text);
+    assert_eq!(s.content.ex_of(s.content.ability("bank_shot").unwrap()), s.content.ability("scatter_shot"));
 }

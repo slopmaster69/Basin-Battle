@@ -42,20 +42,22 @@ away = true
 card = "cone_of_cold"
 target_within = 9.0
 
-# Stun the pack with Shadowfury, back off while it lasts and tear through it with Chaos Bolt's
-# held line; Drain Life when hurt.
+# Stun the pack with Shadowfury and back off while it lasts, a Seed in the middle of the rest;
+# Howl of Terror when it goes badly in a crowd; Drain Life when hurt.
 [[class.warlock]]
 card = "drain_life"
 health_below = 0.55
 
 [[class.warlock]]
-card = "shadowfury"
-foes_within = [6.0, 1]
+card = "howl_of_terror"
+foes_within = [6.0, 3]
+health_below = 0.7
 then_back = 1.5
 
 [[class.warlock]]
-card = "chaos_bolt"
-target_has = "stun"
+card = "shadowfury"
+foes_within = [6.0, 1]
+then_back = 1.5
 
 [[class.warlock]]
 card = "seed_of_corruption"

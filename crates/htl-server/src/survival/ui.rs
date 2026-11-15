@@ -314,7 +314,9 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.chain > 0 {
         out.push(format!("{} bounce{}", d.chain, if d.chain == 1 { "" } else { "s" }));
     }
-    if d.splash > 0.0 && d.kind != "trap" {
+    if d.splash > 0.0 && d.kind == "spread" {
+        out.push(format!("{} yd spread radius", n(d.splash)));
+    } else if d.splash > 0.0 && d.kind != "trap" {
         out.push(format!("{} yd burst radius", n(d.splash)));
     }
     if d.returns {
@@ -2307,14 +2309,7 @@ impl SurvivalGame {
         // reticle can put its points where the arrows go (the visual check, run 040: drawn at a
         // fixed width, the fan read as a ninth of the real spread).
         let arc = |d: &htl_survival::content::AbilityDef| if d.kind == "projectile" && d.count > 1 && !d.lob { d.spread * (d.count - 1) as f32 } else { d.arc };
-        let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) {
-            if d.kind == "shot" {
-                let r = self.sim.ranged_of(p);
-                if r.draw_secs <= 0.0 { (0.0, 0.0) } else { (r.min_draw.max(d.charge[0]), r.draw_secs) }
-            } else {
-                (d.charge[0], d.charge[1])
-            }
-        };
+        let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) { (d.charge[0], d.charge[1]) };
         let slots: Vec<String> = self
             .sim
             .bar(id)

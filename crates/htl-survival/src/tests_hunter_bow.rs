@@ -111,7 +111,7 @@ fn geared(ev: &[Event], p: Id) -> bool {
 #[test]
 fn every_hunter_bow_ability_shows_the_bow() {
     let s = world();
-    for key in ["aimed_arrow", "multi_shot", "bank_shot", "split_arrow", "grapple_arrow", "reverse_grapple", "tripwire", "tripwire_second", "kill_shot", "skyfall", "skyfall_volley"] {
+    for key in ["aimed_arrow", "multi_shot", "bank_shot", "scatter_shot", "grapple_arrow", "reverse_grapple", "tripwire", "tripwire_second", "kill_shot", "skyfall", "skyfall_volley"] {
         assert!(s.content.abilities[idx(&s, key)].bow, "{key} shows the bow");
     }
     // What isn't drawn from the bow stays in the melee weapon's hands.

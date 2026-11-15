@@ -152,13 +152,13 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Split Arrow* | Fan of Knives · *Crippling Throw* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Scatter Shot* | Fan of Knives · *Kidney Shot* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Soul Swap* | Living Seed · *Entangling Roots* |
 <<<<<<< HEAD
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Leap of Faith*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Power Word: Barrier*, or Shadowguard · *Vampiric Touch* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
 =======
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Surge of Light*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Surge of Light*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Body and Soul*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Pain Suppression*, or Vampiric Embrace · *Psychic Ward* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
 >>>>>>> d615170a (Priest: Pain Suppression, Vampiric Embrace and Psychic Ward)
@@ -177,7 +177,9 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   and staggers it (or Heroic Leap, landing in a burst that throws everyone back). Retaliation is a
   one-second brace that blocks a blade and sweeps everyone in front; Shield Wall holds the shield up
   against everything from the front. Bladestorm: a 6 s spin that ramps; or Rallying Cry: everyone
-  near back on their feet with full stamina, and nothing staggers them for 8 s.
+  near back on their feet with full stamina, and nothing staggers them for 8 s. On the Warlord's
+  side, Cleave's EX, Piercing Howl, slows every foe within 10 yd by 60% for 6 s (3 s on a hero)
+  and does no damage: a kite, or a peel.
 - **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
   more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
   frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
@@ -189,8 +191,9 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   12), and Arrow Recall (Tripwire's EX) brings them all home through the fight, each at full damage;
   three or more in one foe Lacerate it. Q: Aimed Shot, a draw (its EX Multi-Shot a fan), or Bank
   Shot, which ricochets off walls and trees harder each bounce and skips off the ground at a low
-  angle, a flash at each (its EX Split Arrow a long glowing arrow that bursts into a fan of 6 where
-  its flight ends). E: Call of the Wild, a chain of spirit beasts that builds from setup
+  angle, a flash at each (its EX, Scatter Shot, is a short-range shot that does no damage and
+  disorients one foe for 4 s, 1.5 s on a hero: it wanders and can't act, and any damage ends it).
+  E: Call of the Wild, a chain of spirit beasts that builds from setup
   to finisher (the key shows the beast coming; a parry or perfect dodge lights it blue and, for 4 s,
   empowers the next), or Raptor Strike, a spear chain (thrust, sweep, an Uppercut that throws you
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
@@ -208,7 +211,8 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   0031, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
   Grapple hauls a foe in on one.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
-  up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
+  up close (its EX, Kidney Shot, is a close stab that stuns one foe for 3 s, 1 s longer if Fan of
+  Knives has Marked it, and uses the Mark up); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
   Smoke Bomb, a cloud at your feet that hides you and your friends in it and slows foes, Vanish
   hides you at once (your next blow counts as from behind); Death Mark.
@@ -239,8 +243,10 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   freezes all round you and makes your next Fireball a free Pyroblast for 5 s; Blink; Ice Block;
   Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
 - **Warlock**: rot. Seed of Corruption sticks in a foe and bursts round them 2 s later, leaving
-  everyone near rotting (its EX, Chaos Bolt, is a 1 s hold that tears through every foe in a
-  line); Shadowfury stuns a spot a moment later, its EX breathes shadowflame; Demonic Circle draws
+  everyone near rotting (its EX, Soul Swap, copies every rot of yours on the foe at the reticle
+  onto each other foe within 10 yd of it, with the time it had left); Shadowfury stuns a spot a
+  moment later, its EX, Howl of Terror, sends every foe within 10 yd fleeing for 4 s (1.5 s on a
+  hero) until enough damage breaks it, but not in the first second; Demonic Circle draws
   a way out at your feet and the key again steps back to it (its EX screams where you left); Drain
   Life outlasts them, every point it drains healing you, and Death Coil sends a foe fleeing as it
   heals you; Summon Infernal crashes down and stands burning.
@@ -256,8 +262,8 @@ Grip and Void Rift); both cut short what they had in hand, and fly heroes on the
 Nothing moves a body in Ice Block, Sanctuary, Barkskin or a Rallying Cry's 8 s. A **leap** goes through the
 air to the reticle's point (or straight back, a Disengage) and strikes what's there as it lands;
 Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at once) and spring on
-the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
-a stun. Projectiles may **pierce** (Crippling Throw, Chaos Bolt), **leap on** (Chain Lightning),
+the first foe to step near; a **wind-up** (Cleave, Typhoon) holds you a moment and is lost to
+a stun. Projectiles may **pierce** (a full Aimed Shot, Kill Shot), **leap on** (Chain Lightning),
 **burst**, or **stick** and go off a moment later round whoever carries them (Seed of
 Corruption); ground may linger, pull, throw out or slow every second. A dash may run **through**
 every foe in its way, striking each as it passes (Charge). Help aimed at a **friend**
@@ -342,7 +348,7 @@ Hover a key with the mouse free (or a card on the board) for what it does in wor
 how it's used, its damage, reach, charge, wind-up, stamina and cooldown, and the same for its
 charged-up version with its Valor. This build has every card from the start (`[dev] full_tree =
 true`), the Warrior's cards on the keys (`[loadout]`); without it a hero has the Warrior's and
-unlocks the rest. Abilities off the board (the bow's Aimed Shot, Frostbolt, Flamestrike,
+unlocks the rest. Abilities off the board (Frostbolt, Flamestrike,
 Nature's Grasp, Fire Ward) keep their rules (`bench = true`) for putting back on
 it.
 
@@ -359,9 +365,12 @@ landed (light 2, heavy 6, an ability 6), a parry (10), a dodge through a blow (8
 catches something (15) and a kill (3). A charged-up EX version costs 25 or 50 of it (a gold pip
 on its key, lit when you have enough) and shares its base's cooldown; an ultimate takes it all.
 
-**Crowd control**: stuns, freezes, roots, slows, panic, silence, weakness and burning, shown over
-the middle of the screen as they hold you. On heroes every one lasts half as long, and after a
-stun, incapacitate or panic you're unshakable for 3 seconds (`[cc]`).
+**Crowd control**: stuns, freezes, roots, slows, panic, disorient, silence, weakness and burning, shown over
+the middle of the screen as they hold you. On heroes every one lasts half as long (an effect may
+name a shorter time: `hero_secs`), and after a stun, incapacitate, panic or disorient you're
+unshakable for 3 seconds (`[cc]`). A disoriented foe wanders and can't act, and any damage ends it;
+a panic can say it takes no damage for its first moments (`break_after`). A boss or a totem shrugs
+off control, and an effect marked `control` (Piercing Howl's slow) as well.
 
 The numbers live in `[[ability]]` in `content/survival.toml`. For testing, with `.es debug` on (or
 in this build): `.es tree` (the board; `full`, `reset`), `.es slot <q|e|1|2|3> <ability>` (a bench
@@ -690,7 +699,7 @@ The **Weapon Rack** beside the camp chest hands out every weapon for free while 
 
 Two-handed weapons have no shield: their guard is narrower and dearer, but parries work the same.
 
-Bows and crossbows aren't on the rack: ranged fighting is off the board (Aimed Shot is benched), though the Hunting Bow and Militia Crossbow are still defined for the camp's towers and older saves.
+Bows and crossbows aren't on the rack: a Hunter's arrows are its abilities (Aimed Shot, Bank Shot), though the Hunting Bow and Militia Crossbow are still defined for the camp's towers and older saves.
 
 A dungeon's own weapons (what its foes carry or yield) aren't on the rack until the camp has
 found one: taken it from the ground below, or had it sent to the chest (a wager's gear). Then

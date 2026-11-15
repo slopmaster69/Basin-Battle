@@ -3796,27 +3796,25 @@ fuse_aura = 23072
 burst_spell = 24050
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0, aura = 172 }]
 
-# Held a whole second, so it can't be thrown off the hip; through every foe in its line.
+# Seed's EX, Soul Swap: the spreader. A Warlock's rot is only as wide as the Seed's 5 yd; this
+# takes every damage-over-time effect of theirs off the foe nearest the reticle and gives each
+# other foe within 10 yd of it the same, with the time it has left. No damage of its own, and it
+# does nothing for a Warlock with no rot on that foe (nothing is spent then). Fired along the
+# reticle, up to Seed's own range.
 [[ability]]
-key = "chaos_bolt"
-name = "Chaos Bolt"
+key = "soul_swap"
+name = "Soul Swap"
 ex_of = "seed_of_corruption"
-text = "Deals 36 damage to every enemy in a line. Hold 1 sec, then release. Releasing early wastes it. A heavy attack on you while you hold breaks it."
-icon = "Spell_Fire_SoulBurn"
+text = "Targets the enemy nearest the reticle, up to 30 yd away. Copies every damage-over-time effect you have on it onto each other enemy within 10 yd of it, with the time they have left. Does nothing if you have none on it."
+icon = "Spell_Shadow_ShadowWordDominate"
 slot = "ranged"
-kind = "projectile"
+kind = "spread"
 valor = 25
-charge = [1.0, 1.0]
-hold = 1.0
-fragile = true
-damage = [36.0, 36.0]
-range = [34.0, 34.0]
-radius = [0.45, 0.45]
-speed = 35.0
-pierce = 8
-spell = 26006
-charge_spell = 686
-impact_kit = 2709
+range = [30.0, 30.0]
+splash = 10.0
+# Shadow Bolt's look, flown to the foe it was taken from and each one it is given to.
+spell = 686
+clip = 53
 
 # Elements: the charge that grows.
 [[ability]]
@@ -4683,33 +4681,6 @@ spell = 2812
 # by taking `bench` away and giving it a free place in its row.
 
 [[ability]]
-key = "aimed_shot"
-name = "Aimed Shot"
-text = "Draw your bow for one powerful shot: the longer you hold the draw, the harder it hits (the bow's own numbers). Then it's back to the sword."
-icon = "INV_Weapon_Bow_02"
-school = "hunter"
-slot = "ranged"
-kind = "shot"
-bench = true
-charge = [0.45, 1.6]
-cooldown = 8.0
-speed = 45.0
-valor_hit = 5.0
-
-[[ability]]
-key = "volley_shot"
-name = "Piercing Shot"
-ex_of = "aimed_shot"
-text = "The draw's shot, and it stuns what it strikes for a moment."
-icon = "INV_Weapon_Bow_02"
-slot = "ranged"
-kind = "shot"
-valor = 25
-charge = [0.3, 1.0]
-speed = 45.0
-effects = [{ kind = "stun", secs = [1.0, 1.6] }]
-
-[[ability]]
 key = "frostbolt"
 name = "Frostbolt"
 text = "Charge for 0.4 to 1.2 sec. Deals 16 to 32 damage and slows the target by 40% for 2 to 4 sec, more the longer you charge."
@@ -5324,49 +5295,27 @@ clip = 53
 valor_hit = 5.0
 plants = true
 
-# Its EX: one long glowing arrow that bursts into a spray where its flight ends.
+# Bank Shot's EX, Scatter Shot: not a bigger arrow but a short-range one that takes a foe out of
+# the fight. It deals no damage, so it can't break what it does: the foe is disoriented for 4 sec
+# (a hero for 1.5, the hard-control budget), wandering every which way and unable to act, until
+# any damage ends it.
 [[ability]]
-key = "split_arrow"
-name = "Split Arrow"
+key = "scatter_shot"
+name = "Scatter Shot"
 ex_of = "bank_shot"
-text = "Fires a glowing arrow up to 36 yd. It bursts at the first enemy or wall it meets, or at the end of its flight, dealing 12 damage to the enemy it bursts in. 6 arrows spray out from the burst in a 60° fan, each dealing 5 damage to the first 2 enemies in its path. Every arrow plants where it stops."
-icon = "Ability_Hunter_Quickshot"
+text = "Fires a shot up to 10 yd that disorients an enemy for 4 sec (1.5 sec against heroes). It wanders and can't act. Any damage ends it. Deals no damage."
+icon = "Ability_GolemStormBolt"
 slot = "ranged"
 bow = true
 kind = "projectile"
 valor = 25
-# Point blank, 12 and all 6 of the spray through one foe: 42, under what an EX of a 16 poke may be.
-damage = [12.0, 12.0]
-range = [36.0, 36.0]
+range = [10.0, 10.0]
 radius = [0.3, 0.3]
-# Arcane Shot's glowing arrow (as Kill Shot's), at its speed; a burst of fire where it splits.
-speed = 50.0
-spell = 3044
-burst_spell = 5162
-splits = "split_spray"
+speed = 40.0
+# Scatter Shot's own look, flown at the foe and on it while it wanders.
+spell = 19503
 clip = 53
-valor_hit = 1.5
-
-# Split Arrow's spray: out from the burst, through the foe it burst in and on to the next.
-[[ability]]
-key = "split_spray"
-name = "Split Arrow"
-text = "Split Arrow's spray."
-icon = "Ability_Hunter_Quickshot"
-inner = true
-slot = "ranged"
-kind = "projectile"
-damage = [5.0, 5.0]
-range = [12.0, 12.0]
-radius = [0.3, 0.3]
-speed = 50.0
-count = 6
-# 12° apart: a 60° fan.
-spread = 12.0
-pierce = 1
-spell = 3044
-valor_hit = 1.0
-plants = true
+effects = [{ kind = "disorient", secs = [4.0, 4.0], hero_secs = 1.5, aura = 19503 }]
 
 # E: a spirit beast a press, a chain that builds: the first stage sets something on the foe, the
 # second turns it into something else, the third cashes it in (the beasts in `[[beast]]`).
@@ -5995,7 +5944,7 @@ from = "OrcMale"
 [[ability]]
 key = "cleave"
 name = "Cleave"
-text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned, Exposed or stance-broken) take 250% instead."
+text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned or stance-broken) take 250% instead."
 icon = "Ability_Warrior_Cleave"
 school = "warrior"
 slot = "close"
@@ -6018,39 +5967,23 @@ from = "TrollMale"
 spell = 845
 valor_hit = 6.0
 
-# E's EX: the opening made, not waited for. Half a second of poise (nothing staggers the warrior
-# in the wind-up, so a pack can't knock it out of their hands; a stun still does), then a rising cut
-# that leaves everything in front Exposed: no block or parry, 20% more from every hero's hit, 30%
-# longer staggers, and open to Cleave's 250%. A boss is Exposed half as long (2.5 sec): a window,
-# never a shutdown.
+# Cleave's EX, Piercing Howl: no blow at all, a shout. Every foe within 10 yd is slowed hard for
+# 6 sec (a hero for 3), and nothing is dealt. 60% is under Gravity Lance's 70% (2 sec) and over
+# Crippling Throw's 50% (3 sec): the longest hard slow there is, for a kite or a peel. A boss holds
+# its ground against it as against control (`control`).
 [[ability]]
-key = "rising_cut"
-name = "Rising Cut"
+key = "piercing_howl"
+name = "Piercing Howl"
 ex_of = "cleave"
-text = "After a 0.5 sec windup in which nothing can stagger you, cuts upward through a 120° arc in front of you, 5 yd deep. Enemies hit take 120% weapon damage and are Exposed for 5 sec (2.5 sec for a boss). Exposed enemies cannot block or parry. Every hero's hit on them deals 20% more damage and staggers 30% longer."
-icon = "Ability_MeleeDamage"
+text = "Every enemy within 10 yd is slowed by 60% for 6 sec (3 sec against heroes). Deals no damage."
+icon = "Spell_Shadow_DeathScream"
 slot = "close"
-kind = "cone"
+kind = "nova"
 valor = 25
-range = [5.0, 5.0]
-arc = 120.0
-cast = 0.5
-weapon = 1.2
-# The wind-up's poise shows nothing (20572 has no visual): the default steadfast look is Power
-# Infusion's blue glow, a magic look on a sword's wind-up (the lab, Nov 4). The wind-up is the clip.
-self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0, aura = 20572 }]
-# Exposed shows for its 5 sec: Expose Armor's crack (kit 3069) again every 1.5 sec (the data has no
-# lasting, non-magical mark; Corey's review, Nov 4).
-effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647, mark = 3069, mark_every = 1.5 }]
-# The rising cut, the same on every race: the orc men's upswing (87/0), the weapon ripped up from
-# the hip to over the head, the biggest rise in the census (+0.58) and quick. The tauren women's
-# slow two-handed upswing (19/1) read as an overhead from the gameplay camera (Corey's review,
-# Nov 4). Overpower's flash, Expose Armor's look on each one Exposed (the effect's `aura`).
-clip = 87
-take = 0
-from = "OrcMale"
-spell = 7384
-valor_hit = 6.0
+radius = [10.0, 10.0]
+# Piercing Howl's own look, where the Warrior stands.
+spell = 12323
+effects = [{ kind = "snare", secs = [6.0, 6.0], amount = 0.6, control = true }]
 
 # 1: the Warrior's one body slam (Beta's Wall Slam retires into it). The rush is short, so the
 # skill is the angle: the wall, the tree or the second enemy behind your target.
@@ -6217,23 +6150,27 @@ valor_hit = 2.0
 # Each knife also Marks (6 s): a Backstab on a Marked foe crits, the rogue's opener.
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }, { kind = "mark", secs = [6.0, 6.0], amount = 0.1 }]
 
+# Fan of Knives' EX, Kidney Shot: the rogue's close-in stun, on the same key. A short windup, then
+# a stab for 40% weapon damage at one body in reach and a 3 sec stun (1.5 on a hero). A Marked
+# foe is stunned 1 sec longer and the Mark is used up, so Fan of Knives first, then this: the
+# stun is longer, or the Mark is kept for a Backstab's crit, never both.
 [[ability]]
-key = "crippling_throw"
-name = "Crippling Throw"
+key = "kidney_shot"
+name = "Kidney Shot"
 ex_of = "fan_of_knives"
-text = "Throws a single blade instead of the fan. It passes through 2 enemies and on, dealing 16 damage to each, slowing them by 50% for 3 sec and poisoning them for 3 damage per sec for 4 sec. Catch the one running away."
-icon = "Ability_PoisonSting"
+text = "After a 0.25 sec windup, stabs one enemy in melee reach for 40% weapon damage and stuns it for 3 sec (1.5 sec against heroes). Stuns for 1 sec longer if the enemy is Marked, and uses up the Mark."
+icon = "Ability_Rogue_KidneyShot"
 slot = "ranged"
-kind = "projectile"
+kind = "art"
 valor = 25
-damage = [16.0, 16.0]
-range = [28.0, 28.0]
-radius = [0.35, 0.35]
-speed = 40.0
-pierce = 2
-spell = 1978
-clip = 107
-effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }, { kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }]
+windup = 0.25
+weapon = 0.4
+one_target = true
+marked_more = 1.0
+stamina = 14.0
+clip = 85
+spell = 408
+effects = [{ kind = "stun", secs = [3.0, 3.0] }]
 
 [[ability]]
 key = "blinding_step"
@@ -7368,21 +7305,23 @@ spell = 24050
 clip = 54
 effects = [{ kind = "stun", secs = [2.0, 2.0] }]
 
+# Shadowfury's EX, Howl of Terror: not a stun on a spot but a scream round the Warlock. Every foe
+# within 10 yd flees for 4 sec, a hero for 1.5. Damage can end it: Psychic Scream's rule (15% of
+# the foe's health), but the first 1 sec of it doesn't count, so a rot already on them doesn't
+# end it at once. A boss holds its ground, as against any control.
 [[ability]]
-key = "shadowflame"
-name = "Shadowflame"
+key = "howl_of_terror"
+name = "Howl of Terror"
 ex_of = "shadowfury"
-text = "After a 0.3 sec windup shown to everyone, breathes shadowflame in a 10 yd cone. Deals 14 damage, burns for 6 damage per sec for 4 sec and slows by 30% for 2 sec."
-icon = "Spell_Shadow_RainOfFire"
+text = "Every enemy within 10 yd flees in terror for 4 sec (1.5 sec against heroes). Enough damage ends it early, but not in the first 1 sec."
+icon = "Spell_Shadow_DeathScream"
 slot = "close"
-kind = "cone"
+kind = "nova"
 valor = 25
-range = [10.0, 10.0]
-arc = 60.0
-cast = 0.3
-damage = [14.0, 14.0]
-spell = 22539
-effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 6.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
+radius = [10.0, 10.0]
+# Howl of Terror's own look, where the Warlock stands.
+spell = 5484
+effects = [{ kind = "panic", secs = [4.0, 4.0], hero_secs = 1.5, break_after = 1.0 }]
 
 [[ability]]
 key = "demonic_circle"
