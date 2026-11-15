@@ -86,7 +86,7 @@ fn a_creature_gone_home_past_its_leash_evades_until_its_foe_comes_back() {
     // A shot at it finds nothing, and shows nothing: no word, and no "Miss" floating over it (a
     // swing event would put one there).
     let _ = s.step(0.0);
-    let arrow = s.content.ability("aimed_shot").expect("Aimed Shot");
+    let arrow = s.content.ability("aimed_arrow").expect("Aimed Shot");
     s.ability_on_mob(p, g, arrow, 1.0, 10.0, s.players[&p].pos, HitKind::Projectile, 19434);
     assert_eq!(s.mobs[&g].health, hp);
     let ev = s.step(0.0);

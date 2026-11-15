@@ -57,7 +57,7 @@ fn struck(events: &[Event], victim: Id) -> bool {
 /// Draw the bow, set the reticle's line (when given), and loose.
 fn shoot(s: &mut Survival, p: Id, line: Option<(f32, f32)>) -> Vec<Event> {
     s.players.get_mut(&p).unwrap().cd_off = true;
-    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    let _ = s.slot_ability(p, "ranged", "aimed_arrow");
     s.input(p, Input::Ability(0, false));
     s.input(p, Input::Attack);
     run(s, 0.8);

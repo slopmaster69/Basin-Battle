@@ -7,7 +7,7 @@
 //! - **Many runs**: each fight is played with different seeds (`SIM_RUNS`, 10 by default) and
 //!   reported as its mean, spread and range, so a real gap shows apart from a lucky run.
 //! - **A plan for each class** (`content/sim.toml`): the class's simplest tactics, tried before
-//!   the plain bot (a Frost Nova and a step back, a Shadowfury and a Chaos Bolt on the stunned).
+//!   the plain bot (a Frost Nova and a step back, a Shadowfury and a step back).
 //! - **What-if sweeps**: `SIM_TUNE="ability.penance.damage=[16,16]|[20,20]|[24,24]"` plays the
 //!   fights once for each value, so a number can be picked from the curve.
 //! - **A band** ([`classes_clear_a_pack_within_a_band`], a real test): every class clears the pack,
@@ -339,7 +339,7 @@ fn think(s: &mut Survival, p: Id, foes: &[Id], plan: &[Rule], bot: &mut Bot, out
             let ground = matches!(a.kind.as_str(), "ground" | "trap" | "place" | "blink") || a.lob;
             let fixed = a.charge[0] >= a.charge[1] && a.charge[1] > 0.0;
             // Up close a charge would only be broken by the blows: a quick release there, unless the
-            // card must be held to its end to go off at all (Pyroblast, Chaos Bolt: they wait).
+            // card must be held to its end to go off at all (Pyroblast, Kill Shot: they wait).
             let want = if d < 6.0 && !fixed { a.charge[0] + 0.1 } else { a.charge[1] };
             let (aim_yaw, aim_d) = if bot.away { (yaw + std::f32::consts::PI, 15.0) } else { (yaw, d) };
             let elev = if ground { -(EYE / aim_d.max(1.0)).atan() } else { ((1.0 - EYE) / aim_d.max(1.0)).atan() };

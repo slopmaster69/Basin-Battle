@@ -74,8 +74,6 @@ pub const KINDS: [&str; 25] = [
     "blink",
     // A counter's stance: it fires when a blow or a projectile reaches you.
     "stance",
-    // The bow: a projectile whose numbers are the hero's bow's own.
-    "shot",
     // Help on a friend, at once: the first friendly hero along the reticle within `range` (traced
     // `radius` wide, 1 yd if none), else the one nearest the reticle within 15° of it, else the
     // caster. It gets `ally_heal`, `cleanse` and the boons among `effects` (nothing else of them).
@@ -106,6 +104,9 @@ pub const KINDS: [&str; 25] = [
     "penance",
     "feather",
     "shell",
+    // The Warlock's Soul Swap: the foe nearest the reticle, and every damage-over-time effect of the
+    // caster's on it copied onto each other foe within `splash` of it.
+    "spread",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -432,6 +433,13 @@ pub struct AbilityDef {
     /// A Mark it uses up makes it a critical hit, this many times the damage.
     #[serde(default)]
     pub mark_crit: f32,
+    /// Its stuns last this many seconds longer on a Marked foe, and the Mark is used up (Kidney
+    /// Shot).
+    #[serde(default)]
+    pub marked_more: f32,
+    /// A weapon art that strikes only the nearest foe in its reach, whatever the weapon cleaves.
+    #[serde(default)]
+    pub one_target: bool,
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
@@ -751,11 +759,6 @@ pub struct AbilityDef {
     pub bounces: u32,
     #[serde(default)]
     pub bounce_gain: f32,
-    /// A projectile that bursts where its flight ends (the first foe, a wall, the ground or its
-    /// range's end) into this `inner` projectile's arrows, fanned out from there (Split Arrow);
-    /// its `burst_spell` shows at the burst.
-    #[serde(default)]
-    pub splits: String,
     /// It goes on the key press, along the facing (no aim and click): Raptor Strike's hits,
     /// Skyfall's leap.
     #[serde(default)]
@@ -1224,8 +1227,8 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub from_caster: bool,
     /// A one-shot look (a `SpellVisualKit`) replayed on whoever has it every `mark_every` seconds
-    /// while it holds, where the data has no lasting look that fits: the Cowed mark over the head,
-    /// the Exposed crack. A kit plays no body animation, as a spell's cast would.
+    /// while it holds, where the data has no lasting look that fits: the Cowed mark over the head.
+    /// A kit plays no body animation, as a spell's cast would.
     #[serde(default)]
     pub mark: u32,
     #[serde(default)]
@@ -1233,6 +1236,10 @@ pub struct AbilityEffect {
     /// Its look on whoever has it, in place of the kind's own (a spell whose state look plays).
     #[serde(default)]
     pub aura: u32,
+    /// A foe that holds its ground (a champion, a totem) shrugs it off as it does control, though
+    /// its kind isn't one (Piercing Howl's slow).
+    #[serde(default)]
+    pub control: bool,
     /// A knockback that throws them into a wall (or up against a steep step) stuns them this long
     /// as they hit it (a creature's duration: a hero's is shortened, and kept from them by the
     /// grace, as any stun's).
@@ -1251,17 +1258,19 @@ pub struct AbilityEffect {
 /// Crowd control and forced movement a foe that holds its ground shrugs off (an ultimate's
 /// aside): what takes away its control of itself or its place. A snare, a weakness, a burn and a
 /// mark still take.
-pub const CONTROL: [&str; 8] = ["stun", "incapacitate", "petrify", "panic", "root", "silence", "stagger", "dominated"];
+pub const CONTROL: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "disorient", "root", "silence", "stagger", "dominated"];
 
 /// The crowd control there is (Battlerite's rules, WoW's names): `stun` (nothing, damage doesn't
 /// break it), `incapacitate` (nothing, damage breaks it), `petrify` (nothing, shielded: a frozen
 /// foe), `panic` (runs, out of control, ended by enough damage), `root` (no moving), `snare`
 /// (slower by `amount`), `silence` (no abilities), `weaken` (deals and heals `amount` less),
 /// `stagger` (the attack or charge in hand is lost), `dominated` (the Priest's Dominate Mind: a
-/// creature fights for whoever took it, a hero walks toward them and can't act). A `root` given an
+/// creature fights for whoever took it, a hero walks toward them and can't act), `disorient` (it
+/// wanders every which way, out of control, and can't act; any damage ends it: Scatter Shot).
+/// A `root` given an
 /// `amount` is held by a tendril of that much health: damage wears it down and it breaks (Void
 /// Tendrils).
-pub const CC_KINDS: [&str; 10] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "stagger", "dominated"];
+pub const CC_KINDS: [&str; 11] = ["stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "stagger", "dominated"];
 /// The other effects an ability can carry.
 /// `knockback` throws them `amount` yards away from where it came from (`pull`: up to `amount`
 /// yards toward it); `shield` soaks `amount` damage; `regen` heals `amount` of their health a
@@ -1278,12 +1287,11 @@ pub const CC_KINDS: [&str; 10] = ["stun", "incapacitate", "petrify", "panic", "r
 /// their attacks come `amount` faster: Rallying Cry), `fury` (their attacks cost no stamina and
 /// deal `amount` more: Blood Fury, Rallying Cry), `grown` (drawn `amount` larger), `cowed` (they
 /// deal `amount` less damage and wind their attacks up slower; a creature low on health flees: a
-/// boss only deals a little less: Intimidating Roar), `exposed` (no block or parry, and every
-/// hero's hit on them deals `amount` more and staggers longer: Rising Cut), `momentum` (the
+/// boss only deals a little less: Intimidating Roar), `momentum` (the
 /// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
 /// at a time while they stand by it).
-pub const OTHER_EFFECTS: [&str; 29] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner", "embrace", "ward",
+pub const OTHER_EFFECTS: [&str; 28] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
@@ -1291,7 +1299,7 @@ pub const BOONS: [&str; 19] = ["freedom", "steed", "wrath", "hallowed", "steadfa
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 15] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "exposed", "dominated"];
+pub const HARMFUL: [&str; 15] = ["stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius
@@ -1459,6 +1467,8 @@ impl Default for CcDef {
             ("incapacitate", 853),
             ("petrify", 122),
             ("panic", 5782),
+            // Scatter Shot's own: the sparkle that spins over a disoriented foe.
+            ("disorient", 19503),
             ("root", 339),
             ("snare", 116),
             ("silence", 15487),

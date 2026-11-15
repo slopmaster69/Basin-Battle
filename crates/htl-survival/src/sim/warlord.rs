@@ -3,13 +3,13 @@
 //! The Warlord (the second choices, the commander who holds the line): Tackle's rush that carries
 //! one enemy and Crashes it into what's behind it, Intervene's rush to a friend to take the blow
 //! meant for them, the War Banner planted for the group (moved by its recast, felled by blows),
-//! Intimidating Roar's Cowed, Rising Cut's Exposed, Cleave's cash-in on an opened enemy, and
+//! Intimidating Roar's Cowed, Cleave's cash-in on an opened enemy, and
 //! Rallying Cry's group back on its feet.
 //!
 //! The Juggernaut (the first choices, the berserker): Momentum, stacked by the hero's own blows,
 //! Berserker Rage breaking free of what holds them, and Blood Fury's attacks paid for in blood.
 //!
-//! An **opened** enemy is one that's staggered, knocked down, stunned, Exposed, or (a boss)
+//! An **opened** enemy is one that's staggered, knocked down, stunned, or (a boss)
 //! stance-broken: [`Survival::opened`] is the one check, for Cleave and anything else that pays
 //! one off.
 
@@ -35,11 +35,6 @@ const COWED_BOSS_CUT: f32 = 0.10;
 /// A Cowed creature (not a boss) below this share of its health flees instead of fighting, once a
 /// Cow (20%: the ones about to die anyway, so it ends a fight rather than resets it).
 const COWED_FLEE_BELOW: f32 = 0.2;
-/// Every hero's hit on an Exposed enemy staggers it this much longer (Rising Cut: 30%).
-const EXPOSED_STAGGER: f32 = 0.3;
-/// A boss is Exposed this share of the time (Rising Cut's 5 sec are 2.5 on one: a window, never
-/// a shutdown).
-const BOSS_EXPOSED_SHARE: f32 = 0.5;
 /// A War Banner is this wide: a blow reaching this near it strikes it.
 const BANNER_SIZE: f32 = 0.5;
 /// The look over a hero near a War Banner is kept on this long at a time, again each tick they
@@ -99,11 +94,11 @@ pub(crate) struct Warlord {
 impl Survival {
     // --- opened -------------------------------------------------------------------------------------
 
-    /// Opened: staggered, knocked down or stunned, Exposed, or (a boss) reeling from a broken
+    /// Opened: staggered, knocked down or stunned, or (a boss) reeling from a broken
     /// stance. A knockdown is a stun that looks it, so one check covers both.
     pub fn opened(&self, id: Id) -> bool {
         let now = self.clock;
-        if self.has_cc(id, "stun") || self.has_cc(id, "exposed") {
+        if self.has_cc(id, "stun") {
             return true;
         }
         if let Some(m) = self.mobs.get(&id) {
@@ -540,7 +535,7 @@ impl Survival {
         self.blow_boost(id) * (1.0 - self.cowed_cut(id))
     }
 
-    // --- Cowed, Exposed -----------------------------------------------------------------------------
+    // --- Cowed -----------------------------------------------------------------------------
 
     /// How much softer a Cowed unit's blows land (Intimidating Roar's 25%; a boss's only 10%).
     pub(crate) fn cowed_cut(&self, id: Id) -> f32 {
@@ -561,18 +556,16 @@ impl Survival {
         }
     }
 
-    /// How much longer a hero's blow staggers `victim`: an Exposed one 30% longer, and a heavy
-    /// attack by a hero near their War Banner its `stagger` longer.
-    pub(crate) fn stagger_share(&self, attacker: Id, victim: Id, heavy: bool) -> f32 {
+    /// How much longer a hero's blow staggers (a heavy attack by a hero near their War Banner its
+    /// `stagger` longer).
+    pub(crate) fn stagger_share(&self, attacker: Id, _victim: Id, heavy: bool) -> f32 {
         let banner = if heavy { self.under_banner(attacker).map_or(0.0, |b| b.stagger) } else { 0.0 };
-        let exposed = if self.has_cc(victim, "exposed") { EXPOSED_STAGGER } else { 0.0 };
-        (1.0 + banner) * (1.0 + exposed)
+        1.0 + banner
     }
 
-    /// The Warrior's effects that are more than a timer: Exposed's half time on a boss, Rallying
-    /// Cry's `rallied` getting them up first.
+    /// The Warrior's effects that are more than a timer: Rallying Cry's `rallied` getting them up
+    /// first.
     pub(crate) fn warrior_effect(&mut self, owner: Id, victim: Id, e: &AbilityEffect, secs: f32, source: &str) {
-        let secs = if e.kind == "exposed" && self.is_boss(victim) { secs * BOSS_EXPOSED_SHARE } else { secs };
         if e.kind == "rallied" {
             self.break_free(victim, &["stun"]);
         }

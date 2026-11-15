@@ -1173,6 +1173,11 @@ pub struct Survival {
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
     pub(crate) fx_vs_bosses: bool,
+    /// The effect being given is shrugged off by a foe that holds its ground, though its kind
+    /// isn't control (an effect's `control`).
+    pub(crate) fx_control: bool,
+    /// The foe whose Mark the last ability's damage used up, and when (a Kidney Shot's longer stun).
+    pub(crate) fx_marked: Option<(Id, f32)>,
     /// The look the caster of the pull being given wears over it (its clip, the model it's
     /// borrowed from): an ability's `pull_clip` and `pull_from`.
     pub(crate) fx_pull_look: Option<(u16, String)>,
@@ -1311,6 +1316,8 @@ impl Survival {
             light: light::Light::default(),
             fx_from: None,
             fx_vs_bosses: false,
+            fx_control: false,
+            fx_marked: None,
             fx_pull_look: None,
             told_immune: BTreeMap::new(),
             told_vocal: BTreeMap::new(),
@@ -2499,11 +2506,7 @@ impl Survival {
     /// What a hero's ranged slot shows: what they carry, or while a bow ability has the bow in
     /// their hands, the bow it draws ([`Self::bow_look`]).
     pub fn ranged_shown(&self, p: &Player) -> usize {
-        let shot = match &p.action {
-            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } => self.content.abilities[*ability].kind == "shot",
-            _ => false,
-        };
-        if p.kit == Kit::Bow && !shot {
+        if p.kit == Kit::Bow {
             self.bow_look(p)
         } else {
             p.bow

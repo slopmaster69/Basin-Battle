@@ -1,0 +1,13 @@
+# Scatter Shot (Ctrl+Q with Bank Shot): a short shot at a creature 8 yd off. Look for: the shot's
+# flight, the disoriented creature wandering with its look over it for 4 sec, and no damage.
+hero hunter
+cam 0 -10 8
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 8 still
+5.0 .es slot q bank_shot
+5.5 .es valor full
+6.0 .es in ab 0 1
+6.6 .es in a {facing} 0.0
+6.7 .es in au {facing} 0.0
+12 end

@@ -328,13 +328,13 @@ fn stamina_stops_coming_back_while_guarding_and_running_out_leaves_you_open() {
 
 // --- the bow: Aimed Shot ---------------------------------------------------------------------------
 
-/// The Aimed Shot's key (Q, the bow taken off the bench onto it).
+/// The Aimed Shot's key (Q).
 const SHOT: Input = Input::Ability(0, false);
 
 /// Draw the bow on its key, hold the click `secs`, and let go.
 fn draw_and_loose(s: &mut Survival, p: Id, secs: f32) -> Vec<Event> {
     s.players.get_mut(&p).unwrap().cd_off = true;
-    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    let _ = s.slot_ability(p, "ranged", "aimed_arrow");
     s.input(p, SHOT);
     s.input(p, Input::Attack);
     let mut ev = run(s, secs);
@@ -367,7 +367,7 @@ fn right_click_calls_off_the_draw_and_nothing_is_spent() {
     let mut s = world();
     let p = hero(&mut s, "Bren", ORIGIN, 0.0);
     mob(&mut s, "grunt", [15.0, 0.0, 0.0]);
-    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    let _ = s.slot_ability(p, "ranged", "aimed_arrow");
     s.input(p, SHOT);
     s.input(p, Input::Attack);
     let ev = run(&mut s, 0.6);
@@ -377,7 +377,7 @@ fn right_click_calls_off_the_draw_and_nothing_is_spent() {
     assert!(!ev.iter().any(|e| matches!(e, Event::Missile { .. })), "nothing fired");
     assert!(ev.iter().any(|e| matches!(e, Event::CastEnd { caster } if *caster == p)), "the draw is let down");
     assert_eq!(s.players[&p].action, Action::Guard, "and the guard is up");
-    let a = s.content.ability("aimed_shot").unwrap();
+    let a = s.content.ability("aimed_arrow").unwrap();
     assert!(s.cooldown(p, a).charges > 0, "no cooldown for a shot not taken");
 }
 
@@ -399,7 +399,6 @@ fn a_longer_draw_hits_harder() {
     let short = hits_on(&draw_and_loose(&mut s, p, 0.45), k);
     let long = hits_on(&draw_and_loose(&mut s, p, 1.6), k);
     assert!(short[0].0 < long[0].0, "{short:?} then {long:?}");
-    assert!(matches!(s.content.abilities[s.content.ability("aimed_shot").unwrap()].kind.as_str(), "shot"));
 }
 
 #[test]
@@ -418,7 +417,7 @@ fn an_aimed_shot_from_the_shoulder_camera_flies_along_its_line() {
 /// An aimed shot loosed with the client's line and, when given, the point its reticle is on.
 fn loose_at(s: &mut Survival, p: Id, line: (f32, f32), at: Option<Vec3>) -> Vec<Event> {
     s.players.get_mut(&p).unwrap().cd_off = true;
-    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    let _ = s.slot_ability(p, "ranged", "aimed_arrow");
     s.input(p, SHOT);
     s.input(p, Input::Attack);
     let mut ev = run(s, 0.8);
@@ -558,37 +557,37 @@ fn a_held_charge_that_goes_off_by_itself_goes_along_the_line_sent_while_it_was_h
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.players.get_mut(&p).unwrap().cd_off = true;
-    // Chaos Bolt (Seed of Corruption's EX): held past its hold it goes off by itself. (Pyroblast,
-    // the Mage's, fizzles instead: its check stakes it all.)
-    let _ = s.slot_ability(p, "ranged", "seed_of_corruption");
-    let key = crate::content::SLOTS.iter().position(|k| *k == "ranged").unwrap() as u8;
+    // Kill Shot (the Hunter's ultimate): held past its hold it goes off by itself. (Pyroblast, the
+    // Mage's, fizzles instead: its check stakes it all.)
+    let _ = s.slot_ability(p, "ultimate", "kill_shot");
+    let key = crate::content::SLOTS.iter().position(|k| *k == "ultimate").unwrap() as u8;
     // Off to the left of the body's facing.
     let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
     let toward = std::f32::consts::FRAC_PI_4;
     s.set_valor(p, 100.0);
-    s.input(p, Input::Ability(key, true));
+    s.input(p, Input::Ability(key, false));
     s.input(p, Input::Attack);
-    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "Chaos Bolt held");
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "Kill Shot held");
     run(&mut s, 0.5);
-    // Aimed at the grunt once, then held on past its full charge (1 s) and hold (1 s).
+    // Aimed at the grunt once, then held on past its full charge (1.3 s) and hold (1.2 s).
     s.set_aim_line(p, toward, 0.0);
-    let mut ev = run(&mut s, 2.2);
-    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "chaos_bolt"), "it went off by itself");
+    let mut ev = run(&mut s, 2.4);
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "kill_shot"), "it went off by itself");
     ev.extend(run(&mut s, 2.0));
     assert!(!hits_on(&ev, g).is_empty(), "along the line sent while it was held");
     // A line sent before the charge began: stale when it goes off, the body's facing as ever.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.players.get_mut(&p).unwrap().cd_off = true;
-    let _ = s.slot_ability(p, "ranged", "seed_of_corruption");
+    let _ = s.slot_ability(p, "ultimate", "kill_shot");
     let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
     s.set_valor(p, 100.0);
     s.set_aim_line(p, toward, 0.0);
     run(&mut s, 0.1);
-    s.input(p, Input::Ability(key, true));
+    s.input(p, Input::Ability(key, false));
     s.input(p, Input::Attack);
     let ev = run(&mut s, 4.7);
-    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "chaos_bolt"), "it went off by itself");
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "kill_shot"), "it went off by itself");
     assert!(hits_on(&ev, g).is_empty(), "an old line isn't kept alive for it");
 }
 
@@ -1456,23 +1455,6 @@ fn two_handed_weapons_guard_with_themselves_and_sweep_wider() {
     s.input(p, Input::Attack);
     let ev = run(&mut s, 0.8);
     assert_eq!(ws.iter().filter(|w| !hits_on(&ev, **w).is_empty()).count(), 1);
-}
-
-#[test]
-fn a_crossbow_shoots_at_once_and_reloads_long() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    // (Not from the rack any more: bows are off it.)
-    let crossbow = s.content.item("crossbow").unwrap();
-    s.players.get_mut(&p).unwrap().bow = crossbow;
-    let k = mob(&mut s, "boar", [12.0, 0.0, 0.0]);
-    let _ = s.slot_ability(p, "ranged", "aimed_shot");
-    s.input(p, SHOT);
-    s.input(p, Input::Attack);
-    assert_eq!(s.players[&p].action.name(), "cast", "no draw");
-    let ev = run(&mut s, 0.5);
-    assert_eq!(hits_on(&ev, k), vec![(34, Outcome::Hit)]);
-    assert!(s.commit_left(p).is_some_and(|l| l > 0.8), "still reloading");
 }
 
 #[test]
@@ -3203,7 +3185,7 @@ fn a_creature_killed_mid_step_stops_where_it_falls() {
 fn walking_with_the_bow_drawn_lets_the_legs_walk_and_standing_shows_the_draw_again() {
     let mut s = world();
     let p = hero(&mut s, "Bren", ORIGIN, 0.0);
-    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    let _ = s.slot_ability(p, "ranged", "aimed_arrow");
     s.input(p, SHOT);
     s.input(p, Input::Attack);
     let ev = run(&mut s, 0.3);

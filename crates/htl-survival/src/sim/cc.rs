@@ -1,6 +1,6 @@
 //! Crowd control, by one exact rule each (Battlerite's, with WoW's names): what a stun, a root, a
 //! panic does to a hero or a creature, how long, and the two rules that keep it fair: heroes get
-//! half the duration creatures do, and after a stun, incapacitate or panic a hero can't be given
+//! half the duration creatures do, and after a stun, incapacitate, panic or disorient a hero can't be given
 //! another of those (and Dominate Mind) for a while (the grace).
 
 use std::collections::VecDeque;
@@ -31,9 +31,9 @@ pub struct Cc {
 }
 
 /// The four that bring the grace after them.
-const HARD: [&str; 4] = ["stun", "incapacitate", "panic", "dominated"];
+const HARD: [&str; 5] = ["stun", "incapacitate", "panic", "disorient", "dominated"];
 /// The ones that keep a unit from acting at all.
-const DISABLED: [&str; 5] = ["stun", "incapacitate", "petrify", "panic", "dominated"];
+const DISABLED: [&str; 6] = ["stun", "incapacitate", "petrify", "panic", "disorient", "dominated"];
 /// A dominated hero walks toward their master until this close (yards).
 pub(crate) const DOMINATED_STOP: f32 = 2.0;
 /// A panicked hero is driven a stride away this often.
@@ -171,7 +171,7 @@ impl Survival {
         }
         // A boss, a totem, a creature winding up a blow no guard stops: it shrugs control off
         // (an ultimate's aside).
-        if !boon && from != target && crate::content::CONTROL.contains(&kind) && !self.fx_vs_bosses && self.holds_ground(target) {
+        if !boon && from != target && (crate::content::CONTROL.contains(&kind) || self.fx_control) && !self.fx_vs_bosses && self.holds_ground(target) {
             self.shrugged_off(from, target);
             return false;
         }
@@ -246,7 +246,7 @@ impl Survival {
         if self.players.contains_key(&id) {
             if disables {
                 self.interrupt_hero(id);
-                if kind != "panic" {
+                if !matches!(kind, "panic" | "disorient") {
                     let anim = if kind == "petrify" { 0 } else { combat::STUN_ANIM };
                     if anim != 0 {
                         let at = self.unit_pos(from).unwrap_or(self.players[&id].pos);
@@ -254,7 +254,7 @@ impl Survival {
                     }
                 }
             }
-            if kind == "panic" {
+            if matches!(kind, "panic" | "disorient") {
                 self.players.get_mut(&id).unwrap().panic_stride = self.clock;
             }
             // Freed: what held them ends (a mark too).
@@ -281,7 +281,7 @@ impl Survival {
             if kind == "dominated" {
                 self.take_thrall(id, from, secs);
             }
-            if kind == "panic" {
+            if matches!(kind, "panic" | "disorient") {
                 self.stagger_mob(id, 0.05, false);
                 if let Some(m) = self.mobs.get_mut(&id) {
                     m.panic_stride = 0.0;
@@ -381,7 +381,7 @@ impl Survival {
                         ended.push(c.kind.clone());
                     }
                 }
-                "incapacitate" if damage > 0 => {
+                "incapacitate" | "disorient" if damage > 0 => {
                     c.until = now;
                     ended.push(c.kind.clone());
                 }
@@ -397,7 +397,8 @@ impl Survival {
                     c.until = now;
                     ended.push(c.kind.clone());
                 }
-                "panic" if damage > 0 => {
+                // (A fear with a grace, Howl of Terror's: the first blows it takes don't count.)
+                "panic" if damage > 0 && (c.break_after <= 0.0 || now - c.since >= c.break_after) => {
                     c.left -= damage as f32;
                     if c.left <= 0.0 {
                         c.until = now;
@@ -524,7 +525,7 @@ impl Survival {
             }
             let Some(m) = self.mobs.get_mut(&id) else { return };
             // Free again: a creature stunned takes up its fight at once.
-            if kinds.iter().any(|k| matches!(k.as_str(), "stun" | "incapacitate" | "petrify" | "panic")) && m.stagger_until > now {
+            if kinds.iter().any(|k| matches!(k.as_str(), "stun" | "incapacitate" | "petrify" | "panic" | "disorient")) && m.stagger_until > now {
                 m.stagger_until = now;
                 m.ready_at = m.ready_at.min(now + 0.4);
             }
@@ -568,18 +569,20 @@ impl Survival {
         self.events.push(Event::Hop { player: id, dir, speed, lift: 0.0, roll: false, style: "" });
     }
 
-    /// A panicked unit runs from what scared it, out of control.
+    /// A panicked unit runs from what scared it, out of control. A disoriented one wanders every
+    /// which way instead, slower, a stride at a time.
     fn panic_run(&mut self, id: Id) {
         let now = self.clock;
-        let Some(c) = self.cc_of(id).iter().find(|c| c.kind == "panic" && c.until > now).cloned() else { return };
+        let Some(c) = self.cc_of(id).iter().find(|c| matches!(c.kind.as_str(), "panic" | "disorient") && c.until > now).cloned() else { return };
+        let wander = c.kind == "disorient";
         let from = self.unit_pos(c.from).unwrap_or([0.0; 3]);
         if let Some(p) = self.players.get(&id) {
             if now - p.panic_stride < PANIC_STRIDE {
                 return;
             }
-            let dir = facing(from, p.pos) + (self.rng.gen::<f32>() - 0.5) * 0.8;
+            let dir = if wander { self.rng.gen::<f32>() * std::f32::consts::TAU } else { facing(from, p.pos) + (self.rng.gen::<f32>() - 0.5) * 0.8 };
             self.players.get_mut(&id).unwrap().panic_stride = now;
-            let speed = self.content.cc.panic_speed * 2.2;
+            let speed = self.content.cc.panic_speed * if wander { 1.2 } else { 2.2 };
             self.events.push(Event::Hop { player: id, dir, speed, lift: 1.2, roll: false, style: "" });
         } else if let Some(m) = self.mobs.get(&id) {
             if now - m.panic_stride < PANIC_STRIDE * 2.0 {
@@ -592,9 +595,10 @@ impl Survival {
             if self.content.mobs[def].run_speed <= 0.0 {
                 return;
             }
-            let dir = facing(from, pos) + (self.rng.gen::<f32>() - 0.5) * 0.8;
-            let to = self.ground_near(pos[0] + dir.cos() * 4.0, pos[1] + dir.sin() * 4.0, pos[2]);
-            let speed = self.content.mobs[def].run_speed * 0.8;
+            let dir = if wander { self.rng.gen::<f32>() * std::f32::consts::TAU } else { facing(from, pos) + (self.rng.gen::<f32>() - 0.5) * 0.8 };
+            let stride = if wander { 3.0 } else { 4.0 };
+            let to = self.ground_near(pos[0] + dir.cos() * stride, pos[1] + dir.sin() * stride, pos[2]);
+            let speed = self.content.mobs[def].run_speed * if wander { 0.5 } else { 0.8 };
             self.mobs.get_mut(&id).unwrap().panic_stride = now;
             if !self.land.blocked_near(to[0], to[1], to[2]) && self.land.walk_clear(pos, to) {
                 self.flee_to(id, to, speed);

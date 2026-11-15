@@ -1623,8 +1623,6 @@ impl Survival {
                     && matches!(m.state, mobs::MobState::Chase { .. } | mobs::MobState::Recover { .. })
                     && angle_between(m.facing, facing(m.pos, pos)) <= 70.0
             });
-            // (Exposed, it can't.)
-            let shielded = shielded && !self.has_cc(mid, "exposed");
             if shielded && !strike.heavy() && !strike.shove() && !w.through_guard {
                 let chance = self.mobs.get(&mid).map_or(0.0, |m| self.content.mobs[m.def].block);
                 if self.rng.gen::<f32>() < chance {
@@ -1726,7 +1724,7 @@ impl Survival {
             let poised = !shoved && !strike.heavy() && self.temper(mid).is_some_and(|t| t.poise);
             if standing && !changed && strike.stagger > 0.0 && (winding || shoved || recovering) && !poised {
                 let riposte = self.content.combat.riposte_any_stagger;
-                // Near a War Banner a heavy attack's stagger lasts longer; on an Exposed one, any.
+                // Near a War Banner a heavy attack's stagger lasts longer.
                 let longer = self.stagger_share(id, mid, strike.heavy());
                 self.stagger_mob(mid, strike.stagger * longer, riposte);
                 if winding && !shoved {
@@ -1916,9 +1914,6 @@ impl Survival {
             self.warlord.took.retain(|_, t| *t + 1.0 >= now);
             self.warlord.took.insert((attacker, victim), now);
         }
-        // Exposed (Rising Cut): a hero's blow can't be blocked or parried.
-        let open = self.players.contains_key(&attacker) && self.has_cc(victim, "exposed");
-        let (blockable, parryable) = (blockable && !open, parryable && !open);
         let grace = self.players.get(&victim).map_or(0.0, |p| p.rtt.min(self.content.combat.max_grace));
         let pending = PendingStrike { attacker, victim, damage, from, blockable, heavy, parryable, style, at: self.clock + grace, area, follow, how };
         if grace <= 0.0 {
@@ -2935,7 +2930,7 @@ impl Survival {
         }
         hits.sort_by(|a, b| a.0.total_cmp(&b.0));
         // A wide art cleaves (three at least); the rest strike as the weapon does.
-        let most = if d.arc > 0.0 { w.targets.max(3) } else { w.targets.max(1) };
+        let most = if d.one_target { 1 } else if d.arc > 0.0 { w.targets.max(3) } else { w.targets.max(1) };
         let room = most.saturating_sub(struck.len());
         // Momentum and a fury (Cowed is the ability's damage's own).
         let might = (1.0 + self.effect_of(&self.players[&id], "might")) * self.blow_boost(id);
@@ -3005,14 +3000,14 @@ impl Survival {
             if *t < strike.windup + strike.active && strike.art.is_some_and(|a| self.content.abilities[a].poise))
     }
 
-    /// The share of a blow's damage a unit takes: more under a Death Mark, a Sunder or Exposed,
+    /// The share of a blow's damage a unit takes: more under a Death Mark or a Sunder,
     /// less on hallowed ground.
     pub(crate) fn taken_share(&self, id: Id) -> f32 {
         let now = self.clock;
         let mut k = 1.0;
         for c in self.cc_of(id).iter().filter(|c| c.until > now) {
             match c.kind.as_str() {
-                "deathmark" | "sunder" | "exposed" => k *= 1.0 + c.amount,
+                "deathmark" | "sunder" => k *= 1.0 + c.amount,
                 "hallowed" => k *= (1.0 - c.amount).max(0.0),
                 _ => {}
             }
