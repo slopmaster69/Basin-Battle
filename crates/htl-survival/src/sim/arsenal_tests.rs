@@ -52,6 +52,8 @@ fn ai_runs_to_the_rack_and_equips_in_order_solo_and_duo() {
         assert!(s.events.iter().any(|e| matches!(e, Event::MobMove { id, path, .. } if *id == boss && path.len() >= 2)));
         tick(&mut s, 4.0);
         assert_eq!(s.mobs[&boss].phase, 1, "burst damage cannot skip the axe showing");
+        assert_eq!(s.mobs[&boss].health, (0.66 * s.mobs[&boss].max_health as f32).floor() as u32, "the blow past both lines was held at the first");
+        hurt_to(&mut s, h, boss, 0.25);
         wait_stage(&mut s, boss, 2, 24.0);
         assert!(s.clock >= axe_at + AXE_SHOWING);
         assert_eq!(s.arsenal_loadout(boss).unwrap().off_hand, 0);
@@ -193,6 +195,8 @@ fn wipe_and_repull_restore_the_sword_without_duplicate_racks() {
     assert_eq!(s.arsenal.racks.len(), 1);
     assert_eq!(s.arsenal_loadout(boss).unwrap().grip, "sword");
     let rack = s.arsenal.racks[&boss].prop;
+    // (Both changes done: the hold that keeps him up at the rack is over.)
+    s.mobs.get_mut(&boss).unwrap().phase = 2;
     s.hurt_mob(boss, h, u32::MAX);
     assert!(!s.objs.contains_key(&rack));
     assert!(s.arsenal.racks.is_empty());
@@ -295,4 +299,61 @@ fn hits_while_he_kneels_dont_keep_him_at_the_rack() {
     }
     assert!(!s.arsenal_hands_empty(boss), "up with the new weapon");
     assert!(s.clock <= knelt + FIT_WEAPON + 0.2, "hits held him at the rack until {:.2} s after he knelt", s.clock - knelt);
+}
+
+#[test]
+fn the_rack_is_lit_from_the_pull() {
+    let (s, _, _, _) = fight(false);
+    let lamps = s.objs.values().filter(|o| matches!(o.kind, ObjKind::Prop { display, .. } if display == super::super::bosses::LINE_LAMP)).count();
+    assert_eq!(lamps, 2, "a lamp each side of the rack, an object in the world and no floor marker");
+}
+
+#[test]
+fn he_faces_the_hero_while_he_kneels() {
+    let (mut s, h, boss, _) = fight(false);
+    hurt_to(&mut s, h, boss, 0.6);
+    let until = s.clock + 20.0;
+    while !s.arsenal_hands_empty(boss) && s.clock < until { tick(&mut s, 0.05); }
+    assert!(s.arsenal_hands_empty(boss));
+    let (m, p) = (&s.mobs[&boss], &s.players[&h]);
+    let want = facing(m.pos, p.pos);
+    let off = (m.facing - want + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+    assert!(off.abs() < 0.1, "he kneels facing the hero, not the rack (off by {off})");
+}
+
+#[test]
+fn he_cannot_fall_before_the_new_weapon_is_in_his_hands() {
+    let (mut s, h, boss, _) = fight(false);
+    let max = s.mobs[&boss].max_health;
+    // One blow far past both lines stops at the first one, so the axes are never skipped.
+    s.hurt_mob(boss, h, max);
+    let line1 = (0.66 * max as f32).floor() as u32;
+    assert_eq!(s.mobs[&boss].health, line1, "held at 66% until the axes are in his hands");
+    // Blows at the rack, empty-handed, do not drop him either.
+    let until = s.clock + 20.0;
+    while !s.arsenal_hands_empty(boss) && s.clock < until { tick(&mut s, 0.05); }
+    assert!(s.arsenal_hands_empty(boss));
+    s.hurt_mob(boss, h, max);
+    assert_eq!(s.mobs[&boss].health, line1, "he cannot be killed at the rack");
+    wait_stage(&mut s, boss, 1, 10.0);
+    assert!(s.events.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text.contains("Axes"))), "he shouts as he lifts them");
+    // The same for the hammer: a lethal blow holds at 33% until it is up.
+    s.hurt_mob(boss, h, max);
+    let line2 = (0.33 * max as f32).floor() as u32;
+    assert_eq!(s.mobs[&boss].health, line2);
+    wait_stage(&mut s, boss, 2, 30.0);
+    // With the hammer in his hands the hold is gone.
+    let health = s.mobs[&boss].health;
+    s.hurt_mob(boss, h, health);
+    assert_eq!(s.mobs[&boss].health, 0);
+}
+
+#[test]
+fn a_lost_fight_puts_the_hold_and_the_stages_back() {
+    let (mut s, h, boss, _) = fight(false);
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, h, max);
+    s.remove_arsenal(boss);
+    assert_eq!(s.mobs[&boss].phase, 0);
+    assert!(s.arsenal.racks.is_empty());
 }

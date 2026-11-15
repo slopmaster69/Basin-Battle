@@ -316,6 +316,7 @@ Invitation (same doc, beat 9) have a dev setup each, not yet run:
 | Scenario | What it films |
 | --- | --- |
 | `vancleef-ring` | Dev setup, by the cameraman, markers off: the ring of 8 guards, the warning head-shake near the line, the shove at the line (strike, dust, flash, "Nobody leaves."), a shove beside him, then the guards turning at 31%, "Cowards! All of you!", the open deck and their walk off |
+| `smite-rack-show` | Dev setup, markers off: the lit rack, his run there at 66% and 33%, the turn to face the hero, the sword thrown down where it stays, the held health at the rack, the shout as he lifts the axes and the hammer |
 | `vancleef-unbowed-invitation` | Dev setup, not yet run: the rig's bot plays Unbowed's first four turned Invitations with markers off (the red blades and "Stand still, and be finished.", the closing thrust 2 sec later, the roll aside on the red glow, his 2.4 sec opening) |
 
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,

@@ -20,6 +20,8 @@ const KNEEL_POSTURE: f32 = 1.5;
 /// The weapons left lying at the rack: the sword he put down, the hammer waiting for him.
 const SWORD_LEFT: u32 = 670;
 const HAMMER_WAITING: u32 = 1067;
+/// The lamps either side of the rack (the torch the collapse's line uses).
+const RACK_LAMP_SCALE: f32 = 1.2;
 /// The rattle of the rack as he rummages.
 const RACK_RATTLE: u32 = 698;
 
@@ -80,11 +82,17 @@ impl Survival {
 
     /// A weapon laid at the rack's foot, a little to one side.
     fn lay_at_rack(&mut self, id: Id, display: u32, side: f32) {
+        self.place_at_rack(id, display, 1.2, [0.9, side], 0.4 + side);
+    }
+
+    /// An object standing at the rack, `off` from it (a weapon on the floor, a lit lamp). It goes
+    /// with the rack.
+    fn place_at_rack(&mut self, id: Id, display: u32, scale: f32, off: [f32; 2], face: f32) {
         let Some(r) = self.arsenal.racks.get(&id) else { return };
         let at = r.at;
         let p = self.alloc();
-        let pos = self.ground_near(at[0] + 0.9, at[1] + side, at[2]);
-        self.objs.insert(p, Obj { kind: ObjKind::Prop { display, scale: 1.2 }, pos, facing: 0.4 + side });
+        let pos = self.ground_near(at[0] + off[0], at[1] + off[1], at[2]);
+        self.objs.insert(p, Obj { kind: ObjKind::Prop { display, scale }, pos, facing: face });
         self.events.push(Event::ObjSpawned { id: p });
         self.arsenal.racks.get_mut(&id).unwrap().lying.push(p);
     }
@@ -95,6 +103,27 @@ impl Survival {
         let Some(k) = r.lying.iter().position(|p| matches!(self.objs.get(p).map(|o| &o.kind), Some(ObjKind::Prop { display: d, .. }) if *d == display)) else { return };
         let p = self.arsenal.racks.get_mut(&id).unwrap().lying.remove(k);
         if self.objs.remove(&p).is_some() { self.events.push(Event::ObjGone { id: p }); }
+    }
+
+    /// He can't fall before the new weapon is in his hands: while a change is still owed, a blow
+    /// can't take his health below that change's line (the way a collapse holds a boss). A
+    /// blow refused reads as blocked, its number the health it took. Ends with the last change.
+    pub(crate) fn arsenal_hold(&mut self, mid: Id, by: Id, damage: u32) -> u32 {
+        let Some(m) = self.mobs.get(&mid) else { return damage };
+        let d = &self.content.mobs[m.def];
+        let Some(line) = d.arsenal.as_ref().and_then(|_| d.phases.get(m.phase)) else { return damage };
+        let floor = ((line.at * m.max_health as f32).floor() as u32).max(1);
+        let most = m.health.saturating_sub(floor);
+        if damage <= most { return damage; }
+        if let Some(Event::Swing { damage: n, outcome, .. }) =
+            self.events.iter_mut().rev().find(|e| matches!(e, Event::Swing { attacker, victim: Some(v), .. } if *attacker == by && *v == mid))
+        {
+            if *outcome == Outcome::Hit && *n == damage {
+                *n = most;
+                if most == 0 { *outcome = Outcome::Blocked; }
+            }
+        }
+        most
     }
 
     pub(crate) fn arsenal_pattern_allowed(&self, id: Id, name: &str) -> bool {
@@ -131,6 +160,11 @@ impl Survival {
             self.events.push(Event::ObjSpawned { id: prop });
             self.arsenal.racks.insert(id, Rack { prop, lying: Vec::new(), at, began_fight: false, next_change: 0.0, transition: None });
             self.lay_at_rack(id, HAMMER_WAITING, -0.6);
+            // The rack is lit from the pull: a lamp each side of it, so a hero sees where he
+            // will run and where the weapons change hands, with no marker on the floor.
+            for side in [-1.2, 1.2] {
+                self.place_at_rack(id, super::bosses::LINE_LAMP, RACK_LAMP_SCALE, [-1.0, side], 0.0);
+            }
         }
     }
 
@@ -263,7 +297,9 @@ impl Survival {
                     }
                     // Down on one knee at the rack, the old weapon put down and his hands empty,
                     // rummaging with a rattle (Nov 8 review: no weapon was seen to change hands).
-                    let face = facing(self.mobs[&id].pos, at);
+                    // He faces the hero he's fighting, not the rack: the change is a show, never a
+                    // turned back (Nov 15 review).
+                    let face = facing(self.mobs[&id].pos, self.players[&hero].pos);
                     let m = self.mobs.get_mut(&id).unwrap();
                     m.facing = face;
                     let (pos, phase) = (m.pos, m.phase);
@@ -309,6 +345,9 @@ impl Survival {
                     self.events.push(Event::Sound { id, sound: 700 }); // Verified UnsheathMetal.
                     self.events.push(Event::Emote { id, emote: super::mobs::ROAR_EMOTE });
                     if phase == 2 { self.take_from_rack(id, HAMMER_WAITING); }
+                    // ...with a shout.
+                    let shout = self.content.mobs[self.mobs[&id].def].arsenal.as_ref().and_then(|a| a.loadouts.get(phase)).map(|l| l.lift_text.clone()).unwrap_or_default();
+                    if !shout.is_empty() { self.yell(id, shout); }
                     let r = self.arsenal.racks.get_mut(&id).unwrap();
                     r.next_change = now + AXE_SHOWING;
                     return true;

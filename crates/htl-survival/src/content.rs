@@ -2403,6 +2403,9 @@ pub struct ArsenalLoadout {
     pub off_hand: u32,
     pub grip: String,
     pub patterns: Vec<String>,
+    /// What he shouts as he lifts this loadout at the rack (empty: nothing).
+    #[serde(default)]
+    pub lift_text: String,
 }
 
 impl MobDef {
