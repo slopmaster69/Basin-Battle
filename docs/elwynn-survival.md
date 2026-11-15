@@ -152,9 +152,9 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Scatter Shot* | Fan of Knives · *Kidney Shot* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Soul Swap* | Living Seed · *Entangling Roots* |
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Leap of Faith*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Scatter Shot* | Fan of Knives · *Kidney Shot* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Polymorph* | Seed of Corruption · *Soul Swap* | Living Seed · *Entangling Roots* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Capacitor Totem* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Leap of Faith*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Prowl* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Pain Suppression*, or Vampiric Embrace · *Psychic Ward* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
 | 3 | **Ultimate** | Bladestorm, or Rallying Cry | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Holy Word: Salvation, or Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
@@ -230,11 +230,15 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   1.5 s, creatures 3 s). 3: Holy Word: Salvation, or Void Rift.
 - **Shaman**: shape the field. Lava Burst, molten rock lobbed over everyone in the way to land
   where its ring shows and leave the ground burning (its EX, Chain Lightning, leaps on twice);
-  Thunderstorm throws everyone round you 8 yd away; totems to slow or root, to heal, or to
-  swallow a projectile (Grounding); Earthquake stuns and slows a field.
-- **Mage**: freeze, then shatter. Fireball grows with its charge, and its EX, Pyroblast, is a
-  1.5 s hold for a huge one; Cone of Cold slows (and freezes the already slowed), Frost Nova
-  freezes all round you and makes your next Fireball a free Pyroblast for 5 s; Blink; Ice Block;
+  Thunderstorm throws everyone round you 8 yd away, and its EX, Capacitor Totem, is a totem that
+  stuns every enemy within 8 yd for 3 sec after a 2 sec fuse unless they destroy it first; other
+  totems slow or root, heal, or swallow a projectile (Grounding); Earthquake stuns and slows a field.
+- **Mage**: freeze, then shatter. Fireball grows with its charge, and its EX, Polymorph, turns the
+  first enemy it hits into a sheep for 8 s (1.5 s on a hero) that wanders, cannot attack and turns
+  back on any damage; Cone of Cold slows (and freezes the already slowed), Frost Nova
+  freezes all round you and makes your next Fireball a free Polymorph for 5 s; the benched
+  Flamestrike's EX, Blast Wave, is an instant ring of fire that throws enemies back 6 yd and
+  slows them 50% for 3 s; Blink; Ice Block;
   Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
 - **Warlock**: rot. Seed of Corruption sticks in a foe and bursts round them 2 s later, leaving
   everyone near rotting (its EX, Soul Swap, copies every rot of yours on the foe at the reticle
@@ -246,7 +250,8 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   heals you; Summon Infernal crashes down and stands burning.
 - **Druid**: grow and pounce. Living Seed's two seeds strike a foe or settle on a friend and mend
   them for 4 s (its EX roots); Swipe, and Typhoon throws a cone of foes back; Feral Leap bounds
-  onto them (Pounce stuns); Barkskin, and Ironbark gives it away, to the friend under your reticle
+  onto them (its EX, Prowl, hides you for up to 10 s, and your next attack from hiding stuns its
+  target for 2 s and deals 20 more damage; damage on you ends it); Barkskin, and Ironbark gives it away, to the friend under your reticle
   with a heal besides (no one there: you); Hurricane hurls everyone in it out from its middle
   every second.
 
@@ -301,19 +306,19 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 **Combos**, inside a class and across them:
 
 - **Freeze, then shatter**: Frost Nova, Freezing Trap, Cold Snap, Frost Blink or a Cone of Cold on
-  a slowed foe freeze; fire (Fireball, Pyroblast, Meteor), a Sundering Blow or a Multi-Shot on them
+  a slowed foe freeze; fire (Fireball, Meteor), a Sundering Blow or a Multi-Shot on them
   shatters for half again.
 - **Pull into the pain**: Void Rift, Leap of Faith or Mind Grip drag foes onto a trap, into
   Consecration, an Earthquake or under a Meteor.
 - **Push into the trap**: Thunderstorm, Typhoon or Heroic Leap throw a foe onto
   an Explosive or Freezing Trap; Hurricane keeps them off a point.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
-  stun (Divine Steed's Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind
+  stun (Divine Steed's Hammer of Justice, Shadowfury, Prowl, Capacitor Totem, Earthquake) or a freeze makes Mind
   Blast and Meteor land.
 - **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab, and Fan of
   Knives Marks them so it crits; a kill under Death Mark readies everything again.
 - **Stay alive**: Guardian Spirit, Pain Suppression, Barkskin and Healing Stream stack with Holy Nova and
-  Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
+  Consecration; Grounding Totem eats the big projectile (a Fireball, a hammer, a Death Mark).
 
 **PvP**: every card keeps to a budget a test holds it to (`tests_classes.rs`): a ranged poke does
 at most about 45 a hit and 9.5 a second over its cooldown, a utility little damage on a cooldown

@@ -273,21 +273,22 @@ fn an_all_or_nothing_spell_fizzles_off_its_moment_and_spends_its_valor() {
 
 #[test]
 fn a_fixed_charges_window_never_opens_before_it_can_go_so_it_never_fizzles_inside_it() {
-    // The review on #199: Pyroblast's moment could roll so its window opened before its least,
-    // and a release there fizzled while the ring showed it in the window.
+    // The review on #199: a fixed charge's moment could roll so its window opened before its
+    // least, and a release there fizzled while the ring showed it in the window. (No ability has
+    // a fixed, checked charge now: Fireball is made one here.)
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.slot_ability(p, "ranged", "fireball").unwrap();
-    let pyro = s.content.ability("pyroblast").unwrap();
-    let lo = s.content.abilities[pyro].charge[0];
+    let fb = s.content.ability("fireball").unwrap();
+    s.content.abilities[fb].charge = [1.5, 1.5];
+    let lo = s.content.abilities[fb].charge[0];
     let w = s.content.checks.window;
     for _ in 0..40 {
-        s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
         s.players.get_mut(&p).unwrap().cd_off = true;
-        s.input(p, Input::Ability(key_of("ranged"), true));
+        s.input(p, Input::Ability(key_of("ranged"), false));
         s.input(p, Input::Attack);
         s.step(0.0);
-        assert!(matches!(s.players[&p].action, Action::Charge { .. }), "charging Pyroblast");
+        assert!(matches!(s.players[&p].action, Action::Charge { .. }), "charging");
         let flare = s.players[&p].check_flare;
         assert!(flare - w >= lo - 1e-4, "the window opens at {} before its least {lo}", flare - w);
         s.input(p, Input::Guard);
@@ -363,15 +364,6 @@ fn a_perfect_fireball_still_burns_the_one_it_hit_longer_though_it_explodes() {
 }
 
 #[test]
-fn pyroblast_stays_one_target_and_outhits_a_perfect_fireball() {
-    let s = world();
-    let (fb, pyro) = (s.content.ability("fireball").unwrap(), s.content.ability("pyroblast").unwrap());
-    let (fb, pyro) = (&s.content.abilities[fb], &s.content.abilities[pyro]);
-    assert_eq!(pyro.splash, 0.0, "the one big ball, for one foe");
-    assert!(pyro.damage[0] > fb.damage[1] * s.content.checks.perfect_damage * 1.3, "well over a perfect Fireball");
-}
-
-#[test]
 fn meteor_leaves_what_it_knocks_back_inside_its_crater() {
     let s = world();
     let mt = &s.content.abilities[s.content.ability("meteor").unwrap()];
@@ -430,24 +422,29 @@ fn a_clients_word_on_its_hold_goes_only_so_far_from_the_servers() {
 }
 
 #[test]
-fn pyroblast_waits_for_a_release_on_its_way_before_it_fizzles() {
-    // Every Pyroblast fizzled on Corey's laggy route: the server's clock passed the window while
-    // the release let go inside it was still coming.
+fn an_all_or_nothing_charge_waits_for_a_release_on_its_way_before_it_fizzles() {
+    // Every all-or-nothing charge fizzled on Corey's laggy route: the server's clock passed the
+    // window while the release let go inside it was still coming. (No ability stakes it all now:
+    // Fireball is made one here, a fixed 1.5 sec charge.)
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.slot_ability(p, "ranged", "fireball").unwrap();
+    let fb = s.content.ability("fireball").unwrap();
+    s.content.abilities[fb].charge = [1.5, 1.5];
+    s.content.abilities[fb].stakes = "all".into();
+    s.content.abilities[fb].hold = 1.0;
     let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
     s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
     let w = s.content.checks.window;
-    let flare = charge_past_flare(&mut s, p, "ranged", true, w + 0.15);
+    let flare = charge_past_flare(&mut s, p, "ranged", false, w + 0.15);
     assert!(matches!(s.players[&p].action, Action::Charge { .. }), "still held, as far as the server knows");
     s.release_held(p, flare + 0.02);
     let ev = s.step(0.0);
-    assert!(perfect_in(&ev, p), "a perfect Pyroblast: {:?}", grade_in(&ev, p));
+    assert!(perfect_in(&ev, p), "a perfect release: {:?}", grade_in(&ev, p));
     // Truly held too long, it still fizzles.
     run(&mut s, 3.0);
     s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
     s.players.get_mut(&p).unwrap().cd_off = true;
-    charge_past_flare(&mut s, p, "ranged", true, w + 0.05 + RELEASE_LAG + 0.1);
+    charge_past_flare(&mut s, p, "ranged", false, w + 0.05 + RELEASE_LAG + 0.1);
     assert!(!matches!(s.players[&p].action, Action::Charge { .. }), "fizzled");
 }

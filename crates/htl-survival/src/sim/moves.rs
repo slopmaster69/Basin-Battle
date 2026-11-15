@@ -280,9 +280,15 @@ impl Survival {
     /// A hero who strikes or casts comes out of a veil; their next blow is from behind.
     pub(crate) fn end_veil(&mut self, id: Id) {
         if self.has_cc(id, "veil") {
-            self.cleanse(id, &["veil"]);
+            // Prowling: the strike is Prowl's (a stun and bonus damage on whatever it lands on).
+            let prowling = self.has_cc(id, "prowl");
+            self.cleanse(id, &["veil", "prowl"]);
+            let now = self.clock;
             if let Some(p) = self.players.get_mut(&id) {
-                p.veil_strike_until = self.clock + 2.0;
+                p.veil_strike_until = now + 2.0;
+                if prowling {
+                    p.prowl_strike_until = now + super::cc::PROWL_WINDOW;
+                }
             }
         }
     }

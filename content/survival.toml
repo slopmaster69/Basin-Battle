@@ -3852,38 +3852,26 @@ full_speed = 40.0
 charge_spell = 133
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 
-# The cash-in: Frost Nova makes the next one free. 48 a hit, half again on a frozen foe; the
-# whole 1.5 s held, so it can't be fired off the hip.
+# The Mage's control, true to the class (the key kept, its name and what it does new: Fireball's
+# EX is no longer a bigger Fireball). A bolt that turns the first foe it hits into a sheep for
+# 8 sec, a longer hold than Sap's 3 sec incapacitate because it is one foe, a bolt's range away,
+# and any damage (its own burn too) turns it back. It is Scatter Shot's `disorient` with
+# Polymorph's own look (118). A hero is a sheep for 1.5 sec (the board's limit on hard control), and the grace follows it. Bosses and
+# totems shrug it off, as they do any control. 25 Valor as before; Frost Nova's combo frees it.
 [[ability]]
 key = "pyroblast"
-name = "Pyroblast"
+name = "Polymorph"
 ex_of = "fireball"
-text = "Hold for 1.5 sec, then release on the flare to hurl a huge, slow fireball. Deals 64 damage and burns the target for 5 damage per sec for 6 sec. Shatters a frozen enemy for 50% more damage. Released off the flare, it fizzles. A heavy attack on you while you hold interrupts it."
-icon = "Spell_Fire_Fireball02"
+text = "Hurls a bolt that turns the first enemy it hits into a sheep for 8 sec (1.5 sec against heroes). The sheep wanders and cannot attack. Any damage turns it back. Bosses and totems are immune."
+icon = "Spell_Nature_Polymorph"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-charge = [1.5, 1.5]
-hold = 1.0
-perfect = true
-# All or nothing: anything but its moment fizzles, its Valor spent (Corey, Nov 5).
-stakes = "all"
-# A perfect bursts out of the cast at the hands: Fireball's own cast flare (Fire Nova's ring
-# flooded the screen and left the caster burning, which read as a shield).
-perfect_kit = 38
-# A critical: the blast stuns them for a moment.
-crit_effects = [{ kind = "stun", secs = [1.0, 1.0] }]
-fragile = true
-# Mage tune, Nov 7: Fireball now explodes; Pyroblast stays one target, the choice for one big foe
-# (48 was barely more than a full Fireball's 43).
-damage = [64.0, 64.0]
-range = [36.0, 36.0]
-radius = [0.8, 0.8]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
 speed = 24.0
-shatter = true
-spell = 11366
-charge_spell = 11366
-effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
+spell = 118
+effects = [{ kind = "disorient", secs = [8.0, 8.0], hero_secs = 1.5, aura = 118 }]
 
 # The Warden: the shield that hunts casters, and the heal on a friend.
 [[ability]]
@@ -4148,7 +4136,7 @@ finisher_effects = [{ kind = "knockback", amount = 4.0 }]
 key = "frost_nova"
 name = "Frost Nova"
 ex_of = "cone_of_cold"
-text = "Freezes every enemy within 8 yd of you for 3 sec (1.5 sec against heroes) and deals 6 damage. For 5 sec, your Fireball key casts a free Pyroblast. Freeze them, then shatter them."
+text = "Freezes every enemy within 8 yd of you for 3 sec (1.5 sec against heroes) and deals 6 damage. For 5 sec, your Fireball key casts a free Polymorph. Freeze them, then sheep the one that matters."
 icon = "Spell_Frost_FrostNova"
 slot = "close"
 kind = "nova"
@@ -4157,7 +4145,7 @@ damage = [6.0, 6.0]
 radius = [8.0, 8.0]
 spell = 122
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
-# The mage's combo, alone: freeze, then a free Pyroblast to shatter it.
+# The mage's combo, alone: freeze, then a free Polymorph on the one that matters.
 empower = { ability = "fireball", secs = 5.0 }
 
 # The Warden: holy ground underfoot.
@@ -4742,24 +4730,23 @@ spell = 2120
 # far more than its circle.
 linger_spell = 13812
 
+# The Mage's peel (key kept): a ring of fire round you that throws foes off and slows them. It
+# does what Flamestrike can't, hit the ones on top of you. Thunderstorm's own numbers, trimmed:
+# 6 yd (7), 12 damage (14), a 6 yd throw (8), and a 50% slow for 3 sec (30% for 2), because the
+# Mage has no other way to get away.
 [[ability]]
 key = "flash_flamestrike"
-name = "Flash Flamestrike"
+name = "Blast Wave"
 ex_of = "flamestrike"
-text = "Flamestrike with no delay and a 2 yd radius. Deals 26 damage, and the ground burns for 4 sec at 6 damage per sec."
-icon = "Spell_Fire_SelfDestruct"
+text = "A ring of fire bursts around you. Deals 12 damage to every enemy within 6 yd, knocks them back 6 yd and slows them by 50% for 3 sec."
+icon = "Spell_Holy_Excorcism_02"
 slot = "ranged"
-kind = "ground"
+kind = "nova"
 valor = 25
-damage = [26.0, 26.0]
-range = [28.0, 28.0]
-radius = [2.0, 2.0]
-linger = 4.0
-linger_damage = 6.0
-spell = 2120
-# The ground after burns as the Explosive Trap's fire: Flamestrike's own pillar, replayed, filled
-# far more than its circle.
-linger_spell = 13812
+radius = [6.0, 6.0]
+damage = [12.0, 12.0]
+spell = 11113
+effects = [{ kind = "knockback", amount = 6.0 }, { kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
 
 [[ability]]
 key = "entangling_roots"
@@ -6767,19 +6754,27 @@ cooldown = 12.0
 spell = 6343
 effects = [{ kind = "knockback", amount = 8.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 
+# The Shaman's crowd stop (key kept): a totem that charges, then stuns everything near it at
+# once. Earthgrab Totem roots every 3 sec for 1.5; this is one stun, the whole 3 sec (Frost
+# Nova's freeze is as long, but damage breaks that), after a 2 sec fuse every foe can see and a
+# totem with 20 health that they can kill first. It falls as it goes off.
 [[ability]]
 key = "thundercrack"
-name = "Thundercrack"
+name = "Capacitor Totem"
 ex_of = "thunderstorm"
-text = "A bigger storm, 9 yd. Deals 16 damage, knocks enemies back 10 yd and silences them for 2 sec (1 sec against heroes), so they cannot use abilities."
-icon = "Spell_Nature_Purge"
+text = "Places a totem at the reticle, up to 20 yd away. After 2 sec it stuns every enemy within 8 yd for 3 sec (1.5 sec against heroes) and falls. Enemies can destroy it first."
+icon = "Spell_Nature_LightningShield"
 slot = "close"
-kind = "nova"
+kind = "place"
 valor = 25
-radius = [9.0, 9.0]
-damage = [16.0, 16.0]
-spell = 8078
-effects = [{ kind = "knockback", amount = 10.0 }, { kind = "silence", secs = [2.0, 2.0] }]
+range = [20.0, 20.0]
+secs = 3.0
+detonate = 2.0
+spell = 2484
+# The shock where it stood: Thunderstorm's own flash.
+burst_spell = 6343
+totem = { mob = "capacitor_totem", radius = 8.0 }
+effects = [{ kind = "stun", secs = [3.0, 3.0] }]
 
 [[ability]]
 key = "earthgrab_totem"
@@ -6817,7 +6812,7 @@ totem = { mob = "healing_stream_totem", radius = 10.0 }
 key = "grounding_totem"
 name = "Grounding Totem"
 ex_of = "healing_stream_totem"
-text = "Places a totem at your feet for 8 sec. It pulls the first enemy projectile within 8 yd into itself and is destroyed doing it, whether a Pyroblast, a hammer or a Death Mark."
+text = "Places a totem at your feet for 8 sec. It pulls the first enemy projectile within 8 yd into itself and is destroyed doing it, whether a Fireball, a hammer or a Death Mark."
 icon = "Spell_Nature_GroundingTotem"
 slot = "defense"
 kind = "place"
@@ -7446,22 +7441,21 @@ spell = 16979
 impact_kit = 44
 effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
+# The Druid's ambush (the key kept): into stealth, the Rogue's own (`veil`), for 10 sec. The first
+# attack from it, a swing or any ability, stuns its target for 2 sec (as Pounce did, 1 sec on a
+# hero) and deals 20 more damage: `sim::cc::PROWL_BONUS` and `PROWL_STUN`. A flat bonus, so it
+# never doubles a big spell. Taking damage ends it with no strike.
 [[ability]]
 key = "pounce"
-name = "Pounce"
+name = "Prowl"
 ex_of = "feral_leap"
-text = "Feral Leap, and every enemy it lands on takes 14 damage and is stunned for 2 sec (1 sec against heroes)."
-icon = "Ability_Druid_SupriseAttack"
+text = "Hides you from enemies for 10 sec, until you attack or take damage. Your next attack from hiding stuns its target for 2 sec (1 sec against heroes) and deals 20 more damage."
+icon = "Ability_Ambush"
 slot = "utility"
-kind = "leap"
+kind = "buff"
 valor = 25
-range = [14.0, 14.0]
-radius = [3.0, 3.0]
-damage = [14.0, 14.0]
-lift = 6.0
-spell = 16979
-impact_kit = 220
-effects = [{ kind = "stun", secs = [2.0, 2.0] }]
+spell = 5215
+effects = [{ kind = "veil", secs = [10.0, 10.0], aura = 5215 }, { kind = "prowl", secs = [10.0, 10.0] }]
 
 [[ability]]
 key = "barkskin"
@@ -8166,6 +8160,28 @@ key = "earthgrab_totem"
 name = "Earthgrab Totem"
 display = 4588
 health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+# Capacitor Totem: 20 health, a foe's two good blows inside its 2 sec.
+[[mob]]
+key = "capacitor_totem"
+name = "Capacitor Totem"
+display = 4588
+health = 20
 run_speed = 0.0
 walk_speed = 0.0
 aggro = 0.0

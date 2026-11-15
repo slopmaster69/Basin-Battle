@@ -2524,6 +2524,10 @@ impl Survival {
                 dmg = dmg.max(h as f32);
             }
         }
+        // The first blow out of Prowl: a flat bonus (so it never doubles a big spell) and a stun.
+        if base > 0.0 {
+            dmg += self.prowl_strike(owner, victim) as f32;
+        }
         dmg.round().max(0.0) as u32
     }
 
@@ -3420,7 +3424,10 @@ impl Survival {
             m.facing = self.players.get(&id).map_or(0.0, |p| p.facing);
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
-        self.totems.push(Totem { mob: mid, owner: id, ability, until: now + d.secs.max(1.0), next: now });
+        // A totem that waits to go off (Capacitor Totem) first pulses when its fuse is out.
+        let fused = d.detonate > 0.0;
+        let until = now + d.secs.max(1.0).max(if fused { d.detonate + 0.5 } else { 0.0 });
+        self.totems.push(Totem { mob: mid, owner: id, ability, until, next: if fused { now + d.detonate } else { now } });
         if self.debug_draws() {
             self.mark(at, t.radius, d.secs.max(1.0));
         }
@@ -3439,7 +3446,9 @@ impl Survival {
         let list = self.totems.clone();
         for t in list {
             let alive = self.mobs.get(&t.mob).is_some_and(|m| m.health > 0);
-            if !alive || now >= t.until || !self.players.contains_key(&t.owner) {
+            // (A fused totem whose fuse is out goes off before its time can run out.)
+            let due = self.content.abilities[t.ability].detonate > 0.0 && now >= t.next;
+            if !alive || (now >= t.until && !due) || !self.players.contains_key(&t.owner) {
                 if !alive {
                     self.totems.retain(|x| x.mob != t.mob);
                 } else {
@@ -3485,6 +3494,13 @@ impl Survival {
                 for f in foes {
                     self.apply_effects(t.owner, f, &hostile, 1.0, &d.name);
                 }
+            }
+            // A fused totem has done its one thing: its look where it stood, and it falls.
+            if d.detonate > 0.0 {
+                if d.burst_spell != 0 {
+                    self.events.push(Event::Missile { caster: t.owner, spell: d.burst_spell, target: Target::Point(at) });
+                }
+                self.remove_totem(t.mob);
             }
         }
     }

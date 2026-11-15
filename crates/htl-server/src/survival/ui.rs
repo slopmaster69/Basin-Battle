@@ -294,6 +294,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "trap" => out.push(format!("{} yd placement range · {} yd trigger radius · {} sec duration", n(d.range[1]), n(d.radius[1]), n(d.secs))),
         "place" if d.banner.is_some() => out.push(format!("{} sec banner · {} yd radius · {} health", n(d.secs), n(d.radius[1]), n(d.banner.as_ref().map_or(0.0, |b| b.health)))),
         "place" if d.totem.is_none() => out.push(format!("{} yd range", n(d.range[1]))),
+        "place" if d.detonate > 0.0 => out.push(format!("{} yd range · {} sec fuse · {} yd radius", n(d.range[1]), n(d.detonate), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "place" => out.push(format!("{} sec totem · {} yd radius", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("{} sec circle duration", n(d.anchor))),
         "art" if d.ambush > 0.0 => out.push(format!("{} yd step", n(d.ambush))),
@@ -370,6 +371,10 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
                 let horror = d.strike_back.iter().find(|x| x.kind == "panic").map_or(0.0, |x| x.secs[1]);
                 out.push(format!("First attacker takes {} and is horrified {} sec ({} on creatures)", n(e.amount), n(horror / 2.0), n(horror)))
             }
+            // Polymorph and Scatter Shot: how long it wanders, and how long on a hero.
+            "disorient" => out.push(format!("{} sec · {} sec on heroes", n(e.secs[1]), n(e.hero_secs))),
+            // Prowl: what its strike from hiding adds.
+            "prowl" => out.push(format!("{} bonus damage · {} sec stun", n(htl_survival::sim::cc::PROWL_BONUS), n(htl_survival::sim::cc::PROWL_STUN))),
             "pull" => out.push(if e.from_caster { "Pulls targets to you".to_string() } else { format!("{} yd pull", n(e.amount)) }),
             _ => {}
         }
@@ -2599,6 +2604,21 @@ mod facts_tests {
         assert!(sky.contains(&hang) && !sky.contains("0.5 yd"), "{sky}");
         // Arcane Explosion's bursts widen: 6 to 8 yd.
         assert!(facts("arcane_explosion").contains("6–8 yd radius"));
+    }
+
+    /// The new EX versions (Polymorph, Blast Wave, Capacitor Totem, Prowl) say what they do in the
+    /// numbers the sim uses.
+    #[test]
+    fn the_new_ex_versions_say_their_numbers() {
+        let poly = facts("pyroblast");
+        assert!(poly.contains("30 yd range") && poly.contains("8 sec · 1.5 sec on heroes") && !poly.contains("damage"), "{poly}");
+        let wave = facts("flash_flamestrike");
+        assert!(wave.contains("12 damage") && wave.contains("6 yd radius") && wave.contains("6 yd knockback"), "{wave}");
+        let cap = facts("thundercrack");
+        assert!(cap.contains("20 yd range · 2 sec fuse · 8 yd radius"), "{cap}");
+        let prowl = facts("pounce");
+        let (bonus, stun) = (htl_survival::sim::cc::PROWL_BONUS, htl_survival::sim::cc::PROWL_STUN);
+        assert!(prowl.contains(&format!("{bonus} bonus damage · {stun} sec stun")) && prowl.contains("10 sec"), "{prowl}");
     }
 
     /// No ability's stat line is a zero or a leftover: "0 yd", "0 sec", "NaN", an empty `· ·`.

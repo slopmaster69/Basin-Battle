@@ -553,3 +553,67 @@ fn an_old_save_with_the_shamans_lightning_bolt_loads_with_lava_burst() {
     assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("lava_burst"));
     assert_eq!(h.loadout.get("close").map(String::as_str), Some("thunderstorm"));
 }
+
+#[test]
+fn capacitor_totem_stuns_everyone_near_it_after_its_fuse_and_falls() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "thunderstorm");
+    s.set_cooldowns(p, true);
+    // Thunderstorm's EX (25 Valor): a totem at the reticle.
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "close", true);
+    assert!(matches!(s.players[&p].action, Action::Aim { .. }), "aimed at the reticle");
+    click(&mut s, p);
+    assert_eq!(s.totems.len(), 1, "a totem down");
+    let tm = s.totems[0].mob;
+    let at = s.mobs[&tm].pos;
+    assert!(s.players[&p].valor < 100.0, "Valor spent");
+    let (near, edge, far) = (grunt(&mut s, [at[0] + 3.0, at[1], 0.0]), grunt(&mut s, [at[0], at[1] + 7.5, 0.0]), grunt(&mut s, [at[0] - 11.0, at[1], 0.0]));
+    let pins: Vec<_> = [near, edge, far].into_iter().map(|g| (g, s.mobs[&g].pos)).collect();
+    // Nothing for the 2 sec it charges.
+    run_pinned(&mut s, 1.6, &pins);
+    assert!(!s.has_cc(near, "stun") && s.totems.len() == 1, "charging");
+    let ev = run_pinned(&mut s, 0.7, &pins);
+    for g in [near, edge] {
+        let c = s.cc_of(g).iter().find(|c| c.kind == "stun").unwrap_or_else(|| panic!("stunned: {g}"));
+        assert!((c.until - c.since - 3.0).abs() < 0.01, "for 3 sec");
+    }
+    assert!(!s.has_cc(far, "stun"), "not one past 8 yd");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 6343, .. })), "its shock where it stood");
+    assert!(s.totems.is_empty() && !s.mobs.contains_key(&tm), "the totem falls once it has gone off");
+    // Once, not again.
+    run_pinned(&mut s, 3.5, &pins);
+    assert!(!s.has_cc(near, "stun"), "over");
+}
+
+#[test]
+fn capacitor_totem_does_nothing_if_foes_destroy_it_first_and_a_boss_shrugs_it_off() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "thunderstorm");
+    s.set_cooldowns(p, true);
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "close", true);
+    click(&mut s, p);
+    let tm = s.totems[0].mob;
+    let at = s.mobs[&tm].pos;
+    let g = grunt(&mut s, [at[0] + 3.0, at[1], 0.0]);
+    let pins = [(g, s.mobs[&g].pos)];
+    run_pinned(&mut s, 0.8, &pins);
+    // Killed inside the fuse: no stun, ever.
+    s.hurt_mob(tm, g, 1000);
+    run_pinned(&mut s, 3.0, &pins);
+    assert!(!s.has_cc(g, "stun"), "it was destroyed first");
+    assert!(s.totems.is_empty());
+    // A champion in reach isn't stunned by it.
+    s.set_cooldowns(p, true);
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "close", true);
+    click(&mut s, p);
+    let at = s.mobs[&s.totems[0].mob].pos;
+    let def = s.content.mobs.iter().position(|m| m.boss && !m.inert()).expect("a boss");
+    let boss = s.spawn_mob(def, [at[0] + 2.0, at[1], 0.0], None, false);
+    run_pinned(&mut s, 2.6, &[]);
+    assert!(!s.has_cc(boss, "stun"), "a boss shrugs it off");
+}

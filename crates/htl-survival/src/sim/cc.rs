@@ -34,6 +34,15 @@ pub struct Cc {
 const HARD: [&str; 5] = ["stun", "incapacitate", "panic", "disorient", "dominated"];
 /// The ones that keep a unit from acting at all.
 const DISABLED: [&str; 6] = ["stun", "incapacitate", "petrify", "panic", "disorient", "dominated"];
+
+/// Prowl (the Druid's, Feral Leap's EX): the hidden Druid's next attack deals this much more
+/// damage and stuns whoever it lands on this long (a creature's time; a hero gets the rules'
+/// share). Both are in its tooltip as these numbers.
+pub const PROWL_BONUS: f32 = 20.0;
+pub const PROWL_STUN: f32 = 2.0;
+/// An attack from hiding has this long to land (a projectile's flight, a swing's wind-up) once
+/// the Druid has shown themselves.
+pub(crate) const PROWL_WINDOW: f32 = 3.0;
 /// A dominated hero walks toward their master until this close (yards).
 pub(crate) const DOMINATED_STOP: f32 = 2.0;
 /// A panicked hero is driven a stride away this often.
@@ -381,7 +390,8 @@ impl Survival {
                         ended.push(c.kind.clone());
                     }
                 }
-                "incapacitate" | "disorient" if damage > 0 => {
+                // (Any damage ends a disorient, and a Druid out of hiding.)
+                "incapacitate" | "disorient" | "prowl" if damage > 0 => {
                     c.until = now;
                     ended.push(c.kind.clone());
                 }
@@ -412,6 +422,10 @@ impl Survival {
             for k in &ended {
                 let line = format!("{k} on {} broken by damage", self.unit_name(id));
                 self.cc_note(id, line);
+            }
+            // Struck while prowling: out of hiding, with no strike to follow.
+            if ended.iter().any(|k| k == "prowl") {
+                self.cleanse(id, &["veil"]);
             }
             self.cc_ended(id, &ended);
         }
@@ -604,6 +618,19 @@ impl Survival {
                 self.flee_to(id, to, speed);
             }
         }
+    }
+
+    /// The Druid's attack out of Prowl lands on `victim`: the strike it was waiting for is used up
+    /// and the bonus damage comes back (the caller adds it to the blow), the victim stunned.
+    pub(crate) fn prowl_strike(&mut self, owner: Id, victim: Id) -> u32 {
+        let now = self.clock;
+        let Some(p) = self.players.get_mut(&owner) else { return 0 };
+        if p.prowl_strike_until <= now || owner == victim {
+            return 0;
+        }
+        p.prowl_strike_until = 0.0;
+        self.apply_cc(victim, owner, "stun", PROWL_STUN, 0.0, 0.0, "Prowl");
+        PROWL_BONUS.round() as u32
     }
 
     /// End everything `from` put on a hero (a duel over: the foe's slows, burns and holds).
