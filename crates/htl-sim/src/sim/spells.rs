@@ -1413,6 +1413,29 @@ impl Sim {
                 self.queue_spell_hit(id, v, base, delay, info.clone());
             }
         }
+        // Splitting: a ranged missile bursts on its first target, hitting up to 2 more enemies
+        // near it for a share of the damage.
+        // The card, the cape and ranks add up, but a burst never hits harder than the missile.
+        let split = self.entities[&id].player().map_or(0.0, |p| p.stats.split).min(1.0);
+        if split > 0.0 && n.damage > 0.0 && range > 8.0 {
+            let at = self.entities[&first].pos;
+            let travel = if n.speed > 0.0 { dist2d(pos, at) / n.speed } else { 0.0 };
+            // The same filters as a `targets` extra (execute-style spells, Mind Blast's afflicted).
+            let others: Vec<EntityId> = self
+                .enemies_near(at, 6.0)
+                .into_iter()
+                .map(|(v, _)| v)
+                .filter(|v| !victims.contains(v))
+                .filter(|v| n.only_below <= 0.0 || self.health_share(*v) < n.only_below)
+                .filter(|v| !(def.key == "mind_blast" && !self.afflicted(*v)))
+                .take(2)
+                .collect();
+            for v in others {
+                // Each burst shows as a missile of its own.
+                self.events.push(Event::SpellGo { caster: id, spell: visual, target: SpellTarget::Unit(v), hits: vec![v] });
+                self.queue_spell_hit(id, v, base * split, travel + 0.05, info.clone());
+            }
+        }
         Ok(true)
     }
 
