@@ -1,0 +1,120 @@
+From e6023685f3ef308521f3e71dfc7d42f670751aac Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 02:43:29 -0600
+Subject: [PATCH] The client's action-combat tests no longer race on the shared
+ queues
+
+Two benilla-ui tests, `a_telegraph_is_queued_with_its_shape_kind_and_window` and
+`the_eighth_rounds_strips_spots_friends_and_aim_shapes`, both drain the process-wide TELEGRAPHS
+queue (patch 0008) and ran on separate test threads, so one could take the other's calls. The
+client-tests run on main f4aa72d9 failed on it and a rerun passed.
+
+Every test in action_combat's test module now takes one test-only lock first (`serial()`, a
+`static` Mutex that ignores poisoning so one failure does not fail the rest). The module's queues
+and settings (calls, dashes, ropes, world fog, ground markers, the aim marker, the move keys) are
+all process-wide, so the lock covers all ten tests, not only the two that failed. Test code
+only; no runtime behaviour changes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-ui/src/action_combat.rs | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 865d665d..007803e7 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -2108,8 +2108,18 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+ mod tests {
+     use super::*;
+ 
++    /// The queues and settings this module keeps are process-wide, and `cargo test` runs tests on
++    /// several threads: a test that fills or drains one takes this first, so another test's calls
++    /// never land in (or vanish from) its own.
++    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
++
++    fn serial() -> std::sync::MutexGuard<'static, ()> {
++        SERIAL.lock().unwrap_or_else(|e| e.into_inner())
++    }
++
+     #[test]
+     fn a_clips_body_is_full_upper_lower_or_auto() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         take_calls();
+@@ -2146,6 +2156,7 @@ mod tests {
+     /// `ActionDash`'s fifth argument `"legs"` keeps the legs' walk; without it, as before.
+     #[test]
+     fn a_dash_keeps_the_legs_only_when_asked() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         take_dashes();
+@@ -2161,6 +2172,7 @@ mod tests {
+ 
+     #[test]
+     fn the_probe_finds_the_nearest_unit_in_front_and_not_behind_or_too_far() {
++        let _serial = serial();
+         // Facing -Z (yaw 0): a unit 2 yards ahead, one behind, one ahead but far, a player.
+         set_nearby(Nearby {
+             hero: Some(([0.0, 0.0, 0.0], 0.0)),
+@@ -2196,6 +2208,7 @@ mod tests {
+ 
+     #[test]
+     fn a_missile_look_holds_for_its_spell_and_a_casters_look_is_for_its_next_missile_alone() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(
+@@ -2256,6 +2269,7 @@ mod tests {
+ 
+     #[test]
+     fn a_rope_runs_from_a_unit_to_a_spot_or_another_unit_and_is_taken_away() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         take_ropes();
+@@ -2296,6 +2310,7 @@ mod tests {
+ 
+     #[test]
+     fn world_fog_calls_queue_clamped_and_in_order() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         take_world_fog();
+@@ -2326,6 +2341,7 @@ mod tests {
+ 
+     #[test]
+     fn ground_markers_queue_and_the_aim_marker_holds() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(r#"SetAimMarker("circle", 30, 5) SetGroundMarker("a", 1, 2, 3, 4, 2.5, true) ClearGroundMarker("a") SetGroundMarker(7, 0, 0, 0, 1, 1)"#)
+@@ -2397,6 +2413,7 @@ mod tests {
+ 
+     #[test]
+     fn a_telegraph_is_queued_with_its_shape_kind_and_window() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(r#"SetTelegraph("es9", "0xF130000000000025", "wedge", 3.4, 120, 1.2, "block", 0.25, 1) SetTelegraph("es10", "0xF130000000000026", "ring", 6, 360, 2, "unblockable", 0, nil) ClearTelegraph("es9")"#)
+@@ -2439,6 +2456,7 @@ mod tests {
+ 
+     #[test]
+     fn the_eighth_rounds_strips_spots_friends_and_aim_shapes() {
++        let _serial = serial();
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(r#"SetTelegraph("es1", "0x0000000000000007", "line", 14, 0, 0.5, "friendly", 0, 1, 3) SetTelegraphAt("es2", 10, 20, 5, 1.5, "ring", 6, 360, 1.25, "unblockable", 0, 1) SetAimMarker("cone", 10, 0, 70)"#)
+@@ -2462,6 +2480,7 @@ mod tests {
+ 
+     #[test]
+     fn the_move_keys_come_back_as_held() {
++        let _serial = serial();
+         for (f, s) in [(0, 0), (1, 0), (-1, 1), (0, -1), (1, 1)] {
+             set_move_keys(f, s);
+             assert_eq!(move_keys(), (f, s));
+-- 
+2.56.0.windows.4
+
