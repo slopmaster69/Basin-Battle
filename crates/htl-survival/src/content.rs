@@ -4443,7 +4443,7 @@ impl Content {
             if a.stack.as_ref().is_some_and(|k| k.most == 0 || k.might < 0.0 || k.secs <= 0.0) {
                 bail!("{what}: a stack needs `most`, `might` and `secs`");
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects).chain(&a.crit_effects).chain(&a.stop_effects).chain(&a.finisher_effects).chain(&a.bomb_effects).chain(&a.backfire_effects) {
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects).chain(&a.crit_effects).chain(&a.stop_effects).chain(&a.finisher_effects).chain(&a.bomb_effects).chain(&a.backfire_effects).chain(&a.strike_back) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {

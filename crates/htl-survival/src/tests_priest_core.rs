@@ -904,7 +904,7 @@ fn power_word_shield_is_key_2_and_absorbs_30_for_the_ally_under_the_reticle() {
     s.slot_ability(p, "defense", "power_word_shield").unwrap();
     let f = hero(&mut s, "Bren", [8.0, 0.0, 0.0], WEST);
     let sh = idx(&s, "power_word_shield");
-    assert_eq!(s.content.ex_of(sh), Some(idx(&s, "power_word_barrier")), "the Barrier is its EX");
+    assert_eq!(s.content.ex_of(sh), Some(idx(&s, "pain_suppression")), "Pain Suppression is its EX");
     let ev = shield(&mut s, p);
     assert!(
         ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 17, target: Target::Unit(t) } if *caster == p && *t == f)),
@@ -1058,7 +1058,7 @@ fn a_draft_2_save_loads_with_draft_3s_cards() {
         .collect();
     let q = s.join("ayla", "Ayla", Some(&save));
     let h = &s.players[&q];
-    for k in ["angelic_feather", "shadowguard", "mind_blast", "psychic_scream", "fade"] {
+    for k in ["angelic_feather", "vampiric_embrace", "mind_blast", "psychic_scream", "fade"] {
         assert!(h.owned.contains(k), "owns {k}: {:?}", h.owned);
     }
     for k in ["leap_of_faith", "dispersion", "mind_flay"] {
@@ -1068,7 +1068,7 @@ fn a_draft_2_save_loads_with_draft_3s_cards() {
     assert_eq!(on("ranged"), Some("mind_blast"), "Mind Flay on Q is Mind Blast now");
     assert_eq!(on("close"), Some("psychic_scream"), "Mind Blast on E is Psychic Scream now");
     assert_eq!(on("utility"), Some("angelic_feather"));
-    assert_eq!(on("defense"), Some("shadowguard"));
+    assert_eq!(on("defense"), Some("vampiric_embrace"));
 }
 
 // --- the board's budgets ------------------------------------------------------------------------

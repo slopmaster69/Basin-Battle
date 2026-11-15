@@ -160,21 +160,51 @@ impl Survival {
     pub(crate) fn meter_dealt(&mut self, by: Id, victim: Id, amount: u32, label: &str) {
         if by != victim {
             self.meter_count(by, Kind::Dealt, amount, label, true);
-            self.vampiric(by, victim, amount);
+            self.embrace(by, amount, label);
         }
     }
 
-    /// Vampiric Touch: what a hero deals a foe they've touched heals them a share of it (only
-    /// them: another's blows on it heal no one).
-    fn vampiric(&mut self, by: Id, victim: Id, amount: u32) {
+    /// Vampiric Embrace: `share` of the shadow a hero deals (a Priest's Shadow spell or staff, by
+    /// its `label`) heals the lowest-health ally (a hero) near them, or them. Nothing else heals.
+    fn embrace(&mut self, by: Id, amount: u32, label: &str) {
         let now = self.clock;
         if amount == 0 || !self.players.contains_key(&by) {
             return;
         }
-        let Some(share) = self.cc_of(victim).iter().find(|c| c.kind == "vampiric" && c.from == by && c.until > now).map(|c| c.amount) else { return };
+        let Some((share, source)) = self.cc_of(by).iter().find(|c| c.kind == "embrace" && c.until > now).map(|c| (c.amount, c.source.clone())) else { return };
+        let shadow = self.content.abilities.iter().enumerate().any(|(i, a)| {
+            let base = &self.content.abilities[self.content.base_of(i)];
+            a.name == label && base.school == "priest" && (base.choice == 2 || base.builds == "weave")
+        });
+        if !shadow {
+            return;
+        }
+        let reach = self.embrace_effect(&source).map_or(0.0, |e| e.reach);
+        let at = self.players[&by].pos;
+        // The lowest share of their health: the one who needs it most, the Priest if no one does.
+        let target = self
+            .players
+            .iter()
+            .filter(|(h, p)| p.health > 0 && (**h == by || (self.helpable(by, **h) && dist2d(p.pos, at) <= reach)))
+            .min_by(|a, b| (a.1.health as f32 / a.1.max_health.max(1) as f32).total_cmp(&(b.1.health as f32 / b.1.max_health.max(1) as f32)))
+            .map_or(by, |(h, _)| *h);
         let heal = (amount as f32 * share).round() as u32;
-        let label = self.cc_of(victim).iter().find(|c| c.kind == "vampiric").map_or_else(String::new, |c| c.source.clone());
-        self.heal_hero_by(by, heal, by, &label);
+        self.heal_hero_by(target, heal, by, &source);
+    }
+
+    /// Vampiric Embrace's effect on the ability called `source`.
+    pub(crate) fn embrace_effect(&self, source: &str) -> Option<crate::content::AbilityEffect> {
+        self.content.abilities.iter().find(|a| a.name == source).and_then(|a| a.effects.iter().find(|e| e.kind == "embrace")).cloned()
+    }
+
+    /// A Mind Blast perfect inside Vampiric Embrace adds its `extend` seconds to it.
+    pub(crate) fn embrace_extended(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(c) = self.cc_of(id).iter().find(|c| c.kind == "embrace" && c.until > now) else { return };
+        let add = self.embrace_effect(&c.source.clone()).map_or(0.0, |e| e.extend);
+        if let Some(c) = self.cc.get_mut(&id).and_then(|v| v.iter_mut().find(|c| c.kind == "embrace" && c.until > now)) {
+            c.until += add;
+        }
     }
 
     /// A hero lost `amount` of health.

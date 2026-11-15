@@ -187,6 +187,31 @@ impl Survival {
         true
     }
 
+    /// Psychic Ward: the first foe to strike a hero who wears it is struck back in the mind
+    /// (the ward's `amount` in damage and the ability's `strike_back`, a panic among them); the
+    /// ward is spent, and the blow still lands.
+    pub(crate) fn ward_strikes(&mut self, attacker: Id, victim: Id) {
+        let now = self.clock;
+        let Some(c) = self.cc_of(victim).iter().find(|c| c.kind == "ward" && c.until > now).cloned() else { return };
+        if attacker == victim || !self.alive(attacker) {
+            return;
+        }
+        self.cleanse(victim, &["ward"]);
+        let by = c.from;
+        let fx = self.content.abilities.iter().find(|a| a.name == c.source).map(|a| a.strike_back.clone()).unwrap_or_default();
+        self.events.push(Event::Flash { player: victim, text: "Psychic Ward".into() });
+        let line = format!("{}: {} is struck back", c.source, self.unit_name(attacker));
+        self.cc_note(victim, line.clone());
+        self.cc_note(by, line);
+        let damage = c.amount.round() as u32;
+        if self.players.contains_key(&attacker) {
+            self.hurt_player_by(attacker, damage, by, &c.source);
+        } else {
+            self.hurt_mob_as(attacker, by, damage, &c.source);
+        }
+        self.apply_effects(by, attacker, &fx, 1.0, &c.source);
+    }
+
     // --- draft 3's hooks (docs/priest-draft3.md) ---------------------------------------------------
 
     /// A cast that found nothing to do (Penance with no one in front of them): its cooldown, and

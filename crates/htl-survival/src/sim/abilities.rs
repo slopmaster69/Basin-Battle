@@ -3133,6 +3133,7 @@ impl Survival {
                     self.events.push(Event::Visual { id: g.owner, kit, by: None });
                 }
                 self.events.push(Event::Perfect { player: g.owner, ability: g.ability });
+                self.embrace_extended(g.owner);
                 self.check_result(g.owner, g.ability, "perfect");
             }
             self.linger_at(g.owner, g.ability, g.at, g.radius);

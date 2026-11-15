@@ -1976,6 +1976,8 @@ impl Survival {
         if self.shield_parries(&s) {
             return;
         }
+        // Psychic Ward: the first foe to strike them is struck back in the mind.
+        self.ward_strikes(s.attacker, s.victim);
         // A counter's stance meets it first.
         if let Some(out) = self.counter_catch(s.victim, s.attacker, s.how, match s.follow {
             Follow::Ability { ability, share } => Some((ability, share)),

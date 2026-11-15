@@ -1,6 +1,6 @@
 //! The Shadow Priest, draft 3 (docs/priest-draft3.md): Mind Blast's sigil (lead your target, its
 //! heart the perfect) and Shadow Word: Death's judgement; Psychic Scream and Void Tendrils; Fade's
-//! sidestep and Dominate Mind; Shadowguard (take it, give it back) and Vampiric Touch; Void Rift (gather, then
+//! sidestep and Dominate Mind; Vampiric Embrace and Psychic Ward, Shadowguard (benched); Void Rift (gather, then
 //! implode); where Shadow is taught.
 
 use crate::content::Content;
@@ -859,33 +859,137 @@ fn shadowguard_with_nothing_stored_throws_nothing_and_left_alone_lets_go_after_2
     let _ = k;
 }
 
+/// Health set to half for `ids` (no mending by itself in this world, but in combat anyway).
+fn hurt_half(s: &mut Survival, ids: &[Id]) {
+    for h in ids {
+        let now = s.clock;
+        let x = s.players.get_mut(h).unwrap();
+        x.health = x.max_health / 2;
+        x.combat_at = now;
+    }
+}
+
 #[test]
-fn vampiric_touch_heals_the_priest_from_her_own_damage_only() {
+fn vampiric_embrace_heals_the_lowest_health_ally_near_for_half_the_shadow_she_deals() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
     let b = hero(&mut s, "Bren", [0.0, 6.0, 0.0], WEST);
+    let c = hero(&mut s, "Cara", [0.0, -6.0, 0.0], WEST);
+    let far = hero(&mut s, "Dane", [0.0, 30.0, 0.0], WEST);
     let m = grunt(&mut s, [2.0, 0.0, 0.0], true);
     let pins = [(m, [2.0, 0.0, 0.0])];
-    for h in [p, b] {
-        let max = s.players[&h].max_health;
-        let now = s.clock;
-        let x = s.players.get_mut(&h).unwrap();
-        x.health = max / 2;
-        x.combat_at = now;
-    }
+    hurt_half(&mut s, &[p, b, c, far]);
+    // Bren is hurt worst of those near; Dane worse still, but past 12 yd.
+    s.players.get_mut(&b).unwrap().health = s.players[&b].max_health / 4;
+    s.players.get_mut(&far).unwrap().health = 1;
     s.set_aim_line(p, EAST, 0.0);
-    cast(&mut s, p, "shadowguard", true);
-    assert!(!shelled(&s, p), "the grip, not the shell");
-    assert!(s.cc_of(m).iter().any(|c| c.kind == "vampiric" && c.from == p), "her grip on it");
-    run_pinned(&mut s, 0.5, &pins);
-    let (mine, his) = (s.players[&p].health, s.players[&b].health);
+    cast(&mut s, p, "vampiric_embrace", false);
+    run_pinned(&mut s, 0.5, &[]);
+    let left = s.cc_of(p).iter().find(|c| c.kind == "embrace").map(|c| c.until - s.clock).expect("it is on her");
+    assert!(left > 5.3 && left <= 6.0 + 1.0e-3, "6 sec: {left}");
+    let (mine, his, hers, dane) = (s.players[&p].health, s.players[&b].health, s.players[&c].health, s.players[&far].health);
     let before = hp(&s, m);
     blast_at(&mut s, p, [2.0, 0.0, 0.0]);
-    run_pinned(&mut s, 1.0, &pins);
+    run_pinned(&mut s, 1.2, &pins);
     let dealt = before - hp(&s, m);
     assert!(dealt >= 26, "her Mind Blast: {dealt}");
-    assert_eq!(s.players[&p].health, mine + (dealt as f32 * 0.2).round() as u32, "20% of hers back");
-    assert_eq!(s.players[&b].health, his, "nothing to him");
+    assert_eq!(s.players[&b].health, his + (dealt as f32 * 0.5).round() as u32, "half of it to Bren, the lowest near her");
+    assert_eq!((s.players[&p].health, s.players[&c].health, s.players[&far].health), (mine, hers, dane), "no one else, Dane too far");
+}
+
+#[test]
+fn vampiric_embrace_heals_the_priest_when_no_ally_is_near_and_runs_out_after_6_sec() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let m = grunt(&mut s, [2.0, 0.0, 0.0], true);
+    let pins = [(m, [2.0, 0.0, 0.0])];
+    hurt_half(&mut s, &[p]);
+    s.set_aim_line(p, EAST, 0.0);
+    cast(&mut s, p, "vampiric_embrace", false);
+    run_pinned(&mut s, 0.5, &[]);
+    let mine = s.players[&p].health;
+    let before = hp(&s, m);
+    blast_at(&mut s, p, [2.0, 0.0, 0.0]);
+    run_pinned(&mut s, 1.2, &pins);
+    let dealt = before - hp(&s, m);
+    assert!(dealt >= 26, "her Mind Blast: {dealt}");
+    assert_eq!(s.players[&p].health, mine + (dealt as f32 * 0.5).round() as u32, "half to herself");
+    // Out after its 6 sec: the next blast heals no one.
+    run_pinned(&mut s, 5.0, &pins);
+    assert!(!s.has_cc(p, "embrace"), "gone");
+    let mine = s.players[&p].health;
+    blast_at(&mut s, p, [2.0, 0.0, 0.0]);
+    run_pinned(&mut s, 1.2, &pins);
+    assert_eq!(s.players[&p].health, mine, "nothing healed");
+}
+
+#[test]
+fn a_mind_blast_perfect_inside_vampiric_embrace_adds_2_sec_to_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let g = grunt(&mut s, [12.0, 0.0, 0.0], true);
+    cast(&mut s, p, "vampiric_embrace", false);
+    run_pinned(&mut s, 0.5, &[(g, [12.0, 0.0, 0.0])]);
+    let until = |s: &Survival| s.cc_of(p).iter().find(|c| c.kind == "embrace").map(|c| c.until).unwrap();
+    let t0 = until(&s);
+    let mut ev = blast_at(&mut s, p, [12.0, 0.0, 0.0]);
+    ev.extend(run_walking(&mut s, 1.0, g, [12.0, 0.0, 0.0]));
+    assert_eq!(perfects(&ev, p), vec![idx(&s, "mind_blast")], "a perfect Mind Blast");
+    assert!((until(&s) - t0 - 2.0).abs() < 1.0e-3, "2 sec added: {} from {t0}", until(&s));
+    // A plain Mind Blast adds none.
+    let t1 = until(&s);
+    s.set_cooldowns(p, true);
+    blast_at(&mut s, p, [12.0, 0.0, 0.0]);
+    run_pinned(&mut s, 1.0, &[(g, [12.0, 0.0, 0.0])]);
+    assert_eq!(until(&s), t1, "a miss of the read adds none");
+}
+
+// --- Psychic Ward -----------------------------------------------------------------------------------
+
+#[test]
+fn psychic_ward_strikes_back_the_first_foe_to_hit_the_warded_friend_20_and_horrified() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let f = hero(&mut s, "Bren", [6.0, 0.0, 0.0], WEST);
+    s.set_aim_line(p, EAST, 0.0);
+    let foe = grunt(&mut s, [7.5, 0.0, 0.0], true);
+    let other = grunt(&mut s, [7.5, 1.0, 0.0], true);
+    cast(&mut s, p, "vampiric_embrace", true);
+    assert!(s.has_cc(f, "ward") && !s.has_cc(p, "ward"), "on Bren, under the reticle");
+    let left = s.cc_of(f).iter().find(|c| c.kind == "ward").map(|c| c.until - s.clock).unwrap();
+    assert!(left > 5.3 && left <= 6.0 + 1.0e-3, "6 sec: {left}");
+    let (h0, o0) = (hp(&s, foe), hp(&s, other));
+    s.strike_fair(foe, f, 5, [7.5, 0.0, 0.0], false, false, false, Blow::Light, None, crate::sim::combat::Follow::None);
+    assert_eq!(h0 - hp(&s, foe), 20, "20 in the mind");
+    assert!(s.has_cc(foe, "panic"), "horrified");
+    let left = s.cc_of(foe).iter().find(|c| c.kind == "panic").map(|c| c.until - s.clock).unwrap();
+    assert!(left > 2.8 && left <= 3.0 + 1.0e-3, "3 sec on a creature: {left}");
+    assert!(!s.has_cc(f, "ward"), "spent by the first");
+    // The second foe is not struck back.
+    s.strike_fair(other, f, 5, [7.5, 1.0, 0.0], false, false, false, Blow::Light, None, crate::sim::combat::Follow::None);
+    assert_eq!(hp(&s, other), o0, "only the first");
+}
+
+#[test]
+fn psychic_ward_horrifies_a_hero_half_as_long_and_lapses_after_6_sec() {
+    let mut s = world();
+    s.content.pvp.friendly_fire = true;
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let f = hero(&mut s, "Bren", [6.0, 0.0, 0.0], WEST);
+    let foe = hero(&mut s, "Cara", [7.0, 0.0, 0.0], WEST);
+    s.set_aim_line(p, EAST, 0.0);
+    cast(&mut s, p, "vampiric_embrace", true);
+    s.strike_fair(foe, f, 5, [7.0, 0.0, 0.0], false, false, false, Blow::Light, None, crate::sim::combat::Follow::None);
+    let left = s.cc_of(foe).iter().find(|c| c.kind == "panic").map(|c| c.until - s.clock);
+    assert!(left.is_some_and(|l| l > 1.3 && l <= 1.5 + 1.0e-3), "1.5 sec on a hero: {left:?}");
+    // A ward not struck on lapses.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    s.set_aim_line(p, EAST, 0.0);
+    cast(&mut s, p, "vampiric_embrace", true);
+    assert!(s.has_cc(p, "ward"), "on herself, no friend");
+    run(&mut s, 6.2);
+    assert!(!s.has_cc(p, "ward"), "lapsed");
 }
 
 // --- Void Rift --------------------------------------------------------------------------------------
@@ -1016,8 +1120,8 @@ fn the_abbey_teaches_shadow_beside_the_light() {
     let shrine = teaches("shrine_priest");
     assert!(shrine.contains(&"mind_blast".to_string()) && shrine.contains(&"psychic_scream".to_string()), "the altar: Q and E, {shrine:?}");
     let relic = teaches("relic_priest");
-    assert!(relic.contains(&"fade".to_string()) && relic.contains(&"shadowguard".to_string()), "the reliquary: 1 and 2, {relic:?}");
-    for k in ["mind_blast", "psychic_scream", "fade", "shadowguard"] {
+    assert!(relic.contains(&"fade".to_string()) && relic.contains(&"vampiric_embrace".to_string()), "the reliquary: 1 and 2, {relic:?}");
+    for k in ["mind_blast", "psychic_scream", "fade", "vampiric_embrace"] {
         let d = &s.content.abilities[idx(&s, k)];
         assert!(d.school == "priest" && d.choice == 2 && s.content.ex_of(idx(&s, k)).is_some(), "{k}: Shadow's, with its EX");
     }
