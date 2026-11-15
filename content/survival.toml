@@ -3852,26 +3852,30 @@ full_speed = 40.0
 charge_spell = 133
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 
-# The Mage's control, true to the class (the key kept, its name and what it does new: Fireball's
-# EX is no longer a bigger Fireball). A bolt that turns the first foe it hits into a sheep for
-# 8 sec, a longer hold than Sap's 3 sec incapacitate because it is one foe, a bolt's range away,
-# and any damage (its own burn too) turns it back. It is Scatter Shot's `disorient` with
-# Polymorph's own look (118). A hero is a sheep for 1.5 sec (the board's limit on hard control), and the grace follows it. Bosses and
-# totems shrug it off, as they do any control. 25 Valor as before; Frost Nova's combo frees it.
+# The Mage's shatter payoff (the key kept, its name and what it does new: Fireball's EX is no
+# longer a bigger Fireball, and no longer Polymorph, which did no damage and so could never shatter
+# what Frost Nova froze). A fast frost bolt, a third of a Fireball's best (12), that shatters a
+# frozen foe like any shattering ability (x1.5, the freeze ended). And the ice bursts outward
+# (`shatter_spread`, the global shatter's own, so any ability could have it): every OTHER frozen
+# foe within 5 yd shatters too, whoever froze it (Frost Nova, Deep Freeze Bolt, Freezing Trap),
+# each once per lance. The 1.12 client has no Ice Lance look: Frostbolt's (116). 25 Valor as
+# before; Frost Nova's combo frees it (Corey, Nov 15).
 [[ability]]
 key = "pyroblast"
-name = "Polymorph"
+name = "Ice Lance"
 ex_of = "fireball"
-text = "Hurls a bolt that turns the first enemy it hits into a sheep for 8 sec (1.5 sec against heroes). The sheep wanders and cannot attack. Any damage turns it back. Bosses and totems are immune."
-icon = "Spell_Nature_Polymorph"
+text = "Hurls a frost bolt up to 30 yd that deals 12 damage. Shatters a frozen enemy for 50% more damage, and the ice bursts outward: every other frozen enemy within 5 yd shatters too."
+icon = "Spell_Frost_FrostBolt02"
 slot = "ranged"
 kind = "projectile"
 valor = 25
+damage = [12.0, 12.0]
 range = [30.0, 30.0]
 radius = [0.5, 0.5]
-speed = 24.0
-spell = 118
-effects = [{ kind = "disorient", secs = [8.0, 8.0], hero_secs = 1.5, aura = 118 }]
+speed = 30.0
+spell = 116
+shatter = true
+shatter_spread = 5.0
 
 # The Warden: the shield that hunts casters, and the heal on a friend.
 [[ability]]
@@ -4136,7 +4140,7 @@ finisher_effects = [{ kind = "knockback", amount = 4.0 }]
 key = "frost_nova"
 name = "Frost Nova"
 ex_of = "cone_of_cold"
-text = "Freezes every enemy within 8 yd of you for 3 sec (1.5 sec against heroes) and deals 6 damage. For 5 sec, your Fireball key casts a free Polymorph. Freeze them, then sheep the one that matters."
+text = "Freezes every enemy within 8 yd of you for 3 sec (1.5 sec against heroes) and deals 6 damage. For 5 sec, your Fireball key casts a free Ice Lance. Freeze them, then shatter the lot."
 icon = "Spell_Frost_FrostNova"
 slot = "close"
 kind = "nova"
@@ -4145,7 +4149,7 @@ damage = [6.0, 6.0]
 radius = [8.0, 8.0]
 spell = 122
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
-# The mage's combo, alone: freeze, then a free Polymorph on the one that matters.
+# The mage's combo, alone: freeze, then a free Ice Lance shatters the lot.
 empower = { ability = "fireball", secs = 5.0 }
 
 # The Warden: holy ground underfoot.

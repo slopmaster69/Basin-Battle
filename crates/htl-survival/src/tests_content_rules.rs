@@ -35,11 +35,18 @@ fn the_new_ex_tooltips_say_the_numbers_the_code_uses() {
     let get = |k: &str| &c.abilities[c.ability(k).unwrap()];
     let share = c.cc.player_share;
     let effect = |d: &crate::content::AbilityDef, kind: &str| d.effects.iter().find(|e| e.kind == kind).cloned().unwrap_or_else(|| panic!("{} has a {kind}", d.name));
-    // Polymorph (Fireball's EX): how long a sheep lasts, and a hero.
+    // Ice Lance (Fireball's EX): its bolt's range and damage, the shatter and how far the ice bursts.
     let d = get("pyroblast");
-    assert_eq!(d.name, "Polymorph");
-    let e = effect(d, "disorient");
-    assert!(d.text.contains(&format!("sheep for {} sec ({} sec against heroes)", said(e.secs[1]), said(e.hero_secs))), "{}", d.text);
+    assert_eq!(d.name, "Ice Lance");
+    for want in [
+        format!("up to {} yd", said(d.range[1])),
+        format!("deals {} damage", said(d.damage[1])),
+        format!("for {}% more damage", said((crate::sim::abilities::SHATTER - 1.0) * 100.0)),
+        format!("within {} yd shatters too", said(d.shatter_spread)),
+    ] {
+        assert!(d.text.contains(&want), "{want:?} in {}", d.text);
+    }
+    assert!(d.shatter && d.shatter_spread > 0.0 && d.damage[1] < c.abilities[c.ability("fireball").unwrap()].damage[1] / 2.0, "a shatter that spreads, for a low blow");
     // Blast Wave (Flamestrike's EX).
     let d = get("flash_flamestrike");
     let (k, s) = (effect(d, "knockback"), effect(d, "snare"));

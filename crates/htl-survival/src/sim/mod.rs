@@ -1180,6 +1180,8 @@ pub struct Survival {
     pub(crate) fx_control: bool,
     /// The foe whose Mark the last ability's damage used up, and when (a Kidney Shot's longer stun).
     pub(crate) fx_marked: Option<(Id, f32)>,
+    /// Inside a shatter's spread: what it shatters doesn't spread it again.
+    pub(crate) fx_shattering: bool,
     /// The look the caster of the pull being given wears over it (its clip, the model it's
     /// borrowed from): an ability's `pull_clip` and `pull_from`.
     pub(crate) fx_pull_look: Option<(u16, String)>,
@@ -1320,6 +1322,7 @@ impl Survival {
             fx_vs_bosses: false,
             fx_control: false,
             fx_marked: None,
+            fx_shattering: false,
             fx_pull_look: None,
             told_immune: BTreeMap::new(),
             told_vocal: BTreeMap::new(),

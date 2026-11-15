@@ -448,6 +448,10 @@ pub struct AbilityDef {
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
+    /// When it shatters a frozen foe, the ice bursts outward: every other frozen foe within this
+    /// many yd shatters too (the same shatter, each foe once). 0: no spread (Ice Lance).
+    #[serde(default)]
+    pub shatter_spread: f32,
     /// A staff's plain bolt: what each hit builds (`heat` or `chill` on the foe, `charge` on the
     /// caster; `[staffs]`). Empty: nothing.
     #[serde(default)]

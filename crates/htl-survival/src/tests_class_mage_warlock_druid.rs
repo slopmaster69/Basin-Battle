@@ -118,7 +118,7 @@ fn hits(ev: &[Event], p: Id, m: Id) -> Vec<u32> {
 // --- Mage: freeze, then shatter ---------------------------------------------------------------------
 
 #[test]
-fn frost_nova_freezes_all_round_and_makes_the_next_fireball_a_free_polymorph() {
+fn frost_nova_freezes_all_round_and_makes_the_next_fireball_a_free_ice_lance() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     learn(&mut s, p, "fireball");
@@ -136,14 +136,16 @@ fn frost_nova_freezes_all_round_and_makes_the_next_fireball_a_free_polymorph() {
     assert_eq!(em[0].0, key_of("ranged") as usize, "the Fireball's");
     assert!((em[0].1 - (s.clock + 5.0)).abs() < 0.2, "for 5 s");
     let valor = s.players[&p].valor;
-    // The plain Fireball key now aims a Polymorph, which goes for no Valor.
+    let health = s.mobs[&k].health;
+    // The plain Fireball key now aims an Ice Lance, which goes for no Valor.
     run_pinned(&mut s, 0.3, &pins);
     press(&mut s, p, "ranged", false);
-    assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Polymorph");
+    assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Ice Lance");
     let mut ev = hold(&mut s, p, 0.0, &pins);
     ev.extend(run_pinned(&mut s, 0.8, &pins));
-    assert!(missile(&ev, 118), "the Polymorph flies");
-    assert!(s.has_cc(k, "disorient"), "the frozen boar a sheep");
+    assert!(missile(&ev, 116), "the Ice Lance flies");
+    assert!(!s.has_cc(k, "petrify"), "the freeze shattered");
+    assert!(s.mobs[&k].health < health, "and it hurt");
     assert!(s.players[&p].valor + 0.001 >= valor, "no Valor spent: {} then {}", valor, s.players[&p].valor);
     assert!(s.empowered_keys(p).is_empty(), "the combo spent");
     // Then the key is Fireball again.
@@ -151,85 +153,117 @@ fn frost_nova_freezes_all_round_and_makes_the_next_fireball_a_free_polymorph() {
     assert_eq!(aiming(&s, p), Some(idx(&s, "fireball")));
 }
 
-#[test]
-fn polymorph_turns_the_first_foe_it_hits_into_a_sheep_that_wanders_and_any_damage_breaks() {
-    let mut s = world(false);
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    learn(&mut s, p, "fireball");
-    s.set_cooldowns(p, true);
-    let (first, behind) = (boar(&mut s, [8.0, 0.0, 0.0]), boar(&mut s, [14.0, 0.0, 0.0]));
-    let pins = [(first, [8.0, 0.0, 0.0]), (behind, [14.0, 0.0, 0.0])];
-    let health = (s.mobs[&first].health, s.mobs[&behind].health);
-    // Fireball's EX (25 Valor): a bolt, no damage, the first body it meets a sheep for 8 sec.
-    s.set_valor(p, 100.0);
-    press(&mut s, p, "ranged", true);
-    assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Polymorph");
-    let mut ev = hold(&mut s, p, 0.0, &pins);
-    ev.extend(run_pinned(&mut s, 1.0, &pins));
-    assert!(missile(&ev, 118), "its bolt");
-    assert!(s.has_cc(first, "disorient"), "the first foe a sheep");
-    assert!(!s.has_cc(behind, "disorient"), "not the one behind it");
-    assert_eq!((s.mobs[&first].health, s.mobs[&behind].health), health, "no damage");
-    assert!(s.players[&p].valor < 100.0, "Valor spent");
-    let d = &s.content.abilities[idx(&s, "pyroblast")];
-    let secs = d.effects[0].secs[1];
-    assert_eq!(secs, 8.0, "for 8 sec");
-    let c = s.cc_of(first).iter().find(|c| c.kind == "disorient").unwrap();
-    assert!((c.until - c.since - secs).abs() < 0.01, "8 sec: {} to {}", c.since, c.until);
-    assert!(s.disabled(first), "it can't act");
-    // Let go (not held where it stood), the sheep wanders off and never touches the hero.
-    let hp = s.players[&p].health;
-    let start = s.mobs[&first].pos;
-    for _ in 0..(4.0 / DT) as usize {
-        s.step(DT);
-        s.mobs.get_mut(&behind).unwrap().pos = [14.0, 0.0, 0.0];
+/// Freeze these boars (3 sec, long enough to aim).
+fn freeze(s: &mut Survival, by: Id, foes: &[Id]) {
+    for f in foes {
+        assert!(s.apply_cc(*f, by, "petrify", 4.0, 0.0, 0.0, "test"), "frozen");
     }
-    assert!(s.has_cc(first, "disorient"), "still a sheep");
-    assert!(dist2d(s.mobs[&first].pos, start) > 1.0, "it wandered: {:?}", s.mobs[&first].pos);
-    assert_eq!(s.players[&p].health, hp, "and attacked no one");
-    // Any damage turns it back.
-    s.hurt_mob(first, p, 1);
-    assert!(!s.has_cc(first, "disorient"), "damage breaks it");
-    // Otherwise it holds the whole 8 sec.
-    let other = boar(&mut s, [8.0, 0.0, 0.0]);
-    let pins = [(other, [8.0, 0.0, 0.0])];
-    s.mobs.get_mut(&first).unwrap().pos = [30.0, 30.0, 0.0];
+}
+
+/// Ice Lance at the first foe in the line, from `p`, with the mobs held where they stand.
+fn lance(s: &mut Survival, p: Id, pins: &[(Id, Vec3)]) -> Vec<Event> {
+    s.set_cooldowns(p, true);
     s.set_valor(p, 100.0);
-    run_pinned(&mut s, 3.0, &pins);
-    press(&mut s, p, "ranged", true);
-    hold(&mut s, p, 0.0, &pins);
-    run_pinned(&mut s, 1.0, &pins);
-    assert!(s.has_cc(other, "disorient"));
-    run_pinned(&mut s, 6.0, &pins);
-    assert!(s.has_cc(other, "disorient"), "7 sec on");
-    run_pinned(&mut s, 2.0, &pins);
-    assert!(!s.has_cc(other, "disorient"), "gone after its 8 sec");
+    press(s, p, "ranged", true);
+    assert_eq!(aiming(s, p), Some(idx(s, "pyroblast")), "the key's EX version, Ice Lance");
+    let mut ev = hold(s, p, 0.0, pins);
+    ev.extend(run_pinned(s, 1.0, pins));
+    ev
 }
 
 #[test]
-fn polymorph_is_much_shorter_on_a_hero_and_bosses_and_totems_are_immune() {
+fn ice_lance_deals_its_low_damage_on_an_unfrozen_foe_and_x1_5_on_a_frozen_one() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "fireball");
+    let d = &s.content.abilities[idx(&s, "pyroblast")];
+    assert_eq!((d.name.as_str(), d.valor, d.range[1], d.damage[1], d.shatter, d.shatter_spread), ("Ice Lance", 25, 30.0, 12.0, true, 5.0));
+    let base = d.damage[1];
+    let a = boar(&mut s, [8.0, 0.0, 0.0]);
+    let pins = [(a, [8.0, 0.0, 0.0])];
+    let h = s.mobs[&a].health;
+    let ev = lance(&mut s, p, &pins);
+    assert!(missile(&ev, 116), "a frost bolt");
+    assert_eq!(hits(&ev, p, a), vec![12], "12 on a foe that isn't frozen");
+    assert_eq!(s.mobs[&a].health, h - 12);
+    assert!(s.players[&p].valor < 100.0, "25 Valor spent");
+    assert!(!crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER), "no shatter");
+    // On a frozen foe: x1.5, the freeze ended, the global shatter look and sound.
+    let h = s.mobs[&a].health;
+    freeze(&mut s, p, &[a]);
+    let ev = lance(&mut s, p, &pins);
+    let want = (base * crate::sim::abilities::SHATTER).round() as u32;
+    assert_eq!(hits(&ev, p, a), vec![want], "x1.5 on the frozen");
+    assert_eq!(s.mobs[&a].health, h - want);
+    assert!(!s.has_cc(a, "petrify"), "the freeze ended");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, a, crate::sim::cues::KIT_FROST_BURST), "the shatter's own look");
+    assert!(crate::sim::cues::seen::looked(&ev, a, s.content.shatter.burst_kit), "and its action lines");
+}
+
+#[test]
+fn one_ice_lance_shatters_the_frozen_pack_round_the_target_and_not_the_far_one_or_the_unfrozen() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "fireball");
+    // The target (the first in the line) and two more frozen within 5 yd of it, one frozen foe
+    // 10 yd off, and a foe among them that isn't frozen.
+    let at = [
+        [10.0, 0.0, 0.0],
+        [10.0, 3.0, 0.0],
+        [13.0, -3.0, 0.0],
+        [20.5, 0.0, 0.0],
+        [10.0, -4.0, 0.0],
+    ];
+    let ids: Vec<Id> = at.iter().map(|a| boar(&mut s, *a)).collect();
+    let (t, b, c, far, cool) = (ids[0], ids[1], ids[2], ids[3], ids[4]);
+    let pins: Vec<(Id, Vec3)> = ids.iter().copied().zip(at).collect();
+    freeze(&mut s, p, &[t, b, c, far]);
+    let before: Vec<u32> = ids.iter().map(|i| s.mobs[i].health).collect();
+    let ev = lance(&mut s, p, &pins);
+    let want = (12.0 * crate::sim::abilities::SHATTER).round() as u32;
+    for (name, f) in [("target", t), ("second", b), ("third", c)] {
+        assert_eq!(hits(&ev, p, f), vec![want], "{name} shatters once for the lance's x1.5");
+        assert!(!s.has_cc(f, "petrify"), "{name}'s freeze ended");
+        assert!(crate::sim::cues::seen::looked(&ev, f, crate::sim::cues::KIT_FROST_BURST) && crate::sim::cues::seen::looked(&ev, f, s.content.shatter.burst_kit), "{name}: the global shatter look");
+    }
+    assert_eq!(s.mobs[&t].health, before[0] - want);
+    assert_eq!(s.mobs[&b].health, before[1] - want, "credited to the caster, whoever froze it");
+    assert_eq!(s.mobs[&c].health, before[2] - want);
+    assert!(hits(&ev, p, far).is_empty() && s.mobs[&far].health == before[3] && s.has_cc(far, "petrify"), "the one 10 yd away is still frozen");
+    assert!(hits(&ev, p, cool).is_empty() && s.mobs[&cool].health == before[4], "an unfrozen foe nearby is not hit");
+}
+
+#[test]
+fn a_spread_shattered_foe_does_not_spread_the_ice_again() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "fireball");
+    // A chain of frozen foes 4 yd apart: the target, one within 5 yd, and a third 8 yd from the
+    // target but only 4 from the second. A chained spread would reach it; the lance's does not.
+    let at = [[10.0, 0.0, 0.0], [10.0, 4.0, 0.0], [10.0, 8.0, 0.0]];
+    let ids: Vec<Id> = at.iter().map(|a| boar(&mut s, *a)).collect();
+    let pins: Vec<(Id, Vec3)> = ids.iter().copied().zip(at).collect();
+    freeze(&mut s, p, &ids);
+    let h = s.mobs[&ids[2]].health;
+    let ev = lance(&mut s, p, &pins);
+    assert!(!s.has_cc(ids[0], "petrify") && !s.has_cc(ids[1], "petrify"), "the target and its neighbour shattered");
+    assert!(s.has_cc(ids[2], "petrify") && s.mobs[&ids[2]].health == h && hits(&ev, p, ids[2]).is_empty(), "no chain: only what the target's ice reaches");
+}
+
+#[test]
+fn a_frozen_hero_in_the_pack_shatters_too_whoever_froze_it() {
     let mut s = world(true);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let rival = hero(&mut s, "Bren", [8.0, 0.0, 0.0], std::f32::consts::PI);
+    let rival = hero(&mut s, "Bren", [10.0, 3.0, 0.0], std::f32::consts::PI);
     learn(&mut s, p, "fireball");
-    s.set_cooldowns(p, true);
-    s.set_valor(p, 100.0);
-    press(&mut s, p, "ranged", true);
-    hold(&mut s, p, 0.0, &[]);
-    run_pinned(&mut s, 1.0, &[]);
-    let c = s.cc_of(rival).iter().find(|c| c.kind == "disorient").expect("the rival a sheep");
-    assert!((c.until - c.since - 1.5).abs() < 0.01, "1.5 sec on a hero, not 8: {}", c.until - c.since);
-    assert!(s.silenced(rival), "and no abilities");
-    // A sheep is held by the grace after: no second at once.
-    s.cleanse(rival, &["disorient"]);
-    assert!(!s.apply_cc(rival, p, "disorient", 8.0, 0.0, 0.0, "test"), "the grace");
-    // A champion and a totem shrug it off.
-    let def = s.content.mobs.iter().position(|m| m.boss && !m.inert()).expect("a boss");
-    let boss = s.spawn_mob(def, [5.0, 0.0, 0.0], None, false);
-    assert!(!s.apply_cc(boss, p, "disorient", 8.0, 0.0, 0.0, "test") && !s.has_cc(boss, "disorient"), "a boss is immune");
-    let totem = s.content.mobs.iter().position(|m| m.totem).expect("a totem");
-    let t = s.spawn_mob(totem, [5.0, 5.0, 0.0], None, false);
-    assert!(!s.apply_cc(t, p, "disorient", 8.0, 0.0, 0.0, "test") && !s.has_cc(t, "disorient"), "a totem is immune");
+    let k = boar(&mut s, [10.0, 0.0, 0.0]);
+    let pins = [(k, [10.0, 0.0, 0.0])];
+    freeze(&mut s, rival, &[k]);
+    assert!(s.apply_cc(rival, k, "petrify", 4.0, 0.0, 0.0, "test"), "the rival frozen");
+    let hp = s.players[&rival].health;
+    lance(&mut s, p, &pins);
+    assert!(!s.has_cc(rival, "petrify"), "the rival's ice shattered by the spread");
+    assert!(s.players[&rival].health < hp, "and it hurt");
 }
 
 #[test]
