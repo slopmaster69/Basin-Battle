@@ -369,7 +369,7 @@ fn unreachable_retreat_stays_in_place_and_still_gives_the_full_arrival_cue() {
 fn the_blackguards_wait_for_a_quiet_moment_turn_shake_a_head_and_walk_off_then_he_is_alone() {
     let (mut s, band, id) = fight("dm_vancleef", 1);
     let watchers = s.vancleef.duels[&id].watchers.clone();
-    assert_eq!(watchers.len(), 2);
+    assert_eq!(watchers.len(), RING_GUARDS);
     for (w, _) in &watchers {
         s.hurt_mob(*w, band[0], 100);
         s.engage(*w, Foe::Hero(band[0]));
@@ -389,23 +389,30 @@ fn the_blackguards_wait_for_a_quiet_moment_turn_shake_a_head_and_walk_off_then_h
     let mut shook = false;
     let mut walking_at = None;
     let mut cowards = None;
-    for _ in 0..600 {
+    let mut gone_at = None;
+    for _ in 0..800 {
         let ev = s.step(DT);
         shook |= ev.iter().any(|e| matches!(e, Event::Emote { id: w, emote: EMOTE_NO } if *w == watchers[0].0));
+        if cowards.is_none() && yells(&ev, id).iter().any(|t| t == "Cowards! All of you!") {
+            cowards = Some(s.clock);
+            // The one moment: the ring is down, he calls after them, his gaps halve, all while they
+            // still stand where they were.
+            assert!(!s.ring_up(id) && s.vancleef.duels[&id].held.is_empty());
+            assert!(s.vancleef.duels[&id].alone);
+            assert!(watchers.iter().all(|(w, _)| s.mobs.contains_key(w) && s.mobs[w].path.is_empty()), "they have not yet set off");
+        }
         if walking_at.is_none() && matches!(s.vancleef.duels[&id].leave, Leave::Walking { .. }) {
             walking_at = Some(s.clock);
             assert!(shook, "one shakes his head before they go");
+            assert!(cowards.is_some_and(|c| s.clock - c >= LEAVE_TURN - 0.1), "the line comes as they turn, before they walk");
             assert!(watchers.iter().all(|(w, _)| !s.mobs[w].path.is_empty()));
         }
-        if yells(&ev, id).iter().any(|t| t == "Cowards! All of you!") {
-            cowards = Some(s.clock);
-            assert!(watchers.iter().all(|(w, _)| !s.mobs.contains_key(w)), "the line comes once they're gone");
-        }
-        if cowards.is_some() { break; }
+        if watchers.iter().all(|(w, _)| !s.mobs.contains_key(w)) { gone_at = Some(s.clock); break; }
     }
-    assert!(walking_at.is_some() && cowards.is_some());
+    assert!(walking_at.is_some() && cowards.is_some() && gone_at.is_some());
     assert!(s.vancleef.duels[&id].alone);
     assert!(s.vancleef.observers.is_empty());
+    assert_eq!(s.vancleef.duels[&id].leave, Leave::Gone);
     assert_eq!(s.duel_gap(id), GAP * 0.5, "alone, his gaps halve");
 }
 
@@ -538,7 +545,7 @@ fn the_actual_secret_handoff_has_one_unbowed_who_kneels_roars_and_waits_before_h
         let id = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "dm_vancleef").unwrap().0;
         s.engage(id, Foe::Hero(hero));
         s.clean_duels();
-        assert_eq!(s.vancleef.duels[&id].watchers.len(), 2);
+        assert_eq!(s.vancleef.duels[&id].watchers.len(), RING_GUARDS);
         for (w, _) in &s.vancleef.duels[&id].watchers {
             assert!(s.mobs[w].pack.is_none() && s.mobs[w].summoned_by.is_none());
             let d = &s.content.mobs[s.mobs[w].def];
@@ -622,6 +629,9 @@ struct Duelled {
     invitations_waited: u32,
     health_left: u32,
     alone_at: Option<f32>,
+    /// Shoves back in from the guards' line, and how far from the ring's middle the hero ever stood.
+    shoves: u32,
+    farthest: f32,
 }
 
 /// A warrior with the starting sword and their own health, reading only what the client shows:
@@ -717,6 +727,12 @@ fn duel_by_tells(key: &str, seed: u64, provoke: bool) -> Duelled {
                     let glow = (s.clock - glow_seen).abs() < 0.01;
                     threat = Some((s.clock + windup, s.clock + reaction, glow));
                 }
+                Event::Hop { player, dir, speed, .. } if player == hero => {
+                    // The hop is flown by the hero's own client: they land where it carries them.
+                    out.shoves += 1;
+                    let (p, yards) = (s.players[&hero].pos, speed * moves::airtime(SHOVE_LIFT));
+                    s.move_player(hero, [p[0] + dir.cos() * yards, p[1] + dir.sin() * yards, p[2]], dir, Moving::default());
+                }
                 Event::Swing { attacker, victim: Some(v), damage, .. } if attacker == id && v == hero && damage > 0 => {
                     out.hits_taken += 1;
                     out.damage_taken += damage;
@@ -725,6 +741,7 @@ fn duel_by_tells(key: &str, seed: u64, provoke: bool) -> Duelled {
             }
         }
         if out.alone_at.is_none() && s.vancleef.duels.get(&id).is_some_and(|d| d.alone) { out.alone_at = Some(s.clock - start); }
+        if let Some(c) = s.vancleef.duels.get(&id).map(|d| d.ring) { out.farthest = out.farthest.max(dist2d(s.players[&hero].pos, c)); }
     }
     out.secs = s.clock - start;
     out.health_left = s.players[&hero].health;
@@ -741,6 +758,8 @@ fn a_lone_sword_hero_playing_by_the_tells_clears_both_forms() {
             assert!(out.health_left > 0);
             assert!(out.breaks >= 1, "{key}: the posture break is earned: {out:?}");
             if key == "dm_vancleef" && provoke { assert!(out.ripostes >= 1); }
+            // The ring never gets in a hero's way: they stood no farther out than its line.
+            if key == "dm_vancleef" { assert!(out.farthest <= RING_RADIUS, "{out:?}"); }
         }
     }
 }
@@ -881,4 +900,333 @@ fn out_of_his_fight_the_ships_side_is_an_ordinary_fall() {
     run(&mut s, 0.2);
     s.move_player(hero, [2.0, 9.0, 0.0], std::f32::consts::PI, Moving::default());
     assert_eq!(s.players[&hero].pos, [2.0, 9.0, 0.0]);
+}
+
+// --- the Blackguards' ring ------------------------------------------------------------------------
+
+/// Where a hero stands in the ring: `d` yd from its middle, at `angle`.
+fn ring_at(s: &Survival, id: Id, angle: f32, d: f32) -> Vec3 {
+    let c = s.vancleef.duels[&id].ring;
+    [c[0] + angle.cos() * d, c[1] + angle.sin() * d, c[2]]
+}
+
+fn put(s: &mut Survival, hero: Id, at: Vec3) {
+    s.move_player(hero, at, std::f32::consts::PI, Moving::default());
+}
+
+/// A fight with the ring up and every hero held inside it (standing at its middle).
+fn ringed(heroes: usize) -> (Survival, Vec<Id>, Id) {
+    let (mut s, band, id) = fight("dm_vancleef", heroes);
+    for h in &band {
+        let c = s.vancleef.duels[&id].ring;
+        put(&mut s, *h, c);
+    }
+    run(&mut s, 0.1);
+    assert!(s.ring_up(id), "the ring stands once the fight has begun");
+    for h in &band { assert!(s.vancleef.duels[&id].held.contains(h)); }
+    (s, band, id)
+}
+
+fn hops(ev: &[Event], hero: Id) -> Vec<(f32, f32)> {
+    ev.iter().filter_map(|e| match e { Event::Hop { player, dir, speed, .. } if *player == hero => Some((*dir, *speed)), _ => None }).collect()
+}
+
+fn guard_heads_shaken(ev: &[Event], s: &Survival, id: Id) -> usize {
+    let guards: Vec<Id> = s.vancleef.duels[&id].watchers.iter().map(|(w, _)| *w).collect();
+    ev.iter().filter(|e| matches!(e, Event::Emote { id: w, emote: EMOTE_NO } if guards.contains(w))).count()
+}
+
+#[test]
+fn eight_guards_stand_in_a_ring_round_the_fight_facing_in_and_the_deck_is_closed() {
+    let (s, _, id) = ringed(1);
+    let duel = &s.vancleef.duels[&id];
+    assert_eq!(duel.watchers.len(), RING_GUARDS);
+    let mut spots = Vec::new();
+    for (w, _) in &duel.watchers {
+        let m = &s.mobs[w];
+        assert!((dist2d(m.pos, duel.ring) - RING_RADIUS).abs() < 0.05, "on the ring: {:?}", m.pos);
+        assert!(angle_between(m.facing, facing(m.pos, duel.ring)) < 1.0, "facing in");
+        spots.push(m.pos);
+    }
+    // 6.9 yd between neighbors, and none stands within 3.5 yd of his lit spot.
+    let spot = s.duel_spot(id);
+    for (i, a) in spots.iter().enumerate() {
+        assert!(dist2d(*a, spot) > 3.5, "no guard on his spot: {a:?}");
+        let b = spots[(i + 1) % spots.len()];
+        assert!((dist2d(*a, b) - 6.9).abs() < 0.2, "{a:?} {b:?}");
+    }
+    assert!(dist2d(spot, duel.ring) < RING_RADIUS - RING_ROOM - 2.0, "his spot has room behind it: {}", dist2d(spot, duel.ring));
+}
+
+#[test]
+fn a_hero_nearing_the_line_sees_a_guard_turn_and_shake_his_head_before_any_shove() {
+    let (mut s, band, id) = ringed(1);
+    let hero = band[0];
+    let at = ring_at(&s, id, 0.3, RING_RADIUS - 1.6);
+    put(&mut s, hero, at);
+    s.events.clear();
+    let ev = run(&mut s, 0.1);
+    assert!(guard_heads_shaken(&ev, &s, id) >= 1, "a guard shakes his head");
+    assert!(hops(&ev, hero).is_empty(), "no shove yet");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })));
+    // And not again at once (a hero walking the line is not nagged every step).
+    let again = run(&mut s, 0.5);
+    assert_eq!(guard_heads_shaken(&again, &s, id), 0);
+}
+
+#[test]
+fn a_hero_who_backs_into_the_line_is_shoved_back_in_with_no_damage_and_no_stagger() {
+    let (mut s, band, id) = ringed(1);
+    let hero = band[0];
+    let health = s.players[&hero].health;
+    let at = ring_at(&s, id, 0.3, RING_RADIUS - 0.5);
+    put(&mut s, hero, at);
+    s.events.clear();
+    let ev = run(&mut s, 0.1);
+    let hop = hops(&ev, hero);
+    assert_eq!(hop.len(), 1, "one shove: {hop:?}");
+    // Inward, and ending inside the line.
+    let c = s.vancleef.duels[&id].ring;
+    assert!(angle_between(hop[0].0, facing(at, c)) < 45.0, "toward the middle");
+    let yards = hop[0].1 * moves::airtime(SHOVE_LIFT);
+    let end = [at[0] + hop[0].0.cos() * yards, at[1] + hop[0].0.sin() * yards, 0.0];
+    assert!(dist2d(end, c) <= RING_RADIUS - RING_EDGE, "ends inside the line");
+    assert!(yards >= 2.0 && yards <= SHOVE_MAX, "{yards}");
+    // Its tells: the guard's strike, dust and a knock on the hero, and the words.
+    assert!(ev.iter().any(|e| matches!(e, Event::Clip { clip: SHOVE_ANIM, .. })));
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id: v, kit: combat::KIT_BASH, .. } if *v == hero)));
+    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == hero && text == "A guard shoved you back.")));
+    let guards: Vec<Id> = s.vancleef.duels[&id].watchers.iter().map(|(w, _)| *w).collect();
+    assert!(ev.iter().any(|e| matches!(e, Event::Yell { id: w, text } if guards.contains(w) && text == "Nobody leaves.")));
+    // No damage, no stagger, no control lost.
+    assert_eq!(s.players[&hero].health, health);
+    assert!(!matches!(s.players[&hero].action, Action::Stagger { .. }));
+    // Pressed against the line again at once: not shoved twice inside the gap, and the cry is once.
+    s.events.clear();
+    put(&mut s, hero, at);
+    let ev = run(&mut s, 0.3);
+    assert!(hops(&ev, hero).is_empty(), "a hero is moved, not juggled");
+    put(&mut s, hero, at);
+    let ev = run(&mut s, SHOVE_GAP);
+    assert_eq!(hops(&ev, hero).len(), 1, "then again");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "Nobody leaves.")), "the cry comes once a fight");
+}
+
+#[test]
+fn a_dodge_over_the_line_is_never_cut_short_and_its_landing_is_shoved_in_after() {
+    let (mut s, band, id) = ringed(1);
+    let hero = band[0];
+    let out = ring_at(&s, id, 2.0, RING_RADIUS + 1.5);
+    put(&mut s, hero, out);
+    s.players.get_mut(&hero).unwrap().action = Action::Dodge { t: 0.1, dir: 0.0, dash: true };
+    s.events.clear();
+    let ev = run(&mut s, 0.1);
+    assert!(hops(&ev, hero).is_empty(), "no shove in a dodge");
+    s.players.get_mut(&hero).unwrap().action = Action::Ready;
+    let ev = run(&mut s, 0.1);
+    assert_eq!(hops(&ev, hero).len(), 1, "set back in once it ends");
+}
+
+#[test]
+fn a_hero_outside_walks_in_unhindered_and_only_those_inside_are_held() {
+    let (mut s, band, id) = ringed(2);
+    let (inside, outside) = (band[0], band[1]);
+    // The second hero was outside: they walk the line and in; nothing touches them until they stand deep in.
+    let out = ring_at(&s, id, 1.0, RING_RADIUS + RING_REACH + 1.0);
+    put(&mut s, outside, out);
+    run(&mut s, 0.1);
+    assert!(!s.vancleef.duels[&id].held.contains(&outside));
+    let mut shoves = 0;
+    for d in [RING_RADIUS + 1.0, RING_RADIUS - 0.5, RING_RADIUS - 1.5, RING_RADIUS - 2.4] {
+        let at = ring_at(&s, id, 1.0, d);
+        put(&mut s, outside, at);
+        shoves += hops(&run(&mut s, 0.1), outside).len();
+    }
+    assert_eq!(shoves, 0, "let through the line");
+    let deep = ring_at(&s, id, 1.0, RING_RADIUS - RING_DEEP - 0.5);
+    put(&mut s, outside, deep);
+    run(&mut s, 0.1);
+    assert!(s.vancleef.duels[&id].held.contains(&outside), "now held");
+    // The hero who stood in all along is shoved at the line; the one deep inside is not.
+    let at = ring_at(&s, id, 4.0, RING_RADIUS - 0.5);
+    put(&mut s, inside, at);
+    s.events.clear();
+    let ev = run(&mut s, 0.1);
+    assert_eq!(hops(&ev, inside).len(), 1);
+    assert!(hops(&ev, outside).is_empty());
+}
+
+#[test]
+fn a_hero_a_guard_cannot_reach_walks_out_through_the_gap_and_a_dead_hero_is_never_shoved() {
+    let (mut s, band, id) = ringed(2);
+    let (hero, dead) = (band[0], band[1]);
+    // The guards near the hero's angle are not there: a gap.
+    let at = ring_at(&s, id, 0.3, RING_RADIUS - 0.5);
+    let near: Vec<Id> = s.vancleef.duels[&id].watchers.iter().map(|(w, _)| *w)
+        .filter(|w| dist2d(s.mobs[w].pos, at) < RING_REACH + 4.0).collect();
+    for w in near {
+        s.remove_watcher(w);
+        s.vancleef.duels.get_mut(&id).unwrap().watchers.retain(|(g, _)| *g != w);
+    }
+    put(&mut s, hero, at);
+    s.events.clear();
+    let ev = run(&mut s, 0.1);
+    assert!(hops(&ev, hero).is_empty(), "nobody there to shove them");
+    // The dead are not held.
+    let at = ring_at(&s, id, 3.5, RING_RADIUS - 0.5);
+    s.players.get_mut(&dead).unwrap().health = 0;
+    put(&mut s, dead, at);
+    let ev = run(&mut s, 0.1);
+    assert!(hops(&ev, dead).is_empty());
+}
+
+#[test]
+fn a_shove_never_sets_a_hero_down_on_him_or_outside_the_line_and_a_hero_is_never_pinned() {
+    let (mut s, _, id) = ringed(1);
+    let c = s.vancleef.duels[&id].ring;
+    for step in 0..36 {
+        let angle = step as f32 * std::f32::consts::TAU / 36.0;
+        let at = ring_at(&s, id, angle, RING_RADIUS - 0.4);
+        // Him, as close to the hero as he fights: 2.5 yd in from them, straight in, or to either side.
+        for aside in [0.0f32, 0.9, -0.9] {
+            let a = angle + std::f32::consts::PI + aside;
+            let boss = [at[0] + a.cos() * 2.5, at[1] + a.sin() * 2.5, 0.0];
+            s.mobs.get_mut(&id).unwrap().pos = boss;
+            let to = s.shove_to(id, at).unwrap_or_else(|| panic!("a shove is always possible: angle {angle} aside {aside}"));
+            assert!(dist2d(to, boss) >= SHOVE_CLEAR, "not on top of him: {to:?} vs {boss:?}");
+            assert!(dist2d(to, c) <= RING_RADIUS - RING_EDGE, "inside the line");
+            assert!(dist2d(at, to) <= SHOVE_MAX + 0.01);
+        }
+    }
+}
+
+#[test]
+fn his_own_lunge_ends_inside_the_ring_and_never_carries_the_fight_through_the_guards() {
+    let (mut s, band, id) = ringed(1);
+    let hero = band[0];
+    let c = s.vancleef.duels[&id].ring;
+    // Him 6 yd out on the east, the hero 1.8 yd further: the riposte would carry 1.5 yd past them.
+    let (boss, stood) = ([c[0] + 6.0, c[1], 0.0], [c[0] + RING_RADIUS - 1.2, c[1], 0.0]);
+    s.mobs.get_mut(&id).unwrap().pos = boss;
+    put(&mut s, hero, stood);
+    invitation(&mut s, id, hero);
+    shot(&mut s, id, hero, 1.0, HitKind::Projectile);
+    run(&mut s, 1.2);
+    let m = &s.mobs[&id];
+    assert!(dist2d(m.pos, c) <= RING_RADIUS - RING_ROOM + 0.05, "stopped inside the line: {}", dist2d(m.pos, c));
+    // Once the ring is down, the whole deck is his again.
+    s.vancleef.duels.get_mut(&id).unwrap().leave = Leave::Gone;
+    assert!(s.ring_room(id, [c[0] + RING_RADIUS + 3.0, c[1], 0.0]));
+}
+
+#[test]
+fn the_ring_opens_at_the_turn_and_a_hero_at_the_line_is_free() {
+    let (mut s, band, id) = ringed(1);
+    let hero = band[0];
+    let at = ring_at(&s, id, 0.3, RING_RADIUS - 0.5);
+    s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health * 3 / 10;
+    s.mobs.get_mut(&id).unwrap().pattern = None;
+    s.mobs.get_mut(&id).unwrap().state = MobState::Recover { foe: Foe::Hero(hero), until: s.clock + 1.0 };
+    let mut turned = false;
+    for _ in 0..200 {
+        let inside = ring_at(&s, id, 0.3, RING_RADIUS - 3.0);
+        put(&mut s, hero, inside);
+        s.step(DT);
+        if matches!(s.vancleef.duels[&id].leave, Leave::Turning { .. }) { turned = true; break; }
+    }
+    assert!(turned, "at the next quiet moment they turn");
+    assert!(!s.ring_up(id));
+    put(&mut s, hero, at);
+    s.events.clear();
+    let ev = run(&mut s, 1.0);
+    assert!(hops(&ev, hero).is_empty(), "the whole deck is open");
+    assert!(s.vancleef.duels[&id].held.is_empty());
+    assert_eq!(s.duel_gap(id), GAP * 0.5);
+}
+
+#[test]
+fn a_lost_fight_puts_the_ring_back_whole() {
+    let (mut s, band, id) = ringed(2);
+    // Shoved once: the cry is spent, the hero held.
+    let at = ring_at(&s, id, 0.3, RING_RADIUS - 0.5);
+    put(&mut s, band[0], at);
+    run(&mut s, 0.1);
+    assert!(s.vancleef.duels[&id].cried);
+    // Everyone falls: he returns, the duel and its guards are gone.
+    for h in &band { s.players.get_mut(h).unwrap().health = 0; }
+    run(&mut s, 0.2);
+    s.reset_duels();
+    s.remove_duel(id);
+    assert!(s.vancleef.observers.is_empty());
+    // The heroes are back and he is pulled again: eight guards, nobody held, nothing spent.
+    for h in &band {
+        let p = s.players.get_mut(h).unwrap();
+        p.health = p.max_health;
+    }
+    s.mobs.get_mut(&id).unwrap().state = MobState::Idle { wander_at: s.clock + 3.0 };
+    s.clean_duels();
+    let duel = &s.vancleef.duels[&id];
+    assert_eq!(duel.watchers.len(), RING_GUARDS);
+    assert!(duel.held.is_empty() && !duel.cried && !duel.alone && duel.leave == Leave::Watching);
+}
+
+#[test]
+fn with_no_guards_placed_there_is_no_ring() {
+    let (mut s, band, id) = fight("dm_vancleef", 1);
+    s.remove_duel(id);
+    s.land = Box::new(NoPath);
+    s.clean_duels();
+    s.vancleef.duels.get_mut(&id).unwrap().entered = true;
+    let c = s.vancleef.duels[&id].ring;
+    put(&mut s, band[0], c);
+    run(&mut s, 0.1);
+    let at = ring_at(&s, id, 0.3, RING_RADIUS - 0.5);
+    put(&mut s, band[0], at);
+    s.events.clear();
+    let ev = run(&mut s, 0.2);
+    assert!(!s.ring_up(id) && hops(&ev, band[0]).is_empty());
+}
+
+#[test]
+fn the_ring_leaves_room_for_his_longest_lunge_and_every_dodge_the_fight_asks_for() {
+    let (s, _, id) = ringed(1);
+    let content = &s.content;
+    let def = &content.mobs[s.mobs[&id].def];
+    // His longest lunge, over every pattern he has; the riposte's is clamped to 7 yd in `vancleef_hit`.
+    let longest = def.patterns.iter().flat_map(|p| p.steps.iter().map(|st| st.lunge)).fold(0.0f32, f32::max);
+    let (line, spot) = (RING_RADIUS - RING_EDGE, dist2d(s.duel_spot(id), s.vancleef.duels[&id].ring));
+    // Between his spot and the line behind it, and across the ring from it, there is room to stand
+    // and to be lunged at: the lunge, a hero's reach (2.9 yd) and a step.
+    let behind = line - spot;
+    let across = line + spot;
+    assert!(across >= longest + def.attack.range + 3.0, "room across the ring: {across} for a lunge of {longest}");
+    assert!(behind >= 2.0, "a step of room behind his spot: {behind}");
+    // The dodges: the sidestep dash along the line, and the step back with nothing held.
+    let dash = content.dodge.speed * content.dodge.dash_secs;
+    let along_line = (line * line + dash * dash).sqrt();
+    assert!(along_line < RING_RADIUS, "a sidestep dash along the line stays inside the guards: {along_line} of {RING_RADIUS}");
+    let back = content.dodge.back_step[0] * moves::airtime(content.dodge.back_step[1]);
+    assert!(line + back < RING_RADIUS + RING_REACH, "a step back from the line ends where a guard can still set them in: {}", line + back);
+    // The riposte's strip (1 yd either side) is cleared by a dash of 4 yd with room to spare.
+    assert!(dash >= RIPOSTE_HALF_WIDTH * 2.0);
+    eprintln!("ring {RING_RADIUS} yd, line {line}, his spot {spot:.1} from the middle ({behind:.1} behind, {across:.1} across); longest lunge {longest}, riposte up to 7; dash {dash}, step back {back:.1}");
+}
+
+#[test]
+fn with_nobody_on_the_deck_there_is_no_turn_and_no_cry_at_30_percent() {
+    // Unbowed's empty deck, and a first form whose guards found no place.
+    let (mut s, _, id) = fight("dm_vancleef", 1);
+    s.remove_duel(id);
+    s.land = Box::new(NoPath);
+    s.clean_duels();
+    s.vancleef.duels.get_mut(&id).unwrap().entered = true;
+    let (mut s2, _, unbowed) = fight("dm_vancleef_unbowed", 1);
+    for (s, id) in [(&mut s, id), (&mut s2, unbowed)] {
+        assert!(s.vancleef.duels[&id].watchers.is_empty());
+        s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health * 3 / 10;
+        let ev = run(s, 4.0);
+        assert!(!yells(&ev, id).iter().any(|t| t == "Cowards! All of you!"), "nobody left to call after");
+        assert_eq!(s.vancleef.duels[&id].leave, Leave::Gone);
+        assert!(!s.vancleef.duels[&id].alone || !s.first_form(id));
+    }
 }

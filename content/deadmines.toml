@@ -202,7 +202,7 @@ radius = 0.0
 count = 1
 
 # He waits in his cabin's doorway and, pulled, steps out onto the lit main deck to duel
-# (docs/vancleef-encounter.md); his Blackguards watch from the west rail.
+# (docs/vancleef-encounter.md); eight of his Blackguards ring the deck fight until 30%.
 [[dungeon.pack]]
 key = "vancleef"
 mob = "dm_vancleef"

@@ -47,12 +47,12 @@ fn covered(s: &Survival, at: [f32; 3]) -> bool {
 
 #[test]
 #[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
-fn he_steps_out_onto_the_open_deck_and_his_blackguards_watch_from_the_rail() {
+fn he_steps_out_onto_the_open_deck_and_his_blackguards_ring_it() {
     let (mut s, hero, boss) = fight();
     let home = s.mobs[&boss].home;
     assert!(covered(&s, home), "he waits under his cabin's roof");
     let watchers = observers(&s);
-    assert_eq!(watchers.len(), 2, "both Blackguards at their posts");
+    assert_eq!(watchers.len(), 8, "all eight Blackguards on the ring");
     let mut first_blow = None;
     let mut previous = s.mobs[&boss].pos;
     for _ in 0..160 {
@@ -73,7 +73,7 @@ fn he_steps_out_onto_the_open_deck_and_his_blackguards_watch_from_the_rail() {
         let m = &s.mobs[w];
         assert!(!covered(&s, m.pos) && m.path.is_empty() && m.state.foe().is_none());
         assert!(m.pack.is_none() && m.summoned_by.is_none());
-        println!("Blackguard {w} watches from {:?}", m.pos);
+        println!("Blackguard {w} stands at {:?}", m.pos);
     }
     println!("first blow from {at:?}, {:.1} yd out of the doorway", dist2d(at, home));
 }
@@ -83,13 +83,13 @@ fn he_steps_out_onto_the_open_deck_and_his_blackguards_watch_from_the_rail() {
 fn the_blackguards_walk_off_the_ship_on_native_floors_and_leave_once() {
     let (mut s, hero, boss) = fight();
     let watchers = observers(&s);
-    assert_eq!(watchers.len(), 2);
+    assert_eq!(watchers.len(), 8);
     for _ in 0..120 { step(&mut s, hero); }
     // Set only the health gate so departure cannot be confused with a posture break.
     s.mobs.get_mut(&boss).unwrap().health = s.mobs[&boss].max_health * 3 / 10;
     let mut walked_at = None;
     let mut previous: Vec<_> = watchers.iter().map(|w| s.mobs[w].pos).collect();
-    let mut gone_at = [None, None];
+    let mut gone_at = [None; 8];
     let mut cowards = None;
     for _ in 0..800 {
         let events = step(&mut s, hero);
@@ -107,13 +107,13 @@ fn the_blackguards_walk_off_the_ship_on_native_floors_and_leave_once() {
                 assert!(dist2d(previous[i], s.mobs[&boss].pos) > 18.0, "out of the duel, off the ship");
             }
         }
-        if events.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == "Cowards! All of you!")) {
+        if cowards.is_none() && events.iter().any(|e| matches!(e, Event::Yell { id, text } if *id == boss && text == "Cowards! All of you!")) {
             cowards = Some(s.clock);
-            break;
         }
+        if gone_at.iter().all(Option::is_some) { break; }
     }
-    assert!(gone_at.iter().all(Option::is_some), "both walked off: {gone_at:?}");
-    assert!(cowards.is_some(), "then he says so");
+    assert!(gone_at.iter().all(Option::is_some), "all walked off: {gone_at:?}");
+    assert!(cowards.is_some_and(|c| walked_at.is_some_and(|w| c <= w + 0.1)), "he calls after them as they set off");
     assert!(observers(&s).is_empty());
     println!("walked at {walked_at:?}, gone {gone_at:?}, line at {cowards:?}");
 }
@@ -197,4 +197,71 @@ fn a_hero_carried_over_either_rail_mid_duel_is_set_back_on_the_deck() {
         }
         assert!(s.mobs[&boss].state.foe().is_some(), "side {side}: the duel goes on");
     }
+}
+
+fn dry_open_deck(s: &Survival, at: [f32; 3], deck: f32) -> bool {
+    s.land().footing(at).is_some() && !s.land().water_near(at[0], at[1], at[2]) && !covered(s, at) && (at[2] - deck).abs() < 1.5
+}
+
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn the_ring_sits_on_the_open_deck_and_every_shove_on_it_lands_on_dry_boards_inside_the_line() {
+    let (mut s, _hero, boss) = fight();
+    let (c, r) = s.test_ring(boss).expect("his duel is set up");
+    // His lit spot's height: the deck is cambered, 40.3 at his door to 41.9 at the east rail.
+    let deck = 40.62;
+    let spot = [-70.0, -819.5, deck];
+    println!("ring: middle {c:?}, radius {r}, his spot {:.1} yd from the middle", dist2d(spot, c));
+    // The guards stand on it, dry, open to the sky, on the deck's own level.
+    let guards = observers(&s);
+    assert_eq!(guards.len(), 8, "all eight placed");
+    for g in &guards {
+        let at = s.mobs[g].pos;
+        assert!(dry_open_deck(&s, at, deck), "a guard on the deck: {at:?}");
+        assert!((dist2d(at, c) - r).abs() < 0.6, "on the ring: {at:?}");
+    }
+    // The whole line, and the boards inside it up to the line (a step of half a yard): dry, open,
+    // level. Anything that is not is counted, so a mast or a crate in the ring shows up here.
+    let (mut bad_line, mut bad_inside, mut inside) = (0, 0, 0);
+    for k in 0..144 {
+        let a = k as f32 * std::f32::consts::TAU / 144.0;
+        let at = floor(&s, c[0] + a.cos() * r, c[1] + a.sin() * r, deck);
+        if !dry_open_deck(&s, at, deck) { bad_line += 1; println!("line not deck at {at:?}"); }
+    }
+    let mut y = -r;
+    while y <= r {
+        let mut x = -r;
+        while x <= r {
+            if (x * x + y * y).sqrt() <= r - 1.0 {
+                inside += 1;
+                let at = floor(&s, c[0] + x, c[1] + y, deck);
+                if !dry_open_deck(&s, at, deck) { bad_inside += 1; }
+            }
+            x += 0.5;
+        }
+        y += 0.5;
+    }
+    println!("line not deck: {bad_line} of 144; inside not deck: {bad_inside} of {inside}");
+    assert_eq!(bad_line, 0, "the guards' line is open deck all round");
+    assert!(bad_inside * 100 <= inside, "the ring holds open boards: {bad_inside} of {inside}");
+    // Every shove from the line, with him close beside them, lands on dry open boards inside it.
+    let mut worst = 0.0f32;
+    for k in 0..72 {
+        let a = k as f32 * std::f32::consts::TAU / 72.0;
+        let at = floor(&s, c[0] + a.cos() * (r - 0.4), c[1] + a.sin() * (r - 0.4), deck);
+        for aside in [0.0f32, 0.9, -0.9] {
+            let b = a + std::f32::consts::PI + aside;
+            let near = floor(&s, at[0] + b.cos() * 2.5, at[1] + b.sin() * 2.5, deck);
+            s.mobs.get_mut(&boss).unwrap().pos = near;
+            let to = s.test_shove_to(boss, at).unwrap_or_else(|| panic!("no shove from {at:?} with him at {near:?}"));
+            assert!(dry_open_deck(&s, to, deck), "landing on dry open boards: {to:?}");
+            assert!(dist2d(to, c) <= r - 1.0 && dist2d(to, near) >= 1.8);
+            worst = worst.max(dist2d(at, to));
+        }
+    }
+    println!("longest shove {worst:.1} yd");
+}
+
+fn floor(s: &Survival, x: f32, y: f32, deck: f32) -> [f32; 3] {
+    [x, y, s.land().height_near(x, y, deck + 1.0)]
 }

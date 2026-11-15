@@ -5,7 +5,8 @@
 //!
 //! What the shared fixes (Corey's Nov 8 table) do engine-wide is done here for VanCleef and
 //! Unbowed alone: the hunch's "open" look, debug damage never counting toward his posture, lines
-//! at least 2 sec apart, the Blackguards leaving, Unbowed's rise before his first attack, and
+//! at least 2 sec apart, the Blackguards' ring (held until they leave at 30%, which opens the deck
+//! and halves his gaps at once), Unbowed's rise before his first attack, and
 //! his death stopping his animation.
 
 use std::collections::VecDeque;
@@ -40,17 +41,49 @@ const RIPOSTE_HALF_WIDTH: f32 = 1.0;
 const SPOT: [f32; 2] = [7.0, 0.5];
 const ENTRANCE_SPEED: f32 = 2.6;
 const ENTRANCE_LIMIT: f32 = 5.0;
-/// The two Blackguards' posts on the main deck's west rail, and the way off the ship at its
-/// bow, down onto the scaffold: (-64, -808), (-68, -807.5) and (-54, -793) on the native deck.
-const POSTS: [[f32; 2]; 2] = [[13.0, 12.0], [9.0, 12.5]];
+/// The way off the ship at its bow, down onto the scaffold, from his home: (-54, -793) on the
+/// native deck.
 const EXIT: [f32; 2] = [23.0, 27.0];
+/// The Blackguards' ring round the deck fight. Its middle, from his home: (-65, -819) on the native
+/// deck, whose open boards run about x -73 to -54 and y -830 to -807, so a ring of 9 yd fits
+/// inside the rails with his lit spot 5 yd from its middle. 8 guards stand on it, 45 degrees
+/// apart (turned 22.5 so none stands in front of his door), 6.9 yd between neighbors.
+const RING_CENTER: [f32; 2] = [12.0, 1.0];
+const RING_RADIUS: f32 = 9.0;
+const RING_GUARDS: usize = 8;
+/// A hero this far in from the guards' line is at it: one more step is the line.
+const RING_EDGE: f32 = 1.0;
+/// A hero is held in the ring once they have stood this far inside it. Anyone outside, walking
+/// in, is let through, and one who is thrown further out than a guard can reach is free.
+const RING_DEEP: f32 = 2.5;
+/// A guard's arm: he shoves a hero at the line only if he stands this near them. A guard that
+/// never got placed leaves a gap, and a hero can walk out through it.
+const RING_REACH: f32 = 4.2;
+/// Nearer than this to the line the nearest guard turns and shakes his head, before the shove.
+const RING_WARN: f32 = 2.2;
+const WARN_GAP: f32 = 2.5;
+/// The shove sets a hero down this far inside the line, never more than `SHOVE_MAX` yd on, and
+/// never again within `SHOVE_GAP` sec (a hero held against the line is moved, not juggled).
+const SHOVE_IN: f32 = 3.0;
+const SHOVE_MAX: f32 = 5.0;
+const SHOVE_GAP: f32 = 1.2;
+/// The hop's height (its flight lasts about 0.26 sec).
+const SHOVE_LIFT: f32 = 2.5;
+/// A shove never sets a hero down within this of him.
+const SHOVE_CLEAR: f32 = 1.8;
+/// While the ring stands his own steps (the riposte's lunge, the walk out of the smoke) end this
+/// far inside the line, so he never carries a fight through the guards.
+const RING_ROOM: f32 = 1.5;
+/// The shove's tell and cry.
+const SHOVE_ANIM: u16 = 16;
+const SHOVE_SOUND: u32 = 1329;
 /// Their longest acceptable way off, walked at their pace.
-const EXIT_LIMIT: f32 = 45.0;
+const EXIT_LIMIT: f32 = 60.0;
 const LEAVE_SPEED: f32 = 3.0;
 /// Turned to go and one shaking his head, this long before they walk.
 const LEAVE_TURN: f32 = 1.5;
 /// Whatever stops them, they're gone this long after they set off.
-const LEAVE_LIMIT: f32 = 20.0;
+const LEAVE_LIMIT: f32 = 24.0;
 /// Unbowed kneels this long, roars, then waits this long before his first attack.
 const RISE_KNEEL: f32 = 1.0;
 const RISE_WAIT: f32 = 2.5;
@@ -100,6 +133,14 @@ struct Duel {
     /// The Blackguards are gone and he's said so: his gaps between combinations halve.
     alone: bool,
     watchers: Vec<(Id, Vec3)>,
+    /// The middle of the guards' ring.
+    ring: Vec3,
+    /// The heroes standing inside the ring, which holds them until the guards leave.
+    held: BTreeSet<Id>,
+    shoved: BTreeMap<Id, f32>,
+    warned: BTreeMap<Id, f32>,
+    /// A guard has said why: once a fight.
+    cried: bool,
     /// Until when his hunch (or kneel) is open: hits count extra toward his posture.
     open_until: f32,
     /// The riposte's start and the length of its lunge, fixed at contact.
@@ -196,6 +237,18 @@ impl Survival {
     /// Whether VanCleef is hunched (or kneeling) open now.
     pub(crate) fn vancleef_open(&self, id: Id) -> bool {
         self.vancleef.duels.get(&id).is_some_and(|d| d.open_until > self.clock)
+    }
+
+    /// (Tests) The ring's middle and radius, once his duel is set up.
+    #[doc(hidden)]
+    pub fn test_ring(&self, id: Id) -> Option<(Vec3, f32)> {
+        self.vancleef.duels.get(&id).map(|d| (d.ring, RING_RADIUS))
+    }
+
+    /// (Tests) Where a shove would set a hero standing at `at` down.
+    #[doc(hidden)]
+    pub fn test_shove_to(&self, id: Id, at: Vec3) -> Option<Vec3> {
+        self.shove_to(id, at)
     }
 
     /// (Tests) A whole posture's worth from `by` at once, as enough parries and hunch hits do.
@@ -323,7 +376,7 @@ impl Survival {
         let mut reach = left.max(0.0);
         while reach > 0.5 {
             let to = self.ground_near(m.pos[0] + f.cos() * reach, m.pos[1] + f.sin() * reach, m.pos[2]);
-            if self.land.walk_clear(m.pos, to) { return Some(reach); }
+            if self.land.walk_clear(m.pos, to) && self.ring_room(id, to) { return Some(reach); }
             reach -= 0.5;
         }
         Some(0.0)
@@ -375,7 +428,9 @@ impl Survival {
     /// A short same-floor path only. Reject water, gaps and long detours: failure means
     /// he stays put and gives the same arrival cue, never a teleport or hidden attack.
     fn duel_floor(&self, from: Vec3, to: Vec3) -> Option<Vec3> {
-        let to = self.ground_near(to[0], to[1], from[2]);
+        // (The floor nearest the height asked for: the deck is cambered, 1.6 yd higher at its east
+        // rail than at his door, and a floor is only found within a step of the height given.)
+        let to = self.ground_near(to[0], to[1], to[2]);
         if (to[2] - from[2]).abs() > 1.5 || self.land.blocked_near(to[0], to[1], to[2]) || self.land.water_near(to[0], to[1], to[2]) { return None; }
         let path = if self.land.walk_clear(from, to) { vec![to] } else { self.land.path(from, to)? };
         if path.is_empty() || dist2d(*path.last()?, to) > 0.5 { return None; }
@@ -392,7 +447,9 @@ impl Survival {
     /// A Blackguard's way off the ship: a searched walk, each stride a walker's, no longer than
     /// `EXIT_LIMIT`. None leaves that Blackguard out.
     fn duel_exit(&self, from: Vec3, to: Vec3) -> Option<Vec3> {
-        let to = self.land.footing(self.ground_near(to[0], to[1], from[2])).unwrap_or_else(|| self.ground_near(to[0], to[1], from[2]));
+        // (The floor `to` stands on is the one nearest its own height, the deck's, not the guard's:
+        // the deck is cambered, 1.6 yd higher at the east rail than at his door.)
+        let to = self.land.footing(self.ground_near(to[0], to[1], to[2])).unwrap_or_else(|| self.ground_near(to[0], to[1], to[2]));
         if self.land.water_near(to[0], to[1], to[2]) || (to[2] - from[2]).abs() > 4.0 { return None; }
         let path = if self.land.walk_clear(from, to) { vec![to] } else { self.land.path(from, to)? };
         if path.is_empty() || dist2d(*path.last()?, to) > 0.5 { return None; }
@@ -449,14 +506,18 @@ impl Survival {
         // Unbowed inherits the empty deck. These are observers, never a combat wave.
         if self.first_form(id) {
             let spot = self.duel_spot(id);
+            let centre = [home[0] + RING_CENTER[0], home[1] + RING_CENTER[1], home[2]];
+            duel.ring = centre;
             if let Some(def) = self.content.mob(WATCHER) {
-                for post in POSTS {
-                    let Some(at) = self.duel_floor(spot, [home[0] + post[0], home[1] + post[1], home[2]]) else { continue };
-                    let Some(exit) = self.duel_exit(at, [home[0] + EXIT[0], home[1] + EXIT[1], home[2]]) else { continue };
+                for k in 0..RING_GUARDS {
+                    let angle = std::f32::consts::TAU * (k as f32 + 0.5) / RING_GUARDS as f32;
+                    let post = [centre[0] + angle.cos() * RING_RADIUS, centre[1] + angle.sin() * RING_RADIUS, spot[2] + 1.5];
+                    let Some(at) = self.duel_floor(spot, post).filter(|at| self.duel_open_sky(*at)) else { continue };
+                    let Some(exit) = self.duel_exit(at, [home[0] + EXIT[0], home[1] + EXIT[1], spot[2]]) else { continue };
                     let watcher = self.spawn_mob(def, at, None, false);
                     let m = self.mobs.get_mut(&watcher).unwrap();
                     m.state = MobState::Idle { wander_at: f32::MAX };
-                    m.facing = facing(at, spot);
+                    m.facing = facing(at, centre);
                     self.vancleef.observers.insert(watcher);
                     duel.watchers.push((watcher, exit));
                 }
@@ -565,8 +626,112 @@ impl Survival {
             && matches!(m.state, MobState::Recover { .. } | MobState::Chase { .. }) && m.stagger_until <= self.clock
     }
 
-    /// The Blackguards: at 30% they wait for a quiet moment, turn, one shakes his head, and both
-    /// walk off the ship. Once they're gone he says so, and he's alone.
+    /// The ring stands: his Blackguards hold it from the pull until they turn to go at 30%.
+    fn ring_up(&self, id: Id) -> bool {
+        self.first_form(id) && self.vancleef.duels.get(&id).is_some_and(|d| d.began && d.leave == Leave::Watching && !d.watchers.is_empty())
+    }
+
+    /// Whether he may end a step at `at`: far enough inside the ring, or no farther out than he
+    /// stands (always, once the ring is down), so he is never trapped against the line.
+    fn ring_room(&self, id: Id, at: Vec3) -> bool {
+        if !self.ring_up(id) { return true; }
+        let Some((d, m)) = self.vancleef.duels.get(&id).zip(self.mobs.get(&id)) else { return true };
+        let out = dist2d(at, d.ring);
+        out <= RING_RADIUS - RING_ROOM || out <= dist2d(m.pos, d.ring)
+    }
+
+    /// The ring holds whoever stands in it. A hero well inside is held; nearing the guards' line
+    /// the nearest guard first turns and shakes his head (nearer than `RING_WARN`), then, at the
+    /// line, shoves them back in. Nobody is shoved from a dodge or a stagger or into him, and
+    /// never twice in `SHOVE_GAP` sec. A hero outside walks in freely.
+    fn step_ring(&mut self, id: Id) {
+        if !self.ring_up(id) {
+            if let Some(d) = self.vancleef.duels.get_mut(&id) { d.held.clear(); }
+            return;
+        }
+        let now = self.clock;
+        let duel = &self.vancleef.duels[&id];
+        let centre = duel.ring;
+        let guards: Vec<(Id, Vec3)> = duel.watchers.iter().filter_map(|(w, _)| self.mobs.get(w).map(|m| (*w, m.pos))).collect();
+        let heroes: Vec<(Id, Vec3, bool, bool)> = self.players.iter()
+            .map(|(h, p)| (*h, p.pos, p.health > 0, !matches!(p.action, Action::Dodge { .. } | Action::Stagger { .. })))
+            .collect();
+        for (hero, at, alive, free) in heroes {
+            let d = dist2d(at, centre);
+            let duel = self.vancleef.duels.get_mut(&id).unwrap();
+            if !alive || (at[2] - centre[2]).abs() > 6.0 || d > RING_RADIUS + RING_REACH + 0.3 {
+                duel.held.remove(&hero);
+                continue;
+            }
+            if d < RING_RADIUS - RING_DEEP { duel.held.insert(hero); }
+            if !duel.held.contains(&hero) || !free || d <= RING_RADIUS - RING_WARN { continue; }
+            let Some((guard, gpos)) = guards.iter().copied()
+                .filter(|(_, g)| dist2d(*g, at) <= RING_REACH)
+                .min_by(|a, b| dist2d(a.1, at).total_cmp(&dist2d(b.1, at))) else { continue };
+            if d <= RING_RADIUS - RING_EDGE {
+                if duel.warned.get(&guard).is_none_or(|t| now - t >= WARN_GAP) {
+                    duel.warned.insert(guard, now);
+                    self.ring_turn(guard, gpos, at);
+                    self.events.push(Event::Emote { id: guard, emote: EMOTE_NO });
+                }
+            } else if duel.shoved.get(&hero).is_none_or(|t| now - t >= SHOVE_GAP) {
+                self.ring_shove(id, guard, gpos, hero);
+            }
+        }
+    }
+
+    /// A guard turns where he stands to face `to`.
+    fn ring_turn(&mut self, guard: Id, pos: Vec3, to: Vec3) {
+        let face = facing(pos, to);
+        if let Some(m) = self.mobs.get_mut(&guard) { m.facing = face; }
+        self.events.push(Event::MobStop { id: guard, pos, facing: face });
+    }
+
+    /// Where a shove sets `at` down: toward the ring's middle, bent aside if he is in the way,
+    /// stopped by any wall or rail, and always inside the line. None leaves them be.
+    pub(crate) fn shove_to(&self, id: Id, at: Vec3) -> Option<Vec3> {
+        let duel = self.vancleef.duels.get(&id)?;
+        let (centre, boss) = (duel.ring, self.mobs.get(&id)?.pos);
+        let want = (dist2d(at, centre) - (RING_RADIUS - SHOVE_IN)).clamp(1.0, SHOVE_MAX);
+        let base = facing(at, centre);
+        // (Further on, if he stands in the way: past him, never onto him.)
+        for k in [1.0, 1.5, 2.0, 0.6] {
+            for turn in [0.0f32, 0.6, -0.6, 1.2, -1.2] {
+                let to = self.slide_end(at, base + turn, (want * k).min(SHOVE_MAX));
+                if dist2d(at, to) >= 0.8 && dist2d(to, boss) >= SHOVE_CLEAR && dist2d(to, centre) <= RING_RADIUS - RING_EDGE
+                    && self.land.footing(to).is_some() {
+                    return Some(to);
+                }
+            }
+        }
+        None
+    }
+
+    /// The nearest guard shoves a hero at the line back in: his strike, dust and a knock on them,
+    /// and a hop of their own client's. No damage, no stagger.
+    fn ring_shove(&mut self, id: Id, guard: Id, gpos: Vec3, hero: Id) {
+        let at = self.players[&hero].pos;
+        let Some(to) = self.shove_to(id, at) else { return };
+        let moved = dist2d(at, to);
+        let air = moves::airtime(SHOVE_LIFT);
+        let dir = facing(at, to);
+        let now = self.clock;
+        let duel = self.vancleef.duels.get_mut(&id).unwrap();
+        duel.shoved.insert(hero, now);
+        let cry = !duel.cried;
+        duel.cried = true;
+        self.ring_turn(guard, gpos, at);
+        self.events.push(Event::Clip { id: guard, clip: SHOVE_ANIM, take: 0, from: None, secs: 0.6, at: 0.0, body: ClipBody::Full });
+        self.events.push(Event::Sound { id: guard, sound: SHOVE_SOUND });
+        self.events.push(Event::Visual { id: hero, kit: combat::KIT_DUST, by: None });
+        self.events.push(Event::Visual { id: hero, kit: combat::KIT_BASH, by: Some(guard) });
+        self.events.push(Event::Hop { player: hero, dir, speed: moved / air, lift: SHOVE_LIFT, roll: false, style: "" });
+        self.events.push(Event::Flash { player: hero, text: "A guard shoved you back.".into() });
+        if cry { self.yell(guard, "Nobody leaves."); }
+    }
+
+    /// The Blackguards: at 30% they wait for a quiet moment, turn, one shakes his head, and all
+    /// walk off the ship. As they turn, the ring opens and he calls after them: he's alone.
     fn step_departure(&mut self, id: Id) {
         let now = self.clock;
         let (health, max) = (self.mobs[&id].health, self.mobs[&id].max_health);
@@ -574,6 +739,8 @@ impl Survival {
         if !duel.departed && health as f32 <= max as f32 * 0.30 {
             let duel = self.vancleef.duels.get_mut(&id).unwrap();
             duel.departed = true;
+            // Nobody to leave (Unbowed's empty deck, or guards that never found a place): no turn,
+            // no cry, and the gaps stay as they are.
             if duel.watchers.is_empty() { duel.leave = Leave::Gone; }
         }
         let duel = &self.vancleef.duels[&id];
@@ -588,6 +755,11 @@ impl Survival {
                     if k == 0 { self.events.push(Event::Emote { id: *w, emote: EMOTE_NO }); }
                 }
                 self.vancleef.duels.get_mut(&id).unwrap().leave = Leave::Turning { walk_at: now + LEAVE_TURN };
+                // The one moment: the ring opens, he calls after them, and his gaps halve.
+                let duel = self.vancleef.duels.get_mut(&id).unwrap();
+                duel.alone = true;
+                duel.held.clear();
+                self.duel_say(id, "Cowards! All of you!");
             }
             Leave::Turning { walk_at } if now >= walk_at => {
                 for (w, exit) in duel.watchers.clone() { self.go(w, exit, LEAVE_SPEED); }
@@ -599,11 +771,7 @@ impl Survival {
                 for w in &gone { self.remove_watcher(*w); }
                 let duel = self.vancleef.duels.get_mut(&id).unwrap();
                 duel.watchers.retain(|(w, _)| !gone.contains(w));
-                if duel.watchers.is_empty() {
-                    duel.leave = Leave::Gone;
-                    duel.alone = true;
-                    self.duel_say(id, "Cowards! All of you!");
-                }
+                if duel.watchers.is_empty() { duel.leave = Leave::Gone; }
             }
             _ => {}
         }
@@ -637,6 +805,7 @@ impl Survival {
             }
         }
         self.step_departure(id);
+        self.step_ring(id);
         match self.vancleef.duels[&id].beat {
             Beat::Entrance { until } => {
                 if now >= until || self.mobs[&id].path.is_empty() {
@@ -695,7 +864,7 @@ impl Survival {
                 // Straight back, facing the hero, staying on the lit deck.
                 let to = [0.0f32, 0.6, -0.6, 1.2, -1.2].into_iter().find_map(|turn| {
                     let to = [at[0] + (away + turn).cos() * RETREAT_YARDS, at[1] + (away + turn).sin() * RETREAT_YARDS, at[2]];
-                    self.duel_floor(at, to).filter(|p| self.land.walk_clear(at, *p) && self.duel_open_sky(*p)
+                    self.duel_floor(at, to).filter(|p| self.land.walk_clear(at, *p) && self.duel_open_sky(*p) && self.ring_room(id, *p)
                         && (dist2d(*p, spot) < 9.0 || dist2d(*p, spot) <= dist2d(at, spot)))
                 });
                 // Smoke at his feet, then he walks backward out of it.
