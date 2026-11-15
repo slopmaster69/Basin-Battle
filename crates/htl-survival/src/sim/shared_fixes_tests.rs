@@ -56,6 +56,8 @@ fn a_death_stops_its_swing_and_takes_its_adds_and_throws() {
     let (mut s, h) = world();
     let def = s.content.mob("dm_smite").unwrap();
     let boss = s.spawn_mob(def, [0.0, 0.0, 0.0], None, false);
+    // Smite with the hammer already in his hands: the hold that keeps him up at the rack is over.
+    s.mobs.get_mut(&boss).unwrap().phase = 2;
     let add_def = s.content.mob("dm_deck_gunner").unwrap_or(def);
     let add = s.spawn_mob(add_def, [6.0, 0.0, 0.0], None, false);
     s.mobs.get_mut(&add).unwrap().summoned_by = Some(boss);

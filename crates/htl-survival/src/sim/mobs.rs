@@ -645,6 +645,8 @@ impl Survival {
         let damage = self.cc_on_damage(mid, damage);
         // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
         let damage = self.boss_hold(mid, by, damage);
+        // Smite can't fall at the rack before the new weapon is in his hands (`sim::arsenal`).
+        let damage = self.arsenal_hold(mid, by, damage);
         // The Shredder broken is left a breath: it runs back to its post and dies in its crash
         // there (`sim::machinery`).
         let damage = self.machinery_hold(mid, by, damage);

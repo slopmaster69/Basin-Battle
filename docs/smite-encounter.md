@@ -81,3 +81,21 @@ sheath/unsheath cues. Exact spoken playback and all animation silhouettes remain
 The controlled recording scenario demonstrates all stages separately and labels its debug
 health changes/healing. Still required: real-client appearance and audible cues, normal-health
 solo/duo dungeon clears, and a full fight with optional floor markers disabled.
+
+## The change is a show (Nov 15)
+
+- **The rack is lit.** From the pull, a lamp stands each side of it (the collapse's torch, an
+  object in the world). With floor markers off the lamps are the whole tell: that is where he runs.
+- **He faces the hero.** He kneels at the rack facing the hero he fights, not the rack. The old
+  weapon is thrown down beside it and lies there until the fight ends: the sword at 66%. The
+  hammer waits there from the pull and leaves with him at 33%.
+- **A shout as he lifts the new weapon** (`lift_text` on the loadout), with the roar and sheath
+  sound as before.
+- **He cannot fall at the rack.** While a change is owed, a blow cannot take his health below that
+  change's line (66%, then 33%; `arsenal_hold`, the same refusal as a collapse's hold: the blow
+  reads as blocked). A blow far past both lines stops at the first, so no stage is skipped. The
+  hold ends when the hammer is in his hands. The change's own 14 sec ceiling, the blocked-route
+  fallback and the posture rule (1.5 times while he kneels) are unchanged, so a held Smite never
+  stalls: at most 14 sec (plus the 7 sec the axes show) before he can be hurt again.
+- **Left out:** the axes thrown down at 33%. No known object display shows an axe; it needs a
+  native-data lookup of one. The sword and the waiting hammer are the objects left on the floor.
