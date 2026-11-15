@@ -321,30 +321,23 @@ fn divine_star_is_penances_ex_a_returning_star_not_rings() {
 }
 
 #[test]
-fn power_word_barrier_wards_and_steadies_whoever_stands_under_it() {
+fn pain_suppression_takes_40_percent_off_and_holds_the_friend_on_their_feet_for_4_sec() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let f = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
-    let away = hero(&mut s, "Cara", [12.0, 0.0, 0.0], 0.0);
-    let m = grunt(&mut s, [4.0, 2.0, 0.0]);
-    let pins = [(m, [4.0, 2.0, 0.0])];
-    // (Now Power Word: Shield's EX.)
+    let away = hero(&mut s, "Cara", [12.0, 9.0, 0.0], 0.0);
+    // (Power Word: Shield's EX.)
     let ev = cast(&mut s, p, "power_word_shield", true);
-    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell: 20116, .. })), "its light on the ground");
-    assert!(s.has_cc(p, "hallowed") && s.unstaggerable(p), "her own at once");
-    assert!((s.taken_share(p) - 0.75).abs() < 0.01, "a quarter less: {}", s.taken_share(p));
-    run_pinned(&mut s, 1.1, &pins);
-    assert!(s.has_cc(f, "hallowed") && s.has_cc(f, "steadfast"), "the friend under it, both");
-    assert!((s.taken_share(f) - 0.75).abs() < 0.01);
-    assert!(!s.has_cc(away, "hallowed") && !s.has_cc(away, "steadfast"), "not one outside it");
-    assert!(!s.has_cc(m, "steadfast") && !s.has_cc(m, "hallowed"), "never a foe in it");
-    // Out from under it, it wears off.
-    s.move_player(f, [12.0, 2.0, 0.0], 0.0, Moving::default());
-    run_pinned(&mut s, 1.6, &pins);
-    assert!(!s.has_cc(f, "hallowed") && !s.has_cc(f, "steadfast"), "gone once he left it");
-    assert!(s.has_cc(p, "hallowed"), "still on her inside it");
-    run_pinned(&mut s, 4.0, &pins);
-    assert!(!s.has_cc(p, "hallowed"), "the dome gone, so is the ward");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 10060, target: Target::Unit(t), .. } if *t == f)), "its light on Bren");
+    assert!(s.has_cc(f, "hallowed") && s.has_cc(f, "steadfast") && s.unstaggerable(f), "Bren, both");
+    assert!((s.taken_share(f) - 0.6).abs() < 0.01, "40% less: {}", s.taken_share(f));
+    assert!(!s.has_cc(p, "hallowed") && !s.has_cc(away, "hallowed"), "no one else");
+    assert!(!s.has_cc(f, "shield"), "no shield: a different spell");
+    let left = s.cc_of(f).iter().find(|c| c.kind == "hallowed").map(|c| c.until - s.clock).unwrap();
+    assert!(left > 3.8 && left <= 4.0 + 1.0e-3, "4 sec: {left}");
+    run_pinned(&mut s, 4.3, &[]);
+    assert!(!s.has_cc(f, "hallowed") && !s.has_cc(f, "steadfast"), "worn off");
+    assert!((s.taken_share(f) - 1.0).abs() < 0.01);
 }
 
 #[test]

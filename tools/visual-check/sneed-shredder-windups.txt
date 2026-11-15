@@ -1,0 +1,30 @@
+# The Shredder's three wind-ups as a hero sees them, filmed by the cameraman close and low on the
+# machine (docs/shredder-encounter.md, "Three wind-ups, three tells"). Dev setup, all before the
+# video: travel, the mine cleared but for the machine, the warrior whole at the Mast Room's door.
+# The warrior stands and is healed every 6 sec, so the machine cycles saw sweep, stamp and rake,
+# Grind and stall again and again without a kill. Judge with the add-on's "Floor markers" OFF (its
+# default) and the floor strips not drawn: a hero must tell the three apart before they land from
+# the machine alone. The saw: a whine that keeps revving and sparks off the blade. The stamp: the
+# foot rises with two thumps and low dust at once and half way, the blow the third beat. The rake:
+# the arm draws back with two clanks and glints at once and half way, the blow the third beat.
+# Nothing here has been filmed (the owner's order on Nov 15); the take is for when filming is back.
+hero warrior
+cam off
+camera low Sneed's Shredder
+include _sneed-shredder-setup
+12.5 .es goto -290 -527 50.6 1.48
+14 .es heal
+16 video
+22 .es heal
+28 .es heal
+34 .es heal
+40 .es heal
+46 .es heal
+52 .es heal
+58 .es heal
+64 .es heal
+70 .es heal
+76 .es heal
+82 .es heal
+88 .es heal
+100 end

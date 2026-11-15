@@ -357,6 +357,17 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
             "root" if e.amount > 0.0 => out.push(format!("{} sec hold · {} health tendril", n(e.secs[1]), n(e.amount))),
             // Dominate Mind: how long a creature fights for you, and how long a hero is held.
             "dominated" => out.push(format!("{} sec · {} sec on heroes", n(e.secs[1]), n(e.hero_secs))),
+            "pull" if d.fetch => out.push(format!("Pulls an ally up to {} yd to you", n(e.amount))),
+            // Pain Suppression: the cut and how long it holds, and no stagger.
+            "hallowed" => out.push(format!("{}% less damage taken", pct(e.amount))),
+            "steadfast" => out.push("Can't be staggered".to_string()),
+            // Vampiric Embrace: how long, how much of your shadow heals, and how near the ally.
+            "embrace" => out.push(format!("{}% of your shadow heals the weakest ally within {} yd · Mind Blast perfect +{} sec", pct(e.amount), n(e.reach), n(e.extend))),
+            // Psychic Ward: the first foe to strike is struck back this hard, and horrified.
+            "ward" => {
+                let horror = d.strike_back.iter().find(|x| x.kind == "panic").map_or(0.0, |x| x.secs[1]);
+                out.push(format!("First attacker takes {} and is horrified {} sec ({} on creatures)", n(e.amount), n(horror / 2.0), n(horror)))
+            }
             "pull" => out.push(if e.from_caster { "Pulls targets to you".to_string() } else { format!("{} yd pull", n(e.amount)) }),
             _ => {}
         }

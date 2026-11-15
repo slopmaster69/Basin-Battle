@@ -74,6 +74,15 @@ const STALL_SOUND: u32 = 1979;
 /// cry. Into a wall, the heavy thud of its crash at the log pile with it.
 const BACKFIRE_SOUND: u32 = 971;
 const HISS_SOUND: u32 = 4858;
+/// The wind-ups' own beats (docs/shredder-encounter.md, "Three wind-ups, three tells"). The
+/// stamp pounds on a count and the blow is the third beat: a heavy thud (as a crash's) and low
+/// dust under the foot. The rake clanks on a count and glints its tines (Cleave's flash): the
+/// blow is the third beat there too. Neither uses the saw's whine or its sparks, and neither
+/// the vents' hiss, which belongs to the heat.
+const THUMP_SOUND: u32 = 921;
+const CLANK_SOUND: u32 = 1978;
+const STAMP_BEAT: f32 = 0.55;
+const RAKE_BEAT: f32 = 0.35;
 /// The stalled engine's sputter: the machine's own clanks (GoblinShredderWound), at uneven gaps.
 const SPUTTER_SOUND: u32 = 1978;
 const SPUTTER_GAPS: [f32; 5] = [0.55, 0.3, 0.75, 0.35, 0.5];
@@ -168,6 +177,8 @@ struct Stall {
 #[derive(Clone, Copy)]
 struct Rev {
     kind: Move,
+    /// Which beat of its tell is next (0 is the wind-up's first instant).
+    beat: u8,
     fx_at: f32,
     lands_at: f32,
     landed: bool,
@@ -302,7 +313,7 @@ impl Survival {
                 _ => Move::Saw,
             };
             let windup = self.attack_now(id).windup;
-            self.machinery.revs.insert(id, Rev { kind, fx_at: now, lands_at: now + windup, landed: false });
+            self.machinery.revs.insert(id, Rev { kind, beat: 0, fx_at: now, lands_at: now + windup, landed: false });
             if kind == Move::Grind {
                 self.machinery_say(id, "That'll cut it!");
                 // It plants and churns its legs in place: its Run, held for the rev, not the
@@ -375,7 +386,7 @@ impl Survival {
             }
         } else if self.content.mobs[m.def].key == DRIVER && name == "flurry" {
             // Spent after three blows: hunched, open for his recovery.
-            let secs = self.content.mobs[m.def].patterns[k].steps.last().and_then(|st| st.recovery).unwrap_or(1.4);
+            let secs = self.content.mobs[m.def].patterns[k].steps.last().and_then(|st| st.recovery).unwrap_or(2.4);
             // Held through the hits that punish it.
             self.hold_open_pose(id, OPEN_CLIP, secs);
         }
@@ -735,19 +746,43 @@ impl Survival {
     fn machine_rev(&mut self, id: Id, r: &mut Rev) {
         let now = self.clock;
         match r.kind {
+            // The saw: a whine that keeps revving, sparks off the blade, every 0.35 sec.
             Move::Saw if now >= r.fx_at => {
                 self.events.push(Event::Visual { id, kit: combat::KIT_PARRY, by: None });
+                if r.beat > 0 {
+                    self.events.push(Event::Sound { id, sound: SAW_SOUND });
+                }
+                r.beat += 1;
                 r.fx_at = now + 0.35;
             }
             Move::Grind if now >= r.fx_at => {
                 self.events.push(Event::Missile { caster: id, spell: SMOKE, target: Target::Unit(id) });
                 r.fx_at = now + 0.35;
             }
+            // The stamp: the foot rises (its own clip) and the ground thumps and kicks up low
+            // dust as it goes: at once and half way, then the blow lands as the third beat.
+            Move::Stamp if now >= r.fx_at && now + 0.05 < r.lands_at => {
+                self.events.push(Event::Sound { id, sound: THUMP_SOUND });
+                self.events.push(Event::Visual { id, kit: combat::KIT_FALL_DUST, by: None });
+                r.beat += 1;
+                r.fx_at = now + STAMP_BEAT;
+            }
+            // The rake: the arm draws back with a clank and its tines glint, at once and half
+            // way, and the blow lands as the third beat.
+            Move::Rake if now >= r.fx_at && now + 0.05 < r.lands_at => {
+                self.events.push(Event::Visual { id, kit: combat::KIT_CLEAVE, by: None });
+                if r.beat > 0 {
+                    self.events.push(Event::Sound { id, sound: CLANK_SOUND });
+                }
+                r.beat += 1;
+                r.fx_at = now + RAKE_BEAT;
+            }
             _ => {}
         }
         if r.kind == Move::Stamp && !r.landed && now + 0.05 >= r.lands_at {
             r.landed = true;
             self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+            self.events.push(Event::Sound { id, sound: THUMP_SOUND });
         }
     }
 
@@ -1147,3 +1182,7 @@ mod tests;
 #[cfg(test)]
 #[path = "machinery_stall_tests.rs"]
 mod stall_tests;
+
+#[cfg(test)]
+#[path = "machinery_foot_tests.rs"]
+mod foot_tests;

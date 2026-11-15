@@ -179,7 +179,7 @@ fn holy_nova_strikes_a_duel_foe_and_mends_a_friend_beside_him() {
 }
 
 #[test]
-fn a_duel_foe_never_takes_the_priests_feather_nor_her_body_and_soul() {
+fn a_duel_foe_never_takes_the_priests_feather_nor_her_leap_of_faith() {
     let mut s = world();
     let (p, b) = duel(&mut s);
     // The feather 8 yd out, under Bren's feet.
@@ -190,12 +190,11 @@ fn a_duel_foe_never_takes_the_priests_feather_nor_her_body_and_soul() {
     run(&mut s, 0.3);
     assert!(!hasted(&s, b), "Bren on it: not for him");
     assert_eq!(s.light.feathers.len(), 1, "still lying");
-    // Body and Soul round her: Bren 5 yd off isn't quickened.
+    // Leap of Faith: Bren 5 yd off is not hers to pull.
     s.move_player(b, [5.0, 0.0, 0.0], WEST, Moving::default());
     run(&mut s, 0.05);
     cast(&mut s, p, "angelic_feather", true);
-    assert!(hasted(&s, p), "Ayla quickened");
-    assert!(!hasted(&s, b), "Bren not");
+    assert!(dist2d(s.players[&b].pos, [5.0, 0.0, 0.0]) < 0.3, "Bren stays where he is");
 }
 
 #[test]
@@ -207,14 +206,13 @@ fn power_word_shield_never_lands_on_a_duel_foe() {
 }
 
 #[test]
-fn power_word_barrier_holds_off_nothing_for_a_duel_foe_under_it() {
+fn pain_suppression_never_lands_on_a_duel_foe() {
     let mut s = world();
     let (p, b) = duel(&mut s);
     s.move_player(b, [3.0, 0.0, 0.0], WEST, Moving::default());
-    aim_ground(&mut s, p, ORIGIN);
     cast(&mut s, p, "power_word_shield", true);
     run_held(&mut s, 0.5, &[(b, [3.0, 0.0, 0.0])]);
-    assert!(s.has_cc(p, "steadfast"), "Ayla under her dome");
+    assert!(s.has_cc(p, "hallowed"), "Ayla suppresses her own pain instead");
     assert!(!s.has_cc(b, "steadfast") && !s.has_cc(b, "hallowed"), "Bren gets nothing of it");
 }
 

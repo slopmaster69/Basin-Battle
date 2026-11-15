@@ -2916,6 +2916,13 @@ impl Survival {
             }
             self.lockouts.insert((target, ability), now + d.lockout);
         }
+        // Leap of Faith: a friend to fetch, never yourself or a creature (its Valor back).
+        if d.fetch && (target == id || !self.players.contains_key(&target)) {
+            self.refuse(id, format!("{} needs an ally to pull to you", d.name), cues::Vocal::InvalidTarget);
+            let cost = self.valor_cost(&d);
+            self.gain_valor(id, cost);
+            return;
+        }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(target) });
         if d.impact_kit != 0 {
             self.events.push(Event::Visual { id: target, kit: d.impact_kit, by: None });
@@ -2937,6 +2944,11 @@ impl Survival {
             let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
             if !boons.is_empty() {
                 self.apply_effects(id, target, &boons, share, &d.name);
+            }
+            // Leap of Faith: the friend is drawn to the caster's side (the pull is from the caster).
+            if d.fetch {
+                let pulls: Vec<_> = d.effects.iter().filter(|e| e.kind == "pull").cloned().collect();
+                self.apply_effects(id, target, &pulls, share, &d.name);
             }
             // Power Word: Shield on a friend: marked for the blow about to land on them.
             if d.parry_for && target != id {
@@ -3121,6 +3133,7 @@ impl Survival {
                     self.events.push(Event::Visual { id: g.owner, kit, by: None });
                 }
                 self.events.push(Event::Perfect { player: g.owner, ability: g.ability });
+                self.embrace_extended(g.owner);
                 self.check_result(g.owner, g.ability, "perfect");
             }
             self.linger_at(g.owner, g.ability, g.at, g.radius);

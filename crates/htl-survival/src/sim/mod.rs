@@ -24,7 +24,7 @@ pub mod cc;
 pub mod cues;
 mod building;
 pub use building::StationActions;
-mod combat;
+pub(crate) mod combat;
 pub mod dungeon;
 pub mod duel;
 mod journal;
@@ -41,6 +41,8 @@ pub mod lab;
 mod raid;
 pub mod siege;
 mod bomb;
+#[cfg(test)]
+mod leave_tests;
 mod flay;
 pub mod priest;
 mod orb;
@@ -1721,6 +1723,7 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        self.drop_hero_owned(id);
         // A duel of theirs given away.
         self.duel_gone(id);
         self.meters.remove(&id);
@@ -1728,6 +1731,50 @@ impl Survival {
         self.foe_gone(id);
         self.events.push(Event::Dirty);
         Some(save)
+    }
+
+    /// What a departed hero left standing or in the air, taken down at once. Ids are never
+    /// reused (`alloc` only counts up), so a hero who rejoins is a new id and could not inherit
+    /// any of it; what the per-tick steps already dropped for a missing owner (`step_totems`,
+    /// `step_orbs`, `step_bombs`, `step_moves`) goes now, not a tick later, and what nothing
+    /// ever pruned (`flays`, `lockouts`, `slips`: a leaked entry per leaver) goes too.
+    ///
+    /// Kept on purpose: bombs of others' on the leaver (`step_bombs` bursts them at the spot,
+    /// the owner still being here), and `staff_marks` (cleared by `leave` itself).
+    fn drop_hero_owned(&mut self, id: Id) {
+        for mid in self.totems.iter().filter(|t| t.owner == id).map(|t| t.mob).collect::<Vec<_>>() {
+            self.remove_totem(mid);
+        }
+        // Traps (and the objects they set on the ground), and the jump pads among them.
+        let (mine, rest): (Vec<moves::Trap>, Vec<moves::Trap>) = std::mem::take(&mut self.traps).into_iter().partition(|t| t.owner == id);
+        self.traps = rest;
+        for t in mine {
+            self.clear_trap(&t);
+        }
+        // Wind-ups not yet gone off: lost, their marks and gathering looks ended as a lost one's are.
+        let (mine, rest): (Vec<moves::Windup>, Vec<moves::Windup>) = std::mem::take(&mut self.windups).into_iter().partition(|w| w.owner == id);
+        self.windups = rest;
+        for w in mine {
+            if let Some(m) = w.mark {
+                self.unmark(m);
+            }
+            let d = &self.content.abilities[w.ability];
+            let look = if w.fixed { d.spell } else { d.charge_spell };
+            if look != 0 {
+                self.events.push(Event::CastDone { caster: id, spell: look });
+            }
+        }
+        if let Some(a) = self.anchors.remove(&id) {
+            self.unmark(a.mark);
+        }
+        for o in self.orbs.iter().filter(|o| o.owner == id) {
+            self.events.push(Event::OrbGone { look: o.look });
+        }
+        self.orbs.retain(|o| o.owner != id);
+        self.bombs.retain(|b| b.owner != id);
+        self.flays.remove(&id);
+        self.slips.remove(&id);
+        self.lockouts.retain(|(h, _), _| *h != id);
     }
 
     /// Where the client says the hero is (it moves itself; the server trusts it).
