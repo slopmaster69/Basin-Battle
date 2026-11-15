@@ -1062,14 +1062,15 @@ fn the_rules_are_tuned_in_play_and_everyone_gets_the_new_blows() {
         a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tT\t") && m.text.contains("combat.chain_after") && m.text.contains("0.4"))).is_some(),
         "told"
     );
-    a.drain(0.5);
+    assert!(a.wait(10.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tMV\t0\t0.40\t"))).is_some(), "the moves line with the tuned chain window");
     let mv = addon_lines(&a, "ES").into_iter().rfind(|l| l.starts_with("MV\t")).expect("the moves line");
     assert_eq!(mv.split('\t').nth(2), Some("0.40"), "{mv}");
     // A bad one says why and changes nothing.
     a.chat(".es tune combat.chain_after lots");
     assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tT\tcombat.chain_after"))).is_some(), "refused");
     a.chat(".es tune moveset.one_hand.light.0.lunge 1.2");
-    a.drain(0.5);
+    // The server re-reads all its rules for a tune and sends the moves line on its next HUD tick; wait for that line, not a fixed pause.
+    assert!(a.wait(10.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tMV\t") && m.text.contains("17~1~0.380~0.480~1.20"))).is_some(), "the moves line with the tuned lunge");
     let mv = addon_lines(&a, "ES").into_iter().rfind(|l| l.starts_with("MV\t")).unwrap();
     assert!(mv.split('\t').nth(10).unwrap().starts_with("17~1~0.380~0.480~1.20"), "{mv}");
 }
