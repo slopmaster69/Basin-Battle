@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 67
+local VERSION = 68
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -7027,7 +7027,11 @@ function ES.Line(line)
   elseif verb == "GB" then
     -- A shape flashed on the ground as an ability lands (Shockwave's cone), on a client with
     -- patch 0026: an effect, drawn whatever the floor markers are set to.
-    if PlayGroundBurst then
+    -- A last field of 1 is a warning-only shape (a ring under a rock about to fall, a band, a
+    -- fire's edge): a floor marker, laid only with the Floor markers on. The tell with them off
+    -- is the world effect beside it (dust from the roof, torches, flames). An older server
+    -- sends no such field: the shape is laid as it was.
+    if PlayGroundBurst and not (f[12] == "1" and not ES.MarksOn()) then
       PlayGroundBurst(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 0,
         f[6] or "wedge", tonumber(f[7]) or 5, tonumber(f[8]) or 90, tonumber(f[9]) or 0.35, f[10] or "C0E8FF", tonumber(f[11]) or 0)
     end

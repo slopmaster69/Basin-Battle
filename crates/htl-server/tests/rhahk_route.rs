@@ -613,7 +613,7 @@ fn the_last_stands_three_falls_leave_dry_floor_to_the_galleries() {
     for _ in 0..10 {
         whole(&mut s, hero);
         for e in s.step(0.05) {
-            if let Event::GroundBurst { at, shape: "ring", reach, secs, .. } = e {
+            if let Event::GroundWarn { at, shape: "ring", reach, secs, .. } = e {
                 if reach == 3.0 && (secs - 1.3).abs() < 0.01 {
                     falls.push(at);
                 }
@@ -812,7 +812,7 @@ fn he_slams_a_wall_of_the_real_mine_two_seconds_after_the_yell() {
                 match e {
                     Event::Log(t) if t.contains(" slams ") => blow = Some(t.clone()),
                     Event::Log(t) => assert!(!t.contains("put back") && !t.contains("fell through"), "{t}"),
-                    Event::GroundBurst { at, shape: "ring", secs, .. } if dist2d(*at, stood) < 0.5 && *secs >= 1.0 => marks += 1,
+                    Event::GroundWarn { at, shape: "ring", secs, .. } if dist2d(*at, stood) < 0.5 && *secs >= 1.0 => marks += 1,
                     _ => {}
                 }
             }

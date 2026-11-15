@@ -309,6 +309,7 @@ Rhahk'Zor's slam (how he brings the mine down at 70%: `content/deadmines.toml`,
 | `rhahk-slam` | Dev setup, by the cameraman: his yell in his chamber, the turn to the wall beside his post, the slam, the rock coming loose, the first face |
 | `rhahk-slam-pov` | The same on the hero's own screen, where the slam's shake is felt |
 | `rhahk-slam-rock-stood-in`, `rhahk-slam-rock-stepped-out` | Dev setup, the hero's own screen: the rock marked under the hero, stood in and stepped out of |
+| `rhahk-slam-rock-nomarks` | Dev setup, not yet run, floor markers off: the same rock stepped out of, told only by dust from the roof over the spot and the rock itself |
 | `rhahk-slam-run` | Dev setup, by the cameraman: the yell in the chamber and sections 1 to 3 going (the lines of `rhahk-last-stand-staged`, ended at 78 s) |
 | `rhahk-slam-fight`, `rhahk-slam-fight-healed` | A real pull by a small player in the interface through the opening, no debug kills; the second healed throughout |
 | `rhahk-slam-clips` | Dev setup: the ogre model's clips played one after another on a Rhahk'Zor stood still in his own mine, the real one and every other creature taken away first (`.es fx clip <id> rhahk`), to choose one by eye |

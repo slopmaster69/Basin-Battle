@@ -92,9 +92,10 @@
 //!   reads it as the whole body.
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), or a held cast ended early (Skyfall's hang,
 //!   a thrown ability's aim let go), its clip let go.
-//! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
+//! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>[\t<1: warning only>]`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
-//!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
+//!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker. A last field of 1 is a
+//!   shape that only warns (a floor marker): the add-on lays it only with the floor markers on.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>\t<a line's width>\t<the roll's window>\t<1: its body tells it, no glow>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
 //! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0030's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0036); a speed of their own in yards a second, uncapped (patch 0040; absent or 0: the spell's own).
 //! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0031's `SetUnitRope`): a grappling hook's line, a haul's.
@@ -535,7 +536,7 @@ pub(crate) const VERSION: u32 = 2;
 /// older add-on knows none of them and shows nothing for them.
 /// 67: the crowd-control word "Disoriented" (Scatter Shot's `disorient`, #378): an older add-on
 /// shows the raw `disorient` key.
-pub(crate) const ADDON_NEWEST: u32 = 67;
+pub(crate) const ADDON_NEWEST: u32 = 68;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

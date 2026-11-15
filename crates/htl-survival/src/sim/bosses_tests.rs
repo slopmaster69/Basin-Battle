@@ -311,7 +311,7 @@ fn the_collapse_starts_at_the_door_and_comes_inward_in_surges() {
         let band: Vec<(Vec3, f32, f32)> = e
             .iter()
             .filter_map(|e| match e {
-                Event::GroundBurst { at, yaw, shape: "line", reach, colour, .. } if colour == BAND_COLOUR => Some((*at, *yaw, *reach)),
+                Event::GroundWarn { at, yaw, shape: "line", reach, colour, .. } if colour == BAND_COLOUR => Some((*at, *yaw, *reach)),
                 _ => None,
             })
             .collect();
@@ -619,7 +619,7 @@ fn rubble_faces_and_stops_go_when_the_fight_is_lost() {
     assert!(s.collapse_face_lines().is_empty() && s.face_crossing([33.0, 0.0, 0.0], [27.0, 0.0, 0.0]).is_none(), "no stop from the first moment");
     assert!(faces.iter().all(|id| s.objs.contains_key(id)), "the faces still seen");
     assert!(ev.iter().filter(|e| matches!(e, Event::MissileFrom { spell: LAND_DUST, .. })).count() >= 6, "in their dust");
-    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. })), "and nothing more falls");
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. } | Event::GroundWarn { .. })), "and nothing more falls");
     ev.extend(run_for(&mut s, LEAVE_HOLD + LEAVE_SECS + 1.0));
     assert_eq!(s.collapse_front(), None, "the collapse is over");
     assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty());
@@ -782,8 +782,8 @@ fn rows_of_rock_are_seen_falling_across_the_tunnel_as_the_wave_comes() {
     }
     // The rows are a roof coming down, not blows: no ring under any of them. The only rings are
     // under the falls ahead of the wave, which are blows.
-    let rings = ev.iter().filter(|e| matches!(e, Event::GroundBurst { shape: "ring", colour, .. } if colour == mobs::HAZARD_COLOUR)).count();
-    let falls = ev.iter().filter(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, colour, .. } if *reach == FALL_RADIUS && colour == mobs::HAZARD_COLOUR)).count();
+    let rings = ev.iter().filter(|e| matches!(e, Event::GroundWarn { shape: "ring", colour, .. } if colour == mobs::HAZARD_COLOUR)).count();
+    let falls = ev.iter().filter(|e| matches!(e, Event::GroundWarn { shape: "ring", reach, colour, .. } if *reach == FALL_RADIUS && colour == mobs::HAZARD_COLOUR)).count();
     assert!(falls >= 4 && rings == falls, "rings only under the falls that are blows: {rings} rings, {falls} falls");
     // The pile builds: rock lands on rock, layer over layer, behind the wave.
     let piled = landed.values().filter(|(p, _)| p[2] > ROW_RISE * 0.5).count();
@@ -809,8 +809,36 @@ fn rows_of_rock_are_seen_falling_across_the_tunnel_as_the_wave_comes() {
     assert!(roof >= 200, "soft dust from the roof, over the whole section: {roof}");
     assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: DUST, .. })), "no starburst puffs: they read as hits");
     assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: DUST_ROLL, .. })));
-    assert!(ev.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", colour, .. } if colour == BAND_COLOUR)));
+    assert!(ev.iter().any(|e| matches!(e, Event::GroundWarn { shape: "line", colour, .. } if colour == BAND_COLOUR)));
     assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: 26271, .. } | Event::Missile { spell: 26271, .. })));
+}
+
+#[test]
+fn a_fall_is_told_by_dust_from_the_roof_with_the_floor_markers_off() {
+    // The owner's rule: every tell reads with the floor markers off. The ring under a rock is a
+    // marker (`GroundWarn`, laid only through the setting); what tells the spot without it is
+    // dust trickling from the roof over it all the warning long, then the rock.
+    let (mut s, boss, _) = mine(Vec::new(), 3);
+    s.events.clear();
+    let at = [5.0, 2.0, 0.0];
+    s.rocks_fall(boss, at, DEBRIS_RADIUS, DEBRIS_WARN, 10, true);
+    assert!(
+        !s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", .. })),
+        "the ring is a marker: never a plain ground burst, which is drawn whatever the setting"
+    );
+    let land = s.clock + DEBRIS_WARN;
+    let mut beats: Vec<f32> = Vec::new();
+    while s.clock < land + 0.5 {
+        let ev = s.step(DT);
+        let trickle = ev.iter().any(|e| matches!(e, Event::MissileFrom { spell: LAND_DUST, from, .. } if dist2d(*from, at) <= DEBRIS_RADIUS && from[2] > at[2] + 1.0));
+        if trickle && s.clock <= land + DT {
+            beats.push(s.clock);
+        }
+    }
+    assert!(beats.len() >= 3, "dust over the spot through its warning, at least 3 beats: {beats:?}");
+    assert!(beats.first().is_some_and(|t| *t <= land - DEBRIS_WARN + 0.4), "it starts at once, with the warning: {beats:?}");
+    assert!(beats.iter().all(|t| *t <= land + DT), "none after the rock is down: {beats:?}");
+    assert!(s.bosses.looks.trickles.is_empty(), "and the trickle is let go");
 }
 
 #[test]
@@ -819,7 +847,7 @@ fn a_fall_drops_its_rock_onto_its_spot_as_its_blow_lands() {
     s.events.clear();
     s.rocks_fall(boss, [5.0, 2.0, 0.0], DEBRIS_RADIUS, DEBRIS_WARN, 10, true);
     let blow = s.missiles.iter().find(|m| m.owner == boss).map(|m| m.land_at).unwrap();
-    assert!(s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, secs, .. } if *reach == DEBRIS_RADIUS && *secs == DEBRIS_WARN)),
+    assert!(s.events.iter().any(|e| matches!(e, Event::GroundWarn { shape: "ring", reach, secs, .. } if *reach == DEBRIS_RADIUS && *secs == DEBRIS_WARN)),
         "its ring on the floor till it lands, markers or not");
     let mut shown = None;
     let mut track: Vec<(f32, Vec3)> = Vec::new();
@@ -1257,7 +1285,7 @@ fn burning_iron_is_drawn_as_wide_as_it_bites() {
     let rings: Vec<(f32, f32)> = ev
         .iter()
         .filter_map(|e| match e {
-            Event::GroundBurst { at, shape: "ring", reach, secs, colour, .. } if colour == FIRE_COLOUR && dist2d(*at, heart) < 0.1 => Some((*reach, *secs)),
+            Event::GroundWarn { at, shape: "ring", reach, secs, colour, .. } if colour == FIRE_COLOUR && dist2d(*at, heart) < 0.1 => Some((*reach, *secs)),
             _ => None,
         })
         .collect();
@@ -1291,7 +1319,7 @@ fn his_fires_go_out_when_he_falls_and_when_his_fight_is_lost() {
     let hp = s.players[&h].health;
     let ev = run_for(&mut s, 8.0);
     assert_eq!(s.players[&h].health, hp, "and nothing bites where it burned");
-    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. })), "nothing drawn there");
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. } | Event::GroundWarn { .. })), "nothing drawn there");
     // The fight lost: the fires out too, and the look off him.
     let (mut s, boss, h) = smith(33);
     let pos = s.mobs[&boss].pos;
@@ -1484,7 +1512,7 @@ fn to_the_blow(s: &mut Survival) -> Vec<Event> {
 fn marked(ev: &[Event]) -> Vec<Vec3> {
     ev.iter()
         .filter_map(|e| match e {
-            Event::GroundBurst { at, shape: "ring", reach, secs, .. } if *reach == DEBRIS_RADIUS && *secs == DEBRIS_WARN => Some(*at),
+            Event::GroundWarn { at, shape: "ring", reach, secs, .. } if *reach == DEBRIS_RADIUS && *secs == DEBRIS_WARN => Some(*at),
             _ => None,
         })
         .collect()

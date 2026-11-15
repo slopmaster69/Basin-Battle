@@ -306,6 +306,13 @@ const FALLING_MOST: usize = 160;
 /// 344, and Smite's slam) its boulders show pink and linger.
 const DUST_ROLL: u32 = 22792;
 const LAND_DUST: u32 = DUST_ROLL;
+/// Dust trickling from the roof over a rock about to fall (`step_trickles`): `TRICKLE_CLOUDS`
+/// every `TRICKLE_EVERY`, head height and a little over, at most `TRICKLE_MOST` spots at once.
+/// Its warning is 1.3 sec: four beats, so a hero sees it start and has most of it to step out.
+const TRICKLE_EVERY: f32 = 0.3;
+const TRICKLE_CLOUDS: usize = 2;
+const TRICKLE_HIGH: f32 = 2.5;
+const TRICKLE_MOST: usize = 24;
 /// A landing's ring on the floor (drawn whatever the markers), dust brown.
 const DUST_COLOUR: &str = "A88E6A";
 /// `DeadmineDoor01Destroy` (wood smashing) as a beam cracks, `BlackRockDoorSingleDestroy` (stone
@@ -505,6 +512,9 @@ pub(crate) struct Looks {
     leaving: Option<(Id, f32, usize, bool)>,
     /// Every piece's tilt (falling or lying), for the drawing.
     tilt: BTreeMap<Id, f32>,
+    /// Dust trickling from the roof over a rock about to fall, the tell with the floor markers
+    /// off: (whose, where, how wide, until when, next trickle).
+    trickles: Vec<(Id, Vec3, f32, f32, f32)>,
     /// When each hero last shook from a landing.
     shook: BTreeMap<Id, f32>,
     /// A count for the pieces' own variety (never the rules' dice, whose draws stay as they were).
@@ -900,6 +910,7 @@ impl Survival {
     /// whoever is behind the rubble caught and thrown clear, the boss fighting on through it,
     /// leashed to nowhere. A fight lost puts everything back: the boss where its fight began.
     pub(crate) fn step_boss_collapse(&mut self, dt: f32) {
+        self.step_trickles();
         self.step_falling_looks();
         self.step_thrown();
         self.step_collapse_fled();
@@ -2044,7 +2055,7 @@ impl Survival {
         }
         // Its edge, where it bites and no wider.
         for (at, reach, secs) in rings {
-            self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach, arc: 360.0, width: 0.0, secs, colour: FIRE_COLOUR.into() });
+            self.events.push(Event::GroundWarn { at, yaw: 0.0, shape: "ring", reach, arc: 360.0, width: 0.0, secs, colour: FIRE_COLOUR.into() });
         }
         self.bosses.fires.retain(|f| now < f.until);
         for obj in out {
@@ -2516,7 +2527,12 @@ impl Survival {
         }
         // How it looks: its ring on the floor till it lands, and a rock dropping onto it.
         if !self.bosses.looks.off {
-            self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: radius, arc: 360.0, width: 0.0, secs: warn, colour: mobs::HAZARD_COLOUR.into() });
+            // Its ring is a floor marker (the setting's). Without it the spot is told by dust
+            // trickling from the roof over it all the warning long, ending in the rock itself.
+            if self.bosses.looks.trickles.len() < TRICKLE_MOST {
+                self.bosses.looks.trickles.push((owner, at, radius, now + warn, now));
+            }
+            self.events.push(Event::GroundWarn { at, yaw: 0.0, shape: "ring", reach: radius, arc: 360.0, width: 0.0, secs: warn, colour: mobs::HAZARD_COLOUR.into() });
             let scale = if heavy { CHUNK_HEAVY } else { CHUNK_SCALE };
             // (A collapse's own fall is of its pale rock.)
             let (display, scale) = if look == DUST { (ROCK, scale) } else { (PALE, scale * PALE_SIZE * 1.6) };
@@ -2876,7 +2892,7 @@ impl Survival {
             if reach < 0.5 {
                 continue;
             }
-            self.events.push(Event::GroundBurst { at: s.at, yaw: d[1].atan2(d[0]), shape: "line", reach, arc: 0.0, width: BAND_WIDTH, secs: BAND_SECS, colour: BAND_COLOUR.into() });
+            self.events.push(Event::GroundWarn { at: s.at, yaw: d[1].atan2(d[0]), shape: "line", reach, arc: 0.0, width: BAND_WIDTH, secs: BAND_SECS, colour: BAND_COLOUR.into() });
         }
     }
 
@@ -2975,6 +2991,29 @@ impl Survival {
         let anchor = self.alloc();
         self.events.push(Event::MissileFrom { anchor, caster: owner, spell, from: at, target: Target::Point(at) });
         self.events.push(Event::ObjGone { id: anchor });
+    }
+
+    /// Dust trickling from the roof over each rock about to fall, every `TRICKLE_EVERY`: the
+    /// warning that reads with the floor markers off (where it will land, and that it is coming).
+    fn step_trickles(&mut self) {
+        if self.bosses.looks.trickles.is_empty() {
+            return;
+        }
+        let now = self.clock;
+        self.bosses.looks.trickles.retain(|t| now < t.3);
+        let due: Vec<(Id, Vec3, f32)> = self.bosses.looks.trickles.iter_mut().filter(|t| now >= t.4).map(|t| {
+            t.4 = now + TRICKLE_EVERY;
+            (t.0, t.1, t.2)
+        }).collect();
+        for (owner, at, radius) in due {
+            for _ in 0..TRICKLE_CLOUDS {
+                let n = self.look_seq();
+                let a = n as f32 * 2.399;
+                let out = radius * 0.7 * ((n % 5) as f32 + 0.5) / 5.0;
+                let up = TRICKLE_HIGH * (1.0 + (n % 3) as f32 * 0.3);
+                self.point_look(owner, [at[0] + a.cos() * out, at[1] + a.sin() * out, at[2] + up], LAND_DUST);
+            }
+        }
     }
 
     /// The pieces on their way down move; those landing burst, shake whoever is beside them and

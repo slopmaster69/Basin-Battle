@@ -141,6 +141,18 @@ impl SurvivalGame {
         self.sim.players.contains_key(&id)
     }
 
+    /// A shape flashed on the ground, for the clients that draw one (the add-on asks its client;
+    /// an older client ignores the line). `shape_at` is reach, arc, width, seconds. A warning-only
+    /// one (`warn`, from `GroundWarn`) ends in 1: the add-on lays it only with the floor markers on.
+    fn ground_burst_line(&mut self, at: [f32; 3], yaw: f32, shape: &str, shape_at: [f32; 4], colour: &str, warn: bool) {
+        let [reach, arc, width, secs] = shape_at;
+        let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+        let line = format!("GB\t{:.2}\t{:.2}\t{:.2}\t{yaw:.3}\t{shape}\t{reach:.2}\t{arc:.0}\t{secs:.2}\t{colour}\t{width:.2}\t{}", at[0], at[1], at[2], u8::from(warn));
+        for c in conns {
+            self.ui_line(c, &line);
+        }
+    }
+
     fn event(&mut self, e: Event) {
         match e {
             Event::MobSpawned { id } => {
@@ -1203,13 +1215,10 @@ impl SurvivalGame {
                 }
             }
             Event::GroundBurst { at, yaw, shape, reach, arc, width, secs, colour } => {
-                // A shape flashed on the ground, for the clients that draw one (the add-on asks
-                // its client; an older client ignores the line).
-                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
-                let line = format!("GB\t{:.2}\t{:.2}\t{:.2}\t{yaw:.3}\t{shape}\t{reach:.2}\t{arc:.0}\t{secs:.2}\t{colour}\t{width:.2}", at[0], at[1], at[2]);
-                for c in conns {
-                    self.ui_line(c, &line);
-                }
+                self.ground_burst_line([at[0], at[1], at[2]], yaw, shape, [reach, arc, width, secs], &colour, false);
+            }
+            Event::GroundWarn { at, yaw, shape, reach, arc, width, secs, colour } => {
+                self.ground_burst_line([at[0], at[1], at[2]], yaw, shape, [reach, arc, width, secs], &colour, true);
             }
             Event::ClipStop { id } => {
                 // A feint: the swing let go on the clients that play clips (the caster's own

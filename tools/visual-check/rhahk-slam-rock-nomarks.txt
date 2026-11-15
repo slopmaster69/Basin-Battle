@@ -1,0 +1,35 @@
+# DEV SETUP, NOT YET RUN (filming is off): Rhahk'Zor's marked rock with the FLOOR MARKERS OFF
+# (the add-on's Controls setting, hidden by default). The same start as rhahk-slam-rock-stepped-out.
+# The ring under the hero is a marker and is not drawn; what tells it is dust trickling from the
+# roof over the spot (every 0.3 s from the blow, 2 clouds each), the Danger flash on the hero's
+# screen, and the rock itself dropping in the last 0.7 s.
+#   20     the blow: dust begins to fall over the spot under the hero, no ring
+#   20.5   the hero sidesteps out of the dust (4 yd in 0.6 s, a walk)
+#   21.3   its rock lands where they stood: no damage
+# What to look for: the spot and the time are plain with no ring at all.
+hero warrior
+cam off
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.2 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+10.5 .es restock
+11.5 .es clearfoes rhahk
+12 .es goto -45 -383 55.4 0.3
+12.6 lua ResetView(2) SetView(2)
+13 .es heal
+13.2 lua function VCTurn(want) local d = math.mod((want - GetActionAim()) * 57.29578 + 900, 360) - 180 if math.abs(d) > 2 then FlipCameraYaw(d) end end
+13.4 lua VCTurn(0.45)
+13.5 video
+14 .es hurt 0.97 rhahk
+15 .es heal
+16.5 .es heal
+17.5 lua VCTurn(0.45)
+17.8 .es heal
+18 .es hurt 0.69 rhahk
+19.9 shots nomark 12 0.15
+20.5 lua ActionDash(0.6, 7, "b")
+21.9 .es where
+22.4 .es heal
+23.4 end

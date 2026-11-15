@@ -91,6 +91,12 @@ of equal length.
   there) in rows across the full width, piled up to three deep where the roof is high, a wall of
   dust rolling at the front. A row's rock has no ring and no burst of its own: it is one roof, not
   many throws. Only the lighter falls ahead of the front, the ones that hurt, keep their ring.
+  **With the floor markers off** (the rule: every tell reads without them, see
+  [floor-markers](floor-markers.md)): that ring, the surge's band and a fire's edge are markers,
+  laid only through the setting. Every fall that hurts is told instead by dust trickling from the
+  roof over its spot from the first moment of its 1.3 sec warning to the landing (2 clouds every
+  0.3 sec, head height and a little over), the Danger flash for a hero in it, and the rock in the
+  last 0.7 sec. The surge is told by its torches and dust. Timing and damage are unchanged.
 - **It fills and stays.** Behind the front the floor is full of rock, up to 400 loose pieces (the
   oldest go first) and 96 in the air at once. Three of the four sections lay fewer: filmed on
   November 13, as the third face stood, 250 loose pieces lay, with 41 face rocks, 41 pale rocks
