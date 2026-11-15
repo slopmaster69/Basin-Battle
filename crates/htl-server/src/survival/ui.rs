@@ -528,7 +528,9 @@ pub(crate) const VERSION: u32 = 2;
 /// 65: `CU` beats for Rhahk'Zor's slam (`slam_near`, `slam_mid`, `slam_far`: the mine shaken for
 /// every hero in it, by how near him) and a section's face landing (`face_near`, `face_far`). An
 /// older add-on knows none of them and shows nothing for them.
-pub(crate) const ADDON_NEWEST: u32 = 66;
+/// 67: the crowd-control word "Disoriented" (Scatter Shot's `disorient`, #378): an older add-on
+/// shows the raw `disorient` key.
+pub(crate) const ADDON_NEWEST: u32 = 67;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

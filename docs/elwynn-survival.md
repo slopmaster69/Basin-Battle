@@ -153,15 +153,9 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Scatter Shot* | Fan of Knives · *Kidney Shot* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Soul Swap* | Living Seed · *Entangling Roots* |
-<<<<<<< HEAD
 | E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Leap of Faith*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Power Word: Barrier*, or Shadowguard · *Vampiric Touch* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
-=======
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Surge of Light*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Body and Soul*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Pain Suppression*, or Vampiric Embrace · *Psychic Ward* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
->>>>>>> d615170a (Priest: Pain Suppression, Vampiric Embrace and Psychic Ward)
 | 3 | **Ultimate** | Bladestorm, or Rallying Cry | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Holy Word: Salvation, or Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
@@ -318,11 +312,7 @@ you, or the circle where it will land. Traps and anchors show as green circles.
   Blast and Meteor land.
 - **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab, and Fan of
   Knives Marks them so it crits; a kill under Death Mark readies everything again.
-<<<<<<< HEAD
-- **Stay alive**: Guardian Spirit, Barkskin and Healing Stream stack with Holy Nova and
-=======
-- **Stay alive**: Power Word: Pain Suppression, Barkskin and Healing Stream stack with Holy Nova and
->>>>>>> d615170a (Priest: Pain Suppression, Vampiric Embrace and Psychic Ward)
+- **Stay alive**: Guardian Spirit, Pain Suppression, Barkskin and Healing Stream stack with Holy Nova and
   Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
 
 **PvP**: every card keeps to a budget a test holds it to (`tests_classes.rs`): a ranged poke does
