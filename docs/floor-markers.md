@@ -55,10 +55,14 @@ Status: pass (tells with markers off already), fixed (this sweep), open (found, 
 | Rhahk'Zor: the wave's rows | None (no ring, by design) | n/a | Rock dropping, dust rolling at the front | Pass | None |
 | Rhahk'Zor: burning ground (burning maul, lodged pound) | Fire-coloured ring at the true edge, redrawn every 0.5 sec (`GB`) | No | The flames themselves: one at the heart and 3 round it at 0.55 of the radius | Marker fail, tell passes | Ring is `GroundWarn` |
 | Rhahk'Zor: dust ring where a rock struck, at the slam's wall, the end dust line | A brief dust-coloured shape after the strike (`GB`, 0.5 to 1.2 sec) | No | Not a warning: it follows the blow, with real dust beside it | Pass (an effect) | None |
-| Gilnid, Greenskin, Cookie, Smite, VanCleef, the Shredder, other enemies | Warning shapes sent as `GB` regardless: see below | No | Per boss, in its own pull request | Open | Each in its own pull request |
+| Cookie: the pour's spot (ring under it, 2 yd, redrawn every 0.5 sec) | Ring at the true radius from the start of the wind-up to the landing (`GB`) | No | The tankard held up, the stew bubbling (3135), the mug in its arc; nothing at the spot itself | Fail | Ring is `GroundWarn`. 8 small steam puffs gather along the spot's edge from the first moment (gone on landing or if broken off) |
+| Cookie: the puddle's edge | Ring redrawn every 0.5 sec while it burns (`GB`) | No | 12 steam puffs on the edge, hot until the last drops | Marker fail, tell passes | Ring is `GroundWarn` |
+| Cookie: the scoop's breath cone (5.4 yd, 65 degrees) | Wedge for the whole 1.6 sec wind-up (`GB`) | No | Breath drawn in (his pose) and its sound; nothing in the cone | Fail | Wedge is `GroundWarn`. 6 small steam puffs gather through the cone during the wind-up, replaced by the breath's own 6 on release |
+| Cookie: the knocked pot's splash ring, the landing splash, Gorged's rising ring | A ring for 1.2 sec after the event (`GB`) | No | Not a warning: it follows the event, with the splash sound and the dust or steam | Pass (an effect) | None |
+| Gilnid, Greenskin, Smite, VanCleef, the Shredder, other enemies | Warning shapes sent as `GB` regardless: see below | No | Per boss, in its own pull request | Open | Each in its own pull request |
 
 Sites still to move to `GroundWarn` (found in the audit, each warning-only and sent as `GB`):
-Cookie's scoop wedge, pot ring and patch ring (`sim/kitchen.rs`), Gilnid's valve lane, stripes and
+Gilnid's valve lane, stripes and
 stick ring (`sim/perches.rs`), Greenskin's firing line (`sim/firing_line.rs`), the Shredder's
 Grind lane and tie ring (`sim/machinery_rig.rs`), small splashes of other enemies
 (`sim/mobs.rs`, noted "so it reads with the floor markers off" on Nov 8, before this rule).

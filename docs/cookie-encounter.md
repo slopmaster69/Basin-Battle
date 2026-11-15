@@ -25,7 +25,7 @@ a hero who kept taking the first slap.
    holds it up (HoldThrown, held 1.8 sec) as the stew bubbles (Blood Boil's sound, 3135). Where it
    lands is fixed as he begins: where the hero stood, pushed out to at least 4 yd from him and in
    to at most 8, on dry floor he can see. That spot is drawn at once as a ring at its true 2 yd
-   radius (an effect, shown with the floor markers off) and redrawn every 0.5 sec until it lands,
+   radius (a floor marker, only with the floor markers on; with them off 8 small steam puffs gather along the spot's edge from the first moment and give way to the puddle's 12 on landing, or go if the pour is broken off) and redrawn every 0.5 sec until it lands,
    so a broken-off pour stops showing within half a second. On release he throws (AttackThrown) and
    his hand is empty: the mug (Throw Dark Iron Ale's, 14814) flies an arc in 4 legs, up 4 yd over
    the middle, about half a second in the air. It lands with a splash (1096) and a tan ring at the
@@ -45,7 +45,7 @@ a hero who kept taking the first slap.
      stew, it doesn't empty the pot.
    - **Leave it**: a gulp (Eat, 45), he heals 4%, and at once draws in a breath (HoldThrown held
      1.6 sec, MurlocAlert 1109) with the cone drawn on the ground at the 5.4 yd and 65 degrees it
-     hits. Then the steam: Frost Breath's white cone on him (kit 2610), a steam burst (4858), a
+     hits (only with the floor markers on; with them off 6 small steam puffs gather through the cone while he draws the breath, and the breath's own steam replaces them). Then the steam: Frost Breath's white cone on him (kit 2610), a steam burst (4858), a
      white flash of the cone, and 6 steam puffs through the whole cone for a second. A short 1.5
      sec opening follows. Breaking is better (5.5 sec open, no heal, no cone); waiting is a choice.
    - The pot has two helpings: two plumes of steam over its bubbles when full, one after the first
