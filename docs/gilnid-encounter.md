@@ -56,14 +56,14 @@ fallback when a ledge can't be placed are kept.
    from there to where it lands (the client flies a missile straight, so the arc is two flights,
    the second from an unseen stand-in a tick later; at least 0.7 sec in the air). It lands and
    sits there a second, a stick on the floor (GunShopDynamite, 423), hissing (1424), its 2.5 yd
-   blast drawn as a ring on the floor whatever the floor markers. Then it blows. **While a stick is
+   blast marked by a ring on the floor only with the floor markers on (with them off the lit stick itself, sparking and hissing where it sits, tells where and when). Then it blows. **While a stick is
    lit, in the air or on the floor, Gilnid holds his heavy blows** (the overhead, the kick).
 3. **The demonstration**, after that first stick blows, if no one has been brought down yet. The
    furnace belches (Molten Metal at its mouth) and 0.6 sec later a spill of molten iron runs from
    its foot to the first man's pole, a section every 1.5 yd, every 0.2 sec, each a small splash
    (8). Where it reaches, the pole flares: the same flames at its foot and up its length that
    every throw gives it (below), with the fire's sound, and Gilnid shouts "Mind the equipment!".
-   The spill itself is molten splashes, real spell visuals; its floor band is the optional extra. 1.4 sec later the plank goes: the pole and plank fall as
+   The spill itself is molten splashes, real spell visuals; its floor band is the optional extra (floor markers setting). With the markers off, every section hisses steam from the belch on and a flame kindles on it 0.5 sec before the spill reaches it (steam, then fire, so the lane advances in plain sight). 1.4 sec later the plank goes: the pole and plank fall as
    lumber and a plank lying on the floor, and he falls outward, away from the ramp, 2.6 yd past
    where he stood, in plain view (0.9 sec, his Fall pose). He lands sitting (SitGround, 1.3 sec),
    gets up (SitGroundUp, 1.2 sec) and fights with his wrench.
@@ -90,7 +90,7 @@ fallback when a ledge can't be placed are kept.
    moment the channel is marked. The line, the mark and his run start together: if his last line
    is less than 2 sec old he waits for it where he stands, so the mark never shows before the
    words. It has three looks, and a fourth as it goes out:
-   - **It will burn if he finishes** (quiet): a pale blue band on the floor its true size, and a
+   - **It will burn if he finishes** (quiet): a pale blue band on the floor its true size (only with the floor markers on), and a
      thin wisp of steam over each section. Nothing hurts.
    - **It burns in 1.2 sec**: the furnace glows, a whistle (3431), the band turns bright and full
      steam stands on every section.
@@ -166,7 +166,7 @@ are Gilnid's versions, for it to fold in:
 | --- | --- |
 | Debug damage counts as real | `perch_posture_share`: "debug" damage builds no posture on Gilnid or his crew (hook in `hurt_mob_as`) |
 | Effects play at the start of a windup | The blast plays when the stick blows (after its sit); the spill bursts where it arrives; the channel's mark stands from his line, the steam from the whistle, the flames only where the fire has come |
-| Small hazards draw nothing with markers off | The stick's blast is a ring on the floor while it sits; the spill and the channel are bands their true width (`GroundBurst`, drawn whatever the markers); steam and flames are real props |
+| Small hazards draw nothing with markers off | The stick's blast ring, the spill's band and the channel's bands are floor markers (`GroundWarn`, drawn only with the markers on). With them off the stick sparks and hisses, each spill section hisses steam and kindles a flame, and the channel has its steam, whistle and flames: real props |
 | Projectiles too fast to see | The stick is in the air at least 0.7 sec, in an arc of two flights |
 | Long windups freeze | The 3 sec fuse is Heavy Dynamite's own ready pose with the lit stick; the throw frame plays on release |
 | Things outlive their boss | Death, reset or a wipe takes the crew, planks, poles, sticks, flames, steam, the fire still to come and every mark |

@@ -146,7 +146,7 @@ fn he_reaches_the_valve_from_all_over_his_pit_works_it_only_there_and_the_fire_k
         let health = s.players[&hero].health;
         let mut marked = 0;
         while stage(&s, boss) == "to valve" && s.clock < t0 + 10.0 {
-            marked += step(&mut s).iter().filter(|e| matches!(e, Event::GroundBurst { shape: "line", .. })).count();
+            marked += step(&mut s).iter().filter(|e| matches!(e, Event::GroundWarn { shape: "line", .. })).count();
         }
         let ran = s.clock - t0;
         assert_eq!(stage(&s, boss), "working", "from {from:?}");
