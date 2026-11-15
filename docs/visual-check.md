@@ -316,6 +316,7 @@ yet run:
 | Scenario | What it films |
 | --- | --- |
 | `vancleef-ring` | Dev setup, by the cameraman, markers off: the ring of 8 guards, the warning head-shake near the line, the shove at the line (strike, dust, flash, "Nobody leaves."), a shove beside him, then the guards turning at 31%, "Cowards! All of you!", the open deck and their walk off |
+| `smite-rack-show` | Dev setup, markers off: the lit rack, his run there at 66% and 33%, the turn to face the hero, the sword thrown down where it stays, the held health at the rack, the shout as he lifts the axes and the hammer |
 
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
 `docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine

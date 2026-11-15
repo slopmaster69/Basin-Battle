@@ -1,0 +1,29 @@
+# The rack as a show (Nov 15). Dev setup, markers off, NOT a balance playtest.
+# Acceptance: the rack is lit (two lamps, objects in the world); at 66% he runs there, turns to
+# face the hero, kneels empty-handed and throws the sword down, where it stays; a hero hitting him
+# at the rack cannot take him below the line (the blows read as blocked); he stands with the axes
+# and shouts. The same at 33% for the hammer; the held blow at the second rack must not kill him.
+hero warrior
+cam 0 -22 13
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ES and ES.ClearMarks then ES.ClearMarks() end
+11 .es unbar all
+12 .es goto 2 -768 9.5 3.14
+12.5 .es clearfoes smite
+13 .es hurt 0 smite
+14 .es goto -10 -768 9.5 0
+15 .es spawn dm_smite
+15.1 video
+16 shots lit-rack 6 0.4
+22 .es heal
+26 .es hurt 0.6 smite
+26.1 shots first-change 30 0.3
+60 .es heal
+62 .es hurt 0.3 smite
+62.1 shots second-change 30 0.3
+96 .es hurt 0 smite
+96.1 shots cleanup 8 0.3
+101 end

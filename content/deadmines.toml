@@ -635,8 +635,8 @@ aggro_sound = 5775
   display = 130
   loadouts = [
     { weapon = 679, grip = "sword", patterns = ["sweep", "delayed overhead"] },
-    { weapon = 2061, off_hand = 2061, grip = "1h", patterns = ["axe pair", "crosscut"] },
-    { weapon = 2056, grip = "hammer", patterns = ["hammer slam", "hoof stomp"] },
+    { weapon = 2061, off_hand = 2061, grip = "1h", patterns = ["axe pair", "crosscut"], lift_text = "Axes! Let us see you block these!" },
+    { weapon = 2056, grip = "hammer", patterns = ["hammer slam", "hoof stomp"], lift_text = "Now you feel the hammer!" },
   ]
   [mob.attack]
   windup = 0.95
