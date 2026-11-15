@@ -1,7 +1,9 @@
 # Gilnid: trouble above the furnace
 
 Corey's revised design (Nov 9, "Deadmines bosses: review and redesign"). The lesson: **men on
-ledges above the drop can be brought down, and the furnace is Gilnid's last weapon.** The code is
+ledges above the drop come down when you strike the pole under them, and the furnace is Gilnid's
+last weapon.** (Nov 15, "One way down, and it is lit": the pole is the one answer, for melee and
+ranged alike, and it is lit. See the second engineer, beat 4.) The code is
 `crates/htl-survival/src/sim/perches.rs`; the numbers are in `content/deadmines.toml`.
 
 The fight was first built by Codex (#295, #299, #302, #304) with low crate-stack perches beside
@@ -22,6 +24,10 @@ fallback when a ledge can't be placed are kept.
   (ExcavationBarrierPole, 1508) from the pit floor up to the plank's underside. The engineer
   stands 2.4 yd out from the rail. The first stands 8.6 yd over the pit (rail top z 29.2), the
   second 9.7 (z 30.3); their planks splay apart. No crate stacks.
+- **Each pole is lit.** A tall torch (`FreestandingTorch04_HUGE`, the lamps of Rhahk'Zor's
+  surge) stands 1.3 yd from its foot, on the side toward the fight, with no hull and shown at
+  once. It goes out with the plank. Every tell of the pole is an object, a light or a sound, so it
+  reads with the add-on's Floor markers off.
 - Nothing new is added to the map: the ramp, rail and pit are the Deadmines' own floors, and the
   plank and pole are game objects with their own hulls (the client stands each engineer on his
   plank). `crates/htl-server/tests/gilnid_native.rs` checks every piece on the installed map:
@@ -55,16 +61,30 @@ fallback when a ledge can't be placed are kept.
 3. **The demonstration**, after that first stick blows, if no one has been brought down yet. The
    furnace belches (Molten Metal at its mouth) and 0.6 sec later a spill of molten iron runs from
    its foot to the first man's pole, a section every 1.5 yd, every 0.2 sec, each a small splash
-   (8) drawn as a line on the floor. Where it reaches, the pole takes light (flames, 397) and
-   Gilnid shouts "Mind the equipment!". 1.4 sec later the plank goes: the pole and plank fall as
+   (8). Where it reaches, the pole flares: the same flames at its foot and up its length that
+   every throw gives it (below), with the fire's sound, and Gilnid shouts "Mind the equipment!".
+   The spill itself is molten splashes, real spell visuals; its floor band is the optional extra. 1.4 sec later the plank goes: the pole and plank fall as
    lumber and a plank lying on the floor, and he falls outward, away from the ramp, 2.6 yd past
    where he stood, in plain view (0.9 sec, his Fall pose). He lands sitting (SitGround, 1.3 sec),
    gets up (SitGroundUp, 1.2 sec) and fights with his wrench.
 4. **The second engineer** throws in turn, a stick each time the last one has blown and 1.5 sec
-   passed. He comes down to one direct ranged hit (a projectile's own contact, not its splash, a
-   burn or zero damage), a melee blow on his pole from the pit floor (it cracks: the same fall),
-   or a blow on him from the ramp behind his plank. If none of those, after his third stick he
-   steps back off his plank onto the ramp (1 sec) and walks down it to fight.
+   passed. **One rule brings him down: strike his pole.** One melee blow on it from the pit floor
+   (in reach and facing, with a clear line), or one shot that passes within 0.9 yd of its middle
+   (plus the shot's radius) from the floor to the plank (the shot stops there): the pole cracks
+   and the plank goes, the same fall as the furnace's. Hits on the man himself hurt him and do
+   not bring him down (80 health: a ranged hero can also just kill him there).
+   - **The pole shows it.** It is lit by its torch all fight. From the moment a stick leaves his
+     hand until 1.5 sec after it blows, flames stand at the pole's foot and 2 more up its length,
+     with the fire's sound: the flare is the moment to strike. A floor mark at its foot is drawn
+     only if the player has Floor markers on.
+   - **No timer climbs him down.** The old climb after 3 sticks is gone. If nobody strikes the
+     pole he runs out of sticks: after his 6th (about 40 sec) he jumps, losing 40% of his health
+     (never his last point), and the plank falls with him. Chosen so a hero who cannot reach
+     the pole for a long time (a lone caster dodging) is never stuck with him throwing for
+     ever, and so the jump costs him what the answer would have saved.
+   - **Reachable on the real floor.** `gilnid_native.rs` checks, for both poles, a floor spot 1.5
+     yd from the foot toward his post, walkable from his post and from the way in, in reach of a
+     blow, and a clear line to the pole's middle from 8 yd back.
 5. **Workers on foot** fight with wrenches. When the last is down: "Useless. Every one of you."
 6. **The valve: a race.** At "Useless. Every one of you." he starts for the valve, and from that
    moment the channel is marked. The line, the mark and his run start together: if his last line
@@ -156,11 +176,12 @@ are Gilnid's versions, for it to fold in:
 
 ## Tests
 
-`perches_tests.rs` (35 sim tests): the planks, poles and heights; the fuse, the arc's two legs,
+`perches_tests.rs` (41 sim tests): the planks, poles and heights; the torches and the flare (flames
+up the pole, a sound, no floor ring as the tell); a strike on the pole drops him once, melee and a
+real fireball (which the pole stops), a shot wide or over it misses, hits on the man leave him up;
+left alone he throws 6 sticks and jumps hurt, and one at 3 health keeps 1; the fuse, the arc's two legs,
 the stick's sit and blast and the heavy-blow hold; the demonstration (belch, spill to the pole,
-fire, line, fall outward, sit, get up, fight); one fall per man from a projectile, a pole blow
-and a blow from the ramp; splash, burns and zero damage don't count; a corpse still falls; the
-second man's three throws and climb; no demonstration once a hero has dropped a man; his lines
+fire, line, fall outward, sit, get up, fight); a corpse still falls; no demonstration once a hero has dropped a man; his lines
 2 sec apart; the finish's flurry and stuck pose; debug posture; wipe, death and party handoff
 cleanup; a ledge without floor is left out and the fight goes on. The valve: the channel fixed in
 the world and marked from his line, never before it; the mark as long as the fire bites;

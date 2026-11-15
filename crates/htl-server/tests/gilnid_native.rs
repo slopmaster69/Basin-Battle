@@ -68,6 +68,25 @@ fn gilnid_is_seen_from_the_way_in_his_crew_stands_on_planks_over_the_pit_and_the
         }
         assert!(s.land().walk_clear(post, l.base) || s.land().path(post, l.base).is_some(), "a hero can walk to the pole");
         assert!(s.land().walk_clear(post, l.landing) || s.land().path(post, l.landing).is_some());
+        // The pole is the answer for everyone, so it must be reachable from where the fight is
+        // (his post and the way in): a hero can walk to a spot at its foot, in reach of a blow
+        // and in sight of it, and a shooter 8 yd back on the way to the post has a clear line
+        // to its middle.
+        let toward = htl_survival::facing(l.base, post);
+        let foot_spot = s.land().footing([l.base[0] + toward.cos() * 1.5, l.base[1] + toward.sin() * 1.5, l.base[2]]).expect("floor at the pole's foot");
+        assert!((foot_spot[2] - l.base[2]).abs() < 1.0, "the foot's floor is the pit's: {foot_spot:?}");
+        assert!(clear_line(s.land(), foot_spot, l.base), "a blow reaches the pole from {foot_spot:?}");
+        assert!(s.land().path(post, foot_spot).is_some() || s.land().walk_clear(post, foot_spot), "walkable from his post");
+        for from in &way_in {
+            assert!(s.land().path(*from, foot_spot).is_some() || s.land().walk_clear(*from, foot_spot), "walkable from the way in {from:?}");
+        }
+        let mid = [l.base[0], l.base[1], l.base[2] + 3.0];
+        let back = s.land().footing([l.base[0] + toward.cos() * 8.0, l.base[1] + toward.sin() * 8.0, l.base[2]]);
+        if let Some(b) = back {
+            let eye = [b[0], b[1], b[2] + 1.7];
+            println!("shooter spot {b:?} to pole middle {mid:?}");
+            assert!(clear_line(s.land(), eye, mid), "a shot from 8 yd back reaches the pole's middle");
+        }
         // Seen from his post: a hero beside him can shoot the man on the plank.
         assert!(clear_line(s.land(), post, l.stand), "the plank seen from his post");
         // The way back: onto the ramp behind the rail, and down it to the pit.

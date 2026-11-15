@@ -6,8 +6,9 @@
 //! in his hand, a stick thrown in an arc that sits sparking a second before it blows. Gilnid holds
 //! his heavy blows while one is live. After the first stick the furnace spills onto the first
 //! engineer's pole and sets it alight, and he falls in plain view, lands sitting and gets up to
-//! fight. The second comes down to one ranged hit, a blow on him or his pole, or climbs down after
-//! three throws. With the workers down Gilnid runs to the furnace's own valve, and the channel its
+//! fight. The second comes down to one blow on his pole, struck by hand or by a shot, and nothing
+//! else: each pole is lit by a torch at its foot and flares after each throw. If nobody strikes
+//! it he jumps after his sixth stick, hurt. With the workers down Gilnid runs to the furnace's own valve, and the channel its
 //! fire will take, the same one every fight, is marked on the floor from that moment. Knocked off
 //! the valve while his hands are on it, he's stopped for good: the mark goes out and he reels,
 //! open. Left to it: a whistle, steam along the channel, and a stripe of fire down it with dry
@@ -41,9 +42,24 @@ const POLE_HEIGHT: f32 = 23.87;
 const STAND_OUT: f32 = 2.4;
 const POLE_OUT: f32 = 3.6;
 const FALL_OUT: f32 = 2.6;
-/// Steps back onto the ramp this far behind the rail when he climbs down.
+/// Where the ramp's walkway lies behind the rail (the way back up, for the installed-data checks).
 const CLIMB_BACK: f32 = 2.5;
-const CLIMB_SECS: f32 = 1.0;
+/// The pole's torch stands this far from its foot, on the side toward the fight.
+const LAMP_OFF: f32 = 1.3;
+const LAMP_SCALE: f32 = 1.2;
+/// A shot strikes the pole when it passes within this far of its middle (plus its own radius),
+/// from the floor to the plank. Wider than the wood: the pole is 9 yd up a free aim.
+const POLE_HIT: f32 = 0.9;
+/// The pole flares this long after he lets go of a stick, longer than the stick is live.
+const FLARE_LONGER: f32 = 1.5;
+const FLARE_SCALE: f32 = 1.4;
+/// Flames up the pole besides the one at its foot.
+const FLARE_UP: usize = 2;
+/// The optional floor mark at its foot (the markers setting).
+const FLARE_RING: f32 = 1.8;
+/// Out of sticks: after this many of his own he jumps, hurt (this share of his health is lost).
+const STICKS_IN_HAND: u32 = 6;
+const JUMP_COST: f32 = 0.4;
 /// Low lumber where a pole stood, the stick on the floor (GunShopDynamite), small flames
 /// (UndeadFireSmall, particles only), and the valve steam.
 const LUMBER: u32 = 1108;
@@ -68,8 +84,6 @@ const LEG_TICK: f32 = 0.05;
 /// The first stick is lit this long after the pull, the next this long after one blows.
 const FIRST_THROW: f32 = 1.5;
 const NEXT_THROW: f32 = 1.5;
-/// The second engineer climbs down after this many throws of his own.
-const THROWS_BEFORE_CLIMB: u32 = 3;
 /// The demonstration: the furnace belches this long after the first stick blows, the spill runs
 /// a section each `SPILL_GAP`, and the plank drops this long after his pole takes light.
 const BELCH_AFTER: f32 = 0.6;
@@ -217,7 +231,6 @@ struct Stick {
 
 struct Demo {
     worker: Id,
-    base: Vec3,
     alight_at: f32,
     drop_at: f32,
     alight: bool,
@@ -245,6 +258,8 @@ struct Worker {
     base: Vec3,
     landing: Vec3,
     climb: Vec3,
+    /// The torch at his pole's foot, until the plank goes.
+    lamp: Option<Id>,
     out: f32,
     grounded: usize,
     throws: u32,
@@ -256,7 +271,6 @@ struct Worker {
 enum Place {
     Perched,
     Falling { from: Vec3, since: f32 },
-    Climbing { since: f32 },
     Ground,
 }
 
@@ -405,7 +419,7 @@ impl Survival {
             m.home = l.landing;
             m.facing = def.out;
             self.perches.workers.insert(id, Worker { owner, plank, support, stand: l.stand, base: l.base,
-                landing: l.landing, climb: l.climb, out: def.out, grounded: ground, throws: 0, up_at: None, state: Place::Perched });
+                landing: l.landing, climb: l.climb, lamp: None, out: def.out, grounded: ground, throws: 0, up_at: None, state: Place::Perched });
             workers.push(id);
         }
         let valve = self.ground_near(home[0] + d.valve[0], home[1] + d.valve[1], home[2]);
@@ -424,6 +438,14 @@ impl Survival {
             channel: Vec::new(), channel_yaw, wisps: Vec::new(), paint_at: 0.0, fire_at: 0.0,
             stage: Stage::Crew, lines: VecDeque::new(), said_at: None, stuck_until: 0.0,
         });
+        // Each pole is lit where a hero stands to strike it: a torch at its foot, toward the fight.
+        let lit: Vec<(Id, Vec3)> = self.perches.crews[&owner].workers.iter().map(|id| (*id, self.perches.workers[id].base)).collect();
+        for (id, base) in lit {
+            let spot = along(base, facing(base, home), LAMP_OFF);
+            let spot = self.ground_near(spot[0], spot[1], base[2]);
+            let lamp = self.perch_visual(owner, spot, super::bosses::LINE_LAMP, LAMP_SCALE, 0.0, None);
+            self.perches.workers.get_mut(&id).unwrap().lamp = Some(lamp);
+        }
         let reach = STRIPE_STEP * (STRIPE_MOST - 1) as f32;
         let channel = self.perch_run_points(owner, along(valve, channel_yaw, CHANNEL_OUT), channel_yaw, reach, STRIPE_STEP);
         if channel.len() < CHANNEL_LEAST || stand.is_none() {
@@ -547,9 +569,9 @@ impl Survival {
             if busy || now < c.next_throw { continue; }
             let perched: Vec<_> = ids.iter().copied().filter(|id| alive(self, id)
                 && self.perches.workers.get(id).is_some_and(|w| matches!(w.state, Place::Perched))).collect();
-            // Three throws and he climbs down rather than wait to be knocked off.
-            if let Some(&id) = perched.iter().find(|id| self.perches.workers[id].throws >= THROWS_BEFORE_CLIMB) {
-                self.climb_down(id);
+            // Out of sticks he jumps, hurt: nobody is left to wait on a pole nobody struck.
+            if let Some(&id) = perched.iter().find(|id| self.perches.workers[id].throws >= STICKS_IN_HAND) {
+                self.jump_down(id);
                 continue;
             }
             // In turn: the first until the furnace takes him down, then the next.
@@ -575,7 +597,7 @@ impl Survival {
         let moving: Vec<_> = self.perches.workers.iter().map(|(id, w)| (*id, w.state)).collect();
         for (id, state) in moving {
             let w = &self.perches.workers[&id];
-            let (to, climb, stand, ground, out) = (w.landing, w.climb, w.stand, w.grounded, w.out);
+            let (to, ground) = (w.landing, w.grounded);
             match state {
                 Place::Falling { from, since } => {
                     let t = ((now - since) / FALL_SECS).clamp(0.0, 1.0);
@@ -598,19 +620,6 @@ impl Survival {
                         self.events.push(Event::HoldPose { id, clip: SIT_CLIP, secs: SIT_SECS, from: None });
                         self.perches.workers.get_mut(&id).unwrap().up_at = Some(now + SIT_SECS);
                     }
-                }
-                Place::Climbing { since } => {
-                    let t = ((now - since) / CLIMB_SECS).clamp(0.0, 1.0);
-                    let Some(m) = self.mobs.get_mut(&id) else { continue };
-                    m.pos = [stand[0] + (climb[0] - stand[0]) * t, stand[1] + (climb[1] - stand[1]) * t, stand[2] + (climb[2] - stand[2]) * t];
-                    m.path.clear();
-                    if t < 1.0 { continue; }
-                    m.def = ground;
-                    m.home = climb;
-                    m.facing = out + std::f32::consts::PI;
-                    self.events.push(Event::MobGear { id });
-                    self.events.push(Event::MobStop { id, pos: climb, facing: out + std::f32::consts::PI });
-                    self.perches.workers.get_mut(&id).unwrap().state = Place::Ground;
                 }
                 Place::Ground => {
                     if self.perches.workers[&id].up_at.is_some_and(|t| now >= t) {
@@ -686,14 +695,14 @@ impl Survival {
         let points = self.perch_run_points(owner, foot, dir, reach, SPILL_STEP);
         let n = self.perch_run(owner, &points, dir, 1.0, start, SPILL_GAP, 8);
         let alight_at = start + n as f32 * SPILL_GAP;
-        self.perches.crews.get_mut(&owner).unwrap().demo = Some(Demo { worker, base, alight_at, drop_at: alight_at + ALIGHT_SECS, alight: false });
+        self.perches.crews.get_mut(&owner).unwrap().demo = Some(Demo { worker, alight_at, drop_at: alight_at + ALIGHT_SECS, alight: false });
     }
 
     /// The demonstration's beats; true while it runs.
     fn step_perch_demo(&mut self, owner: Id) -> bool {
         let now = self.clock;
         let Some(d) = self.perches.crews[&owner].demo.as_ref() else { return false };
-        let (worker, base, alight_at, drop_at, alight) = (d.worker, d.base, d.alight_at, d.drop_at, d.alight);
+        let (worker, alight_at, drop_at, alight) = (d.worker, d.alight_at, d.drop_at, d.alight);
         if !self.perches.workers.get(&worker).is_some_and(|w| matches!(w.state, Place::Perched)) {
             // Knocked down another way meanwhile: the lesson is learned.
             self.perches.crews.get_mut(&owner).unwrap().demo = None;
@@ -701,8 +710,8 @@ impl Survival {
         }
         if !alight && now >= alight_at {
             self.perches.crews.get_mut(&owner).unwrap().demo.as_mut().unwrap().alight = true;
-            let flame = self.perch_visual(owner, base, FIRE, 1.0, 0.0, Some(drop_at + 2.5));
-            self.events.push(Event::Sound { id: flame, sound: 1484 }); // Fire Cast.
+            // The same glow a throw gives his pole, so the lesson is the one to use.
+            self.flare_pole(owner, worker, drop_at - now + 2.5);
             self.perch_say(owner, "Mind the equipment!");
         }
         if now >= drop_at {
@@ -758,31 +767,35 @@ impl Survival {
             blockable: false, heavy: false, land_at: blows, mark, look: a.look });
         let w = self.perches.workers.get_mut(&id).unwrap();
         w.throws += 1;
+        // His pole flares from the throw until a moment after the stick blows: the answer.
+        self.flare_pole(owner, id, blows - now + FLARE_LONGER);
         let c = self.perches.crews.get_mut(&owner).unwrap();
         c.legs.push((now + first, id, a.spell, top, at));
         c.sticks.push(Stick { thrower: id, at, lands, blows, landed: false });
         true
     }
 
-    /// He steps back off his plank onto the ramp and comes down it to fight.
-    fn climb_down(&mut self, id: Id) {
-        let Some(w) = self.perches.workers.get(&id).filter(|w| matches!(w.state, Place::Perched)) else { return };
-        let (from, to) = (w.stand, w.climb);
-        self.perch_hold(id, CLIMB_SECS);
-        self.perches.workers.get_mut(&id).unwrap().state = Place::Climbing { since: self.clock };
-        self.events.push(Event::MobMove { id, path: vec![from, to], speed: length(from, to) / CLIMB_SECS, face: None });
+    /// Out of sticks and left alone on his plank: he jumps, losing `JUMP_COST` of his health (never
+    /// his last point), and falls as a struck pole drops him.
+    fn jump_down(&mut self, id: Id) {
+        if let Some(m) = self.mobs.get_mut(&id).filter(|m| m.health > 0) {
+            let cost = (m.max_health as f32 * JUMP_COST) as u32;
+            m.health = m.health.saturating_sub(cost).max(1);
+        }
+        self.drop_perch(id);
     }
 
-    /// A real projectile hit, a blow on him or his pole, or the furnace drops him exactly once:
+    /// A blow or a shot on his pole, the furnace, his own jump or his death drops him exactly once:
     /// the plank goes, and he falls outward in plain view.
     pub(crate) fn drop_perch(&mut self, id: Id) {
         let Some(w) = self.perches.workers.get(&id).filter(|w| matches!(w.state, Place::Perched)) else { return };
-        let (owner, support, plank, base, out) = (w.owner, w.support, w.plank, w.base, w.out);
+        let (owner, support, plank, base, out, lamp) = (w.owner, w.support, w.plank, w.base, w.out, w.lamp);
         let Some(from) = self.mobs.get(&id).map(|m| m.pos) else { return };
         let landing = self.perches.workers[&id].landing;
         self.perch_hold(id, FALL_SECS);
         self.perches.workers.get_mut(&id).unwrap().state = Place::Falling { from, since: self.clock };
-        for prop in [support, plank] { self.perch_gone(owner, prop); }
+        for prop in [support, plank].into_iter().chain(lamp) { self.perch_gone(owner, prop); }
+        self.perches.workers.get_mut(&id).unwrap().lamp = None;
         // The broken pole and the plank lie where they fell, without hulls to trip on.
         self.perch_visual(owner, base, LUMBER, 1.0, out, None);
         let lie = self.ground_near(base[0] + out.cos() * 1.2, base[1] + out.sin() * 1.2, base[2]);
@@ -802,19 +815,63 @@ impl Survival {
         }
     }
 
-    /// A hero's swing: a pole in reach on the hero's floor cracks and drops its man; so does a
-    /// blow on the man himself, from the ramp behind him.
+    /// A hero's swing: a pole in reach on the hero's floor cracks and drops its man. A blow on the
+    /// man himself hurts him and does no more: the pole is the one way down.
     pub(crate) fn swing_on_perches(&mut self, hero: Id, face: f32, range: f32, arc: f32) {
         let Some(pos) = self.players.get(&hero).map(|p| p.pos) else { return };
-        let reach = |at: Vec3, rise: f32| dist2d(pos, at) <= range + 0.6 && (pos[2] - at[2]).abs() < rise
-            && angle_between(face, facing(pos, at)) <= arc / 2.0;
-        let hits: Vec<_> = self.perches.workers.iter().filter(|(id, w)| matches!(w.state, Place::Perched)
-            && ((reach(w.base, 2.0) && clear_line(self.land.as_ref(), pos, w.base))
-                || self.mobs.get(id).is_some_and(|m| m.health > 0 && reach(m.pos, 2.5)))).map(|(id, _)| *id).collect();
+        let hits: Vec<_> = self.perches.workers.iter().filter(|(_, w)| matches!(w.state, Place::Perched)
+            && dist2d(pos, w.base) <= range + 0.6 && (pos[2] - w.base[2]).abs() < 2.0
+            && angle_between(face, facing(pos, w.base)) <= arc / 2.0
+            && clear_line(self.land.as_ref(), pos, w.base)).map(|(id, _)| *id).collect();
         for id in hits {
             self.perch_hurt(id, hero);
             self.drop_perch(id);
         }
+    }
+
+    /// Some engineer is still perched (the cheap test before a shot looks for a pole).
+    pub(crate) fn perches_standing(&self) -> bool {
+        self.perches.workers.values().any(|w| matches!(w.state, Place::Perched))
+    }
+
+    /// How far along its flight a shot from `from` along `dir` (for `go` yd, `radius` wide) first
+    /// strikes a standing pole, and whose it is. A pole is struck from the floor to its plank.
+    pub(crate) fn perch_pole_shot(&self, from: Vec3, dir: Vec3, go: f32, radius: f32) -> Option<(Id, f32)> {
+        let poles: Vec<_> = self.perches.workers.iter().filter(|(_, w)| matches!(w.state, Place::Perched))
+            .map(|(id, w)| (*id, w.base, w.stand[2] - PLANK_THICK)).collect();
+        if poles.is_empty() { return None; }
+        let mut d = 0.0f32;
+        loop {
+            let q = [from[0] + dir[0] * d, from[1] + dir[1] * d, from[2] + dir[2] * d];
+            for (id, base, top) in &poles {
+                if q[2] >= base[2] && q[2] <= *top && dist2d(q, *base) <= POLE_HIT + radius { return Some((*id, d)); }
+            }
+            if d >= go { return None; }
+            d = (d + 0.25).min(go);
+        }
+    }
+
+    /// A hero's shot found the pole: it drops its man, as a blow would.
+    pub(crate) fn perch_pole_struck(&mut self, id: Id, by: Id) {
+        self.perch_hurt(id, by);
+        self.drop_perch(id);
+    }
+
+    /// His pole flares for `secs`: flames at its foot and up its length (so it glows from across
+    /// the pit) with the fire's sound. The tell is these objects; a floor mark at its foot is only
+    /// the optional extra, drawn through the markers setting. After each throw, and when the
+    /// furnace's spill reaches it.
+    fn flare_pole(&mut self, owner: Id, id: Id, secs: f32) {
+        let Some((base, top)) = self.perches.workers.get(&id).filter(|w| matches!(w.state, Place::Perched))
+            .map(|w| (w.base, w.stand[2] - PLANK_THICK)) else { return };
+        let until = Some(self.clock + secs);
+        let flame = self.perch_visual(owner, base, FIRE, FLARE_SCALE, 0.0, until);
+        for k in 1..=FLARE_UP {
+            let z = base[2] + (top - base[2]) * k as f32 / (FLARE_UP + 1) as f32;
+            self.perch_visual(owner, [base[0], base[1], z], FIRE, FLARE_SCALE, 0.0, until);
+        }
+        self.events.push(Event::Sound { id: flame, sound: 1484 }); // Fire Cast.
+        self.mark(base, FLARE_RING, secs);
     }
 
     /// The sections of a run along the floor from `from` along `yaw`, one each `step` for

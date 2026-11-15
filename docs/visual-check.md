@@ -286,6 +286,7 @@ of 0.4 sec, reading his place after each):
 | `gilnid-valve-stopped-pov`, `gilnid-valve-fire-pov` | The same two on the hero's own screen |
 | `gilnid-valve-stood` | Dev setup, the hero's own screen: a hero who stays in the channel to the end |
 | `gilnid-valve-fight`, `gilnid-valve-fight-healed` | A real pull by a small player in the interface, no debug kills; the second healed throughout |
+| `gilnid-pole` | Not yet filmed: the lit poles, the flare after each throw, the furnace's lesson on the first pole, one blow on the second pole, his fall |
 | `gilnid-valve`, `gilnid-ledges`, `gilnid-plank` | The older takes: the valve left alone seen from the side, the crew on their planks, his wait under a plank |
 
 Rhahk'Zor's slam (how he brings the mine down at 70%: `content/deadmines.toml`,
