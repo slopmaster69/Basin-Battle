@@ -2677,6 +2677,10 @@ impl Survival {
         if self.firing_alone(id) {
             a.cooldown = 0.0;
         }
+        // His last gunner left shoots on every beat and harder (`sim::firing_line`).
+        if self.firing_last_gunner(id) {
+            a.damage = (a.damage as f32 * super::firing_line::LAST_MIGHT).round() as u32;
+        }
         // A blow held a beat (the delayed swing).
         a.windup += m.hold;
         // Quicker (and harder) in its later phases.
