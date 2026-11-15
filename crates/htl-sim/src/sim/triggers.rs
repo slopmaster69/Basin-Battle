@@ -574,3 +574,48 @@ impl Sim {
         p.spells.iter().find(|o| kit.spells[o.spell].visual() == visual).map(|o| o.spell)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::Content;
+
+    /// Every "within N yd" in `text` that follows the word "allies".
+    fn ally_yards(text: &str) -> Vec<f32> {
+        text.split("allies within ").skip(1).filter_map(|r| r.split(" yd").next()?.parse().ok()).collect()
+    }
+
+    #[test]
+    fn team_texts_say_the_yards_the_sim_uses() {
+        let content = Content::builtin();
+        let mut seen = (0, 0);
+        for kit in &content.kits {
+            // A perk's team buff or team heal reaches `TEAM_YARDS`.
+            for spell in &kit.spells {
+                for perk in &spell.perks {
+                    let team = perk.triggers.iter().any(|t| t.heal_team > 0.0 || t.buff.as_ref().is_some_and(|b| b.team));
+                    for y in ally_yards(&perk.text) {
+                        assert!(team, "{}/{} says allies within {y} yd but has no team effect", spell.key, perk.key);
+                        assert_eq!(y, TEAM_YARDS, "{}/{}: {}", spell.key, perk.key, perk.text);
+                        seen.0 += 1;
+                    }
+                }
+            }
+            // A talent's team aura reaches `TEAM_AURA_YARDS`, but max health is the whole team's
+            // (Fortitude: it has no reach), so its text says no yards.
+            for t in &kit.talents {
+                let aura = t.effects.iter().any(|e| e.team.iter().any(|(k, _)| k != "health"));
+                let health_only = !aura && t.effects.iter().any(|e| !e.team.is_empty());
+                let yards = ally_yards(&t.text);
+                assert!(!(health_only && !yards.is_empty()), "{}: team health has no reach: {}", t.key, t.text);
+                for y in yards {
+                    if aura {
+                        assert_eq!(y, super::super::players::TEAM_AURA_YARDS, "{}: {}", t.key, t.text);
+                        seen.1 += 1;
+                    }
+                }
+            }
+        }
+        assert!(seen.0 >= 5 && seen.1 >= 5, "the texts that say a team's reach: {seen:?}");
+    }
+}

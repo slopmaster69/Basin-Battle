@@ -225,7 +225,7 @@ const ALLY_TRACE: f32 = 1.0;
 /// How far off the reticle's line a foe may be for Soul Swap to find it (degrees).
 const SPREAD_CONE: f32 = 20.0;
 /// A frozen foe struck by a shattering ability takes this many times the damage.
-const SHATTER: f32 = 1.5;
+pub const SHATTER: f32 = 1.5;
 /// A dash runs this fast; a blink's landing must be this near the ground the line meets.
 const DASH_SPEED: f32 = 30.0;
 /// How far a projectile goes in one step of its flight.

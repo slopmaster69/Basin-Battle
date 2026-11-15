@@ -45,7 +45,7 @@ pub const WILD_SECS: f32 = 4.0;
 pub const WILD_STAMINA: [f32; 3] = [25.0, 30.0, 35.0];
 pub const WILD_DAMAGE: [f32; 3] = [12.0, 18.0, 30.0];
 /// Empowered (a parry or a perfect dodge in the last `WILD_PRIMED_SECS`): this much more damage.
-const WILD_EMPOWERED: f32 = 1.25;
+pub const WILD_EMPOWERED: f32 = 1.25;
 /// A parry or a perfect dodge empowers the next call this long. (Play-test: a landed hit or an
 /// arrow empowered it too, so from range every call was half price. Now it pays for the core's
 /// own moves, and only for a few seconds: answer the parry with a beast.)
@@ -87,9 +87,9 @@ const CALL_CONE: f32 = 0.6;
 const CALL_AIM_FRESH: f32 = 2.0;
 /// Arrow Recall: a foe struck by this many arrows or more is Lacerated, a second longer for each
 /// past it.
-const LACERATE_AT: u32 = 3;
-const LACERATE_DPS: f32 = 4.0;
-const LACERATE_SECS: f32 = 4.0;
+pub const LACERATE_AT: u32 = 3;
+pub const LACERATE_DPS: f32 = 4.0;
+pub const LACERATE_SECS: f32 = 4.0;
 /// A bleed's look (Rend's).
 const BLEED_AURA: u32 = 772;
 /// Arrow Recall's hand: the arm goes out at the press (a held pose, `Emotes.dbc` STATE_POINT) and

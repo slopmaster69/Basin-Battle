@@ -1926,6 +1926,8 @@ impl Sim {
 
 /// Whether reaching level `l` brings a card pick.
 /// Soul Harvest counts kills up to this many tens.
+/// How far a talent's team aura reaches ("you and allies within 30 yd"): what class texts say.
+pub(super) const TEAM_AURA_YARDS: f32 = 30.0;
 pub(crate) const SOUL_HARVEST_STACKS: u32 = 200;
 
 pub(super) fn level_pick(l: u32) -> bool {
@@ -2117,19 +2119,19 @@ fn apply_effect(s: &mut Stats, acc: &mut Adds, e: &crate::kit::TalentEffect, ran
         match k.as_str() {
             "damage" => {
                 s.shout += v;
-                s.shout_radius = 30.0;
+                s.shout_radius = TEAM_AURA_YARDS;
             }
             "haste" => {
                 s.team_haste += v;
-                s.team_haste_radius = 30.0;
+                s.team_haste_radius = TEAM_AURA_YARDS;
             }
             "regen" => {
                 s.team_regen += v;
-                s.team_regen_radius = 30.0;
+                s.team_regen_radius = TEAM_AURA_YARDS;
             }
             "taken" => {
                 s.devotion += v;
-                s.devotion_radius = 30.0;
+                s.devotion_radius = TEAM_AURA_YARDS;
             }
             "health" => s.team_health += v,
             _ => {}
