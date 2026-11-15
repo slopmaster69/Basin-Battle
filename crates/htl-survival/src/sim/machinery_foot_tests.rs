@@ -104,19 +104,6 @@ fn warrior(seed: u64, guards: bool, open_only: bool, react: f32, secs: f32, star
     run
 }
 
-/// From farther out, and with a slow guard.
-#[test]
-fn sneed_on_foot_is_measured_from_farther_out() {
-    for start in [4.0f32, 8.0, 14.0] {
-        for react in [0.3f32, 0.5] {
-            for seed in [2u64, 7] {
-                let r = warrior(seed, true, false, react, 40.0, start);
-                println!("from {start} yd, guard {react} sec late, seed {seed}: first hit {:?}, {} hits, {} in his opening, closed {:?}, wrench hits {}, blows taken {}, dead {:?}, {} flurries, {} throws", r.hits.first(), r.hits.len(), r.in_open, r.closed, r.wrenched, r.struck, r.dead_at, r.flurries, r.throws);
-            }
-        }
-    }
-}
-
 /// A warrior who strikes whenever in reach lands a first blow soon after he is up, whether they
 /// start 4, 8 or 14 yd off, with or without the guard for his flurry (`-- --nocapture` prints it):
 /// he backs off slower than they close and his wrench (a 1 sec wind-up) stops nobody.
