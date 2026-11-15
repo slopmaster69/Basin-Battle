@@ -265,3 +265,54 @@ fn the_ring_sits_on_the_open_deck_and_every_shove_on_it_lands_on_dry_boards_insi
 fn floor(s: &Survival, x: f32, y: f32, deck: f32) -> [f32; 3] {
     [x, y, s.land().height_near(x, y, deck + 1.0)]
 }
+
+/// Unbowed on the real deck, from where the first form's lit spot is: he is the pack, so no rise,
+/// and the secret is not needed to see his turned Invitation (docs/vancleef-encounter.md).
+fn unbowed_fight(hero_at: [f32; 3]) -> (Survival, Id, Id) {
+    let data = std::env::var("WOW_DATA").expect("set WOW_DATA to installed Data directory");
+    let land = DeadminesLand::new(htl_map::deadmines::load(std::path::Path::new(&data)).unwrap());
+    let mut c = Content::builtin();
+    let def = c.mob("dm_vancleef_unbowed").unwrap();
+    let d = c.dungeon.as_mut().unwrap();
+    d.packs.retain(|p| p.mob == "dm_vancleef");
+    d.doors.clear();
+    d.packs[0].mob = "dm_vancleef_unbowed".into();
+    d.packs[0].at = [-70.0, -819.5];
+    d.packs[0].z = Some(40.62);
+    let mut s = Survival::new_dungeon(c, Box::new(land), 7, 0.0);
+    let boss = *s.mobs.iter().find(|(_, m)| m.def == def).unwrap().0;
+    let hero = s.join("sternproof", "Sternproof", None);
+    s.players.get_mut(&hero).unwrap().last_safe = s.mobs[&boss].home;
+    s.move_player(hero, hero_at, std::f32::consts::PI, Default::default());
+    step(&mut s, hero);
+    (s, hero, boss)
+}
+
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn unbowed_turned_invitation_thrust_stays_on_the_open_deck_wherever_the_hero_stands() {
+    // Near him, at the east rail (the deck's far edge from his door), and at the north rail.
+    for at in [[-66.0, -819.5, 41.0], [-56.4, -819.0, 41.9], [-64.0, -809.0, 41.4]] {
+        let (mut s, hero, boss) = unbowed_fight(at);
+        let deck = 40.62;
+        let (mut thrusts, mut invitations) = (0, 0);
+        for k in 0..1200 {
+            // The hero stands where they were put (a hero who walks off is the unit tests' case).
+            if k % 10 == 0 {
+                let p = s.players[&hero].pos;
+                if dist2d(p, at) > 1.0 { s.move_player(hero, at, std::f32::consts::PI, Default::default()); }
+            }
+            for e in step(&mut s, hero) {
+                match e {
+                    Event::MobWindup { id, clip: 85, blockable: false, .. } if id == boss => thrusts += 1,
+                    Event::MobGuard { id, up: true } if id == boss => invitations += 1,
+                    _ => {}
+                }
+            }
+            let pos = s.mobs[&boss].pos;
+            assert!(dry_open_deck(&s, pos, deck), "he stays on the open deck: {pos:?} (hero at {at:?})");
+        }
+        println!("hero at {at:?}: {invitations} Invitations, {thrusts} thrusts in 60 sec, he ended at {:?}", s.mobs[&boss].pos);
+        assert!(invitations >= 2 && thrusts >= 2, "the turned Invitation comes round, and the thrust with it: {invitations}, {thrusts}");
+    }
+}
