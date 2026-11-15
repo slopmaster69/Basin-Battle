@@ -13,11 +13,13 @@ is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (t
    (AttackUnarmed, either take) every 3.2 sec, sparks off the blade, the saw's sound. It notices a
    hero as any creature does, turns to face them (0.8 sec), "Clear the floor!", and walks in at its
    Walk clip's own pace (2.5 yd a second) until it's in reach. Its first blow comes only then.
-2. **Saw sweep.** The arm swings out (AttackUnarmed take 0, 1 sec), the saw revs with sparks every
-   0.35 sec. A guard stops it, or get behind it or out of its 4.7 yd. One vent puff after.
-3. **Stamp and rake.** A foot rises and lands (CreatureSpecial, 1.1 sec), dust where it lands, no
-   guard stops it. Then a blockable rake (AttackUnarmed take 1, 0.7 sec). Now the vents pour steam
-   (a puff every 0.5 sec) with a hiss.
+2. **Saw sweep.** The arm swings out (AttackUnarmed take 0, 1 sec), the saw's whine keeps revving
+   with sparks every 0.35 sec. A guard stops it, or get behind it or out of its 4.7 yd. One vent
+   puff after.
+3. **Stamp and rake.** A foot rises and lands (CreatureSpecial, 1.1 sec), two thumps and low dust
+   on the way up, dust where it lands, no guard stops it. Then a blockable rake (AttackUnarmed take
+   1, 0.7 sec), two clanks and glints of its tines on the way. Now the vents pour steam (a puff
+   every 0.5 sec) with a hiss.
 4. **Grind,** at full heat. It plants and stops turning, its legs churning in place (its Run,
    held 1.4 sec, the engine racing and smoking): "That'll cut it!" Then it drives 6 yd straight in
    0.9 sec, its legs running, chips and sparks off the floor every 0.2 sec. Its 3 yd lane checks
@@ -51,7 +53,7 @@ is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (t
    Nothing reaches him until he is up. The wreck smokes while he can still mend it.
 8. **Sneed on foot.** He backs off, facing his foe, to 8 yd at 4 yd a second (slower than a hero
    runs). A wrench every 6 sec, then a 4 yd scramble. Caught within 3.4 yd, he flurries three
-   blows, then is open 1.4 sec, hunched (StandWound, held).
+   blows, then is open 2.4 sec, hunched (StandWound, held).
 9. **The repair, once: a race.** No sooner than 6 sec after he is up, at a safe moment: "Just...
    one... bolt..." and he runs (5 yd a second) to his one work place beside the wreck, under the
    log. 4.2 sec of hammering (Mining) under a cast bar; the wreck coughs at each quarter, "She's
@@ -70,6 +72,26 @@ A wipe at any point (the machine on its run, Sneed inside, on foot, mid-repair, 
 or down) puts back one whole machine at its post and hangs the log again over a clean floor; a
 lamp rest does too. Only Sneed's death awards plunder and gear and clears the pack; the wreck,
 the lumber and the fallen log go with his body.
+
+## Three wind-ups, three tells
+
+With the add-on's "Floor markers" off (its default) the three wind-ups must tell themselves apart
+on the machine, before they land, and no timing changed (saw 1.0 sec, stamp 1.1, rake 0.7). Each
+is its own clip and its own sound and visual, none shared (`machine_rev` in `machinery.rs`):
+
+| Move | Pose | Sound | Visual | Beats |
+| --- | --- | --- | --- | --- |
+| Saw sweep | AttackUnarmed take 0, the arm out to the side | The saw's whine (1977), again at each spark after the first | Sparks off the blade (the parry kit 555) every 0.35 sec | Three sparks, the blow after the third |
+| Stamp | CreatureSpecial, a foot rising | Its cry (1981), a heavy thud (921) at once and half way, one more as it lands | Low dust (5930) at once and half way, a dust nova where it lands | Thump, thump, THUD |
+| Rake | AttackUnarmed take 1, the arm drawn back | A clank (1978: the machine's own, not the saw's 1977 it used to share) at once and half way | Cleave's flash (507) on the tines at once and half way | Clank, clank, blow |
+
+The vents' hiss and steam belong to the heat after the string, never to a wind-up, and the stall's
+backfire (971) and sputter stay the stall's. The clank (1978) is also the stall's sputter, a
+different phase (the held slump, no wind-up) a hero is never in danger in. Pose is unchanged: the three clips were
+already distinct; what looked alike was the sound (the rake used the saw's) and the stamp having
+no tell until it landed. Nothing here has been seen in the client, and a distinct held pose per
+move would need a client patch (a whole-body clip per wind-up the add-on cannot make from the
+server's events), left out.
 
 ## The rigged log
 
@@ -122,6 +144,25 @@ The repair was 4 sec and any hit stopped it. It was expected to grow to 7 to 9 s
 stake is so close to where a hero fights him that a longer repair is won at a stroll, so its
 length stayed and what stops it changed.
 
+## Sneed on foot, by measure
+
+A scripted warrior (`machinery_foot_tests.rs` on flat ground; `shredder_rig.rs`,
+`a_warrior_who_plays_it_right_...`, on the real Mast Room floor from four stands) runs at him as he
+gets up, guards his flurry (the guard up 0.3 sec into its first wind-up), and strikes whenever in
+reach or only in his opening.
+
+| What | Measure | So |
+| --- | --- | --- |
+| Closing | Flat ground, from 4, 8 and 14 yd: first blow 0.45, 1.5 and 1.9 sec after he is up, dead in 7 to 19 sec. Real floor: first blow 0.3 to 3.3 sec after, from the wreck, the walkway, the low floor and the door | He backs off at 4 yd a sec and a hero runs 7: he is always reached. His wrench (1 sec of wind-up, 16 damage) stopped no approach |
+| His flurry | Guarded by the real-kit warrior: the last blow tears the guard (below) | A fair answer, the guard costs the opening |
+| His opening, as it was (1.4 sec) | A warrior who guarded all three blows has 0 stamina at the opening (blocks cost 23, 23 and the heavy last blow the rest) and the last blow tears the guard: staggered 1.5 sec. Their first blow came 1.9 sec after it began: 5 of 6 openings at the real floor's stands were missed | **No hero who plays it right could hit him.** The cause of "no take ever landed a hit" |
+| His opening now (2.4 sec) | Same warrior: the first blow lands 1.9 sec in, every time, at all four stands | **2.4 sec**: 0.5 sec to spare. The one number changed (the last blow's `recovery`) |
+| A hero who dodges the last blow | Never staggered: strikes at once | Dodging is still the better answer |
+
+Not changed: the flurry's blows, his range, his pace (4 yd a sec), the wrench's 6 sec. A hero who
+stands just outside his 3.4 yd (3.43 yd flat) pokes him with a weapon of that reach and draws only
+the wrench every 6 sec: that is a hit-and-wait answer, not a lock-out.
+
 ## Health and sizes
 
 The machine has 950 base health and 320 posture; Sneed 340 and 160. The machine's legs stand
@@ -136,7 +177,7 @@ fight only.
 
 | Shared fix | Here |
 | --- | --- |
-| Punish windows look like idling | The stall's slump: JumpEnd caught with the legs buckled and held still (`freeze_open_pose`, the add-on's `FZ`), a backfire, then smoke, sparks and a sputter until the engine catches 1 sec before the end; Sneed's open 1.4 sec holds GoblinMale's StandWound (`hold_open_pose` 8). Neither is flinched out of by the hits that punish it |
+| Punish windows look like idling | The stall's slump: JumpEnd caught with the legs buckled and held still (`freeze_open_pose`, the add-on's `FZ`), a backfire, then smoke, sparks and a sputter until the engine catches 1 sec before the end; Sneed's open 2.4 sec holds GoblinMale's StandWound (`hold_open_pose` 8). Neither is flinched out of by the hits that punish it |
 | Debug damage counts as real | `machinery_debug`: debug damage builds no posture on either form and never stops the repair |
 | Second forms are instant swaps | Sneed hidden in the wreck until it has collapsed, then seen lying in its scrap and getting up 3 sec before his line; the rebuilt machine heaves up and waits 2 sec |
 | Deaths lag | Either form sends `HoldPose` 0 as it falls, letting go of a held slump, rev or hunch |
@@ -193,7 +234,9 @@ fight lost in a stall), the run back and the crash,
 Sneed's crawl, the 2 sec lines, his footwork, the log (the cut, the creak, who it stuns, the
 marks, one use, a hero under it beside a live machine, hung again after a wipe or a lamp rest), the repair (his one work place, 4.2
 sec, what stops it and what doesn't, the heave, health kept, no second repair), wipes at every
-stage and debug damage. `shredder_rig` (ignored without `WOW_DATA`) runs it on the real Mast Room
+stage and debug damage, the three wind-ups' own tells (`the_saw_the_stamp_and_the_rake_each_...`
+in `machinery_tests.rs`: each move's sounds and visuals by seconds into its wind-up, none shared,
+the clips and times unchanged) and Sneed on foot (`machinery_foot_tests.rs`). `shredder_rig` (ignored without `WOW_DATA`) runs it on the real Mast Room
 floor: where the wreck, his work place and the tie-off stand and that each is reached, the run
 back from every yard of the room, the race for the log from four stands, the stance break with
 the log spent, the repair left alone, and the Grind driven at a hero with their back to the

@@ -1603,9 +1603,12 @@ then = "dm_sneed"
   name = "saws"
   steps = [ { clip = 16, take = 0, windup = 1.0, damage = 30, recovery = 1.4 } ]
   # A foot rises and lands in dust (no guard stops it), then a blockable rake. Steam pours after.
+  # Each wind-up has its own tell with the floor marks off (sim/machinery, machine_rev): the saw's
+  # whine and sparks, the stamp's thumps and low dust (its cry 1981), the rake's clanks (1978, not
+  # the saw's 1977 it used to share) and glinting tines. The clips, takes and times are as they were.
   [[mob.pattern]]
   name = "stamp and rake"
-  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.9, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5 } ]
+  steps = [ { clip = 130, take = 0, windup = 1.1, range = 3.9, arc = 100.0, damage = 20, blockable = false, heavy = false, recovery = 0.35, sound = 1981 }, { clip = 16, take = 1, windup = 0.7, damage = 28, recovery = 1.5, sound = 1978 } ]
   # Plants and churns its legs in place (its Run, held) as the engine races 1.4 sec, then drives
   # 6 yd straight in 0.9 sec and stalls, slumped, for 4.5 sec (6 into a wall): sim/machinery's
   # STALL, set by measure. The recovery here is the drive and that stall.
@@ -1615,7 +1618,10 @@ then = "dm_sneed"
   steps = [ { clip = 5, take = 0, windup = 1.4, range = 7.5, arc = 24.0, damage = 28, heavy = false, blockable = false, recovery = 5.4, sound = 1982 } ]
 
 # Fragile on foot: he keeps his distance, a wrench every 6 sec covering a scramble; cornered, three
-# blows and then he's open (hunched) 1.4 sec. sim/machinery moves him, and his one repair.
+# blows and then he's open (hunched) 2.4 sec. (It was 1.4: his last blow is heavy and tears a
+# raised guard, so a hero who blocked all three was staggered 1.5 sec and could first strike 1.9 sec
+# into an opening that was over at 1.4. At 2.4 their first blow lands with 0.5 sec to spare. Measured
+# on the real floor: docs/shredder-encounter.md, "Sneed on foot, by measure".)
 [[mob]]
 key = "dm_sneed"
 name = "Sneed"
@@ -1652,7 +1658,7 @@ respawn = 0.0
   name = "flurry"
   weight = 3.0
   max_range = 3.4
-  steps = [ { clip = 59, take = 0, windup = 0.8, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.55, damage = 14, recovery = 0.3 }, { clip = 57, take = 0, windup = 0.85, damage = 22, heavy = true, recovery = 1.4 } ]
+  steps = [ { clip = 59, take = 0, windup = 0.8, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.55, damage = 14, recovery = 0.3 }, { clip = 57, take = 0, windup = 0.85, damage = 22, heavy = true, recovery = 2.4 } ]
   [[mob.pattern]]
   name = "wrench"
   weight = 2.0

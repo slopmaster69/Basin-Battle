@@ -250,7 +250,7 @@ fn sneed_keeps_his_distance_and_flurries_when_cornered_then_is_open() {
         s.move_player(band[0], [p[0] + 1.6, p[1], p[2]], std::f32::consts::PI, Moving::default());
         let ev = s.step(DT);
         flurry |= s.pattern_name(driver) == Some("flurry");
-        if ev.iter().any(|e| matches!(e, Event::HoldPose { id, clip: OPEN_CLIP, secs, .. } if *id == driver && *secs >= 1.4)) {
+        if ev.iter().any(|e| matches!(e, Event::HoldPose { id, clip: OPEN_CLIP, secs, .. } if *id == driver && *secs >= 2.4)) {
             open = true;
             break;
         }
@@ -437,4 +437,102 @@ fn sneeds_wrench_is_drawn_big_and_streaked_at_the_throws_speed() {
     let sneed = c.mobs.iter().find(|m| m.key == "dm_sneed").expect("Sneed");
     let throw = sneed.patterns.iter().flat_map(|p| &p.steps).find(|s| s.spell == Some(13398)).expect("his throw");
     assert_eq!(throw.speed, Some(l.speed), "the look flies with the throw");
+}
+
+/// What a wind-up shows before it lands, with the floor marks off (they are the add-on's and
+/// draw nothing here): the sounds and visuals it plays on the machine, by seconds into the
+/// wind-up, and the wind-up's own length.
+#[derive(Default, Debug)]
+struct Tell {
+    windup: f32,
+    clip: (u16, u32),
+    sparks: Vec<f32>,
+    whines: Vec<f32>,
+    thumps: Vec<f32>,
+    low_dust: Vec<f32>,
+    glints: Vec<f32>,
+    clanks: Vec<f32>,
+    hiss: usize,
+}
+
+fn tells(seed: u64) -> Vec<(String, Tell)> {
+    let (mut s, _, id) = fight(1, seed);
+    let mut out: Vec<(String, Tell)> = Vec::new();
+    let mut t0 = 0.0;
+    for _ in 0..600 {
+        let ev = s.step(DT);
+        let at = s.clock;
+        let name = s.pattern_name(id).map(str::to_string);
+        for e in &ev {
+            match e {
+                Event::MobWindup { id: who, clip, take, windup, .. } if *who == id => {
+                    t0 = at;
+                    out.push((name.clone().unwrap(), Tell { windup: *windup, clip: (*clip, *take), ..Default::default() }));
+                }
+                _ => {}
+            }
+        }
+        let Some((_, t)) = out.last_mut() else { continue };
+        if at - t0 > t.windup + 0.01 { continue; }
+        for e in &ev {
+            match e {
+                Event::Visual { id: who, kit, .. } if *who == id && *kit == combat::KIT_PARRY => t.sparks.push(at - t0),
+                Event::Visual { id: who, kit, .. } if *who == id && *kit == combat::KIT_FALL_DUST => t.low_dust.push(at - t0),
+                Event::Visual { id: who, kit, .. } if *who == id && *kit == combat::KIT_CLEAVE => t.glints.push(at - t0),
+                Event::Sound { id: who, sound } if *who == id => match *sound {
+                    SAW_SOUND => t.whines.push(at - t0),
+                    THUMP_SOUND => t.thumps.push(at - t0),
+                    CLANK_SOUND => t.clanks.push(at - t0),
+                    // (The vents' hiss as the string's last blow lands is the heat, not a tell.)
+                    HISS_SOUND if at - t0 < t.windup - 0.05 => t.hiss += 1,
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+        if s.machinery.grinds.contains_key(&id) { break; }
+    }
+    out
+}
+
+/// Saw sweep, stamp and rake each tell themselves apart on the machine before they land, and no
+/// tell is shared: with the floor marks off a hero knows which blow is coming from what they see
+/// and hear. The clips, takes and times are those the pattern always had.
+#[test]
+fn the_saw_the_stamp_and_the_rake_each_have_their_own_tell_before_they_land() {
+    for seed in [3u64, 11] {
+        let all = tells(seed);
+        let by = |n: &str| &all.iter().find(|(k, _)| k == n).unwrap_or_else(|| panic!("no {n}: {all:?}")).1;
+        let (saw, stamp, rake) = (by("saws"), by("stamp and rake"), all.iter().filter(|(k, _)| k == "stamp and rake").nth(1).map(|(_, t)| t).expect("the rake"));
+        // Times and clips untouched.
+        assert_eq!((saw.clip, stamp.clip, rake.clip), ((16, 0), (130, 0), (16, 1)));
+        assert_eq!((saw.windup, stamp.windup, rake.windup), (1.0, 1.1, 0.7));
+        // The saw: sparks and a whine that keeps revving; nothing of the others'.
+        assert!(saw.sparks.len() >= 3 && saw.whines.len() >= 2, "{saw:?}");
+        assert!(saw.thumps.is_empty() && saw.low_dust.is_empty() && saw.glints.is_empty() && saw.clanks.is_empty(), "{saw:?}");
+        // The stamp: a thump and low dust at once and half way, the blow the third beat.
+        assert_eq!(stamp.thumps.len(), 3, "two in the wind-up and the blow's own: {stamp:?}");
+        assert!((stamp.thumps[2] - stamp.windup).abs() < 0.06, "{stamp:?}");
+        assert_eq!(stamp.low_dust.len(), 2, "{stamp:?}");
+        assert!((stamp.thumps[1] - stamp.thumps[0] - STAMP_BEAT).abs() < 0.06, "{stamp:?}");
+        assert!(stamp.sparks.is_empty() && stamp.whines.is_empty() && stamp.glints.is_empty() && stamp.clanks.is_empty(), "{stamp:?}");
+        // The rake: tines glint and the arm clanks (its step's own clank at once, one more half
+        // way), the blow the third beat.
+        assert_eq!(rake.glints.len(), 2, "{rake:?}");
+        assert_eq!(rake.clanks.len(), 2, "{rake:?}");
+        assert!((rake.glints[1] - rake.glints[0] - RAKE_BEAT).abs() < 0.06, "{rake:?}");
+        assert!(rake.sparks.is_empty() && rake.whines.is_empty() && rake.thumps.is_empty() && rake.low_dust.is_empty(), "{rake:?}");
+        // Nobody pours steam before the string is done.
+        assert_eq!(saw.hiss + stamp.hiss + rake.hiss, 0);
+    }
+}
+
+/// The rake no longer uses the saw's sound: its step's own, set in the content.
+#[test]
+fn the_rake_does_not_share_the_saws_sound() {
+    let c = content();
+    let m = c.mobs.iter().find(|m| m.key == MACHINE).unwrap();
+    let sound = |name: &str, step: usize| m.patterns.iter().find(|p| p.name == name).unwrap().steps[step].sound.unwrap_or(m.attack.sound);
+    let (saw, stamp, rake) = (sound("saws", 0), sound("stamp and rake", 0), sound("stamp and rake", 1));
+    assert!(saw != stamp && saw != rake && stamp != rake, "{saw:?} {stamp:?} {rake:?}");
 }

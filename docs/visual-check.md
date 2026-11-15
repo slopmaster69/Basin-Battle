@@ -316,6 +316,7 @@ the tie-off at "Just... one... bolt..."):
 | `sneed-shredder-stagger` | Dev setup: the log spent, light blows without a gap from his line break his stance |
 | `sneed-shredder-log-machine` | Dev setup: the log dropped on the machine as it walks in |
 | `sneed-shredder-fight`, `sneed-shredder-fight-healed` | A real pull by the small player from the door to Sneed's death, no debug kills; the second healed throughout |
+| `sneed-shredder-windups` | Dev setup: a hero standing and healed while the machine cycles saw sweep, stamp, rake, Grind and stall, close and low, floor markers off: the three wind-ups told apart by the machine alone (not run yet) |
 
 What it needs beyond the rest: a client with patch 0088 (`WOW_SPECTATE`; an older one films the
 cameraman's own body) and 0090 for `wide` or a crew (an older one won't film with them), 0092 for the cut away from a wall, 0093 for the
