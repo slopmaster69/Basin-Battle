@@ -829,6 +829,11 @@ impl Survival {
         }
     }
 
+    /// Some engineer is still perched (the cheap test before a shot looks for a pole).
+    pub(crate) fn perches_standing(&self) -> bool {
+        self.perches.workers.values().any(|w| matches!(w.state, Place::Perched))
+    }
+
     /// How far along its flight a shot from `from` along `dir` (for `go` yd, `radius` wide) first
     /// strikes a standing pole, and whose it is. A pole is struck from the floor to its plank.
     pub(crate) fn perch_pole_shot(&self, from: Vec3, dir: Vec3, go: f32, radius: f32) -> Option<(Id, f32)> {

@@ -1745,7 +1745,12 @@ impl Survival {
             // (A grappling hook meets the land's solid shapes too: a rock, a fence, a roof.)
             let t = self.catch_solid(p.ability, p.pos, p.dir, self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &skip));
             // A shot that finds an engineer's pole first drops him (Gilnid's crew); the pole stops it.
-            let pole = if p.allies || !self.players.contains_key(&p.owner) { None }
+            // (Only an ordinary shot: not a hook, orb or chain, a boomerang, a sticky or a piercing one.)
+            let ordinary = {
+                let d = &self.content.abilities[p.ability];
+                !returns && !sticks && p.pierce == 0 && !d.yank && !d.swap && d.tether_secs <= 0.0 && d.hunt != "haul"
+            };
+            let pole = if !ordinary || p.allies || !self.perches_standing() || !self.players.contains_key(&p.owner) { None }
                 else { self.perch_pole_shot(p.pos, p.dir, go, p.radius).filter(|(_, d)| *d <= t.dist) };
             if let Some((worker, d)) = pole {
                 p.pos = add(p.pos, p.dir, d);
