@@ -1413,6 +1413,17 @@ impl Sim {
                 self.queue_spell_hit(id, v, base, delay, info.clone());
             }
         }
+        // Splitting: a ranged missile bursts on its first target, hitting up to 2 more enemies
+        // near it for a share of the damage.
+        let split = self.entities[&id].player().map_or(0.0, |p| p.stats.split);
+        if split > 0.0 && n.damage > 0.0 && range > 8.0 {
+            let at = self.entities[&first].pos;
+            let travel = if n.speed > 0.0 { dist2d(pos, at) / n.speed } else { 0.0 };
+            let others: Vec<EntityId> = self.enemies_near(at, 6.0).into_iter().map(|(v, _)| v).filter(|v| !victims.contains(v)).take(2).collect();
+            for v in others {
+                self.queue_spell_hit(id, v, base * split, travel + 0.05, info.clone());
+            }
+        }
         Ok(true)
     }
 

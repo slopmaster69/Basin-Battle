@@ -3033,6 +3033,49 @@ fn bosses_leave_powers_and_escalations_offer_class_legendaries() {
     assert!(!seen.contains("power:archmage"), "no mage's powers for a warrior");
 }
 
+/// The Splitting card: a missile bursts on its target and hits 2 more enemies nearby.
+#[test]
+fn splitting_missiles_hit_two_more_enemies() {
+    let run = |card: bool| -> Vec<u32> {
+        let mut s = sim();
+        let p = s.add_player("Ayla", "hunter", Luck::default());
+        s.close_all_menus_for_test(p);
+        s.give_test_card(p, "arcane_shot", 0);
+        if card {
+            s.give_test_legendary(p, "splitting");
+        }
+        s.set_manual(p, true);
+        s.start_now();
+        s.clear_wave_for_test();
+        let c = [20.0, 20.0, 0.0];
+        s.move_player(p, c, 0.0);
+        let mobs: Vec<_> = (0..4).map(|k| s.spawn_for_test("golem", [c[0] + 15.0 + k as f32, c[1], 0.0])).collect();
+        for m in &mobs {
+            s.tough_for_test(*m);
+        }
+        s.step(0.05);
+        for _ in 0..200 {
+            s.move_player(p, c, 0.0);
+            if s.cast_slot(p, 0).is_ok() {
+                break;
+            }
+            s.step(0.05);
+        }
+        for _ in 0..60 {
+            s.move_player(p, c, 0.0);
+            s.step(0.05);
+        }
+        mobs.iter().map(|m| {
+            let (hp, max) = s.health_for_test(*m);
+            max - hp
+        }).collect()
+    };
+    let plain = run(false).iter().filter(|d| **d > 0).count();
+    let split = run(true).iter().filter(|d| **d > 0).count();
+    assert_eq!(plain, 1, "one missile, one enemy");
+    assert_eq!(split, 3, "the missile bursts onto 2 more");
+}
+
 /// A power's spell patch reaches the spell: Bladestorm makes Whirlwind spin twice more often.
 #[test]
 fn a_power_patches_its_spells() {
