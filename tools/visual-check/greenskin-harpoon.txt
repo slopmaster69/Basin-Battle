@@ -1,0 +1,41 @@
+# Captain Greenskin's harpoon on its count (docs/greenskin-encounter.md), not yet filmed (the owner
+# turned filming off on Nov 14): the same unassisted duel as greenskin-duel, markers off, to see
+# three things on the captain himself. After every third blow of his cutlass he steps back from the hero
+# (to 8 yd, or the bulwark behind him), the harpoon comes up over his shoulder (the clip 108 the small
+# player below already reads as "a line is about to fire": a strafe just before it flies) and his line
+# of "Ye're not gettin' away!"; a hero who stands is hauled in and set down 3 yd from him, and has 0.9 sec once
+# on their feet before the clearing cut lands. The first 10 sec are as they were; when one gunner falls
+# the other shoots on every beat, harder. Judge the events: the step back reads as a count (3 blows,
+# then he leaves you), nobody is cut off, and the hauled hero can still guard or step out.
+hero warrior
+cam off
+camera duel Captain Greenskin
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes greenskin
+12 .es goto -74.5 -816 41.5 0.0798
+12.6 .es heal
+12.2 lua GD = { q = {}, on = false, side = 1, pending = 0, nextHit = 0 }
+12.2 lua function GD.say(t) SendChatMessage(t, "SAY") end
+12.2 lua function GD.after(d, f) table.insert(GD.q, { GetTime() + d, f }) end
+12.2 lua function GD.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+12.2 lua function GD.hit(why) GD.log(why .. " hp " .. UnitHealth("player")) GD.say(".es in a") GD.after(0.08, function() GD.say(".es in au") end) end
+12.2 lua function GD.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+12.2 lua function GD.aside(t) GD.after(math.max(0.3, t - 0.4), function() GD.side = -GD.side GD.log("step off the line hp " .. UnitHealth("player")) ActionDash(0.35, 7, GD.side > 0 and "l" or "r") end) end
+12.2 lua function GD.blow(t) GD.pending = GetTime() + t GD.after(math.max(0.3, t - 0.15), function() GD.log("guard hp " .. UnitHealth("player")) GD.say(".es in g") end) GD.after(t + 0.2, function() GD.say(".es in gu") end) GD.after(t + 0.45, function() GD.hit("punish") end) GD.after(t + 1.1, function() GD.hit("punish") end) end
+12.2 lua function GD.line(l) local f = GD.split(l) if not GD.on or f[1] ~= "AN" then return end local clip, t = tonumber(f[3]), tonumber(f[4]) or 0 if f[11] == "cast" and (clip == 48 or clip == 108) then GD.aside(t) elseif f[11] == "mob" and f[7] ~= "1" then GD.blow(t) end end
+12.2 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) GD.line(l) return old(l) end
+12.2 lua GD.f = CreateFrame("Frame") GD.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(GD.q) do local a = GD.q[i] if now >= a[1] then table.remove(GD.q, i) a[2]() else i = i + 1 end end if GD.locked and now > GD.pending + 1.5 and now >= GD.nextHit then GD.nextHit = now + 1.2 GD.hit("press him") end end)
+13.2 video
+13.6 lua GD.on = true
+14 lua ActionDash(0.4, 7, "f")
+15.5 .es in lock
+15.7 lua GD.locked = true
+14 shots pull 10 1.0
+30 shots duel 30 4.0
+150 shots late 20 4.0
+120 end

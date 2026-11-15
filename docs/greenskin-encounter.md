@@ -31,20 +31,35 @@ lines.** The code is `crates/htl-survival/src/sim/firing_line.rs`; the line's hi
    a volley. He only won't start a blow that would land within 0.8 sec of a gunner's shot
    (counting a blow held a beat). Run to a gunner (2 to 3 sword hits) with him chasing, or duel
    him and step out of the lines.
-5. **A gunner falls.** His gun clatters to the deck (PutDownLargeMetal, 1207), his body stays at
-   his post, and his turns go with him: the clock keeps its 3.6 sec beat, so his partner fires
-   every 7.2 sec, half the shots. The captain fights straight through the empty turns.
+5. **A gunner falls.** His gun clatters to the deck (PutDownLargeMetal, 1207) and his body stays at
+   his post. His partner, the last gunner left, is the dangerous one: he now shoots on every 3.6 sec
+   beat (the pair together shot one a beat, so the fight does not get gentler with a kill) and his
+   shot does 25% more (35 instead of 28, `LAST_MIGHT`). Until then, and in the first 10 sec, the
+   pair alternates exactly as before. The captain fights straight through.
 6. **The last gunner falls.** At his next free moment, "I'll do it meself." A real draw: GoblinMale's
    Sheath (89), the gun in his hand 0.3 sec in; the load as the cocking (106 and the click), a
    1.2 sec aim (48), and the shot with its puff, bang, tracer, line and dust. The gun stays
    out 6 sec after a shot, then he puts it away the same way. From now on he has no pause
    between his attacks: that's the escalation.
-7. **The harpoon,** only with both gunners down and only at a hero who has stayed 8 yd or more
-   away for 2 sec. A harpoon in his hand (item display 5949) held back over his shoulder
-   (ReadyThrown 108) the full 1.7 sec, then the throw (AttackThrown 107) along a line, on the
-   native net (6533) at 14 yd/s. A fair hit hauls the hero to 3 yd from him, and he goes straight
-   into his clearing cut. A sidestep, a dodge or a guard spares them the haul. The gun is for a
-   hero who kites him: at least 6 yd away, at most one shot every 10 sec.
+7. **The harpoon comes on a count, not on distance.** After every third blow of his cutlass (a
+   thrust or a cut; shots and the haul's own cut are not blows) he is free, steps back from his
+   hero to 8 yd (4.5 yd/s, at most 2.5 sec, stopped sooner by the bulwark, a wall or the water;
+   with nowhere to go he throws where he stands) and throws. He says "Ye're not gettin' away!". A hero
+   who stays beside him sees it as much as one who waits at range: it is his blows that count,
+   with the crew alive or not. A harpoon in his hand (item display 5949) held back over his
+   shoulder (ReadyThrown 108) the full 1.7 sec, then the throw (AttackThrown 107) along a line, on the
+   native net (6533) at 14 yd/s. A fair hit hauls the hero to 3 yd from him, and he goes into his
+   clearing cut, which lands 0.9 sec after the hero is on their feet again (the haul is a flight
+   in which they cannot act: 0.3 sec reaction plus 0.6 sec to guard or step out of its 4 yd), and
+   never within 0.8 sec of a gunner's shot. A sidestep, a dodge or a guard spares them the haul.
+   The gun is for a hero who kites him: at least 6 yd away, at most one shot every 10 sec; the
+   count has the harpoon first.
+
+   *How it reads with the floor markers off:* nothing is carried by a marker. The count is the
+   captain's own body: three blows, then he turns his back on the fight and walks away from you
+   (a thing nobody does by accident), the harpoon comes out over his shoulder and he calls out;
+   the line of the throw is the barrel-like pose facing you for 1.7 sec and the net in flight. The
+   floor line of the throw is the optional extra the setting draws.
 8. **Death.** "My ship..." The shared fixes stop his swing as he falls. The gunners still standing
    go with him; the fallen lie where they fell.
 
@@ -220,8 +235,10 @@ clips, puff, bang, tracer, line burst and end burst, the line striking as the ba
 and missing a sidestep, another floor or a hero stepping on behind it, a guard blocking it, a
 fallen gunner's turns passing unshot while the captain fights through them, the last gunner's
 draw, load, 1.2 sec aim and shot with the gun out 6 sec, no pause and the 10 sec gun when alone,
-the harpoon waiting for 2 sec at 8 yd, its held pose, spear, throw, haul and clearing cut, a
-sidestep or guard sparing the haul, party retarget, Vanish, the wipe putting the crew back at
+the harpoon after exactly every third blow whether the hero stays beside him or waits 14 yd off,
+his step back to 8 yd, never landing within 0.8 sec of a shot, its held pose, spear, throw, haul and
+clearing cut (a hauled hero has 0.9 sec once up, and a guard or a step answers it), a
+sidestep or guard sparing the haul, the last gunner shooting every beat and harder, a pair unchanged, party retarget, Vanish, the wipe putting the crew back at
 its posts, death clearing every shot, the floor checks, ranged input on a gunner, knockback, and
 the captain-first reward. The bulwark: on each of its lines, its pieces cover every run end to
 end and cut no corner, each tipped to the deck, tall enough all along, and keep their hulls; a walk, a roll's dash, a jump and a falling step over it are stopped at it on the deck; the
@@ -242,6 +259,12 @@ as his blows land, then duel him: 68 to 82 sec, 74 to 200 health left, no shot t
 seeds). `a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines` takes the other
 choice: it duels him from the start with the crew firing throughout: 60 to 65 sec, 2 to 94 health
 left, 3 to 6 of 16 or 17 shots taken. These are the simulation's numbers, not a filmed fight.
+
+**The harpoon on its count (Nov 15).** The duel runs about 5 sec longer for each harpoon, and a hero
+takes 2 more shots for it, so his health went from 1500 to 1200 to keep the fair-hero numbers where
+they were: the duel 55 to 57 sec (16 to 78 health left, 5 of 17 or 18 shots taken, 3 harpoons), the
+crew-first clear 65 to 72 sec (142 to 164 left, 4 or 5 harpoons, 0 to 2 hauls), three seeds each
+(they were 53 to 57 sec and 2 to 94 left, and 68 to 82 sec).
 
 **Balance (after take 336).** On film a duel killed him in 29 sec before any gunner fell. His
 health is now 1500 (was 520) and a gunner's shot 28 (was 17). The duel is now clearly the harder

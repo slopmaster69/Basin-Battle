@@ -713,7 +713,8 @@ windup_sound = 1409
 scale = 1.5
 # Tuned with the fair-hero sim (firing_line_tests.rs): breaking the line first takes a lone sword
 # hero about 70 to 80 sec; dueling him through the volleys takes them through 16 or 17 shots.
-health = 1500
+# 1200, down from 1500: the harpoon on its count (3 blows, a step back, a throw) adds about 5 sec to a duel and a hero takes 2 more shots for it, so the fight is cut by a fifth to keep the fair-hero sim where it was (duel 55 to 57 sec, 16 to 78 health left; crew first 65 to 72 sec).
+health = 1200
 run_speed = 7.0
 walk_speed = 2.0
 aggro = 12.0
@@ -760,12 +761,14 @@ death_text = "My ship..."
   min_range = 6.0
   max_range = 28.0
   steps = [ { ranged = true, windup = 1.8, damage = 23, range = 28.0, radius = 0.5, speed = 20.0, spell = 8682, recovery = 1.8 } ]
-  # The harpoon, only at a hero who has kept 8 yd away for 2 sec: held back 1.7 sec, thrown along
-  # a line on the native net (6533) at 14 yd/s. A fair hit hauls them to 3 yd and into his
-  # clearing cut; a sidestep, a dodge or a guard spares them the haul.
+  # The harpoon comes on a count, never by distance or by dice (`sim::firing_line`): after every
+  # third blow of his cutlass he steps back from his hero to 8 yd (the bulwark or a wall may stop him
+  # sooner) and throws. Held back 1.7 sec (a sidestep clears it), thrown along a line on the native
+  # net (6533) at 14 yd/s. A fair hit hauls them to 3 yd and into his clearing cut; a sidestep, a
+  # dodge or a guard spares them the haul. Its weight is 0 so the AI never picks it by itself.
   [[mob.pattern]]
   name = "harpoon"
-  weight = 1.5
+  weight = 0.0
   min_range = 8.0
   max_range = 26.0
   steps = [ { ranged = true, windup = 1.7, damage = 16, range = 26.0, radius = 0.5, speed = 14.0, spell = 6533, blockable = true, recovery = 2.0 } ]

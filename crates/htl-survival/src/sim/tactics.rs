@@ -456,6 +456,7 @@ impl Survival {
         m.string_len = len;
         m.held_step = held;
         m.space = None;
+        self.firing_blow_begun(id, k);
     }
 
     /// The blow a boss winds up: how much longer it holds it (its string's held blow, a beat).

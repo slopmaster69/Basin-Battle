@@ -3,9 +3,10 @@
 //! orders them to fire, and they take turns, one shot about every 3.6 sec, never on the same beat:
 //! a load with a click, the gun raised to the shoulder (where its aim locks), and a shot along a
 //! line the hero steps out of. He never idles: he fights all the while, only never starting a
-//! blow that would land within 0.8 sec of a shot. A gunner who falls takes his turns with him.
-//! With both down he draws his own gun, keeps it out a while, attacks without pause, and throws a
-//! harpoon at a hero who keeps away from him: a fair hit hauls them in to his clearing cut.
+//! blow that would land within 0.8 sec of a shot. The last gunner left shoots on every beat, harder.
+//! After every third blow he steps back and throws a harpoon: a fair hit hauls the hero in to his
+//! clearing cut, which lands once they are on their feet. With both gunners down he draws his own
+//! gun, keeps it out a while, and attacks without pause.
 
 use super::mobs::{Foe, MobState};
 use super::*;
@@ -17,6 +18,10 @@ mod tests;
 
 /// A gunner's turn comes this often; the two take turns.
 const SHOT_GAP: f32 = 3.6;
+/// The last gunner left shoots on every beat (the pair together shot one a beat; one alone used
+/// to shoot one every two) and hits this much harder: the fight never gets gentler as the crew
+/// falls.
+pub(crate) const LAST_MIGHT: f32 = 1.25;
 /// The captain never starts a blow that lands this near a gunner's shot.
 const CLASH: f32 = 0.8;
 /// After the pull he advances; this long after it he points his cutlass at his first gunner,
@@ -33,10 +38,20 @@ const DRAW_SWAP: f32 = 0.3;
 const GUN_OUT: f32 = 6.0;
 /// Alone, a shot at most this often: the gun is for heroes who kite him.
 const GUN_EVERY: f32 = 10.0;
-/// The harpoon only flies at a hero who has stayed this far off this long, and a fair hit hauls
-/// them in to this far from him.
+/// The harpoon comes on a count: after every third blow of his cutlass (a thrust or a cut, not
+/// a shot) he steps back from his hero to this far, the bulwark or a wall stopping him sooner,
+/// and throws. A hero fighting him always sees it, however near they stay.
+const HARPOON_EVERY: u32 = 3;
 const HARPOON_FAR: f32 = 8.0;
-const HARPOON_WAIT: f32 = 2.0;
+/// He aims to stand this much farther than `HARPOON_FAR` when his step back ends; at this pace
+/// (4.5 yd/s, 2.25 times his walk, under a hero's 7 yd/s run) and for at most this long.
+const HARPOON_OVER: f32 = 1.0;
+const HARPOON_PACE: f32 = 4.5;
+const HARPOON_STEP: f32 = 2.5;
+/// A hauled hero is carried in the air for about 1.7 sec, helpless. His clearing cut lands this
+/// long after they are on their feet again: a hero's 0.3 sec reaction and 0.6 sec to guard or step.
+const HAUL_FREE: f32 = 0.9;
+/// A fair hit hauls them in to this far from him.
 const PULL_TO: f32 = 3.0;
 /// The posts, from his home (-62, -815, 41.5): (-58, -806.5) and (-58, -824.5) on the quarterdeck,
 /// 9.4 and 10.3 yd out on either side of him, on dry deck with a walk to him (dmprobe, Nov 9).
@@ -83,8 +98,12 @@ struct Crew {
     stage: Stage,
     /// He holds his point at the first gunner until then.
     hold_until: f32,
-    /// Alone: since when his hero has kept away from him.
-    far_since: Option<f32>,
+    /// His cutlass blows since the last harpoon (a thrust or a cut each).
+    blows: u32,
+    /// Stepping back for the harpoon: until when, at the latest.
+    stepping_until: Option<f32>,
+    /// A hauled hero's clearing cut waits for them to be on their feet: when it starts, at whom.
+    cut: Option<(f32, Id)>,
     /// Alone: his gun is ready again then.
     gun_ready: f32,
 }
@@ -158,8 +177,13 @@ impl Survival {
         match name {
             // He advances, and gives his order before his first blow.
             _ if matches!(c.stage, Stage::Order { .. }) => false,
+            // The harpoon is never picked: `firing_hook` throws it on the count.
+            "harpoon" => false,
+            // A hauled hero is let up first, then the cut comes (`step_firing_captain`).
+            _ if c.cut.is_some() => false,
+            // The third blow was his last until the harpoon has been thrown.
+            _ if c.blows >= HARPOON_EVERY => false,
             "pistol shot" => c.stage == Stage::Alone && now >= c.gun_ready,
-            "harpoon" => c.stage == Stage::Alone && c.far_since.is_some_and(|t| now - t >= HARPOON_WAIT),
             _ => !self.firing_clashes(id, name),
         }
     }
@@ -194,12 +218,26 @@ impl Survival {
             _ => return due,
         };
         for k in 0..2 * n {
-            let g = &c.gunners[(turn + k) % n];
-            if live(g) {
-                due.push(next + k as f32 * SHOT_GAP + windup(g));
+            if let Some(g) = Self::next_gunner(&c.gunners, turn + k, live) {
+                due.push(next + k as f32 * SHOT_GAP + windup(&g));
             }
         }
         due
+    }
+
+    /// Whose shot the beat `turn` is: that gunner's if he lives, else the next one standing, so a
+    /// lone gunner shoots on every beat.
+    fn next_gunner(gunners: &[Id], turn: usize, live: impl Fn(&Id) -> bool) -> Option<Id> {
+        let n = gunners.len();
+        (0..n).map(|k| gunners[(turn + k) % n]).find(|g| live(g))
+    }
+
+    /// His last gunner's shot hits harder than either of a pair's (`LAST_MIGHT`).
+    pub(crate) fn firing_last_gunner(&self, id: Id) -> bool {
+        let Some(owner) = self.firing_line.owners.get(&id) else { return false };
+        let Some(c) = self.firing_line.crews.get(owner) else { return false };
+        let alive = c.gunners.iter().filter(|g| self.mobs.get(g).is_some_and(|m| m.health > 0)).count();
+        alive == 1 && self.mobs.get(&id).is_some_and(|m| m.health > 0)
     }
 
     /// The create packet and later equipment changes agree, including for late observers.
@@ -243,7 +281,7 @@ impl Survival {
             self.events.push(Event::MobGear { id });
             gunners.push(id);
         }
-        self.firing_line.crews.insert(owner, Crew { gunners, stage: Stage::Posted, hold_until: 0.0, far_since: None, gun_ready: 0.0 });
+        self.firing_line.crews.insert(owner, Crew { gunners, stage: Stage::Posted, hold_until: 0.0, blows: 0, stepping_until: None, cut: None, gun_ready: 0.0 });
     }
 
     /// Pulled (him, or one of his crew first: they all come): the crew turns on the hero, and a
@@ -444,6 +482,16 @@ impl Survival {
         let Some(hero) = self.firing_foe(id) else { return true };
         let foe = Foe::Hero(hero);
         let (stage, hold) = (c.stage, c.hold_until);
+        if let Some((at, hauled)) = c.cut {
+            // (Never into a gunner's shot, as with his every blow: the hero is up a while longer.)
+            if now < at || self.firing_clashes(id, "clearing cut") {
+                self.halt(id);
+                return true;
+            }
+            self.firing_line.crews.get_mut(&id).unwrap().cut = None;
+            self.firing_cut(id, hauled);
+            return true;
+        }
         let live = c.gunners.iter().any(|g| self.mobs.get(g).is_some_and(|m| m.health > 0));
         // The last gunner down: at his next free moment he draws his own gun.
         if !live && stage != Stage::Alone {
@@ -452,7 +500,7 @@ impl Survival {
             }
             let c = self.firing_line.crews.get_mut(&id).unwrap();
             c.stage = Stage::Alone;
-            c.far_since = None;
+            c.stepping_until = None;
             self.mobs.get_mut(&id).unwrap().phase = 1;
             self.yell(id, "I'll do it meself.");
             if let Some(k) = self.content.mobs[self.mobs[&id].def].patterns.iter().position(|p| p.name == "pistol shot") {
@@ -487,14 +535,90 @@ impl Survival {
                     self.firing_turn(id, turn, foe);
                     self.firing_line.crews.get_mut(&id).unwrap().stage = Stage::Turns { turn: turn + 1, next: next + SHOT_GAP };
                 }
-                now < hold
+                now < hold || self.firing_hook(id, hero, foe)
             }
-            Stage::Alone => {
-                let far = dist2d(self.mobs[&id].pos, self.players[&hero].pos) >= HARPOON_FAR;
-                let c = self.firing_line.crews.get_mut(&id).unwrap();
-                c.far_since = if far { Some(c.far_since.unwrap_or(now)) } else { None };
-                false
+            Stage::Alone => self.firing_hook(id, hero, foe),
+        }
+    }
+
+    /// The harpoon on its count: after his third blow, once he is free, he steps back from his
+    /// hero (to `HARPOON_FAR`, or as far as the bulwark, a wall or `HARPOON_STEP` lets him) and
+    /// throws. Whether he is on it now (his own blows wait).
+    fn firing_hook(&mut self, id: Id, hero: Id, foe: Foe) -> bool {
+        let now = self.clock;
+        let Some(c) = self.firing_line.crews.get(&id) else { return false };
+        let (blows, stepping) = (c.blows, c.stepping_until);
+        let (Some(at), Some(pos)) = (self.players.get(&hero).map(|p| p.pos), self.mobs.get(&id).map(|m| m.pos)) else { return false };
+        let dist = dist2d(pos, at);
+        let Some(until) = stepping else {
+            if blows < HARPOON_EVERY || !self.firing_safe(id) {
+                return false;
             }
+            // Already far enough, or nowhere to step to (the bulwark at his back): he throws.
+            let home = self.mobs[&id].home;
+            let leash = self.leash_of(self.mobs[&id].def) * 0.8;
+            let want = HARPOON_FAR + HARPOON_OVER;
+            let away = facing(at, pos);
+            let goal = [0.0f32, 0.5, -0.5, 1.0, -1.0].iter().find_map(|off| {
+                let b = away + off;
+                let to = self.ground_near(at[0] + b.cos() * want, at[1] + b.sin() * want, pos[2]);
+                let ok = dist2d(to, pos) >= 1.0
+                    && dist2d(to, home) <= leash
+                    && (to[2] - pos[2]).abs() < 1.5
+                    && self.land.walk_clear(pos, to)
+                    && !self.land.blocked_near(to[0], to[1], to[2])
+                    && !self.land.water_near(to[0], to[1], to[2])
+                    && !self.through_rail(pos, to);
+                ok.then_some(to)
+            });
+            let Some(to) = goal.filter(|_| dist < HARPOON_FAR) else {
+                self.firing_throw(id, hero, foe);
+                return true;
+            };
+            self.sidle_to(id, to, HARPOON_PACE, hero);
+            if self.mobs[&id].path.is_empty() {
+                self.firing_throw(id, hero, foe);
+                return true;
+            }
+            self.firing_line.crews.get_mut(&id).unwrap().stepping_until = Some(now + HARPOON_STEP);
+            return true;
+        };
+        // Stepping back: stopped by a stagger or a stun, he starts the step again when free.
+        if !self.firing_safe(id) {
+            self.firing_line.crews.get_mut(&id).unwrap().stepping_until = None;
+            return false;
+        }
+        let arrived = self.mobs[&id].path.is_empty();
+        if dist >= HARPOON_FAR || arrived || now >= until {
+            // Never into a gunner's shot: he holds his place until the beat is clear.
+            if !self.firing_clashes(id, "harpoon") {
+                self.firing_throw(id, hero, foe);
+            }
+        }
+        true
+    }
+
+    /// The count met and his step done: the harpoon is held back and thrown (`firing_windup`).
+    fn firing_throw(&mut self, id: Id, hero: Id, foe: Foe) {
+        let Some(k) = self.content.mobs[self.mobs[&id].def].patterns.iter().position(|p| p.name == "harpoon") else { return };
+        let Some(to) = self.players.get(&hero).map(|p| p.pos) else { return };
+        let c = self.firing_line.crews.get_mut(&id).unwrap();
+        c.blows = 0;
+        c.stepping_until = None;
+        self.halt(id);
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.state = MobState::Chase { foe };
+        self.begin_pattern(id, k, false);
+        self.yell(id, "Ye're not gettin' away!");
+        self.windup(id, foe, to);
+    }
+
+    /// One more cutlass blow begun, for the harpoon's count (his shots are not blows).
+    pub(crate) fn firing_blow_begun(&mut self, id: Id, k: usize) {
+        let Some(m) = self.mobs.get(&id) else { return };
+        let shot = self.content.mobs[m.def].patterns.get(k).is_none_or(|p| p.steps.iter().any(|s| s.ranged == Some(true)));
+        if let Some(c) = self.firing_line.crews.get_mut(&id).filter(|_| !shot) {
+            c.blows += 1;
         }
     }
 
@@ -504,7 +628,8 @@ impl Survival {
         if gunners.is_empty() {
             return;
         }
-        let g = gunners[turn % gunners.len()];
+        let live = |g: &Id| self.mobs.get(g).is_some_and(|m| m.health > 0);
+        let Some(g) = Self::next_gunner(gunners, turn, live) else { return };
         let ready = self.mobs.get(&g).is_some_and(|m| m.health > 0 && m.stagger_until <= self.clock
             && !matches!(m.state, MobState::Windup { .. })) && !self.disabled(g);
         if !ready {
@@ -649,17 +774,35 @@ impl Survival {
         true
     }
 
-    /// Hauled in by his harpoon (a fair hit): straight into his clearing cut.
+    /// Hauled in by his harpoon (a fair hit): into his clearing cut, which lands `HAUL_FREE` after
+    /// the hero is back on their feet (the haul is a long flight, 1.7 sec, helpless).
     pub(crate) fn firing_pulled(&mut self, id: Id, hero: Id) {
-        if !self.firing_alone(id) || !self.mobs.get(&id).is_some_and(|m| m.health > 0) {
+        if !self.mobs.get(&id).is_some_and(|m| m.health > 0) || !self.firing_line.crews.contains_key(&id) {
             return;
         }
         let Some(k) = self.content.mobs[self.mobs[&id].def].patterns.iter().position(|p| p.name == "clearing cut") else { return };
-        let Some(to) = self.players.get(&hero).map(|p| p.pos) else { return };
+        let now = self.clock;
+        let stands = match self.players.get(&hero).map(|p| p.action.clone()) {
+            Some(Action::Stagger { until }) => until,
+            _ => now,
+        };
+        let d = &self.content.mobs[self.mobs[&id].def];
+        let w = d.patterns[k].steps.first().and_then(|s| s.windup).unwrap_or(d.attack.windup).max(self.content.ai.first_blow);
+        let start = (stands + HAUL_FREE - w).max(now);
         let m = self.mobs.get_mut(&id).unwrap();
         m.pattern = None;
         m.state = MobState::Chase { foe: Foe::Hero(hero) };
+        self.firing_line.crews.get_mut(&id).unwrap().cut = Some((start, hero));
+    }
+
+    fn firing_cut(&mut self, id: Id, hero: Id) {
+        let Some(k) = self.content.mobs[self.mobs[&id].def].patterns.iter().position(|p| p.name == "clearing cut") else { return };
+        let Some(to) = self.players.get(&hero).map(|p| p.pos) else { return };
         self.begin_pattern(id, k, false);
+        // The haul's cut is not a blow of the count.
+        if let Some(c) = self.firing_line.crews.get_mut(&id) {
+            c.blows = 0;
+        }
         self.windup(id, Foe::Hero(hero), to);
     }
 }

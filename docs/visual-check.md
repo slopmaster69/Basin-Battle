@@ -283,6 +283,9 @@ camera wide Gilnid + Furnace Engineer    # a boss, and his crew kept in the pict
 `tools/visual-check/camera-greenskin.txt` is the first: the warrior and Captain Greenskin on the
 landing's deck.
 
+`tools/visual-check/greenskin-harpoon.txt` is the duel with the harpoon on its count (every third blow:
+the step back, the held harpoon, the haul and the cut). Not yet filmed.
+
 Gilnid's valve (the race, `docs/gilnid-encounter.md`) has its own set, all sharing
 `_gilnid-valve-setup.txt` (the mine cleared but for him and his crew, markers off, and a timer
 that presses the hero's keys a set time after his line is heard, and runs him to a spot in dashes

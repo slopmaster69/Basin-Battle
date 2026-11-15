@@ -145,7 +145,7 @@ fn the_captain_never_idles_and_never_lands_a_blow_within_0_8_sec_of_a_shot() {
     for seed in [31, 7, 12] {
         let (mut s, band, boss, crew) = fight_with(1, seed);
         let h = band[0];
-        let (mut lands, mut starts, mut fired) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut lands, mut starts, mut fired, mut throws) = (Vec::new(), Vec::new(), Vec::new(), Vec::<f32>::new());
         let start = s.clock;
         while s.clock - start < 40.0 {
             for e in s.step(DT) {
@@ -154,6 +154,7 @@ fn the_captain_never_idles_and_never_lands_a_blow_within_0_8_sec_of_a_shot() {
                         starts.push(s.clock);
                         lands.push(s.clock + windup);
                     }
+                    Event::Clip { id, clip: CLIP_THROW_HOLD, .. } if id == boss => throws.push(s.clock),
                     Event::Missile { caster, spell: TRACER, .. } if crew.contains(&caster) => fired.push(s.clock),
                     _ => {}
                 }
@@ -171,8 +172,11 @@ fn the_captain_never_idles_and_never_lands_a_blow_within_0_8_sec_of_a_shot() {
             }
         }
         let first = starts[0];
+        // (His harpoon, stepped back for and thrown, is a blow too.)
+        starts.extend(throws.iter().copied());
+        starts.sort_by(f32::total_cmp);
         for w in starts.windows(2) {
-            assert!(w[1] - w[0] < 6.0, "no long pause: {starts:?}");
+            assert!(w[1] - w[0] < 8.0, "no long pause (seed {seed}): {starts:?} throws {throws:?}");
         }
         assert!(first - start < 5.0, "his first blow comes soon: {first}");
     }
@@ -330,7 +334,7 @@ fn a_fallen_gunners_turns_pass_unshot_and_the_captain_fights_through_them() {
     assert!(fired.iter().all(|(g, _)| *g == crew[1]), "only the living gunner fires");
     assert!(fired.len() >= 2);
     for w in fired.windows(2) {
-        assert!((w[1].1 - w[0].1 - 2.0 * SHOT_GAP).abs() < 0.11, "half the shots: {fired:?}");
+        assert!((w[1].1 - w[0].1 - SHOT_GAP).abs() < 0.11, "no gentler for the loss: {fired:?}");
     }
     // The dead man's turn is no pause: the captain swings through it.
     let (a, b) = (fired[0].1, fired[1].1);
@@ -409,6 +413,7 @@ fn alone_he_has_no_pause_and_shoots_only_a_kiting_hero_every_10_sec() {
         assert!(!s.firing_pattern_allowed(boss, "pistol shot"));
     }
     run(&mut s, 0.2);
+    s.firing_line.crews.get_mut(&boss).unwrap().blows = 0;
     assert!(s.firing_pattern_allowed(boss, "pistol shot"));
     let d = &s.content.mobs[s.mobs[&boss].def];
     assert_eq!(d.patterns.iter().find(|p| p.name == "pistol shot").unwrap().min_range, 6.0, "only at a hero away from him");
@@ -417,30 +422,176 @@ fn alone_he_has_no_pause_and_shoots_only_a_kiting_hero_every_10_sec() {
 // --- the harpoon --------------------------------------------------------------------------------
 
 #[test]
-fn the_harpoon_waits_for_a_hero_who_keeps_8_yd_away_for_2_sec() {
-    let (mut s, h, boss) = alone();
-    let kite = |s: &mut Survival, yards: f32| {
+fn the_harpoon_comes_after_every_third_blow_never_by_distance() {
+    // A hero who never leaves his side, and one who waits 14 yd off for him, both see it on the
+    // count: it is his blows that count, never where they stand.
+    for stay in [2.0f32, 14.0] {
+        let (mut s, band, boss, crew) = fight(1);
+        let h = band[0];
+        for g in &crew {
+            s.mobs.get_mut(g).unwrap().health = 1_000_000;
+        }
+        let (mut blows, mut throws) = (Vec::new(), Vec::new());
+        let mut count = 0u32;
+        let mut last = 0u32;
+        let start = s.clock;
+        while s.clock - start < 60.0 && throws.len() < 3 {
+            for e in s.step(DT) {
+                match e {
+                    Event::Clip { id, clip: CLIP_THROW_HOLD, .. } if id == boss => {
+                        throws.push((s.clock, count));
+                        count = 0;
+                    }
+                    _ => {}
+                }
+            }
+            // His count of blows, as the server keeps it: each rise is one blow begun.
+            let now_blows = s.firing_line.crews[&boss].blows;
+            if now_blows > last {
+                count += now_blows - last;
+                blows.push(s.clock);
+            }
+            last = now_blows;
+            let p = s.mobs[&boss].pos;
+            if stay < 10.0 {
+                s.move_player(h, [p[0] - stay, p[1], p[2]], 0.0, Moving::default());
+            }
+        }
+        assert!(throws.len() >= 3, "stay {stay}: three harpoons in 60 sec: {throws:?}");
+        for (_, n) in &throws {
+            assert_eq!(*n, HARPOON_EVERY, "stay {stay}: one harpoon after exactly three blows: {throws:?}");
+        }
+    }
+}
+
+#[test]
+fn he_steps_back_to_8_yd_before_he_throws_and_a_wall_behind_him_throws_from_where_he_stands() {
+    let (mut s, band, boss, _) = fight(1);
+    let h = band[0];
+    s.firing_line.crews.get_mut(&boss).unwrap().blows = HARPOON_EVERY;
+    s.firing_line.crews.get_mut(&boss).unwrap().gun_ready = f32::MAX;
+    let start = s.clock;
+    let (mut held_at, mut from) = (None, None);
+    while s.clock - start < 12.0 && held_at.is_none() {
         let p = s.mobs[&boss].pos;
-        s.move_player(h, [p[0] - yards, p[1], p[2]], 0.0, Moving::default());
-        s.firing_line.crews.get_mut(&boss).unwrap().gun_ready = f32::MAX;
-        run(s, DT);
-    };
-    kite(&mut s, 5.0);
-    assert!(!s.firing_pattern_allowed(boss, "harpoon"), "not at a hero beside him");
-    for _ in 0..30 {
-        kite(&mut s, 10.0);
+        // Standing beside him: the hero never gives him the 8 yd.
+        s.move_player(h, [p[0] - 2.0, p[1], p[2]], 0.0, Moving::default());
+        for e in s.step(DT) {
+            if matches!(e, Event::MobMove { id, .. } if id == boss) && from.is_none() {
+                from = Some(s.clock);
+            }
+            if matches!(e, Event::Clip { id, clip: CLIP_THROW_HOLD, .. } if id == boss) {
+                held_at = Some((s.clock, dist2d(s.mobs[&boss].pos, s.players[&h].pos)));
+            }
+        }
     }
-    assert!(!s.firing_pattern_allowed(boss, "harpoon"), "1.5 sec is not long enough");
-    kite(&mut s, 5.0);
-    for _ in 0..30 {
-        kite(&mut s, 10.0);
+    let (at, d) = held_at.expect("he throws");
+    assert!(from.is_some(), "he stepped back first");
+    assert!(at - start <= HARPOON_STEP + SHOT_GAP + 0.2, "the step back is short: {}", at - start);
+    assert!(d < 4.0, "a hero who stayed beside him is still beside him: {d}");
+    // He walks away from a hero standing off, and stops at 8 yd on the way.
+    let (mut s, band, boss, _) = fight(1);
+    s.firing_line.crews.get_mut(&boss).unwrap().blows = HARPOON_EVERY;
+    s.firing_line.crews.get_mut(&boss).unwrap().gun_ready = f32::MAX;
+    let h = band[0];
+    let p = s.mobs[&boss].pos;
+    s.move_player(h, [p[0] - 3.0, p[1], p[2]], 0.0, Moving::default());
+    let start = s.clock;
+    let mut held = None;
+    while s.clock - start < 12.0 && held.is_none() {
+        for e in s.step(DT) {
+            if matches!(e, Event::Clip { id, clip: CLIP_THROW_HOLD, .. } if id == boss) {
+                held = Some(dist2d(s.mobs[&boss].pos, s.players[&h].pos));
+            }
+        }
     }
-    assert!(!s.firing_pattern_allowed(boss, "harpoon"), "coming close starts it again");
-    for _ in 0..12 {
-        kite(&mut s, 10.0);
+    let d = held.expect("he throws");
+    assert!(d >= HARPOON_FAR - 0.5, "a hero who holds still gets the 8 yd: {d}");
+}
+
+#[test]
+fn the_harpoon_never_lands_within_0_8_sec_of_a_gunners_shot() {
+    for seed in [31, 7, 12] {
+        let (mut s, band, boss, crew) = fight_with(1, seed);
+        let h = band[0];
+        for g in &crew {
+            s.mobs.get_mut(g).unwrap().health = 1_000_000;
+        }
+        let (mut lands, mut fired) = (Vec::new(), Vec::new());
+        let start = s.clock;
+        while s.clock - start < 50.0 {
+            for e in s.step(DT) {
+                match e {
+                    Event::Clip { id, clip: CLIP_THROW_HOLD, secs, .. } if id == boss => lands.push(s.clock + secs),
+                    Event::Missile { caster, spell: TRACER, .. } if crew.contains(&caster) => fired.push(s.clock),
+                    _ => {}
+                }
+            }
+            let p = s.mobs[&boss].pos;
+            s.move_player(h, [p[0] - 2.0, p[1], p[2]], 0.0, Moving::default());
+        }
+        assert!(lands.len() >= 3, "{lands:?}");
+        for l in &lands {
+            for f in &fired {
+                assert!((l - f).abs() >= CLASH - DT - 1e-3, "a throw at {l} and a shot at {f}");
+            }
+        }
     }
-    assert!(s.firing_line.crews[&boss].far_since.is_some_and(|t| s.clock - t >= HARPOON_WAIT));
-    assert_eq!(s.content.mobs[s.mobs[&boss].def].patterns.iter().find(|p| p.name == "harpoon").unwrap().min_range, 8.0);
+}
+
+#[test]
+fn the_last_gunner_left_shoots_on_every_beat_and_harder() {
+    let (mut s, band, boss, crew) = fight(1);
+    let h = band[0];
+    let normal = s.attack_now(crew[1]).damage;
+    s.hurt_mob(crew[0], h, u32::MAX);
+    run(&mut s, DT);
+    assert_eq!(s.attack_now(crew[1]).damage, (normal as f32 * LAST_MIGHT).round() as u32, "harder alone");
+    assert!(s.attack_now(crew[1]).damage > normal);
+    let mut fired = Vec::new();
+    let start = s.clock;
+    while s.clock - start < 30.0 {
+        for e in s.step(DT) {
+            if let Event::Missile { caster, spell: TRACER, .. } = e {
+                if crew.contains(&caster) {
+                    fired.push((caster, s.clock));
+                }
+            }
+        }
+        let p = s.mobs[&boss].pos;
+        s.move_player(h, [p[0] - 2.0, p[1], p[2]], 0.0, Moving::default());
+    }
+    assert!(fired.iter().all(|(g, _)| *g == crew[1]));
+    assert!(fired.len() >= 7, "{fired:?}");
+    for w in fired.windows(2) {
+        assert!((w[1].1 - w[0].1 - SHOT_GAP).abs() < 0.11, "every beat, not every other: {fired:?}");
+    }
+}
+
+#[test]
+fn a_pair_keeps_its_shots_as_they_were_the_first_10_sec_and_after() {
+    let (mut s, band, boss, crew) = fight(1);
+    let h = band[0];
+    assert_eq!(s.attack_now(crew[0]).damage, s.content.mobs[s.mobs[&crew[0]].def].attack.damage);
+    let mut fired = Vec::new();
+    let start = s.clock;
+    while s.clock - start < 20.0 {
+        for e in s.step(DT) {
+            if let Event::Missile { caster, spell: TRACER, .. } = e {
+                if crew.contains(&caster) {
+                    fired.push((caster, s.clock - start));
+                }
+            }
+        }
+        let p = s.mobs[&boss].pos;
+        s.move_player(h, [p[0] - 2.0, p[1], p[2]], 0.0, Moving::default());
+    }
+    assert!(fired.len() >= 4);
+    assert!(fired[0].1 < 6.0, "the first shot is as soon as ever: {fired:?}");
+    for w in fired.windows(2) {
+        assert_ne!(w[0].0, w[1].0, "they take turns");
+        assert!((w[1].1 - w[0].1 - SHOT_GAP).abs() < 0.11, "{fired:?}");
+    }
 }
 
 /// The harpoon begun at a hero `yards` off, he held still for it.
@@ -488,6 +639,88 @@ fn the_harpoon_is_held_back_in_his_hand_then_hauls_a_hit_hero_to_3_yd_into_his_c
     assert!(angle_between(dir, facing(s.players[&h].pos, to)) < 5.0, "toward him");
     assert!(cut, "straight into his clearing cut");
     assert!(matches!(s.mobs[&boss].state, MobState::Windup { .. }));
+}
+
+/// A hero hauled in by the harpoon from `yards` away, then what they do once on their feet:
+/// returns (free sec between landing and the cut, health lost to the cut).
+fn hauled(yards: f32, answer: &str) -> (f32, u32, bool) {
+    let (mut s, h, boss) = harpoon(yards);
+    s.players.get_mut(&h).unwrap().health = 1000;
+    s.players.get_mut(&h).unwrap().max_health = 1000;
+    let start = s.clock;
+    let mut ev;
+    // Run to the haul (no answer to the line itself: the hero stands).
+    let (mut free, mut hit_at, mut lands_at) = (0.0, None, None);
+    let mut answered = false;
+    let mut up_at = 0.0;
+    let mut landing: Option<Vec3> = None;
+    let mut blocked = false;
+    let mut before = s.players[&h].health;
+    while s.clock - start < 6.0 {
+        ev = s.step(DT);
+        for e in &ev {
+            match e {
+                Event::Hop { player, dir, .. } if *player == h && hit_at.is_none() => {
+                    // Set down 3 yd from him, on the line they were hauled along.
+                    let b = s.mobs[&boss].pos;
+                    landing = Some([b[0] - dir.cos() * PULL_TO, b[1] - dir.sin() * PULL_TO, b[2]]);
+                    hit_at = Some(s.clock);
+                    before = s.players[&h].health;
+                    up_at = match s.players[&h].action { Action::Stagger { until } => until, _ => s.clock };
+                }
+                Event::MobWindup { id, windup, .. } if *id == boss && hit_at.is_some() && lands_at.is_none() => lands_at = Some(s.clock + windup),
+                Event::Swing { victim: Some(v), outcome: Outcome::Blocked, .. } if *v == h && hit_at.is_some() => blocked = true,
+                _ => {}
+            }
+        }
+        if let (Some(hit), Some(land)) = (hit_at, lands_at) {
+            // The first moment their body is theirs again, plus a hero's reaction.
+            let stands = up_at;
+            free = land - stands;
+            // Their client reports where the haul set them down, once the flight is over.
+            if let Some(to) = landing.filter(|_| s.clock >= stands) {
+                landing = None;
+                s.move_player(h, to, facing(to, s.mobs[&boss].pos), Moving::default());
+            }
+            if !answered && s.clock >= stands + crate::tests_fair::REACTION && s.clock > hit {
+                answered = true;
+                let to = s.mobs[&boss].pos;
+                let me = s.players[&h].pos;
+                match answer {
+                    "none" => {}
+                    "guard" => {
+                        s.move_player(h, me, facing(me, to), Moving::default());
+                        s.input(h, Input::Guard);
+                    }
+                    _ => {
+                        // Out of the cut's 4 yd reach, away from him, at a hero's run.
+                        let away = facing(to, me);
+                        s.players.get_mut(&h).unwrap().pos = [me[0] + away.cos() * 2.0, me[1] + away.sin() * 2.0, me[2]];
+                        let np = s.players[&h].pos;
+                        s.move_player(h, np, away, Moving::default());
+                    }
+                }
+            }
+        }
+        if lands_at.is_some_and(|l| s.clock > l + 0.5) {
+            break;
+        }
+    }
+    assert!(hit_at.is_some(), "{answer}: the haul landed");
+    (free, before - s.players[&h].health, blocked)
+}
+
+#[test]
+fn a_hauled_hero_has_time_to_block_or_step_from_the_clearing_cut() {
+    let (free, _, _) = hauled(11.0, "none");
+    eprintln!("hauled from 11 yd: {free:.2} sec on their feet before the cut lands");
+    assert!(free >= crate::tests_fair::REACTION + 0.4, "time to answer once up: {free}");
+    let (_, lost, blocked) = hauled(11.0, "guard");
+    assert!(lost == 0, "a guard raised once up blocks the cut: lost {lost}");
+    let (_, lost, _) = hauled(11.0, "step");
+    assert_eq!(lost, 0, "two yards away once up is out of the cut: lost {lost}");
+    let (_, lost, _) = hauled(11.0, "none");
+    assert!(lost > 0, "the cut is real when nobody answers");
 }
 
 #[test]
@@ -707,6 +940,8 @@ struct Cleared {
     blows: u32,
     blows_taken: u32,
     alone_at: Option<f32>,
+    harpoons: u32,
+    hauled: u32,
 }
 
 /// A warrior with the starting sword and their own health, reading only what the client shows:
@@ -804,8 +1039,10 @@ fn clear_by_tells(seed: u64, crew_first: bool) -> Cleared {
                 Event::Clip { id, clip: CLIP_AIM | CLIP_THROW_HOLD, secs, .. } => {
                     let f = s.mobs.get(&id).map_or(0.0, |m| m.facing);
                     faces.entry(id).or_insert(f);
+                    out.harpoons += u32::from(id == boss && s.mobs[&id].pattern.is_some_and(|(k, _)| s.content.mobs[s.mobs[&id].def].patterns[k].name == "harpoon"));
                     lines.push((id, s.clock + secs, s.clock + reaction));
                 }
+                Event::Hop { player, .. } if player == hero => out.hauled += 1,
                 Event::MobWindup { id, windup, .. } if id == boss => blow = Some((s.clock + windup, s.clock + reaction)),
                 Event::Missile { caster, spell: TRACER | 6533, .. } if crew.contains(&caster) || caster == boss => out.shots += 1,
                 Event::Swing { attacker, victim: Some(v), damage, .. } if v == hero && damage > 0 => {
@@ -843,7 +1080,8 @@ fn a_lone_sword_hero_can_instead_duel_the_captain_stepping_out_of_the_lines() {
         eprintln!("Greenskin duel, seed {seed}: {out:?}");
         assert!(out.cleared, "{out:?}");
         assert!(out.health_left > 0);
-        assert_eq!(out.gunners_felled, 0, "the crew goes with him: {out:?}");
+        // (A sword's arc may catch a gunner as he steps back toward the post: at most one.)
+        assert!(out.gunners_felled <= 1, "the crew goes with him: {out:?}");
         assert!(out.shots >= 4 && out.sidesteps >= 3, "the crew fired all through: {out:?}");
         assert!(out.shots_taken * 2 <= out.shots, "most lines left: {out:?}");
         // Breaking the line first meets two or three shots and takes none (the test above); a
