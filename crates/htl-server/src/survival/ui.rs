@@ -371,7 +371,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
                 let horror = d.strike_back.iter().find(|x| x.kind == "panic").map_or(0.0, |x| x.secs[1]);
                 out.push(format!("First attacker takes {} and is horrified {} sec ({} on creatures)", n(e.amount), n(horror / 2.0), n(horror)))
             }
-            // Polymorph and Scatter Shot: how long it wanders, and how long on a hero.
+            // Scatter Shot: how long it wanders, and how long on a hero.
             "disorient" => out.push(format!("{} sec · {} sec on heroes", n(e.secs[1]), n(e.hero_secs))),
             // Prowl: what its strike from hiding adds.
             "prowl" => out.push(format!("{} bonus damage · {} sec stun", n(htl_survival::sim::cc::PROWL_BONUS), n(htl_survival::sim::cc::PROWL_STUN))),
@@ -2606,12 +2606,12 @@ mod facts_tests {
         assert!(facts("arcane_explosion").contains("6–8 yd radius"));
     }
 
-    /// The new EX versions (Polymorph, Blast Wave, Capacitor Totem, Prowl) say what they do in the
+    /// The new EX versions (Ice Lance, Blast Wave, Capacitor Totem, Prowl) say what they do in the
     /// numbers the sim uses.
     #[test]
     fn the_new_ex_versions_say_their_numbers() {
-        let poly = facts("pyroblast");
-        assert!(poly.contains("30 yd range") && poly.contains("8 sec · 1.5 sec on heroes") && !poly.contains("damage"), "{poly}");
+        let lance = facts("pyroblast");
+        assert!(lance.contains("30 yd range") && lance.contains("12 damage") && !lance.contains("sheep") && !lance.contains("1.5 sec on heroes"), "{lance}");
         let wave = facts("flash_flamestrike");
         assert!(wave.contains("12 damage") && wave.contains("6 yd radius") && wave.contains("6 yd knockback"), "{wave}");
         let cap = facts("thundercrack");

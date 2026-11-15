@@ -2463,6 +2463,7 @@ impl Survival {
         let cowed = 1.0 - self.cowed_cut(owner);
         let mut dmg = base * might * self.weakened(owner) * cowed * if opened { d.opened } else { 1.0 };
         let shatter = d.shatter;
+        let (spread, spell) = (d.shatter_spread, d.spell);
         let mark_crit = d.mark_crit;
         // Shadow Word: Death on a foe low on health: its judgement, many times as hard.
         let (low, low_mult) = (d.low_health, d.low_mult);
@@ -2499,6 +2500,13 @@ impl Survival {
             if lines != 0 {
                 self.events.push(Event::Visual { id: victim, kit: lines, by: None });
             }
+            // The ice bursts outward (Ice Lance): every other frozen foe within `shatter_spread`
+            // shatters too, through this same path. Only the first shatter of a lance spreads: a
+            // foe struck by the spread can't spread it again (`fx_shattering`), so each foe
+            // shatters once per lance.
+            if spread > 0.0 && !self.fx_shattering {
+                self.shatter_spread(owner, victim, ability, base, spread, spell);
+            }
         }
         if opened {
             self.events.push(Event::Visual { id: victim, kit: combat::KIT_RIPOSTE, by: Some(owner) });
@@ -2529,6 +2537,36 @@ impl Survival {
             dmg += self.prowl_strike(owner, victim) as f32;
         }
         dmg.round().max(0.0) as u32
+    }
+
+    /// The shatter's spread: every other foe frozen within `radius` of the shattered `victim`
+    /// takes the ability's shatter hit as the caster's (its `base` x [`SHATTER`], the freeze
+    /// ended, the global shatter look and sound), by the same `ability_damage` path. Not on one
+    /// that isn't frozen. Runs with `fx_shattering` set, so what it shatters doesn't spread again.
+    fn shatter_spread(&mut self, owner: Id, victim: Id, ability: usize, base: f32, radius: f32, spell: u32) {
+        let Some(at) = self.unit_pos(victim) else { return };
+        let near = |pos: Vec3| dist2d(pos, at) <= radius && (pos[2] - at[2]).abs() <= 4.0;
+        let mobs: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(mid, m)| **mid != victim && **mid != owner && m.health > 0 && !m.hidden && near(m.pos) && !self.own_totem(**mid, owner) && !self.spirit_body(**mid) && self.has_cc(**mid, "petrify"))
+            .map(|(id, _)| *id)
+            .collect();
+        let heroes: Vec<Id> = if self.heroes_clash() {
+            self.players.iter().filter(|(h, p)| **h != victim && **h != owner && self.hostile(owner, **h) && p.health > 0 && near(p.pos) && self.has_cc(**h, "petrify")).map(|(h, _)| *h).collect()
+        } else {
+            Vec::new()
+        };
+        let was = std::mem::replace(&mut self.fx_shattering, true);
+        for m in mobs {
+            self.ability_on_mob(owner, m, ability, 1.0, base, at, HitKind::Area, spell);
+        }
+        for h in heroes {
+            let dmg = self.ability_damage(owner, h, ability, base);
+            let area = Some(combat::Area::Circle { at, radius: radius + HERO_SIZE });
+            self.strike_fair_as(owner, h, dmg, at, false, false, false, Blow::Arrow(spell), area, combat::Follow::Ability { ability, share: 1.0 }, HitKind::Area);
+        }
+        self.fx_shattering = was;
     }
 
     /// An ability lands on a creature (a totem, a dummy): damage, its effects, the look.

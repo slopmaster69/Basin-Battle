@@ -152,7 +152,7 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Scatter Shot* | Fan of Knives · *Kidney Shot* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Polymorph* | Seed of Corruption · *Soul Swap* | Living Seed · *Entangling Roots* |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Scatter Shot* | Fan of Knives · *Kidney Shot* | Penance · *Divine Star*, or Mind Blast · *Shadow Word: Death* | Lava Burst · *Chain Lightning* | Fireball · *Ice Lance* | Seed of Corruption · *Soul Swap* | Living Seed · *Entangling Roots* |
 | E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Guardian Spirit*, or Psychic Scream · *Void Tendrils* | Thunderstorm · *Capacitor Totem* | Cone of Cold · *Frost Nova* | Shadowfury · *Howl of Terror* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Angelic Feather · *Leap of Faith*, or Fade · *Dominate Mind* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Prowl* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Shield · *Pain Suppression*, or Vampiric Embrace · *Psychic Ward* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
@@ -232,10 +232,10 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   Thunderstorm throws everyone round you 8 yd away, and its EX, Capacitor Totem, is a totem that
   stuns every enemy within 8 yd for 3 sec after a 2 sec fuse unless they destroy it first; other
   totems slow or root, heal, or swallow a projectile (Grounding); Earthquake stuns and slows a field.
-- **Mage**: freeze, then shatter. Fireball grows with its charge, and its EX, Polymorph, turns the
-  first enemy it hits into a sheep for 8 s (1.5 s on a hero) that wanders, cannot attack and turns
-  back on any damage; Cone of Cold slows (and freezes the already slowed), Frost Nova
-  freezes all round you and makes your next Fireball a free Polymorph for 5 s; the benched
+- **Mage**: freeze, then shatter. Fireball grows with its charge, and its EX, Ice Lance, is a frost bolt for 12 damage that
+  shatters a frozen enemy (x1.5, the freeze ended) and bursts the ice outward: every other frozen
+  enemy within 5 yd shatters too, whoever froze it, each once per lance; Cone of Cold slows (and freezes the already slowed), Frost Nova
+  freezes all round you and makes your next Fireball a free Ice Lance for 5 s; the benched
   Flamestrike's EX, Blast Wave, is an instant ring of fire that throws enemies back 6 yd and
   slows them 50% for 3 s; Blink; Ice Block;
   Meteor falls 1.5 s after you call it, on a circle 5 to 7 yd wide: 45 to 90 damage.
@@ -306,7 +306,8 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 
 - **Freeze, then shatter**: Frost Nova, Freezing Trap, Cold Snap, Frost Blink or a Cone of Cold on
   a slowed foe freeze; fire (Fireball, Meteor), a Sundering Blow or a Multi-Shot on them
-  shatters for half again.
+  shatters for half again. An Ice Lance on a frozen foe shatters every other frozen foe within
+  5 yd as well.
 - **Pull into the pain**: Void Rift, Leap of Faith or Mind Grip drag foes onto a trap, into
   Consecration, an Earthquake or under a Meteor.
 - **Push into the trap**: Thunderstorm, Typhoon or Heroic Leap throw a foe onto
