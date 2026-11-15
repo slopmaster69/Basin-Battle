@@ -29,6 +29,14 @@ taken). Surge of Light and Body and Soul are gone.
 **Gone:** Greater Penance, Surge of Light,
 Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
 
+**Built (Nov 15 2026), the defence keys:** Pain Suppression, Vampiric Embrace and Psychic Ward,
+marked **Built** below. Power Word: Barrier and Vampiric Touch are gone from the content;
+Shadowguard is benched (its rules and tests kept, as Mind Flay's are) and a save with it on the key
+loads with Vampiric Embrace there. Not built: the fling and the brace on the beat (Power Word:
+Shield stays as it stands, parry and all: both need the client to draw rings and read flicks, and
+the client is not changed), Lightwell, Power Infusion and Holy Word: Sanctuary (see the EX rule note
+above: their keys' EXes are Guardian Spirit and Leap of Faith), and Fade's lost-creatures rule.
+
 ## Light
 
 | Key | Spell | EX (Valor) |
@@ -62,7 +70,7 @@ Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
   with no aiming, and the blow is parried for them (the striker reels, the perfect). Missed, the
   Shield still soaks the blow. (Draft 3's cast-at-the-blow asked for a read, an aim and a timing
   inside one wind-up.)
-- **Pain Suppression** (EX, 25). The friend under the reticle, or you: 40% less damage and
+- **Pain Suppression** (EX, 25). **Built.** The friend under the reticle, or you: 40% less damage and
   nothing staggers them, 4 sec.
 
 ## Shadow
@@ -88,7 +96,15 @@ Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
   8 yd is held where it stands for 3 sec (heroes 1.5) by a tendril of 50 health, until the tendril
   is broken (Corey: 10 was one blow from anything). *As built:* the hold is a root whose tendril
   every point of damage wears down; a champion holds its ground and is not held.
-- **Psychic Ward** (EX, 25). The friend under the reticle, or you, for 6 sec: the first foe to
+- **Psychic Ward** (EX, 25). **Built.** The friend under the reticle, or you, for 6 sec: the first foe to
   strike them is struck back in the mind, 20 damage and horrified 1.5 sec (creatures 3 sec).
-- **Vampiric Embrace** (cooldown 15 sec). For 6 sec, half of all the shadow you deal heals the
+- **Vampiric Embrace** (cooldown 15 sec). **Built.** For 6 sec, half of all the shadow you deal heals the
   lowest-health ally near you, or you; a Mind Blast perfect inside it adds 2 sec.
+
+*As built (defence keys):* Pain Suppression is an ally-aimed buff (the friend under the reticle,
+else you, 30 yd): `hallowed` 40% less damage and `steadfast` no stagger, 4 sec; no shield, no
+parry. Vampiric Embrace heals half of what the Priest's Shadow spells and Shadow staff bolts deal
+(by the spell's name) to the lowest share of health among heroes she can help within 12 yd, or
+herself; a Mind Blast perfect adds 2 sec. Psychic Ward is on the friend under the reticle (else
+you) 6 sec: the first foe to strike them (a creature or a hero) takes 20 and a panic of 3 sec
+(heroes half, as for any panic); the blow itself still lands.

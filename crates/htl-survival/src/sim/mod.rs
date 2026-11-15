@@ -24,7 +24,7 @@ pub mod cc;
 pub mod cues;
 mod building;
 pub use building::StationActions;
-mod combat;
+pub(crate) mod combat;
 pub mod dungeon;
 pub mod duel;
 mod journal;

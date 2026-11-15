@@ -631,6 +631,10 @@ pub struct AbilityDef {
     pub backfire_yd: f32,
     #[serde(default)]
     pub backfire_effects: Vec<AbilityEffect>,
+    /// What a foe who strikes a hero under this ability's `ward` takes back (its `amount` the
+    /// damage), besides it (Psychic Ward).
+    #[serde(default)]
+    pub strike_back: Vec<AbilityEffect>,
     /// A second activation (Battlerite's recast): once this goes, its key is armed for
     /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
     /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX
@@ -1203,6 +1207,12 @@ pub struct AbilityEffect {
     /// Mind: a creature is taken for `secs`, a hero for this). 0: the usual share of `secs`.
     #[serde(default)]
     pub hero_secs: f32,
+    /// Vampiric Embrace's reach (yards: the allies it heals are within this of the caster) and the
+    /// seconds a Mind Blast perfect adds to it (`embrace`); 0 otherwise.
+    #[serde(default)]
+    pub reach: f32,
+    #[serde(default)]
+    pub extend: f32,
     /// A snare on a foe already snared freezes it instead (Cone of Cold).
     #[serde(default)]
     pub freeze_if_snared: bool,
@@ -1260,8 +1270,8 @@ pub const CC_KINDS: [&str; 10] = ["stun", "incapacitate", "petrify", "panic", "r
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
 ///
-/// The Shadow Priest's: `vampiric` (everything whoever gave it deals them heals that one for
-/// `amount` of it: Vampiric Touch).
+/// The Shadow Priest's: `embrace` (half of the shadow they deal heals the lowest-health ally near them:
+/// Vampiric Embrace), `ward` (the first foe to strike them takes `amount` and the ability's `strike_back`: Psychic Ward).
 ///
 /// The Warrior's: `guarded` (the first blow meant for them strikes the one who gave it instead:
 /// Intervene), `rallied` (any stagger or knockdown ends as it lands; nothing staggers them, and
@@ -1272,12 +1282,12 @@ pub const CC_KINDS: [&str; 10] = ["stun", "incapacitate", "petrify", "panic", "r
 /// hero's hit on them deals `amount` more and staggers longer: Rising Cut), `momentum` (the
 /// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
 /// at a time while they stand by it).
-pub const OTHER_EFFECTS: [&str; 28] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner", "vampiric",
+pub const OTHER_EFFECTS: [&str; 29] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner", "embrace", "ward",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 17] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
+pub const BOONS: [&str; 19] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).

@@ -254,7 +254,9 @@ const RENAMED: &[(&str, &str)] = &[
     // Shadowguard; Holy Fire and Mind Grip (EX versions, never saved) are gone; Mind Flay is
     // benched and Mind Blast is Shadow's Q, so a Mind Flay on the Q key is Mind Blast now.
     ("leap_of_faith", "angelic_feather"),
-    ("dispersion", "shadowguard"),
+    ("dispersion", "vampiric_embrace"),
+    // Draft 4: Shadowguard is benched; its card on a key is Vampiric Embrace now.
+    ("shadowguard", "vampiric_embrace"),
     ("mind_flay", "mind_blast"),
     // Shaman
     ("lightning_bolt", "lava_burst"),

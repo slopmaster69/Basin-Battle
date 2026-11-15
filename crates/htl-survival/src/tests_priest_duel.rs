@@ -206,14 +206,13 @@ fn power_word_shield_never_lands_on_a_duel_foe() {
 }
 
 #[test]
-fn power_word_barrier_holds_off_nothing_for_a_duel_foe_under_it() {
+fn pain_suppression_never_lands_on_a_duel_foe() {
     let mut s = world();
     let (p, b) = duel(&mut s);
     s.move_player(b, [3.0, 0.0, 0.0], WEST, Moving::default());
-    aim_ground(&mut s, p, ORIGIN);
     cast(&mut s, p, "power_word_shield", true);
     run_held(&mut s, 0.5, &[(b, [3.0, 0.0, 0.0])]);
-    assert!(s.has_cc(p, "steadfast"), "Ayla under her dome");
+    assert!(s.has_cc(p, "hallowed"), "Ayla suppresses her own pain instead");
     assert!(!s.has_cc(b, "steadfast") && !s.has_cc(b, "hallowed"), "Bren gets nothing of it");
 }
 

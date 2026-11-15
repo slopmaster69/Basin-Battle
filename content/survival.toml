@@ -6450,26 +6450,23 @@ parry_for = true
 spell = 17
 effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 30.0 }]
 
-# The dome: a place to hold, no parry (its own job, not the Shield's twice).
+# Pain Suppression (Corey's EX rule: niche, never a stronger shield), Power Word: Shield's EX and a
+# different spell: it doesn't soak a number, it takes the sting out of everything for a few seconds
+# and holds a friend on their feet through the worst of it. No parry, no shield: the friend under
+# the reticle (or you) takes 40% less from every blow for 4 sec and nothing staggers them.
 [[ability]]
-key = "power_word_barrier"
-name = "Power Word: Barrier"
+key = "pain_suppression"
+name = "Pain Suppression"
 ex_of = "power_word_shield"
-text = "Raises a 6 yd dome of light around you for 5 sec. You and every ally under it take 25% less damage and cannot be staggered. Hold the line inside it."
-icon = "Spell_Holy_PowerInfusion"
+text = "Suppresses the pain of the ally under your reticle, up to 30 yd away, or of you. For 4 sec they take 40% less damage and nothing staggers them."
+icon = "Spell_Holy_PainSuppression"
 slot = "defense"
-kind = "ground"
+kind = "ally"
 valor = 25
-at_self = true
-radius = [6.0, 6.0]
-linger = 5.0
-# A column of light on you as it rises (Sanctuary's), and holy light on the ground while it lasts.
-spell = 24171
-linger_spell = 20116
-boon = "hallowed"
-boon_amount = 0.25
-tick_effects = [{ kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
-self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+range = [30.0, 30.0]
+# Power Infusion's light on them (the 3.x Pain Suppression spell, 33206, is not in the 1.12 client).
+spell = 10060
+effects = [{ kind = "hallowed", secs = [4.0, 4.0], amount = 0.4 }, { kind = "steadfast", secs = [4.0, 4.0], amount = 1.0 }]
 
 # The group's beat: a circle where you stand, for everyone. You rise on wings of light (Magic
 # Wings), out of reach, still able to fight from the air. Three times a ring runs out from you to
@@ -6643,6 +6640,24 @@ spell = 29317
 impact_kit = 2709
 effects = [{ kind = "dominated", secs = [6.0, 6.0], hero_secs = 1.5, aura = 605 }]
 
+# 2: Vampiric Embrace (draft 4): Shadow's defence is not a shell but a sustain. For 6 sec half of all
+# the shadow you deal (Mind Blast, Shadow Word: Death, the rift and the shadow staff's bolts) heals
+# the lowest-health ally within 12 yd of you, or you. A Mind Blast perfect inside it adds 2 sec
+# (`extend`). Shadowguard below is benched, its rules kept.
+[[ability]]
+key = "vampiric_embrace"
+name = "Vampiric Embrace"
+text = "For 6 sec, half of all the shadow damage you deal heals the lowest-health ally within 12 yd of you, or you. A perfect Mind Blast inside it adds 2 sec."
+icon = "Spell_Shadow_UnsummonBuilding"
+school = "priest"
+slot = "defense"
+choice = 2
+kind = "buff"
+cooldown = 15.0
+# Vampiric Embrace's own aura on the Priest while it holds.
+spell = 15286
+effects = [{ kind = "embrace", secs = [6.0, 6.0], amount = 0.5, reach = 12.0, extend = 2.0, aura = 15286 }]
+
 # 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
 # again (or its time up) throws it at the first foe along the reticle. Let go just after a blow
 # lands on you: half again as much (45 at most), the perfect.
@@ -6655,6 +6670,7 @@ perfect_kit = 117
 school = "priest"
 slot = "defense"
 choice = 2
+bench = true
 kind = "shell"
 cooldown = 12.0
 secs = 2.0
@@ -6681,22 +6697,24 @@ speed = 40.0
 spell = 26006
 impact_kit = 2709
 
-# Shadow wants to deal damage: a grip that turns the Priest's own damage into their health (only
-# theirs: Corey's ruling).
+# Psychic Ward (Corey's EX rule: niche, never a stronger Embrace), Vampiric Embrace's EX and a
+# different spell: no healing, a trap in the mind. The friend under the reticle (or you) wears it
+# 6 sec; the first foe to strike them is struck back in the mind, 20 damage and horrified 1.5 sec
+# (creatures 3: heroes get half of any panic), and the ward is spent. The blow still lands.
 [[ability]]
-key = "vampiric_touch"
-name = "Vampiric Touch"
-ex_of = "shadowguard"
-text = "Grips the enemy in front of you with a hand of shadow for 8 sec. Your damage to it heals you for 20% of the damage dealt."
-icon = "Spell_Shadow_UnsummonBuilding"
+key = "psychic_ward"
+name = "Psychic Ward"
+ex_of = "vampiric_embrace"
+text = "Wards the ally under your reticle, up to 30 yd away, or you, for 6 sec. The first enemy to strike them is struck back in the mind for 20 damage and horrified for 1.5 sec (3 sec for creatures)."
+icon = "Spell_Shadow_PsychicHorrors"
 slot = "defense"
-kind = "cone"
+kind = "ally"
 valor = 25
-at_once = true
-range = [3.5, 3.5]
-arc = 60.0
-spell = 15286
-effects = [{ kind = "vampiric", secs = [8.0, 8.0], amount = 0.2, aura = 15286 }]
+range = [30.0, 30.0]
+# Shadow Word: Pain's dark look on them while it waits.
+spell = 589
+effects = [{ kind = "ward", secs = [6.0, 6.0], amount = 20.0, aura = 15286 }]
+strike_back = [{ kind = "panic", secs = [3.0, 3.0] }]
 
 # 3: gather, then implode. A wound at the reticle grows for 2 sec; cords drag the foes in it toward
 # its heart each second (a hero 5 yd at most). The key again implodes it: 40, and 8 more for every
@@ -12386,7 +12404,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["angelic_feather", "power_word_shield", "fade", "shadowguard"]
+teaches = ["angelic_feather", "power_word_shield", "fade", "vampiric_embrace"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0
