@@ -79,7 +79,7 @@ fn the_log_hangs_over_the_post_from_the_pull_its_drop_marked_and_its_tie_off_out
     let ev = run(&mut s, 1.0);
     assert_eq!(rig(&s).state, "hung");
     assert_eq!(ev.iter().filter(|e| matches!(e, Event::Rope { .. })).count(), 3, "one rope to the stake, two slings");
-    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. })), "no mark before the pull");
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundWarn { .. })), "no mark before the pull");
 
     let (mut s, _, _) = fight(1, 3);
     let ev = run(&mut s, 1.2);
@@ -99,13 +99,13 @@ fn the_log_hangs_over_the_post_from_the_pull_its_drop_marked_and_its_tie_off_out
     assert!((3.0..=9.0).contains(&dist2d(work, tie)), "{}", dist2d(work, tie));
     // From the pull: the drop on the floor, quiet, its whole length; a ring at the tie-off.
     let lines: Vec<f32> = ev.iter().filter_map(|e| match e {
-        Event::GroundBurst { shape: "line", yaw, reach, width, colour, .. } if colour == QUIET && (*yaw - g.across).abs() < 1e-3 && (*width - 2.0 * g.half).abs() < 1e-3 => Some(*reach),
+        Event::GroundWarn { shape: "line", yaw, reach, width, colour, .. } if colour == QUIET && (*yaw - g.across).abs() < 1e-3 && (*width - 2.0 * g.half).abs() < 1e-3 => Some(*reach),
         _ => None,
     }).collect();
     assert!(lines.len() >= 2, "sent again while the fight is on");
     assert!((lines[0] - g.len).abs() < 0.3, "{lines:?}");
-    assert!(ev.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", at, colour, .. } if colour == QUIET && dist2d(*at, tie) < 0.1)));
-    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { colour, .. } if colour == BRIGHT)));
+    assert!(ev.iter().any(|e| matches!(e, Event::GroundWarn { shape: "ring", at, colour, .. } if colour == QUIET && dist2d(*at, tie) < 0.1)));
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundWarn { colour, .. } if colour == BRIGHT)));
 }
 
 #[test]
@@ -219,8 +219,12 @@ fn a_blow_on_the_tie_off_cuts_it_the_log_creaks_and_comes_down_once() {
     let took = s.clock - t0;
     assert!((took - CREAK - FALL).abs() < 0.11, "{took}");
     // Bright on the floor from the cut until it lands; it hangs through the creak, then falls.
-    assert!(ev.iter().chain(&fall).filter(|(_, e)| matches!(e, Event::GroundBurst { shape: "line", colour, .. } if colour == BRIGHT)).count() >= 3);
-    assert!(ev.iter().any(|(_, e)| matches!(e, Event::GroundBurst { shape: "line", colour, .. } if colour == BRIGHT)), "bright from the blow itself");
+    assert!(ev.iter().chain(&fall).filter(|(_, e)| matches!(e, Event::GroundWarn { shape: "line", colour, .. } if colour == BRIGHT)).count() >= 3);
+    assert!(ev.iter().any(|(_, e)| matches!(e, Event::GroundWarn { shape: "line", colour, .. } if colour == BRIGHT)), "bright from the blow itself");
+    // With the floor markers off, dust shakes off the log along the floor it falls on, through the creak.
+    let shaken = ev.iter().chain(&fall).filter(|(t, e)| *t <= t0 + CREAK + 0.01
+        && matches!(e, Event::MissileFrom { spell: DUST, caster, .. } if *caster == log)).count();
+    assert!(shaken >= 3, "dust comes off the creaking log: {shaken}");
     let moved: Vec<f32> = fall.iter().filter(|(_, e)| matches!(e, Event::ObjChanged { id } if *id == log)).map(|(t, _)| *t - t0).collect();
     assert!(moved.len() >= 3 && moved[0] >= CREAK - 0.11, "{moved:?}");
     assert!(top - s.objs[&log].pos[2] > 5.0, "down on the floor");
@@ -236,7 +240,7 @@ fn a_blow_on_the_tie_off_cuts_it_the_log_creaks_and_comes_down_once() {
     let after = run(&mut s, 2.0);
     assert_eq!(rig(&s).state, "down");
     assert!(!after.iter().any(|e| matches!(e, Event::Sound { sound: CREAK_SOUND, .. })));
-    assert!(!after.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", .. })), "no mark for a log that's down");
+    assert!(!after.iter().any(|e| matches!(e, Event::GroundWarn { shape: "line", .. })), "no mark for a log that's down");
     assert_eq!(props(&s, LOG), LOG_BUNDLE.len());
 }
 
@@ -571,7 +575,7 @@ fn a_lost_fight_at_any_stage_hangs_the_log_again_over_a_clean_floor_with_one_who
         assert!(s.machinery.drivers.is_empty() && s.machinery.rebuilt.is_empty() && s.machinery.runaways.is_empty(), "stage {stage}");
         assert!(!s.slain("sneed"));
         let ev = run(&mut s, 1.5);
-        assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. })), "stage {stage}: no mark left on the floor");
+        assert!(!ev.iter().any(|e| matches!(e, Event::GroundWarn { .. })), "stage {stage}: no mark left on the floor");
     }
 }
 
@@ -615,7 +619,7 @@ fn sneed_killed_while_stunned_under_the_log_takes_it_and_the_wreck_with_his_body
     assert!(!s.mobs.contains_key(&machine) && !s.mobs.contains_key(&driver));
     assert_eq!((props(&s, LOG), props(&s, LUMBER), props(&s, PLANK)), (0, 0, 0), "the fallen log and the lumber go with him");
     let ev = run(&mut s, 2.0);
-    assert!(!ev.iter().any(|e| matches!(e, Event::GroundBurst { .. } | Event::Rope { .. })));
+    assert!(!ev.iter().any(|e| matches!(e, Event::GroundWarn { .. } | Event::Rope { .. })));
 }
 
 #[test]
@@ -794,4 +798,19 @@ fn a_fight_lost_in_a_stall_ends_its_smoke_and_its_sound_at_once() {
         let machines: Vec<&Mob> = s.mobs.values().filter(|m| s.content.mobs[m.def].key == MACHINE).collect();
         assert!(machines.len() == 1 && machines[0].health == machines[0].max_health && dist2d(machines[0].pos, rig(&s).home) < 1.0, "{at} s in: one whole machine at its post");
     }
+}
+
+#[test]
+fn a_torch_burns_by_the_stake_while_sneed_mends_and_goes_out_with_the_rope() {
+    let (mut s, band, machine) = fight(1, 13);
+    assert_eq!(props(&s, LAMP), 0, "no torch before he mends");
+    let driver = broken(&mut s, machine, band[0]);
+    working(&mut s, driver);
+    run(&mut s, 0.3);
+    assert_eq!(props(&s, LAMP), 1, "a torch lit while he mends: the moment to cut");
+    let tie = rig(&s).tie.unwrap();
+    let lamp = s.objs.values().find(|o| matches!(o.kind, ObjKind::Prop { display: LAMP, .. })).unwrap().pos;
+    assert!(dist2d(lamp, tie) < 2.0, "by the stake");
+    cut(&mut s, band[0]);
+    assert_eq!(props(&s, LAMP), 0, "it goes out with the rope");
 }
