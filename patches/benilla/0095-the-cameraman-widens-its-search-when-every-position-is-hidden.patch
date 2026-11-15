@@ -1,0 +1,281 @@
+From c136f601e128b1b0a831d3488e02c6069b501f58 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Sat, 14 Nov 2026 07:31:55 -0600
+Subject: [PATCH] The cameraman widens its search when every position of the
+ shot is hidden
+
+After two seconds of "no clearer position" it tries a ring of 12 bearings at two distances and two heights, scored like the shot's own positions and taken only if clearly better; failing that it rises seven yards over the point it looks at. The bearing is kept until a cut to one of the shot's positions.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/player/spectator.rs | 176 ++++++++++++++++++++-
+ 1 file changed, 173 insertions(+), 3 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/spectator.rs b/crates/benilla-app/src/player/spectator.rs
+index 37bacb9e..b46f9e31 100644
+--- a/crates/benilla-app/src/player/spectator.rs
++++ b/crates/benilla-app/src/player/spectator.rs
+@@ -57,6 +57,14 @@
+ //!   so it's on the fight from the video's first frame. A fight over (the hero fell in the setup)
+ //!   is on again at once when the hero, up, is moved beside a living subject.
+ //!
++//! - **Widen the search when every position is hidden** (patch 0095). A deck full of cannons,
++//!   masts and crew can hide the hero from every one of the shot's positions. After
++//!   [`WIDEN_SECS`] of "no clearer position", the camera tries a ring round the fight
++//!   ([`ring`]: [`RING_BEARINGS`] bearings, two distances, two heights), scored like the shot's
++//!   positions and taken only if clearly better; failing that it rises over the cover
++//!   ([`rise`]: [`RISE_OVER`] yd above the point it looks at) to look down past it. It keeps that
++//!   bearing, following the fight, until a cut to one of the shot's positions.
++//!
+ //! Positions are chosen with the clearest picture: nothing hiding either of the two, nothing in
+ //! the foreground, then the shot's own order (the other side, square to the side, behind, then
+ //! higher). With no subject (`,<hero>`) or none within [`SUBJECT_REACH`] of the hero, the hero alone
+@@ -100,6 +108,17 @@ const QUICK_HOLD_SECS: f32 = 1.0;
+ /// position that can't be kept, this long.
+ const RETRY_SECS: f32 = 1.0;
+ const RETRY_URGENT_SECS: f32 = 0.25;
++/// After a search found no clearer position this long (seconds), the camera widens it (patch
++/// 0095): a ring of positions round the fight, then up over the cover.
++const WIDEN_SECS: f32 = 2.0;
++/// The ring: this many bearings, each at these shares of the shot's distance and these heights
++/// (degrees up), and the score order a ring position takes (a little behind the shot's own).
++const RING_BEARINGS: usize = 12;
++const RING_SHARES: [f32; 2] = [0.8, 1.4];
++const RING_UPS: [f32; 2] = [25.0, 55.0];
++const RING_ORDER: f32 = 1.0;
++/// Up over the cover the eye stands at least this far (yd) above the point it looks at.
++const RISE_OVER: f32 = 7.0;
+ /// The hero out of sight this long (seconds) gives the camera back to the body.
+ const LOST_SECS: f32 = 3.0;
+ /// Once the fight is over, it's on again only with the hero up beside a living subject this long
+@@ -485,6 +504,44 @@ fn in_picture(eye: Vec3, look: Vec3, p: Vec3) -> bool {
+     depth > 0.3 && v.dot(right).abs() <= depth * TAN_HALF_WIDE / 0.8 && v.dot(up).abs() <= depth * TAN_HALF_TALL / 0.85
+ }
+ 
++/// Whether a search that has found no clearer position for `stuck` seconds widens (patch 0095).
++fn widen_now(stuck: f32) -> bool {
++    stuck >= WIDEN_SECS
++}
++
++/// The ring of positions round the fight (patch 0095) for a shot `dist` yd out: each of
++/// [`RING_BEARINGS`] bearings at [`RING_SHARES`] of it and [`RING_UPS`] degrees up, as (the way
++/// out from the point looked at, unit; how far), the distance within [`NEAREST`] and [`FAR`].
++fn ring(dist: f32) -> Vec<(Vec3, f32)> {
++    let mut out = Vec::new();
++    for k in 0..RING_BEARINGS {
++        let yaw = std::f32::consts::TAU * k as f32 / RING_BEARINGS as f32;
++        for share in RING_SHARES {
++            for up in RING_UPS {
++                let up = up.to_radians();
++                let way = Vec3::new(yaw.sin() * up.cos(), up.sin(), yaw.cos() * up.cos());
++                out.push((way, (dist * share).clamp(NEAREST, FAR)));
++            }
++        }
++    }
++    out
++}
++
++/// How high the eye rises over the cover (patch 0095): over the tallest body that covers it
++/// (`top`, with the gap and a yard and a half), and, when `lift` is given, at least `lift` above
++/// the point looked at (at `look_y`), so it looks down past what hid the hero. Never below `top`.
++fn rise(top: f32, look_y: f32, lift: Option<f32>) -> f32 {
++    let over = top + BODY_GAP + 1.5;
++    lift.map_or(over, |l| over.max(look_y + l))
++}
++
++/// The way from the point looked at to `eye` (unit) and how far; `None` when they are one point.
++fn out_of(look: Vec3, eye: Vec3) -> Option<(Vec3, f32)> {
++    let v = eye - look;
++    let len = v.length();
++    (len > 1e-3).then(|| (v / len, len))
++}
++
+ /// The camera's state between frames.
+ #[derive(Default)]
+ struct Framing {
+@@ -535,6 +592,11 @@ struct Framing {
+     /// How long the hero, and the subject, have each been hidden (patch 0093).
+     hero_blocked: f32,
+     subject_blocked: f32,
++    /// How long a search has said "no clearer position" (patch 0095), and the bearing and distance
++    /// from the point looked at that the widened search chose, kept until a cut to one of the
++    /// shot's positions.
++    stuck: f32,
++    aside: Option<(Vec3, f32)>,
+ }
+ 
+ /// What the camera films this frame: the two, and every other body that can stand in the way.
+@@ -683,11 +745,51 @@ impl Scene {
+             .min_by(|a, b| a.score.total_cmp(&b.score))
+     }
+ 
++    /// What the widened search finds (patch 0095) when every one of the shot's positions is hidden:
++    /// the clearest of the ring round `p.look` (each kept to the same rules as the shot's
++    /// positions: room to stand, ground, clear of bodies, seeing the hero or the subject), else
++    /// the eye risen over the cover; either only if it scores clearly better than `here`.
++    fn widen(
++        &self,
++        collide: &WorldCollision,
++        p: Pose,
++        pick: usize,
++        eye: Vec3,
++        here: f32,
++    ) -> Option<(Spot, &'static str)> {
++        let better = |s: &Spot| s.score + BETTER_BY < here;
++        let round = ring(p.dist)
++            .into_iter()
++            .filter_map(|(out, dist)| {
++                let q = Pose { out, dist, ..p };
++                let (eye, pulled) = self.place(collide, q, BODY_GAP + CHOOSE_GAP)?;
++                let score = self.score(collide, eye, p.look, RING_ORDER, pulled);
++                Some(Spot { pick, eye, look: p.look, score })
++            })
++            .min_by(|a, b| a.score.total_cmp(&b.score))
++            .filter(better);
++        if let Some(spot) = round {
++            return Some((spot, "ring position"));
++        }
++        let up = self.over_them(collide, eye, p.look, Some(RISE_OVER))?;
++        let score = self.score(collide, up, p.look, RING_ORDER, false);
++        let spot = Spot { pick, eye: up, look: p.look, score };
++        better(&spot).then_some((spot, "up over it"))
++    }
++
+     /// Where the camera can go when a body is about to cover it and no position is free: straight
+     /// up over the bodies there, if the point it looks at still sees it.
+-    fn over_them(&self, collide: &WorldCollision, eye: Vec3, look: Vec3) -> Option<Vec3> {
++    /// With `lift` (patch 0095, the widened search) it rises [`RISE_OVER`] over the point it
++    /// looks at.
++    fn over_them(
++        &self,
++        collide: &WorldCollision,
++        eye: Vec3,
++        look: Vec3,
++        lift: Option<f32>,
++    ) -> Option<Vec3> {
+         let top = self.bodies().filter(|b| b.covers(eye, BODY_GAP)).map(|b| b.feet.y + b.tall).fold(eye.y, f32::max);
+-        let up = Vec3::new(eye.x, top + BODY_GAP + 1.5, eye.z);
++        let up = Vec3::new(eye.x, rise(top, look.y, lift), eye.z);
+         (!self.covered(up, BODY_GAP) && sees(collide, look, up) && grounded(collide, up)).then_some(up)
+     }
+ 
+@@ -919,6 +1021,8 @@ fn film(
+         let spot = first_spot(&collide, &scene, shot, axis);
+         info!("spectate: t={clock:.1} a fresh position where the fight is: position {} (score {:.0})", spot.pick, spot.score);
+         state.unsure = !spot.score.is_finite();
++        state.aside = None;
++        state.stuck = 0.0;
+         state.walled = 0.0;
+         state.axis = axis;
+         state.pick = spot.pick;
+@@ -957,7 +1061,10 @@ fn film(
+     if state.blocked == 0.0 && state.cluttered == 0.0 {
+         state.told = false;
+     }
++    state.stuck = if state.told { state.stuck + dt } else { 0.0 };
+     let p = scene.pose(&collide, shot, state.axis, state.pick);
++    // A bearing chosen by the widened search holds, following the fight (patch 0095).
++    let p = state.aside.map_or(p, |(out, dist)| Pose { out, dist, ..p });
+     let want = scene.place(&collide, p, BODY_GAP);
+     // What can't wait: a body on the camera's spot or about to be, or the eye out of the world.
+     // (A position with no room just now holds the eye where it is: being hidden moves it.)
+@@ -973,6 +1080,7 @@ fn film(
+         None
+     };
+     let mut to = None;
++    let mut aside = None;
+     if let Some(why) = urgent.filter(|_| state.retry <= 0.0) {
+         match scene.best(&collide, shot, state.axis, None) {
+             Some(spot) => {
+@@ -980,7 +1088,7 @@ fn film(
+                 to = Some(spot);
+             }
+             None => {
+-                if let Some(up) = scene.over_them(&collide, eye, state.look) {
++                if let Some(up) = scene.over_them(&collide, eye, state.look, None) {
+                     info!("spectate: t={clock:.1} {why}, and no position is free: up over it");
+                     to = Some(Spot { pick: state.pick, eye: up, look: state.look, score: f32::INFINITY });
+                 } else if eye.distance(p.look) > JUMP {
+@@ -1043,10 +1151,23 @@ fn film(
+                     state.told = true;
+                 }
+                 state.retry = RETRY_SECS;
++                // Every position hidden for a while: a ring round the fight, then up over it.
++                if widen_now(state.stuck) {
++                    if let Some((spot, how)) = scene.widen(&collide, p, state.pick, eye, here) {
++                        info!(
++                            "spectate: t={clock:.1} {what} {secs:.2} s: the shot's positions all                              hidden: {how} (score {:.0} for {:.0})",
++                            spot.score, here
++                        );
++                        aside = out_of(spot.look, spot.eye);
++                        to = Some(spot);
++                    }
++                }
+             }
+         }
+     }
+     let (eye, look) = if let Some(spot) = to {
++        state.aside = aside;
++        state.stuck = 0.0;
+         state.unsure = !spot.score.is_finite();
+         state.walled = 0.0;
+         state.cluttered = 0.0;
+@@ -1397,6 +1518,55 @@ mod tests {
+         assert!((d - 5.0 / TAN_HALF_TALL).abs() < 1e-3, "{d}");
+     }
+ 
++    /// The widened search comes after 2 s of "no clearer position", not before.
++    #[test]
++    fn a_search_that_found_nothing_widens_after_two_seconds() {
++        assert!(!widen_now(0.0));
++        assert!(!widen_now(1.9));
++        assert!(widen_now(2.0));
++    }
++
++    /// The ring: 12 bearings at two distances and two heights, all unit ways out and above the
++    /// level, within the camera's nearest and furthest.
++    #[test]
++    fn the_ring_goes_round_the_fight_at_two_distances_and_heights() {
++        let r = ring(10.0);
++        assert_eq!(r.len(), RING_BEARINGS * RING_SHARES.len() * RING_UPS.len());
++        assert!(r.iter().all(|(out, d)| {
++            (out.length() - 1.0).abs() < 1e-4 && out.y > 0.0 && (NEAREST..=FAR).contains(d)
++        }));
++        let mut bearings: Vec<i32> =
++            r.iter().map(|(o, _)| o.x.atan2(o.z).to_degrees().rem_euclid(360.0).round() as i32).collect();
++        bearings.sort();
++        bearings.dedup();
++        assert_eq!(bearings.len(), RING_BEARINGS, "{bearings:?}");
++        assert!(bearings.windows(2).all(|w| w[1] - w[0] == 30), "every 30 degrees: {bearings:?}");
++        let mut dists: Vec<i32> = r.iter().map(|(_, d)| (d * 10.0).round() as i32).collect();
++        dists.sort();
++        dists.dedup();
++        assert_eq!(dists, [80, 140], "0.8 and 1.4 of 10 yd");
++        assert!(ring(1.0).iter().all(|(_, d)| *d == NEAREST), "never nearer than the nearest");
++        assert!(ring(100.0).iter().all(|(_, d)| *d == FAR), "never further than the furthest");
++    }
++
++    /// Rising over the cover: over the tallest body (with the gap), and with a lift at least that
++    /// far over the point looked at; never lower than over the bodies.
++    #[test]
++    fn the_eye_rises_over_the_cover_and_looks_down_past_it() {
++        assert_eq!(rise(3.0, 1.5, None), 3.0 + BODY_GAP + 1.5, "the urgent rise is unchanged");
++        assert_eq!(rise(3.0, 1.5, Some(RISE_OVER)), 1.5 + RISE_OVER, "the lift is the higher");
++        assert_eq!(rise(9.0, 1.5, Some(RISE_OVER)), 9.0 + BODY_GAP + 1.5, "over a tall cover");
++    }
++
++    /// The bearing kept from a position: the way out from the point looked at, and how far.
++    #[test]
++    fn a_position_is_kept_as_a_bearing_from_the_point_looked_at() {
++        let (out, d) = out_of(Vec3::new(1.0, 1.0, 1.0), Vec3::new(1.0, 5.0, 4.0)).unwrap();
++        let want = Vec3::new(0.0, 0.8, 0.6);
++        assert!((d - 5.0).abs() < 1e-5 && out.distance(want) < 1e-5, "{out} {d}");
++        assert!(out_of(Vec3::ONE, Vec3::ONE).is_none());
++    }
++
+     fn scene(hero_alive: bool) -> Scene {
+         Scene { subject: body(0.0, 0.0), named: Some(("Gilnid".into(), true)), hero: body(0.0, 3.0), hero_alive, crew: Vec::new(), others: Vec::new() }
+     }
+-- 
+2.56.0.windows.4
+
