@@ -3033,6 +3033,48 @@ fn bosses_leave_powers_and_escalations_offer_class_legendaries() {
     assert!(!seen.contains("power:archmage"), "no mage's powers for a warrior");
 }
 
+/// The Echo card: with the chance at 100% (rank 5 stacked), every cast goes off twice.
+#[test]
+fn the_echo_card_casts_twice() {
+    let run = |card: bool| -> u32 {
+        let mut s = sim();
+        let p = s.add_player("Ayla", "mage", Luck::default());
+        s.close_all_menus_for_test(p);
+        s.give_test_card(p, "frostbolt", 0);
+        if card {
+            for _ in 0..5 {
+                s.give_test_legendary(p, "echo");
+            }
+        }
+        s.set_manual(p, true);
+        s.start_now();
+        s.clear_wave_for_test();
+        let c = [20.0, 20.0, 0.0];
+        s.move_player(p, c, 0.0);
+        let dummy = s.spawn_for_test("golem", [c[0] + 15.0, c[1], 0.0]);
+        s.tough_for_test(dummy);
+        s.step(0.05);
+        for _ in 0..200 {
+            s.move_player(p, c, 0.0);
+            if s.cast_slot(p, 0).is_ok() {
+                break;
+            }
+            s.step(0.05);
+        }
+        let (hp, max) = s.health_for_test(dummy);
+        for _ in 0..60 {
+            s.move_player(p, c, 0.0);
+            s.step(0.05);
+        }
+        let _ = hp;
+        let (hp, _) = s.health_for_test(dummy);
+        max - hp
+    };
+    let once = run(false);
+    let twice = run(true);
+    assert!(once > 0 && twice as f32 > once as f32 * 1.7, "{once} -> {twice}");
+}
+
 /// The Splitting card: a missile bursts on its target and hits 2 more enemies nearby.
 #[test]
 fn splitting_missiles_hit_two_more_enemies() {

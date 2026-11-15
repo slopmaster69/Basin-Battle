@@ -1072,7 +1072,9 @@ impl Sim {
             self.fire(id, crate::kit::On::Cast, Some(src), target, 0.0);
         }
         // Echo: sometimes it goes off again, free.
-        if nums.echo > 0.0 && self.rng.gen::<f32>() < nums.echo.min(1.0) && !matches!(def.kind, SpellKind::Buff | SpellKind::Toggle) {
+        // The spell's own echo and the Echo cards' (and their kin's) add up.
+        let echo = nums.echo + self.entities[&id].player().map_or(0.0, |p| p.stats.echo);
+        if echo > 0.0 && self.rng.gen::<f32>() < echo.min(1.0) && !matches!(def.kind, SpellKind::Buff | SpellKind::Toggle) {
             let _ = self.cast_kind(id, &def, &nums, i);
         }
         Ok(())
