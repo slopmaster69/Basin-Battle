@@ -1120,6 +1120,8 @@ fn a_lobbed_throw_is_marked_from_its_wind_up_and_takes_its_time_even_point_blank
     assert!(marked, "its ring is on the ground where the hero stood, from the wind-up's start");
     assert!(s.events.iter().any(|e| matches!(e, Event::Mark { ground: 0, radius, .. } if (*radius - 3.0).abs() < 0.01)), "drawn as its circle");
     assert!(!s.events.iter().any(|e| matches!(e, Event::Mark { ground: 22191, .. })), "not laid as Heated Ground");
+    assert!(s.events.iter().any(|e| matches!(e, Event::GroundWarn { shape: "ring", reach, .. } if (*reach - 3.0).abs() < 0.01)), "its true size, a floor marker through the setting");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", .. })), "not drawn whatever the setting");
     let mark = s.mobs[&boss].lob.expect("the lob remembered").1;
     // Still there at the moment it's let go (the wind-up done), and a while after.
     run(&mut s, 1.05);
