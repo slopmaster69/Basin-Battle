@@ -1984,7 +1984,7 @@ name = "Improved Power Word: Fortitude"
 rarity = "common"
 ranks = 2
 icon = 1243
-text = "You and allies within 30 yd have {0%} more max health."
+text = "You and your allies, wherever they stand, have {0%} more max health."
 values = [0.06]
   [[talent.effect]]
   team = { health = 0.06 }
@@ -3019,7 +3019,7 @@ name = "Divine Spirit"
 path_only = "discipline"
 rarity = "common"
 icon = 2006
-text = "You and allies within 30 yd have 8% more max health."
+text = "You and your allies, wherever they stand, have 8% more max health."
   [[talent.effect]]
   team = { health = 0.08 }
 

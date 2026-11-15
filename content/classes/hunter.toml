@@ -2179,7 +2179,7 @@ key = "aspect_of_the_wild"
 name = "Aspect of the Wild"
 rarity = "common"
 icon = 20043
-text = "You and allies within 30 yd have 6% more max health."
+text = "You and your allies, wherever they stand, have 6% more max health."
   [[talent.effect]]
   team = { health = 0.06 }
 

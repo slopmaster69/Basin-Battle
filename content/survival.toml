@@ -5701,7 +5701,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec and leaves frost that slows what stands in it by 50% for 6 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec and leaves frost that slows what stands in it by 50% for 6 sec. Fire and Sundering Blow shatter them for 50% more damage. When it springs, it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"

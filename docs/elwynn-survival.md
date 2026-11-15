@@ -176,10 +176,9 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   and does no damage: a kite, or a peel.
 - **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
   more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
-  frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
-  roots, and its key again within 3 s throws Hammer of Justice, a stun: ride in, then punish
-  (its EX, Blessing of Freedom, frees and speeds a friend). Blessing of Protection halves what a
-  friend takes for 3 s, the one defense you give away; Lay on Hands is 40% of their health at once.
+  frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a 4 s burst of speed out of
+  roots (its EX, Blessing of Freedom, frees and speeds a friend). Blessing of Protection halves what a
+  friend takes for 3 s, the one defense you give away; Lay on Hands is 60% of their health at once.
 - **Hunter**: the archer who owns the ground, with two choices on every key (the board shows the
   second under the first). Every arrow that ends its flight sticks in the ground for 6 s (up to
   12), and Arrow Recall (Tripwire's EX) brings them all home through the fight, each at full damage;
@@ -239,7 +238,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   freezes all round you and makes your next Fireball a free Polymorph for 5 s; the benched
   Flamestrike's EX, Blast Wave, is an instant ring of fire that throws enemies back 6 yd and
   slows them 50% for 3 s; Blink; Ice Block;
-  Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
+  Meteor falls 1.5 s after you call it, on a circle 5 to 7 yd wide: 45 to 90 damage.
 - **Warlock**: rot. Seed of Corruption sticks in a foe and bursts round them 2 s later, leaving
   everyone near rotting (its EX, Soul Swap, copies every rot of yours on the foe at the reticle
   onto each other foe within 10 yd of it, with the time it had left); Shadowfury stuns a spot a

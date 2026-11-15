@@ -2393,7 +2393,7 @@ key = "heroic_presence"
 name = "Heroic Presence"
 rarity = "common"
 icon = 12318
-text = "You and allies within 30 yd have 8% more max health."
+text = "You and your allies, wherever they stand, have 8% more max health."
   [[talent.effect]]
   team = { health = 0.08 }
 

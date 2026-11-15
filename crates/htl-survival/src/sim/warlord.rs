@@ -29,12 +29,12 @@ const CARRY_GAP: f32 = 0.2;
 const INTERVENE_REACH: f32 = 8.0;
 /// A Cowed creature winds its blows up this much slower (Intimidating Roar: 15%, the designer's,
 /// enough to read and parry, not enough to stop it fighting). A boss's don't slow at all.
-const COWED_SLOW: f32 = 0.15;
+pub(crate) const COWED_SLOW: f32 = 0.15;
 /// A Cowed boss's blows are only this much softer (10%): never shut down, as every boss.
-const COWED_BOSS_CUT: f32 = 0.10;
+pub(crate) const COWED_BOSS_CUT: f32 = 0.10;
 /// A Cowed creature (not a boss) below this share of its health flees instead of fighting, once a
 /// Cow (20%: the ones about to die anyway, so it ends a fight rather than resets it).
-const COWED_FLEE_BELOW: f32 = 0.2;
+pub(crate) const COWED_FLEE_BELOW: f32 = 0.2;
 /// A War Banner is this wide: a blow reaching this near it strikes it.
 const BANNER_SIZE: f32 = 0.5;
 /// The look over a hero near a War Banner is kept on this long at a time, again each tick they
