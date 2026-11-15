@@ -1211,3 +1211,22 @@ fn the_ring_leaves_room_for_his_longest_lunge_and_every_dodge_the_fight_asks_for
     assert!(dash >= RIPOSTE_HALF_WIDTH * 2.0);
     eprintln!("ring {RING_RADIUS} yd, line {line}, his spot {spot:.1} from the middle ({behind:.1} behind, {across:.1} across); longest lunge {longest}, riposte up to 7; dash {dash}, step back {back:.1}");
 }
+
+#[test]
+fn with_nobody_on_the_deck_there_is_no_turn_and_no_cry_at_30_percent() {
+    // Unbowed's empty deck, and a first form whose guards found no place.
+    let (mut s, _, id) = fight("dm_vancleef", 1);
+    s.remove_duel(id);
+    s.land = Box::new(NoPath);
+    s.clean_duels();
+    s.vancleef.duels.get_mut(&id).unwrap().entered = true;
+    let (mut s2, _, unbowed) = fight("dm_vancleef_unbowed", 1);
+    for (s, id) in [(&mut s, id), (&mut s2, unbowed)] {
+        assert!(s.vancleef.duels[&id].watchers.is_empty());
+        s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health * 3 / 10;
+        let ev = run(s, 4.0);
+        assert!(!yells(&ev, id).iter().any(|t| t == "Cowards! All of you!"), "nobody left to call after");
+        assert_eq!(s.vancleef.duels[&id].leave, Leave::Gone);
+        assert!(!s.vancleef.duels[&id].alone || !s.first_form(id));
+    }
+}

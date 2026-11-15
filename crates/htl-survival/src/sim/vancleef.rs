@@ -739,6 +739,9 @@ impl Survival {
         if !duel.departed && health as f32 <= max as f32 * 0.30 {
             let duel = self.vancleef.duels.get_mut(&id).unwrap();
             duel.departed = true;
+            // Nobody to leave (Unbowed's empty deck, or guards that never found a place): no turn,
+            // no cry, and the gaps stay as they are.
+            if duel.watchers.is_empty() { duel.leave = Leave::Gone; }
         }
         let duel = &self.vancleef.duels[&id];
         match duel.leave {
