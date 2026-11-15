@@ -11,8 +11,8 @@ The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `conte
 
 1. **Pull.** He waits in his cabin's doorway (home (-77, -820), under the roof). Pulled, he walks
    7 yd north onto the open main deck at (-70, -819.5) before his first blow, under the lantern
-   over the door. Two friendly Blackguards watch from the west rail, at (-64, -808) and
-   (-68, -807.5). They have no pack, aggro, attack, loot or reward. The Juggernaut's main deck is
+   over the door. Eight friendly Blackguards stand in a ring round the deck fight (see "The
+   ring"). They have no pack, aggro, attack, loot or reward. The Juggernaut's main deck is
    also Captain Greenskin's: the duel assumes he has fallen first, as the way to the cabin passes him.
 2. **Honest string.** Two cuts (0.75 and 0.65 sec windups), then a 1.8 sec hunch. Hits in a hunch
    count 2 times more toward his posture (3 times with the recovery bonus every boss has).
@@ -34,12 +34,14 @@ The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `conte
    facing the hero, at 2.2 yd/sec, never under a roof (so never back into his cabin). A scuff on
    the boards (649) and a glint (kit 379), 0.9 sec, then the advance: 3 blows (block or
    sidestep), then a 2.5 sec hunch. Blocked or roofed routes leave him in place with the same cue.
-6. **About 30%.** The Blackguards wait for a quiet moment (no blow in his hands), turn toward the
-   bow, one shakes his head (emote 274), and after 1.5 sec both walk off the ship along the deck
-   and down onto the scaffold at (-54, -793), 33 to 37 yd, and are gone when they get there (about
-   12 sec). Then, alone: "Cowards! All of you!"
-7. **Alone**, his gap between combinations (planted, squared up, after each hunch) halves from 1
-   to 0.5 sec. His windups don't change.
+6. **About 30%.** The Blackguards wait for a quiet moment (no blow in his hands) and turn toward
+   the bow, one shakes his head (emote 274). That is the one moment: the ring opens, and he calls
+   after them, "Cowards! All of you!" (see 7). After 1.5 sec all eight walk off the ship along the
+   deck and down onto the scaffold at (-54, -793), 31 to 48 yd, and are gone when they get there
+   (up to 24 sec).
+7. **Alone**, from that moment, his gap between combinations (planted, squared up, after each
+   hunch) halves from 1 to 0.5 sec. His windups don't change. So one moment does both: the deck
+   opens, and he gets faster.
 8. **12%.** At the end of whatever string or recovery he's in: "This ends here." Four blows (0.65
    sec windups at least), then he kneels 3 sec: the last opening. It happens once, and never
    holds his health above zero. When he dies, any held pose stops at once, so death plays.
@@ -54,6 +56,41 @@ His lines never come closer than 2 sec together: one due sooner waits its turn. 
 random string cuts and extensions, held beats, extra chains, tactical retreats and circling, so
 the visible exchange stays honest. The ordinary lunge still closes distance without spending the
 next Invitation. Reset, return, wipe, death and the handoff remove his poses and the Blackguards.
+
+## The ring
+
+Until about 30% the Blackguards hold a ring round the deck fight, so the deck is closed and
+the guards have a job to leave. Every number is a constant at the top of `vancleef.rs`.
+
+| What | Number |
+| --- | --- |
+| Middle | 12 yd east, 1 north of his home: (-65, -819) on the native deck (open boards run about x -73 to -54, y -830 to -807), his lit spot 5 yd from it |
+| Radius | 9 yd, 8 guards 45 degrees apart (turned 22.5 so none stands before his door), 6.9 yd between neighbors, all facing in |
+| Held | a hero who has stood 2.5 yd inside the line (6.5 yd from the middle) is held; a hero outside walks in freely, and one thrown more than 4.5 yd beyond the line is free |
+| Warning | from 2.2 yd inside the line the nearest guard turns to the hero and shakes his head (once in 2.5 sec) |
+| The shove | at 1 yd inside the line (8 yd): the nearest guard within 4.2 yd strikes (unarmed clip 16), dust and the bash's look on the hero, a hop that sets them down 3 yd inside the line (never past 5 yd, never within 1.8 yd of him: bent aside or sent further if he stands in the way), "A guard shoved you back." |
+| Not twice | 1.2 sec between shoves on one hero; a guard cries "Nobody leaves." the first time only |
+| Never | damage, stagger, a shove in a dodge or a stagger (the landing is shoved in after), or one on a hero who is down |
+| His steps | the riposte's lunge and his walk out of the smoke end at least 1.5 yd inside the line (never trapped there: no farther out than he already stands) |
+
+How it reads with the floor markers off: the ring is the guards' own bodies, standing round the
+deck facing in, so a hero sees the circle. Nearing the line a guard turns to them and shakes his
+head (the same "no" the guards give as they leave), and at the line he strikes and throws them
+back with dust, a flash and a line. Nothing is drawn on the floor.
+
+The measurements (test `the_ring_leaves_room_for_his_longest_lunge_and_every_dodge_the_fight_asks_for`):
+his longest lunge is 4 yd (the riposte's is cut to 7 and now ends inside the line); the ring is 16
+yd across inside the line, 13 yd from his spot to the far line, 3 yd behind it. A sidestep dash
+is 4 yd (16 yd/sec for 0.25 sec): along the line it ends 8.9 yd out, inside the guards. A step
+back with no key held is 2.5 yd: from the line it ends within a guard's reach, where it is shoved
+in. A hero pressed to the line with him straight in front, 2.5 yd off, is set down past him
+(tested at 36 angles with him in front and to either side, on flat land and on the real deck).
+The real deck's line (144 points) and the 797 half-yard points inside it are all open, dry
+boards.
+
+A lost fight puts it back whole (the duel and its guards are removed with the wipe and set up
+again on the next pull: 8 guards, nobody held, the cry unspent). With two heroes each is held
+and shoved on their own.
 
 ## How it reads
 
@@ -87,7 +124,7 @@ are the VanCleef and Unbowed versions, for it to fold in:
 | Punish windows look like idling | The hunch (`HoldPose` StealthStand 120) for every final recovery, and the kneel (EmoteKneel 75) for the last stand. `vancleef_string_landed`, `duel_open` |
 | Debug damage counts as real | `vancleef_posture_share` gives "debug" damage no posture (`hurt_mob_as`) |
 | Second forms are instant swaps | Unbowed kneels, roars, then waits 2.5 sec (`vancleef_risen`, called from `rise`; the generic roar there skips him) |
-| Things outlive their boss | The Blackguards leave on their own at 30% and are removed with the duel on death or reset |
+| Things outlive their boss | The Blackguards leave on their own at 30% (the ring opens as they turn) and are removed with the duel on death or reset |
 | Deaths lag | `remove_duel` stops any held pose (`HoldPose` 0) as he falls |
 | Yells collide | `duel_say` keeps his lines 2 sec apart |
 
@@ -100,7 +137,9 @@ The riposte's lunge and its line of contact are VanCleef's own hooks in `mobs.rs
 and their hunch, hunch hits and debug damage on posture, waiting out the Invitation, its scrape
 and line, the provoked riposte (once, glowing, a thrust, past the spot, sidestepped, never
 lethal), what never provokes, control and break precedence, the backward retreat out of smoke
-into the scuff and three blows, the Blackguards' quiet-moment departure and "Cowards!", line
+into the scuff and three blows, the Blackguards' ring (its shape, the warning, the shove and its
+fairness cases, his lunge kept inside it) and their quiet-moment departure with "Cowards!" at the
+turn, line
 spacing, the last stand's kneel and death stopping it, cleanup, the secret handoff with
 Unbowed's kneel, roar and wait, and Unbowed's strings.
 
@@ -112,9 +151,10 @@ into Invitations to draw ripostes, in about 2.2 min with 6. Unbowed takes about 
 uses a debug command. That's the simulation, not the client.
 
 `crates/htl-server/tests/vancleef_native.rs` (installed data, `--ignored`) walks the real deck:
-the walk-out from under the cabin roof to the open deck, the Blackguards' posts in the open,
-their walk off the ship (every stride a walker's, no falls), and the posture retreat staying on
-the open deck, from the first exchange and after 15 sec of fighting.
+the walk-out from under the cabin roof to the open deck, the ring's 8 guards on open deck (the
+line and its inside open, dry boards), every shove from the line landing on dry open boards
+inside it, their walk off the ship (every stride a walker's, no falls), and the posture retreat
+staying on the open deck, from the first exchange and after 15 sec of fighting.
 
 ## Filming
 
@@ -126,7 +166,8 @@ interface that reads only what the client shows: the hunch or kneel held (`WP` c
 0.3 sec after it shows), a windup (`AN`: guard the first blow as it lands, roll from a string's
 follow-up), the red glow (`WG`: roll aside). It hits into every other Invitation to draw the
 riposte and waits out the rest. `vancleef-late.txt` is the same from 33% (dev setup: a `.es hurt`
-before the video), for the late beats alone.
+before the video), for the late beats alone. `vancleef-ring.txt` (dev setup, not yet run) puts the
+hero at the guards' line with `.es goto` for the warning, the shove and the opening.
 
 On Nov 9 the clear succeeded on the third version of that player, with the Footman's Axe: VanCleef
 in about 2 min (2 posture breaks, 4 ripostes rolled aside, the Blackguards gone, the 12% kneel),
@@ -136,6 +177,13 @@ lock-on turns the hero to him, guard only a string's first blow and roll the fol
 a human's reaction before hitting a hunch (the blow that ends in it settles a round trip later).
 
 ## Not tested in the client
+
+The ring (Nov 15): nothing about it has been seen in the client. Whether eight guards standing
+round the deck read as a closed ring without a floor mark, whether the shove (a client-flown hop,
+the strike, dust, the bash's flash) reads as the guard's doing and feels fair, and whether the
+turn-away reads as the ring opening, all need someone to play it. The scripted hero (see
+Verification) is shoved 2 to 5 times in a clear and never stands past the line, but it presses no
+key into the line on purpose.
 
 Seen in the Nov 9 footage, not yet judged by a person: the walk out of the doorway, the smoke puff
 (a clear white ring, seen through), Unbowed's dark swirl and black blades, the body lying 4 sec and

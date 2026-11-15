@@ -1,0 +1,47 @@
+# DEV SETUP, the Blackguards' ring (docs/vancleef-encounter.md, "The ring"), not a fight: the hero
+# is put at the guards' line with `.es goto`, as if backed into it, and `.es hurt` takes VanCleef
+# to the 30% line for the guards' walk off. Filmed by the cameraman, floor markers off, so
+# nothing here may need them (the ring has no floor mark at all). NOT RUN: filming is off
+# (owner's order); nothing here has been seen in the client.
+#
+# What to look for, by the scenario's own times:
+#   16     the hero stands 8 yd from the ring's middle, on the east side, with 8 guards in a ring
+#          round the deck, facing in: a guard turns to the hero and shakes his head (the warning)
+#   17     the hero is moved to the line itself: that guard strikes (an unarmed blow), the hero
+#          is thrown back about 3 yd with dust and a flash of the bash, a guard calls "Nobody
+#          leaves." (once), the line "A guard shoved you back." shows. No damage, no stagger.
+#   21     the hero is moved to the north side of the line, next to him: the shove sets the hero
+#          down beside him, never on him
+#   26     he is set to 31% and the guards wait for a quiet moment: they turn together, one
+#          shakes his head, and at that moment he calls "Cowards! All of you!" and the ring is
+#          open: the hero at the line (28) is not touched
+#   28-45  the guards walk off the ship along the deck and down to the scaffold, one behind the
+#          other; his strings come at half the gap (0.5 sec) from the turn
+# Look for: whether a guard standing in a ring reads as "I may not leave" without any floor mark,
+# whether the shove reads as the guard's doing, whether the turn-away reads as the ring opening.
+hero warrior
+cam off
+camera duel Edwin VanCleef
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes vancleef
+13 .es goto -64 -819.5 41.5 3.141593
+14.5 .es heal
+14.6 video
+# The pull: he steps out to the lit spot. The hero stands at the ring's middle.
+15 .es goto -65 -819 41 0
+16 .es goto -57.8 -819 41.9 0
+17 .es goto -56.4 -819 41.9 0
+19 .es heal
+20 .es goto -65 -819 41 0
+21 .es goto -64 -811.4 41.4 1.5708
+23 .es heal
+24 .es goto -65 -819 41 0
+26 .es hurt 0.31 vancleef
+28 .es goto -56.4 -819 41.9 0
+30 .es heal
+60 end
