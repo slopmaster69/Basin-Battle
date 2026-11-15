@@ -44,7 +44,7 @@ lines.** The code is `crates/htl-survival/src/sim/firing_line.rs`; the line's hi
 7. **The harpoon comes on a count, not on distance.** After every third blow of his cutlass (a
    thrust or a cut; shots and the haul's own cut are not blows) he is free, steps back from his
    hero to 8 yd (4.5 yd/s, at most 2.5 sec, stopped sooner by the bulwark, a wall or the water;
-   with nowhere to go he throws where he stands) and throws. He says "Get over here!". A hero
+   with nowhere to go he throws where he stands) and throws. He says "Ye're not gettin' away!". A hero
    who stays beside him sees it as much as one who waits at range: it is his blows that count,
    with the crew alive or not. A harpoon in his hand (item display 5949) held back over his
    shoulder (ReadyThrown 108) the full 1.7 sec, then the throw (AttackThrown 107) along a line, on the

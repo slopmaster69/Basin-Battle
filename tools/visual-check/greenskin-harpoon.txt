@@ -3,7 +3,7 @@
 # three things on the captain himself. After every third blow of his cutlass he steps back from the hero
 # (to 8 yd, or the bulwark behind him), the harpoon comes up over his shoulder (the clip 108 the small
 # player below already reads as "a line is about to fire": a strafe just before it flies) and his line
-# of "Get over here!"; a hero who stands is hauled in and set down 3 yd from him, and has 0.9 sec once
+# of "Ye're not gettin' away!"; a hero who stands is hauled in and set down 3 yd from him, and has 0.9 sec once
 # on their feet before the clearing cut lands. The first 10 sec are as they were; when one gunner falls
 # the other shoots on every beat, harder. Judge the events: the step back reads as a count (3 blows,
 # then he leaves you), nobody is cut off, and the hauled hero can still guard or step out.

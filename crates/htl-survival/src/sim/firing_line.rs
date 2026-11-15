@@ -609,7 +609,7 @@ impl Survival {
         let m = self.mobs.get_mut(&id).unwrap();
         m.state = MobState::Chase { foe };
         self.begin_pattern(id, k, false);
-        self.yell(id, "Get over here!");
+        self.yell(id, "Ye're not gettin' away!");
         self.windup(id, foe, to);
     }
 
