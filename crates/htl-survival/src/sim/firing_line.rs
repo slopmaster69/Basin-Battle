@@ -732,7 +732,7 @@ impl Survival {
     }
 
     /// It fires (or the harpoon flies) along the line its aim locked on: a puff at the muzzle,
-    /// the bang, the ball flown at its own speed, the line flashed on the ground for its flight,
+    /// the bang, the ball flown at its own speed, the line flashed on the ground for its flight (the optional floor mark),
     /// and a dust burst where it stops.
     pub(crate) fn firing_release(&mut self, id: Id) -> bool {
         if self.firing_line.aims.remove(&id).is_none() {
@@ -766,7 +766,7 @@ impl Survival {
         }
         let len = dist2d(pos, end);
         let mid = [(pos[0] + end[0]) / 2.0, (pos[1] + end[1]) / 2.0, pos[2]];
-        self.events.push(Event::GroundBurst { at: mid, yaw: f, shape: "line", reach: len / 2.0, arc: 0.0, width: half * 2.0,
+        self.events.push(Event::GroundWarn { at: mid, yaw: f, shape: "line", reach: len / 2.0, arc: 0.0, width: half * 2.0,
             secs: len / speed + 0.2, colour: mobs::HAZARD_COLOUR.into() });
         self.line_shots.push(combat::LineShot { owner: id, from: pos, to: end, radius: half, speed, start: now, reached: 0.0,
             damage: a.damage, blockable: a.blockable, pull_to: hook.then_some(PULL_TO), look: if hook { 0 } else { SPLINTERS },
