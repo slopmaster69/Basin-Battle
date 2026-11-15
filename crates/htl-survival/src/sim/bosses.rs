@@ -3185,6 +3185,8 @@ impl Survival {
     /// over everything that lies or stands (`step_looks_leaving` takes it away).
     fn looks_leave(&mut self, owner: Id) {
         let l = &mut self.bosses.looks;
+        // (Its dust still trickling over a rock that will not fall is let go with the rock.)
+        l.trickles.retain(|t| t.0 != owner);
         let air: Vec<Id> = l.falling.iter().filter(|f| f.owner == owner).filter_map(|f| f.id).collect();
         l.falling.retain(|f| f.owner != owner);
         for id in air {
