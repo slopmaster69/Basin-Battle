@@ -633,3 +633,104 @@ fn a_grind_stopped_by_the_rooms_walls_crashes_where_a_hero_walks_back_to_it_and_
     println!("{crashes} Grinds crashed, {plain} drove their whole 6 yd");
     assert!(crashes >= 4, "the room's walls stop it: {crashes} crashes");
 }
+
+/// His opening after a flurry, in seconds (`dm_sneed`'s last blow's recovery).
+const OPENING: f32 = 2.4;
+
+/// How a scripted warrior fared against Sneed on foot, from his getting up to his repair (his
+/// line) or his death: seconds to their first hit, hits, hits in his opening, openings seen,
+/// his flurries and wrenches thrown, how he ended.
+#[derive(Debug, Default)]
+struct Foot {
+    first: Option<f32>,
+    hits: u32,
+    in_open: u32,
+    openings: u32,
+    flurries: u32,
+    wrenches: u32,
+    /// Each opening: the warrior's stamina as it began, and when their first blow landed in it.
+    opens: Vec<(f32, Option<f32>)>,
+    end: &'static str,
+    secs: f32,
+}
+
+/// The warrior runs at him until 2.7 yd short (inside his 3.4), faces him and, with `guard`,
+/// puts the guard up `react` s after a flurry's first wind-up begins and lets it down for the
+/// opening that follows. `open_only` swings only in that opening; else whenever in reach.
+fn foot(at: [f32; 2], stay: bool, guard: bool, open_only: bool, react: f32) -> Foot {
+    let (mut s, hero, him) = on_foot(at, stay, true);
+    let mut out = Foot::default();
+    let (t0, mut hp) = (s.clock, s.mobs[&him].health);
+    let (mut open_until, mut up, mut since) = (0.0f32, false, None::<f32>);
+    let mut open_from = 0.0f32;
+    loop {
+        out.secs = s.clock - t0;
+        if live(&s, "dm_sneed").is_none() { out.end = "dead"; break; }
+        if s.shredder_stage() != "on foot" { out.end = "his repair"; break; }
+        if out.secs > 40.0 { out.end = "40 s"; break; }
+        let (me, his) = (s.players[&hero].pos, s.mobs[&him].pos);
+        let want = guard && since.is_some_and(|t| s.clock - t >= react) && open_until <= s.clock;
+        if want != up { s.input(hero, if want { Input::Guard } else { Input::GuardUp }); up = want; }
+        let reach = 2.6;
+        if dist2d(me, his) > reach {
+            if !up {
+                let to = along(his, facing(his, me), 2.2);
+                let to = s.land().footing([to[0], to[1], his[2] + 0.5]).unwrap_or(to);
+                run_to(&mut s, hero, to, his);
+            }
+        } else {
+            put(&mut s, hero, me, his);
+            if !up && (open_only == (open_until > s.clock) || !open_only) { s.input(hero, Input::Attack); }
+        }
+        mend(&mut s, hero);
+        let ev = step(&mut s);
+        for e in &ev {
+            match e {
+                Event::MobWindup { id, clip: 59, take: 0, .. } if *id == him => { out.flurries += 1; since = Some(s.clock); }
+                Event::MobWindup { id, clip: 107, .. } if *id == him => out.wrenches += 1,
+                Event::HoldPose { id, clip: 8, secs, .. } if *id == him => { open_until = s.clock + secs; out.openings += 1; since = None; out.opens.push((s.players[&hero].stamina, None)); open_from = s.clock; }
+                _ => {}
+            }
+        }
+        if let Some(m) = s.mobs.get(&him) {
+            if m.health < hp {
+                out.first.get_or_insert(out.secs);
+                out.hits += 1;
+                if open_until > s.clock {
+                    out.in_open += 1;
+                    if let Some(o) = out.opens.last_mut() { o.1.get_or_insert(s.clock - open_from); }
+                }
+                hp = m.health;
+            }
+        }
+    }
+    out
+}
+
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn a_warrior_who_plays_it_right_reaches_sneed_on_foot_and_hits_him_from_every_stand() {
+    // The same four stands as the race: on him by the wreck, and held off at three places.
+    let stands: [(&str, [f32; 2], bool); 4] = [
+        ("on him by the wreck", [-284.0, -503.0], false),
+        ("waiting at the walkway's south end", [-289.0, -516.0], true),
+        ("waiting on the low floor north-east", [-272.0, -488.0], true),
+        ("waiting before the door", [-290.0, -527.0], true)];
+    for (name, at, stay) in stands {
+        for (label, guard, open_only) in [("striking whenever in reach", false, false), ("guarding his flurry, striking whenever in reach", true, false), ("guarding his flurry, striking only his opening", true, true)] {
+            let f = foot(at, stay, guard, open_only, 0.3);
+            println!("{name}, {label}: {f:?}");
+            if !open_only {
+                assert!(f.first.is_some_and(|t| t < 4.0), "{name}, {label}: a hero who strikes lands a blow within 4 s of his getting up: {f:?}");
+            }
+            if guard && open_only {
+                // Every opening that came after a guard blocked all of it (their stamina spent,
+                // their guard torn by the last blow) still takes a blow, with half a second to spare.
+                let blocked: Vec<_> = f.opens.iter().filter(|o| o.0 < 1.0).collect();
+                assert!(!f.opens.is_empty(), "{name}: he flurries and is open: {f:?}");
+                assert!(f.opens.iter().all(|o| o.1.is_some_and(|t| t <= OPENING - 0.4)) || blocked.is_empty(), "{name}: a blocked flurry's opening is hit with 0.4 s to spare: {f:?}");
+                assert!(f.in_open >= 1, "{name}: the opening is hit: {f:?}");
+            }
+        }
+    }
+}
