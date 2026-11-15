@@ -219,6 +219,11 @@ pub struct AbilityDef {
     pub secs: f32,
     #[serde(default)]
     pub tick: f32,
+    /// A placed totem that waits this long, then does its one thing (its `effects` on every foe
+    /// within its radius) and falls (Capacitor Totem); foes can destroy it first. 0: it pulses
+    /// every `tick` for its `secs`.
+    #[serde(default)]
+    pub detonate: f32,
     /// The caster heals this share of the damage it does (a drain).
     #[serde(default)]
     pub drain: f32,
@@ -1290,12 +1295,15 @@ pub const CC_KINDS: [&str; 11] = ["stun", "incapacitate", "petrify", "panic", "d
 /// boss only deals a little less: Intimidating Roar), `momentum` (the
 /// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
 /// at a time while they stand by it).
-pub const OTHER_EFFECTS: [&str; 28] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward",
+///
+/// The Druid's: `prowl` (with a `veil`: the hidden Druid's next attack stuns and hits harder,
+/// `sim::cc::PROWL_BONUS` and `PROWL_STUN`; any damage on them ends both).
+pub const OTHER_EFFECTS: [&str; 29] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 19] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward"];
+pub const BOONS: [&str; 20] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).

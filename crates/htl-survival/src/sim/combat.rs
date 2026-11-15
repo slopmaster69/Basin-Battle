@@ -1682,6 +1682,8 @@ impl Survival {
             let low = self.mobs.get(&mid).is_some_and(|m| (m.health as f32) < m.max_health as f32 / 3.0);
             let damage = if w.execute > 0.0 && low && !strike.shove() { (damage as f32 * w.execute).round() as u32 } else { damage };
             let damage = (damage as f32 * self.taken_share(mid)).round() as u32;
+            // The first blow out of Prowl: its bonus damage, and its stun.
+            let damage = if damage > 0 && !strike.shove() { damage + self.prowl_strike(id, mid) } else { damage };
             if behind {
                 self.backstabbed(mid, id);
             }
@@ -1769,6 +1771,8 @@ impl Survival {
         let might = 1.0 + self.effect_of(&self.players[&id], "might");
         let rolled = (self.roll(w.damage) as f32 * strike.damage * might * self.blow_share(id)).round() as u32;
         let damage = self.hero_riposted(victim, rolled);
+        // The first blow out of Prowl: its bonus damage, and its stun.
+        let damage = if damage > 0 { damage + self.prowl_strike(id, victim) } else { damage };
         // A heavy attack under way is poised: a light blow doesn't knock it aside.
         let poised = (self.content.combat.heavy_poise
             && !strike.heavy()

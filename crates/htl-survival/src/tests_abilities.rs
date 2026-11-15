@@ -133,17 +133,6 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast (Fireball's EX) let go before its 1.5 s fizzles: all or nothing, its Valor
-    // wasted (Corey, Nov 5).
-    slot(&mut s, p, "ranged", "fireball");
-    s.set_valor(p, 100.0);
-    let mut ev = cast(&mut s, p, "ranged", true, 1.0);
-    ev.extend(s.step(0.0));
-    assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
-    assert_eq!(s.players[&p].action, Action::Ready, "dropped");
-    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "fizzle", .. })), "it fizzles");
-    let pyro = s.content.ability("pyroblast").unwrap();
-    assert_eq!(s.players[&p].valor, 100.0 - s.valor_cost(&s.content.abilities[pyro].clone()), "and its Valor is spent");
 }
 
 #[test]
@@ -431,13 +420,13 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
 }
 
 #[test]
-fn a_heavy_blow_breaks_a_pyroblast_charge() {
+fn a_heavy_blow_breaks_an_aimed_shots_draw() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
-    slot(&mut s, a, "ranged", "fireball");
+    slot(&mut s, a, "ranged", "aimed_arrow");
     s.set_valor(a, 100.0);
-    s.input(a, Input::Ability(key_of("ranged"), true));
+    s.input(a, Input::Ability(key_of("ranged"), false));
     s.input(a, Input::Attack);
     run(&mut s, 0.5);
     assert!(matches!(s.players[&a].action, Action::Charge { .. }));

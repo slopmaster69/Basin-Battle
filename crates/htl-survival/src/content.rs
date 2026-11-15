@@ -4215,6 +4215,9 @@ impl Content {
             }
             // (A banner's recast moves the banner its first cast planted: it needs none of its own.)
             let banner = a.banner.is_some() || (a.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == a.key));
+            if a.detonate < 0.0 || (a.detonate > 0.0 && (a.kind != "place" || a.totem.is_none() || a.effects.is_empty())) {
+                bail!("{what}: only a placed totem with `effects` waits to go off (`detonate`, seconds)");
+            }
             if a.kind == "place" && a.hollow.is_none() && a.totem.is_some() == banner {
                 bail!("{what}: a placed ability needs a [ability.totem], a `banner` or a `hollow` (one of them)");
             }

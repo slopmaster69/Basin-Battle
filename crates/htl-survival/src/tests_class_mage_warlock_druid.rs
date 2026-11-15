@@ -118,7 +118,7 @@ fn hits(ev: &[Event], p: Id, m: Id) -> Vec<u32> {
 // --- Mage: freeze, then shatter ---------------------------------------------------------------------
 
 #[test]
-fn frost_nova_makes_the_next_fireball_a_free_pyroblast_that_shatters_the_frozen() {
+fn frost_nova_freezes_all_round_and_makes_the_next_fireball_a_free_polymorph() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     learn(&mut s, p, "fireball");
@@ -136,30 +136,129 @@ fn frost_nova_makes_the_next_fireball_a_free_pyroblast_that_shatters_the_frozen(
     assert_eq!(em[0].0, key_of("ranged") as usize, "the Fireball's");
     assert!((em[0].1 - (s.clock + 5.0)).abs() < 0.2, "for 5 s");
     let valor = s.players[&p].valor;
-    // The plain Fireball key now aims a Pyroblast; held to its moment (all or nothing: rolled as
-    // the charge begins) it goes, for no Valor.
+    // The plain Fireball key now aims a Polymorph, which goes for no Valor.
     run_pinned(&mut s, 0.3, &pins);
     press(&mut s, p, "ranged", false);
-    assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Pyroblast");
-    s.input(p, Input::Attack);
-    let mut ev = s.step(DT);
-    let flare = s.players[&p].check_flare;
-    ev.extend(run_pinned(&mut s, flare - DT, &pins));
-    s.input(p, Input::AttackUp);
-    ev.extend(s.step(DT));
-    assert!(missile(&ev, 11366), "the Pyroblast flies");
-    ev.extend(run_pinned(&mut s, 0.6, &pins));
-    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the frozen boar shatters");
-    // The same shatter as a Hunter's: the action lines' burst on the frozen one too, and the
-    // server adds no fire of its own (Pyroblast's own impact is the client's, from its spell).
-    assert!(s.content.shatter.burst_kit != 0 && crate::sim::cues::seen::looked(&ev, k, s.content.shatter.burst_kit), "the shatter's action lines");
-    assert!(!flashed(&ev, p, "Shatter"), "no word");
-    assert!(hits(&ev, p, k).iter().any(|d| *d >= 70), "half again its 48: {:?}", hits(&ev, p, k));
+    assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Polymorph");
+    let mut ev = hold(&mut s, p, 0.0, &pins);
+    ev.extend(run_pinned(&mut s, 0.8, &pins));
+    assert!(missile(&ev, 118), "the Polymorph flies");
+    assert!(s.has_cc(k, "disorient"), "the frozen boar a sheep");
     assert!(s.players[&p].valor + 0.001 >= valor, "no Valor spent: {} then {}", valor, s.players[&p].valor);
     assert!(s.empowered_keys(p).is_empty(), "the combo spent");
     // Then the key is Fireball again.
     press(&mut s, p, "ranged", false);
     assert_eq!(aiming(&s, p), Some(idx(&s, "fireball")));
+}
+
+#[test]
+fn polymorph_turns_the_first_foe_it_hits_into_a_sheep_that_wanders_and_any_damage_breaks() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "fireball");
+    s.set_cooldowns(p, true);
+    let (first, behind) = (boar(&mut s, [8.0, 0.0, 0.0]), boar(&mut s, [14.0, 0.0, 0.0]));
+    let pins = [(first, [8.0, 0.0, 0.0]), (behind, [14.0, 0.0, 0.0])];
+    let health = (s.mobs[&first].health, s.mobs[&behind].health);
+    // Fireball's EX (25 Valor): a bolt, no damage, the first body it meets a sheep for 8 sec.
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "ranged", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Polymorph");
+    let mut ev = hold(&mut s, p, 0.0, &pins);
+    ev.extend(run_pinned(&mut s, 1.0, &pins));
+    assert!(missile(&ev, 118), "its bolt");
+    assert!(s.has_cc(first, "disorient"), "the first foe a sheep");
+    assert!(!s.has_cc(behind, "disorient"), "not the one behind it");
+    assert_eq!((s.mobs[&first].health, s.mobs[&behind].health), health, "no damage");
+    assert!(s.players[&p].valor < 100.0, "Valor spent");
+    let d = &s.content.abilities[idx(&s, "pyroblast")];
+    let secs = d.effects[0].secs[1];
+    assert_eq!(secs, 8.0, "for 8 sec");
+    let c = s.cc_of(first).iter().find(|c| c.kind == "disorient").unwrap();
+    assert!((c.until - c.since - secs).abs() < 0.01, "8 sec: {} to {}", c.since, c.until);
+    assert!(s.disabled(first), "it can't act");
+    // Let go (not held where it stood), the sheep wanders off and never touches the hero.
+    let hp = s.players[&p].health;
+    let start = s.mobs[&first].pos;
+    for _ in 0..(4.0 / DT) as usize {
+        s.step(DT);
+        s.mobs.get_mut(&behind).unwrap().pos = [14.0, 0.0, 0.0];
+    }
+    assert!(s.has_cc(first, "disorient"), "still a sheep");
+    assert!(dist2d(s.mobs[&first].pos, start) > 1.0, "it wandered: {:?}", s.mobs[&first].pos);
+    assert_eq!(s.players[&p].health, hp, "and attacked no one");
+    // Any damage turns it back.
+    s.hurt_mob(first, p, 1);
+    assert!(!s.has_cc(first, "disorient"), "damage breaks it");
+    // Otherwise it holds the whole 8 sec.
+    let other = boar(&mut s, [8.0, 0.0, 0.0]);
+    let pins = [(other, [8.0, 0.0, 0.0])];
+    s.mobs.get_mut(&first).unwrap().pos = [30.0, 30.0, 0.0];
+    s.set_valor(p, 100.0);
+    run_pinned(&mut s, 3.0, &pins);
+    press(&mut s, p, "ranged", true);
+    hold(&mut s, p, 0.0, &pins);
+    run_pinned(&mut s, 1.0, &pins);
+    assert!(s.has_cc(other, "disorient"));
+    run_pinned(&mut s, 6.0, &pins);
+    assert!(s.has_cc(other, "disorient"), "7 sec on");
+    run_pinned(&mut s, 2.0, &pins);
+    assert!(!s.has_cc(other, "disorient"), "gone after its 8 sec");
+}
+
+#[test]
+fn polymorph_is_much_shorter_on_a_hero_and_bosses_and_totems_are_immune() {
+    let mut s = world(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let rival = hero(&mut s, "Bren", [8.0, 0.0, 0.0], std::f32::consts::PI);
+    learn(&mut s, p, "fireball");
+    s.set_cooldowns(p, true);
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "ranged", true);
+    hold(&mut s, p, 0.0, &[]);
+    run_pinned(&mut s, 1.0, &[]);
+    let c = s.cc_of(rival).iter().find(|c| c.kind == "disorient").expect("the rival a sheep");
+    assert!((c.until - c.since - 1.5).abs() < 0.01, "1.5 sec on a hero, not 8: {}", c.until - c.since);
+    assert!(s.silenced(rival), "and no abilities");
+    // A sheep is held by the grace after: no second at once.
+    s.cleanse(rival, &["disorient"]);
+    assert!(!s.apply_cc(rival, p, "disorient", 8.0, 0.0, 0.0, "test"), "the grace");
+    // A champion and a totem shrug it off.
+    let def = s.content.mobs.iter().position(|m| m.boss && !m.inert()).expect("a boss");
+    let boss = s.spawn_mob(def, [5.0, 0.0, 0.0], None, false);
+    assert!(!s.apply_cc(boss, p, "disorient", 8.0, 0.0, 0.0, "test") && !s.has_cc(boss, "disorient"), "a boss is immune");
+    let totem = s.content.mobs.iter().position(|m| m.totem).expect("a totem");
+    let t = s.spawn_mob(totem, [5.0, 5.0, 0.0], None, false);
+    assert!(!s.apply_cc(t, p, "disorient", 8.0, 0.0, 0.0, "test") && !s.has_cc(t, "disorient"), "a totem is immune");
+}
+
+#[test]
+fn blast_wave_is_an_instant_ring_that_throws_foes_off_and_slows_them() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "flamestrike");
+    s.set_cooldowns(p, true);
+    let (near, far) = (boar(&mut s, [3.0, 0.0, 0.0]), boar(&mut s, [9.0, 0.0, 0.0]));
+    let (hn, hf) = (s.mobs[&near].health, s.mobs[&far].health);
+    s.set_valor(p, 100.0);
+    // Flamestrike's EX (25 Valor): no aim and no delay, it goes off round the Mage on the press.
+    let ev = press(&mut s, p, "ranged", true);
+    assert_eq!(aiming(&s, p), None, "no reticle");
+    assert!(missile(&ev, 11113), "its ring of fire");
+    assert_eq!(hits(&ev, p, near), vec![12], "12 damage, at once");
+    assert_eq!(s.mobs[&near].health, hn - 12);
+    assert!(hits(&ev, p, far).is_empty() && s.mobs[&far].health == hf, "not the one past 6 yd");
+    assert!(s.players[&p].valor < 100.0, "Valor spent");
+    let c = s.cc_of(near).iter().find(|c| c.kind == "snare").expect("slowed");
+    assert!((c.amount - 0.5).abs() < 1e-3 && (c.until - c.since - 3.0).abs() < 0.01, "50% for 3 sec");
+    assert!(!s.has_cc(far, "snare"));
+    // Thrown off it, 6 yd from where it stood.
+    let mut farthest = 0.0f32;
+    for _ in 0..(1.5 / DT) as usize {
+        run_pinned(&mut s, DT, &[(far, [9.0, 0.0, 0.0])]);
+        farthest = farthest.max(dist2d(s.mobs[&near].pos, ORIGIN));
+    }
+    assert!(farthest > 7.5, "knocked back from 3 yd: no farther than {farthest:.1}");
 }
 
 // --- Warlock: rot ---------------------------------------------------------------------------------
@@ -530,4 +629,100 @@ fn typhoon_throws_a_creature_back_and_its_slow_takes_hold_after() {
     assert!(x > 11.0, "thrown back about 9 yd from 4: at {x:.1}");
     assert!(s.has_cc(b, "snare"), "and slowed");
     let _ = ev;
+}
+
+/// A creature that outlasts a blow with the bonus on it.
+fn tough(s: &mut Survival, id: Id) {
+    let m = s.mobs.get_mut(&id).unwrap();
+    m.health = 500;
+    m.max_health = 500;
+}
+
+/// The hero's own swing (a click), the creature held where it is.
+fn swing(s: &mut Survival, p: Id, pins: &[(Id, Vec3)]) -> Vec<Event> {
+    s.input(p, Input::Attack);
+    let mut ev = s.step(DT);
+    s.input(p, Input::AttackUp);
+    ev.extend(run_pinned(s, 1.0, pins));
+    ev
+}
+
+#[test]
+fn prowl_hides_the_druid_for_ten_sec_and_the_next_swing_from_it_stuns_and_hits_harder() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "feral_leap");
+    s.set_cooldowns(p, true);
+    let k = boar(&mut s, [1.5, 0.0, 0.0]);
+    tough(&mut s, k);
+    let pins = [(k, [1.5, 0.0, 0.0])];
+    // A plain swing, to compare: no stun, and less than the bonus.
+    let most = s.weapon_of(&s.players[&p]).damage[1];
+    let bonus = crate::sim::cc::PROWL_BONUS as u32;
+    let plain = swing(&mut s, p, &pins);
+    let plain_hit = hits(&plain, p, k)[0];
+    assert!(!s.has_cc(k, "stun") && plain_hit <= most, "a swing is {plain_hit}, at most {most}");
+    run_pinned(&mut s, 2.0, &pins);
+    // Feral Leap's EX (25 Valor): the Rogue's stealth, for 10 sec.
+    s.set_valor(p, 100.0);
+    let ev = press(&mut s, p, "utility", true);
+    assert!(missile(&ev, 5215), "its look");
+    assert!(s.has_cc(p, "veil") && s.has_cc(p, "prowl"), "hidden and prowling");
+    assert!(s.players[&p].valor < 100.0, "Valor spent");
+    let v = s.cc_of(p).iter().find(|c| c.kind == "veil").unwrap();
+    assert!((v.until - v.since - 10.0).abs() < 0.01, "up to 10 sec");
+    run_pinned(&mut s, 8.0, &pins);
+    assert!(s.has_cc(p, "veil") && s.has_cc(p, "prowl"), "still hidden 8 sec on");
+    // The swing out of hiding: it stuns for 2 sec and hits for the bonus more.
+    let ev = swing(&mut s, p, &pins);
+    let hit = hits(&ev, p, k)[0];
+    assert!(hit > bonus && hit - bonus <= most, "20 more than a swing: {hit}");
+    assert!(s.has_cc(k, "stun"), "the boar stunned");
+    let st = s.cc_of(k).iter().find(|c| c.kind == "stun").unwrap();
+    assert!((st.until - st.since - crate::sim::cc::PROWL_STUN).abs() < 0.01, "for 2 sec");
+    assert!(!s.has_cc(p, "veil") && !s.has_cc(p, "prowl"), "out of hiding");
+    // Only the one: the next swing is a swing.
+    run_pinned(&mut s, 3.0, &pins);
+    assert!(!s.has_cc(k, "stun"));
+    let ev = swing(&mut s, p, &pins);
+    assert!(hits(&ev, p, k)[0] <= most && !s.has_cc(k, "stun"), "an ordinary swing again");
+}
+
+#[test]
+fn an_ability_from_prowl_strikes_the_same_and_damage_on_the_druid_ends_it_with_no_strike() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "feral_leap");
+    learn(&mut s, p, "fireball");
+    s.set_cooldowns(p, true);
+    let k = boar(&mut s, [6.0, 0.0, 0.0]);
+    tough(&mut s, k);
+    let pins = [(k, [6.0, 0.0, 0.0])];
+    s.set_valor(p, 100.0);
+    press(&mut s, p, "utility", true);
+    assert!(s.has_cc(p, "prowl"));
+    run_pinned(&mut s, 0.6, &pins);
+    // Any ability is an attack: it brings them out, and what it lands on is stunned.
+    press(&mut s, p, "ranged", false);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "fireball")), "Fireball up");
+    let mut ev = hold(&mut s, p, 0.0, &pins);
+    ev.extend(run_pinned(&mut s, 1.0, &pins));
+    assert!(!s.has_cc(p, "veil"), "out of hiding");
+    assert!(s.has_cc(k, "stun"), "the boar stunned by the Fireball");
+    assert!(hits(&ev, p, k).iter().any(|d| *d >= crate::sim::cc::PROWL_BONUS as u32), "with the bonus on it: {:?}", hits(&ev, p, k));
+    // Struck while hiding: out at once, and the next swing is only a swing.
+    run_pinned(&mut s, 3.0, &pins);
+    let k2 = boar(&mut s, [1.5, 0.0, 0.0]);
+    tough(&mut s, k2);
+    let pins = [(k2, [1.5, 0.0, 0.0])];
+    s.set_valor(p, 100.0);
+    s.set_cooldowns(p, true);
+    press(&mut s, p, "utility", true);
+    assert!(s.has_cc(p, "veil") && s.has_cc(p, "prowl"));
+    s.hurt_player(p, 3);
+    assert!(!s.has_cc(p, "veil") && !s.has_cc(p, "prowl"), "damage ends it");
+    run_pinned(&mut s, 1.0, &pins);
+    let ev = swing(&mut s, p, &pins);
+    assert!(!s.has_cc(k2, "stun"), "no strike");
+    assert!(hits(&ev, p, k2)[0] <= s.weapon_of(&s.players[&p]).damage[1]);
 }

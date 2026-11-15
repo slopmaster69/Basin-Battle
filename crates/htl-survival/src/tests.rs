@@ -549,7 +549,7 @@ fn a_shot_from_a_hero_pressed_to_a_wall_does_not_start_past_it() {
     assert!(hits_on(&ev, g).is_empty(), "the wall takes it");
 }
 
-/// A held charge that goes off by itself (Pyroblast held past its hold) goes along the last line
+/// A held charge that goes off by itself (a Chaos Bolt held past its hold) goes along the last line
 /// the client sent while it was held, though that line is more than a moment old by then; a line
 /// from before the charge began is not kept alive for it.
 #[test]

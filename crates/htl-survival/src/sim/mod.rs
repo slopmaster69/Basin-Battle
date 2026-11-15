@@ -817,6 +817,8 @@ pub struct Player {
     pub lock_seen: Vec<Id>,
     /// Out of a veil (Vanish) until then: their blow counts as from behind.
     pub veil_strike_until: f32,
+    /// Until when the Druid's next attack is Prowl's strike (0: it isn't).
+    pub prowl_strike_until: f32,
     /// When their client last told us where they are: between its reports the server carries
     /// them on along the keys they hold (a heartbeat comes only twice a second).
     pub moved_at: f32,
@@ -1654,6 +1656,7 @@ impl Survival {
             lock: None,
             lock_seen: Vec::new(),
             veil_strike_until: 0.0,
+            prowl_strike_until: 0.0,
             moved_at: 0.0,
             armor: BTreeMap::new(),
             pack: None,

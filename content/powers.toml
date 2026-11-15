@@ -246,9 +246,9 @@ name = "Meteor"
 source = "boss"
 class = "mage"
 icon = 133
-text = "Fireball, Pyroblast and Flamestrike splash half their damage onto everything within 6 yd."
+text = "Fireball and Flamestrike splash half their damage onto everything within 6 yd."
   [[power.effect]]
-  spells = "fireball,pyroblast,flamestrike"
+  spells = "fireball,flamestrike"
   add = { splash = 0.5, splash_radius = 6 }
 
 [[power]]

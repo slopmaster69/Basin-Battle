@@ -26,7 +26,7 @@
 # Change them freely: they're read only by the sim.
 
 # Freeze, then shatter: Frost Nova's ring when something's in reach, step back out of its blows,
-# and the next Fireball press is a free Pyroblast on the frozen.
+# and the next Fireball press is a free Polymorph.
 [[class.mage]]
 card = "frost_nova"
 foes_within = [6.0, 1]
