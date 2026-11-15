@@ -21,7 +21,8 @@ The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `conte
    20 sec. Waited out, he drops into a 1.2 sec hunch: punish it.
 4. **The riposte.** A direct frontal hit (melee, off hand, or a projectile's direct contact) in the
    Invitation spends it once. He thrusts (HumanMale Pierce, 85, not the cuts' raised arm), his
-   weapon glowing red for the 0.9 sec windup, the only blow that glows. His lunge carries him from
+   weapon glowing red for the 0.9 sec windup, the only blow that glows in the first form (Unbowed's
+   Invitation is red from the start, see 9). His lunge carries him from
    where he stood, along the line fixed at contact, 1.5 yd past where the hero stood. It strikes
    along that whole line; no guard stops it. A hero who sidestepped is behind him for a backstab
    through his 2.4 sec hunch. One who stood still takes it, but it never takes their last point
@@ -47,10 +48,24 @@ The code is `crates/htl-survival/src/sim/vancleef.rs`; the numbers are in `conte
    holds his health above zero. When he dies, any held pose stops at once, so death plays.
 9. **Unbowed.** Through the quarters secret only. The body lies 4 sec, then he rises where it
    lay: kneeling 1 sec, then a roar as he stands, then 2.5 sec before his first attack. He's
-   dropped the Invitation and the riposte. His strings are 4 blows (the last stand 5), and only
-   the final hunch is open (2.8, 3 and 3.4 sec); the blows between have 0.2 to 0.3 sec and no
-   hunch. His one single blow is a lunge (1.1 sec windup), open 2.2 sec after. He looks different: black Blackwing blades (displays 31855 and 31856) and Shadowform's
-   dark swirl at his feet (15473). His gap is the halved one from the start.
+   turned the Invitation round. His strings are 4 blows (the last stand 5), and the final hunch
+   of each is open (2.8, 3 and 3.4 sec); the blows between have 0.2 to 0.3 sec and no hunch. His
+   one single blow is a lunge (1.1 sec windup), open 2.2 sec after. He looks different: black
+   Blackwing blades (displays 31855 and 31856) and Shadowform's dark swirl at his feet (15473).
+   His gap is the halved one from the start. His health is 900 (the first form's 1500).
+   **The turned Invitation.** After every completed string he raises his blades as the first form
+   does (the held guard, the scrape, 2 sec) but his weapon is red from the first moment, where the
+   first form's glows only for the thrust, and he says "Stand still, and be finished." (the first
+   time, then again after 20 sec). Waiting is now the wrong answer: at the end of the 2 sec the
+   closing thrust comes for whoever stands there, the same blow as the first form's riposte (a
+   Pierce thrust, no guard stops it, 0.9 sec windup still red, aimed once as it starts, a lunge
+   along that line up to 1.5 yd past the hero and never more than 7 yd) at 40 damage against its
+   36, never taking a last point of health. A hit into the Invitation brings the same thrust at
+   once (the Invitation is spent, no second one from the timer; a second hero can't restart it).
+   Only the sidestep answers it: the hero ends behind him, and he is open through the thrust's 2.4
+   sec recovery (hits count 2 times more toward his posture), as the first form is after a
+   riposte. Control and a posture break come first, as in the first form. A lunge closes
+   distance without spending the next turned Invitation.
 
 His lines never come closer than 2 sec together: one due sooner waits its turn. Both forms bypass
 random string cuts and extensions, held beats, extra chains, tactical retreats and circling, so
@@ -110,6 +125,14 @@ wind-up holds (its coil, about half way to the blow) and over the hunch's loop:
 \* On the Undead man's own bones, which stand at 0.85 and 31° forward: each new wind-up rises
 and leans back from his stance. The 12% kneel turns him to face the hero he was fighting.
 
+**The turned Invitation, with floor markers off.** Nothing about it is a mark on the floor. It
+reads on him: the blades come up into the held guard (the first form's too), the scrape plays,
+his weapon is red the whole hold and through the thrust's windup (the first form's blades are
+plain), and he says "Stand still, and be finished." The red is the lesson: red means a thrust is
+coming, whatever you do, so the answer is the sidestep he shows the same way at the windup (the
+Pierce thrust, not the cuts' raised arm). The add-on's floor markers and danger mark are an
+optional extra over the same events and carry none of it.
+
 The hunch also used to last only until the first blow into it: on the clients a hit's flinch
 replaces any held pose, so punishing him stood him back up. The hunch and the kneel are now held
 with `hold_open_pose`, which leaves out the flinch until the pose ends.
@@ -141,20 +164,31 @@ into the scuff and three blows, the Blackguards' ring (its shape, the warning, t
 fairness cases, his lunge kept inside it) and their quiet-moment departure with "Cowards!" at the
 turn, line
 spacing, the last stand's kneel and death stopping it, cleanup, the secret handoff with
-Unbowed's kneel, roar and wait, and Unbowed's strings.
+Unbowed's kneel, roar and wait, and Unbowed's strings, and the turned Invitation (its red blades,
+line and scrape; the thrust at a hero who stands, one who hits into it, one who rolls aside, one
+out of reach, one at 30 health, a stun, a wipe, two heroes, and the length of the fight).
 
 `a_lone_sword_hero_playing_by_the_tells_clears_both_forms` plays both forms with a warrior on the
 starting sword and their own 200 health, reading only what the client shows (the hunch and kneel,
 the raised blades, each windup, the red glow) with a 0.3 sec reaction: parry the cuts, sidestep
 the glow, hit only hunches. Patient, it clears VanCleef in about 2.5 min with 2 breaks; hitting
-into Invitations to draw ripostes, in about 2.2 min with 6. Unbowed takes about 1.8 min. It never
+into Invitations to draw ripostes, in about 2.2 min with 6. Unbowed takes about 1.5 min (it was 1.8 before the turned Invitation, with 1100 health; see
+below). It never
 uses a debug command. That's the simulation, not the client.
 
 `crates/htl-server/tests/vancleef_native.rs` (installed data, `--ignored`) walks the real deck:
 the walk-out from under the cabin roof to the open deck, the ring's 8 guards on open deck (the
 line and its inside open, dry boards), every shove from the line landing on dry open boards
 inside it, their walk off the ship (every stride a walker's, no falls), and the posture retreat
-staying on the open deck, from the first exchange and after 15 sec of fighting.
+staying on the open deck, from the first exchange and after 15 sec of fighting, and Unbowed's
+turned Invitation and thrust (4 in a minute) with the hero at his side, at the east rail and at
+the north rail, he never leaving the open deck.
+
+Unbowed's length (Nov 15, the scripted warrior, 3 seeds, 200 health): before the turned
+Invitation 108, 109 and 110 sec with 1100 health and 6 breaks; with it and 1100 health 93, 106 and
+102 sec; with it and 900 health 92, 87 and 88 sec, never hit once, every thrust rolled aside.
+The film's human took 2 min and 61 hits without a kill on the old form. The script reads and
+answers every tell perfectly, so a person is slower; that margin is why 900 and not 1100.
 
 ## Filming
 

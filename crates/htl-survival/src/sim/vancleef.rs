@@ -2,6 +2,8 @@
 //! hit, blades up means wait. Every completed combination ends in a hunch (a kneel for the last
 //! one), and only a hunch is open; the Invitation's raised blades never deal damage on their own,
 //! but a direct frontal hit spends it once and the ordinary, committed melee engine answers.
+//! Unbowed turns the Invitation round: his blades are red from the start, and waiting it out is
+//! met by the same thrust, so only the sidestep opens him.
 //!
 //! What the shared fixes (Corey's Nov 8 table) do engine-wide is done here for VanCleef and
 //! Unbowed alone: the hunch's "open" look, debug damage never counting toward his posture, lines
@@ -94,6 +96,8 @@ const OVERBOARD_DROP: f32 = 4.0;
 const LINE_GAP: f32 = 2.0;
 /// "Go on, then." again only after this long.
 const INVITE_LINE_AGAIN: f32 = 20.0;
+/// Unbowed's line over the turned Invitation: plain, and it says what waiting costs.
+const TURNED_LINE: &str = "Stand still, and be finished.";
 const WATCHER: &str = "dm_blackguard_observer";
 /// The open look: hunched low (StealthStand, bent well forward with the blades down, looping as
 /// he breathes), or the kneel (EmoteKneel) for the last opening. Lower than any wind-up of his,
@@ -195,7 +199,7 @@ impl Survival {
 
     /// The first exchange is honest. Invitations follow a completed string, not a timer
     /// or a health line. A lunge closes distance without spending that next Invitation.
-    /// Unbowed has no Invitation at all.
+    /// Unbowed's is the turned one: the same blades, red from the start, and waiting is met.
     pub(crate) fn vancleef_pattern(&self, id: Id, dist: f32, size: f32) -> Option<usize> {
         let m = self.mobs.get(&id)?;
         let d = &self.content.mobs[m.def];
@@ -327,7 +331,15 @@ impl Survival {
         // and the steel's scrape. It has no block or damage immunity.
         self.events.push(Event::MobGuard { id, up: true });
         self.events.push(Event::Sound { id, sound: SCRAPE });
-        if say { self.duel_say(id, "Go on, then."); }
+        if self.first_form(id) {
+            if say { self.duel_say(id, "Go on, then."); }
+        } else {
+            // The turned Invitation: his weapon is red from the first moment (the first form's
+            // glows only for the riposte), so a hero who has learned that red means a thrust
+            // reads it at once, and his line says what is coming.
+            self.events.push(Event::Glow { id, secs: INVITATION });
+            if say { self.duel_say(id, TURNED_LINE); }
+        }
         true
     }
 
@@ -349,6 +361,11 @@ impl Survival {
             || (m.pos[2] - from[2]).abs() > 6.0 { return; }
         self.vancleef.duels.get_mut(&id).unwrap().beat = Beat::Fighting;
         self.lower_invitation(id);
+        self.riposte(id, hero);
+    }
+
+    /// The thrust at `hero`: from a hit into the Invitation, or (Unbowed's) from standing through it.
+    fn riposte(&mut self, id: Id, hero: Id) {
         let Some(k) = self.duel_pattern_named(id, "riposte") else { return };
         self.begin_pattern(id, k, false);
         // Aim at where the attacker stands now, once, and carry the lunge past it. Content gives
@@ -845,9 +862,15 @@ impl Survival {
                     self.mobs.get_mut(&id).unwrap().pattern = None;
                     self.vancleef.duels.get_mut(&id).unwrap().beat = Beat::Fighting;
                 } else if now >= until {
-                    // Waited out: blades down into a short hunch. Punish it.
                     self.lower_invitation(id);
                     self.vancleef.duels.get_mut(&id).unwrap().beat = Beat::Fighting;
+                    if !self.first_form(id) {
+                        // Unbowed: waiting is the wrong answer. The thrust comes for whoever
+                        // stands there, aimed once as it starts, and only a sidestep opens him.
+                        self.riposte(id, hero);
+                        return true;
+                    }
+                    // Waited out: blades down into a short hunch. Punish it.
                     let gap = self.duel_gap(id);
                     let m = self.mobs.get_mut(&id).unwrap();
                     m.pattern = None;
