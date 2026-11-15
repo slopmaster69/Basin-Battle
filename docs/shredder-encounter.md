@@ -98,14 +98,15 @@ server's events), left out.
 From the pull a log hangs 6 yd over where the wreck will lie and Sneed will work (three of the
 dig site's barrier poles slung together on their sides, 9.5 yd long), one rope running down to a waist-high stake on the
 floor, the tie-off, 4.8 yd from his work place and 3.2 yd outside the drop. The drop is marked on
-the floor from the pull: a quiet blue strip, 9.5 yd by 3.2, drawn by the client itself (not the
-add-on's optional floor marks).
+the floor from the pull: a quiet blue strip, 9.5 yd by 3.2, an optional floor mark (the add-on's
+Floor markers setting; the log hanging over it is what tells the drop with the markers off). While Sneed
+mends, a torch burns beside the stake (the moment to cut), and goes out with the rope.
 
 - **Cutting it.** A melee blow that reaches the stake cuts the rope: any hero's, light or heavy,
   at any time in the fight. One log, one use a fight. A blow meant for a foe doesn't cut it: if
   the blow strikes a foe nearer the hero's own line than the stake is, the rope holds (the first
   filmed look lost the log to a blow at Sneed beside the stake).
-- **The fall.** The rope whips away, the log creaks 0.7 sec and comes down in 0.3; the drop's
+- **The fall.** The rope whips away, the log creaks 0.7 sec (dust shaking off it along the drop) and comes down in 0.3; the drop's
   mark burns bright from the cut until it lands. A hero in the drop's middle who moves at the
   creak is out either side (1.6 yd).
 - **Under it.** A hero is knocked down 2 sec and takes no damage. Sneed is stunned 4 sec, open,
@@ -211,8 +212,8 @@ tie-off is the dig site's stake (ExcavationStake, 2270) at three times its size,
 ropes are drawn lines from overhead to the stake and to the log either side of its middle. The
 crash's and the fallen log's lumber is DeadMineLumberPileSmall (1108) and loose planks (6481).
 Sounds: wood struck 3720, a heavy thud 921, the creak 3360 (the mine's door); the dust is spell
-22792's. The drop's mark on the floor is the client's own ground burst (patch 0026), so it shows
-with the add-on's floor marks off.
+22792's. The drop's mark on the floor is a floor marker (`GroundWarn`), shown only with the add-on's
+floor markers on. With them off, dust shakes off the creaking log along the floor it falls on, every 0.3 sec for the 0.7 sec of the creak, 3 clouds a beat.
 
 ## Filming
 

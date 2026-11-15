@@ -71,6 +71,12 @@ const DUST: u32 = 22792;
 const QUIET: &str = "8FB4D8";
 const SOON: &str = "FFF2C8";
 const BRIGHT: &str = "FFB23A";
+/// The torch by the stake (`FreestandingTorch04_HUGE`, as Rhahk'Zor's lamps), this far to the side
+/// of it; and the dust off the creaking log, a cloud this far apart along the drop.
+const LAMP: u32 = 2430;
+const LAMP_SCALE: f32 = 1.0;
+const LAMP_SIDE: f32 = 1.2;
+const CREAK_DUST_GAP: f32 = 3.0;
 const QUIET_EVERY: f32 = 0.5;
 const QUIET_SECS: f32 = 1.0;
 const BRIGHT_EVERY: f32 = 0.3;
@@ -110,6 +116,9 @@ pub(super) struct Rig {
     /// The poles slung with it (`LOG_BUNDLE`'s second and third).
     pub(super) bundle: Vec<Id>,
     pub(super) stake: Option<Id>,
+    /// A torch lit beside the stake while Sneed is at his repair: the moment to cut (the tell
+    /// with the floor markers off; its ring on the floor is the optional extra).
+    pub(super) lamp: Option<Id>,
     /// The tie rope first, then the log's two slings.
     pub(super) ropes: Vec<Id>,
     pub(super) state: RigState,
@@ -300,7 +309,7 @@ impl Survival {
             work: work.filter(|_| rigged),
             tie: tie.filter(|_| rigged),
             marks,
-            log: None, bundle: Vec::new(), stake: None, ropes: Vec::new(),
+            log: None, bundle: Vec::new(), stake: None, lamp: None, ropes: Vec::new(),
             state: RigState::Down,
             mark_at: 0.0, rope_at: 0.0,
             lumber: Vec::new(), crashed: false, clear_at: None, fought: false,
@@ -357,7 +366,7 @@ impl Survival {
     /// what fell.
     fn rig_clear(&mut self, key: usize) {
         let Some(g) = self.machinery.rigs.get_mut(&key) else { return };
-        let props: Vec<Id> = g.log.take().into_iter().chain(std::mem::take(&mut g.bundle)).chain(g.stake.take()).chain(std::mem::take(&mut g.lumber)).collect();
+        let props: Vec<Id> = g.log.take().into_iter().chain(std::mem::take(&mut g.bundle)).chain(g.stake.take()).chain(g.lamp.take()).chain(std::mem::take(&mut g.lumber)).collect();
         let ropes = std::mem::take(&mut g.ropes);
         g.state = RigState::Down;
         g.clear_at = None;
@@ -650,6 +659,10 @@ impl Survival {
         g.state = RigState::Cut { creak_until: now + CREAK, lands_at: now + CREAK + FALL };
         self.events.push(Event::Log(format!("shredder {now:.2} s: the log's rope is cut")));
         g.mark_at = now;
+        // The torch by the stake goes out with its rope.
+        let lamp = g.lamp.take();
+        if let Some(lamp) = lamp { self.rig_prop_gone(lamp); }
+        let Some(g) = self.machinery.rigs.get_mut(&key) else { return };
         let (stake, log, tie_rope) = (g.stake, g.log, g.ropes.first().copied());
         if let Some(rope) = tie_rope {
             self.events.push(Event::MarkGone { id: rope });
@@ -736,9 +749,20 @@ impl Survival {
                     self.rig_mark(&g, QUIET, QUIET_SECS);
                     if let Some(at) = g.tie {
                         let colour = if mending { SOON } else { QUIET };
-                        self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: 1.2, arc: 360.0, width: 0.0, secs: QUIET_SECS, colour: colour.into() });
+                        self.events.push(Event::GroundWarn { at, yaw: 0.0, shape: "ring", reach: 1.2, arc: 360.0, width: 0.0, secs: QUIET_SECS, colour: colour.into() });
                     }
                     self.machinery.rigs.get_mut(&key).unwrap().mark_at = now + QUIET_EVERY;
+                }
+                // The torch by the stake burns while he mends, and goes out when he doesn't.
+                if mending && fighting && g.lamp.is_none() {
+                    if let Some(tie) = g.tie {
+                        let at = off(tie, g.across + std::f32::consts::FRAC_PI_2, LAMP_SIDE);
+                        let at = self.ground_near(at[0], at[1], tie[2]);
+                        let lamp = self.rig_prop(at, LAMP, LAMP_SCALE, 0.0, 0.0);
+                        self.machinery.rigs.get_mut(&key).unwrap().lamp = Some(lamp);
+                    }
+                } else if !(mending && fighting) {
+                    if let Some(lamp) = self.machinery.rigs.get_mut(&key).unwrap().lamp.take() { self.rig_prop_gone(lamp); }
                 }
             }
             RigState::Cut { creak_until, lands_at } => {
@@ -747,6 +771,9 @@ impl Survival {
                     return;
                 }
                 if now >= g.mark_at {
+                    // Dust shakes off the log along the floor it will fall on, through the creak
+                    // (the tell with the floor markers off; the strip is the optional extra).
+                    if now < creak_until { self.rig_creak_dust(&g); }
                     self.rig_mark(&g, BRIGHT, BRIGHT_SECS.min(lands_at - now + 0.1));
                     self.machinery.rigs.get_mut(&key).unwrap().mark_at = now + BRIGHT_EVERY;
                 }
@@ -780,9 +807,21 @@ impl Survival {
         g.work.map_or(g.crash[2], |w| w[2]) + 0.3
     }
 
+    /// Dust coming down off the log: a cloud every `CREAK_DUST_GAP` along the floor it falls on.
+    fn rig_creak_dust(&mut self, g: &Rig) {
+        let by = g.log.unwrap_or(0);
+        let mut k = CREAK_DUST_GAP / 2.0;
+        while k < LOG_LEN {
+            let p = off(g.crash, g.across, k);
+            let p = self.ground_near(p[0], p[1], g.home[2]);
+            self.rig_dust(by, p);
+            k += CREAK_DUST_GAP;
+        }
+    }
+
     fn rig_mark(&mut self, g: &Rig, colour: &str, secs: f32) {
         for (at, len) in &g.marks {
-            self.events.push(Event::GroundBurst { at: *at, yaw: g.across, shape: "line", reach: *len, arc: 0.0, width: ZONE_HALF * 2.0, secs, colour: colour.into() });
+            self.events.push(Event::GroundWarn { at: *at, yaw: g.across, shape: "line", reach: *len, arc: 0.0, width: ZONE_HALF * 2.0, secs, colour: colour.into() });
         }
     }
 

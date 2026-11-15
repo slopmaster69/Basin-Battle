@@ -55,12 +55,13 @@ Status: pass (tells with markers off already), fixed (this sweep), open (found, 
 | Rhahk'Zor: the wave's rows | None (no ring, by design) | n/a | Rock dropping, dust rolling at the front | Pass | None |
 | Rhahk'Zor: burning ground (burning maul, lodged pound) | Fire-coloured ring at the true edge, redrawn every 0.5 sec (`GB`) | No | The flames themselves: one at the heart and 3 round it at 0.55 of the radius | Marker fail, tell passes | Ring is `GroundWarn` |
 | Rhahk'Zor: dust ring where a rock struck, at the slam's wall, the end dust line | A brief dust-coloured shape after the strike (`GB`, 0.5 to 1.2 sec) | No | Not a warning: it follows the blow, with real dust beside it | Pass (an effect) | None |
+| The Shredder: the log's drop strip (9.5 yd by 3.2), quiet from the pull and bright from the cut | Strip on the floor (`GB`; the doc called it the client's own, shown with markers off) | No | The log hanging 6 yd over it, then the rope whipping away and the creak (3360) for 0.7 sec; nothing on the floor | Fail | Strip is `GroundWarn`. Dust shakes off the log along the drop every 0.3 sec through the creak |
+| The Shredder: the tie-off ring (lit while Sneed mends) | Ring at the stake (`GB`) | No | The stake itself (waist high, 3 times its size); nothing said when to cut it | Fail | Ring is `GroundWarn`. A torch burns beside the stake while Sneed mends and goes out with the rope |
 | Gilnid, Greenskin, Cookie, Smite, VanCleef, the Shredder, other enemies | Warning shapes sent as `GB` regardless: see below | No | Per boss, in its own pull request | Open | Each in its own pull request |
 
 Sites still to move to `GroundWarn` (found in the audit, each warning-only and sent as `GB`):
 Cookie's scoop wedge, pot ring and patch ring (`sim/kitchen.rs`), Gilnid's valve lane, stripes and
-stick ring (`sim/perches.rs`), Greenskin's firing line (`sim/firing_line.rs`), the Shredder's
-Grind lane and tie ring (`sim/machinery_rig.rs`), small splashes of other enemies
+stick ring (`sim/perches.rs`), Greenskin's firing line (`sim/firing_line.rs`), small splashes of other enemies
 (`sim/mobs.rs`, noted "so it reads with the floor markers off" on Nov 8, before this rule).
 Smite's stomp and slam and VanCleef's strings use `TG`/`TA`/`MK` lines, which the setting already
 gates; what tells them with the markers off is not yet checked (the striker's weapon glow and the
