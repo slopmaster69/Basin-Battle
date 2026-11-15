@@ -126,7 +126,7 @@ fn gilnid_is_seen_from_the_way_in_his_crew_stands_on_planks_over_the_pit_and_the
     for _ in 0..400 {
         let ev = step(&mut s, hero);
         stripe.extend(ev.iter().filter_map(|e| match e {
-            Event::GroundBurst { shape: "line", at, reach, width, .. } => Some((*at, *reach, *width)), _ => None,
+            Event::GroundWarn { shape: "line", at, reach, width, .. } => Some((*at, *reach, *width)), _ => None,
         }));
         if !stripe.is_empty() { break; }
     }

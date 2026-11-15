@@ -108,7 +108,7 @@ fn the_first_stick_has_a_three_second_fuse_an_arc_and_sits_sparking_a_second_bef
     assert!(until(&mut s, 2.0, |s| s.perches.crews[&boss].visuals.iter().any(|id| display(s, *id) == Some(STICK))));
     let prop = *s.perches.crews[&boss].visuals.iter().find(|id| display(&s, **id) == Some(STICK)).unwrap();
     assert_eq!(s.objs[&prop].pos, stick);
-    assert!(s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, at, .. } if *at == stick && *reach >= 2.5)), "drawn to its size with markers off");
+    assert!(s.events.iter().any(|e| matches!(e, Event::GroundWarn { shape: "ring", reach, at, .. } if *at == stick && *reach >= 2.5)), "its blast ring is the floor mark, through the markers setting");
     assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id, sound: 1424 } if *id == prop)), "hissing");
     assert!(s.missiles.iter().any(|m| m.owner == crew[0] && m.land_at == blows), "it hasn't blown yet");
     assert!(until(&mut s, 1.2, |s| !s.objs.contains_key(&prop)));
@@ -131,7 +131,7 @@ fn after_the_first_stick_the_furnace_sets_the_first_pole_alight_and_he_falls_lan
     assert!(spill.len() >= 3);
     let near = spill.iter().map(|p| dist2d(*p, base)).fold(f32::MAX, f32::min);
     assert!(near < 2.0, "it reaches the pole: {near}");
-    assert!(s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "line", .. })));
+    assert!(s.events.iter().any(|e| matches!(e, Event::GroundWarn { shape: "line", .. })));
     assert!(until(&mut s, 4.0, |s| s.events.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "Mind the equipment!"))));
     assert!(s.perches.crews[&boss].visuals.iter().any(|id| display(&s, *id) == Some(FIRE) && s.objs[id].pos == base), "his pole alight");
     assert!(perched(&s, crew[0]), "the line comes before the drop");
@@ -335,7 +335,7 @@ fn his_pole_flares_with_flames_up_its_length_from_each_throw_until_after_the_sti
     let base = s.perches.workers[&crew[0]].base;
     s.events.clear();
     assert!(until(&mut s, 5.0, |s| !s.perches.crews[&boss].sticks.is_empty()), "thrown");
-    assert!(!s.events.iter().any(|e| matches!(e, Event::GroundBurst { at, .. } if *at == base)),
+    assert!(!s.events.iter().any(|e| matches!(e, Event::GroundWarn { at, .. } if *at == base)),
         "no floor ring carries the tell: it reads with the markers off");
     assert!(s.events.iter().any(|e| matches!(e, Event::Mark { pos, .. } if *pos == base)), "the floor mark is the optional extra, through the markers setting");
     let flame = s.perches.crews[&boss].visuals.iter().copied().find(|id| display(&s, *id) == Some(FIRE) && s.objs[id].pos == base);
@@ -394,7 +394,7 @@ fn stage(s: &Survival, boss: Id) -> &'static str {
 /// The channel's bursts among `ev` in `colour`: where each begins, its way, reach, width, secs.
 fn marks(ev: &[Event], colour: &str) -> Vec<(Vec3, f32, f32, f32, f32)> {
     ev.iter().filter_map(|e| match e {
-        Event::GroundBurst { at, yaw, shape: "line", reach, width, secs, colour: c, .. } if c == colour => Some((*at, *yaw, *reach, *width, *secs)),
+        Event::GroundWarn { at, yaw, shape: "line", reach, width, secs, colour: c, .. } if c == colour => Some((*at, *yaw, *reach, *width, *secs)),
         _ => None,
     }).collect()
 }
@@ -518,7 +518,7 @@ fn left_to_it_a_whistle_then_steam_then_fire_down_the_marked_channel_with_dry_gr
     let mut from = 0;
     loop {
         for e in &s.events[from..] {
-            if let Event::GroundBurst { at, reach, colour, secs, shape: "line", .. } = e { log.push((s.clock, colour.clone(), *at, *reach, *secs)); }
+            if let Event::GroundWarn { at, reach, colour, secs, shape: "line", .. } = e { log.push((s.clock, colour.clone(), *at, *reach, *secs)); }
         }
         from = s.events.len();
         if stage(&s, boss) == "finished" || s.clock > opened + 12.0 { break; }
@@ -1148,4 +1148,24 @@ fn gilnid_waits_for_a_hero_out_where_he_cannot_walk_and_slips_their_shots() {
             assert!(s.clock - lost >= super::kitchen::HOLD_ON - 0.06, "he waited {:.1} s", s.clock - lost);
         }
     }
+}
+
+#[test]
+fn each_spill_section_hisses_steam_and_kindles_a_flame_before_it_catches_whatever_the_markers() {
+    let (mut s, _, boss, _) = fight();
+    assert!(until(&mut s, 10.0, |s| s.perches.crews[&boss].demo.is_some()));
+    // The sections still to catch, with steam over every one of them already.
+    let spill: Vec<(Vec3, f32)> = s.missiles.iter().filter(|m| m.owner == boss && m.look == MOLTEN).map(|m| (m.at, m.land_at)).collect();
+    assert!(spill.len() >= 3);
+    let steam = |s: &Survival, at: Vec3| s.perches.crews[&boss].visuals.iter().any(|id| display(s, *id) == Some(STEAM) && s.objs[id].pos == at);
+    for (at, _) in &spill {
+        assert!(steam(&s, *at), "steam hissing up from a section before the spill reaches it");
+    }
+    // A flame kindles on a section shortly before it catches, and the steam is gone once it has.
+    let (at, lands) = spill[spill.len() - 1];
+    assert!(until(&mut s, 4.0, |s| s.clock >= lands - SPILL_GLOW + 0.05));
+    let flame = |s: &Survival| s.perches.crews[&boss].visuals.iter().any(|id| display(s, *id) == Some(FIRE) && s.objs[id].pos == at);
+    assert!(flame(&s), "a flame kindling on the last section before it catches");
+    assert!(until(&mut s, 2.0, |s| s.clock >= lands + 0.05));
+    assert!(!steam(&s, at), "the steam gives way to the fire");
 }

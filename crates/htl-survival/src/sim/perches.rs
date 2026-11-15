@@ -89,6 +89,10 @@ const NEXT_THROW: f32 = 1.5;
 const BELCH_AFTER: f32 = 0.6;
 const SPILL_STEP: f32 = 1.5;
 const SPILL_GAP: f32 = 0.2;
+/// Each section of the spill hisses steam from the belch until it catches (scale), and a flame
+/// kindles on it this long before (the tell with the floor markers off).
+const SPILL_STEAM: f32 = 0.9;
+const SPILL_GLOW: f32 = 0.5;
 const ALIGHT_SECS: f32 = 1.4;
 /// The valve: his hands on it `WORK_SECS`, then the whistle and `VENT_SECS` of steam along the
 /// channel, then the stripe of fire advances a section each `STRIPE_GAP`; each section burns,
@@ -115,7 +119,7 @@ const VALVE_OPEN: f32 = 4.0;
 /// gives it up, and the mark goes out. (He used to work it wherever he stood after 8 sec, so
 /// fire came from a valve nobody was at.)
 const GIVE_UP: f32 = 3.0;
-/// The channel's mark, drawn whatever the floor markers, in short bursts sent again and again:
+/// The channel's mark, an optional floor mark (the floor markers setting; steam wisps, the whistle and flames tell it with them off), in short bursts sent again and again:
 /// the client can't take a drawn burst back, so a mark that must go out when he's stopped, falls
 /// or loses his foe can't be drawn longer than a moment ahead. Three looks: it will burn if he
 /// finishes (pale steam-blue with small wisps of steam, from his line; sent 4 times a second, as
@@ -518,7 +522,7 @@ impl Survival {
             })
             .collect();
         for (_, at, yaw, reach, width) in bands {
-            self.events.push(Event::GroundBurst { at, yaw, shape: "line", reach, arc: 0.0, width, secs: BAND_SECS, colour: BAND_FILL.into() });
+            self.events.push(Event::GroundWarn { at, yaw, shape: "line", reach, arc: 0.0, width, secs: BAND_SECS, colour: BAND_FILL.into() });
         }
         let new: Vec<_> = self.mobs.iter().filter(|(id, m)| {
             m.health > 0 && !m.hidden && !matches!(m.state, MobState::Return)
@@ -659,7 +663,7 @@ impl Survival {
             let stick = self.perch_visual(owner, at, STICK, 2.0, 0.0, Some(blows));
             self.events.push(Event::Sound { id: stick, sound: 1424 });
             let radius = self.mobs.get(&thrower).map_or(2.5, |m| self.content.mobs[m.def].attack.radius);
-            self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: radius, arc: 360.0, width: 0.0,
+            self.events.push(Event::GroundWarn { at, yaw: 0.0, shape: "ring", reach: radius, arc: 360.0, width: 0.0,
                 secs: (blows - now).max(0.3), colour: "FF7A1A".into() });
         }
         let mut first = false;
@@ -893,7 +897,7 @@ impl Survival {
     }
 
     /// The spill of molten iron run along the floor: a section each point, the first landing at
-    /// `start` and each next `gap` later, every one drawn to its true width whatever the floor
+    /// `start` and each next `gap` later, every one marked to its true width on the floor only with the floor
     /// markers. The number of sections laid.
     #[allow(clippy::too_many_arguments)]
     fn perch_run(&mut self, owner: Id, points: &[Vec3], yaw: f32, radius: f32, start: f32, gap: f32, damage: u32) -> usize {
@@ -903,9 +907,16 @@ impl Survival {
             let mark = self.mark_ground(p, radius, lands - now, 0);
             self.missiles.push(combat::Missile { owner, from: p, at: p, radius, damage, blockable: false, heavy: false,
                 land_at: lands, mark, look: MOLTEN });
+            // What tells a section before it catches, with the floor markers off: steam hissing
+            // up from it from the belch on, and a flame kindling there just before the spill
+            // reaches it (the floor band is only the optional extra).
+            self.perch_visual(owner, p, STEAM, SPILL_STEAM, 0.0, Some(lands));
+            if let Some(c) = self.perches.crews.get_mut(&owner) {
+                c.later.push((lands - SPILL_GLOW, p, FIRE, 0.7, lands + 0.4));
+            }
         }
         let n = points.len();
-        // Drawn whatever the floor markers: a solid band its true width, laid two sections at a
+        // Drawn only with the floor markers on: a solid band its true width, laid two sections at a
         // time as the first of them catches (so it advances across the floor), and both its edges
         // from now to the end, so the dry ground either side reads. (One line from the middle drew
         // only its far half, and faded before the fire got there: Nov 9 filming saw a row of dots.)
@@ -917,7 +928,7 @@ impl Survival {
             let side = yaw + std::f32::consts::FRAC_PI_2;
             let secs = start - now + n as f32 * gap + 0.4;
             for edge in [radius, -radius] {
-                self.events.push(Event::GroundBurst { at: along(begin, side, edge), yaw, shape: "line", reach: len, arc: 0.0,
+                self.events.push(Event::GroundWarn { at: along(begin, side, edge), yaw, shape: "line", reach: len, arc: 0.0,
                     width: BAND_EDGE_WIDTH, secs, colour: BAND_EDGE.into() });
             }
             if let Some(c) = self.perches.crews.get_mut(&owner) {
@@ -962,7 +973,7 @@ impl Survival {
         let half = STRIPE_RADIUS;
         let reach = dist2d(a, b) + 2.0 * half;
         let (at, yaw) = if back { (along(b, yaw, half), yaw + std::f32::consts::PI) } else { (along(a, yaw, -half), yaw) };
-        self.events.push(Event::GroundBurst { at, yaw, shape: "line", reach, arc: 0.0, width: STRIPE_RADIUS * 2.0, secs, colour: colour.into() });
+        self.events.push(Event::GroundWarn { at, yaw, shape: "line", reach, arc: 0.0, width: STRIPE_RADIUS * 2.0, secs, colour: colour.into() });
     }
 
     /// The channel's mark, sent again each little while as long as it stands (`MARK_WILL`): the

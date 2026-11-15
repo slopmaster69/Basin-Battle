@@ -286,6 +286,9 @@ landing's deck.
 `tools/visual-check/greenskin-harpoon.txt` is the duel with the harpoon on its count (every third blow:
 the step back, the held harpoon, the haul and the cut). Not yet filmed.
 
+`tools/visual-check/gilnid-spill-nomarks.txt` (not yet run): the first stick and the furnace's lesson with the
+floor markers off, told only by the sparking stick and by steam and a kindling flame on each spill section.
+
 Gilnid's valve (the race, `docs/gilnid-encounter.md`) has its own set, all sharing
 `_gilnid-valve-setup.txt` (the mine cleared but for him and his crew, markers off, and a timer
 that presses the hero's keys a set time after his line is heard, and runs him to a spot in dashes

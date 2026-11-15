@@ -1,0 +1,21 @@
+# NOT RUN (filming is off on the owner's order). Gilnid's furnace lesson and his sticks with the
+# FLOOR MARKERS OFF (the setting is off below). Same start as gilnid-pole, no strike on the pole.
+# What to look for with no floor band or ring drawn at all:
+#  - The stick lands and sits 1 sec sparking and hissing: its place and its time are plain.
+#  - After the first stick blows the furnace belches; steam hisses up from every section of the
+#    spill's lane toward his first pole, a flame kindles on each section just before the molten
+#    splash reaches it, and the steam gives way to the fire. The lane is told before it burns.
+hero warrior
+cam off
+camera wide Gilnid + Furnace Engineer
+0 .es debug quiet
+0.4 .es goto -9624 675
+1 .es travel landing
+10 .es debug quiet
+10.5 .es restock
+10.5 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+11 .es clearfoes gilnid
+12 .es goto -178 -579 19.4 3.3
+13 video
+14 .es goto -188 -580 21 3.6
+30 end
