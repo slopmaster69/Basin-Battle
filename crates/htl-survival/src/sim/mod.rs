@@ -400,6 +400,11 @@ pub enum Event {
     /// An ability's shape flashed on the ground as it lands, for the clients that draw one: at a
     /// spot facing a way, `shape` `wedge`, `ring` or `line` (`width` wide), `reach` out over `arc`.
     GroundBurst { at: Vec3, yaw: f32, shape: &'static str, reach: f32, arc: f32, width: f32, secs: f32, colour: String },
+    /// A `GroundBurst` that only warns (the ring under a rock about to fall, the band across a
+    /// surge's line, a fire's edge): a floor marker, so it is drawn only through the add-on's
+    /// "Floor markers" setting (`GB` line's last field is 1). Whatever tells it with the markers
+    /// off is a world effect beside it, never this.
+    GroundWarn { at: Vec3, yaw: f32, shape: &'static str, reach: f32, arc: f32, width: f32, secs: f32, colour: String },
     /// A flurry of cuts starts on a unit, for the clients that play clips (Bladestorm): how it
     /// goes is the ability's `flurry`; a `ClipStop` ends it with its finishing sweep.
     Flurry { id: Id, secs: f32, def: crate::content_abilities::FlurryDef },
