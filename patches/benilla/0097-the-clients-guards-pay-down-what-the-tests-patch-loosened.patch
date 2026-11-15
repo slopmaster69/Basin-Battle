@@ -1,4 +1,4 @@
-From cf1ad4a890454314fd9531df0caf54fd24733b9f Mon Sep 17 00:00:00 2001
+From 0e3ca4283cf82456875f58df3e5e4e22bc413835 Mon Sep 17 00:00:00 2001
 From: Corios00 <52224974+Corios00@users.noreply.github.com>
 Date: Sun, 15 Nov 2026 00:08:17 -0600
 Subject: [PATCH] The client's guards pay down what the tests patch loosened
@@ -20,13 +20,18 @@ CAM_FOVY, NEARCLIP_DEFAULT), `ViewDistance::set_farclip` (FARCLIP_RANGE),
 self_model_fade_alpha), `WmoPortalInstance::down_ray_group` and `WorldPoint::interior_probe_eye`
 (down_ray_seeds, terrain_z_local, INTERIOR_PROBE_HEIGHT).
 
-Left alone: the schedule ceilings (Update 2,347, PostUpdate 598). They count undeclared-order
+Patch 0096 merged without a client-tests run and left two guards one over: Update's undeclared
+pairs read 2,350 against 2,347 and its sync points 55 against 54, from the route lanterns'
+chained `sync` and `apply`. Both ceilings follow the count, with the reason beside them.
+
+Left alone: the rest of the schedule ceilings (PostUpdate 598, and the Update pairs above). They count undeclared-order
 pairs, which a run condition does not change, and the pairs that remain are the effect drawers'
 shared `EffectQuads` stream and `Transform` writers on disjoint lanes; declaring an order there
 could change draw order.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
+ crates/benilla-app/src/game_plugins.rs        | 11 +++++--
  crates/benilla-app/src/minimap/mod.rs         | 11 ++-----
  crates/benilla-app/src/pipe_warm/menagerie.rs | 21 ++++--------
  crates/benilla-app/src/pipe_warm/mod.rs       |  9 ++++++
@@ -39,8 +44,41 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  crates/benilla-world/src/view.rs              | 32 +++++++++++++++++++
  crates/benilla-world/src/wmo_portal/mod.rs    | 18 +++++++++++
  crates/benilla-world/src/world_point.rs       |  6 ++++
- 12 files changed, 98 insertions(+), 61 deletions(-)
+ 13 files changed, 106 insertions(+), 64 deletions(-)
 
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index 8a5ff269..bed44b3f 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -1008,11 +1008,14 @@ pub(crate) mod schedule_tests {
+     ///   (`afterimage::spawn_afterimages` against the attaches and the aura tints, a ghost's own
+     ///   rig), `Visibility` (`look::sky::apply_look_sky_visibility`, the cloud layer's) and
+     ///   `AnimationPlayer`/`RigPose` (the action clips, the same population as the first bullet).
++    /// - patch 0096's route lanterns (`deadmines_route_lamps::sync` and `apply`), 3 pairs over
++    ///   the 2,347 above, read off the CI count (2,350): they write the lights' strength in
++    ///   `Update` against other writers of lights and visibility.
+     ///
+     /// Raising the ceiling is a claim that a new undeclared order is acceptable: make it with the
+     /// reason read off the dump, or declare the order (`.after`, a set, a `chain`). A resource
+     /// that commutes by construction belongs in [`Classes`].
+-    const UPDATE_ACTIONABLE_CEILING: usize = 2_347;
++    const UPDATE_ACTIONABLE_CEILING: usize = 2_350;
+     const UPDATE_ACTIONABLE_SLACK: usize = 40;
+ 
+     fn ratchet(what: &str, n: usize, ceiling: usize, slack: usize) {
+@@ -1144,8 +1147,10 @@ pub(crate) mod schedule_tests {
+     /// VM pass's links ignore the deferred buffers between them
+     /// ([`crate::vm_pass::order_the_pass`]), so a link's commands wait for the first barrier past
+     /// the chain. The count may not rise past the ceiling, and the ceiling follows it down. Read
+-    /// on the dev build, whose schedule holds every system the player build does.
+-    const UPDATE_SYNC_POINT_CEILING: usize = 54;
++    /// on the dev build, whose schedule holds every system the player build does. 55: the 54
++    /// before patch 0096 and the one barrier its chained `deadmines_route_lamps::sync` and
++    /// `apply` add, the first putting lights out through commands the second reads.
++    const UPDATE_SYNC_POINT_CEILING: usize = 55;
+     const UPDATE_SYNC_POINT_SLACK: usize = 4;
+ 
+     #[test]
 diff --git a/crates/benilla-app/src/minimap/mod.rs b/crates/benilla-app/src/minimap/mod.rs
 index eb2573be..af6e857e 100644
 --- a/crates/benilla-app/src/minimap/mod.rs
