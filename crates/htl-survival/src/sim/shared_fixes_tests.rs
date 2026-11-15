@@ -124,7 +124,7 @@ fn a_blows_impact_look_lands_with_the_blow() {
 }
 
 #[test]
-fn a_small_lobbed_splash_is_drawn_with_the_markers_off() {
+fn a_small_lobbed_splash_is_a_floor_marker_drawn_only_through_the_setting() {
     let (mut s, h) = world();
     s.move_player(h, [8.0, 0.0, 0.0], std::f32::consts::PI, Moving::default());
     let def = s.content.mob("dm_smite").unwrap();
@@ -134,8 +134,9 @@ fn a_small_lobbed_splash_is_drawn_with_the_markers_off() {
     s.events.clear();
     s.windup(id, mobs::Foe::Hero(h), s.players[&h].pos);
     assert!(3.0 < GROUND_LOOK_MIN);
-    assert!(s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", reach, .. } if (*reach - 3.0).abs() < 1e-3)),
-        "its true size drawn on the ground");
+    assert!(s.events.iter().any(|e| matches!(e, Event::GroundWarn { shape: "ring", reach, .. } if (*reach - 3.0).abs() < 1e-3)),
+        "its true size on the ground, a floor marker through the setting");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", .. })), "never drawn whatever the setting");
 }
 
 /// A dodge with no keys held is a hop back. On a client that doesn't run its own dodges the

@@ -55,13 +55,12 @@ Status: pass (tells with markers off already), fixed (this sweep), open (found, 
 | Rhahk'Zor: the wave's rows | None (no ring, by design) | n/a | Rock dropping, dust rolling at the front | Pass | None |
 | Rhahk'Zor: burning ground (burning maul, lodged pound) | Fire-coloured ring at the true edge, redrawn every 0.5 sec (`GB`) | No | The flames themselves: one at the heart and 3 round it at 0.55 of the radius | Marker fail, tell passes | Ring is `GroundWarn` |
 | Rhahk'Zor: dust ring where a rock struck, at the slam's wall, the end dust line | A brief dust-coloured shape after the strike (`GB`, 0.5 to 1.2 sec) | No | Not a warning: it follows the blow, with real dust beside it | Pass (an effect) | None |
-| Gilnid, Greenskin, Cookie, Smite, VanCleef, the Shredder, other enemies | Warning shapes sent as `GB` regardless: see below | No | Per boss, in its own pull request | Open | Each in its own pull request |
+| Other enemies: a lobbed splash too small for a ground look (under 6 yd), from the wind-up to the landing | Ring at the true radius (`GB`; noted "reads with the markers off" on Nov 8, before this rule) | No | The thrown thing flying its arc, at least 0.7 sec, to where it comes down | Marker fail, tell passes | Ring is `GroundWarn` |
+| Other enemies: a step's `burst` shape flashed where its blow landed | A shape for 0.45 sec after the blow (`GB`) | No | Not a warning: it follows the blow, with its own sound and look | Pass (an effect) | None |
+| Smite: the stomp and the hammer slam | `TG` lines (a wedge or ring), laid only through the setting | Yes | His own wind-up pose, the weapon glowing amber (a guard stops it) or red (nothing does), the flash a moment before the window to answer, the woosh: all the add-on's, drawn whatever the setting | Pass | None. The stomp is round his feet and the slam where his hammer comes down, so the striker is the place |
+| VanCleef: the strings and the closed ring of guards | `TG`/`TA`/`MK` lines, through the setting | Yes | The guards' own bodies round the deck, his thrust pose and the same striker tells; `docs/vancleef-encounter.md` says nothing is drawn on the floor | Pass | None |
+| Gilnid, Greenskin, Cookie, the Shredder | Each has its own rows above | | | | Each in its own pull request |
 
-Sites still to move to `GroundWarn` (found in the audit, each warning-only and sent as `GB`):
-Cookie's scoop wedge, pot ring and patch ring (`sim/kitchen.rs`), Gilnid's valve lane, stripes and
-stick ring (`sim/perches.rs`), Greenskin's firing line (`sim/firing_line.rs`), the Shredder's
-Grind lane and tie ring (`sim/machinery_rig.rs`), small splashes of other enemies
-(`sim/mobs.rs`, noted "so it reads with the floor markers off" on Nov 8, before this rule).
-Smite's stomp and slam and VanCleef's strings use `TG`/`TA`/`MK` lines, which the setting already
-gates; what tells them with the markers off is not yet checked (the striker's weapon glow and the
-flash before the window are the add-on's, and read on the creature itself).
+Smite and VanCleef were checked in the audit: their lines already go through the setting, and
+the striker's weapon glow, the flash before the window and the woosh are drawn from the `TG` line
+whatever the setting is, so both pass. Nothing of either has been seen in the client.

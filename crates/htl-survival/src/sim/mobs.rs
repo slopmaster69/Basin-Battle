@@ -2853,10 +2853,10 @@ impl Survival {
                 if look != 0 && a.radius >= GROUND_LOOK_MIN {
                     self.mark_ground(at, a.radius, secs, look);
                 } else {
-                    // Too small for a ground look: its true size drawn on the ground anyway, as an
-                    // effect, so it reads with the floor markers off (Nov 8: the small splashes
-                    // showed nothing).
-                    self.events.push(Event::GroundBurst { at, yaw: 0.0, shape: "ring", reach: a.radius, arc: 360.0, width: 0.0, secs, colour: HAZARD_COLOUR.into() });
+                    // Too small for a ground look: its true size drawn on the ground anyway, but
+                    // as a floor marker (the markers setting's). With them off the thrown thing
+                    // in the air, at least `LOB_MIN_FLY` of it, tells where it comes down.
+                    self.events.push(Event::GroundWarn { at, yaw: 0.0, shape: "ring", reach: a.radius, arc: 360.0, width: 0.0, secs, colour: HAZARD_COLOUR.into() });
                 }
                 let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
                 let mk = self.mark_as(at, a.radius, secs, Some(tele));
