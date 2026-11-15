@@ -2845,7 +2845,11 @@ display = 2029
 windup_sound = 1335
 clips_from = "HumanMale"
 scale = 1.3
-health = 1100
+# 900, not 1100: with the Invitation back he has open windows after every string (the thrust's
+# 2.4 sec as well as the last hunch's 2.8), so a hero who reads them lands more per minute, and
+# the fight is cut to a length the scripted warrior clears in well under 2 min (it was 108 to 110
+# sec with 1100, and the film showed 2 min and 61 hits without a kill).
+health = 900
 run_speed = 8.0
 walk_speed = 2.4
 aggro = 30.0
@@ -2885,7 +2889,21 @@ slay_sound = 5781
   min_range = 3.5
   max_range = 10.0
   steps = [ { from = "ScourgeMale", clip = 17, take = 2, windup = 1.1, lunge = 5.0, damage = 28, recovery = 2.2 } ]
-  # No Invitation once risen: long strings, and only the final hunch is open.
+  # The Invitation, turned (docs/vancleef-encounter.md): the same raised blades, but now red from
+  # the start, and waiting is the wrong answer. Held 2 sec by the module (this dummy step never
+  # fires), then the thrust below comes for whoever stands still; a hit into it brings the same
+  # thrust at once. Only a sidestep answers it, and that opens him.
+  [[mob.pattern]]
+  name = "invitation"
+  weight = 0.0
+  steps = [ { windup = 2.0, damage = 0, recovery = 1.2 } ]
+  # The closing thrust: the first form's riposte (a Pierce thrust, no guard stops it, 0.9 sec
+  # windup, 2.4 sec open after) with his bigger blows: 40 where the first form's is 36 (his
+  # strings run 22 to 32 against its 20 to 24). The module never lets it take a last point of health.
+  [[mob.pattern]]
+  name = "riposte"
+  weight = 0.0
+  steps = [ { from = "HumanMale", clip = 85, take = 0, windup = 0.9, damage = 40, arc = 80.0, heavy = true, blockable = false, recovery = 2.4 } ]
   [[mob.pattern]]
   name = "advance"
   weight = 0.0

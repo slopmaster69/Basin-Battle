@@ -310,12 +310,13 @@ Rhahk'Zor's slam (how he brings the mine down at 70%: `content/deadmines.toml`,
 | `rhahk-slam-fight`, `rhahk-slam-fight-healed` | A real pull by a small player in the interface through the opening, no debug kills; the second healed throughout |
 | `rhahk-slam-clips` | Dev setup: the ogre model's clips played one after another on a Rhahk'Zor stood still in his own mine, the real one and every other creature taken away first (`.es fx clip <id> rhahk`), to choose one by eye |
 
-VanCleef's ring of Blackguards (`docs/vancleef-encounter.md`, "The ring") has one dev setup, not
-yet run:
+VanCleef's ring of Blackguards (`docs/vancleef-encounter.md`, "The ring") and Unbowed's turned
+Invitation (same doc, beat 9) have a dev setup each, not yet run:
 
 | Scenario | What it films |
 | --- | --- |
 | `vancleef-ring` | Dev setup, by the cameraman, markers off: the ring of 8 guards, the warning head-shake near the line, the shove at the line (strike, dust, flash, "Nobody leaves."), a shove beside him, then the guards turning at 31%, "Cowards! All of you!", the open deck and their walk off |
+| `vancleef-unbowed-invitation` | Dev setup, not yet run: the rig's bot plays Unbowed's first four turned Invitations with markers off (the red blades and "Stand still, and be finished.", the closing thrust 2 sec later, the roll aside on the red glow, his 2.4 sec opening) |
 
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
 `docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine

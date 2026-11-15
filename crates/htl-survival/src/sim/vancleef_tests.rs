@@ -580,10 +580,10 @@ fn the_actual_secret_handoff_has_one_unbowed_who_kneels_roars_and_waits_before_h
 }
 
 #[test]
-fn unbowed_has_longer_fixed_strings_no_invitation_and_only_the_final_hunch_is_open() {
+fn unbowed_has_longer_fixed_strings_the_turned_invitation_and_only_the_final_hunch_of_a_string_is_open() {
     let (mut s, band, id) = fight("dm_vancleef_unbowed", 2);
     assert!(s.vancleef.duels[&id].watchers.is_empty());
-    assert!(s.duel_pattern_named(id, "invitation").is_none() && s.duel_pattern_named(id, "riposte").is_none());
+    assert!(s.duel_pattern_named(id, "invitation").is_some() && s.duel_pattern_named(id, "riposte").is_some());
     let normal = &s.content.mobs[s.content.mob("dm_vancleef").unwrap()];
     let second = &s.content.mobs[s.mobs[&id].def];
     assert!(normal.patterns.iter().all(|p| p.steps.iter().all(|st| st.windup.unwrap_or(0.0) >= 0.0)));
@@ -758,6 +758,13 @@ fn a_lone_sword_hero_playing_by_the_tells_clears_both_forms() {
             assert!(out.health_left > 0);
             assert!(out.breaks >= 1, "{key}: the posture break is earned: {out:?}");
             if key == "dm_vancleef" && provoke { assert!(out.ripostes >= 1); }
+            // The turned Invitation is answered every time: the thrust came (red blades and its
+            // windup) and the hero was never hit by it. Clearly under 2 min (it was 108 to 110
+            // sec before the Invitation came back and his health fell from 1100 to 900).
+            if key == "dm_vancleef_unbowed" {
+                assert!(out.ripostes >= 2 && out.hits_taken == 0, "{out:?}");
+                assert!(out.secs < 100.0, "Unbowed is clearly shorter than 2 min: {out:?}");
+            }
             // The ring never gets in a hero's way: they stood no farther out than its line.
             if key == "dm_vancleef" { assert!(out.farthest <= RING_RADIUS, "{out:?}"); }
         }
@@ -1229,4 +1236,178 @@ fn with_nobody_on_the_deck_there_is_no_turn_and_no_cry_at_30_percent() {
         assert_eq!(s.vancleef.duels[&id].leave, Leave::Gone);
         assert!(!s.vancleef.duels[&id].alone || !s.first_form(id));
     }
+}
+
+// --- Unbowed turns the Invitation round ---------------------------------------------------------
+
+/// A thrust seen coming: a windup of the riposte's clip, no guard stops it.
+fn thrusts(events: &[Event], id: Id) -> usize {
+    events.iter().filter(|e| matches!(e, Event::MobWindup { id: who, clip: 85, blockable: false, .. } if *who == id)).count()
+}
+
+fn glows(events: &[Event], id: Id) -> Vec<f32> {
+    events.iter().filter_map(|e| match e { Event::Glow { id: who, secs } if *who == id => Some(*secs), _ => None }).collect()
+}
+
+/// The Invitation's own events kept (the shared helper clears them).
+fn invitation_events(s: &mut Survival, id: Id, hero: Id) {
+    let k = s.duel_pattern_named(id, "invitation").unwrap();
+    s.begin_pattern(id, k, false);
+    s.windup(id, Foe::Hero(hero), s.players[&hero].pos);
+}
+
+#[test]
+fn the_turned_invitation_reads_on_his_body_red_blades_a_line_and_the_scrape_unlike_the_first_forms() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    invitation_events(&mut s, id, band[0]);
+    assert!(s.mobs[&id].guarding, "blades up, the native held guard");
+    assert_eq!(glows(&s.events, id), vec![INVITATION], "red from the first moment, the whole hold");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Sound { id: who, sound: 700 } if *who == id)));
+    assert_eq!(yells(&s.events, id), vec![TURNED_LINE.to_string()]);
+    // The first form's blades stay plain until the riposte itself.
+    let (mut s, band, id) = fight("dm_vancleef", 1);
+    invitation_events(&mut s, id, band[0]);
+    assert!(glows(&s.events, id).is_empty(), "the first form's Invitation does not glow");
+    assert_eq!(yells(&s.events, id), vec!["Go on, then.".to_string()]);
+}
+
+#[test]
+fn a_string_is_followed_by_the_turned_invitation_and_a_lunge_does_not_spend_it() {
+    let (mut s, _band, id) = fight("dm_vancleef_unbowed", 1);
+    let near = s.content.mobs[s.mobs[&id].def].attack.range;
+    let k = |s: &Survival, n: &str| s.duel_pattern_named(id, n);
+    assert_eq!(s.vancleef_pattern(id, near - 1.0, 0.5), k(&s, "string"), "an honest string first");
+    s.vancleef.duels.get_mut(&id).unwrap().invite_next = true;
+    assert_eq!(s.vancleef_pattern(id, 6.0, 0.5), k(&s, "lunge"), "a lunge closes distance first");
+    assert!(s.vancleef.duels[&id].invite_next, "and keeps the next Invitation");
+    assert_eq!(s.vancleef_pattern(id, near - 1.0, 0.5), k(&s, "invitation"));
+}
+
+#[test]
+fn standing_through_the_turned_invitation_is_met_with_the_closing_thrust() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    let hero = band[0];
+    invitation(&mut s, id, hero);
+    let health = s.players[&hero].health;
+    // The hold itself costs nothing.
+    let ev = run(&mut s, INVITATION - 0.2);
+    assert_eq!(windups(&ev, id), 0);
+    assert_eq!(s.players[&hero].health, health);
+    // Then the thrust: a Pierce windup no guard stops, glowing, at where the hero stands.
+    let ev = run(&mut s, 0.4);
+    assert_eq!(thrusts(&ev, id), 1, "exactly one thrust");
+    assert!(!glows(&ev, id).is_empty(), "his weapon is red through the windup");
+    assert!(!s.mobs[&id].guarding);
+    assert!(matches!(s.mobs[&id].state, MobState::Windup { foe: Foe::Hero(h), .. } if h == hero));
+    let ev = run(&mut s, 1.2);
+    assert!(s.players[&hero].health < health, "a hero who stood still is run through");
+    assert!(ev.iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(v), damage, .. } if *attacker == id && *v == hero && *damage > 0)));
+    assert!(s.vancleef_open(id), "and he is open after it either way");
+}
+
+#[test]
+fn a_sidestep_of_the_closing_thrust_leaves_the_hero_behind_him_and_opens_him_like_the_first_forms() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    let hero = band[0];
+    invitation(&mut s, id, hero);
+    let stood = s.players[&hero].pos;
+    let health = s.players[&hero].health;
+    // Stand through the hold, then step aside as the windup begins (the same two yards the first
+    // form's riposte is answered with).
+    let mut came = false;
+    for _ in 0..80 {
+        let ev = s.step(DT);
+        if thrusts(&ev, id) > 0 {
+            s.move_player(hero, [stood[0], stood[1] + 2.2, stood[2]], std::f32::consts::PI, Moving::default());
+            came = true;
+            break;
+        }
+    }
+    assert!(came, "the thrust came by itself, 2 sec after the blades rose");
+    run(&mut s, 1.1);
+    let m = &s.mobs[&id];
+    assert!(dist2d([0.0; 3], m.pos) > dist2d([0.0; 3], stood) + 1.0, "past the spot: {:?}", m.pos);
+    assert_eq!(s.players[&hero].health, health, "no damage to a hero who stepped aside");
+    assert!(s.vancleef_open(id), "the opening, as the first form's riposte leaves");
+    // The window is the thrust's own recovery: 2.4 sec after a 0.9 sec windup, as the first form's,
+    // with every hit in it counting extra toward his posture.
+    let step = &s.content.mobs[s.mobs[&id].def].patterns[s.duel_pattern_named(id, "riposte").unwrap()].steps[0];
+    assert!((step.recovery.unwrap() - 2.4).abs() < 0.01 && (step.windup.unwrap() - 0.9).abs() < 0.01);
+    assert!(s.vancleef_posture_share(id, "sword") >= HUNCH_POSTURE);
+}
+
+#[test]
+fn hitting_into_the_turned_invitation_brings_the_same_thrust_at_once_and_it_too_is_sidestepped() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 2);
+    invitation(&mut s, id, band[0]);
+    shot(&mut s, id, band[1], 1.0, HitKind::Projectile);
+    assert_eq!(thrusts(&s.events, id), 1);
+    assert!(matches!(s.mobs[&id].state, MobState::Windup { foe: Foe::Hero(h), .. } if h == band[1]));
+    shot(&mut s, id, band[0], 1.0, HitKind::Projectile);
+    assert_eq!(thrusts(&s.events, id), 1, "a second hero cannot restart it");
+    for h in &band { s.move_player(*h, [-2.0, 4.0, 0.0], 0.0, Moving::default()); }
+    let health: Vec<_> = band.iter().map(|h| s.players[h].health).collect();
+    let ev = run(&mut s, 1.2 + INVITATION);
+    assert_eq!(band.iter().map(|h| s.players[h].health).collect::<Vec<_>>(), health);
+    assert_eq!(thrusts(&ev, id), 1, "only the provoked thrust (its events come with this run): the Invitation was spent, none from the timer");
+    assert!(s.vancleef_open(id));
+}
+
+#[test]
+fn the_closing_thrust_never_takes_a_last_point_of_health_and_control_cancels_it() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    let hero = band[0];
+    let p = s.players.get_mut(&hero).unwrap();
+    p.max_health = 200;
+    p.health = 30;
+    invitation(&mut s, id, hero);
+    run(&mut s, INVITATION + 1.6);
+    let h = s.players[&hero].health;
+    assert!(h > 0 && h < 30, "hurt, alive: {h}");
+    // A stun in the hold drops the blades and there is no thrust.
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    invitation(&mut s, id, band[0]);
+    let ability = s.content.ability("fireball").unwrap();
+    s.content.abilities[ability].effects = vec![crate::content::AbilityEffect { kind: "stun".into(), secs: [2.0, 2.0], vs_bosses: true, ..Default::default() }];
+    s.ability_on_mob(band[0], id, ability, 1.0, 1.0, s.players[&band[0]].pos, HitKind::Projectile, 133);
+    let health = s.players[&band[0]].health;
+    let ev = run(&mut s, INVITATION + 0.5);
+    assert_eq!(thrusts(&ev, id), 0);
+    assert!(!s.mobs[&id].guarding);
+    assert_eq!(s.players[&band[0]].health, health);
+}
+
+#[test]
+fn a_hero_out_of_reach_is_never_trapped_by_the_thrust_and_a_wipe_puts_it_back() {
+    // Far from him when the hold ends: the thrust is a lunge of at most 7 yd and then his opening.
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    let hero = band[0];
+    invitation(&mut s, id, hero);
+    s.move_player(hero, [18.0, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+    let health = s.players[&hero].health;
+    run(&mut s, INVITATION + 1.4);
+    assert_eq!(s.players[&hero].health, health, "out of the lunge's 7 yd");
+    assert!(dist2d(s.mobs[&id].pos, [0.0; 3]) <= 7.5, "and he did not chase it down: {:?}", s.mobs[&id].pos);
+    // A lost fight puts everything back: no blades, no thrust, nothing pending.
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    invitation(&mut s, id, band[0]);
+    run(&mut s, 0.5);
+    s.reset_duels();
+    assert!(!s.vancleef.duels.contains_key(&id));
+    assert!(!s.mobs[&id].guarding);
+    let ev = run(&mut s, INVITATION + 2.0);
+    assert_eq!(thrusts(&ev, id), 0, "no thrust from a wiped Invitation");
+}
+
+#[test]
+fn the_one_thrust_hits_only_those_on_its_line() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 2);
+    // Hero 0 is the foe, hero 1 stands well off the line.
+    s.move_player(band[1], [2.0, 6.0, 0.0], std::f32::consts::PI, Moving::default());
+    invitation(&mut s, id, band[0]);
+    let health: Vec<_> = band.iter().map(|h| s.players[h].health).collect();
+    let ev = run(&mut s, INVITATION + 1.6);
+    assert_eq!(thrusts(&ev, id), 1, "one thrust, not one each");
+    assert!(s.players[&band[0]].health < health[0]);
+    assert_eq!(s.players[&band[1]].health, health[1], "the one off the line is left alone");
 }
