@@ -17,7 +17,16 @@ rest of this draft (the fling, Lightwell, Power Infusion, Pain Suppression, Psyc
 Word: Sanctuary, the new Shield, Vampiric Embrace, Fade's lost-creatures rule and the others) is
 still to build.
 
-**Gone:** Greater Penance, Surge of Light, Angelic Feather (its look moves to the new 1 key),
+**Corey's EX rule, applied (Nov 14 2026, overriding the rows above where they conflict):** an EX is
+niche but powerful, never a stronger copy. Holy Nova's EX is **Guardian Spirit** (built: the ally
+nearest the reticle, or you, for 6 sec: a blow that would kill them leaves them at 1 health and
+heals them 60%, once; Cheat Death's boon given to a friend), and Angelic Feather's EX is **Leap of
+Faith** (built: pulls the ally nearest the reticle, up to 30 yd, to your side; a rescue). These stand
+on their keys in place of Holy Word: Sanctuary and Power Infusion, and Angelic Feather stays as the 1
+key's base, so **Lightwell, Power Infusion and Holy Word: Sanctuary are not built** (their slots are
+taken). Surge of Light and Body and Soul are gone.
+
+**Gone:** Greater Penance, Surge of Light,
 Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
 
 ## Light

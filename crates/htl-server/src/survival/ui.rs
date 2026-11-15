@@ -357,6 +357,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
             "root" if e.amount > 0.0 => out.push(format!("{} sec hold · {} health tendril", n(e.secs[1]), n(e.amount))),
             // Dominate Mind: how long a creature fights for you, and how long a hero is held.
             "dominated" => out.push(format!("{} sec · {} sec on heroes", n(e.secs[1]), n(e.hero_secs))),
+            "pull" if d.fetch => out.push(format!("Pulls an ally up to {} yd to you", n(e.amount))),
             "pull" => out.push(if e.from_caster { "Pulls targets to you".to_string() } else { format!("{} yd pull", n(e.amount)) }),
             _ => {}
         }

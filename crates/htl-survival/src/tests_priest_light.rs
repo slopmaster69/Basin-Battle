@@ -1,6 +1,6 @@
 //! The Light Priest, draft 3 (docs/priest-draft3.md): Penance's rings and their timing, Divine Star, Holy Nova
-//! and Surge of Light (stronger for every hero inside), Angelic Feather and Body and Soul (the road
-//! out, taken by choice), and Holy Word: Salvation (the group's beat, the caster aloft).
+//! and Guardian Spirit (a friend's last chance), Angelic Feather and Leap of Faith (the road
+//! out, and the rescue), and Holy Word: Salvation (the group's beat, the caster aloft).
 
 use crate::content::Content;
 use crate::land::FlatLand;
@@ -437,20 +437,61 @@ fn holy_nova_is_25_percent_stronger_for_each_other_hero_inside_up_to_75() {
     assert_eq!(hd - hp(&s, d), 28, "16 x 1.75, no more");
 }
 
+/// A friend of `p` (Bren) 6 yd ahead on the reticle, at 100 health.
+fn friend_ahead(s: &mut Survival, p: Id) -> Id {
+    s.set_aim_line(p, EAST, 0.0);
+    let f = hero(s, "Bren", [6.0, 0.0, 0.0], EAST);
+    s.players.get_mut(&f).unwrap().max_health = 100;
+    s.players.get_mut(&f).unwrap().health = 100;
+    f
+}
+
 #[test]
-fn surge_of_light_is_bigger_and_its_friends_run_faster() {
+fn guardian_spirit_leaves_a_friend_at_1_health_and_mends_them_once() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
-    let a = hero(&mut s, "Bren", [9.0, 0.0, 0.0], EAST);
-    let ha = halve(&mut s, a);
-    let d = post(&mut s, [0.0, 9.5, 0.0]);
+    let f = friend_ahead(&mut s, p);
+    let ev = cast(&mut s, p, "holy_nova", true);
+    assert!(s.has_cc(f, "cheat_death"), "the spirit is on Bren");
+    assert!(!s.has_cc(p, "cheat_death"), "not on her");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 2061, .. })), "a holy look");
+    let left = s.cc_of(f).iter().find(|c| c.kind == "cheat_death").map(|c| c.until - s.clock).unwrap();
+    assert!(left > 5.9 && left <= 6.0 + 1.0e-3, "6 sec: {left}");
+    // A killing blow: left at 1, and mended 60% (of 100) over the next seconds.
+    s.hurt_player(f, 500);
+    assert_eq!(s.players[&f].health, 1, "left at 1 health");
+    assert!(!s.has_cc(f, "cheat_death"), "spent");
+    run(&mut s, 4.0, &[]);
+    let h = s.players[&f].health;
+    assert!((59..=62).contains(&h), "mended 60%: {h}");
+    // Once: the next killing blow kills.
+    s.hurt_player(f, 500);
+    assert_eq!(s.players[&f].health, 0, "no second save");
+}
+
+#[test]
+fn guardian_spirit_is_a_different_spell_from_holy_nova_and_runs_out_in_6_sec() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let f = friend_ahead(&mut s, p);
+    let d = post(&mut s, [0.0, 5.0, 0.0]);
     let hd = hp(&s, d);
+    let hf = halve(&mut s, f);
     cast(&mut s, p, "holy_nova", true);
-    assert_eq!(hd - hp(&s, d), 30, "24 x 1.25 within 10 yd");
-    assert_eq!(s.players[&a].health, ha + 30);
-    assert!(has_haste(&s, a, 0.3), "Bren runs 30% faster");
-    // (25 Valor spent, a little back for the hits.)
-    assert!(s.players[&p].valor < 90.0, "25 Valor: {}", s.players[&p].valor);
+    assert_eq!(hp(&s, d), hd, "no burst: nothing struck");
+    assert_eq!(s.players[&f].health, hf, "and no nova heal");
+    run(&mut s, 6.2, &[(d, [0.0, 5.0, 0.0])]);
+    assert!(!s.has_cc(f, "cheat_death"), "gone after 6 sec");
+    s.hurt_player(f, 500);
+    assert_eq!(s.players[&f].health, 0, "so the blow kills");
+}
+
+#[test]
+fn guardian_spirit_with_no_friend_is_on_the_priest() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    cast(&mut s, p, "holy_nova", true);
+    assert!(s.has_cc(p, "cheat_death"), "on herself");
 }
 
 // --- Angelic Feather and Body and Soul --------------------------------------------------------------
@@ -538,25 +579,27 @@ fn two_feathers_lie_at_once_the_oldest_going_for_a_third() {
 }
 
 #[test]
-fn body_and_soul_frees_and_quickens_everyone_near_at_once() {
+fn leap_of_faith_pulls_the_friend_nearest_the_reticle_to_the_priest() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
-    let a = hero(&mut s, "Bren", [6.0, 0.0, 0.0], EAST);
-    let far = hero(&mut s, "Cara", [14.0, 0.0, 0.0], EAST);
-    let m = foe(&mut s, "training_dummy", [30.0, 0.0, 0.0]);
-    for h in [p, a, far] {
-        s.apply_cc(h, m, "snare", 5.0, 0.5, 0.0, "test");
-    }
-    s.apply_cc(a, m, "root", 5.0, 0.0, 0.0, "test");
-    cast(&mut s, p, "angelic_feather", true);
-    for h in [p, a] {
-        assert!(!s.has_cc(h, "snare") && !s.has_cc(h, "root"), "freed");
-        assert!(has_haste(&s, h, 0.4), "40% faster");
-        let left = s.cc_of(h).iter().find(|c| c.kind == "haste").map(|c| c.until - s.clock).unwrap();
-        assert!(left > 3.8, "for 4 sec: {left}");
-    }
-    assert!(s.has_cc(far, "snare") && !has_haste(&s, far, 0.4), "not past 10 yd");
-    assert!(s.light.feathers.is_empty(), "no feather: at once");
+    s.set_aim_line(p, EAST, 0.0);
+    let f = hero(&mut s, "Bren", [26.0, 0.0, 0.0], EAST);
+    let other = hero(&mut s, "Cara", [20.0, 25.0, 0.0], EAST);
+    let ev = cast(&mut s, p, "angelic_feather", true);
+// A hero's own client flies them: the hop, west toward her, the whole way less a step.    let hops: Vec<_> = ev.iter().filter_map(|e| match e { Event::Hop { player, dir, speed, lift, .. } => Some((*player, *dir, *speed, *lift)), _ => None }).collect();    assert_eq!(hops.len(), 1, "one body hauled: {hops:?}");    let (who, dir, speed, lift) = hops[0];    assert_eq!(who, f, "Bren, on the reticle");    assert!((dir - std::f32::consts::PI).abs() < 0.05, "toward her: {dir}");    let yards = speed * crate::sim::moves::airtime(lift);    assert!((yards - 24.4).abs() < 0.3, "26 yd off, to a step from her: {yards}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 1706, target: Target::Unit(t), .. } if *t == f)), "its look on Bren");
+    let _ = other;
+    assert!(s.light.feathers.is_empty(), "no feather laid: a rescue, not a road");
+    assert!(!has_haste(&s, f, 0.4), "no haste either");
+}
+
+#[test]
+fn leap_of_faith_needs_a_friend_and_gives_the_valor_back() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let ev = cast(&mut s, p, "angelic_feather", true);
+    assert!(s.players[&p].valor >= 99.9, "refused, its 25 Valor back: {}", s.players[&p].valor);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: 1706, .. })), "nothing cast");
 }
 
 // --- Holy Word: Salvation ---------------------------------------------------------------------------
