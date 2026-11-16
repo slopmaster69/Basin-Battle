@@ -280,7 +280,7 @@ pub struct SurvivalGame {
     /// Heroes whose view of Siege changed (their corner and open window are told on the next
     /// flush).
     pub(crate) siege_dirty: BTreeSet<Id>,
-    /// Done below, for the camp: journal counts and trophies.
+    /// Done below, for the camp: its counts and trophies.
     pub(crate) to_camp: Vec<(Vec<(String, u32)>, BTreeMap<usize, u32>)>,
     /// Wagers won below, for the Bookmaker's Board.
     pub(crate) wagers: Vec<htl_survival::sim::wager::WagerRun>,

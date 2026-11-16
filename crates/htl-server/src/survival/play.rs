@@ -695,7 +695,7 @@ impl SurvivalGame {
                 }
             }
             // The add-on's effects line follows on the next flush.
-            Event::Effects { .. } | Event::Goal | Event::Sites => {}
+            Event::Effects { .. } | Event::Sites => {}
             Event::Guard { player, up } => {
                 // The guard's pose, held while the hero stands with it up. Down, a pose the rules
                 // hold of their own (Arrow Recall's arm out) comes back rather than nothing.

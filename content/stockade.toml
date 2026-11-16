@@ -1268,8 +1268,6 @@ respawn = 0.0
   max_range = 22
   steps = [ { ranged = true, windup = 1.1, damage = 38, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
 
-# --- the journal (outside the camp's goals for now) ---------------------------------------------------
-
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 
 [[set]]

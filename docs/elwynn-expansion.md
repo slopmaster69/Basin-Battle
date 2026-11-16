@@ -2,11 +2,12 @@
 
 Stages are ticked in their headings as each PR lands. Designed 15 Nov 2026 from origin/main @738a62ae. Approved for building overnight by the main session.
 
+**No journal (16 Nov 2026).** Corey took the camp's journal out: no `[[goal]]`, no goal tracker at the top right, no journal window, no goal rewards. The content of every stage stays (bosses, places, people, story, chests, choices, holds, escorts); what each stage unlocks already reads the camp's own counts through `after` conditions (`kill:`, `open:`, `found:`, `raids:N`, `built:`, `chose:`), so nothing here was gated on a goal. The stages' goal lines, `ELWYNN_GOALS` notes and "Every corner" counts below were taken out with it. An older save's goal is read past and dropped.
+
 Defaults for Corey's open questions, all reversible:
 - The story spine is the Brotherhood selling Elwynn's roads to the Horde.
 - The invented names stay.
 - Stitches does NOT attack stations.
-- New goals go just before "Every corner".
 - Talking has no choices yet.
 - Bile uses a green ground spell look if one reads; otherwise Fire, which is flagged for Corey.
 
@@ -17,7 +18,7 @@ Defaults for Corey's open questions, all reversible:
   - the woods between Eastvale and Blackfang's Den, (-9660, -1200);
   - the woods east of Jasperlode, (-9260, -800).
 - **Quests from content alone.**
-  - The journal is `[[goal]]`, one linear list. Kinds: kill, open, explore (site key), raid, clear. Counts are camp-wide.
+  - The camp's counts are camp-wide: `kill:`, `open:`, `explore:`, `raid:`, `clear:` and more, read by `after` conditions.
   - Chest `after = <mob>`: the chest stays shut until that mob is killed.
   - Pack `wake = <chest>`: the pack stays unseen until that chest is opened, then is set on the opener.
   - `route` makes a patrol. `rare = true` announces the mob's fall.
@@ -38,7 +39,6 @@ Defaults for Corey's open questions, all reversible:
 - Every boss has its own story and "a rule a hero learns". No stock 50%-adds or 25%-enrage.
 - Every warning must read with the floor markers off (`docs/floor-markers.md`).
 - Player text follows `docs/writing-style.md`.
-- **Journal safety.** `camp.goal` is saved as an index. Put every new goal IMMEDIATELY BEFORE "Every corner", and raise that goal's count to the new number of sites.
 
 ## Stage 1: The camp talks [x] (small engine change, the base for the rest)
 
@@ -80,7 +80,7 @@ Built as planned, with these differences, found checking the plan against the co
 - The line changes after `raids_won` rises and after a `kill:` count is set.
 - `camp_has("kill:hogger")` goes from false to true.
 - `validate` rejects `"bogus:x"`.
-- A content test checks that every `after`, `wake`, goal `what` and talk `after` names a real mob, chest, site or station.
+- A content test checks that every `after`, `wake` and talk `after` names a real mob, chest, site or station.
 - Run `scripts/check-addon.sh` if it can run.
 
 **Risk.** Only the use key reaches an NPC, not right-click. Leave right-click out.
@@ -88,8 +88,6 @@ Built as planned, with these differences, found checking the plan against the co
 ## Stage 2: The Brotherhood's Hand [x] (questline, content only)
 
 Built as planned, with these differences, found checking the plan against the code:
-- The goals sit before "Every corner", which was goal 34 of 34 in `survival.toml` (the dungeon files' goals follow it). The save loader already finds a goal by its title. For a save with no title (a finished journal, read by its place) `ELWYNN_GOALS_AT` and `ELWYNN_GOALS` in `save.rs` carry the places past the new goals along. Raise `ELWYNN_GOALS` by the goals each stage adds. A test checks every old goal still loads as itself.
-- "Every corner" was set to 35 while there were 34 sites, so it could not be finished. It is now 35 for the 35 sites, and a test holds it to the number of sites.
 - `then`, `run_to`, `wait_for`, `arrive_text`, `wake`, `route`, `rare` and `burn` all exist as the plan says. A phase's `run_to` points take a height (x, y, z), so the ford's two points carry their ground heights, read from the real land with `elwynn_probe`.
 - Voss's "rule" is a `commander` temper (holds back while others of his fight are on the hero), and his turn at 35% is a `[[mob.phase]]`.
 - The boat is a yell and a place at the water. No boat model was used.
@@ -106,7 +104,6 @@ Built as planned, with these differences, found checking the plan against the co
    - At 35%, a `run_to` phase across the ford with `wait_for = 10`; he makes his last stand at his boat.
    - Lines: aggro "You're not on the list.", phase "Hold them. You're paid till sundown.", arrive "The boat leaves without me, then."
 
-**Goals.** "The messenger" (kill), "The drop at the dock" (open), "The Smugglers' Ford" (explore), "The Paymaster" (kill).
 
 **Talk.** Wyle, at `kill:bh_paymaster`: "The Brotherhood paid the Horde's way, and the orders came from below Moonbrook." Link: `.es lore <deadmines key>~The Deadmines`.
 
@@ -114,7 +111,6 @@ Built as planned, with these differences, found checking the plan against the co
 - The drop stays shut until the messenger dies.
 - Opening the strongbox wakes the Paymaster on the opener.
 - At 35% he runs to his last point and fights again once a hero is within 10 yd.
-- The goals advance in order.
 - The ambush waits again after the chest refills.
 
 **Risk.** The ford's coordinates are unchecked. Run `elwynn_probe` if the WoW data is present; otherwise say so in the report.
@@ -123,9 +119,9 @@ Built as planned, with these differences, found checking the plan against the co
 
 Built as planned, with these differences, found checking the plan against the code:
 - A rare pack with a second form announced the first form's fall, and put the second form back as a creature of its own. In `mobs.rs` the fall is now told only when no form rises, and what comes back is the first form (`form_of`), after its own respawn time, once the last form is dead.
-- Fenros's `then` form is `fenros_risen`, which holds the trophy and the goal's kill. Only the risen form is a `boss` (with the health bar): a parry makes a boss fill its posture instead of reeling, so the first form is not one, and a parry on him cuts his string short as the plan says.
+- Fenros's `then` form is `fenros_risen`, which holds the trophy and the kill. Only the risen form is a `boss` (with the health bar): a parry makes a boss fill its posture instead of reeling, so the first form is not one, and a parry on him cuts his string short as the plan says.
 - Watcher Dodds uses the Westbrook sentry's display (1499). No creature viewer was available to pick a better one.
-- The crossing's site is of kind `foes`. `ELWYNN_GOALS` in `save.rs` is 6. "Every corner" is 36 for the 36 sites.
+- The crossing's site is of kind `foes`.
 - Placement is at the plan's (-10060, -1100) and (-9660, -1200), the third spot (-9830, -1175), all open ground by `elwynn_probe`.
 
 **Locations.**
@@ -148,7 +144,6 @@ Built as planned, with these differences, found checking the plan against the co
 - The risen form is `unparryable`, slower and heavier.
 - Rule: "What you learned is taken away: parry the first form, dodge the second."
 
-**Goals.** "The Nightbane Crossing" (clear), "Fenros" (kill fenros_risen).
 
 **Tests.**
 - The camp is taken when its packs die.
@@ -164,7 +159,7 @@ Built as planned, with these differences, found checking the plan against the co
 - The route is read off the real road (the probe's drawing of it), from the bridge at (-9744, 470) to (-9474, 120) north of Goldshire's crossroads. Every point is 209 yd or more from the camp, and open ground by `elwynn_probe`.
 - The bile is Fire's look (the flames are the bile). No green ground look could be seen from here, so this is flagged for Corey. Every blow of his is `heavy`, so every one leaves bile once he burns.
 - The thrown cleaver uses the Hurled Axe's missile look (spell 16075).
-- `ELWYNN_GOALS` is 7. No site was added: "Every corner" stays 36.
+- No site was added.
 
 **Location.** A pack with a `route` along the cobbled road from the south bridge toward Goldshire's crossroads, kept more than 110 yd from the camp. Settings: `rare`, `boss`, `respawn = 2400`. Use Stitches' own display (creature 412).
 
@@ -177,7 +172,6 @@ Built as planned, with these differences, found checking the plan against the co
 - At 50%, `burn`: his heavy blows leave bile where they land.
 - Rule: "Too big to parry. Every heavy blow leaves bile, so keep him walking."
 
-**Goal.** "Stitches" (kill).
 
 **Tests.**
 - He moves along the route with a hero near.
@@ -191,7 +185,7 @@ Built as planned, with these differences, found checking the plan against the co
 - `turn_rate` is the creature's `[mob.attack] turn_rate`, and it only slows his turning while he winds up (between blows a creature faces its foe at once). At the plan's 90 a hero could not be sure to get round him in one wind-up. It is 70, which the test shows works at the sprint's 12 yd/s.
 - The stomp only punishes hugging if nothing else fits up close, so his maul and sweep have `min_range = 3.6` and the stomp `max_range = 3.5`. A creature stops 4.35 yd from its foe with this reach, so at its natural distance it uses the maul.
 - The weapon is the black two-hand maul (display 1478). The mason wears the blacksmith's look (1500): no dressed human creature display with a mason's clothes turned up.
-- `ELWYNN_GOALS` is 8; no site was added. The stonemason stands at (-9648.5, 716), open ground by `elwynn_probe`.
+- No site was added. The stonemason stands at (-9648.5, 716), open ground by `elwynn_probe`.
 
 **The raid.** A new `[[raid.tier]]`.
 - `needs = ["barracks", "infirmary"]`, `from = [-9690, 420]`.
@@ -205,7 +199,6 @@ Built as planned, with these differences, found checking the plan against the co
 
 **Camp growth.** Gate it on `after = "kill:brannick"`, not `raids:5`. It brings a Stormwind stonemason NPC with talk lines.
 
-**Goal.** "The Brotherhood's Price" (raid, what = "4").
 
 **Tests.**
 - `plan(4)` is the new tier.
@@ -233,13 +226,12 @@ Defaults for Corey's open questions, all reversible:
 
 Story spine: Gruff's Riverpaw were paid in Brotherhood silver. A tally stick points to Brannick's cairn. His road book names "R. at the Lion's Pride". Remy "Two Times" sold the watch rosters to a man in black. The Stonefield wagon note names a parley. At the parley Marzon the Silent Blade sells the Redridge road to a Blackrock envoy, and his satchel carries Lord Gregor Lescovar's seal.
 
-Journal: every new goal goes just before "Every corner". `ELWYNN_GOALS` in `save.rs` goes 8, 9, 10, 11, 12, 15. "Every corner" equals the site count (36, then 37 in Stage 7, then 38 in Stage 10). Every placement was probed with `elwynn_probe` against the real data in `C:\WoW\Data` (its `near` mode), and a failing spot was moved nearby. The tests are in `tests_story2.rs`, with `tests_story.rs`'s old-save, goal-order and sites-equal-corner tests extended.
+Every placement was probed with `elwynn_probe` against the real data in `C:\WoW\Data` (its `near` mode), and a failing spot was moved nearby. The tests are in `tests_story2.rs`, with `tests_story.rs`'s tests extended.
 
 ## Stage 6: Gruff Swiftbite [x] (content only)
 
 Built as planned, with these differences, found checking the plan against the code:
 - `evade` is a creature field, and `evade_heavy` (in `sim/mobs.rs`) is the mechanism: it runs as a hero's heavy begins, for a creature in `Chase` with `stagger_until <= clock`, within 4.5 yd and 60 degrees of the hero's facing. A parried Gruff reels, so he cannot step back, exactly as the plan says.
-- His goal is placed with the other goals before "Every corner", not in his block (a goal's place in the journal is its place in the file). `ELWYNN_GOALS` is 9.
 - His spots are all probed clear: (-9930, 600), (-10010, 660) and (-9880, 720), each more than 250 yd from the camp and at least 20 yd from Hogger's.
 
 Rule: "He steps out of every heavy. Parry him, and the heavy lands while he reels." The Riverpaw Tribute (259) at (-9965, 628) stays shut while he lives.
@@ -248,7 +240,7 @@ Rule: "He steps out of every heavy. Parry him, and the heavy lands while he reel
 Built as planned, with these differences, found checking the plan against the code:
 - **E1.** `use_chest` (`sim/explore.rs`) reads a chest's `after` through `chest_unlocked`: with a colon it is `camp_has`, a bare key is the camp's `kill:<key>` count as before. `validate()` accepts only `open:`, `found:` and `kill:` for a chest, checks the name is real, and refuses a chest that waits on itself. The locked text of a chest with a condition and no `locked` line is "<name> is shut."
 - The stones' display is 235 (the plain runestone). The plan's 1364 has no game-object row in the real data (it is a creature display).
-- `ELWYNN_GOALS` is 10. The site is a `landmark`, so "Every corner" is 37 for the 37 sites.
+- The site is a `landmark`.
 - Probed with `elwynn_probe near`: every stone is on open ground. The crown's footpads stood at (-8896, -824), which has a trunk or wall next to it, so they stand at (-8890, -822).
 
 ## Stage 8: Remy "Two Times" [x] (camp choice; engine change E4)
@@ -256,10 +248,10 @@ Built as planned, with these differences, found checking the plan against the co
 Built as planned, with these differences, found checking the plan against the code:
 - **E4.** `Survival::choose` (`sim/explore.rs`, called by `.es choose` in `htl-server/src/survival/ui.rs`) checks, in this order, that the group is not yet decided ("That is already decided."), then that a person within 6 yd has a current line with that link. It counts `chose:<group>` and `chose:<group>:<option>`, then runs `grow_camp` at once so the people stand or go now. No save-format change: it all lives in `camp.counts`, and the add-on is untouched (its link buttons already send any command), so no `VERSION` bump.
 - `CAMP_CONDITIONS` has `chose`, `GoalDef::KINDS` has `chose`, and `PropDef.until` removes a standing piece (and stops it being set out) once its condition holds.
-- `validate()` checks each `.es choose` link is `group:option`, each `chose:` condition names an option some link offers, each goal of kind `chose` names a group, and each option is waited on by some line, person or chest (a choice with no consequence is refused).
+- `validate()` checks each `.es choose` link is `group:option`, each `chose:` condition names an option some link offers, and each option is waited on by some line, person or chest (a choice with no consequence is refused).
 - A chest's `after` can be `chose:...` too, so the bounty and the stash are chests that stand but stay shut, with their own words, until the choice. (A chest has no way to stand later. The plan's "stand only after arrest" is read as "open only".)
 - Displays from `npcfind` on the real data: Remy is 1466 (a cloth swashbuckler's shirt over black, human male), Dughan is 1504 (copper mail), not the plan's fallbacks (1295 is a woman's look). The Stockade link uses the real key `stockade`.
-- Remy stands at (-9444, 30): the plan's (-9450, 30) has a wall beside it. The bounty chest is at (-9463, 70), not (-9466, 78), which sits in a pocket of walls. Dughan (-9465, 75) and the stash (-9990, 75) are open ground. `ELWYNN_GOALS` is 11; no site was added, so "Every corner" stays 37.
+- Remy stands at (-9444, 30): the plan's (-9450, 30) has a wall beside it. The bounty chest is at (-9463, 70), not (-9466, 78), which sits in a pocket of walls. Dughan (-9465, 75) and the stash (-9990, 75) are open ground.
 
 ## Stage 9: Hold the Stonefield Wagon [x] (timed defense with a fighting ally; engine E2 and E3)
 
@@ -269,7 +261,7 @@ Built as planned, with these differences, found checking the plan against the co
 - **E3 (ally).** `MobDef.shoots` (a `ShootDef`, with a new optional `spell`), only on a `friendly` mob (checked by `validate()`). `allies_shoot` (`sim/explore.rs`, run every tick with a hero in the world) shoots the nearest foe within range in `Chase` or `Windup` on a hero, with a clear line (`land::clear_line`), through `hurt_mob(r, 0, dmg)` as a tower does, so a creature it finishes counts for the camp. A friendly creature no longer wanders from its home, so one set by a pack stands where it was put. `engage` already skipped friendly creatures.
 - The banner's second line is "Stay near it for 90 sec" (generic), not "Stay near the wagon for 90 sec".
 - Fedfennel's scale is 1.3 in the content, and every boss is drawn `combat.boss_scale` times that, as Brannick is. His shield rule is the existing one (`block`, in `combat.rs`): Chase or Recover, within 70 degrees, not a heavy, shove or `through_guard`, not while a Bearded Axe hook holds his guard down. The wind-up and the side are the open moments. A kobold with a shield on its arm is unseen in the real client.
-- Tommy Joe's and Fedfennel's looks and the shield are unchecked in the client. Tommy Joe wears display 1408 (human male, brown leathers) with a bow. `ELWYNN_GOALS` is 12; no site was added, so "Every corner" stays 37.
+- Tommy Joe's and Fedfennel's looks and the shield are unchecked in the client. Tommy Joe wears display 1408 (human male, brown leathers) with a bow.
 - Probed with `elwynn_probe near`: the farm spots, the wagon, the ally and the wave spawn are open ground, unchanged.
 
 ## Stage 10: The Parley Stones [x] (payoff; engine E5; one new weapon)
@@ -280,7 +272,6 @@ Built as planned, with these differences, found checking the plan against the co
 - The fan of knives is a pattern of weight 0, begun by his 50% phase (`pattern`), so it comes once and is no enrage (`speed` and `might` stay 1). His stabs carry `parry_ends` (and `tests_boss_rules.rs` checks he does not reel from a parry).
 - Marzon's own pack is `marzon` on the chest `parley_price` with the helpers `parley_dughan` and `parley_remy`, all `wake = "parley_price"`. The helpers are friendly shooters named for the people (Dughan, display 1504, a bow, 40 damage every 5 sec to 30 yd; Remy, 1466, a dagger, 6 damage every 0.8 sec to 16 yd). The envoy has no weapon of note (the Blackrock grunt's axe) and is a `coward`.
 - The silent blade is a dagger (display 2699, backstab 2.5, damage 15 to 20) with `punish = 0.75` and nothing else of the pass's. It is Marzon's trophy.
-- `ELWYNN_GOALS` is 15 and "Every corner" is 38 for the 38 sites.
 - Probed with `elwynn_probe near`: the site centre, the guards (the archers' spot has a trunk or wall within 6 yd, none beside it), the envoy, the table, the satchel and the helpers' spots are open ground, unmoved.
 
 Round two is built.
@@ -294,13 +285,13 @@ Defaults for Corey's open questions, all reversible:
 - The escort ends at the Stormwind gate, a new landmark on the north road. Nothing of the city is spawned.
 - A lost escort is not a death: Pell is struck down, the knives slip away, and he waits at his start to try again.
 - The second choice (sell or keep the letter) is camp-wide and one-time, like Remy's.
-- Sable hunts whichever way the camp chose, so the journal can always be finished.
+- Sable hunts whichever way the camp chose.
 - Stormwind's archers at the camp shoot raiders at its buildings too.
 - No new weapon this round. The Horde column on the Redridge road and a night event are deferred.
 
 Story spine: a letter is ink, so Stormwind needs the man who cut the seal to swear to it. Pell is walked to the city under Lescovar's knives. Lescovar then offers to buy the letter back, and sends his hunter whatever the answer.
 
-Journal: every new goal goes just before "Every corner". `ELWYNN_GOALS` in `save.rs` goes 17, 18, 19. "Every corner" equals the site count (39 from Stage 11). Camps already past "The classes' trials" still skip the new goals: that migration is a call left for Corey. The tests are in `tests_story3.rs`, with `tests_story.rs`'s old-save, goal-order and sites tests extended.
+The tests are in `tests_story3.rs`.
 
 ## Stage 11: The Witness [x] (escort; engine change E6)
 
@@ -313,7 +304,6 @@ Built as planned, with these differences, found checking the plan against the co
 - Displays (`npcfind` on the real data): Pell 1724 (purple cloth), Crane 3358 (black leathers), the watchman 1984 (Stormwind plate and tabard). Unchecked in the client.
 - Wyle's line at `open:marzon_satchel` now ends with the pointer to Pell (it still starts as round two's test reads it), and Wyle, Remy and Dughan each have a line at `open:pell_satchel`.
 - Two tests elsewhere (`tests_tactics`'s give-ground, `tests_warlord`'s tackle) drew their dice from the world's content, which this stage's packs move; each now seeds its own dice (both pass on 11 of 12 seeds).
-- `ELWYNN_GOALS` is 17 and "Every corner" is 39 for the 39 sites.
 - Probed with `elwynn_probe near`: the satchel, Pell's start, every point of the road, the wave spots and the gate are open ground. The route's fifth point moved from (-9150, 365), which has a wall within 6 yd, to (-9152, 360).
 
 ## Stage 12: The Lion's Bargain [x] (a second camp choice; engine change E7)
@@ -323,7 +313,7 @@ Built as planned, with these differences, found checking the plan against the co
 - `allies_shoot` also shoots a raider (any state but fallen), so the archers help in a raid.
 - Venn, the purse and the archers stand outside the camp's building ground (55 yd from its heart, past the gate's lion statues), so nothing built can stand on them. Pell leaves only if the letter is sold (`until = "chose:letter:sell"`); kept, he stays at the gate with a new line.
 - Displays: Venn 7011 (a black suit, `npcfind`), the archers 1984. Unchecked in the client.
-- `ELWYNN_GOALS` is 18. No site was added.
+- No site was added.
 - Probed with `elwynn_probe near`: Venn (-9673, 692), the purse (-9675, 688) and the archers (-9678, 674) and (-9678, 702) are open ground; the plan's first spots by the statues had walls beside them.
 
 ## Stage 13: Sable, the Lion's Hound [x] (roaming hunter; content on E7)
@@ -334,7 +324,6 @@ Built as planned, with these differences, found checking the plan against the co
 - Three spots, not four: the Goldshire road east of the camp is Stitches' (his bridge end is at (-9744, 470)), and (-9752, 540) is on the stream's bridge. Her spots are (-9752, 640), (-9764, 790) and (-9705, 760), each more than 100 yd from the camp and 60 from Stitches' road.
 - Display 1297 (a woman in black and red leathers, `npcfind`), two daggers. Unchecked in the client.
 - Lines: Wyle, Marten and Pell (only there if the letter was kept) each have a last word at `kill:sable`.
-- `ELWYNN_GOALS` is 19; no site was added, so "Every corner" stays 39.
 - Probed with `elwynn_probe near`: the three spots are open ground; (-9752, 540) and (-9790, 700) failed (water, a wall) and were dropped.
 
 Round three is built.

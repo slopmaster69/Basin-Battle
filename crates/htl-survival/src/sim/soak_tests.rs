@@ -9,7 +9,7 @@
 //! ```
 //!
 //! - `SOAK_MINUTES` (default 120): simulated minutes in all, at 20 Hz. Elwynn gets 45 %, the
-//!   dungeons together 40 %, the Basin Battle siege 15 %. The whole journal takes about 170
+//!   dungeons together 40 %, the Basin Battle siege 15 %. The scouts' whole route takes about 170
 //!   simulated minutes of Elwynn (so a run of at least 400 here); give it more to see what the
 //!   finished camp does over hours (a run of 1500 is 15 minutes of real time).
 //! - `SOAK_SEED` (default 20261115): the seed. It is printed at the start of every phase, so a
@@ -33,23 +33,23 @@
 //! bosses pulled, wiped on and pulled again, the run reset; in the siege, whole matches of sends
 //! and trainer cards, one after another.
 //!
-//! And in Elwynn two strong scouts PLAY THE JOURNAL (`soak_tests/journey.rs`), goal by goal,
-//! read from `content.goals`: banking, crafting, building, wearing, exploring, finding secrets,
-//! opening chests (guardians first, trials won), learning (shrines, relics, champions), killing
-//! (a creature in Elwynn, or in the dungeon whose pack it is), taking the Horde's camps, raids
-//! met at the heart, dungeons entered by the book, cleared boss by boss, left by a lamp and the
+//! And in Elwynn two strong scouts PLAY THE WORLD (`soak_tests/journey.rs`), deed by deed along
+//! their `ROUTE` (the camp has no journal): banking, crafting, building, wearing, exploring,
+//! finding secrets, opening chests (guardians first, trials won), learning (shrines, relics,
+//! champions), killing (a creature in Elwynn, or in the dungeon whose pack it is), taking the
+//! Horde's camps, raids met at the heart, dungeons entered by the book, cleared boss by boss, left by a lamp and the
 //! news sent home (`Event::ToCamp`) as the server does it, with the camp's people spoken to and
 //! their links followed. Each dungeon is its own world beside the camp's. The scouts' blows are
 //! `hurt_mob_as` slices (a dev world's abilities do no damage) while they also press buttons at
-//! what they fight, so every boss's phases, adds, holds, doors and deaths run. When the journal
+//! what they fight, so every boss's phases, adds, holds, doors and deaths run. When the route
 //! is done they go on: the chests again in order, every place, every camp, every dungeon cleared
-//! again. A goal that stays the journal's for three simulated hours fails the run (`SOAK STUCK
-//! journal`); one the pilot does not know how to play is named (`SOAK JOURNAL UNPLAYED`).
+//! again. A deed that stays the route's next for three simulated hours fails the run (`SOAK STUCK
+//! route`); one the pilot does not know how to play is named (`SOAK ROUTE UNPLAYED`).
 //!
 //! Every tick: nothing panics and positions and health are finite and in range. Every simulated
 //! minute: the size of each collection of the sim is sampled (a debug-string length stands for
 //! the ones that hold collections inside, the structs with no `Debug` report their own with
-//! `sizes()`), the camp and journal are checked for validity, and creatures are checked for being
+//! `sizes()`), the camp's progress is checked for validity, and creatures are checked for being
 //! stuck. At the end of a phase: any collection that only ever grew, and the tick time's creep,
 //! are reported (`SOAK GROWS`, `SOAK CREEP`), and anything stuck is a failure (`SOAK STUCK`). The
 //! run fails (panics) on a broken invariant, a stuck creature or a boss that did not reset; growth
@@ -121,7 +121,7 @@ struct Monitor {
     dbg: std::collections::BTreeSet<Id>,
     reported: std::collections::BTreeSet<Id>,
     started: Instant,
-    last_goal: usize,
+    last_found: usize,
     last_raids: u32,
     min_ticks: usize,
     last_hidden: Map<Id, String>,
@@ -241,7 +241,7 @@ impl Monitor {
             dbg: Default::default(),
             reported: Default::default(),
             started: Instant::now(),
-            last_goal: 0,
+            last_found: 0,
             last_raids: 0,
             min_ticks: 0,
             last_hidden: Map::new(),
@@ -305,12 +305,12 @@ impl Monitor {
         for (name, n) in sizes(s) {
             self.sizes.entry(name).or_default().push(n);
         }
-        // The camp and its journal.
+        // The camp and how far it has come.
         if !s.is_below() && !s.is_siege() {
-            assert!(s.camp.goal <= s.content.goals.len(), "SOAK {}: journal on goal {} of {}", self.phase, s.camp.goal, s.content.goals.len());
-            assert!(s.camp.goal >= self.last_goal, "SOAK {}: the journal went back from goal {} to {}", self.phase, self.last_goal, s.camp.goal);
+            let found = s.camp.found.len();
+            assert!(found >= self.last_found, "SOAK {}: places found went back from {} to {found}", self.phase, self.last_found);
             assert!(s.camp.raids_won >= self.last_raids, "SOAK {}: raids won went back from {} to {}", self.phase, self.last_raids, s.camp.raids_won);
-            self.last_goal = s.camp.goal;
+            self.last_found = found;
             self.last_raids = s.camp.raids_won;
             for (k, n) in &s.camp.counts {
                 assert!(*n < 100_000_000, "SOAK {}: camp count {k} = {n}", self.phase);

@@ -1215,6 +1215,14 @@ impl Survival {
         self.camp.counts.get(&format!("{what}:{key}")).is_some_and(|n| *n > 0)
     }
 
+    /// Below: what the camp has done (its counts), so a condition below (`kill:`, `open:`,
+    /// `chose:`) reads as it does at camp. The camp keeps them; this only mirrors them.
+    pub fn mirror_counts(&mut self, counts: &BTreeMap<String, u32>) {
+        if &self.camp.counts != counts {
+            self.camp.counts = counts.clone();
+        }
+    }
+
     /// A note's page for a hero: its text, and its clue while what it points to is still hidden.
     fn note_letter(&mut self, id: Id, key: &str, again: bool) {
         let Some((d, n)) = self.content.dungeons().find_map(|d| d.notes.iter().find(|n| n.key == key).map(|n| (d.clone(), n.clone()))) else { return };
@@ -1768,7 +1776,7 @@ impl Survival {
         }
     }
 
-    /// At camp: what was done below (the journal's counts), and trophies into the chest.
+    /// At camp: what was done below (the camp's counts), and trophies into the chest.
     pub fn from_below(&mut self, counts: &[(String, u32)], items: &BTreeMap<usize, u32>) {
         self.from_below_at(None, counts, items);
     }

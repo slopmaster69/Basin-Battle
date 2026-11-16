@@ -389,33 +389,14 @@ fn an_escort_must_be_one_friendly_walker_that_wakes_on_it_with_a_route_and_waves
 }
 
 #[test]
-fn the_witness_follows_the_seal_in_the_journal_and_the_gate_is_a_place() {
+fn the_witness_walks_to_the_gate_and_the_gate_is_a_place() {
     let c = Content::builtin();
-    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
-    let seal = at("The seal on the letter");
-    for (k, (t, kind, what)) in [("The seal-cutter", "open", "pell_satchel"), ("The Lion's Knife", "kill", "crane")].into_iter().enumerate() {
-        assert_eq!(at(t), seal + 1 + k, "{t} in its place");
-        let g = &c.goals[at(t)];
-        assert_eq!((g.kind.as_str(), g.what.as_str()), (kind, what));
-    }
-    assert!(at("Every corner") > at("The Lion's Knife"));
-    assert!(crate::save::ELWYNN_GOALS >= 17);
     let gate = c.sites.iter().find(|s| s.key == "stormwind_gate").unwrap();
     assert_eq!(gate.kind, "landmark");
     let route = &c.chests.iter().find(|ch| ch.key == "pell_satchel").unwrap().route;
     let end = route.last().unwrap();
     assert!(dist2d([end[0], end[1], 0.0], [gate.at[0], gate.at[1], 0.0]) < gate.radius, "the road ends at the gate");
-    assert!(c.sites.len() >= 39);
-    assert_eq!(c.goals[at("Every corner")].count as usize, c.sites.len());
-    // Done in order: the escort, then Crane.
-    let mut s = world();
-    s.camp.goal = seal + 1;
-    s.camp.counts.insert("kill:crane".into(), 1);
-    s.step_goals();
-    assert_eq!(s.camp.goal, seal + 1, "Crane doesn't count before the escort");
-    s.camp.counts.insert("open:pell_satchel".into(), 1);
-    s.step_goals();
-    assert_eq!(s.camp.goal, seal + 3);
+    assert_eq!(c.sites.len(), 39);
 }
 
 // --- Stage 12: The Lion's Bargain --------------------------------------------------------------
@@ -566,24 +547,6 @@ fn a_pack_with_a_condition_of_its_own_stays_unseen_until_it_holds() {
     assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == m)), "drawn as it comes");
 }
 
-#[test]
-fn the_bargain_follows_the_lions_knife_in_the_journal() {
-    let c = Content::builtin();
-    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
-    assert_eq!(at("The Lion's Bargain"), at("The Lion's Knife") + 1);
-    let g = &c.goals[at("The Lion's Bargain")];
-    assert_eq!((g.kind.as_str(), g.what.as_str()), ("chose", "letter"));
-    assert!(crate::save::ELWYNN_GOALS >= 18);
-    let mut s = world();
-    s.camp.goal = at("The Lion's Bargain");
-    s.step_goals();
-    assert_eq!(s.camp.goal, at("The Lion's Bargain"));
-    s.camp.counts.insert("chose:letter".into(), 1);
-    s.camp.counts.insert("chose:letter:keep".into(), 1);
-    s.step_goals();
-    assert!(s.camp.goal > at("The Lion's Bargain"));
-}
-
 // --- Stage 13: Sable, the Lion's Hound ---------------------------------------------------------
 
 /// The built-in world on flat ground with only Sable's pack, and a hero far off.
@@ -714,15 +677,3 @@ fn sables_fall_is_told_and_the_camp_has_words_for_it() {
     }
 }
 
-#[test]
-fn the_hound_closes_round_three_in_the_journal() {
-    let c = Content::builtin();
-    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
-    assert_eq!(at("The Lion's Hound"), at("The Lion's Bargain") + 1);
-    assert_eq!(at("Every corner"), at("The Lion's Hound") + 1);
-    let g = &c.goals[at("The Lion's Hound")];
-    assert_eq!((g.kind.as_str(), g.what.as_str()), ("kill", "sable"));
-    assert_eq!(crate::save::ELWYNN_GOALS, 19);
-    assert_eq!(c.sites.len(), 39);
-    assert_eq!(c.goals[at("Every corner")].count, 39);
-}

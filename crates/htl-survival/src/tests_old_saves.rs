@@ -39,11 +39,11 @@ fn bag_of(s: &Survival, p: Id) -> BTreeMap<String, u32> {
 
 #[test]
 fn the_first_release_shape_loads_with_everything_it_held() {
+    // It still has the journal's goal, from before the journal was taken out: read past.
+    assert!(V01.lines().any(|l| l.trim() == "goal = 5"));
     let (mut s, save) = load(V01);
-    assert_eq!((save.raids_won, save.goal, save.goal_title.clone()), (2, 5, None));
+    assert_eq!(save.raids_won, 2);
     assert_eq!(s.camp.raids_won, 2);
-    // Goal 5 of the first journal, found by title.
-    assert_eq!(s.content.goals[s.camp.goal].title, "Thin the Warsong", "{}", s.content.goals[s.camp.goal].title);
     let wood = s.content.item("wood").unwrap();
     assert_eq!(s.storage[&wood], 9);
     assert_eq!(s.storage[&s.content.item("ore").unwrap()], 4);
@@ -68,8 +68,10 @@ fn the_first_release_shape_loads_with_everything_it_held() {
 
 #[test]
 fn a_v04_shape_keeps_its_camp_progress_gear_and_below() {
+    // A goal by title too, read past.
+    assert!(V04.lines().any(|l| l.trim() == "goal_title = \"The Overseer\""));
     let (mut s, save) = load(V04);
-    assert_eq!((s.camp.raids_won, s.content.goals[s.camp.goal].title.as_str()), (6, "The Overseer"));
+    assert_eq!(s.camp.raids_won, 6);
     assert_eq!(s.camp.counts["grunts"], 12);
     assert!(s.camp.found.contains("fargodeep") && s.camp.opened.contains_key("chest_a"));
     // The chest: the retired weapons are their families' basic ones, wood is kept.

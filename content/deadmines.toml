@@ -952,22 +952,6 @@ respawn = 0.0
   max_range = 8.0
   steps = [ { from = "TaurenMale", clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 14, recovery = 0.8 } ]
 
-# --- the journal's steps below (after the camp's own) -----------------------------------------------
-
-[[goal]]
-title = "Cookie's stew"
-text = "Beat Cookie, the Brotherhood's cook, at his stew pot by the cove's east pier in the Deadmines."
-kind = "kill"
-what = "dm_cookie"
-reward = { meat = 6, peacebloom = 4 }
-
-[[goal]]
-title = "The first mate"
-text = "Beat Mr. Smite on the island where the scaffold around the Juggernaut meets the dry dock. The next lamp is past the Foundry."
-kind = "kill"
-what = "dm_smite"
-reward = { bronze = 4, leather = 2 }
-
 # === phase 3: the Cannon Gallery, the Foundry, the Mast Room =======================================
 # West through the Ironclad Door the gallery climbs to the Foundry's doors; Gilnid works its pit,
 # and its back door (up the ramp round the wall) opens when he falls. A workshop passage runs on to
@@ -1624,20 +1608,6 @@ respawn = 0.0
   # other thrown things here (harpoon, bomb): at 20 the wrench crossed 16 yd in 0.8 sec, too quick to
   # see in flight (docs/boss-shared-fixes.md, "slower projectiles with a visible flight").
   steps = [ { clip = 107, take = 0, ranged = true, windup = 1.0, range = 16.0, radius = 1.0, speed = 14.0, spell = 13398, damage = 16, recovery = 1.5 } ]
-
-[[goal]]
-title = "The Smelter"
-text = "Beat Gilnid in the Foundry's pit, west up the Cannon Gallery from the dry dock. His back door opens at the top of the ramp."
-kind = "kill"
-what = "dm_gilnid"
-reward = { ore = 8, bronze = 4 }
-
-[[goal]]
-title = "The Lumbermaster"
-text = "Wreck Sneed's shredder in the Mast Room, past the Foundry's workshop. Then beat the goblin who climbs out."
-kind = "kill"
-what = "dm_sneed"
-reward = { wood = 10, linen = 4 }
 
 # === phase 4: the galleries and the mine's mouth ===================================================
 # North from the Mast Room the old mine's galleries wind east to the mouth, where Rhahk'Zor keeps
@@ -2300,83 +2270,6 @@ death_text = "...VanCleef... never pay..."
   weight = 3.0
   below = 0.4
   steps = [ { clip = 17, take = 1, windup = 0.6, damage = 34, heavy = false, recovery = 0.15 }, { clip = 59, take = 0, windup = 0.5, damage = 34, heavy = false, recovery = 0.15 }, { clip = 18, take = 1, windup = 0.9, damage = 52, recovery = 1.8 } ]
-
-[[goal]]
-title = "The foreman"
-text = "Beat Rhahk'Zor at the mine's front door, east through the galleries from the Mast Room."
-kind = "kill"
-what = "dm_rhahkzor"
-reward = { bronze = 6, leather = 4 }
-
-[[goal]]
-title = "Out into Moonbrook"
-text = "Walk out of the Deadmines once Rhahk'Zor is down: by the smugglers' tunnel at the landing, the front door being buried."
-kind = "delve"
-# (Out of the Deadmines: `end` alone is any dungeon's way out.)
-what = "end:deadmines"
-reward = { roast = 4, linen = 4 }
-
-# --- the ladder: every dungeon of the book, easiest first -------------------------------------------
-# After the Deadmines, the journal walks the camp through the book: the other two of the first
-# tier, then the second (open once two of the first are cleared: `LADDER_CLEARS`), then the third.
-# Each asks for a clear (`cleared`: every boss down in one run), and pays a little more each tier
-# on top of the dungeon's own first-clear gift. (First guesses at the pay, to tune.)
-
-[[goal]]
-title = "Into the fire"
-text = "Clear Ragefire Chasm, every boss down in one run. The Searing Blade hides in the caves under Orgrimmar."
-kind = "cleared"
-what = "ragefire"
-reward = { bronze = 4, leather = 4 }
-
-[[goal]]
-title = "Naralex's nightmare"
-text = "Clear the Wailing Caverns, every Fanglord and Verdan with them. The Druids of the Fang dream under the Barrens."
-kind = "cleared"
-what = "wailing"
-reward = { bronze = 4, linen = 6 }
-
-[[goal]]
-title = "The Stockade"
-text = "Clear the Stockade, Stormwind's prison, now in its inmates' hands. Its pages open once 2 of the first dungeons are cleared."
-kind = "cleared"
-what = "stockade"
-reward = { silver = 1, bronze = 6 }
-
-[[goal]]
-title = "Arugal's keep"
-text = "Clear Shadowfang Keep in Silverpine, held by Arugal's worgen and its old lords' ghosts."
-kind = "cleared"
-what = "shadowfang"
-reward = { silver = 2, leather = 6 }
-
-[[goal]]
-title = "The warren of thorns"
-text = "Clear Razorfen Kraul, where Charlga Razorflank speaks for Agamaggan."
-kind = "cleared"
-what = "razorfen"
-reward = { silver = 2, linen = 8 }
-
-[[goal]]
-title = "The Crusade's dead"
-text = "Clear the Graveyard of the Scarlet Monastery, where the dead won't stay buried. The book's last pages start here."
-kind = "cleared"
-what = "graveyard"
-reward = { silver = 2, pearl = 1 }
-
-[[goal]]
-title = "The Crusade's books"
-text = "Clear the Library, with its hounds, its Arcanist and whatever he keeps bound in his tomes."
-kind = "cleared"
-what = "library"
-reward = { silver = 3, pearl = 1 }
-
-[[goal]]
-title = "The Crusade's heart"
-text = "Clear the Cathedral, where Mograine stands at the altar and Whitemane won't let him die. The book ends here."
-kind = "cleared"
-what = "cathedral"
-reward = { silver = 4, pearl = 2 }
 
 # === secrets, rares and the Brotherhood's other hands ===============================================
 # What isn't on the way through: a hidden pantry, a captain's quarters, a cave-in that isn't one,
