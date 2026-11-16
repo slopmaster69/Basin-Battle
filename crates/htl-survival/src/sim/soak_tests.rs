@@ -360,6 +360,7 @@ impl Monitor {
                                 s.raid.raiders.len(),
                                 s.raid.queue.len()
                             ),
+                            mobs::Foe::Mob(o) => format!("a friendly creature {o:?}"),
                         }),
                         m.speed, m.think, m.ready_at, m.lost_at, m.moved_at, m.far_at, m.stagger_until, m.summoned_by, m.friendly
                     ));
