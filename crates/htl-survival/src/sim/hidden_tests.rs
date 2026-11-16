@@ -74,3 +74,15 @@ fn nothing_hurts_a_hidden_creature() {
     s.hurt_mob_as(grunt, h, 40, "Melee");
     untouched(&s, grunt);
 }
+
+/// ...and none of what a blow sets off on the way to the health: a freeze it would end, a shield
+/// it would soak.
+#[test]
+fn a_blow_on_a_hidden_creature_ends_none_of_its_holds() {
+    let (mut s, h, grunt) = world();
+    assert!(s.apply_cc(grunt, h, "petrify", 30.0, 1.0, 0.0, "Ice"));
+    s.hurt_mob_as(grunt, h, 40, "Meteor");
+    s.ability_on_mob(h, grunt, 0, 1.0, 40.0, [0.0, 0.0, 0.0], abilities::HitKind::Area, 0);
+    assert!(s.has_cc(grunt, "petrify"), "the freeze was not touched");
+    untouched(&s, grunt);
+}
