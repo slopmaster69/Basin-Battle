@@ -2492,14 +2492,7 @@ impl Survival {
         // besides: that's the ability's, not the shatter's.)
         if shatter && self.has_cc(victim, "petrify") {
             dmg *= SHATTER;
-            self.cleanse(victim, &["petrify"]);
-            // The ice bursts off it: a flare of frost, the ice breaking, and the biggest beat,
-            // with a short pale burst of action lines round the foe (`shatter.burst_kit`).
-            self.cue(Some(owner), victim, cues::KIT_FROST_BURST, cues::SOUND_SHATTER, cues::BEAT_SHATTER);
-            let lines = self.content.shatter.burst_kit;
-            if lines != 0 {
-                self.events.push(Event::Visual { id: victim, kit: lines, by: None });
-            }
+            self.shatter_ice(owner, victim);
             // The ice bursts outward (Ice Lance): every other frozen foe within `shatter_spread`
             // shatters too, through this same path. Only the first shatter of a lance spreads: a
             // foe struck by the spread can't spread it again (`fx_shattering`), so each foe
@@ -2537,6 +2530,18 @@ impl Survival {
             dmg += self.prowl_strike(owner, victim) as f32;
         }
         dmg.round().max(0.0) as u32
+    }
+
+    /// The ice breaks off a frozen foe: its freeze ends, a flare of frost, the ice breaking and the
+    /// biggest beat, with a short pale burst of action lines round it (`shatter.burst_kit`). The
+    /// look and sound of every shatter, an ability's or a weapon's.
+    pub(crate) fn shatter_ice(&mut self, owner: Id, victim: Id) {
+        self.cleanse(victim, &["petrify"]);
+        self.cue(Some(owner), victim, cues::KIT_FROST_BURST, cues::SOUND_SHATTER, cues::BEAT_SHATTER);
+        let lines = self.content.shatter.burst_kit;
+        if lines != 0 {
+            self.events.push(Event::Visual { id: victim, kit: lines, by: None });
+        }
     }
 
     /// The shatter's spread: every other foe frozen within `radius` of the shattered `victim`

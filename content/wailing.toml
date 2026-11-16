@@ -1533,6 +1533,8 @@ key = "fanglord"
 name = "The Fanglords' Vestments"
 bonus = [ { pieces = 2, kind = "regen", amount = 0.003 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
 
+# The fang's sleep: a blow from behind puts the foe to sleep 3 sec (the Druids of the Fang's own
+# slumber); any damage wakes it, so the hero chooses the moment.
 [[weapon]]
 key = "cobrahn_fang"
 windup = 0.18
@@ -1544,6 +1546,7 @@ range = 2.5
 arc = 75.0
 targets = 1
 subclass = 15
+sleep = 3.0
 backstab = 3.4
 
 [[item]]
@@ -1552,7 +1555,7 @@ name = "Cobrahn's Fang"
 display = 2709
 icon = "INV_Weapon_ShortBlade_03"
 kind = "weapon"
-text = "Blows from behind deal 340% damage. \"Lord Cobrahn's. A serpent's tooth on a hilt.\""
+text = "Blows from behind deal 340% damage. {fx} \"Lord Cobrahn's. A serpent's tooth on a hilt.\""
 perks = [{ kind = "might", amount = 0.03 }]
 
 [[weapon]]

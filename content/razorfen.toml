@@ -1302,6 +1302,8 @@ key = "thornweave"
 name = "Thornweave"
 bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
 
+# The thorn breaks a spell: a hit on a foe mid-cast interrupts it and staggers it 1.5 sec (Charlga's
+# own crew are shamans; a champion's cast is not broken).
 [[weapon]]
 key = "thornspike"
 windup = 0.18
@@ -1313,6 +1315,7 @@ range = 2.5
 arc = 75.0
 targets = 1
 subclass = 15
+interrupt = 1.5
 backstab = 3.6
 
 [[item]]
@@ -1321,7 +1324,7 @@ name = "Thornspike"
 display = 2694
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Charlga's. A thorn of Agamaggan himself, filed to a point."
+text = "Quick. Blows from behind deal 360% damage. {fx} \"Charlga's. A thorn of Agamaggan himself, filed to a point.\""
 perks = [{ kind = "stamina", amount = 0.06 }]
 
 [[weapon]]

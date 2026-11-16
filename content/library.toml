@@ -632,6 +632,8 @@ text = "Archivist Corwin's. The Crusade's scholars wore these to the last shelf.
 set = "arcanist"
 perks = [{ kind = "focus", amount = 0.05 }]
 
+# The hypnotic blade: each hit makes the foe lose interest in the wielder (it drops them for 4 sec and
+# looks for another), the dagger's answer to a pack: stab, step aside, let it wander. Not a champion.
 [[weapon]]
 key = "hypnotic_blade"
 windup = 0.18
@@ -643,6 +645,7 @@ range = 2.5
 arc = 75.0
 targets = 1
 subclass = 15
+lull = true
 backstab = 3.5
 
 [[item]]
@@ -651,7 +654,7 @@ name = "Hypnotic Blade"
 display = 2711
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Doan's. The light in it moves when you aren't looking."
+text = "Quick. Blows from behind deal 350% damage. {fx} \"Doan's. The light in it moves when you aren't looking.\""
 perks = [{ kind = "focus", amount = 0.06 }]
 
 # The boar spear pins its quarry: each thrust slows the foe 40% for 2.5 sec.
