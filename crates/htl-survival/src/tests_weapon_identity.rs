@@ -220,3 +220,54 @@ fn a_save_holding_a_retired_weapon_loads_the_familys_basic_one() {
     let bag: Vec<String> = h.bag.keys().map(|i| key(*i)).collect();
     assert!(bag.contains(&"halberd".to_string()) && bag.contains(&"ember_staff".to_string()), "{bag:?}");
 }
+
+/// The families that play their own set (the item subclass of each, the set it swings).
+const FAMILY_SETS: [(u32, bool, &str, &str); 4] = [
+    (0, false, "axe_one_hand", "one_hand"),
+    (4, false, "mace_one_hand", "one_hand"),
+    (1, true, "axe_two_hand", "two_hand"),
+    (5, true, "maul", "two_hand"),
+];
+
+#[test]
+fn each_family_resolves_to_its_own_set_and_the_rest_keep_the_grips() {
+    let c = Content::dev();
+    for w in &c.weapons {
+        let want = FAMILY_SETS.iter().find(|(sub, two, _, _)| w.subclass == *sub && w.two_handed == *two && w.bolt.is_empty());
+        match want {
+            Some((_, _, own, _)) => assert_eq!(w.moveset_key(), *own, "{} swings its family's set", w.key),
+            // (Swords, daggers, greatswords, polearms, staffs.)
+            None => assert!(["one_hand", "two_hand", "dagger", "polearm"].contains(&w.moveset_key()), "{} keeps its grip's set: {}", w.key, w.moveset_key()),
+        }
+    }
+    let keys: Vec<&str> = FAMILY_SETS.iter().map(|f| f.2).collect();
+    for k in &keys {
+        assert_eq!(keys.iter().filter(|x| *x == k).count(), 1);
+        let set = c.movesets.iter().find(|m| m.key == *k).unwrap_or_else(|| panic!("no set {k}"));
+        // (Each plays its own timing, not the grip's copied.)
+        for g in ["one_hand", "two_hand", "dagger", "polearm"] {
+            let grip = c.movesets.iter().find(|m| m.key == g).unwrap();
+            let same = set.light.len() == grip.light.len() && set.light.iter().zip(&grip.light).all(|(a, b)| (a.clip, a.take, a.windup, a.recovery, a.damage) == (b.clip, b.take, b.windup, b.recovery, b.damage));
+            assert!(!same, "{k} is not {g}");
+        }
+    }
+}
+
+/// A weapon's light chain: damage a second over the whole chain with this set's steps.
+fn chain_dps(w: &crate::content::WeaponDef, set: &crate::content::MovesetDef) -> f32 {
+    let mid = (w.damage[0] + w.damage[1]) as f32 / 2.0;
+    let (dmg, secs) = set.light.iter().fold((0.0, 0.0), |(d, t), s| (d + mid * s.damage, t + w.windup * s.windup + w.active + w.recovery * s.recovery));
+    dmg / secs
+}
+
+#[test]
+fn a_family_set_keeps_the_familys_damage_a_second() {
+    let c = Content::dev();
+    for (sub, two, own, grip) in FAMILY_SETS {
+        let (own, grip) = (c.movesets.iter().find(|m| m.key == own).unwrap(), c.movesets.iter().find(|m| m.key == grip).unwrap());
+        for w in c.weapons.iter().filter(|w| w.subclass == sub && w.two_handed == two && w.bolt.is_empty()) {
+            let ratio = chain_dps(w, own) / chain_dps(w, grip);
+            assert!((0.95..=1.05).contains(&ratio), "{} does {ratio:.2} times the damage a second it did", w.key);
+        }
+    }
+}

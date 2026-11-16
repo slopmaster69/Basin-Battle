@@ -1339,6 +1339,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 1
+moveset = "axe_two_hand"
 
 [[item]]
 key = "corpsemaker"

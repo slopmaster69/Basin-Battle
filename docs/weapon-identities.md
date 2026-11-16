@@ -70,3 +70,17 @@ Each of these is a boss's only weapon reward, so it stays (a boss never loses it
 a fitting unique effect in the third step instead of a removal: Fallen Champion's Greatsword,
 Corpsemaker, Guillotine Axe, Loksey's Boar Spear, Cursed Felblade, Ironspine's Fist, Thornspike,
 Cobrahn's Fang.
+
+### How the families play (step 2)
+
+Each family swings its own `[[moveset]]` (a weapon's `moveset =`), so the families read differently
+before any trait does. The sets keep their family's damage a second (a slower step hits harder by
+about as much as it takes longer; `a_family_set_keeps_the_familys_damage_a_second` pins it within 5%).
+
+| Family | Set | How it plays |
+| --- | --- | --- |
+| 1H axe | `axe_one_hand` | Wide hacking cleaves: three chops stepping further in, the last a two-hander's wide swing (the grip's timing: the Footman's Axe is the starting weapon and the drills are tuned to its pace) |
+| 1H mace | `mace_one_hand` | Overhead slams, every step slower and heavier than the last |
+| 2H axe | `axe_two_hand` | Big diagonal cleaves, the widest closing the chain |
+| Maul, hammers | `maul` | A slow overhead slam every blow, the longest coil on the heavy |
+| Sword, dagger, greatsword, polearm, staff | the grip's | Unchanged |

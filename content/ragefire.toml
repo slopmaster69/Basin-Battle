@@ -1317,6 +1317,7 @@ range = 3.2
 arc = 110.0
 targets = 3
 subclass = 0
+moveset = "axe_one_hand"
 
 [[item]]
 key = "bloodlust_edge"
