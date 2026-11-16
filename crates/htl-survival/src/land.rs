@@ -96,6 +96,12 @@ pub trait Land: Send + Sync {
     fn lowest_floor(&self) -> Option<f32> {
         None
     }
+    /// The heights of the floors over (x, y), for a walker at height `z` looking for one of them
+    /// (a deck and the hold under it, a landing and the hall under the stair). By default the one
+    /// floor it finds from there.
+    fn floors_at(&self, x: f32, y: f32, z: f32) -> Vec<f32> {
+        vec![self.height_near(x, y, z)]
+    }
 }
 
 /// Resolve an authored itinerary into walking corners on its own floors, dry ones. Every leg must

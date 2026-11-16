@@ -1609,7 +1609,9 @@ z = -90.8
 radius = 2.0
 count = 2
 link = 12.0
-route = [ [-52.7, 107.8], [-191.1, 35.2] ]
+# (Two turns until Nov 2026, 127 and 156 yd apart: farther than a foe below plans a walk, so it
+# never left. A turn on the way to each now, every leg under 100 yd.)
+route = [ [-24.1, 179.2], [-52.7, 107.8], [-127.1, 68.2], [-191.1, 35.2] ]
 wait = 6.0
 
 # Asleep in the dark until a hero comes near.

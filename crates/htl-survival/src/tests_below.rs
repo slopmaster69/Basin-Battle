@@ -2749,3 +2749,79 @@ fn a_foe_felled_under_silver_is_not_put_back_at_a_rest() {
     s.below_kill(w, [30.0, 0.0, 0.0], [30.0, 0.0, 0.0], Some(k), false, false, true);
     assert_eq!(s.below.as_ref().unwrap().fallen.len(), before + 1, "one laid to rest by silver stays down");
 }
+
+/// The rules below with one patrol of `count` grunts from (0, -60) to (20, -60) on `land` (a
+/// hero at the first lamp, 60 yards off: the patrol awake, and nobody in a fight).
+fn patrol_below(land: Box<dyn crate::land::Land>, count: usize) -> (Survival, Vec<Id>) {
+    let mut c = content();
+    let d = c.dungeon.as_mut().unwrap();
+    let mut p = pack("grunt", "", [0.0, -60.0], false);
+    p.count = count;
+    p.route = vec![[20.0, -60.0]];
+    p.wait = 4.0;
+    d.packs = vec![p, pack("warlord", "boss", [100.0, 0.0], false)];
+    let mut s = Survival::new_dungeon(c, land, 3, 1_000_000.0);
+    let _ = s.join("ayla", "Ayla", None);
+    let grunt = s.content.mob("grunt").unwrap();
+    let ids = s.mobs.iter().filter(|(_, m)| m.def == grunt).map(|(id, _)| *id).collect();
+    (s, ids)
+}
+
+#[test]
+fn a_patrol_foe_whose_place_round_its_turn_is_in_a_wall_turns_at_the_turn() {
+    // Level ground with a pillar just beside the turn, where the second of two keeps its place.
+    struct Pillar;
+    impl crate::land::Land for Pillar {
+        fn height(&self, _x: f32, _y: f32) -> f32 { 0.0 }
+        fn blocked(&self, x: f32, y: f32) -> bool { (17.5..19.6).contains(&x) && (-59.5..-57.5).contains(&y) }
+    }
+    let (mut s, ids) = patrol_below(Box::new(Pillar), 2);
+    assert_eq!(ids.len(), 2);
+    let mut ev = run(&mut s, 0.5);
+    for id in &ids {
+        let home = s.mobs[id].home;
+        assert!(home[0] > 17.0, "bound for the turn: {home:?}");
+        // Nov 2026: a Deadmines miner's home was its place in the gallery's wall, and a rest set
+        // it there, where it "fell through the floor".
+        assert!(s.land.footing(home).is_some(), "sent to open floor, not into the pillar: {home:?}");
+    }
+    ev.extend(run(&mut s, 12.0));
+    for id in &ids {
+        let m = &s.mobs[id];
+        assert!(dist2d(m.pos, m.home) < 0.5 && m.pos[0] > 17.0, "came to its turn: {:?}", m.pos);
+    }
+    // A hero rests: every foe set at its home.
+    for m in s.mobs.values_mut() {
+        m.pos = m.home;
+    }
+    ev.extend(run(&mut s, 1.0));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("put back"))), "nobody put back: {ev:?}");
+}
+
+#[test]
+fn a_patrol_up_a_ramp_turns_on_the_landing_not_in_the_hall_under_it() {
+    // A ramp from x 5 to 15 up to a landing 3 yards up; under the landing a walled-off hall.
+    struct Landing;
+    impl crate::land::Land for Landing {
+        fn height(&self, x: f32, _y: f32) -> f32 { ((x - 5.0) * 0.3).clamp(0.0, 3.0) }
+        fn height_near(&self, x: f32, y: f32, z: f32) -> f32 {
+            if x > 15.0 && z < 1.7 { 0.0 } else { self.height(x, y) }
+        }
+        fn blocked_near(&self, x: f32, _y: f32, z: f32) -> bool { x > 15.0 && z < 1.5 }
+        fn floors_at(&self, x: f32, y: f32, z: f32) -> Vec<f32> {
+            if x > 15.0 { vec![0.0, 3.0] } else { vec![self.height_near(x, y, z)] }
+        }
+    }
+    let (mut s, ids) = patrol_below(Box::new(Landing), 1);
+    let id = ids[0];
+    let mut ev = run(&mut s, 12.0);
+    // Its turn's floor looked for from its own height, 3 yards under the landing, was the hall
+    // under it: no footing, so it stood (Nov 2026: Scarlet Cathedral's monks, Razorfen's boars).
+    let m = &s.mobs[&id];
+    assert!((m.home[2] - 3.0).abs() < 0.1, "its turn on the landing: {:?}", m.home);
+    assert!(dist2d(m.pos, [20.0, -60.0, 0.0]) < 0.5 && (m.pos[2] - 3.0).abs() < 0.1, "came up to it: {:?}", m.pos);
+    // And back down.
+    ev.extend(run(&mut s, 20.0));
+    assert!(dist2d(s.mobs[&id].pos, [0.0, -60.0, 0.0]) < 1.0, "back: {:?}", s.mobs[&id].pos);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("put back"))), "nobody put back: {ev:?}");
+}

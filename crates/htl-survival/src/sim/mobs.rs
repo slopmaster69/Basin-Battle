@@ -525,11 +525,18 @@ impl Survival {
             for (j, id) in members.iter().enumerate() {
                 let a = j as f32 * 2.4;
                 let r = if members.len() > 1 { 1.8 } else { 0.0 };
-                let goal = self.ground_near(to[0] + a.cos() * r, to[1] + a.sin() * r,
-                    self.mobs[id].pos[2],
-                );
-                let m = &self.mobs[id];
-                let (from, speed) = (m.pos, self.content.mobs[m.def].walk_speed.max(1.0));
+                let from = self.mobs[id].pos;
+                let goal = if self.is_below() {
+                    // (No floor there it has a way to: it stays where it is, its home with it,
+                    // rather than being sent into a wall it would be put back at.)
+                    match self.patrol_goal(from, to, [a.cos() * r, a.sin() * r]) {
+                        Some(g) => g,
+                        None => continue,
+                    }
+                } else {
+                    self.ground_near(to[0] + a.cos() * r, to[1] + a.sin() * r, from[2])
+                };
+                let speed = self.content.mobs[self.mobs[id].def].walk_speed.max(1.0);
                 longest = longest.max(dist2d(from, goal) / speed);
                 let m = self.mobs.get_mut(id).unwrap();
                 m.home = goal;
@@ -538,6 +545,32 @@ impl Survival {
             }
             self.patrols.insert(k, (step, now + longest * 1.3 + wait));
         }
+    }
+
+    /// Below, where a patrolling foe at `from` goes for its turn at `to`, its own place `off` from
+    /// the turn (each of a pack keeps its place round it):
+    /// - on the floor over the turn that it has a way to, the nearest its own height of those: a
+    ///   route up a stair turns on the landing, not on the floor under it, which a walker looking
+    ///   from below the landing finds (Scarlet Cathedral's monks, the Razorfen quilguards and
+    ///   boars and a Shadowfang darksoul were sent under their turns until Nov 2026, found no
+    ///   way and stood);
+    /// - at its own place only if that's floor joined to the turn by a straight walk, else at the
+    ///   turn itself. Nov 2026, a Deadmines miner's place round its turn was in the gallery's
+    ///   wall: it stood, but the wall was its home, and when a hero rested it was set there and
+    ///   "fell through the floor".
+    /// `None`: no floor at the turn it has a way to.
+    pub(crate) fn patrol_goal(&self, from: Vec3, to: [f32; 2], off: [f32; 2]) -> Option<Vec3> {
+        let mut floors = self.land.floors_at(to[0], to[1], from[2]);
+        floors.sort_by(|a, b| (a - from[2]).abs().total_cmp(&(b - from[2]).abs()));
+        let turn = floors
+            .into_iter()
+            .filter_map(|z| self.land.footing([to[0], to[1], z]))
+            .find(|t| self.land.walk_clear(from, *t) || self.land.path(from, *t).is_some_and(|p| !p.is_empty()))?;
+        if off == [0.0, 0.0] {
+            return Some(turn);
+        }
+        let own = self.land.footing(self.ground_near(to[0] + off[0], to[1] + off[1], turn[2]));
+        Some(own.filter(|p| self.land.walk_clear(turn, *p)).unwrap_or(turn))
     }
 
     pub(crate) fn step_respawns(&mut self) {
