@@ -613,37 +613,45 @@ fn the_clubs_heavy_knocks_a_foe_back_and_the_maces_doesnt() {
     assert!(hit && far < 3.6, "the mace's doesn't: {far}");
 }
 
-#[test]
-fn a_tenderized_foe_takes_more_from_the_next_hit_of_another_hero_once() {
+/// Bren's second blow (the sword's chain, fixed damage) on a foe Ayla's mallet has tenderized, or
+/// not, and what's left of the mark on it after.
+fn second_blow_on_tender_foe(tenderized: bool, own_blow_between: bool) -> (u32, u32, f32) {
     let (mut s, p) = world();
     let q = s.join("bren", "Bren", None);
     s.move_player(q, [0.0, 1.0, 0.0], 0.0, Moving::default());
+    // (Fixed blows, so what's read is the mark and not a roll.)
+    for k in ["sword", "cookie_tenderizer"] {
+        let i = s.content.weapons.iter().position(|w| w.key == k).unwrap();
+        s.content.weapons[i].damage = [20, 20];
+    }
     wield(&mut s, p, "cookie_tenderizer");
     wield(&mut s, q, "sword");
     let m = sturdy_foe(&mut s, "dm_woodcutter");
-    let plain = first_hit(&swing(&mut s, q), m);
-    assert!((14..=19).contains(&plain), "an untouched foe: {plain}");
-    for _ in 0..60 {
-        s.step(0.02);
+    let first = first_hit(&swing(&mut s, q), m);
+    if tenderized {
+        reset_foe(&mut s, m);
+        swing(&mut s, p);
+        if own_blow_between {
+            // The wielder's own next blow doesn't use it up.
+            reset_foe(&mut s, m);
+            swing(&mut s, p);
+        }
     }
-    // Now the mallet tenderizes it, and the sword's next hit is 25% harder.
     reset_foe(&mut s, m);
-    swing(&mut s, p);
-    assert!(s.mobs[&m].fx.tender.1 > s.clock);
-    // The wielder's own next blow doesn't use it up.
-    reset_foe(&mut s, m);
-    let own = first_hit(&swing(&mut s, p), m);
-    assert!(own <= 34, "the wielder's own blow is untouched: {own}");
-    assert!(s.mobs[&m].fx.tender.0 > 0.0, "still tender");
-    reset_foe(&mut s, m);
-    let tender = first_hit(&swing(&mut s, q), m);
-    assert!((17..=24).contains(&tender), "the ally's hit does a quarter more: {tender}");
-    assert_eq!(s.mobs[&m].fx.tender.0, 0.0, "used up");
-    reset_foe(&mut s, m);
-    let after = first_hit(&swing(&mut s, q), m);
-    // (The sword's third blow of the chain, the finisher, is 35% harder: what's read is no more
-    // than that, not a quarter on top of it.)
-    assert!((14..=26).contains(&after), "and gone: {after}");
+    let second = first_hit(&swing(&mut s, q), m);
+    (first, second, s.mobs[&m].fx.tender.0)
+}
+
+#[test]
+fn a_tenderized_foe_takes_more_from_the_next_hit_of_another_hero_once() {
+    let (first, control, _) = second_blow_on_tender_foe(false, false);
+    assert_eq!(first, 20, "an untouched foe");
+    let (_, tender, left) = second_blow_on_tender_foe(true, false);
+    assert_eq!(tender, (control as f32 * 1.25).round() as u32, "the ally's hit does a quarter more than it would: {tender} against {control}");
+    assert_eq!(left, 0.0, "used up");
+    // The wielder's own blow in between leaves it for the ally.
+    let (_, tender_after_own, _) = second_blow_on_tender_foe(true, true);
+    assert_eq!(tender_after_own, tender, "the wielder's own blow doesn't use it up");
 }
 
 #[test]

@@ -152,6 +152,7 @@ impl Survival {
         self.windups.clear();
         self.missiles.clear();
         self.pending.clear();
+        self.fx_pending.clear();
         self.collapse_reset();
     }
 

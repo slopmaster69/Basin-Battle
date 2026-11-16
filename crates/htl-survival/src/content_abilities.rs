@@ -1485,6 +1485,8 @@ impl Default for CcDef {
             ("snare", 116),
             ("silence", 15487),
             ("burn", 2120),
+            // (A shiv's poison shows as the burn does.)
+            ("poison", 2120),
             ("deathmark", 1130),
             // Death Wish's red: Blood Fury, and the Warrior's own Rallying Cry.
             ("fury", 12328),

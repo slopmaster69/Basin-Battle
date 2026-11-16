@@ -807,6 +807,7 @@ impl Survival {
         }
         self.missiles.clear();
         self.pending.clear();
+        self.fx_pending.clear();
     }
 
     /// A wave comes in at every camp standing: the base wave, and what was bought for it. Every

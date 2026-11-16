@@ -186,9 +186,7 @@ impl Survival {
         }
         // Smite's hammer builds: blows in a row on the same foe, the third staggers it.
         if w.build > 0.0 && self.alive(mid) {
-            let (n, last) = self.players.get(&id).and_then(|p| p.fx.build).filter(|(m, _, t)| *m == mid && now - *t <= BUILD_WINDOW).map_or((0, 0.0), |(_, n, t)| (n, t));
-            let _ = last;
-            let n = n + 1;
+            let n = self.players.get(&id).and_then(|p| p.fx.build).filter(|(m, _, t)| *m == mid && now - *t <= BUILD_WINDOW).map_or(0, |(_, n, _)| n) + 1;
             if n >= BUILD_HITS {
                 self.stagger_mob(mid, w.build, false);
                 if let Some(p) = self.players.get_mut(&id) {
@@ -258,10 +256,9 @@ impl Survival {
     /// What a heavy swing does round the hero whether or not it struck (the shockwave, the rally).
     pub(crate) fn weapon_heavy_swing(&mut self, id: Id, w: &WeaponDef) {
         let Some(at) = self.players.get(&id).map(|p| p.pos) else { return };
-        let now = self.clock;
         if w.shockwave > 0.0 {
             let dmg = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.shockwave).round() as u32;
-            let near: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && dist2d(m.pos, at) <= SHOCK_RADIUS).map(|(k, _)| *k).collect();
+            let near: Vec<Id> = self.mobs.iter().filter(|(k, m)| m.health > 0 && !m.hidden && dist2d(m.pos, at) <= SHOCK_RADIUS && !self.content.mobs[m.def].inert() && !self.own_totem(**k, id)).map(|(k, _)| *k).collect();
             self.events.push(Event::Visual { id, kit: super::combat::KIT_SLAM, by: None });
             for k in near {
                 self.hurt_mob_as(k, id, dmg, "Shockwave");
@@ -273,7 +270,6 @@ impl Survival {
                 self.apply_cc(h, id, "hallowed", RALLY_SECS, w.rally, 0.0, "Rally");
             }
         }
-        let _ = now;
     }
 
     /// The rocks come down.
@@ -285,7 +281,7 @@ impl Survival {
         let (due, keep): (Vec<Rockfall>, Vec<Rockfall>) = std::mem::take(&mut self.fx_pending).into_iter().partition(|r| r.at <= now);
         self.fx_pending = keep;
         for r in due {
-            let near: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && dist2d(m.pos, r.pos) <= ROCK_RADIUS).map(|(k, _)| *k).collect();
+            let near: Vec<Id> = self.mobs.iter().filter(|(k, m)| m.health > 0 && !m.hidden && dist2d(m.pos, r.pos) <= ROCK_RADIUS && !self.content.mobs[m.def].inert() && !self.own_totem(**k, r.by)).map(|(k, _)| *k).collect();
             for k in near {
                 self.events.push(Event::Visual { id: k, kit: super::combat::KIT_DUST, by: None });
                 self.hurt_mob_as(k, r.by, r.damage, "Rockfall");
