@@ -451,6 +451,45 @@ fn cloak_and_dagger_prefers_an_enemy_not_yet_struck() {
     assert_eq!(s.players[&p].rogue.cloak_steps, 7);
 }
 
+#[test]
+fn cloak_and_dagger_never_steps_to_an_idle_creature_and_never_wakes_it() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    // An idle pack 4 yd off (a packmate beside it), and nothing fighting.
+    let idle = grunt(&mut s, [4.0, 0.0, 0.0], PI);
+    let mate = grunt(&mut s, [4.0, 2.0, 0.0], PI);
+    // (They notice no one, so they stay as they are put: it is her step that is asked.)
+    let def = s.mobs[&idle].def;
+    s.content.mobs[def].aggro = 0.0;
+    press(&mut s, p, "ultimate", false);
+    run(&mut s, 0.5);
+    assert!(s.has_cc(p, "cloak"), "on");
+    let hp = (s.mobs[&idle].health, s.mobs[&mate].health);
+    // The press itself: no step, none of the 10 spent (the plain blow that follows, 4 yd
+    // off, reaches neither of them).
+    s.input(p, Input::Attack);
+    let _ = s.step(DT);
+    s.input(p, Input::AttackUp);
+    assert!(dist2d(s.players[&p].pos, ORIGIN) < 0.5, "no step to an idle one: {:?}", s.players[&p].pos);
+    assert_eq!(s.players[&p].rogue.cloak_steps, 10, "no step spent");
+    to_late_recovery(&mut s, p);
+    assert_eq!((s.mobs[&idle].health, s.mobs[&mate].health), hp, "nothing struck");
+    for m in [idle, mate] {
+        assert!(matches!(s.mobs[&m].state, MobState::Idle { .. }), "still asleep to her");
+    }
+    s.move_player(p, ORIGIN, 0.0, Moving::default());
+    let _ = s.step(0.0);
+    // One of them in the fight: the step goes to it, and its idle neighbour stays idle.
+    fighting(&mut s, idle, p);
+    s.input(p, Input::Attack);
+    let _ = s.step(DT);
+    s.input(p, Input::AttackUp);
+    let at = s.players[&p].pos;
+    assert!(dist2d(at, s.mobs[&idle].pos) < 1.6 && s.from_behind(idle, at), "to the one in the fight: {at:?}");
+    assert_eq!(s.players[&p].rogue.cloak_steps, 9);
+    assert!(matches!(s.mobs[&mate].state, MobState::Idle { .. }) && s.mobs[&mate].health == hp.1, "its neighbour never woke");
+}
+
 // --- Shrouded Step and the trait -------------------------------------------------------------------
 
 #[test]

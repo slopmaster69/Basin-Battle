@@ -8,7 +8,10 @@
 # sec, and three main-hand blows that each bring the green back a stack.
 # Then Garrote on a casting Kobold Geomancer: it comes at her and casts; Shadowstep puts her at its
 # back, the 1 key is changed to Garrote and pressed. Look for its cast bar breaking, its stagger,
-# the silence's look, the blood burst each second, and no new cast for 3 sec.
+# the silence's look, the blood burst each second, and no new cast for 3 sec. (The refilm's 3 presses
+# did nothing because the Shadowstep click's reticle line, sent while she faced the kobold, was still
+# fresh for the next 0.6 sec and turned the first Garrote away from the back she had been put behind:
+# a miss that spent the 14 sec. A Rogue's step now drops the line, so the press needs no new one.)
 # Last, Choking Cloud (2's EX) between two grunts that come at her: the green cloud on the ground
 # (28158, to be checked for its size against the 5 yd), and their wind-ups visibly slower.
 # Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>` (the `setup`
@@ -63,7 +66,7 @@ include _setup
 19.9 .es in au
 20.0 .es slot 1 garrote
 20.1 .es in ab 2 0                      # 1: Garrote, into its back
-20.5 .es in ab 2 0                      # again if the first was out of reach (it is 14 sec to cool)
+20.5 .es in ab 2 0                      # a spare, only if the first was refused (a blow that lands spends its 14 sec)
 20.9 .es in ab 2 0
 19.4 shots garrote 40 0.1
 25.0 .es target clear

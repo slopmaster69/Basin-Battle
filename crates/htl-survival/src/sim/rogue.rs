@@ -334,6 +334,7 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(from) });
         }
         self.set_down(id, spot, face);
+        self.drop_aim(id);
         if puff != 0 {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(spot) });
         }
@@ -539,9 +540,9 @@ impl Survival {
     }
 
     /// Cloak and Dagger: an attack while it lasts first steps the hero behind the nearest enemy
-    /// within `[rogue] cloak_reach` (one not yet struck in it before any other), a puff at both
+    /// within `[rogue] cloak_reach` that is already in the fight (one not yet struck in it before any other), a puff at both
     /// ends, then strikes as that hand's blow. False (the press goes on as any other) when it isn't
-    /// on, no steps are left, the hero isn't free to strike, or no back is in reach.
+    /// on, no steps are left, the hero isn't free to strike, or no back in the fight is in reach.
     pub(crate) fn cloak_step(&mut self, id: Id, kind: StrikeKind) -> bool {
         let c = &self.content;
         let Some(p) = self.players.get(&id) else { return false };
@@ -564,6 +565,12 @@ impl Survival {
             if m.health == 0 || m.hidden || m.friendly || d.totem || (d.inert() && !d.dummy) || self.own_totem(mid, id) {
                 continue;
             }
+            // Only one already in the fight: coming at a foe (or winding up, or getting its
+            // breath back). An idle one, a packmate that hasn't woken, is never a step: a blow
+            // there would pull its whole pack. (A practice target and a dummy aren't a pack.)
+            if m.state.foe().is_none() && !d.dummy && !self.targets.contains_key(&mid) {
+                continue;
+            }
             foes.push((struck.contains(&mid), dist2d(from, m.pos), mid, m.pos, m.facing));
         }
         if self.heroes_clash() {
@@ -583,6 +590,7 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(from) });
         }
         self.set_down(id, spot, face);
+        self.drop_aim(id);
         if puff != 0 {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(spot) });
         }

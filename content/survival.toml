@@ -4651,13 +4651,14 @@ impact_kit = 2709
 effects = [{ kind = "deathmark", secs = [8.0, 8.0], amount = 0.3 }]
 
 # Shadow: every blow from behind, for a moment. Each attack press first steps the Rogue behind the
-# nearest enemy within 8 yd ([rogue] cloak_reach), one not yet struck in it first, then strikes as
-# that hand's blow. The backstab's decay (`backstab_bonus`) makes spreading the steps over a pack
+# nearest enemy within 8 yd ([rogue] cloak_reach) that is already in the fight (coming at a foe,
+# winding up or recovering: never an idle one, which would pull its pack), one not yet struck in it
+# first, then strikes as that hand's blow. The backstab's decay (`backstab_bonus`) makes spreading the steps over a pack
 # the strong play; on a lone boss it is about six backstabs, each worth less.
 [[ability]]
 key = "cloak_and_dagger"
 name = "Cloak and Dagger"
-text = "For 6 sec, each attack first steps you through the shadows behind the nearest enemy within 8 yd, then strikes its back. Prefers an enemy you haven't struck yet. Up to 10 steps."
+text = "For 6 sec, each attack first steps you through the shadows behind the nearest enemy within 8 yd that is already fighting, then strikes its back. Prefers an enemy you haven't struck yet. Up to 10 steps."
 icon = "Ability_Stealth"
 school = "rogue"
 slot = "ultimate"
