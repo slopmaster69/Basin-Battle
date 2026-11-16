@@ -1228,7 +1228,7 @@ fn the_killer_leaving_before_gorged_rises_lets_him_rise_for_the_next_hero() {
     s.move_player(h, [-3.0, -2.0, 0.0], 0.0, Moving::default());
     until(&mut s, next, 5.0, |s, n| !s.mobs[&n].hidden);
     run(&mut s, 12.0);
-    assert!(s.mobs[&next].state.foe() == Some(Foe::Hero(h)) || s.kitchen.cooks.contains_key(&next), "he is up and in the fight");
+    assert!(!s.mobs[&next].hidden && s.kitchen.cooks.contains_key(&next), "he is up and has his own state again");
 }
 
 #[test]
