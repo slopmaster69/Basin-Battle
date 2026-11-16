@@ -814,6 +814,8 @@ pub struct Player {
     /// The light chain: the next blow's place, if an attack comes by then.
     pub combo_next: u8,
     pub combo_until: f32,
+    /// What the weapon in hand has built up in them (`weapon_fx`).
+    pub fx: weapon_fx::HeroFx,
     /// Their round trip to the server (seconds), for the allowances for lag.
     pub rtt: f32,
     /// Their client runs its own dashes and lunges (the action-combat client): the server sends it
@@ -1664,6 +1666,7 @@ impl Survival {
             sent_back: BACK_SPEED,
             combo_next: 0,
             combo_until: -100.0,
+            fx: Default::default(),
             rtt: 0.0,
             local_moves: false,
             lock: None,

@@ -3,13 +3,22 @@
 //! hero's blow lands on a creature (`combat.rs`) and the few where a creature falls or mends.
 
 use super::*;
-use crate::content::{WeaponDef, SILVER_SECS};
+use crate::content::{WeaponDef, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, SILVER_SECS, SNARE_SECS};
 
 /// What weapons have done to a creature, kept on it.
 #[derive(Debug, Clone, Default)]
 pub struct MobFx {
     /// Silvered until: it doesn't mend on its way home, and stays down once slain.
     pub silvered_until: f32,
+    /// A hook has taken its shield aside until: it can't block.
+    pub guard_down_until: f32,
+}
+
+/// What a weapon has built up in the hero holding it.
+#[derive(Debug, Clone, Default)]
+pub struct HeroFx {
+    /// Bloodlust: kills in a row, and until when the latest one counts.
+    pub bloodlust: (u32, f32),
 }
 
 impl Survival {
@@ -49,6 +58,24 @@ impl Survival {
             let pull = crate::content::AbilityEffect { kind: "pull".into(), amount: w.hook, from_caster: true, ..Default::default() };
             self.displace(id, mid, &pull);
         }
+        // The hooked guard: a shield-bearer struck by the heavy can't block for a while.
+        if w.guard_hook > 0.0 && strike.heavy() {
+            if let Some(m) = self.mobs.get_mut(&mid) {
+                m.fx.guard_down_until = now + w.guard_hook;
+            }
+        }
+        // The reaper's cut mends the reaper, foe by foe.
+        if w.reap_heal > 0.0 {
+            let amount = self.players.get(&id).map_or(0, |p| (p.max_health as f32 * w.reap_heal).round() as u32);
+            self.heal_hero_by(id, amount, id, "Reaping");
+        }
+        // The pin and the fright: a slow, a weaker foe.
+        if w.snare > 0.0 && self.alive(mid) {
+            self.apply_cc(mid, id, "snare", SNARE_SECS, w.snare, 0.0, "Hamstring");
+        }
+        if w.cow > 0.0 && self.alive(mid) {
+            self.apply_cc(mid, id, "cowed", COW_SECS, w.cow, 0.0, "Dread");
+        }
         // The fel step: the chain's last blow carries the hero round behind the foe.
         if w.blink_behind && strike.kind == StrikeKind::Light && self.alive(mid) {
             let last = self.content.moveset_of(w).light.len().saturating_sub(1);
@@ -56,6 +83,26 @@ impl Survival {
                 self.step_behind(id, mid);
             }
         }
+    }
+
+    /// A hero's kill: what the weapon in hand makes of it (a bloodlust builds).
+    pub(crate) fn weapon_kill(&mut self, killer: Id) {
+        let now = self.clock;
+        let Some(p) = self.players.get(&killer) else { return };
+        let lust = self.weapon_of(p).bloodlust;
+        if lust > 0.0 {
+            let p = self.players.get_mut(&killer).unwrap();
+            let (n, until) = p.fx.bloodlust;
+            let n = if until > now { (n + 1).min(BLOODLUST_STACKS) } else { 1 };
+            p.fx.bloodlust = (n, now + BLOODLUST_SECS);
+        }
+    }
+
+    /// The share a hero's swings come quicker by: a bloodlust's stacks while they last.
+    pub(crate) fn bloodlust_haste(&self, id: Id) -> f32 {
+        let Some(p) = self.players.get(&id) else { return 0.0 };
+        let (n, until) = p.fx.bloodlust;
+        if until > self.clock { self.weapon_of(p).bloodlust * n as f32 } else { 0.0 }
     }
 
     /// The hero comes out just behind a foe (on the far side from where they stood), facing it.

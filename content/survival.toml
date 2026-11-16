@@ -1002,6 +1002,7 @@ arc = 110.0
 targets = 2
 stagger = 0.5
 subclass = 0
+guard_hook = 4.0
 moveset = "axe_one_hand"
 # The bleeder (docs/weapon-identities.md).
 bleed = 6.0
@@ -1369,7 +1370,7 @@ name = "Bearded Axe"
 display = 8458
 icon = "INV_Axe_06"
 kind = "weapon"
-text = "Slower and costs more stamina to swing, but deals much more damage."
+text = "Slower and costs more stamina to swing, but deals much more damage. {fx}"
 
 [[item]]
 key = "sword"

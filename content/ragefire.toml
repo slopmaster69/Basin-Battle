@@ -1319,6 +1319,7 @@ range = 3.2
 arc = 110.0
 targets = 3
 subclass = 0
+bloodlust = 0.08
 moveset = "axe_one_hand"
 
 [[item]]
@@ -1327,7 +1328,7 @@ name = "Bloodlust Edge"
 display = 1455
 icon = "INV_Axe_03"
 kind = "weapon"
-text = "Hits up to 3 enemies at a swing. \"Bazzalan's, wide and hungry.\""
+text = "Hits up to 3 enemies at a swing. {fx} \"Bazzalan's, wide and hungry.\""
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------

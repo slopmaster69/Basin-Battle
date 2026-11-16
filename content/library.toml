@@ -668,6 +668,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 38
 subclass = 6
+snare = 0.4
 
 [[item]]
 key = "loksey_boar_spear"
@@ -675,7 +676,7 @@ name = "Loksey's Boar Spear"
 display = 5636
 icon = "INV_Spear_06"
 kind = "weapon"
-text = "The Houndmaster's. Long enough to keep a dog off, or a hero."
+text = "Two-handed. Long enough to keep a dog off. {fx} \"The Houndmaster's.\""
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------
