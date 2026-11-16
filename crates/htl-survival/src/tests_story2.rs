@@ -7,6 +7,7 @@ use crate::land::FlatLand;
 use crate::sim::mobs::{Foe, MobState};
 use crate::sim::*;
 use crate::tests_story::*;
+use std::collections::BTreeMap;
 
 // --- Stage 6: Gruff Swiftbite ------------------------------------------------------------------
 
@@ -281,8 +282,8 @@ fn a_chests_condition_must_name_something_real_and_one_a_chest_can_meet() {
         ("open:nope", "nope"),
         ("found:nowhere", "nowhere"),
         ("kill:nobody_at_all", "nobody_at_all"),
-        ("raids:3", "open:, found: or kill:"),
-        ("bogus:x", "open:, found: or kill:"),
+        ("raids:3", "open:, found:, kill: or chose:"),
+        ("bogus:x", "open:, found:, kill: or chose:"),
         ("open:mason_trowel", "wait on itself"),
     ] {
         let mut t = text.clone();
@@ -328,4 +329,228 @@ fn the_cairn_is_a_place_and_every_corner_counts_it() {
         let ch = c.chests.iter().find(|ch| ch.key == k).unwrap();
         assert!(dist2d([ch.at[0], ch.at[1], 0.0], [site.at[0], site.at[1], 0.0]) < site.radius, "{k} is at the cairn");
     }
+}
+
+// --- Stage 8: Remy "Two Times" -----------------------------------------------------------------
+
+const REMY: &str = "Remy \"Two Times\"";
+
+/// The world with the mason's book open, Remy standing outside the inn, and a hero beside him.
+fn remy_world() -> (Survival, Id, Id) {
+    let mut s = world();
+    s.camp.counts.insert("open:mason_cache".into(), 1);
+    run(&mut s, 5.5);
+    let (_, id) = person(&s, REMY);
+    let h = beside(&mut s, id);
+    (s, h, id)
+}
+
+/// Whether the camp's person called `name` stands.
+fn stands(s: &Survival, name: &str) -> bool {
+    s.content.props.iter().position(|p| p.npc && p.name == name).is_some_and(|def| s.objs.values().any(|o| matches!(o.kind, ObjKind::Piece { def: d } if d == def)))
+}
+
+#[test]
+fn remy_waits_for_the_mason_book_and_offers_two_choices_on_his_page() {
+    let mut s = world();
+    run(&mut s, 5.5);
+    assert!(!stands(&s, REMY), "not before the road book is open");
+    s.camp.counts.insert("open:mason_cache".into(), 1);
+    run(&mut s, 5.5);
+    let (_, id) = person(&s, REMY);
+    let h = beside(&mut s, id);
+    s.interact(h, None);
+    let said = letters(&s.step(0.0));
+    assert_eq!(said.len(), 1);
+    assert!(said[0].2.starts_with("Rosters. Who walks which road, and when."));
+    let links: Vec<&str> = said[0].3.iter().map(|(c, _)| c.as_str()).collect();
+    assert_eq!(links, [".es choose remy:arrest", ".es choose remy:free"]);
+    assert_eq!(said[0].3[0].1, "Arrest Him");
+    assert_eq!(said[0].3[1].1, "Free Him");
+}
+
+#[test]
+fn a_choice_is_refused_far_from_remy_twice_over_and_for_the_other_option() {
+    let (mut s, h, _) = remy_world();
+    // Far from him: nobody is waiting on it.
+    s.move_player(h, [4000.0, 4000.0, 0.0], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    assert!(s.choose(h, "remy:arrest").unwrap_err().contains("Nobody here"));
+    assert!(!s.camp_has("chose:remy"));
+    // Close, but nobody offers that.
+    let (_, id) = person(&s, REMY);
+    let at = s.objs[&id].pos;
+    s.move_player(h, [at[0] + 1.5, at[1], at[2]], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    assert!(s.choose(h, "remy:hang").unwrap_err().contains("Nobody here"));
+    assert!(s.choose(h, "remy").unwrap_err().starts_with("Try .es choose"));
+    assert!(s.choose(h, "remy:arrest:now").unwrap_err().starts_with("Try .es choose"));
+    // The choice is made, the camp's, once.
+    assert!(s.choose(h, "remy:free").is_ok());
+    assert!(s.camp_has("chose:remy") && s.camp_has("chose:remy:free") && !s.camp_has("chose:remy:arrest"));
+    assert_eq!(s.camp.counts.get("chose:remy"), Some(&1));
+    assert!(s.choose(h, "remy:free").unwrap_err().contains("already decided"), "a second time");
+    assert!(s.choose(h, "remy:arrest").unwrap_err().contains("already decided"), "the other option");
+    assert!(!s.camp_has("chose:remy:arrest"));
+}
+
+#[test]
+fn a_hero_must_be_within_6_yd_and_any_hero_may_choose() {
+    let (mut s, _, id) = remy_world();
+    let at = s.objs[&id].pos;
+    let far = s.join("bren", "Bren", None);
+    s.move_player(far, [at[0] + 7.0, at[1], at[2]], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    assert!(s.choose(far, "remy:arrest").unwrap_err().contains("Nobody here"), "7 yd is too far");
+    s.move_player(far, [at[0] + 5.5, at[1], at[2]], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    assert!(s.choose(far, "remy:arrest").is_ok(), "5.5 yd is near enough, for any hero");
+}
+
+#[test]
+fn arrested_remy_goes_and_dughan_and_the_bounty_come() {
+    let (mut s, h, _) = remy_world();
+    assert!(!stands(&s, "Marshal Dughan"));
+    // The bounty and the stash are shut before the choice.
+    let ev = open_at(&mut s, h, "remy_bounty");
+    assert!(told(&ev, "Nobody has been taken to the Marshal yet."), "{ev:?}");
+    let ev = open_at(&mut s, h, "remy_stash");
+    assert!(told(&ev, "Nobody has told you where Remy hides his silver."));
+    let (_, id) = person(&s, REMY);
+    let at = s.objs[&id].pos;
+    s.move_player(h, [at[0] + 1.5, at[1], at[2]], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    s.choose(h, "remy:arrest").unwrap();
+    let ev = s.step(0.0);
+    assert!(!stands(&s, REMY), "Remy is taken away");
+    assert!(stands(&s, "Marshal Dughan"), "and the Marshal stands");
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text == "Marshal Dughan takes Remy \"Two Times\" to the Stockade.")), "{ev:?}");
+    // He never stands again, however long the camp looks.
+    run(&mut s, 30.0);
+    assert!(!stands(&s, REMY));
+    // The bounty opens, the stash does not.
+    let silver = s.content.item("silver").unwrap();
+    let bronze = s.content.item("bronze").unwrap();
+    let before = (s.players[&h].bag.get(&silver).copied().unwrap_or(0), s.players[&h].bag.get(&bronze).copied().unwrap_or(0));
+    let ev = open_at(&mut s, h, "remy_bounty");
+    assert!(told(&ev, "Stormwind pays for informers, once they stop informing."));
+    assert_eq!(s.players[&h].bag.get(&silver).copied().unwrap_or(0), before.0 + 3);
+    assert_eq!(s.players[&h].bag.get(&bronze).copied().unwrap_or(0), before.1 + 2);
+    let ev = open_at(&mut s, h, "remy_stash");
+    assert!(told(&ev, "Nobody has told you where Remy hides his silver."), "the stash stays shut after an arrest");
+    // Dughan names the Stockade, with its real page.
+    let (dughan, did) = person(&s, "Marshal Dughan");
+    let t = s.talk_line(dughan).unwrap();
+    assert!(t.text.starts_with("Remy sold the rosters"));
+    assert_eq!(t.links, [".es lore stockade~The Stockade"]);
+    assert!(s.content.dungeons().any(|d| d.key == "stockade"));
+    let _ = did;
+}
+
+#[test]
+fn freed_remy_stays_with_his_word_and_his_stash_opens() {
+    let (mut s, h, id) = remy_world();
+    s.choose(h, "remy:free").unwrap();
+    let _ = s.step(0.0);
+    run(&mut s, 30.0);
+    assert!(stands(&s, REMY), "Remy stays");
+    assert!(!stands(&s, "Marshal Dughan"), "no marshal");
+    let (def, _) = person(&s, REMY);
+    let t = s.talk_line(def).unwrap();
+    assert!(t.text.starts_with("You never saw me. The man in black meets his buyers past Jasperlode."));
+    assert!(t.links.is_empty(), "nothing left to choose");
+    let _ = id;
+    let silver = s.content.item("silver").unwrap();
+    let pearl = s.content.item("pearl").unwrap();
+    let ev = open_at(&mut s, h, "remy_bounty");
+    assert!(told(&ev, "Nobody has been taken to the Marshal yet."), "no bounty for a free man");
+    let ev = open_at(&mut s, h, "remy_stash");
+    assert!(told(&ev, "Two silver a road, saved."));
+    assert_eq!(s.players[&h].bag.get(&silver).copied().unwrap_or(0), 2);
+    assert_eq!(s.players[&h].bag.get(&pearl).copied().unwrap_or(0), 2);
+}
+
+#[test]
+fn the_choice_counts_for_the_journal_and_a_save_keeps_it() {
+    let (mut s, h, _) = remy_world();
+    let g = s.content.goals.iter().position(|g| g.title == "Remy Two Times").unwrap();
+    let corner = s.content.goals.iter().position(|g| g.title == "Every corner").unwrap();
+    assert_eq!(g + 1, corner, "just before Every corner");
+    assert_eq!((s.content.goals[g].kind.as_str(), s.content.goals[g].what.as_str()), ("chose", "remy"));
+    s.camp.goal = g;
+    s.step_goals();
+    assert_eq!(s.camp.goal, g, "not before the choice");
+    s.choose(h, "remy:arrest").unwrap();
+    s.step_goals();
+    assert_eq!(s.camp.goal, corner, "the choice is the goal");
+    // A save keeps the choice: Remy is still gone, the Marshal still stands, the bounty still opens.
+    let save = s.save(&BTreeMap::new());
+    let mut back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    back.mobs.clear();
+    assert!(back.camp_has("chose:remy:arrest") && !back.camp_has("chose:remy:free"));
+    run(&mut back, 5.5);
+    assert!(!stands(&back, REMY));
+    assert!(stands(&back, "Marshal Dughan"));
+    assert!(back.choose(h, "remy:free").is_err(), "and it can't be made again");
+}
+
+#[test]
+fn a_freed_remy_is_still_there_after_a_save() {
+    let (mut s, h, _) = remy_world();
+    s.choose(h, "remy:free").unwrap();
+    let save = s.save(&BTreeMap::new());
+    let mut back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    back.mobs.clear();
+    run(&mut back, 5.5);
+    assert!(stands(&back, REMY));
+    assert!(!stands(&back, "Marshal Dughan"));
+}
+
+#[test]
+fn a_choice_nothing_offers_or_nothing_waits_on_is_refused_by_validate() {
+    let text = source("survival.toml");
+    let dungeon = source("deadmines.toml");
+    assert!(Content::parse_with(&text, &dungeon).is_ok());
+    let swap = |from: &str, to: &str| {
+        let at = text.find(from).unwrap_or_else(|| panic!("no {from}"));
+        let mut t = text.clone();
+        t.replace_range(at..at + from.len(), to);
+        Content::parse_with(&t, &dungeon)
+    };
+    // A condition that names an option nobody offers.
+    let err = swap("after = \"chose:remy:free\"\ntext = \"You never", "after = \"chose:remy:nope\"\ntext = \"You never").unwrap_err();
+    assert!(format!("{err:#}").contains("nope"), "{err:#}");
+    let err = swap("after = \"chose:remy:arrest\"\nclear", "after = \"chose:nobody:arrest\"\nclear").unwrap_err();
+    assert!(format!("{err:#}").contains("nobody:arrest"), "{err:#}");
+    // A link that is no group and option, or an option nothing waits on.
+    let two = "\".es choose remy:free~Free Him\"]";
+    let err = swap(two, "\".es choose remy:free~Free Him\", \".es choose remy~Bad\"]").unwrap_err();
+    assert!(format!("{err:#}").contains("not `.es choose <group>:<option>`"), "{err:#}");
+    let err = swap(two, "\".es choose remy:free~Free Him\", \".es choose remy:pardon~Pardon\"]").unwrap_err();
+    assert!(format!("{err:#}").contains("nothing waits on it"), "{err:#}");
+    // A goal for a group nobody offers.
+    let err = swap("kind = \"chose\"\nwhat = \"remy\"", "kind = \"chose\"\nwhat = \"nobody\"").unwrap_err();
+    assert!(format!("{err:#}").contains("nobody"), "{err:#}");
+    // And a prop that goes for a condition that names nothing.
+    let err = swap("until = \"chose:remy:arrest\"", "until = \"chose:remy:bogus\"").unwrap_err();
+    assert!(format!("{err:#}").contains("bogus"), "{err:#}");
+}
+
+#[test]
+fn a_prop_with_until_never_stands_once_it_holds_even_at_the_start() {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    // A person from the start whose `until` already holds is not set out.
+    let k = c.props.iter().position(|p| p.npc && p.name == REMY).unwrap();
+    c.props[k].after = None;
+    let mut s = Survival::new(c.clone(), Box::new(FlatLand::default()), 1, 1_000_000.0);
+    assert!(stands(&s, REMY), "from the start he stands");
+    s.camp.counts.insert("chose:remy:arrest".into(), 1);
+    run(&mut s, 5.5);
+    assert!(!stands(&s, REMY), "and goes once his until holds");
+    let mut s2 = Survival::new(c, Box::new(FlatLand::default()), 1, 1_000_000.0);
+    s2.camp.counts.insert("chose:remy:arrest".into(), 1);
+    s2.objs.retain(|_, o| !matches!(o.kind, ObjKind::Piece { .. }));
+    s2.place_props();
+    assert!(!stands(&s2, REMY), "never set out at all");
 }

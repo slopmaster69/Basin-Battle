@@ -45,12 +45,17 @@ impl Survival {
             return;
         }
         for k in 0..self.content.props.len() {
-            if self.content.props[k].after.is_none() {
+            if self.content.props[k].after.is_none() && !self.prop_gone(k) {
                 self.place_piece(k);
             }
         }
         // The camp's own, as far as it has come.
         self.grow_camp(false);
+    }
+
+    /// Whether prop `k` has gone: its `until` holds.
+    fn prop_gone(&self, k: usize) -> bool {
+        self.content.props[k].until.as_deref().is_some_and(|u| self.camp_has(u))
     }
 
     /// Set out `[[prop]]` `k`.
@@ -81,9 +86,45 @@ impl Survival {
                 self.has_station(key) || self.camp.counts.get(&format!("build:{key}")).is_some_and(|n| *n > 0)
             }
             "found" => self.camp.found.contains(arg.trim()),
-            "kill" | "open" => self.ever(what.trim(), arg.trim()),
+            // `chose:<group>` once any option was chosen, `chose:<group>:<option>` for that one.
+            "kill" | "open" | "chose" => self.ever(what.trim(), arg.trim()),
             _ => false,
         }
+    }
+
+    /// How near a hero must stand to a person to put a choice to them.
+    const CHOOSE_RANGE: f32 = 6.0;
+
+    /// A hero makes a choice a person is offering (`.es choose <group>:<option>`, a link in their
+    /// talk line): only within 6 yd of a person whose current line has that link, and only once
+    /// for a group. It is the camp's: it counts `chose:<group>` and `chose:<group>:<option>`, and
+    /// the camp's people stand or go at once.
+    pub fn choose(&mut self, id: Id, spec: &str) -> Result<(), String> {
+        let spec = spec.trim();
+        let Some((group, option)) = spec.split_once(':').filter(|(g, o)| !g.is_empty() && !o.is_empty() && !o.contains(':')) else {
+            return Err("Try .es choose <group>:<option>.".into());
+        };
+        if self.ever("chose", group) {
+            return Err("That is already decided.".into());
+        }
+        let Some(pos) = self.players.get(&id).filter(|p| p.health > 0).map(|p| p.pos) else { return Err("Not now.".into()) };
+        let link = format!(".es choose {group}:{option}");
+        let offered = self.objs.values().any(|o| match o.kind {
+            ObjKind::Piece { def } => {
+                dist2d(o.pos, pos) <= Self::CHOOSE_RANGE
+                    && self.talk_line(def).is_some_and(|t| t.links.iter().any(|l| l.split('~').next().is_some_and(|c| c.trim() == link)))
+            }
+            _ => false,
+        });
+        if !offered {
+            return Err("Nobody here is waiting on that. Talk to them first.".into());
+        }
+        self.count("chose", group, 1);
+        self.count("chose", &format!("{group}:{option}"), 1);
+        // Who stands and who goes follows the choice now, not at the next look.
+        self.grow_camp(true);
+        self.events.push(Event::Dirty);
+        Ok(())
     }
 
     /// What the camp's person at prop `def` says now: the last of their lines whose `after`
@@ -110,10 +151,22 @@ impl Survival {
         if self.is_below() || self.is_siege() {
             return;
         }
+        // What the camp has outgrown goes (a person taken away: `until`), and never stands again.
+        let gone: Vec<Id> = self
+            .objs
+            .iter()
+            .filter(|(_, o)| matches!(o.kind, ObjKind::Piece { def } if self.prop_gone(def)))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in gone {
+            self.objs.remove(&id);
+            self.events.push(Event::ObjGone { id });
+        }
         let standing: BTreeSet<usize> = self.objs.values().filter_map(|o| match o.kind { ObjKind::Piece { def } => Some(def), _ => None }).collect();
         let due: Vec<usize> = (0..self.content.props.len())
             .filter(|k| !standing.contains(k))
             .filter(|k| self.content.props[*k].after.as_deref().is_some_and(|a| self.camp_has(a)))
+            .filter(|k| !self.prop_gone(*k))
             .collect();
         for k in due {
             let id = self.place_piece(k);

@@ -1854,6 +1854,8 @@ impl SurvivalGame {
             // The pages kept: a note read before, and a dungeon's secrets, rumours and notes.
             "note" | "reread" => self.sim.reread(me, &arg),
             "lore" | "secrets" => self.sim.lore_page(me, &arg),
+            // A choice a person offers (a link in their talk): `.es choose remy:arrest`.
+            "choose" => self.sim.choose(me, &arg),
             // The Bookmaker's Wager: its page, a level taken (from the book), its board.
             "wager" if arg2.is_empty() => self.ui_wager_page(conn, me, &arg),
             "wager" => match arg2.trim_start_matches('+').parse::<u32>() {
