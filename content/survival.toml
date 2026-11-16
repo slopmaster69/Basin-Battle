@@ -3826,6 +3826,13 @@ what = "letter"
 reward = { silver = 2 }
 
 [[goal]]
+title = "The Lion's Hound"
+text = "Kill Sable, the Lion's Hound, who waits unseen on the roads round the camp. She only strikes your back, so turn with her."
+kind = "kill"
+what = "sable"
+reward = { silver = 3, pearl = 1 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
@@ -10900,6 +10907,11 @@ text = "Lescovar's ring, my cut. I'd know it in the dark. The House will call me
 after = "chose:letter:keep"
 text = "The Guard keeps me at the gate until the House sits. You kept the letter. I'll keep my word."
 
+# (Stage 13) The hound is dead.
+[[prop.talk]]
+after = "kill:sable"
+text = "The hound's dead? Then I'll sleep tonight. The House sits within the week, and I'll be standing in it."
+
 # (Its goals, "The seal-cutter" and "The Lion's Knife", sit with the journal's other goals, just
 # before "Every corner". Wyle's, Remy's and Dughan's lines for it stand with their people.)
 
@@ -10993,6 +11005,91 @@ after = "chose:letter:keep"
 # Wyle's and Pell's lines for it stand with them.)
 
 # === end of Stage 12's block ===========================================================================
+
+# === Elwynn expansion, round three, Stage 13: Sable, the Lion's Hound (docs/elwynn-expansion.md) =======
+# Whatever the camp answered House Lescovar, his lordship sends a hunter: "he keeps a bargain with a
+# knife". Sable walks the roads round the camp, unseen (`hidden`) until a hero comes within 12 yd, and
+# only once the camp has answered (the pack's `after`). She strikes only from behind, or at an opening
+# (the `stalker` temper): turn with her and she circles; give her your back and she cuts it. At half
+# her health she throws down every hero beside her and goes for a back while they rise.
+
+[[temper]]
+key = "stalker"
+backstab = true
+flank = true
+punish = true
+retreat = 0.5
+retreat_yards = 5.0
+pace = 0.9
+
+[[mob]]
+key = "sable"
+name = "Sable"
+subname = "The Lion's Hound"
+display = 1297
+scale = 1.05
+health = 600
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 14.0
+leash = 50.0
+weapon = 2699
+grip = "dagger"
+off_hand = 2699
+temper = "stalker"
+boss = true
+posture = 160
+drops = { wool = [2, 3], linen = [2, 3], silver = [1, 2] }
+trophy = { silver = 3, bronze = 2 }
+respawn = 1800.0
+aggro_text = "His lordship sends his regards."
+death_text = "There's always another hound."
+  [mob.attack]
+  windup = 0.45
+  damage = 14
+  range = 2.6
+  arc = 80.0
+  recovery = 0.8
+  cooldown = 1.2
+  turn_rate = 260.0
+  lock = 0.25
+  blockable = true
+  # Two quick cuts, from behind: parry the first and the second never comes.
+  [[mob.pattern]]
+  name = "two cuts"
+  weight = 3.0
+  parry_ends = true
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 12, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.3, damage = 14, recovery = 0.9 } ]
+  # A lunge at a back a few strides off.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 9.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, lunge = 4.5, damage = 18, recovery = 1.0 } ]
+  # At half her health she throws down every hero within 4 yd, and goes round them as they rise.
+  [[mob.phase]]
+  at = 0.5
+  shove = 4.0
+  text = "You'll tire before I do."
+
+# She walks the camp's roads: the junction below the gate, the Westfall road, the woods by the camp's
+# north-west road. Unseen until a hero comes within 12 yd, and only once the camp has answered Venn.
+[[pack]]
+mob = "sable"
+at = [-9752.0, 640.0]
+radius = 0.0
+count = 1
+link = 0.0
+hidden = 12.0
+spots = [[-9752.0, 640.0], [-9764.0, 790.0], [-9705.0, 760.0]]
+rare = true
+after = "chose:letter"
+
+# (Its goal, "The Lion's Hound", sits with the journal's other goals, just before "Every corner". The
+# camp's words on her stand with its people.)
+
+# === end of Stage 13's block ===========================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
@@ -15249,6 +15346,11 @@ text = "The Darkspear came through woods I'd have sworn were empty. Someone show
 after = "raids:3"
 text = "The bare ground west of the lake saw another party cross. I watch the roads. Nobody has told me about the ground between them."
 
+# (Stage 13) The hound walked his roads.
+[[prop.talk]]
+after = "kill:sable"
+text = "Sable walked our roads a week and I never once saw her. She only ever came up behind."
+
 # The warband beaten: Westbrook stands again.
 [[prop]]
 display = 661
@@ -15299,6 +15401,11 @@ text = "We sold it. Like everyone else in Elwynn."
 [[prop.talk]]
 after = "chose:letter:keep"
 text = "Stormwind has it now, and two of its archers on our gate. Let the House of Nobles choke on it."
+
+# (Stage 13) Sable is dead.
+[[prop.talk]]
+after = "kill:sable"
+text = "Sold or kept, he sent the hound all the same. A lord pays for silence and keeps the change. We hold the roads we can."
 
 [[prop]]
 display = 624
