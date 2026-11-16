@@ -536,7 +536,9 @@ pub(crate) const VERSION: u32 = 2;
 /// older add-on knows none of them and shows nothing for them.
 /// 67: the crowd-control word "Disoriented" (Scatter Shot's `disorient`, #378): an older add-on
 /// shows the raw `disorient` key.
-pub(crate) const ADDON_NEWEST: u32 = 68;
+/// 69: the camp's people can be talked to (a `talk` page, `Letter.lua`): an older add-on shows
+/// their words as the default page.
+pub(crate) const ADDON_NEWEST: u32 = 69;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

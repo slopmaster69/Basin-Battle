@@ -3,8 +3,8 @@
 -- again). Parchment that stays up till it's closed (Escape, the ink cross, or Close), and a
 -- clue in red ink under a note while what it points to is still hidden.
 --
--- The server sends `NT kind title place text clue links`: kind is note, secret, lore, wager, board
--- or run (a run's tally as you leave it); `{n}`
+-- The server sends `NT kind title place text clue links`: kind is note, secret, lore, wager, board,
+-- run (a run's tally as you leave it) or talk (what a person in the camp says); `{n}`
 -- breaks a line in the text; links are `command~label` with `^` between.
 --
 -- It loads after Ledger.lua and wears its art and fonts (a plain dark page without it).
@@ -36,7 +36,7 @@ local SEPIA = { 0.353, 0.275, 0.188 }
 local WAX = { 0.604, 0.169, 0.125 }
 local FROST = { 0.184, 0.373, 0.47 }
 -- The seal on each kind of page.
-local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue", wager = "seal_grey", board = "seal_grey", run = "seal_check" }
+local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue", wager = "seal_grey", board = "seal_grey", run = "seal_check", talk = "seal_blue" }
 -- And the line at its foot.
 local FOOT = {
   note = "Kept in the logbook, under Secrets and Notes.",
@@ -45,6 +45,7 @@ local FOOT = {
   wager = "Click a wager to take it. The dungeon starts fresh.",
   board = "Every server's runs, through the board's keeper.",
   run = "The run's tally, as you leave it. The book at camp keeps the dungeon's page.",
+  talk = "Talk to them again as the camp grows.",
 }
 
 local ledger = ES.ledger

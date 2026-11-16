@@ -1244,6 +1244,17 @@ The camp's people are drawn as creatures (friendly, never fought, never in the w
 A camp from before the move keeps its stations: each standing outside the new building ground is
 carried over to the nearest good spot in it as the save is read.
 
+**Talking.** Each of the camp's people can be talked to with the use key ("Talk to", not
+right-click). A `[[prop]]` with `npc = true` takes `[[prop.talk]]` lines, each an `after` (the
+condition a prop's `after` takes) and a `text`, and optionally `links = ["command~label"]`. They
+say the last line whose `after` holds, so each person's words follow the camp: Hale after the
+first raid, Wyle after the Blackrock. The page is a `talk` letter (the blue seal) in the add-on's
+`Letter.lua`; there are no choices yet. A person with no line that holds isn't usable. The
+conditions are `start`, `raids:N`, `goal:N`, `built:<station>`, `found:<site>`, `kill:<mob>`
+(once the camp has killed one) and `open:<chest>` (once one has been opened). `Content::validate`
+refuses any other word, and a name that isn't a real station, site, creature or chest.
+
+
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set
 again every five minutes so it never runs on to the dusk (not below, not in Siege); until 7 Nov
 it was half past eleven at night under Duskwood's mist, and every game was night and fog. To watch

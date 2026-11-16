@@ -2974,7 +2974,27 @@ pub struct PropDef {
     /// What the camp hears when it first stands (the first of a tier says how the camp grows).
     #[serde(default)]
     pub say: String,
+    /// What an `npc` says when used (the use key), as the camp grows: the last line whose `after`
+    /// holds is the one read. None: the person only stands there.
+    #[serde(default)]
+    pub talk: Vec<TalkDef>,
 }
+
+/// One thing a camp's person says, once the camp has come as far as its `after`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TalkDef {
+    /// How far the camp must have come (as a prop's `after`: `raids:N`, `built:<station>`,
+    /// `goal:N`, `found:<site>`, `kill:<mob>`, `open:<chest>`); none: always.
+    #[serde(default)]
+    pub after: Option<String>,
+    pub text: String,
+    /// Links under the words, each `command~label` (a dungeon's lore page: `.es lore deadmines~The Deadmines`).
+    #[serde(default)]
+    pub links: Vec<String>,
+}
+
+/// The conditions a prop's or a line's `after` may name, each with what follows its colon.
+pub const CAMP_CONDITIONS: [&str; 7] = ["start", "raids", "goal", "built", "found", "kill", "open"];
 
 fn chest_display() -> u32 {
     259
@@ -3592,6 +3612,28 @@ impl Content {
         self.item(&k).unwrap_or(item)
     }
 
+    /// A condition on how far the camp has come (`raids:2`, `kill:hogger`) that names something real.
+    fn check_camp_condition(&self, cond: &str, what: &str) -> Result<()> {
+        let (kind, arg) = cond.split_once(':').unwrap_or((cond, ""));
+        let (kind, arg) = (kind.trim(), arg.trim());
+        if !CAMP_CONDITIONS.contains(&kind) {
+            bail!("{what}: after {cond:?}: no condition {kind:?} (one of {CAMP_CONDITIONS:?})");
+        }
+        let real = match kind {
+            "start" => true,
+            "raids" => arg.parse::<u32>().is_ok(),
+            "goal" => arg.parse::<usize>().is_ok(),
+            "built" => self.station(arg).is_some(),
+            "found" => self.sites.iter().any(|s| s.key == arg),
+            "kill" => self.mob(arg).is_some(),
+            _ => self.chests.iter().any(|c| c.key == arg),
+        };
+        if !real {
+            bail!("{what}: after {cond:?}: {arg:?} names nothing");
+        }
+        Ok(())
+    }
+
     fn validate(&self) -> Result<()> {
         // Gear's perks and sets.
         for i in &self.items {
@@ -3839,6 +3881,29 @@ impl Content {
         for m in &self.mobs {
             for k in &m.teaches {
                 card(k, &format!("mob {}", m.key))?;
+            }
+        }
+        // What a prop and what a person's words wait for.
+        for (n, p) in self.props.iter().enumerate() {
+            let what = format!("prop {n} ({})", if p.name.is_empty() { "unnamed" } else { &p.name });
+            if let Some(a) = &p.after {
+                self.check_camp_condition(a, &what)?;
+            }
+            if !p.talk.is_empty() && !p.npc {
+                bail!("{what}: talk lines are for an npc");
+            }
+            for t in &p.talk {
+                if let Some(a) = &t.after {
+                    self.check_camp_condition(a, &what)?;
+                }
+                if t.text.trim().is_empty() {
+                    bail!("{what}: a talk line with no words");
+                }
+                for l in &t.links {
+                    if l.split_once('~').is_none_or(|(c, n)| c.trim().is_empty() || n.trim().is_empty()) {
+                        bail!("{what}: link {l:?} is not `command~label`");
+                    }
+                }
             }
         }
         for t in 0..self.raid.count() {

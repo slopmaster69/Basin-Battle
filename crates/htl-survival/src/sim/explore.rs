@@ -68,7 +68,8 @@ impl Survival {
     }
 
     /// Whether the camp has come as far as `after` says (`raids:N`, `built:<station>`,
-    /// `goal:N`, `found:<site>`); an unknown condition never holds.
+    /// `goal:N`, `found:<site>`, `kill:<mob>` once the camp has killed one, `open:<chest>` once
+    /// one has been opened); an unknown condition never holds.
     pub fn camp_has(&self, after: &str) -> bool {
         let (what, arg) = after.split_once(':').unwrap_or((after, ""));
         match what.trim() {
@@ -80,8 +81,27 @@ impl Survival {
                 self.has_station(key) || self.camp.counts.get(&format!("build:{key}")).is_some_and(|n| *n > 0)
             }
             "found" => self.camp.found.contains(arg.trim()),
+            "kill" | "open" => self.ever(what.trim(), arg.trim()),
             _ => false,
         }
+    }
+
+    /// What the camp's person at prop `def` says now: the last of their lines whose `after`
+    /// holds (none if they have no lines, or none holds yet).
+    pub fn talk_line(&self, def: usize) -> Option<&crate::content::TalkDef> {
+        let d = self.content.props.get(def)?;
+        if !d.npc {
+            return None;
+        }
+        d.talk.iter().rev().find(|t| t.after.as_deref().is_none_or(|a| self.camp_has(a)))
+    }
+
+    /// A hero uses one of the camp's people: their words, as a page (talk, no choices).
+    pub(crate) fn talk_to(&mut self, id: Id, def: usize) {
+        let Some(t) = self.talk_line(def).cloned() else { return };
+        let d = &self.content.props[def];
+        let links: Vec<(String, String)> = t.links.iter().filter_map(|l| l.split_once('~')).map(|(c, n)| (c.trim().to_string(), n.trim().to_string())).collect();
+        self.events.push(Event::Letter { player: id, kind: "talk".into(), title: d.name.clone(), place: d.subname.clone(), text: t.text, clue: String::new(), links });
     }
 
     /// Set out every camp prop the camp has earned and doesn't have yet; with `tell`, the camp

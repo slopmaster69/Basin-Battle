@@ -126,3 +126,5 @@ mod tests_priest_core;
 mod tests_content_rules;
 #[cfg(test)]
 mod tests_hero_fuzz;
+#[cfg(test)]
+mod tests_story;
