@@ -59,10 +59,10 @@ Each cell: mean seconds (mean seconds of the wins) · damage taken as a share of
 
 | fight | class | plays it right | sloppy |
 | --- | --- | --- | --- |
-| Rhahk'Zor | warrior | 157 s (wins 157) · 74% · 1.0 · 0/10 · 10/10 | 33 s (no win) · 193% · 2.3 · 10/10 · 0/10 |
-|  | mage | 130 s (wins 133) · 56% · 0.6 · 1/10 · 9/10 | 46 s (no win) · 207% · 2.7 · 10/10 · 0/10 |
-|  | priest | 214 s (wins 221) · 249% · 1.9 · 3/10 · 7/10 | 32 s (no win) · 208% · 2.4 · 10/10 · 0/10 |
-|  | hunter | 151 s (wins 154) · 131% · 2.2 · 2/10 · 8/10 | 27 s (no win) · 150% · 1.3 · 10/10 · 0/10 |
+| Rhahk'Zor | warrior | 105 s (wins 105) · 71% · 1.0 · 0/10 · 10/10 | 33 s (no win) · 189% · 2.2 · 10/10 · 0/10 |
+|  | mage | 90 s (wins 90) · 34% · 0.1 · 0/10 · 10/10 | 42 s (no win) · 198% · 2.4 · 10/10 · 0/10 |
+|  | priest | 152 s (wins 159) · 165% · 1.3 · 1/10 · 9/10 | 32 s (no win) · 206% · 2.4 · 10/10 · 0/10 |
+|  | hunter | 98 s (wins 105) · 95% · 1.0 · 2/10 · 8/10 | 26 s (no win) · 146% · 1.2 · 10/10 · 0/10 |
 | Sneed and the Shredder | warrior | 65 s (wins 65) · 59% · 1.0 · 0/10 · 10/10 | 58 s (wins 59) · 153% · 2.6 · 1/10 · 9/10 |
 |  | mage | 69 s (wins 69) · 60% · 1.0 · 0/10 · 10/10 | 67 s (wins 72) · 170% · 2.7 · 3/10 · 7/10 |
 |  | priest | 81 s (wins 81) · 91% · 0.7 · 0/10 · 10/10 | 68 s (wins 70) · 207% · 2.8 · 1/10 · 9/10 |
@@ -179,17 +179,17 @@ slower than the fastest on any boss; no boss takes longer than VanCleef.
 
 | Target | Result | Verdict |
 | --- | --- | --- |
-| Right play wins in 90 to 180 s | Rhahk'Zor 133 to 221 s; every other boss 25 to 88 s (warrior's time: Shredder 65, Gilnid 58, Smite 59, Greenskin 54, VanCleef 66, Cookie 25) | **Miss**: six of seven bosses are under 90 s for every class, by 2 to 45% (Cookie by 65 to 70%). Rhahk'Zor's priest is over 180 s |
-| Right play rarely falls | Only Rhahk'Zor: warrior 0/10, mage 1/10, hunter 2/10, **priest 3/10** (249% of its health taken). No other boss makes a right hero fall | **Miss** for Rhahk'Zor's priest and hunter |
+| Right play wins in 90 to 180 s | Rhahk'Zor 90 to 159 s (was 133 to 221 s, health 1900 to 1300 in `tune-rhahkzor`); every other boss 25 to 88 s (warrior's time: Shredder 65, Gilnid 58, Smite 59, Greenskin 54, VanCleef 66, Cookie 25) | **Miss**: six of seven bosses are under 90 s for every class, by 2 to 45% (Cookie by 65 to 70%). Rhahk'Zor's priest is now under 180 s |
+| Right play rarely falls | Only Rhahk'Zor, now warrior 0/10, mage 0/10, priest 1/10 (165% of its health taken), hunter 2/10 (was mage 1, hunter 2, priest 3 of 10 at 1900 health). No other boss makes a right hero fall | **Miss** for Rhahk'Zor's hunter only (Hunter numbers are not touched) |
 | Sloppy falls more than wins | Rhahk'Zor 10/10 falls (all four classes), Smite 8 or 9/10, Greenskin mage and priest 9/10, VanCleef mage 6/10. But Shredder 1 to 3/10, Gilnid 1 to 3/10, VanCleef warrior 0/10, priest 2/10, hunter 3/10, Cookie 0/10, Greenskin warrior and hunter 5/10 | **Miss** on Shredder, Gilnid, VanCleef, Cookie: a hero who misses half the answers still wins with 3 Draughts (Shredder 7 to 9/10, Gilnid 7 to 9/10, VanCleef 4 to 10/10, Cookie 10/10) |
-| No class more than 1.5x the fastest | Rhahk'Zor **1.66x** (mage 133 s, priest 221 s); Gilnid 1.47x (warrior 58, priest 85); Cookie 1.40x; Greenskin and VanCleef 1.33x; Shredder and Smite 1.25x | **Miss** only on Rhahk'Zor (priest); Gilnid is at the edge |
-| No boss takes longer than VanCleef | VanCleef 66 to 88 s. Rhahk'Zor is 2 to 2.5x that (133 to 221 s) | **Miss**: Rhahk'Zor outlasts VanCleef by a wide margin; Greenskin, Smite, Shredder and Gilnid are shorter than VanCleef, as wanted |
+| No class more than 1.5x the fastest | Rhahk'Zor **1.77x** by the wins (mage 90 s, priest 159 s; was 1.66x at 1900 health); Gilnid 1.47x (warrior 58, priest 85); Cookie 1.40x; Greenskin and VanCleef 1.33x; Shredder and Smite 1.25x | **Miss** only on Rhahk'Zor (priest): the spread is how the class plays him, not a number (a smaller health scales every class alike, and the mage gained most); Gilnid is at the edge |
+| No boss takes longer than VanCleef | VanCleef 66 to 88 s. Rhahk'Zor is now 1.2 to 1.8x that (90 to 159 s; was 2 to 2.5x) | **Miss**, narrower: Rhahk'Zor still outlasts VanCleef (the real fight adds the collapse run);  Greenskin, Smite, Shredder and Gilnid are shorter than VanCleef, as wanted |
 
 What else stands out:
 
-- **Priest is the slowest class on Rhahk'Zor (221 s), the Shredder (81 s), Gilnid (85 s), Smite
+- **Priest is the slowest class on Rhahk'Zor (159 s), the Shredder (81 s), Gilnid (85 s), Smite
   (74 s) and Cookie (35 s)**; the mage is on Greenskin (65 s) and VanCleef (88 s, the priest 86 s).
-  The priest also takes by far the most on Rhahk'Zor (249% of its health). Its two starting cards (Penance and Holy Nova) do little damage next to the axe; nothing here tunes
+  The priest also takes by far the most on Rhahk'Zor (165% of its health). Its two starting cards (Penance and Holy Nova) do little damage next to the axe; nothing here tunes
   them (a class card is not a boss number).
 - **Mage takes 95% of its health on Greenskin** (1.5 Draughts) against the warrior's 41% and the hunter's 26%: the 1.5 s
   Fireball charge under a gunner's locked aim.
@@ -217,7 +217,7 @@ fight is for. They are first guesses to rerun the table on, not settled numbers.
 
 | Boss | Line | From | To | Why |
 | --- | --- | --- | --- | --- |
-| Rhahk'Zor | 2087 `health` | 1900 | 1300 | Priest 221 s (target 180), 3/10 falls; mage 133 s. The collapse (not measured) adds to the real fight. Brings the warrior to about 107 s and the priest to about 150 s |
+| Rhahk'Zor | 2090 `health` | 1900 | 1300 | **Done in `claude/tune-rhahkzor`** (rows above are the rerun). Was priest 221 s, 3/10 falls; mage 133 s. Now warrior 105 s, priest 152 s (159 s for the wins), falls 0, 0, 1, 2 of 10. The collapse (not measured) adds to the real fight |
 | VanCleef | 807 `health` | 1500 | 2600 | Final boss, 66 to 88 s: shorter than the boss before it by half (target: nothing longer than him). Warrior to about 115 s, mage to about 153 s |
 | Smite | 606 `health` | 1100 | 1700 | 59 to 74 s: below 90 s for all four classes. Warrior to about 91 s |
 | Greenskin | 706 `health` | 1200 | 2000 | 49 to 65 s. Warrior to about 90 s. The gunners (85 health, line 774) die first and stay as they are |
@@ -229,6 +229,17 @@ Not proposed, because they are not a number: Rhahk'Zor's priest and hunter falli
 cards), the sloppy hero who still wins at Shredder, Gilnid, VanCleef and Cookie (Draughts: 3 at 40%
 is 120% of a 200-health hero; fewer or smaller Draughts, or a lamp's refill rule, would make misses
 cost, which is a design change), and the class spread at Rhahk'Zor (the priest's damage).
+
+## The owner's call
+
+Not tuned, and not for a tuning pull request:
+
+- **Raising the other bosses' health** (the table above), which would make VanCleef the longest boss.
+- **Cookie's length** (25 to 35 s): his pot is the design.
+- **Sloppy heroes still winning most fights** at Shredder, Gilnid, VanCleef and Cookie.
+- **Draughts covering 120% of health** (3 at 40% on a 200-health hero).
+- **Rhahk'Zor's hunter still falling 2 in 10** and the class spread there (priest 159 s, mage 90 s): the
+  hunter's and the priest's own damage, not a boss number.
 
 ## Rerun it
 

@@ -2084,7 +2084,10 @@ temper = "bruiser"
 subname = "The Foreman"
 display = 1051
 windup_sound = 397
-health = 1900
+# 1300, was 1900: with the scripted heroes the right-play fight ran 133 to 221 s (priest slowest, 1.66x
+# the mage) and the priest fell 3 in 10, the hunter 2, the mage 1, from the damage taken over so long a
+# fight; every other boss is under 90 s (docs/deadmines-balance.md). The 26% collapse hold is a share of health.
+health = 1300
 run_speed = 6.5
 walk_speed = 2.0
 aggro = 18.0
