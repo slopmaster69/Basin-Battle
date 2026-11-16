@@ -447,12 +447,13 @@ impl Survival {
                 if !(free || matches!(p.action, Action::Aim { .. })) {
                     return true;
                 }
+                // No words: the body puts them away or draws them (Corey, 16 Nov 2026), the
+                // clients playing the sheathe animation for a change that comes with a new count.
                 self.ability_cancel(id);
                 let p = self.players.get_mut(&id).unwrap();
                 p.sheathed = !p.sheathed;
-                let text = if p.sheathed { "You put your weapons away." } else { "Weapons out." };
+                p.sheath_hand = p.sheath_hand.wrapping_add(1);
                 self.events.push(Event::Gear { player: id });
-                self.tell(id, text);
                 true
             }
             Input::Dodge => {
