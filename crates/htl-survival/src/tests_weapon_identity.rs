@@ -1271,3 +1271,37 @@ fn the_silent_blade_does_75_percent_more_to_a_foe_recovering_from_its_blow_and_n
     assert!(text.contains("Marzon never struck first."), "{text}");
     assert_eq!(w.subclass, 15, "a dagger");
 }
+
+/// A weapon's help for the heroes round its wielder (the Hand's mend, the Champion's rally) passes
+/// over a hero it can't help: one held in a duel, as every other help does (`helpable`).
+#[test]
+fn the_hands_mend_and_the_rally_pass_over_heroes_held_in_a_duel() {
+    let duelling = |s: &mut Survival| {
+        let q = s.join("bren", "Bren", None);
+        s.move_player(q, [0.0, 3.0, 0.0], 0.0, Moving::default());
+        let r = s.join("cal", "Cal", None);
+        s.move_player(r, [0.0, -3.0, 0.0], 0.0, Moving::default());
+        s.duel_challenge(q, r).unwrap();
+        s.duel_accept(r);
+        assert!(s.in_duel(q) && s.in_duel(r));
+        (q, r)
+    };
+    // The Hand: the most wounded is a duellist; the bystander's blow doesn't mend them.
+    let (mut s, p) = world();
+    let (q, _) = duelling(&mut s);
+    wield(&mut s, p, "hand_of_righteousness");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let max = s.players[&q].max_health;
+    s.players.get_mut(&q).unwrap().health = max / 2;
+    let ev = swing(&mut s, p);
+    assert!(first_hit(&ev, m) > 0);
+    assert!(s.players[&q].health < max / 2 + 8, "a duellist isn't mended from outside the duel: {}", s.players[&q].health);
+    // The Champion's greatsword: its rally covers the wielder, not the duellists.
+    let (mut s, p) = world();
+    let (q, r) = duelling(&mut s);
+    wield(&mut s, p, "champions_greatsword");
+    sturdy_foe(&mut s, "dm_woodcutter");
+    heavy_swing(&mut s, p);
+    assert!(s.has_cc(p, "hallowed"), "the wielder rallied");
+    assert!(!s.has_cc(q, "hallowed") && !s.has_cc(r, "hallowed"), "not the duellists");
+}

@@ -249,7 +249,7 @@ impl Survival {
         let target = self
             .players
             .iter()
-            .filter(|(_, p)| p.health > 0 && p.health < p.max_health && dist2d(p.pos, at) <= MEND_RANGE)
+            .filter(|(h, p)| p.health > 0 && p.health < p.max_health && dist2d(p.pos, at) <= MEND_RANGE && self.helpable(id, **h))
             .min_by(|a, b| (a.1.health as f32 / a.1.max_health as f32).total_cmp(&(b.1.health as f32 / b.1.max_health as f32)))
             .map(|(h, p)| (*h, p.max_health));
         if let Some((h, max)) = target {
@@ -269,7 +269,7 @@ impl Survival {
             }
         }
         if w.rally > 0.0 {
-            let allies: Vec<Id> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= RALLY_RADIUS).map(|(h, _)| *h).collect();
+            let allies: Vec<Id> = self.players.iter().filter(|(h, p)| p.health > 0 && dist2d(p.pos, at) <= RALLY_RADIUS && self.helpable(id, **h)).map(|(h, _)| *h).collect();
             for h in allies {
                 self.apply_cc(h, id, "hallowed", RALLY_SECS, w.rally, 0.0, "Rally");
             }
