@@ -175,3 +175,77 @@ fn perf_basin_battle_siege_biggest_waves() {
     eprintln!("PERF slowest siege ticks (tick, tick % 80, ms): {:?}", top.iter().take(10).map(|(i, m)| (*i, i % 80, (*m * 100.0).round() / 100.0)).collect::<Vec<_>>());
     report("basin battle siege 1v1v1v1, waves every 4 s", ms, peak);
 }
+
+/// Elwynn round three, Stage 11: the seal-cutter's escort in the whole built-in world. Pell (a
+/// friendly walker) and the watchman (a friendly archer that `shoots`) fight the knives (creature
+/// against creature, `Foe::Mob`), a hero beside Pell; a knife the hero fells every 5 s so the waves
+/// come and he keeps walking the route.
+#[test]
+#[ignore]
+fn perf_elwynn_escort_pell_with_friendly_archers() {
+    use crate::tests_story::{bh_hero, fell, open_at};
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    let h = bh_hero(&mut s, [-9243.0, 178.0, 0.0]);
+    s.camp.counts.insert("open:marzon_satchel".into(), 1);
+    open_at(&mut s, h, "pell_satchel");
+    let pell = |s: &Survival| s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "aldric_pell").map(|(id, _)| *id).expect("Pell");
+    let mut ms = Vec::new();
+    let (mut peak, mut mob_foes) = (0, 0);
+    for tick in 0..1600 {
+        if tick % 100 == 99 {
+            let knives: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && !m.friendly && m.pack.is_some_and(|k| s.content.packs[k].key.starts_with("pell_"))).map(|(id, _)| *id).collect();
+            for k in knives {
+                fell(&mut s, h, k);
+            }
+        }
+        let at = s.mobs[&pell(&s)].pos;
+        s.move_player(h, [at[0] - 3.0, at[1], at[2]], 0.0, Moving::default());
+        let t = Instant::now();
+        let ev = s.step(DT);
+        ms.push(t.elapsed().as_secs_f64() * 1000.0);
+        std::hint::black_box(ev);
+        if let Some(p) = s.players.get_mut(&h) {
+            p.health = p.max_health;
+        }
+        peak = peak.max(s.mobs.values().filter(|m| m.health > 0).count());
+        mob_foes = mob_foes.max(s.mobs.values().filter(|m| m.health > 0 && matches!(m.state.foe(), Some(Foe::Mob(_)))).count());
+    }
+    eprintln!("PERF escort: at most {mob_foes} creatures at once fighting another creature");
+    assert!(mob_foes > 0, "the escort never set creature against creature: the bench measures nothing");
+    report("elwynn escort (Pell, friendly archers, knives), 1 hero", ms, peak);
+}
+
+/// Stage 13: Sable the stalker in the whole built-in world, a hero who keeps turning with her (she
+/// circles) and then gives her his back (she winds up), over and over.
+#[test]
+#[ignore]
+fn perf_elwynn_sable_stalker_circling_a_hero() {
+    use crate::tests_story::bh_hero;
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let h = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    let k = s.spawn_mob(s.content.mob("sable").unwrap(), [2.5, 0.0, 0.0], None, false);
+    s.engage(k, Foe::Hero(h));
+    let mut ms = Vec::new();
+    for tick in 0..1200 {
+        let (me, her) = (s.players[&h].pos, s.mobs[&k].pos);
+        let toward = (her[1] - me[1]).atan2(her[0] - me[0]);
+        let f = if (tick / 100) % 2 == 0 { toward } else { toward + std::f32::consts::PI };
+        s.move_player(h, me, f, Moving::default());
+        let t = Instant::now();
+        let ev = s.step(DT);
+        ms.push(t.elapsed().as_secs_f64() * 1000.0);
+        std::hint::black_box(ev);
+        if let Some(p) = s.players.get_mut(&h) {
+            p.health = p.max_health;
+        }
+        if s.mobs[&k].health == 0 {
+            break;
+        }
+    }
+    let live = s.mobs.values().filter(|m| m.health > 0).count();
+    report("elwynn Sable (stalker) circling a hero", ms, live);
+}
