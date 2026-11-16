@@ -200,8 +200,7 @@ fn a_small_lobbed_splash_reads_by_the_thrown_thing_in_the_air_with_the_markers_o
             }
             if released.is_some() && s.missiles.is_empty() { break; }
         }
-        let released = released.expect("the thrown thing was let go");
-        let _ = released;
+        assert!(released.is_some(), "the thrown thing was let go");
         assert!(air >= mobs::LOB_MIN_FLY - 0.05, "{air:.2} sec in the air at {stand} yd");
         assert!(0.3 + s.content.dodge.dash_secs <= air, "a 0.3 sec reaction and the dash fit in the flight");
         assert!(s.content.dodge.speed * s.content.dodge.dash_secs >= 3.0, "the dash clears the 3 yd ring");
