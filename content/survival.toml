@@ -6663,8 +6663,9 @@ damage = [9.0, 9.0]
 range = [22.0, 22.0]
 radius = [0.3, 0.3]
 speed = 30.0
-# 3 charges of 5 sec: two knives to open a run and one held for the next.
-cooldown = 5.0
+# 3 charges, each back in 5 sec (a cooldown is shared by its charges: 15 over 3): two knives to open
+# a run and one held for the next.
+cooldown = 15.0
 charges = 3
 # 1.12's Throw: a spinning dagger and its glint where it lands (to be checked when first filmed).
 spell = 2764
@@ -6752,7 +6753,8 @@ slot = "utility"
 choice = 3
 kind = "buff"
 quickstep = true
-cooldown = 10.0
+# 2 charges, each back in 10 sec (20 over 2): a utility's pace for each.
+cooldown = 20.0
 charges = 2
 
 # Quickstep's EX, Afterimage: leave a decoy. A Quickstep that leaves a shade where you stood for 2

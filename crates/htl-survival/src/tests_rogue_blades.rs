@@ -434,7 +434,8 @@ fn quickstep_has_2_charges_costs_no_stamina_and_evades_like_a_dodge() {
     let p = rogue(&mut s);
     let m = foe(&mut s);
     let d = s.content.abilities[idx(&s, "quickstep")].clone();
-    assert_eq!((d.charges, d.cooldown, d.quickstep), (2, 10.0, true));
+    // 2 charges, each back in 10 sec (a cooldown is shared by its charges).
+    assert_eq!((d.charges, d.cooldown / d.charges as f32, d.quickstep), (2, 10.0, true));
     s.players.get_mut(&p).unwrap().stamina = 40.0;
     s.input(p, Input::Ability(key_of("utility"), false));
     assert!(matches!(s.players[&p].action, Action::Dodge { .. }), "a dodge: {:?}", s.players[&p].action);
@@ -670,7 +671,7 @@ fn blades_cards_words_say_what_the_data_does() {
         "A hit on you removes them all".into(),
     ];
     let d = &s.content.abilities[idx(&s, "darting_knife")];
-    assert!(d.hand && d.charges == 3 && d.cooldown == 5.0);
+    assert!(d.hand && d.charges == 3 && d.cooldown / d.charges as f32 == 5.0, "3 charges, each back in 5 sec");
     let mut w = vec![format!("for {} damage, up to {} yd", d.damage[1], d.range[1]), "counts as a strike in your two-weapon chain".into(), format!("Holds {} charges", d.charges)];
     w.extend(flourish.iter().cloned());
     said("darting_knife", &w);

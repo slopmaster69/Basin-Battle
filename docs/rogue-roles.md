@@ -508,6 +508,9 @@ What the design left open, decided in the pull request that built it:
     would lay Blades over Shadow, so it is sent the first two only and told to update. The Rogue's
     column draws its cards shorter, three in a row's height (`FitCard`); other columns are as they
     were.
+  - **Charges**: a cooldown is shared by its charges (Fan of Knives' 8 over 2), so "3 charges of 5
+    sec" is Darting Knife's 15 over 3 and "2 charges of 10 sec" Quickstep's 20 over 2: each charge
+    comes back in the time the table says.
   - **Where they're learned**: Darting Knife and Blade Flurry are first cards (a class's whole Q
     and E rows) and the Dead Drop teaches them too; Morgan's Stash teaches Quickstep and Evasion;
     Morgan the Collector teaches Blade Dance beside Death Mark and Cloak and Dagger.
