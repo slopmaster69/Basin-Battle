@@ -169,7 +169,7 @@ are Gilnid's versions, for it to fold in:
 | Small hazards draw nothing with markers off | The stick's blast ring, the spill's band and the channel's bands are floor markers (`GroundWarn`, drawn only with the markers on). With them off the stick sparks and hisses, each spill section hisses steam and kindles a flame, and the channel has its steam, whistle and flames: real props |
 | Projectiles too fast to see | The stick is in the air at least 0.7 sec, in an arc of two flights |
 | Long windups freeze | The 3 sec fuse is Heavy Dynamite's own ready pose with the lit stick; the throw frame plays on release |
-| Things outlive their boss | Death, reset or a wipe takes the crew, planks, poles, sticks, flames, steam, the fire still to come and every mark |
+| Things outlive their boss | Death, reset, a wipe or the last hero leaving (put back at once, `perch_abandoned`: the world takes no steps with nobody in it) takes the crew, planks, poles, sticks, flames, steam, the fire still to come and every mark |
 | Deaths lag | Death lets go of the stuck pose (`HoldPose` 0) and the valve's cast |
 | Punish windows look like idling | The stuck spanner: the chop into the floor caught bent double and held 2.5 sec (`freeze_open_pose`, the add-on's `FZ`), no flinch meanwhile; a landed engineer sits, then gets up, instead of the stagger's reel |
 | Yells collide | `perch_say` keeps his lines 2 sec apart, the pull line included |

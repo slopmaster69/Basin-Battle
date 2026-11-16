@@ -100,3 +100,8 @@ numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a ban
 | Pirate Cutlass | Its heavy is a 5 yd boarding leap, a gap closer | `boarding` |
 | Sneed's Machete | No backstab; each light hit chops every foe in a 5 yd line | `no_backstab`, `line` |
 | Cursed Felblade | The last blow of the light chain carries you behind the foe | `blink_behind` |
+| Bearded Axe | Its heavy hooks a shield aside: the enemy can't block for 4 sec | `guard_hook` |
+| Bloodlust Edge | Each kill speeds your swings 8%, up to 4 times, for 6 sec | `bloodlust` |
+| Miner's Pick | A posture breaker (3 times towards a stance); 50% more to stone, golem and mechanical | `posture`, `bane` |
+| Horseman's Scythe | A 200 degree reaping sweep of up to 5; each foe struck heals 1% of your health | `reap_heal` |
+| Loksey's Boar Spear | Its thrust slows the foe 40% for 2.5 sec | `snare` |

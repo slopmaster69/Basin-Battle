@@ -85,7 +85,15 @@ Built as planned, with these differences, found checking the plan against the co
 
 **Risk.** Only the use key reaches an NPC, not right-click. Leave right-click out.
 
-## Stage 2: The Brotherhood's Hand [ ] (questline, content only)
+## Stage 2: The Brotherhood's Hand [x] (questline, content only)
+
+Built as planned, with these differences, found checking the plan against the code:
+- The goals sit before "Every corner", which was goal 34 of 34 in `survival.toml` (the dungeon files' goals follow it). The save loader already finds a goal by its title. For a save with no title (a finished journal, read by its place) `ELWYNN_GOALS_AT` and `ELWYNN_GOALS` in `save.rs` carry the places past the new goals along. Raise `ELWYNN_GOALS` by the goals each stage adds. A test checks every old goal still loads as itself.
+- "Every corner" was set to 35 while there were 34 sites, so it could not be finished. It is now 35 for the 35 sites, and a test holds it to the number of sites.
+- `then`, `run_to`, `wait_for`, `arrive_text`, `wake`, `route`, `rare` and `burn` all exist as the plan says. A phase's `run_to` points take a height (x, y, z), so the ford's two points carry their ground heights, read from the real land with `elwynn_probe`.
+- Voss's "rule" is a `commander` temper (holds back while others of his fight are on the hero), and his turn at 35% is a `[[mob.phase]]`.
+- The boat is a yell and a place at the water. No boat model was used.
+- Placement: the plan's (-10040, -480) is 160 yd from the river, so the ford is at (-9950, -530), 20 yd from the water's edge. Probed against the real land: nothing flagged.
 
 **The chain.**
 1. **Defias Messenger** (`bh_messenger`, 2338, not elite, respawns after 900 sec). It patrols with `route` from Goldshire (-9460, 40) to Jerod's Landing (-9940, -145).

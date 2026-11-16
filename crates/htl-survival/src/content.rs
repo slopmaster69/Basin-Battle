@@ -1264,7 +1264,30 @@ pub struct WeaponDef {
     /// The last blow of its light chain carries the hero behind the foe it strikes.
     #[serde(default)]
     pub blink_behind: bool,
+    /// Its heavy blow hooks a shield-bearer's guard aside: it can't block for this many seconds.
+    #[serde(default)]
+    pub guard_hook: f32,
+    /// Each kill speeds the hero's swings by this much, stacking up to `BLOODLUST_STACKS` for
+    /// `BLOODLUST_SECS` after the latest.
+    #[serde(default)]
+    pub bloodlust: f32,
+    /// Each foe a blow strikes heals the hero this share of their health.
+    #[serde(default)]
+    pub reap_heal: f32,
+    /// A blow slows the foe by this share for `SNARE_SECS`.
+    #[serde(default)]
+    pub snare: f32,
+    /// A blow cows the foe (it deals this much less and winds up slower) for `COW_SECS`.
+    #[serde(default)]
+    pub cow: f32,
 }
+
+/// How long a bloodlust lasts after the latest kill, and how many kills it stacks.
+pub const BLOODLUST_SECS: f32 = 6.0;
+pub const BLOODLUST_STACKS: u32 = 4;
+/// How long a blow's slow and its cow last.
+pub const SNARE_SECS: f32 = 2.5;
+pub const COW_SECS: f32 = 4.0;
 
 /// "undead and worgen", "stone, mechanical and undead": a list of kinds as words.
 fn join_kinds(kinds: &[String]) -> String {
@@ -1308,6 +1331,24 @@ impl WeaponDef {
         }
         if self.no_backstab {
             s.push("Does no extra damage from behind.".into());
+        }
+        if self.posture > 1.0 && !self.bane.is_empty() {
+            s.push(format!("Breaks stances {}% faster.", ((self.posture - 1.0) * 100.0).round()));
+        }
+        if self.guard_hook > 0.0 {
+            s.push(format!("Heavy attacks hook a shield aside: the enemy can't block for {} sec.", self.guard_hook));
+        }
+        if self.bloodlust > 0.0 {
+            s.push(format!("Each kill speeds your swings by {}% for {} sec, up to {} times.", (self.bloodlust * 100.0).round(), BLOODLUST_SECS, BLOODLUST_STACKS));
+        }
+        if self.reap_heal > 0.0 {
+            s.push(format!("Restores {}% of your health for each enemy it strikes.", (self.reap_heal * 100.0).round()));
+        }
+        if self.snare > 0.0 {
+            s.push(format!("Slows the enemy by {}% for {} sec.", (self.snare * 100.0).round(), SNARE_SECS));
+        }
+        if self.cow > 0.0 {
+            s.push(format!("Cows the enemy for {} sec: it deals {}% less damage and winds up slower.", COW_SECS, (self.cow * 100.0).round()));
         }
         if self.blink_behind {
             s.push("The last blow of a light chain carries you behind the enemy.".into());

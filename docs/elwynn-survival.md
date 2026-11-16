@@ -908,6 +908,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Eastvale Logging Camp | the hunter's shrine; prowlers and black bears; timber |
 | Ridgepoint Tower and Blackfang's den | the Blackrock: outrunners, shadowcasters, Rak'gash the Herald and the tower's armory; Old Blackfang (the hunter's champion) |
 | Jerod's Landing | Defias smugglers and their crate (guarded); murlocs; fish; the rogue's relic under the dock |
+| Smugglers' Ford (the river's south bank) | the Brotherhood's paymaster, Paymaster Voss, and his strongbox (guarded), with thugs, lookouts and a conjurer. The Defias Messenger who walks the Goldshire road to Jerod's Landing carries the key to the Messenger's Drop at the dock |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
@@ -1239,6 +1240,16 @@ so as it does:
 | The Darkspear Raid beaten | A guard tower over the north-east corner (Elwynn's own, half size), Scout Marten |
 | The Horde Warband beaten | A second tower over the west wall, Marshal Wyle by the fire |
 | The Blackrock Assault beaten | Westbrook's footmen, a second weapon rack |
+
+**The Brotherhood's hand** (Stage 2 of docs/elwynn-expansion.md). The Brotherhood is selling Elwynn's
+roads to the Horde. The Defias Messenger (not a rare; he respawns after 15 min, and under 35% of
+his health he runs) walks from Goldshire to Jerod's Landing and back. The Messenger's Drop at the dock
+stays shut while he lives, and its map points to the Smugglers' Ford. There the Paymaster's Strongbox
+wakes Paymaster Voss and 2 hirelings on whoever opens it, and they lie in wait again when it fills. His
+rule: while his hirelings fight he circles off (a commander), so kill them or go in after him. At 35% health
+he says "Hold them. You're paid till sundown.", calls 2 more thugs and runs to his boat at the water,
+and fights again once a hero comes within 10 yd. Four journal goals follow it (the messenger, the drop,
+the ford, the Paymaster), and once the Paymaster is dead Marshal Wyle names the Deadmines.
 
 The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
 A camp from before the move keeps its stations: each standing outside the new building ground is

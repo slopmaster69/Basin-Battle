@@ -92,6 +92,14 @@ const FIRST_JOURNAL: [&str; 17] = [
     "Break the warband",
 ];
 
+/// Where the Elwynn expansion's goals (docs/elwynn-expansion.md) were put into the journal: just
+/// before "Every corner", which was the 34th goal (index 33). A save keeps its goal's title, so it
+/// finds its goal wherever it moved; only a save with no title (a finished journal, read by its
+/// place) needs the goals past this point carried over the new ones. Raise `ELWYNN_GOALS` by the
+/// goals each stage adds there.
+pub(crate) const ELWYNN_GOALS_AT: usize = 33;
+pub(crate) const ELWYNN_GOALS: usize = 4;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StationSave {
     pub uid: u64,
@@ -526,7 +534,11 @@ impl Survival {
             // Done with a journal that's grown since (steps added at its end, as the book's ladder
             // was): on at the first of the new ones. (Past the first journal, a save has a title
             // unless it was done, so its place is that journal's end.)
-            None if save.goal > FIRST_JOURNAL.len() && save.goal < s.content.goals.len() => save.goal,
+            // (A place past where the expansion's goals went has moved down by their number.)
+            None if save.goal > FIRST_JOURNAL.len() && save.goal < s.content.goals.len() => {
+                let moved = if save.goal >= ELWYNN_GOALS_AT { ELWYNN_GOALS } else { 0 };
+                (save.goal + moved).min(s.content.goals.len())
+            }
             // Past the end of the first journal: done with it, so at the end of this one.
             None if save.goal >= FIRST_JOURNAL.len() => s.content.goals.len(),
             None => save.goal,

@@ -1096,6 +1096,8 @@ icon = "INV_Mace_01"
 kind = "weapon"
 text = "Breaks guards. \"Ironspine's. Bone grown around iron.\""
 
+# The scythe reaps: a 200 degree sweep of up to 5, and 1% of the wielder's health for each foe it
+# strikes (a full sweep of 5 mends 5%).
 [[weapon]]
 key = "horsemans_scythe"
 windup = 0.42
@@ -1104,12 +1106,13 @@ recovery = 0.55
 stamina = 20.0
 damage = [41, 53]
 range = 5.0
-arc = 80.0
-targets = 3
+arc = 200.0
+targets = 5
 two_handed = true
 guard = "haft_guard"
 emote = 38
 subclass = 6
+reap_heal = 0.01
 
 [[item]]
 key = "horsemans_scythe"
@@ -1117,7 +1120,7 @@ name = "The Horseman's Scythe"
 display = 5637
 icon = "INV_Spear_06"
 kind = "weapon"
-text = "The Headless Rider's. Long, cruel, and it never stops swinging."
+text = "Two-handed. A wide sweep that hits up to 5 enemies. {fx} \"The Headless Rider's. It never stops swinging.\""
 perks = [{ kind = "might", amount = 0.05 }]
 
 [[weapon]]
