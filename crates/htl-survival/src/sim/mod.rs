@@ -1804,7 +1804,8 @@ impl Survival {
         };
         let was = p.pos;
         let (safe, f, up) = (p.last_safe, p.facing, p.health > 0);
-        let drop = if self.clock < p.landing_until { LANDING_FALL } else { FELL_THROUGH };
+        let (landing, arrived) = (self.clock < p.landing_until, p.landing_until - LANDING_SECS);
+        let drop = if landing { LANDING_FALL } else { FELL_THROUGH };
         if self.is_below() && pos.iter().all(|v| v.is_finite()) && self.hold_at_doors(id, was, pos)
         {
             return;
@@ -1819,6 +1820,19 @@ impl Survival {
         }
         // Fallen through the world (the floor not there on arrival): back to the last firm ground.
         if pos.iter().all(|v| v.is_finite()) && pos[2] < safe[2] - drop && up {
+            // Into the host's log too, with where their client said they were and when: the one
+            // record of a fall a player's client keeps no log of (a hero falling on arrival in
+            // Shadowfang Keep, Nov 2026, left none).
+            let name = self.players.get(&id).map(|p| p.name.clone()).unwrap_or_default();
+            let since = if landing {
+                format!(", {:.1} s after arriving", self.clock - arrived)
+            } else {
+                String::new()
+            };
+            self.events.push(Event::Log(format!(
+                "{name} fell through the world at ({:.1}, {:.1}, {:.1}){since}: put back at ({:.1}, {:.1}, {:.1})",
+                pos[0], pos[1], pos[2], safe[0], safe[1], safe[2] + ARRIVE_LIFT
+            )));
             self.put_at(id, [safe[0], safe[1], safe[2] + ARRIVE_LIFT], f);
             self.land_from_far(id);
             if let Some(p) = self.players.get_mut(&id) {
