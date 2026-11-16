@@ -329,6 +329,13 @@ pub(crate) fn hero_name(key: &str, save: Option<&PlayerSave>) -> String {
     }
 }
 
+/// The host's line for a dungeon's world loaded from its save, named by its own dungeon (every
+/// dungeon's said "the Deadmines" until Nov 2026).
+fn below_loaded_line(content: &htl_survival::Content, heroes: usize) -> String {
+    let name = content.dungeon.as_ref().map_or("A dungeon", |d| d.name.as_str());
+    format!("[survival] {name} loaded: {heroes} heroes below")
+}
+
 /// Seconds since the epoch, for nodes that come back by real time.
 pub fn unix_now() -> f64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0.0, |d| d.as_secs_f64())
@@ -367,10 +374,7 @@ impl SurvivalGame {
             }
             (Some(s), true) => {
                 let players = s.players.clone();
-                println!(
-                    "[survival] the Deadmines loaded: {} heroes below",
-                    players.len()
-                );
+                println!("{}", below_loaded_line(&content, players.len()));
                 (
                     Survival::load_dungeon(content, land, seed, now, &s),
                     players,
@@ -1208,3 +1212,22 @@ fn only_looking(opcode: u16) -> bool {
 const CHAT_MSG_AFK: u32 = 0x14;
 const CHAT_MSG_DND: u32 = 0x15;
 
+#[cfg(test)]
+mod load_line_tests {
+    /// Nov 2026: the host said "the Deadmines loaded" for each of the nine dungeons' saves.
+    #[test]
+    fn each_dungeons_load_line_names_its_own_dungeon() {
+        let content = htl_survival::Content::builtin();
+        let keys: Vec<String> = content.dungeons().map(|d| d.key.clone()).collect();
+        assert!(keys.len() > 1, "more than one dungeon");
+        let mut lines = std::collections::BTreeSet::new();
+        for key in keys {
+            let c = content.for_dungeon_of(&key);
+            let name = c.dungeon.as_ref().unwrap().name.clone();
+            let line = super::below_loaded_line(&c, 2);
+            assert_eq!(line, format!("[survival] {name} loaded: 2 heroes below"));
+            lines.insert(line);
+        }
+        assert_eq!(lines.len(), content.dungeons().count(), "each its own");
+    }
+}
