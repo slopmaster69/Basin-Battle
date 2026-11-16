@@ -508,11 +508,11 @@ fn each_pairs_words_say_what_its_data_does() {
     hands(&mut s, p, "sword", "sword");
     assert!(says(&s).contains(&format!("within {} degrees", r.cross_arc)), "{}", says(&s));
     hands(&mut s, p, "mace", "sword");
-    assert!(says(&s).contains(&format!("breaks stances {}% faster", ((r.breaker_heft - 1.0) * 100.0).round())), "{}", says(&s));
+    assert!(says(&s).contains(&format!("breaks stances {}", crate::content::rate_words(r.breaker_heft))), "{}", says(&s));
     hands(&mut s, p, "footpad_knuckles", "footpad_knuckles");
     let w = says(&s);
     assert!(w.starts_with("Your pair is Iron Knuckles.") && w.contains(&format!("the {}th is with both", r.knuckle_run)) && w.contains(&format!("for {} sec", r.wheel_secs)), "{w}");
-    assert!(w.contains(&format!("{}% faster", ((r.knuckle_boss_heft - 1.0) * 100.0).round())), "{w}");
+    assert!(w.contains(&format!("breaks stances {} instead", crate::content::rate_words(r.knuckle_boss_heft))), "{w}");
     // No pair (an empty off hand), no words; nor for a Warrior.
     let h = s.players.get_mut(&p).unwrap();
     h.off_weapon = None;

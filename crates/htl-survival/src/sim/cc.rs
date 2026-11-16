@@ -365,6 +365,7 @@ impl Survival {
         let Some(list) = self.cc.get_mut(&id) else { return damage };
         let mut through = damage as f32;
         let mut ended = Vec::new();
+        let mut slumber_woke = false;
         // A shield soaks it first, then overhealth (health over the most, lost before your own).
         for kind in ["shield", "overhealth"] {
             for c in list.iter_mut().filter(|c| c.until > now && c.kind == kind) {
@@ -392,6 +393,9 @@ impl Survival {
                 }
                 // (Any damage ends a disorient, and a Druid out of hiding.)
                 "incapacitate" | "disorient" | "prowl" if damage > 0 => {
+                    if c.kind == "incapacitate" && c.source == "Slumber" {
+                        slumber_woke = true;
+                    }
                     c.until = now;
                     ended.push(c.kind.clone());
                 }
@@ -416,6 +420,12 @@ impl Survival {
                     }
                 }
                 _ => {}
+            }
+        }
+        // The fang's sleep broken by a blow: its 6 sec of immunity run from now.
+        if slumber_woke {
+            if let Some(m) = self.mobs.get_mut(&id) {
+                m.fx.sleep_immune_until = now + crate::content::SLEEP_IMMUNE_SECS;
             }
         }
         if !ended.is_empty() {

@@ -648,7 +648,10 @@ fn an_axes_and_polearms_tooltips_say_their_mechanics_from_their_numbers() {
     assert!(text("bloodlust_edge").contains(&format!("speeds your swings by {}% for {} sec, up to {} times", (l.bloodlust * 100.0).round(), crate::content::BLOODLUST_SECS, crate::content::BLOODLUST_STACKS)));
     let m = w("miner_pick");
     assert!(text("miner_pick").contains(&format!("Deals {}% more damage to stone, golem and mechanical", (m.bane_damage * 100.0).round())), "{}", text("miner_pick"));
-    assert!(text("miner_pick").contains(&format!("Breaks stances {}% faster", ((m.posture - 1.0) * 100.0).round())));
+    assert!(text("miner_pick").contains(&format!("Breaks stances {}.", crate::content::rate_words(m.posture))));
+    assert_eq!(crate::content::rate_words(m.posture), "3 times as fast");
+    assert_eq!(crate::content::rate_words(1.5), "50% faster");
+    assert_eq!(crate::content::rate_words(2.0), "2 times as fast");
     assert!(text("horsemans_scythe").contains(&format!("Restores {}% of your health for each enemy", (w("horsemans_scythe").reap_heal * 100.0).round())));
     assert!(text("loksey_boar_spear").contains(&format!("Slows the enemy by {}% for {} sec", (w("loksey_boar_spear").snare * 100.0).round(), crate::content::SNARE_SECS)));
 }

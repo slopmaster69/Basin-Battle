@@ -1,48 +1,40 @@
--- Elwynn Survival: the letter. The Bookmaker's pages: a wager's terms and the board's records,
--- parchment that stays up till it's closed (Escape, the ink cross, or Close), each wager or
--- record a button. (Words to read, a note, a secret, the book's record, a run's tally, and what
--- the camp's people say, are told in chat: `Words.lua`.)
+-- Elwynn Survival: the Bookmaker's pages. A wager's terms and the board's records on a plain dark
+-- panel that stays up till it's closed (Escape, the X, or Close), each wager or record a button.
+-- (Words to read, a note, a secret, the book's record, a run's tally, and what the camp's people
+-- say, are told in chat: `Words.lua`.)
 --
 -- The server sends `NT kind title place text clue links`: kind is wager or board here; `{n}`
 -- breaks a line in the text; links are `command~label` with `^` between.
 --
--- It loads after Ledger.lua and wears its art and fonts (a plain dark page without it).
+-- Plain colors and the game's own font; it needs nothing from Ledger.lua.
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
 if not ES then return end
 
-local A = "Interface\\AddOns\\ElwynnSurvival\\art\\ledger\\"
-local FONTS = "Interface\\AddOns\\ElwynnSurvival\\fonts\\"
-local TITLE = FONTS .. "IMFellEnglishSC-Regular.ttf"
-local SERIF = FONTS .. "IMFellEnglish-Regular.ttf"
-local BODY = FONTS .. "CrimsonPro-Regular.ttf"
+local FACE = "Fonts\\FRIZQT__.TTF"
 
 local W = 460
-local PAD = 36
+local PAD = 28
 local INNER = W - 2 * PAD
 local MAX_LINKS = 10
 -- A page too tall for the screen is laid out wider first (a wager's rules ran off the top and
 -- the foot of a laptop's), then scaled down if it still doesn't fit.
 local WIDTHS = { 460, 600, 740 }
--- The links: wood buttons, the logbook's, one under another, or two abreast past three.
-local LINK_H = 28
+local LINK_H = 26
 local LINK_W = 280
 
--- The inks: the page's, a faded one, a red for the hover, the links' blue.
-local INK = { 0.165, 0.13, 0.094 }
-local SEPIA = { 0.353, 0.275, 0.188 }
-local WAX = { 0.604, 0.169, 0.125 }
-local FROST = { 0.184, 0.373, 0.47 }
--- The seal on each kind of page.
-local SEALS = { wager = "seal_grey", board = "seal_grey" }
--- And the line at its foot.
+-- The colors: the title's, the text's, the faded line, the links', the panel's edge.
+local WHITE = { 1, 1, 1 }
+local TEXT = { 0.86, 0.86, 0.88 }
+local FADED = { 0.58, 0.6, 0.64 }
+local ACCENT = { 0.44, 0.78, 1 }
+local EDGE = { 0.32, 0.34, 0.4 }
+-- The line at each page's foot.
 local FOOT = {
   wager = "Click a wager to take it. The dungeon starts fresh.",
   board = "Every server's runs, through the board's keeper.",
 }
-
-local ledger = ES.ledger
 
 local f = CreateFrame("Frame", "ElwynnSurvivalLetter", UIParent)
 f:SetWidth(W)
@@ -59,85 +51,88 @@ f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
 f:Hide()
 ES.letter = f
 
--- The page: parchment and its torn rim with the Ledger's art, a dark sheet without it.
-if ledger and ledger.Parchment then
-  f.paper = ledger.Parchment(f, "BACKGROUND", 4, 0.8)
-  if ledger.Slice and ledger.FRAME_RECTS then
-    f.rim = ledger.Slice(f, "parchment_frame", "BORDER", 512, 512, ledger.FRAME_RECTS, 40, 6, true)
-  end
-else
-  f.paper = f:CreateTexture(nil, "BACKGROUND")
-  f.paper:SetAllPoints(f)
-  f.paper:SetTexture(0.08, 0.06, 0.04, 0.94)
-  INK = { 0.95, 0.88, 0.72 }
-  SEPIA = { 0.75, 0.66, 0.5 }
-  WAX = { 1, 0.45, 0.35 }
-  FROST = { 0.55, 0.78, 1 }
+-- A flat rectangle of one color.
+local function Fill(parent, layer, r, g, b, a)
+  local t = parent:CreateTexture(nil, layer)
+  t:SetTexture(r, g, b, a or 1)
+  return t
 end
 
-local function Text(face, size, color, justify)
+-- The panel: dark and a little see-through, with a thin edge.
+f.paper = Fill(f, "BACKGROUND", 0.05, 0.055, 0.07, 0.92)
+f.paper:SetAllPoints(f)
+local function Edge(p1, p2, w, h)
+  local t = Fill(f, "BORDER", EDGE[1], EDGE[2], EDGE[3], 0.9)
+  t:SetPoint(p1, f, p1, 0, 0)
+  t:SetPoint(p2, f, p2, 0, 0)
+  if w then t:SetWidth(w) end
+  if h then t:SetHeight(h) end
+  return t
+end
+Edge("TOPLEFT", "TOPRIGHT", nil, 1)
+Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
+Edge("TOPLEFT", "BOTTOMLEFT", 1, nil)
+Edge("TOPRIGHT", "BOTTOMRIGHT", 1, nil)
+
+local function Text(size, color, justify)
   local t = f:CreateFontString(nil, "ARTWORK")
-  t:SetFont(face, size, "")
+  t:SetFont(FACE, size, "")
   t:SetTextColor(color[1], color[2], color[3])
   t:SetShadowOffset(0, 0)
   t:SetJustifyH(justify or "LEFT")
   if t.SetJustifyV then t:SetJustifyV("TOP") end
   t:SetWidth(INNER)
-  t.ledgerInk = true
+  -- Ledger.lua leaves a string marked like this as it is.
+  t.ledgerKeep = true
   return t
 end
 
-local function Art(layer, file, w, h)
-  local t = f:CreateTexture(nil, layer)
-  t:SetTexture(A .. file)
-  t:SetWidth(w)
-  t:SetHeight(h)
-  return t
-end
-
-f.seal = Art("OVERLAY", "seal_red", 46, 46)
-f.seal:SetPoint("CENTER", f, "TOP", 0, -6)
-f.title = Text(TITLE, 21, INK, "CENTER")
-f.place = Text(SERIF, 12, SEPIA, "CENTER")
-f.rule = Art("ARTWORK", "divider_vine", 300, 18)
-f.rule:SetVertexColor(1, 1, 1, 0.8)
-f.body = Text(SERIF, 15, INK, "LEFT")
+f.title = Text(18, WHITE, "CENTER")
+f.place = Text(12, FADED, "CENTER")
+f.rule = Fill(f, "ARTWORK", EDGE[1], EDGE[2], EDGE[3], 0.7)
+f.rule:SetHeight(1)
+f.body = Text(13, TEXT, "LEFT")
 if f.body.SetSpacing then f.body:SetSpacing(3) end
-f.foot = Text(TITLE, 12, SEPIA, "CENTER")
+f.foot = Text(11, FADED, "CENTER")
 
--- The ink cross, top right; Close, at the foot.
+-- The X, top right.
 f.x = CreateFrame("Button", nil, f)
-f.x:SetWidth(28)
-f.x:SetHeight(28)
-f.x:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -10)
-f.x.mark = f.x:CreateTexture(nil, "ARTWORK")
-f.x.mark:SetAllPoints(f.x)
-f.x.mark:SetTexture(A .. "close_ink")
-f.x:SetScript("OnEnter", function() this.mark:SetTexture(A .. "close_ink_hover") end)
-f.x:SetScript("OnLeave", function() this.mark:SetTexture(A .. "close_ink") end)
+f.x:SetWidth(24)
+f.x:SetHeight(24)
+f.x:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+f.x.label = f.x:CreateFontString(nil, "ARTWORK")
+f.x.label:SetFont(FACE, 14, "")
+f.x.label:SetShadowOffset(0, 0)
+f.x.label:SetPoint("CENTER", f.x, "CENTER", 0, 0)
+f.x.label:SetText("X")
+f.x.label.ledgerKeep = true
+f.x.label:SetTextColor(FADED[1], FADED[2], FADED[3])
+f.x:SetScript("OnEnter", function() this.label:SetTextColor(1, 1, 1) end)
+f.x:SetScript("OnLeave", function() this.label:SetTextColor(FADED[1], FADED[2], FADED[3]) end)
 f.x:SetScript("OnClick", function() f:Hide() end)
 
--- The links: the logbook's wood buttons (`Ledger.Button`), plain to see as something to press;
--- a line of blue ink each without the Ledger.
-local wood = ledger and ledger.Button
+-- The links: flat buttons that light under the mouse.
 f.links = {}
 for i = 1, MAX_LINKS do
   local b = CreateFrame("Button", nil, f)
-  b:SetWidth(wood and LINK_W or INNER)
-  b:SetHeight(wood and LINK_H or 18)
+  b:SetWidth(LINK_W)
+  b:SetHeight(LINK_H)
+  b.bg = Fill(b, "BACKGROUND", 0.14, 0.15, 0.19, 0.95)
+  b.bg:SetAllPoints(b)
   b.label = b:CreateFontString(nil, "ARTWORK")
-  b.label:SetFont(SERIF, 14, "")
+  b.label:SetFont(FACE, 13, "")
   b.label:SetShadowOffset(0, 0)
   b.label:SetPoint("CENTER", b, "CENTER", 0, 0)
-  b.label:SetTextColor(FROST[1], FROST[2], FROST[3])
-  if wood then
-    if b.label.SetWidth then b.label:SetWidth(LINK_W - 20) end
-    wood(b)
-  else
-    b.label.ledgerInk = true
-    b:SetScript("OnEnter", function() this.label:SetTextColor(WAX[1], WAX[2], WAX[3]) end)
-    b:SetScript("OnLeave", function() this.label:SetTextColor(FROST[1], FROST[2], FROST[3]) end)
-  end
+  b.label:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+  b.label.ledgerKeep = true
+  b:SetScript("OnEnter", function()
+    this.bg:SetTexture(0.22, 0.25, 0.32, 1)
+    this.label:SetTextColor(1, 1, 1)
+  end)
+  b:SetScript("OnLeave", function()
+    this.bg:SetTexture(0.14, 0.15, 0.19, 0.95)
+    this.label:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+  end)
   b:SetScript("OnClick", function()
     if this.cmd and ES.Say then
       if ES.Play then ES.Play("click") end
@@ -169,34 +164,36 @@ local function Lay(kind, title, place, text, links, w)
   f:SetWidth(w)
   local words = { f.title, f.place, f.body, f.foot }
   for i = 1, table.getn(words) do words[i]:SetWidth(inner) end
-  f.seal:SetTexture(A .. (SEALS[kind] or "seal_grey"))
-  local y = 34
+  local y = 22
   local function put(region, h, gap)
     region:ClearAllPoints()
     region:SetPoint("TOP", f, "TOP", 0, -y)
     y = y + h + (gap or 0)
   end
   f.title:SetText(title)
-  put(f.title, Tall(f.title, 21, title), 2)
+  put(f.title, Tall(f.title, 18, title), 4)
   f.place:SetText(place)
   if place ~= "" then
     f.place:Show()
-    put(f.place, Tall(f.place, 12, place), 4)
+    put(f.place, Tall(f.place, 12, place), 6)
   else
     f.place:Hide()
   end
-  put(f.rule, 18, 10)
+  f.rule:ClearAllPoints()
+  f.rule:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -y)
+  f.rule:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -y)
+  y = y + 13
   f.body:SetText(text)
-  put(f.body, Tall(f.body, 15, text), 14)
+  put(f.body, Tall(f.body, 13, text), 14)
   local n = 0
   for i = 1, MAX_LINKS do
     if links[i] then n = n + 1 end
   end
   -- Two abreast past three (when the page is wide enough for two), else one under another.
-  local cols = (wood and n > 3 and inner >= 2 * 180 + 12) and 2 or 1
-  local bw = wood and math.min(cols == 2 and math.floor((inner - 12) / 2) or LINK_W, inner) or inner
-  local bh = wood and LINK_H or 18
-  local gap = wood and 6 or 2
+  local cols = (n > 3 and inner >= 2 * 180 + 12) and 2 or 1
+  local bw = math.min(cols == 2 and math.floor((inner - 12) / 2) or LINK_W, inner)
+  local bh = LINK_H
+  local gap = 6
   local top = y
   for i = 1, MAX_LINKS do
     local l = links[i]
@@ -204,9 +201,8 @@ local function Lay(kind, title, place, text, links, w)
     if l then
       b.cmd = l[1]
       b:SetWidth(bw)
-      if b.plate and b.plate.Layout then b.plate:Layout(bh + 2) end
       if b.label.SetWidth then b.label:SetWidth(bw - 20) end
-      b.label:SetText(wood and l[2] or ("~ " .. l[2] .. " ~"))
+      b.label:SetText(l[2])
       local row, col = math.floor((i - 1) / cols), math.mod(i - 1, cols)
       local x = 0
       -- (An odd last one under the middle.)
@@ -221,8 +217,7 @@ local function Lay(kind, title, place, text, links, w)
   if n > 0 then y = top + math.ceil(n / cols) * (bh + gap) + 8 end
   f.foot:SetText(FOOT[kind] or FOOT.wager)
   put(f.foot, 14, 0)
-  f:SetHeight(math.max(180, y + 30))
-  if f.paper.Fit then f.paper.Fit() end
+  f:SetHeight(math.max(140, y + 22))
 end
 
 -- Laid out at the narrowest width that fits the screen's height; past the widest, scaled down.

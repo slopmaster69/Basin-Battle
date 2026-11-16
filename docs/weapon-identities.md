@@ -141,7 +141,7 @@ Gorzak's Cleaver, Goldshire Halberd and Zanjin's Spear, and the six staffs.
 | Meteor Shard | `meteor_shard` | A backstab bursts in fire (50%) on foes within 4 yd and is a shatter trigger | `shatter`, `burst` |
 | Bazil's Shiv | `bazil_shiv` | Hits poison 3 a sec a stack, up to 5 stacks, for 6 sec | `poison` |
 | Thornspike | `thornspike` | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
-| Cobrahn's Fang | `cobrahn_fang` | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |
+| Cobrahn's Fang | `cobrahn_fang` | A backstab puts the foe to sleep for 3 sec; damage wakes it; 6 sec from waking, no new sleep | `sleep` |
 | The Silent Blade | `silent_blade` | A punisher: a blow on a foe recovering from its own blow, between its blows, does 75% more | `punish` |
 
 #### Fists

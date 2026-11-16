@@ -569,7 +569,8 @@ pub(crate) const VERSION: u32 = 2;
 /// type, and still opens those pages.
 /// 75: the health-bar watch keeps its list of plates and the Ledger's font sweep walks a few frames
 /// a tick, so neither costs a frame spike in a crowd (Corey's laggy Elwynn). No line changes.
-pub(crate) const ADDON_NEWEST: u32 = 75;
+/// 76: the Bookmaker's Wager and board pages are a plain dark panel, no parchment. No line changes.
+pub(crate) const ADDON_NEWEST: u32 = 76;
 /// The first add-on that shows a person's answers (`AN`) as links in chat.
 pub(crate) const SPEECH_ADDON: u32 = 74;
 /// The first add-on that lays a column's third choice on the board.

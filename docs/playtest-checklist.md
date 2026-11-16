@@ -22,7 +22,7 @@ Sections: [Camp and Elwynn](#camp-and-elwynn) |
 
 - [ ] Press (F) beside Hale, Tobin, Garrick Stone, Wren, Maren, Marten, Wyle, a sentry and a footman: they say their line aloud (a speech bubble over them, "<name> says:" in chat), a friend standing near sees it too, and no page opens ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476), [#400](https://github.com/slopmaster69/Basin-Battle/pull/400)). **Risk:** only the use key reaches a person, not right-click.
 - [ ] Talk to Remy (or Venn, or Wyle after Voss): the answers follow in chat as blue links after his name; click one and it acts as typing its command ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)). **Risk:** a clickable link of the add-on's own (`es:`) has never been clicked in the real client's chat; if it does nothing, typing the command still works.
-- [ ] Read a note below, find a secret, open the book's Notes row, leave a run: each is told in chat (title in gold, its title briefly mid-screen, a clue in red), no page opens, and its links click ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)). The Bookmaker's Wager and the board still open as pages.
+- [ ] Read a note below, find a secret, open the book's Notes row, leave a run: each is told in chat (title in gold, its title briefly mid-screen, a clue in red), no page opens, and its links click ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)). The Bookmaker's Wager and the board still open as pages, on a plain dark panel with no parchment.
 - [ ] With an add-on older than 74, talk to Remy: "Type .es choose remy:free for Free Him." and the same for Arrest Him ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)).
 - [ ] Talk to the same person before and after a raid and after a kill: the words change with the camp ([#400](https://github.com/slopmaster69/Basin-Battle/pull/400)).
 - [ ] Take the add-on to v69 (older add-on against this server): a hero on an older add-on is told how to update ([#400](https://github.com/slopmaster69/Basin-Battle/pull/400)).
@@ -191,7 +191,7 @@ Each weapon's tooltip sentence is built from its numbers, so check the sentence 
 
 - [ ] Bearded Axe, heavy, against a shield-bearer: they can't block for 4 sec ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 - [ ] Bloodlust Edge: each kill speeds your swing 8%, up to 4 times, fading 6 sec after the last ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
-- [ ] Defias Miner's Pick on a golem, a rockling or the Shredder: 50% more damage, and stances break quicker ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
+- [ ] Defias Miner's Pick on a golem, a rockling or the Shredder: 50% more damage, and stances break 3 times as fast ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 - [ ] The Horseman's Scythe: a 200 degree sweep of up to 5 foes, and each foe struck heals you 1% of your health ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 - [ ] Loksey's Boar Spear: its thrust slows the foe 40% for 2.5 sec ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 
@@ -211,7 +211,7 @@ Each weapon's tooltip sentence is built from its numbers, so check the sentence 
 - [ ] Bazil's Shiv: each hit adds a poison stack (3 a sec, up to 5, 6 sec), beside a Fireball's burn ([#413](https://github.com/slopmaster69/Basin-Battle/pull/413), [#416](https://github.com/slopmaster69/Basin-Battle/pull/416)).
 - [ ] The Silent Blade (Marzon's dagger): 75% more damage to a foe that is recovering from its own blow, and plain damage on any other ([#445](https://github.com/slopmaster69/Basin-Battle/pull/445)).
 - [ ] Thornspike: a hit interrupts a casting foe and staggers it 1.5 sec (not a champion) ([#413](https://github.com/slopmaster69/Basin-Battle/pull/413)).
-- [ ] Cobrahn's Fang, a blow from behind: the foe sleeps 3 sec and damage wakes it. A woken foe can't be put to sleep again for 6 sec ([#413](https://github.com/slopmaster69/Basin-Battle/pull/413), [#416](https://github.com/slopmaster69/Basin-Battle/pull/416)).
+- [ ] Cobrahn's Fang, a blow from behind: the foe sleeps 3 sec and damage wakes it. A woken foe, woken by damage or by its sleep running out, can't be put to sleep again for 6 sec from the moment it wakes ([#413](https://github.com/slopmaster69/Basin-Battle/pull/413), [#416](https://github.com/slopmaster69/Basin-Battle/pull/416)).
 
 ### Two-handers
 

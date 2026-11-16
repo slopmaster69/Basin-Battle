@@ -58,6 +58,7 @@
 //! cuts, a wheeled creature's own turn.
 
 use super::*;
+use crate::content::rate_words;
 use crate::land::clear_line;
 
 /// What a Rogue's footwork holds between ticks.
@@ -1201,12 +1202,12 @@ impl Survival {
                 (main.backstab.max(off.backstab) * 100.0).round()
             ),
             Pair::CrossedSwords => format!("Your strike with both blades hits every enemy within {} degrees in front of you.", r.cross_arc),
-            Pair::BreakersPair => format!("Your strike with both weapons breaks stances {}% faster.", ((r.breaker_heft - 1.0) * 100.0).round()),
+            Pair::BreakersPair => format!("Your strike with both weapons breaks stances {}.", rate_words(r.breaker_heft)),
             Pair::IronKnuckles => format!(
-                "Your strikes alternate fists, and the {}th is with both. It turns an enemy's back to you for {} sec. On a boss it breaks stances {}% faster instead.",
+                "Your strikes alternate fists, and the {}th is with both. It turns an enemy's back to you for {} sec. On a boss it breaks stances {} instead.",
                 r.knuckle_run,
                 r.wheel_secs,
-                ((r.knuckle_boss_heft - 1.0) * 100.0).round()
+                rate_words(r.knuckle_boss_heft)
             ),
         };
         Some(format!("Your pair is {}. {rule}", pair.name()))

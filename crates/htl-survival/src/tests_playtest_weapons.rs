@@ -1029,6 +1029,17 @@ fn cobrahns_fang_a_blow_from_behind_sleeps_the_foe_3_sec_damage_wakes_it_and_not
     turn_away(&mut s, m);
     let (_, _) = light(&mut s, p, m);
     assert!(!s.has_cc(m, "incapacitate"), "not put to sleep again within 6 sec of its sleep ending");
+    // The 6 sec run from when its sleep ran out (at + 3), not from the blow: 5 sec on, still not.
+    run_to(&mut s, at + 3.0 + 5.0);
+    reset_foe(&mut s, m);
+    turn_away(&mut s, m);
+    let (_, again) = light(&mut s, p, m);
+    assert!(!s.has_cc(m, "incapacitate") && again.expect("lands") < at + 3.0 + 6.0, "5 sec after waking by itself: not again");
+    run_to(&mut s, at + 3.0 + 6.5);
+    reset_foe(&mut s, m);
+    turn_away(&mut s, m);
+    light(&mut s, p, m);
+    assert!(s.has_cc(m, "incapacitate"), "asleep again 6.5 sec after waking by itself");
     // Damage wakes a sleeper: put to sleep afresh in a clean world and hit it.
     let (mut s, p) = world();
     wield(&mut s, p, "cobrahn_fang");
@@ -1036,20 +1047,22 @@ fn cobrahns_fang_a_blow_from_behind_sleeps_the_foe_3_sec_damage_wakes_it_and_not
     turn_away(&mut s, m);
     light(&mut s, p, m);
     assert!(s.has_cc(m, "incapacitate"), "asleep");
+    run(&mut s, 1.0);
     s.hurt_mob(m, p, 5);
     assert!(!s.has_cc(m, "incapacitate"), "damage wakes it");
-    // Woken, it can't be put to sleep again for at least 6 sec; once its immunity ends it can.
+    // The 6 sec run from when it woke (1 sec into the sleep), not from the blow: 5 sec on, still not;
+    // 6.5 sec on, asleep again.
     let woke = s.clock;
-    run(&mut s, 5.5);
+    run(&mut s, 5.0);
+    reset_foe(&mut s, m);
+    turn_away(&mut s, m);
+    let (_, late) = light(&mut s, p, m);
+    assert!(!s.has_cc(m, "incapacitate") && late.expect("lands") < woke + 6.0, "5 sec after waking: not again");
+    run_to(&mut s, woke + 6.5);
     reset_foe(&mut s, m);
     turn_away(&mut s, m);
     light(&mut s, p, m);
-    assert!(!s.has_cc(m, "incapacitate") && s.clock - woke < 7.0, "5.5 sec after waking: not again");
-    run_to(&mut s, woke + 3.0 + 6.0 + 0.5);
-    reset_foe(&mut s, m);
-    turn_away(&mut s, m);
-    light(&mut s, p, m);
-    assert!(s.has_cc(m, "incapacitate"), "and again once the immunity has passed");
+    assert!(s.has_cc(m, "incapacitate"), "and again 6.5 sec after waking, 7.5 sec after the blow");
 }
 
 // --- Two-handers ---------------------------------------------------------------------------------------
@@ -1322,7 +1335,7 @@ fn every_weapon_here_has_a_tooltip_sentence_built_from_its_numbers() {
     has("bearded_axe", "can't block for 4 sec");
     has("bloodlust_edge", "speeds your swings by 8% for 6 sec, up to 4 times");
     has("miner_pick", "Deals 50% more damage to stone, golem and mechanical");
-    has("miner_pick", "Breaks stances 200% faster");
+    has("miner_pick", "Breaks stances 3 times as fast.");
     has("horsemans_scythe", "Restores 1% of your health for each enemy it strikes");
     has("horsemans_scythe", "hits up to 5 enemies");
     has("loksey_boar_spear", "Slows the enemy by 40% for 2.5 sec");
@@ -1340,7 +1353,7 @@ fn every_weapon_here_has_a_tooltip_sentence_built_from_its_numbers() {
     has("silent_blade", "Deals 75% more damage to an enemy recovering from its blow");
     has("thornspike", "interrupt an enemy that is casting and stagger it for 1.5 sec");
     has("cobrahn_fang", "put the enemy to sleep for 3 sec");
-    has("cobrahn_fang", "can't be put to sleep again for 6 sec");
+    has("cobrahn_fang", "can't be put to sleep again for 6 sec after it wakes.");
     has("champions_greatsword", "rally allies within 8 yd, you included: they take 15% less damage for 5 sec");
     has("thornroot_maul", "root the enemies they hit for 2.5 sec");
     has("mograines_might", "holy shockwave out to 6 yd that deals 60 damage");
