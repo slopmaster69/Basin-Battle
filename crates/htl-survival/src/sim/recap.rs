@@ -88,7 +88,7 @@ pub fn caught_word(action: &Action, outcome: Outcome, blockable: bool) -> &'stat
 fn tip_for(w: &Wound) -> &'static str {
     match (w.what.as_str(), w.caught) {
         ("fall", _) => "Mind the drop.",
-        ("burning ground", _) => "Step off a red mark before it burns.",
+        ("burning ground", _) => "Move off burning ground.",
         (_, "through your guard") => "A guard breaks when your stamina runs out. Dodge heavy attacks.",
         (_, "past your guard, unblockable") => "That attack can't be blocked. Dodge it.",
         (_, "around your guard") => "A guard only covers your front. Turn to face the enemy.",
