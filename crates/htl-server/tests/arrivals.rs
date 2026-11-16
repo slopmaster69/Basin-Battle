@@ -96,10 +96,7 @@ fn every_dungeons_places_stand_on_its_floor() {
         };
         // A dungeon whose first lamp stands on a building's floor is walked inside its buildings.
         let start = d.lamps[0].at;
-        let indoors = ground.cell_at(start[0], start[1]).zip(ground.floor_near(start[0], start[1], start[2])).is_some_and(|((i, j), f)| {
-            let [x, y] = ground.cell_xy(i, j);
-            !cols.on_terrain([x, y, f.z])
-        });
+        let indoors = cols.walked_indoors(&ground, start);
         println!("{}: walked {}", d.name, if indoors { "indoors" } else { "anywhere" });
         let reached = ground.reachable_avoiding(d.lamps[0].at, PIECE_SLOPE, &cols.off_limits(&ground, indoors));
         for (what, at, kind) in places(d, &ground) {

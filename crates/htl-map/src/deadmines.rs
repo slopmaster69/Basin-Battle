@@ -231,6 +231,15 @@ impl Columns {
         self.on_terrain(at) && self.faces(at[0], at[1]).is_empty()
     }
 
+    /// Whether a dungeon whose first lamp is at `start` is walked inside its buildings: the lamp
+    /// stands on a building's floor, not the terrain (every dungeon but the Deadmines, Nov 2026).
+    pub fn walked_indoors(&self, ground: &Layers, start: [f32; 3]) -> bool {
+        ground.cell_at(start[0], start[1]).zip(ground.floor_near(start[0], start[1], start[2])).is_some_and(|((i, j), f)| {
+            let [x, y] = ground.cell_xy(i, j);
+            !self.on_terrain([x, y, f.z])
+        })
+    }
+
     /// Each of `ground`'s floors (by floor index) that a walk inside the dungeon's buildings keeps
     /// off: the terrain in a hollow under their floors ([`Self::in_hollow`]), which the server's
     /// ground has as a floor of its own, and with `indoors` the terrain outside them too

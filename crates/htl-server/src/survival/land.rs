@@ -333,7 +333,6 @@ impl DeadminesLand {
     fn walkable(&self, a: Vec3, b: Vec3) -> bool {
         if self.footing(a).is_none() || self.footing(b).is_none() { return false; }
         let d = (b[0] - a[0]).hypot(b[1] - a[1]);
-        let steps = (d / 0.5).ceil().max(1.0) as usize;
         // Uniform samples alone can miss a tiny diagonal slice through a blocked cell.
         // Include the middle of every crossed grid-cell interval, however short it is.
         let origin = self.ground.cell_xy(0, 0);
@@ -365,20 +364,8 @@ impl DeadminesLand {
             z = next_z;
             previous = t;
         }
-        let mut z = a[2];
-        for k in 1..=steps {
-            let t = k as f32 / steps as f32;
-            let (x, y) = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
-            let Some(f) = self.ground.floor_near(x, y, z) else {
-                return false;
-            };
-            let next_z = self.ground.height_near(x, y, z);
-            if f.blocked || f.water || (next_z - z).abs() > MAX_SLOPE * (d / steps as f32) + 0.05 {
-                return false;
-            }
-            z = next_z;
-        }
-        (z - b[2]).abs() < 1.0
+        // The half-yard looks at the slope, as the grid's diagonal steps are held to.
+        self.ground.straight_walk(a, b, MAX_SLOPE).is_some_and(|z| (z - b[2]).abs() < 1.0)
     }
 }
 
@@ -529,6 +516,39 @@ mod tests {
         let to = [0.2, 0.1, 0.0];
         assert_eq!(land.path(from, to), Some(vec![to]), "same-cell search still reaches its exact endpoint");
         assert!(!land.walk_clear([0.0, 0.477, 0.0], [2.0, 0.557, 0.0]), "a short slice of another floor between uniform half-yard samples is still rejected");
+    }
+
+    /// Ground rising gently (0.375 a yard each way), with a stair's riser across one corner: the
+    /// cells either side of the diagonal from (0, 0) to (1, 1) a yard under and over it, as at the
+    /// foot of Shadowfang Keep's gate stair (-204, 2104) to (-203, 2103).
+    fn stair_corner() -> DeadminesLand {
+        use htl_map::layers::{Layers, Sources};
+        let terrain = |x: f32, y: f32| {
+            let (i, j) = (x.round() as i32, y.round() as i32);
+            Some(match (i, j) {
+                (0, 1) => -1.01,
+                (1, 0) => 1.38,
+                (1, 1) => 0.75,
+                _ => 0.375 * (i + j) as f32,
+            })
+        };
+        DeadminesLand::from_layers(Layers::build([-10.0, -10.0], [10.0, 10.0], 1.0, &Sources { terrain: &terrain, solid: &[], liquid: &[] }))
+    }
+
+    #[test]
+    fn a_planned_walk_takes_no_diagonal_step_its_straight_walk_refuses() {
+        let land = stair_corner();
+        let (a, b) = ([0.0, 0.0, 0.0], [1.0, 1.0, 0.75]);
+        assert!(!land.walk_clear(a, b), "straight across the riser's corner: too steep where it rises");
+        // The grid's own search agrees: its walk goes round (Shadowfang Keep's gate stair, Nov 2026,
+        // where every walk from the gate into the keep came back with none).
+        let path = land.walk(a, b).expect("a walk round the corner");
+        let mut at = a;
+        for p in &path {
+            assert!(land.walk_clear(at, *p), "each leg walkable: {at:?} to {p:?} in {path:?}");
+            at = *p;
+        }
+        assert!(land.path([-4.0, -4.0, -3.0], [4.0, 4.0, 3.0]).is_some(), "and a walk up the slope past it");
     }
 
     /// A small land: level ground, a cliff 20 yards high from x = 40 on, and a tree at (20, 0).

@@ -1696,7 +1696,9 @@ z = 53.6
 radius = 2.0
 count = 2
 link = 14.0
-route = [[-205.0, -430.0]]
+# (Its turn was (-205, -430) until Nov 2026: a walled cell, its open floor a nook the walks reach
+# only by a diagonal across a riser, which no walk takes now. 2.8 yd out onto the open floor.)
+route = [[-203.0, -428.0]]
 wait = 6.0
 
 [[dungeon.pack]]
