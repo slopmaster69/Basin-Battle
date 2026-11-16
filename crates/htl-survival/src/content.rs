@@ -1372,7 +1372,17 @@ pub struct WeaponDef {
     /// punisher's dagger: let it strike first).
     #[serde(default)]
     pub punish: f32,
+    /// Each hit gives the hero this much stamina back (a fist's quick jabs keep the feet light).
+    #[serde(default)]
+    pub wind: f32,
+    /// Its hits within `SLIP_SECS` of a dodge that slipped a blow do this much more (the claw's
+    /// counter-punch: let it swing, slip it, strike).
+    #[serde(default)]
+    pub slip: f32,
 }
+
+/// How long after a dodge slips a blow a slipping weapon's hits do more.
+pub const SLIP_SECS: f32 = 1.0;
 
 /// The shockwave's reach, the build's hits and window, the rockfall's delay and radius, the
 /// rally's reach and length.
@@ -1467,6 +1477,8 @@ impl WeaponDef {
             (self.guillotine > 0.0, "guillotine"),
             (self.rally > 0.0, "rally"),
             (self.punish > 0.0, "punish"),
+            (self.wind > 0.0, "wind"),
+            (self.slip > 0.0, "slip"),
         ];
         on.into_iter().filter(|(on, _)| *on).map(|(_, n)| n.to_string()).collect()
     }
@@ -1612,6 +1624,12 @@ impl WeaponDef {
         }
         if self.blink_behind {
             s.push("The last blow of a light chain carries you behind the enemy.".into());
+        }
+        if self.wind > 0.0 {
+            s.push(format!("Each hit restores {} stamina.", self.wind));
+        }
+        if self.slip > 0.0 {
+            s.push(format!("Hits within {} sec of a dodge that slips a blow deal {}% more damage.", SLIP_SECS, (self.slip * 100.0).round()));
         }
         s.join(" ")
     }
@@ -5389,6 +5407,20 @@ pub struct RogueDef {
     pub pinned_boss_turn: f32,
     /// Afterimage's shade: the creature (`[[mob]]` key) left where the Rogue stood.
     pub shade: String,
+    /// The dual-wield pairs (docs/rogue-roles.md, "Weapon paths"; `sim::weapon_fx`, `Pair`): what a
+    /// Rogue's two hands add to the two-blade finisher. Crossed Swords' cross-cut strikes every
+    /// enemy in this arc (degrees) in reach.
+    pub cross_arc: f32,
+    /// Breaker's Pair: its finisher counts this many times toward a champion's posture.
+    pub breaker_heft: f32,
+    /// Iron Knuckles: a run this many blows long (the others' 4); its finisher wheels a creature
+    /// (not a boss) round, its back to the Rogue, for this long (a Distract away from the Rogue),
+    /// and counts this many times toward a boss's posture.
+    pub knuckle_run: u8,
+    pub wheel_secs: f32,
+    pub knuckle_boss_heft: f32,
+    /// Iron Knuckles' finisher: both fists at once (`AttackUnarmed`), in place of `Attack1H`.
+    pub knuckle_clip: u16,
 }
 
 impl Default for RogueDef {
@@ -5429,6 +5461,12 @@ impl Default for RogueDef {
             knife_window: 1.5,
             pinned_boss_turn: 0.5,
             shade: "rogue_shade".into(),
+            cross_arc: 150.0,
+            breaker_heft: 3.0,
+            knuckle_run: 6,
+            wheel_secs: 1.0,
+            knuckle_boss_heft: 2.0,
+            knuckle_clip: 16,
         }
     }
 }

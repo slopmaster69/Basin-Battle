@@ -83,6 +83,7 @@ about as much as it takes longer; `a_family_set_keeps_the_familys_damage_a_secon
 | 1H mace | `mace_one_hand` | Overhead slams, every step slower and heavier than the last |
 | 2H axe | `axe_two_hand` | Big diagonal cleaves, the widest closing the chain |
 | Maul, hammers | `maul` | A slow overhead slam every blow, the longest coil on the heavy |
+| Fist (Nov 16, the Rogue's) | `fist` | Three quick jabs and a heavier hook, AttackUnarmed (clip 16); the quickest wind-up on the rack (0.15 sec) |
 | Sword, dagger, greatsword, polearm, staff | the grip's | Unchanged |
 
 ### Each weapon's own mechanic (step 3)
@@ -142,6 +143,18 @@ Gorzak's Cleaver, Goldshire Halberd and Zanjin's Spear, and the six staffs.
 | Thornspike | `thornspike` | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
 | Cobrahn's Fang | `cobrahn_fang` | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |
 | The Silent Blade | `silent_blade` | A punisher: a blow on a foe recovering from its own blow, between its blows, does 75% more | `punish` |
+
+#### Fists
+
+A new family (Nov 16) for the Rogue's Iron Knuckles ([rogue-roles.md](rogue-roles.md), "Weapon
+paths"), on the rack for anyone. Identity: the brawler, whose job is making backs: the quickest
+blows, short reach, twice the damage from behind (`backstab = 2.0`, between the rules' 1.5 and a
+dagger's 2.5).
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Footpad's Knuckles | `footpad_knuckles` | Each hit gives 3 stamina back, so a string of jabs leaves breath for the dodge | `wind` |
+| Cutpurse's Claw | `cutpurse_claw` | Hits within 1 sec of a dodge that slipped a blow do 50% more | `slip` |
 
 #### Two-handers
 

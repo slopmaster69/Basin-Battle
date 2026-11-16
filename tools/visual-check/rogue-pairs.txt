@@ -1,0 +1,81 @@
+# The Rogue's dual-wield pairs (docs/rogue-roles.md, build plan 5), floor markers off. The Rogue
+# stands at the camp's weapon rack (.es arm needs it) and takes up each pair in turn, then runs
+# both hands on a still grunt 3 yd ahead until the finisher. Look for, with no floor marker and no
+# word: Twin Fangs (two Poacher's Knives), the plain finisher, both blades (clip 17); Crossed Swords
+# (two swords) on three grunts side by side, the finisher's cross-cut striking all three; Breaker's
+# Pair (the Militia Mace and a knife) on a Defias Overseer, its stance bar jumping on the finisher;
+# Iron Knuckles (Footpad's Knuckles and Cutpurse's Claw): six quick punches (AttackUnarmed, clip
+# 16), the 6th with both fists, and the grunt wheeling round to show the Rogue its back for 1 sec,
+# then a stab in its back (the blood burst) before it turns back. Each pair's words say in chat as
+# it's equipped ("Your pair is ..."). Both fists show in the hands: the off-hand fist is the same
+# model as the main hand's (no left-hand model is set), to be checked here.
+# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>`. Not run yet: the
+# blow times are a first guess (a dagger's swing is about 0.5 sec, a fist's 0.42), tune them on the
+# first run.
+hero rogue
+cam 90 -12 8
+include _setup
+4.0 .es goto -9638 671
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.5 .es arm dagger
+4.6 .es arm dagger off
+4.8 .es target grunt 3 still
+5.0 video
+5.0 shots twin 40 0.1
+5.2 .es in a                            # Twin Fangs: main, off, main, off (the finisher)
+5.3 .es in au
+5.8 .es in g
+5.9 .es in gu
+6.4 .es in a
+6.5 .es in au
+7.0 .es in g                            # both blades
+7.1 .es in gu
+9.0 .es target clear
+9.2 .es arm sword
+9.3 .es arm sword off
+9.5 .es target grunt 3 still
+9.6 .es target grunt 3 still
+9.7 .es target grunt 3 still
+10.0 shots crossed 40 0.1
+10.2 .es in a                           # Crossed Swords: the 4th cuts all three
+10.3 .es in au
+10.9 .es in g
+11.0 .es in gu
+11.6 .es in a
+11.7 .es in au
+12.3 .es in g
+12.4 .es in gu
+14.5 .es target clear
+14.7 .es arm mace
+14.8 .es arm dagger off
+15.0 .es target overseer 3 still
+15.5 shots breaker 40 0.1
+15.6 .es in a                           # Breaker's Pair: the stance bar on the 4th
+15.7 .es in au
+16.4 .es in g
+16.5 .es in gu
+17.0 .es in a
+17.1 .es in au
+17.8 .es in g
+17.9 .es in gu
+20.0 .es target clear
+20.2 .es arm footpad_knuckles
+20.3 .es arm cutpurse_claw off
+20.5 .es target grunt 3 still
+21.0 shots knuckles 60 0.1
+21.1 .es in a                           # Iron Knuckles: six punches, the 6th both fists
+21.2 .es in au
+21.55 .es in g
+21.65 .es in gu
+22.0 .es in a
+22.1 .es in au
+22.45 .es in g
+22.55 .es in gu
+22.9 .es in a
+23.0 .es in au
+23.35 .es in g                          # the wheel: its back to the Rogue
+23.45 .es in gu
+23.9 .es in a                           # a stab in its back
+24.0 .es in au
+27 end

@@ -709,7 +709,8 @@ impl Survival {
         // A champion's posture: enough damage in a short while breaks its stance (heavier
         // weapons count more, and a blow in its recovery more again).
         if earned && self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 && !self.machinery_debug(mid, label) {
-            let heft = self.players.get(&by).map_or(1.0, |p| self.weapon_of(p).posture).max(1.0);
+            // (A Rogue's blow: its own hand's weight, or its pair's finisher's, `sim::rogue`.)
+            let heft = self.players.get(&by).map_or(1.0, |p| if p.rogue.blow_heft > 0.0 { p.rogue.blow_heft } else { self.weapon_of(p).posture }).max(1.0);
             // Struck just after its own blow, it's open: that counts more.
             let m = &self.mobs[&mid];
             let open = matches!(m.state, MobState::Recover { .. }) && m.stagger_until <= now;

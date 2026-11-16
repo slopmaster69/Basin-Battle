@@ -532,6 +532,22 @@ running = { from = "ScourgeMale", clip = 17, take = 2, recovery = 1.1, damage = 
 roll = { from = "ScourgeMale", clip = 17, take = 1, windup = 0.8, recovery = 1.1, damage = 1.1, lunge = 1.6 }
 leap = { from = "ScourgeMale", clip = 18, take = 2, windup = 0.85, recovery = 1.35, damage = 1.45, stamina = 1.3, lunge = 3.6, range = 1.1 }
 
+# The fist (docs/rogue-roles.md, "Weapon paths"): quick punches. Three jabs and a heavier hook,
+# the dwarf's AttackUnarmed (clip 16; the dagger's set is the dwarf's too), the heavy the dagger's
+# overhead. Its family damage a second sits within 5% of the one-hander's (`tests_weapon_identity`).
+[[moveset]]
+key = "fist"
+light = [
+  { from = "DwarfMale", clip = 16, take = 0, lunge = 0.5 },
+  { from = "DwarfMale", clip = 16, take = 0, lunge = 0.5 },
+  { from = "DwarfMale", clip = 16, take = 0, lunge = 0.5 },
+  { from = "DwarfMale", clip = 16, take = 0, windup = 1.2, recovery = 1.2, damage = 1.5, stamina = 1.2, lunge = 0.9 },
+]
+heavy = { from = "DwarfMale", clip = 57, take = 0, lunge = 0.9 }
+running = { from = "DwarfMale", clip = 16, take = 0, recovery = 1.1, damage = 1.3, lunge = 2.4 }
+roll = { from = "DwarfMale", clip = 16, take = 0, windup = 0.8, recovery = 1.1, damage = 1.2, lunge = 1.6 }
+leap = { from = "DwarfMale", clip = 57, take = 0, windup = 0.85, recovery = 1.35, damage = 1.6, stamina = 1.3, lunge = 3.6, range = 1.1 }
+
 # The one-hander's mace: overhead slams, slower and heavier. Every step comes down from above
 # (the dwarf's overhead), each a beat slower and a bit harder than the last.
 [[moveset]]
@@ -1060,6 +1076,41 @@ targets = 1
 subclass = 15
 # Identity: the assassin; 2.5 times the damage from behind (docs/weapon-identities.md).
 backstab = 2.5
+# The fists (docs/rogue-roles.md, "Weapon paths"): the quickest blows on the rack, a 0.15 sec
+# wind-up, short reach and light hits, about a dagger's damage a second. Identity: the brawler,
+# whose job is making backs; twice the damage from behind (the rules' 1.5, a dagger's 2.5).
+[[weapon]]
+key = "footpad_knuckles"
+windup = 0.15
+active = 0.07
+recovery = 0.20
+stamina = 7.0
+damage = [7, 11]
+range = 2.2
+arc = 70.0
+targets = 1
+subclass = 13
+moveset = "fist"
+backstab = 2.0
+# Its own: each hit gives 3 stamina back (a hit costs 7), so a string of jabs leaves breath for the
+# dodge that ends it.
+wind = 3.0
+[[weapon]]
+key = "cutpurse_claw"
+windup = 0.15
+active = 0.07
+recovery = 0.22
+stamina = 7.0
+damage = [8, 12]
+range = 2.3
+arc = 70.0
+targets = 1
+subclass = 13
+moveset = "fist"
+backstab = 2.0
+# Its own: hits within 1 sec of a dodge that slipped a blow deal 50% more (let it swing, slip it,
+# strike), a smaller reward than a perfect dodge's backstab that any clean dodge earns.
+slip = 0.5
 [[weapon]]
 key = "greatsword"
 windup = 0.50
@@ -1407,6 +1458,22 @@ display = 2699
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
 text = "Very quick and light, with short reach and low damage."
+
+[[item]]
+key = "footpad_knuckles"
+name = "Footpad's Knuckles"
+display = 15720
+icon = "INV_Gauntlets_11"
+kind = "weapon"
+text = "{fx} \"Brass, worn bright where it meets a jaw.\""
+
+[[item]]
+key = "cutpurse_claw"
+name = "Cutpurse's Claw"
+display = 4687
+icon = "INV_Gauntlets_04"
+kind = "weapon"
+text = "{fx} \"Three hooked blades, filed in a Moonbrook cellar.\""
 
 [[item]]
 key = "greatsword"
@@ -1842,6 +1909,29 @@ knife_window = 1.5
 pinned_boss_turn = 0.5
 # Afterimage's shade: a Defias Footpad's body (a rogue's look), see-through.
 shade = "rogue_shade"
+# The dual-wield pairs (docs/rogue-roles.md, "Weapon paths"): what a Rogue's two hands add to the
+# two-blade finisher, judged on both hands' families. Twin Fangs (two daggers): a Shadow Cut's
+# backstab is whole and not remembered. Blade and Shiv (a sword and a dagger): the finisher has the
+# sword's reach and the dagger's backstab. Neither needs a number.
+# Crossed Swords (two swords): the finisher is a cross-cut on every enemy in 150 degrees in reach, a
+# sword's 90 opened out to the two blades' sweep. #60 found the Rogue falls to a big pack; this is
+# its answer, and it still has to be earned with 3 blows first.
+cross_arc = 150.0
+# Breaker's Pair (a mace and any other): the finisher counts 3 times toward a champion's posture (a
+# mace's own blows count 2). With no parry, the Rogue needs a stance-breaker for bosses: about one
+# run in three of a parry's 25% fill.
+breaker_heft = 3.0
+# Iron Knuckles (two fists): a run of 6 (the others' 4), each blow a fist's 0.15 sec wind-up, so the
+# whole run takes about as long as a dagger's 4. The finisher wheels a creature (not a boss) round
+# so its back is to the Rogue for 1 sec (a Distract away from the Rogue: about two fist blows in
+# its back), then it turns back. On a boss it counts 2 times toward posture instead: a boss is
+# never turned.
+knuckle_run = 6
+wheel_secs = 1.0
+knuckle_boss_heft = 2.0
+# Iron Knuckles' finisher plays AttackUnarmed (clip 16, both fists) in place of Attack1H (17). (35,
+# which the design page first named, is NPCGoodbye: tools/clip-census.)
+knuckle_clip = 16
 
 # --- stations -------------------------------------------------------------------------------------
 

@@ -163,6 +163,11 @@ pub struct Strike {
     pub from: Option<String>,
     /// The two-blade run's finisher, both blades at once (dual wield).
     pub finish: bool,
+    /// A Rogue's dual-wield pair, whose rule the finisher (and a Twin Fangs Shadow Cut) carries
+    /// (`sim::weapon_fx`, docs/rogue-roles.md "Weapon paths").
+    pub pair: Option<rogue::Pair>,
+    /// A Shadow Cut's blow (the step behind out of a perfect dodge).
+    pub cut: bool,
 }
 
 impl Strike {
