@@ -94,6 +94,10 @@
 //!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
 //!   the legs while the arms draw the bow). `lower` takes client patch 0037 (`ac23`); `ac22`
 //!   reads it as the whole body.
+//!   A hero's swing goes on `\t<blow>/<of>\t<open secs>\t<two hands 1|0>` after `from`: its place
+//!   in the chain the hero is on (`0/0`: none, a heavy or a bash), how long after the blow ends
+//!   the next press still carries it on, and whether the hero fights with two hands (their chain
+//!   is the server's to say; the add-on doesn't guess it). Drawn under the reticle (`Chain.lua`).
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), or a held cast ended early (Skyfall's hang,
 //!   a thrown ability's aim let go), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>[\t<1: warning only>]`: an
@@ -571,7 +575,14 @@ pub(crate) const VERSION: u32 = 2;
 /// a tick, so neither costs a frame spike in a crowd (Corey's laggy Elwynn). No line changes.
 /// 76: the Bookmaker's Wager and board pages are a plain dark panel, no parchment. No line changes.
 /// 77: no parchment anywhere: the Ledger skin (parchment windows, leather, wax seals, brush bars) is gone and every window, the HUD and the dock are the plain dark panels; the wager slip matches the Bookmaker's pages. No line changes.
-pub(crate) const ADDON_NEWEST: u32 = 77;
+/// 78: the light chain under the reticle: a pip for each blow of the weapon's set, lit as each is
+/// swung, and a line counting down the time left to press the next (a swing's `AN` goes on
+/// `\t<blow>/<of>\t<open secs>\t<two hands>`). The finisher's flash on the swinger plays from the
+/// add-on as its impact comes. An older add-on ignores the fields and is still sent the flash.
+pub(crate) const ADDON_NEWEST: u32 = 78;
+/// The first add-on that plays the finisher's flash on its own hero (`Chain.lua`): the server
+/// leaves that client out of the kit.
+pub(crate) const CHAIN_ADDON: u32 = 78;
 /// The first add-on that shows a person's answers (`AN`) as links in chat.
 pub(crate) const SPEECH_ADDON: u32 = 74;
 /// The first add-on that lays a column's third choice on the board.

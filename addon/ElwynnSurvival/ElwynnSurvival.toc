@@ -21,3 +21,4 @@ Staff.lua
 Priest.lua
 PriestLook.lua
 Rogue.lua
+Chain.lua

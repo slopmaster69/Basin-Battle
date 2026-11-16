@@ -77,7 +77,7 @@ mod world;
 
 #[cfg(test)]
 pub(crate) use combat::Follow;
-pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_FALL_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, MEAL, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, TOO_HEAVY_PUSH, WOUND_ANIM,
+pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_FALL_DUST, KIT_FINISHER, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, MEAL, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, TOO_HEAVY_PUSH, WOUND_ANIM,
 };
 pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
@@ -168,11 +168,22 @@ pub struct Strike {
     pub pair: Option<rogue::Pair>,
     /// A Shadow Cut's blow (the step behind out of a perfect dodge).
     pub cut: bool,
+    /// Its place in the chain the hero is on, `(blow, of)` counting from 1: the light chain's,
+    /// the off hand's, or a two-blade run's (`run`). `(0, 0)`: no chain's (a heavy, a bash, a
+    /// weapon art, a set of one). Shown on the hero's own screen (`AN`, `Chain.lua`).
+    pub chain: (u8, u8),
+    /// The chain is a two-blade run, open [`DUAL_WINDOW`] longer than the light chain.
+    pub run: bool,
 }
 
 impl Strike {
     pub fn total(&self) -> f32 {
         self.windup + self.active + self.recovery
+    }
+    /// The last blow of its set, the finisher: its flash on the swinger whether it strikes or not
+    /// ([`combat::KIT_FINISHER`]).
+    pub fn finisher(&self) -> bool {
+        self.chain.1 >= 2 && self.chain.0 == self.chain.1
     }
     pub fn heavy(&self) -> bool {
         self.kind == StrikeKind::Heavy

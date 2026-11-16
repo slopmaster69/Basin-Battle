@@ -722,6 +722,8 @@ impl Survival {
             finish: false,
             pair: None,
             cut: false,
+            chain: (0, 0),
+            run: false,
         }
     }
 
@@ -798,7 +800,8 @@ impl Survival {
             let alternate = p.dual_run > 0 && (p.dual_last_off != off || p.rogue.any_hand) && self.clock <= p.combo_until + DUAL_WINDOW;
             let run = if alternate { p.dual_run + 1 } else { 1 };
             // (A Rogue's Iron Knuckles run longer.)
-            let finish = run >= self.run_length(p);
+            let len = self.run_length(p);
+            let finish = run >= len;
             if finish {
                 strike.damage *= DUAL_FINISH_DAMAGE;
                 strike.stagger = strike.stagger.max(DUAL_FINISH_STAGGER);
@@ -813,6 +816,14 @@ impl Survival {
             p.dual_run = if finish { 0 } else { run };
             p.dual_last_off = off;
             p.rogue.any_hand = false;
+            // Its place: the run's, once the hands alternate (the first blow is the light chain's).
+            if run >= 2 || finish {
+                strike.chain = (if finish { len } else { run.min(len) }, len);
+                strike.run = true;
+            }
+        }
+        if strike.chain.1 == 0 && matches!(kind, StrikeKind::Light | StrikeKind::Off) && set_len >= 2 {
+            strike.chain = (strike.step + 1, set_len);
         }
         if pay {
             self.spend_attack(id, strike.stamina);
@@ -890,6 +901,8 @@ impl Survival {
             finish: false,
             pair: None,
             cut: false,
+            chain: (0, 0),
+            run: false,
         };
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;
@@ -1357,6 +1370,10 @@ impl Survival {
                 if t2 >= strike.windup && t < strike.windup + strike.active {
                     // (Its first moment: what's struck once a swing, a War Banner, is struck then.)
                     let first = t < strike.windup;
+                    // The chain's last blow flashes on the swinger as it comes, struck or not.
+                    if first && strike.finisher() {
+                        self.finisher_cue(id);
+                    }
                     let before = struck.len();
                     self.connect(id, &w, &strike, &mut struck, first);
                     if before == 0 && !struck.is_empty() && strike.art.is_none() && !strike.shove() {
@@ -3284,6 +3301,11 @@ pub const KIT_HEAVY: u32 = 437;
 /// body hitting the ground.
 pub const KIT_SLAM: u32 = 1666;
 pub const KIT_CLEAVE: u32 = 507;
+/// The chain's last blow on the swinger, struck or not: Execute's own cast (`SpellVisualKit` 394,
+/// `BloodLust_State_Hand` flaring red on both hands) and its sound, the Warrior's special swing
+/// (`SoundEntries` 3091, `SwingWeaponSpecialWarrior`), which no other blow here plays. A kit plays
+/// no body animation, so the swing's own clip goes on. Check on video.
+pub const KIT_FINISHER: u32 = 394;
 pub const KIT_DUST: u32 = 5649;
 /// A body knocked to the ground: Charge's landing puff (`DustCloud_Land`), low and about a
 /// creature's width. The dust nova above is a dragon's wing buffet: on a tripped grunt, seen from

@@ -10,6 +10,10 @@
 //! when it ends short of that: the grace ran out, a broken guard or a knockdown staggered the hero
 //! mid-chain (a blow that lands doesn't stop a swing), or a heavy attack, a roll, a leap, a weapon
 //! art or a feint (the guard raised in a wind-up) replaced the next blow.
+//!
+//! The hero sees the chain too: each blow's place in it goes out with its swing (`Strike::chain`,
+//! the `AN` line) for the add-on's pips under the reticle (`Chain.lua`), and the finisher flashes
+//! on the swinger as it comes, struck or not ([`Survival::finisher_cue`]).
 
 use super::{Action, Id, StrikeKind, Survival};
 use crate::sim::Outcome;
@@ -155,6 +159,19 @@ impl Survival {
                 t.end_chain(ChainEnd::Switched);
             }
         }
+    }
+
+    /// The chain's last blow comes (its active moment begins), struck or not: its flash and sound
+    /// on the swinger, for everyone near. The swinger's own add-on plays it at the impact as the
+    /// clip crosses it (`Chain.lua`), so the server leaves that client out (`play.rs`).
+    pub(crate) fn finisher_cue(&mut self, id: Id) {
+        self.events.push(super::Event::Visual { id, kit: super::combat::KIT_FINISHER, by: Some(id) });
+    }
+
+    /// How long a chain stays open after its blow ends: the light chain's grace, and a two-blade
+    /// run's `DUAL_WINDOW` past that (what the hero's chain cue counts down).
+    pub fn chain_window(&self, run: bool) -> f32 {
+        self.content.combat.combo_grace + if run { super::DUAL_WINDOW } else { 0.0 }
     }
 
     /// Something other than a light blow takes the place of the chain's next (a weapon art, a feint).
