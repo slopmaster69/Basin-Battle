@@ -62,6 +62,7 @@ include _setup
 17.8 .es in g
 17.9 .es in gu
 20.0 .es target clear
+20.1 .es goto -9638 671                 # back at the rack: the cuts above lunged away, and .es arm needs it
 20.2 .es arm footpad_knuckles
 20.3 .es arm cutpurse_claw
 20.5 .es target grunt 3 still

@@ -51,6 +51,7 @@ $Defaults = [ordered]@{
     password      = "hold"
     hunter        = "Vchunter"
     warrior       = "Vcwarrior"
+    rogue         = "Vcrogue"
     cameraman     = "Vccamera"
     resolution    = "1280x720"
     hero_resolution = "560x315"
@@ -71,7 +72,7 @@ $SettingsHelp = @(
     "# data: the Data folder of your WoW 1.12.1 install. Empty: the one settings-windows.txt names.",
     "# host, port, realm, account, password: the local test server and its test account (test credentials",
     "#   only, on a local server; the password is the one the host prints, 'hold' unless you changed it).",
-    "# hunter, warrior: the test heroes on that account the scenarios play ('setup' makes them).",
+    "# hunter, warrior, rogue: the test heroes on that account the scenarios play ('setup' makes them).",
     "# cameraman: the hero whose client films a scenario with a 'camera' line ('setup' makes it too).",
     "# resolution: the client's window. format: jpg (small) or png. width: stills wider are scaled down.",
     "# hero_resolution: with a cameraman, the hero's own window, beside the cameraman's on the same screen.",
@@ -1163,12 +1164,12 @@ function Invoke-Scenario($s, $name, $out) {
 
 # The test heroes: each made at character select (benilla's WOW_PROBE_CHARCREATE), kept. A hero
 # already there stays as it is (the server answers that the name is in use).
-$HeroBodies = @{ hunter = "3,3,0"; warrior = "1,1,0"; cameraman = "1,1,0" }  # race, class, gender: a dwarf hunter, two human warriors
+$HeroBodies = @{ hunter = "3,3,0"; warrior = "1,1,0"; rogue = "1,4,0"; cameraman = "1,1,0" }  # race, class, gender: a dwarf hunter, two human warriors, a human rogue
 function Invoke-Setup($s, $out) {
     if (Test-Path $out) { Remove-Item -Recurse -Force $out }
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     $results = @()
-    foreach ($role in @("hunter", "warrior", "cameraman")) {
+    foreach ($role in @("hunter", "warrior", "rogue", "cameraman")) {
         $hero = $s[$role]
         if (-not $hero) { continue }
         $chome = Join-Path $out "client-$role"

@@ -47,7 +47,7 @@ watcher, below).
    | `tail` | `5` | with a `camera` line, seconds the video goes on once the fight is over (the hero or the boss fell); `off` films to the scenario's end |
 
 5. **The test heroes**: run the `setup` scenario once (`Visual Check.bat setup`). It makes a dwarf
-   hunter, a human warrior and a human cameraman with the names in the settings on the test
+   hunter, a human warrior, a human rogue and a human cameraman with the names in the settings on the test
    account, through the character screen (benilla's `WOW_PROBE_CHARCREATE`); a hero already there is left alone. Any
    existing heroes on the account do as well: put their names in `hunter` and `warrior`. The class
    only decides the hero's look and gear: each scenario slots its own abilities (`.es spells` owns
@@ -327,7 +327,7 @@ Invitation (same doc, beat 9) have a dev setup each, not yet run:
 | `vancleef-unbowed-invitation` | Dev setup, not yet run: the rig's bot plays Unbowed's first four turned Invitations with markers off (the red blades and "Stand still, and be finished.", the closing thrust 2 sec later, the roll aside on the red glow, his 2.4 sec opening) |
 
 The Rogue (`docs/rogue-roles.md`) has a scenario per build-plan entry. Each needs a Rogue test
-hero: put a Rogue's name in the settings as `rogue = <name>` (`setup` doesn't make one yet).
+hero: `setup` makes one (a human Rogue, `Vcrogue`; the settings' `rogue` names another).
 
 | Scenario | What it films |
 | --- | --- |
