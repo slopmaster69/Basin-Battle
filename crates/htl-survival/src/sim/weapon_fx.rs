@@ -18,7 +18,8 @@ pub struct MobFx {
     pub curse: Option<(f32, Id, u32)>,
     /// Lulled: it takes no notice of this hero until.
     pub lulled: Option<(Id, f32)>,
-    /// Asleep before: no new sleep takes until (a foe woken by a blow isn't put straight back).
+    /// No new sleep takes until: `SLEEP_IMMUNE_SECS` after the foe wakes (its sleep running out, or
+    /// a blow waking it early, `cc_on_damage`).
     pub sleep_immune_until: f32,
 }
 
@@ -194,6 +195,7 @@ impl Survival {
         if w.sleep > 0.0 && behind && self.alive(mid) && self.mobs.get(&mid).is_some_and(|m| m.fx.sleep_immune_until <= now) {
             if self.apply_cc(mid, id, "incapacitate", w.sleep, 0.0, 0.0, "Slumber") {
                 if let Some(m) = self.mobs.get_mut(&mid) {
+                    // (Counted from the sleep's end; a blow that wakes it early restarts the count.)
                     m.fx.sleep_immune_until = now + w.sleep + SLEEP_IMMUNE_SECS;
                 }
             }

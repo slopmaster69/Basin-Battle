@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use super::*;
+use crate::content::rate_words;
 
 /// How close a hero must be to use something.
 pub const INTERACT_RANGE: f32 = 4.5;
@@ -939,7 +940,7 @@ impl Survival {
                 perks.push(format!("Interrupts an enemy's wind-up for {:.1} sec, except a boss's", w.stagger));
             }
             if w.posture > 1.0 {
-                perks.push(format!("Breaks stances {:.0}% faster", (w.posture - 1.0) * 100.0));
+                perks.push(format!("Breaks stances {}", rate_words(w.posture)));
             }
             if w.parry > 0.0 {
                 perks.push(format!("Parry window {:.0} ms longer", w.parry * 1000.0));

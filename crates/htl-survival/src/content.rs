@@ -1396,7 +1396,7 @@ pub const LULL_SECS: f32 = 4.0;
 pub const BURST_RADIUS: f32 = 4.0;
 pub const POISON_STACKS: u32 = 5;
 pub const POISON_SECS: f32 = 6.0;
-/// How long after a sleep a foe can't be put to sleep again (after the sleep itself).
+/// How long after a foe wakes (from a blow, or when its sleep runs out) it can't be put to sleep again.
 pub const SLEEP_IMMUNE_SECS: f32 = 6.0;
 
 /// The tenderized foe's window, the mending hand's reach, the curse's length and burst radius, the
@@ -1539,7 +1539,7 @@ impl WeaponDef {
             s.push("Does no extra damage from behind.".into());
         }
         if self.posture > 1.0 && !self.bane.is_empty() {
-            s.push(format!("Breaks stances {}% faster.", ((self.posture - 1.0) * 100.0).round()));
+            s.push(format!("Breaks stances {}.", rate_words(self.posture)));
         }
         if self.guard_hook > 0.0 {
             s.push(format!("Heavy attacks hook a shield aside: the enemy can't block for {} sec.", self.guard_hook));
@@ -1591,7 +1591,7 @@ impl WeaponDef {
             s.push(format!("Hits interrupt an enemy that is casting and stagger it for {} sec.", self.interrupt));
         }
         if self.sleep > 0.0 {
-            s.push(format!("Blows from behind put the enemy to sleep for {} sec. Damage wakes it, and it can't be put to sleep again for {} sec.", self.sleep, SLEEP_IMMUNE_SECS));
+            s.push(format!("Blows from behind put the enemy to sleep for {} sec. Damage wakes it. It can't be put to sleep again for {} sec after it wakes.", self.sleep, SLEEP_IMMUNE_SECS));
         }
         if self.root > 0.0 {
             s.push(format!("Heavy attacks root the enemies they hit for {} sec.", self.root));
@@ -1874,6 +1874,17 @@ pub fn hone_tier(level: u32) -> u8 {
 pub struct PerkDef {
     pub kind: String,
     pub amount: f32,
+}
+
+/// A rate as a multiple of the usual, for a tooltip: "50% faster" below twice the rate, and
+/// "3 times as fast" from there.
+pub fn rate_words(mult: f32) -> String {
+    if mult >= 2.0 {
+        let r = (mult * 10.0).round() / 10.0;
+        format!("{r} times as fast")
+    } else {
+        format!("{}% faster", ((mult - 1.0) * 100.0).round())
+    }
 }
 
 /// A perk in words, for a tooltip: "+5% damage", "+1% health a second"...

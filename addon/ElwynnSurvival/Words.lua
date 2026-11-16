@@ -4,7 +4,7 @@
 -- reads (a note found below, a secret come upon, the book's record of a dungeon, a run's tally:
 -- `NT` of kinds note, secret, lore, run) is told in chat too, its title briefly on screen. A link
 -- in chat ([Arrest Him], [The Deadmines]) sends its command when clicked, as typing it would.
--- (A wager's page and the board stay pages: `Letter.lua`.)
+-- (A wager's page and the board stay pages, on a plain dark panel: `Letter.lua`.)
 --
 -- Lines: `AN who links` and `NT kind title place text clue links`; links are `command~label`
 -- with `^` between; `{n}` breaks a line.

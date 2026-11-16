@@ -620,25 +620,6 @@
       "sha256": "20cf266013eefd837add3ead6194e6679fe76da09e39ca9984b93ac0a477f4dc"
     },
     {
-      "name": "seal_blue",
-      "size": [
-        64,
-        64
-      ],
-      "kind": "single",
-      "tint": false,
-      "use": "Blank slightly irregular embossed round blue wax seal, no emblem.",
-      "file": "seal_blue.tga",
-      "source": "../../../art-src/ledger/seal_blue.png",
-      "imagegen_exec": "exec-baf7eaba-2abc-4261-9904-672f89c3e931.png",
-      "source_size": [
-        1254,
-        1254
-      ],
-      "source_sha256": "058b4ac07a87e92510f219c06925f6e2390f844b26fde044859a5e381edb5712",
-      "sha256": "06ec9835f0a866f283a16cc2669bc7777feb15874ba296e50ae8c912cb1730e0"
-    },
-    {
       "name": "seal_grey",
       "size": [
         64,
