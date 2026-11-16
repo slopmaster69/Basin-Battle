@@ -1755,6 +1755,7 @@ impl Survival {
         // Nobody left below in a falling mine: put it back now, the world takes no steps to.
         self.collapse_abandoned();
         self.machinery_abandoned();
+        self.arsenal_abandoned();
         self.events.push(Event::Dirty);
         Some(save)
     }

@@ -201,6 +201,48 @@ impl Survival {
         }
     }
 
+    /// The last hero has left (or been taken out of the world) while he fights. The world takes
+    /// no steps with nobody in it, so the lost fight's own end (the rack, its lamps and the
+    /// weapons lying there gone, the sword back in his hand, his health whole, he at his post)
+    /// would wait for the next hero and play out in front of them, with the old fight's props
+    /// standing until then. It is put back now, whole. (`leave`'s `foe_gone` has already sent
+    /// him home.) A rack at rest is left alone; the next step lights a fresh one.
+    pub(crate) fn arsenal_abandoned(&mut self) {
+        if !self.players.is_empty() {
+            return;
+        }
+        let ids: Vec<Id> = self.arsenal.racks.keys().copied().collect();
+        for id in ids {
+            let Some(m) = self.mobs.get(&id).filter(|m| m.health > 0) else { continue };
+            let dirty = self.arsenal.racks[&id].began_fight || m.health < m.max_health || m.phase != 0
+                || m.state.foe().is_some() || !matches!(m.state, MobState::Idle { .. });
+            if !dirty { continue; }
+            if let MobState::Windup { mark: Some(mk), .. } = m.state { self.unmark(mk); }
+            self.remove_arsenal(id);
+            self.clear_cc(id);
+            self.halt(id);
+            let home = self.mobs[&id].home;
+            let m = self.mobs.get_mut(&id).unwrap();
+            m.pos = home;
+            m.health = m.max_health;
+            m.fighters = 1;
+            m.posture = 0;
+            m.pattern = None;
+            m.special = false;
+            m.enraged = false;
+            m.phase = 0;
+            m.voiced = false;
+            m.lost_at = None;
+            m.stagger_until = 0.0;
+            m.posed_until = 0.0;
+            m.state = MobState::Idle { wander_at: self.clock + 3.0 };
+            let (health, max, facing) = (m.health, m.max_health, m.facing);
+            self.events.push(Event::Health { id, health, max });
+            self.events.push(Event::MobStop { id, pos: home, facing });
+            self.events.push(Event::MobGear { id });
+        }
+    }
+
     pub(crate) fn arsenal_hurt(&mut self, id: Id) {
         let now = self.clock;
         if let Some(c) = self.arsenal.racks.get_mut(&id).and_then(|r| r.transition.as_mut()) {
