@@ -2086,3 +2086,42 @@ fn the_weather_reaches_every_hero_and_holds_for_filming() {
     a.chat(".es weather auto");
     assert!(b.until(3.0, |c| weathers(c).last().is_some_and(|w| w.0 == 0)), "{:?}", weathers(&b));
 }
+
+#[test]
+fn a_camp_person_speaks_in_the_world_and_their_answers_come_as_links() {
+    let mut c = content();
+    // Quartermaster Hale beside where a hero comes in, standing from the start, with a link to offer.
+    let spawn = c.world.spawn;
+    let hale = c.props.iter().position(|p| p.npc && p.name == "Quartermaster Hale").expect("Hale");
+    c.props[hale].after = None;
+    c.props[hale].at = [spawn[0] + 4.0, spawn[1]];
+    c.props[hale].z = None;
+    c.props[hale].talk.truncate(1);
+    c.props[hale].talk[0].after = None;
+    c.props[hale].talk[0].text = "Keep the storage stocked.".into();
+    c.props[hale].talk[0].links = vec![".es lore deadmines~The Deadmines".into()];
+    let server = start_content(None, false, c);
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut a);
+    a.chat(".es hello 74 ac4");
+    a.drain(0.6);
+    stand(&mut a, [spawn[0] + 3.0, spawn[1], 0.0], 0.0);
+    a.drain(0.3);
+    a.seen.clear();
+    a.chat(".es e");
+    // His words: his own say (a creature's, with his name), not a page.
+    let said = a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.chat_type == 0x0B && m.text == "Keep the storage stocked."));
+    let Some(ServerPacket::MessageChat(m)) = said else { panic!("Hale says his line: {:?}", addon_lines(&a, "ES")) };
+    assert_eq!(m.sender_name.as_deref(), Some("Quartermaster Hale"));
+    assert_ne!(m.sender_guid, 0, "from where he stands");
+    a.drain(0.3);
+    let lines = addon_lines(&a, "ES");
+    assert!(lines.iter().any(|l| l == "AN\tQuartermaster Hale\t.es lore deadmines~The Deadmines"), "{lines:?}");
+    assert!(!lines.iter().any(|l| l.starts_with("NT\t")), "no page: {lines:?}");
+    // An older add-on is told the answer as a command to type.
+    a.chat(".es hello 73 ac4");
+    a.drain(0.6);
+    a.seen.clear();
+    a.chat(".es e");
+    assert!(a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "Type .es lore deadmines for The Deadmines.")).is_some(), "typed");
+}

@@ -1081,9 +1081,11 @@ chest.
 
 ## Secrets and notes
 
-Notes lie where they were dropped below; read one (the use key) and it opens on a parchment page
-that stays till you close it, with a clue in red ink while the secret it speaks of is still
-hidden. Every hidden spot has a marker to search (a heap of sacks, a pumpkin on a grave, a book
+Notes lie where they were dropped below; read one (the use key) and its words are told in chat,
+its title briefly on screen, with a clue in red while the secret it speaks of is still hidden.
+There is no page to close: a secret found, the book's record of a dungeon and a run's tally as
+you leave it are told the same way, their links ([All found in the Deadmines], a note to read
+again) clickable in the chat line. Every hidden spot has a marker to search (a heap of sacks, a pumpkin on a grave, a book
 in rusted chains): come near it and you're nudged once a run, search it and it gives up what it
 kept. The camp remembers every note read and secret found, but the book doesn't list or count
 secrets: they're found down there, not ticked off. Its page for each dungeon has a **Notes** row
@@ -1345,23 +1347,27 @@ carried over to the nearest good spot in it as the save is read.
 right-click). A `[[prop]]` with `npc = true` takes `[[prop.talk]]` lines, each an `after` (the
 condition a prop's `after` takes) and a `text`, and optionally `links = ["command~label"]`. They
 say the last line whose `after` holds, so each person's words follow the camp: Hale after the
-first raid, Wyle after the Blackrock. The page is a `talk` letter (the blue seal) in the add-on's
-`Letter.lua`; there are no choices yet. A person with no line that holds isn't usable. The
+first raid, Wyle after the Blackrock. There is no page: the person says the line aloud where they
+stand (a creature's say, "Hale says:", with a speech bubble, heard by every hero within 25 yd),
+and the answers they offer follow in the talker's chat as links to click ([Arrest Him], [The
+Deadmines]: the add-on's `AN` line and `Words.lua`, which catches the click and sends the link's
+command). Without the add-on, or with one older than 74, each answer is a command to type ("Type
+.es choose remy:free for Free Him."). A person with no line that holds isn't usable. The
 conditions are `start`, `raids:N`, `built:<station>`, `found:<site>`, `kill:<mob>`
 (once the camp has killed one), `open:<chest>` (once one has been opened) and `chose:<group>` or
 `chose:<group>:<option>` (once the camp has made that choice). `Content::validate`
 refuses any other word, and a name that isn't a real station, site, creature or chest.
 
 **Choices.** A talk line can offer a choice with links of the form `.es choose <group>:<option>~Label`. A hero
-within 6 yd of a person whose current line holds the link makes it, from the page's button or by typing
-the command, and the choice is the camp's, made once per group (a second try says "That is already
+within 6 yd of a person whose current line holds the link makes it, by clicking the link in chat or by
+typing the command, and the choice is the camp's, made once per group (a second try says "That is already
 decided."). It counts `chose:<group>` and `chose:<group>:<option>` in the camp's counts, which the save
 already keeps. A `[[prop]]` with `until = "<condition>"` goes once its condition holds and never stands
 again, so a person can be taken away. `Content::validate` refuses a link that isn't a group and an option,
 a condition that names a choice nobody offers, and an option nothing waits on.
 
 **Remy "Two Times"** (Stage 8 of docs/elwynn-expansion.md). Once the mason's road book is open, Remy stands
-outside the Lion's Pride in Goldshire, and says he sold the watch rosters to a man in black. His page offers
+outside the Lion's Pride in Goldshire, and says he sold the watch rosters to a man in black. He offers
 two choices. *Arrest Him*: he is taken away, Marshal Dughan stands in his place (and names the Stockade's page),
 and the Stormwind Bounty opens (3 silver, 2 bronze). *Free Him*: he stays, tells where the man in black meets
 his buyers (past Jasperlode), and his stash at the Maclure well opens (2 silver, 2 pearls). The chest of the

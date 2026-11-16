@@ -490,7 +490,7 @@ impl Survival {
             ObjKind::Chest { def, spent: false } => self.use_chest(id, def, t),
             ObjKind::Chest { .. } => {}
             ObjKind::Loot { item, n } => self.take_loot(id, item, n, t),
-            ObjKind::Piece { def } => self.talk_to(id, def),
+            ObjKind::Piece { def } => self.talk_to(id, def, t),
             ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } => {}
         }
     }

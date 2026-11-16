@@ -60,10 +60,13 @@
 //!   the other lit lamps, the quartermaster's wares (a flask among them while there's room for
 //!   one), the dungeon's currency the hero carries and its name, and the pieces of the dungeon's
 //!   gear the quartermaster can hone a tier further (to `tier`).
-//! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: a page to read and keep
-//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board, a
-//!   run's tally as a hero leaves it: kind `run`); `{n}`
-//!   breaks a line.
+//! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: words to read. A
+//!   note, a secret found, the book's record of a dungeon and a run's tally as a hero leaves it
+//!   (kinds `note`, `secret`, `lore`, `run`) are told in chat, the links clickable there (add-on
+//!   74 on; an older one opens a page); a wager's page and the board (`wager`, `board`) are a page
+//!   kept up. `{n}` breaks a line.
+//! - `AN\t<who>\t<command~label^...>`: the answers to what one of the camp's people just said
+//!   (their words come as their own say, `CHAT_MSG_MONSTER_SAY`): links in chat to click.
 //! - `WT\t<dungeon>\t<level>\t<elapsed>\t<limit>\t<falls>\t<state>\t<terms>\t<name~down^...>\t<felled~needed~total>`:
 //!   a wager's clock below (state `wait`, `run`, `won` or `over`; the bosses it must beat, and its
 //!   count of foes), then `\t<ready~heroes~count secs>` before the clock (empty after), then
@@ -560,7 +563,13 @@ pub(crate) const VERSION: u32 = 2;
 /// blows it guesses.
 /// 73: no journal: the goal card at the top right, the journal window and its key (J) are gone,
 /// and the server sends no `GL` or `GJ`. An older add-on just never fills its goal card.
-pub(crate) const ADDON_NEWEST: u32 = 73;
+/// 74: no parchment pages for words: a person's line is their own say in the world and their
+/// answers come as `AN`, links in chat; a note, a secret, the book's record and a run's tally
+/// (`NT` of those kinds) are told in chat. An older add-on is told the answers as commands to
+/// type, and still opens those pages.
+pub(crate) const ADDON_NEWEST: u32 = 74;
+/// The first add-on that shows a person's answers (`AN`) as links in chat.
+pub(crate) const SPEECH_ADDON: u32 = 74;
 /// The first add-on that lays a column's third choice on the board.
 pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
@@ -2835,6 +2844,7 @@ mod board_tests {
             assert_eq!((c[3].as_str(), c[22].as_str()), ("rogue", "3"), "{k}: the Rogue's third choice");
         }
         assert!(super::THIRD_CHOICE_ADDON <= super::ADDON_NEWEST);
+        assert!(super::SPEECH_ADDON <= super::ADDON_NEWEST);
     }
 }
 

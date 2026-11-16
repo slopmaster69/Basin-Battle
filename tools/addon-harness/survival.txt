@@ -501,12 +501,19 @@ DM	12	1	Ayla~priest~1234~300~500~1^Bren~warrior~2000~0~900~0^Cass~mage~0~0~40~0
 !ElwynnSurvival.meter.tab = "own" ElwynnSurvival.meter.heal = true ElwynnSurvival.DrawMeter() local f = ElwynnSurvivalMeter table.insert(SAID, "meter, your healing: " .. f.sub:GetText() .. " / " .. f.rows[1].name:GetText() .. " / row 2 " .. tostring(f.rows[2]:IsShown()) .. " / reset " .. tostring(f.reset:IsShown()))
 !this = ElwynnSurvivalMeter.reset ElwynnSurvivalMeter.reset:GetScript("OnClick")()
 !ElwynnSurvival.ToggleMeter() table.insert(SAID, "meter hidden: " .. tostring(not ElwynnSurvivalMeter:IsShown())) ElwynnSurvival.ToggleMeter() ElwynnSurvival.meter.tab = "fight" ElwynnSurvival.meter.heal = false
-# A note, read: a page that stays, its clue under it; a link reads on; Escape's list closes it.
+# Words to read are told in chat, not on a page: the title, each line, the clue, links that send their command.
 NT	note	A Smuggler's Tally	Found in The Deadmines	"Two crates salt pork, one keg rum, one jar of something for the cook."{n}{n}Whatever's in that jar MOVES.	Cookie's jar is kept in the little tent at the south end of the cove.	.es lore deadmines~All found in the Deadmines
-!local L = ElwynnSurvival.letterShown table.insert(SAID, "letter: " .. tostring(ElwynnSurvivalLetter:IsShown()) .. " " .. L.kind .. " " .. L.title .. " / clue " .. tostring(ElwynnSurvivalLetter.clue:IsShown()) .. " / body has its break " .. tostring(string.find(ElwynnSurvivalLetter.body:GetText(), "\n\nWhatever", 1, true) ~= nil) .. " / links " .. L.links .. " / tall " .. tostring(L.height > 200))
-!this = ElwynnSurvivalLetter.links[1]; ElwynnSurvivalLetter.links[1]:GetScript("OnClick")()
-NT	lore	The Deadmines	1 of 5 secrets found, 2 of 6 notes read	Secrets found: Cookie's Pantry.{n}{n}Rumours:{n}- VanCleef keeps quarters aft of the mast. (Orders, Sealed in Red)		.es note smugglers_tally~A Smuggler's Tally^.es note smite_orders~Orders, Sealed in Red
-!local L = ElwynnSurvival.letterShown table.insert(SAID, "lore page: " .. L.kind .. " " .. L.title .. " / clue " .. tostring(ElwynnSurvivalLetter.clue:IsShown()) .. " / links " .. L.links .. " " .. tostring(ElwynnSurvivalLetter.links[2].cmd) .. " / third link " .. tostring(ElwynnSurvivalLetter.links[3]:IsShown()))
+!local W = ElwynnSurvival.wordsTold table.insert(SAID, "words told: " .. W.kind .. " " .. W.title .. " / page shown " .. tostring(ElwynnSurvivalLetter:IsShown()))
+!SetItemRef("es:.es lore deadmines", "[All found in the Deadmines]", "LeftButton")
+!SetItemRef("es:/script nothing", "[x]", "LeftButton")
+NT	lore	The Deadmines	2 of 6 notes read	Rumours:{n}- VanCleef keeps quarters aft of the mast. (Orders, Sealed in Red)		.es note smugglers_tally~A Smuggler's Tally^.es note smite_orders~Orders, Sealed in Red
+!table.insert(SAID, "lore told: " .. ElwynnSurvival.wordsTold.title .. " / page shown " .. tostring(ElwynnSurvivalLetter:IsShown()))
+# A person's answers: links after their name, clicked to answer.
+AN	Remy "Two Times"	.es choose remy:arrest~Arrest Him^.es choose remy:free~Free Him
+!SetItemRef("es:.es choose remy:free", "[Free Him]", "LeftButton")
+# The Bookmaker's pages stay pages.
+NT	wager	The Bookmaker's Wager: The Deadmines	The terms	Beat every boss in time.		.es wager deadmines 1~Level 1^.es wager deadmines 2~Level 2
+!local L = ElwynnSurvival.letterShown table.insert(SAID, "wager page: " .. tostring(ElwynnSurvivalLetter:IsShown()) .. " " .. L.kind .. " / links " .. L.links)
 !ElwynnSurvival.CloseWindows() table.insert(SAID, "letter after closing windows: " .. tostring(ElwynnSurvivalLetter:IsShown()) .. ", on Escape's list " .. tostring(UISpecialFrames[table.getn(UISpecialFrames)]))
 # A fall with its recap: three blows, the last first, and a tip; the band grows to hold it; up again clears it.
 DE	10	Targorr the Dread's heavy blow, through your guard (212)^Targorr the Dread's blow, around your guard (40)^Burning ground (12)	A guard breaks when your stamina runs out: dodge the heavy ones.

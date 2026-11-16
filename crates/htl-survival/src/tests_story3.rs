@@ -436,10 +436,10 @@ fn steward_venn_waits_for_pell_and_offers_to_buy_the_letter_back() {
     assert!(!stands(&s, "Steward Venn"), "not before Pell is through");
     let (mut s, h) = venn_world();
     s.interact(h, None);
-    let said = letters(&s.step(0.0));
+    let said = talks(&s.step(0.0));
     assert_eq!(said.len(), 1);
-    assert!(said[0].2.starts_with("His lordship hears the camp has something of his."));
-    let links: Vec<(&str, &str)> = said[0].3.iter().map(|(c, n)| (c.as_str(), n.as_str())).collect();
+    assert!(said[0].1.starts_with("His lordship hears the camp has something of his."));
+    let links: Vec<(&str, &str)> = said[0].2.iter().map(|(c, n)| (c.as_str(), n.as_str())).collect();
     assert_eq!(links, [(".es choose letter:sell", "Sell the Letter"), (".es choose letter:keep", "Keep the Letter")]);
     // A building can't go up on him (he keeps his ground), and he stands outside the camp's ground.
     let venn = s.content.props.iter().find(|p| p.name == "Steward Venn").unwrap();

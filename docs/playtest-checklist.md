@@ -20,7 +20,10 @@ Sections: [Camp and Elwynn](#camp-and-elwynn) |
 
 ## Camp and Elwynn
 
-- [ ] Press (F) beside Hale, Tobin, Garrick Stone, Wren, Maren, Marten, Wyle, a sentry and a footman: a page opens with what they say, headed "Talk to" ([#400](https://github.com/slopmaster69/Basin-Battle/pull/400)). **Risk:** only the use key reaches a person, not right-click; the page itself has not been seen in the client.
+- [ ] Press (F) beside Hale, Tobin, Garrick Stone, Wren, Maren, Marten, Wyle, a sentry and a footman: they say their line aloud (a speech bubble over them, "<name> says:" in chat), a friend standing near sees it too, and no page opens ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476), [#400](https://github.com/slopmaster69/Basin-Battle/pull/400)). **Risk:** only the use key reaches a person, not right-click.
+- [ ] Talk to Remy (or Venn, or Wyle after Voss): the answers follow in chat as blue links after his name; click one and it acts as typing its command ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)). **Risk:** a clickable link of the add-on's own (`es:`) has never been clicked in the real client's chat; if it does nothing, typing the command still works.
+- [ ] Read a note below, find a secret, open the book's Notes row, leave a run: each is told in chat (title in gold, its title briefly mid-screen, a clue in red), no page opens, and its links click ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)). The Bookmaker's Wager and the board still open as pages.
+- [ ] With an add-on older than 74, talk to Remy: "Type .es choose remy:free for Free Him." and the same for Arrest Him ([#476](https://github.com/slopmaster69/Basin-Battle/pull/476)).
 - [ ] Talk to the same person before and after a raid and after a kill: the words change with the camp ([#400](https://github.com/slopmaster69/Basin-Battle/pull/400)).
 - [ ] Take the add-on to v69 (older add-on against this server): a hero on an older add-on is told how to update ([#400](https://github.com/slopmaster69/Basin-Battle/pull/400)).
 - [ ] Build a barracks and an infirmary, then beat the fourth raid: the fifth raid, "The Brotherhood's Price", comes along the Goldshire road ([#425](https://github.com/slopmaster69/Basin-Battle/pull/425)).
@@ -85,7 +88,7 @@ Sections: [Camp and Elwynn](#camp-and-elwynn) |
 
 ### Remy and the Stonefield wagon (Stages 8 and 9)
 
-- [ ] With the road book open, find Remy "Two Times" outside the Lion's Pride and press (F) within 6 yd: a page offers Arrest Him and Free Him ([#438](https://github.com/slopmaster69/Basin-Battle/pull/438)). **Risk:** the link buttons and the page have not been seen in the client.
+- [ ] With the road book open, find Remy "Two Times" outside the Lion's Pride and press (F) within 6 yd: he says his line and offers Arrest Him and Free Him as links in chat ([#438](https://github.com/slopmaster69/Basin-Battle/pull/438), [#476](https://github.com/slopmaster69/Basin-Battle/pull/476)).
 - [ ] Try to choose from past 6 yd: it is refused. Choose once, then try again, as another hero too: "That is already decided." ([#438](https://github.com/slopmaster69/Basin-Battle/pull/438)).
 - [ ] Choose Arrest Him: Remy goes, Marshal Dughan stands there and links the Stockade page, the Stormwind Bounty opens, and Remy's Stash at the Maclure well stays shut with its own words ([#438](https://github.com/slopmaster69/Basin-Battle/pull/438)).
 - [ ] From a save before the choice, choose Free Him: Remy stays and says where the man in black meets his buyers, Remy's Stash opens, and there is no bounty. Save and reload: either choice is kept ([#438](https://github.com/slopmaster69/Basin-Battle/pull/438)).
