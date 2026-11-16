@@ -482,7 +482,7 @@ impl Survival {
     fn duel_exit(&self, from: Vec3, to: Vec3) -> Option<Vec3> {
         // (The floor `to` stands on is the one nearest its own height, the deck's, not the guard's:
         // the deck is cambered, 1.6 yd higher at the east rail than at his door.)
-        let to = self.land.footing(self.ground_near(to[0], to[1], to[2])).unwrap_or_else(|| self.ground_near(to[0], to[1], to[2]));
+        let to = self.land.dry_footing(self.ground_near(to[0], to[1], to[2])).unwrap_or_else(|| self.ground_near(to[0], to[1], to[2]));
         if self.land.water_near(to[0], to[1], to[2]) || (to[2] - from[2]).abs() > 4.0 { return None; }
         let path = if self.land.walk_clear(from, to) { vec![to] } else { self.land.path(from, to)? };
         if path.is_empty() || dist2d(*path.last()?, to) > 0.5 { return None; }
@@ -783,7 +783,7 @@ impl Survival {
             for turn in [0.0f32, 0.6, -0.6, 1.2, -1.2] {
                 let to = self.slide_end(at, base + turn, (want * k).min(SHOVE_MAX));
                 if dist2d(at, to) >= 0.8 && dist2d(to, boss) >= SHOVE_CLEAR && dist2d(to, centre) <= RING_RADIUS - RING_EDGE
-                    && self.land.footing(to).is_some() {
+                    && self.land.dry_footing(to).is_some() {
                     return Some(to);
                 }
             }
