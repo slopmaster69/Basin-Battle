@@ -695,6 +695,83 @@ fn blade_dance_counts_every_evading_dodge_as_perfect_and_cuts_the_striker() {
     assert_eq!(blow(&mut s, m, p), Outcome::Hit);
 }
 
+// --- the fight's numbers: dodges, Evasion, abilities, damage ----------------------------------------
+
+#[test]
+fn the_fight_tally_splits_quickstep_from_rolls_and_counts_perfects_that_slipped_a_blow() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let m = foe(&mut s);
+    // A Quickstep, a perfect one.
+    s.input(p, Input::Ability(key_of("utility"), false));
+    run(&mut s, 0.1);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    run(&mut s, 1.0);
+    // A plain roll that slips a blow too late to be perfect, then one that slips nothing.
+    s.players.get_mut(&p).unwrap().stamina = 100.0;
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.24);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    run(&mut s, 1.0);
+    s.players.get_mut(&p).unwrap().stamina = 100.0;
+    s.input(p, Input::Dodge);
+    run(&mut s, 1.0);
+    let t = &s.players[&p].melee;
+    assert_eq!((t.dodges, t.evaded, t.perfect_dodges), (3, 2, 1), "{t:?}");
+    assert_eq!((t.quick_dodges, t.quick_evaded, t.quick_perfect), (1, 1, 1), "{t:?}");
+    assert_eq!(
+        t.dodge_line("Ayla").unwrap(),
+        "Ayla's dodges: rolls 2 (slipped a blow 1, perfect 0), quickstep 1 (slipped a blow 1, perfect 1)"
+    );
+    assert!(t.abilities.iter().any(|a| a.name == s.content.abilities[idx(&s, "quickstep")].name && a.casts == 1), "{t:?}");
+}
+
+#[test]
+fn evasion_counts_its_casts_the_blows_that_landed_and_the_perfects_only_it_made() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let m = foe(&mut s);
+    press(&mut s, p, "defense", false);
+    run(&mut s, 0.4);
+    assert_eq!(s.players[&p].melee.evasion_casts, 1);
+    // 0.24 sec in: perfect only under Evasion.
+    s.players.get_mut(&p).unwrap().stamina = 50.0;
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.24);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    run(&mut s, 0.6);
+    // A blow that lands while it is up.
+    assert_eq!(blow(&mut s, m, p), Outcome::Hit);
+    let t = &s.players[&p].melee;
+    assert_eq!((t.evasion_dodged, t.evasion_landed, t.evasion_perfect, t.perfect_dodges), (1, 1, 1, 1), "{t:?}");
+    assert!(t.taken > 0 && t.lowest.is_some_and(|(low, max)| low < max), "{t:?}");
+    let line = t.dodge_line("Ayla").unwrap();
+    assert!(line.ends_with("evasion cast 1x: 1 blows landed while up, 1 dodged (1 perfect only thanks to it)"), "{line}");
+    // After it ends, nothing more counts for it.
+    run(&mut s, 5.0);
+    assert_eq!(blow(&mut s, m, p), Outcome::Hit);
+    assert_eq!(s.players[&p].melee.evasion_landed, 1);
+}
+
+#[test]
+fn blade_dance_is_counted_by_foes_hit_and_damage_in_the_abilities_line() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let m = foe(&mut s);
+    press(&mut s, p, "ultimate", false);
+    run(&mut s, 0.4);
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.28);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    let t = &s.players[&p].melee;
+    let dance = t.abilities.iter().find(|a| a.name == "Blade Dance").unwrap_or_else(|| panic!("{t:?}"));
+    assert_eq!((dance.casts, dance.hits, dance.foes.len()), (1, 1, 1), "{dance:?}");
+    assert!(dance.damage > 0 && t.dealt >= dance.damage, "{t:?}");
+    assert_eq!((t.perfect_dodges, t.quick_dodges), (1, 0));
+    let line = t.abilities_line("Ayla").unwrap();
+    assert!(line.starts_with("Ayla's abilities: Blade Dance cast 1x, 1 hits, 1 foes, "), "{line}");
+}
+
 // --- the board ---------------------------------------------------------------------------------------
 
 #[test]
