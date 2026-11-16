@@ -2385,7 +2385,7 @@ impl Survival {
             ObjKind::Prop { display, scale } => (*display, *scale, String::new(), false),
             ObjKind::Piece { def } => {
                 let d = &c.props[*def];
-                (d.display, d.scale, d.name.clone(), false)
+                (d.display, d.scale, d.name.clone(), self.talk_line(*def).is_some())
             }
             ObjKind::ArenaBanner => (
                 arena::ARENA_BANNER_DISPLAY,

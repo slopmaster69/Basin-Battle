@@ -36,7 +36,7 @@ local SEPIA = { 0.353, 0.275, 0.188 }
 local WAX = { 0.604, 0.169, 0.125 }
 local FROST = { 0.184, 0.373, 0.47 }
 -- The seal on each kind of page.
-local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue", wager = "seal_grey", board = "seal_grey", run = "seal_check" }
+local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue", wager = "seal_grey", board = "seal_grey", run = "seal_check", talk = "seal_blue" }
 -- And the line at its foot.
 local FOOT = {
   note = "Kept in the logbook, under Secrets and Notes.",
@@ -45,6 +45,7 @@ local FOOT = {
   wager = "Click a wager to take it. The dungeon starts fresh.",
   board = "Every server's runs, through the board's keeper.",
   run = "The run's tally, as you leave it. The book at camp keeps the dungeon's page.",
+  talk = "Talk to them again as the camp grows.",
 }
 
 local ledger = ES.ledger

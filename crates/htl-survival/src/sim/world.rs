@@ -404,6 +404,7 @@ impl Survival {
             ObjKind::Chest { def, .. } if self.content.chests[*def].keep => "Use",
             ObjKind::Chest { .. } => "Open",
             ObjKind::Loot { .. } => "Pick up",
+            ObjKind::Piece { .. } => "Talk to",
             _ => "Use",
         };
         Some((oid, v.name, verb))
@@ -489,7 +490,8 @@ impl Survival {
             ObjKind::Chest { def, spent: false } => self.use_chest(id, def, t),
             ObjKind::Chest { .. } => {}
             ObjKind::Loot { item, n } => self.take_loot(id, item, n, t),
-            ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } | ObjKind::Piece { .. } => {}
+            ObjKind::Piece { def } => self.talk_to(id, def),
+            ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } => {}
         }
     }
 

@@ -13136,6 +13136,13 @@ npc = true
 name = "Quartermaster Hale"
 subname = "Camp Stores"
 
+[[prop.talk]]
+text = "Keep the storage stocked and I'll keep the pots full. Goldshire sends what it can spare, which is less every week."
+
+[[prop.talk]]
+after = "raids:1"
+text = "That raid cost 2 crates of linen and a wagon wheel. I wrote it down. Nobody reads my lists."
+
 [[prop]]
 display = 1357
 at = [-9619.0, 679.5]
@@ -13145,6 +13152,9 @@ clear = 1.2
 npc = true
 name = "Tobin"
 subname = "Camp Cook"
+
+[[prop.talk]]
+text = "Roast Meat keeps a hero upright and grilled fish keeps one cheerful. I won't say which I'm paid for."
 
 # Once there's an anvil: the west yard's tool rack and its smith.
 [[prop]]
@@ -13173,6 +13183,13 @@ npc = true
 name = "Garrick Stone"
 subname = "Blacksmith"
 
+[[prop.talk]]
+text = "Bring me Fargodeep copper and I'll give you an edge. The Warsong are sitting on the best of it."
+
+[[prop.talk]]
+after = "kill:grunt"
+text = "You've been at the Warsong. Their blades come back to me notched. Good iron, badly kept."
+
 # Once there's a tanning rack: a trapper's racks by the shelter.
 [[prop]]
 display = 409
@@ -13193,6 +13210,13 @@ npc = true
 name = "Wren Ashby"
 subname = "Trapper"
 
+[[prop.talk]]
+text = "Hides are worth more than the meat. The boars know it too, from how they run."
+
+[[prop.talk]]
+after = "raids:1"
+text = "A raider left a boot in my snare. One boot. I'd like the rest of him to keep his distance."
+
 # Once there's a cauldron: the herbalist and her sacks.
 [[prop]]
 display = 252
@@ -13212,6 +13236,9 @@ clear = 1.2
 npc = true
 name = "Sister Maren"
 subname = "Herbalist"
+
+[[prop.talk]]
+text = "Peacebloom steadies the hands and silverleaf the stomach. Carry salves, and drink them before you need them."
 
 # The first raid beaten: the camp keeps a watch.
 [[prop]]
@@ -13249,6 +13276,13 @@ npc = true
 name = "Westbrook Sentry"
 subname = "Camp Watch"
 
+[[prop.talk]]
+text = "Quiet tonight. I say that every night, and so far I've been right half the time."
+
+[[prop.talk]]
+after = "raids:2"
+text = "The tower sees farther than we do. It doesn't see everything."
+
 [[prop]]
 display = 1499
 at = [-9655.5, 695.0]
@@ -13258,6 +13292,13 @@ clear = 1.2
 npc = true
 name = "Westbrook Sentry"
 subname = "Camp Watch"
+
+[[prop.talk]]
+text = "Quiet tonight. I say that every night, and so far I've been right half the time."
+
+[[prop.talk]]
+after = "raids:2"
+text = "The tower sees farther than we do. It doesn't see everything."
 
 # The second raid beaten: a guard tower (Elwynn's own, half size) and its scout.
 [[prop]]
@@ -13279,6 +13320,13 @@ npc = true
 name = "Scout Marten"
 subname = "Westbrook Watch"
 
+[[prop.talk]]
+text = "The Darkspear came through woods I'd have sworn were empty. Someone showed them the way."
+
+[[prop.talk]]
+after = "raids:3"
+text = "The bare ground west of the lake saw another party cross. I watch the roads. Nobody has told me about the ground between them."
+
 # The warband beaten: Westbrook stands again.
 [[prop]]
 display = 661
@@ -13298,6 +13346,13 @@ clear = 1.2
 npc = true
 name = "Marshal Wyle"
 subname = "Westbrook Garrison"
+
+[[prop.talk]]
+text = "Three raids. Three roads. Every one the road we'd left bare. Someone is selling Elwynn by the mile. Start at the Lion's Pride."
+
+[[prop.talk]]
+after = "raids:4"
+text = "Four raids, and the Blackrock came by the Goldshire road we did watch. Whoever sells Elwynn sells it to every bidder."
 
 [[prop]]
 display = 624
@@ -13319,6 +13374,9 @@ name = "Westbrook Footman"
 subname = "Westbrook Garrison"
 say = "The Blackrock break at Westbrook's gate, and Stormwind sends footmen to make the camp a garrison again."
 
+[[prop.talk]]
+text = "Stormwind sent footmen, and the footmen found a camp. We're making it a garrison again."
+
 [[prop]]
 display = 1500
 at = [-9646.0, 705.0]
@@ -13328,6 +13386,9 @@ clear = 1.2
 npc = true
 name = "Westbrook Footman"
 subname = "Westbrook Garrison"
+
+[[prop.talk]]
+text = "Stormwind sent footmen, and the footmen found a camp. We're making it a garrison again."
 
 [[prop]]
 display = 130
