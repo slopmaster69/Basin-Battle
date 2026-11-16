@@ -34,7 +34,7 @@ fn arrive(s: &mut Survival, name: &str) -> Id {
 }
 
 fn def() -> crate::content::SiegeDef {
-    Content::dev().siege.unwrap()
+    (*Content::dev().siege.unwrap()).clone()
 }
 
 /// Heroes in the hall, into a way to play, and the match under way.

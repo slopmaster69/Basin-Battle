@@ -43,6 +43,8 @@ pub mod siege;
 mod bomb;
 #[cfg(test)]
 mod leave_tests;
+#[cfg(test)]
+mod perf_tests;
 mod flay;
 pub mod priest;
 mod orb;

@@ -197,7 +197,7 @@ impl Survival {
 
     /// Act on an input now if the hero is free to; false if it must wait.
     fn try_act(&mut self, id: Id, input: Input) -> bool {
-        let c = self.content.clone();
+        let c = self.slim();
         if !self.players.contains_key(&id) {
             return true;
         }
@@ -490,7 +490,7 @@ impl Survival {
                         self.set_action(id, Action::Eat { t: 0.0, item });
                         // Eating or drinking looks like it (its clip over the use, on everyone);
                         // anything else, the Food spell's cast.
-                        let d = &c.items[item];
+                        let d = &self.content.items[item];
                         match d.use_clip(&c.player) {
                             0 => self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (d.use_secs * 1000.0) as u32 }),
                             clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs, take: 0, from: None, at: 0.0, body: ClipBody::Full }),
@@ -1161,7 +1161,27 @@ impl Survival {
 
     fn step_player(&mut self, id: Id, dt: f32) {
         let now = self.clock;
-        let c = self.content.clone();
+        // The few numbers this step reads, copied: cloning the whole `Content` here (once per
+        // hero per tick) cost more than everything else in the step.
+        let c = {
+            let k = &self.content;
+            StepCfg {
+                exhausted_below: k.player.exhausted_below,
+                sprint_restart: k.player.sprint_restart,
+                sprint_drain: k.player.sprint_drain,
+                stamina_regen: k.player.stamina_regen,
+                stamina_delay: k.player.stamina_delay,
+                stamina: k.player.stamina,
+                field_regen_after: k.player.field_regen_after,
+                rest_regen: k.player.rest_regen,
+                field_regen: k.player.field_regen,
+                stamina_waits: k.combat.stamina_waits,
+                dodge_secs: k.dodge.secs,
+                dodge_dash_secs: k.dodge.dash_secs,
+                heart: k.world.heart,
+                rest_radius: k.world.rest_radius,
+            }
+        };
         // Getting up.
         if let Some(Action::Dead { until }) = self.players.get(&id).map(|p| p.action.clone()) {
             // A ward up as they fell comes down (the barrier and the raised arm off the body).
@@ -1179,7 +1199,7 @@ impl Survival {
             let p = &self.players[&id];
             let moving = p.moving.forward || p.moving.back || p.moving.left || p.moving.right;
             // Run dry, it stops; it starts again only with some stamina back.
-            let enough = if p.sprinting { p.stamina > c.player.exhausted_below } else { p.stamina >= c.player.sprint_restart.max(c.player.exhausted_below) };
+            let enough = if p.sprinting { p.stamina > c.exhausted_below } else { p.stamina >= c.sprint_restart.max(c.exhausted_below) };
             let want = p.sprint_held && moving && !p.moving.walk && matches!(p.action, Action::Ready) && enough;
             if want != p.sprinting {
                 let p = self.players.get_mut(&id).unwrap();
@@ -1189,7 +1209,7 @@ impl Survival {
             if want {
                 let p = self.players.get_mut(&id).unwrap();
                 let before = p.stamina.floor();
-                p.stamina = (p.stamina - c.player.sprint_drain * dt).max(0.0);
+                p.stamina = (p.stamina - c.sprint_drain * dt).max(0.0);
                 p.spent_at = now;
                 if p.stamina.floor() != before {
                     self.events.push(Event::Stamina { player: id });
@@ -1201,17 +1221,17 @@ impl Survival {
         {
             let rate = {
                 let p = &self.players[&id];
-                c.player.stamina_regen * (1.0 - self.armor_weight(p)) * (1.0 + self.effect_of(p, "stamina")) * self.banner_regen(id)
+                c.stamina_regen * (1.0 - self.armor_weight(p)) * (1.0 + self.effect_of(p, "stamina")) * self.banner_regen(id)
             };
             let p = self.players.get_mut(&id).unwrap();
             let before = p.stamina.floor();
             let guarding = matches!(p.action, Action::Guard);
             // Nothing comes back mid-blow or mid-dodge: the pause starts as it ends.
-            if c.combat.stamina_waits && matches!(p.action, Action::Swing { .. } | Action::Dodge { .. }) {
+            if c.stamina_waits && matches!(p.action, Action::Swing { .. } | Action::Dodge { .. }) {
                 p.spent_at = now;
             }
-            if !guarding && now - p.spent_at >= c.player.stamina_delay && p.stamina < c.player.stamina {
-                p.stamina = (p.stamina + rate * dt).min(c.player.stamina);
+            if !guarding && now - p.spent_at >= c.stamina_delay && p.stamina < c.stamina {
+                p.stamina = (p.stamina + rate * dt).min(c.stamina);
             }
             if p.stamina.floor() != before {
                 self.events.push(Event::Stamina { player: id });
@@ -1266,7 +1286,7 @@ impl Survival {
         let action = self.players[&id].action.clone();
         match action {
             Action::Swing { t, struck, weapon, strike } => {
-                let w = c.weapons[weapon].clone();
+                let w = self.content.weapons[weapon].clone();
                 let t2 = t + dt;
                 let mut struck = struck;
                 if t2 >= strike.windup && t < strike.windup + strike.active {
@@ -1283,12 +1303,12 @@ impl Survival {
                 }
             }
             Action::Dodge { t, dir, dash } => {
-                if t + dt >= c.dodge.secs {
+                if t + dt >= c.dodge_secs {
                     self.finish_commitment(id);
                 } else if let Some(p) = self.players.get_mut(&id) {
                     p.action = Action::Dodge { t: t + dt, dir, dash };
                     // The dash spent: back to the usual speeds for the rest of the roll.
-                    if t < c.dodge.dash_secs && t + dt >= c.dodge.dash_secs {
+                    if t < c.dodge_dash_secs && t + dt >= c.dodge_dash_secs {
                         self.update_speed(id);
                     }
                 }
@@ -1302,7 +1322,7 @@ impl Survival {
                 }
             }
             Action::Eat { t, item } => {
-                if t + dt >= c.items[item].use_secs {
+                if t + dt >= self.content.items[item].use_secs {
                     self.eaten(id, item);
                     self.events.push(Event::CastEnd { caster: id });
                     self.players.get_mut(&id).unwrap().action = Action::Ready;
@@ -1323,13 +1343,13 @@ impl Survival {
                     }
                 } else {
                     let (secs, chest) = match &self.objs[&node].kind {
-                        ObjKind::Node { def, .. } => (c.nodes[*def].gather_secs, None),
-                        ObjKind::Chest { def, .. } => (c.chests[*def].secs, Some(*def)),
+                        ObjKind::Node { def, .. } => (self.content.nodes[*def].gather_secs, None),
+                        ObjKind::Chest { def, .. } => (self.content.chests[*def].secs, Some(*def)),
                         _ => (1.0, None),
                     };
                     // A chop each `CHOP_SECS`, while there's another to come.
                     let clip = match &self.objs[&node].kind {
-                        ObjKind::Node { def, .. } => c.nodes[*def].gather_clip,
+                        ObjKind::Node { def, .. } => self.content.nodes[*def].gather_clip,
                         _ => 0,
                     };
                     let chop = super::world::CHOP_SECS;
@@ -1368,13 +1388,13 @@ impl Survival {
         // last blow dealt or taken. Never in a fight: there, only gear, food and heals.
         let p = &self.players[&id];
         if p.health > 0 && p.health < p.max_health {
-            let heart = c.world.heart;
+            let heart = c.heart;
             // Resting at the chest, or (faster) at an infirmary.
             let ward = self.infirmary_at(p.pos);
-            let home = (dist2d(p.pos, [heart[0], heart[1], 0.0]) <= c.world.rest_radius || ward.is_some()) && !self.raid.active();
-            let calm = now - p.combat_at >= c.player.field_regen_after;
-            let rest = c.player.rest_regen * ward.unwrap_or(1.0).max(1.0);
-            let rate = if home && now - p.combat_at >= 2.0 { rest } else if calm { c.player.field_regen } else { 0.0 };
+            let home = (dist2d(p.pos, [heart[0], heart[1], 0.0]) <= c.rest_radius || ward.is_some()) && !self.raid.active();
+            let calm = now - p.combat_at >= c.field_regen_after;
+            let rest = c.rest_regen * ward.unwrap_or(1.0).max(1.0);
+            let rate = if home && now - p.combat_at >= 2.0 { rest } else if calm { c.field_regen } else { 0.0 };
             if rate > 0.0 {
                 let p = self.players.get_mut(&id).unwrap();
                 p.heal_bank += p.max_health as f32 * rate * dt;
@@ -2117,7 +2137,7 @@ impl Survival {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn strike_player(&mut self, attacker: Id, victim: Id, damage: u32, from: Vec3, blockable: bool, heavy: bool, parryable: bool, style: Blow) -> Outcome {
         let now = self.clock;
-        let c = self.content.clone();
+        let c = self.slim();
         let Some(p) = self.players.get(&victim) else { return Outcome::Miss };
         if p.health == 0 {
             return Outcome::Miss;
@@ -2135,7 +2155,7 @@ impl Survival {
         // Untouchable: in Ice Block, or mid-dash on an ability that's untouchable while it runs.
         let dashing = matches!(&p.action, Action::Dash { ability, .. } if self.content.abilities[*ability].invulnerable) || self.skyfall_aloft(victim);
         // A giant's blow (`unparryable`) can be blocked, not parried.
-        let giant = self.mobs.get(&attacker).is_some_and(|m| c.mobs[m.def].unparryable);
+        let giant = self.mobs.get(&attacker).is_some_and(|m| self.content.mobs[m.def].unparryable);
         let parryable = parryable && !giant;
         // The guard raised just in time: a parry, if the blow can be parried at all.
         let alone = if self.one_hand_alone(p) { ONE_HAND_PARRY } else { 0.0 };
@@ -2371,7 +2391,7 @@ impl Survival {
     /// opening to answer in, Valor, and the attacker reels (a boss fills its posture instead).
     pub(crate) fn parry_pays(&mut self, victim: Id, attacker: Id) {
         let now = self.clock;
-        let c = self.content.clone();
+        let c = self.slim();
         // No word: the parry shows and sounds (Disarm's spark on the parrier, the clang and the
         // hit-stop on the clients, from the swing's `IM` line).
         // The parry pays: breath back, and an opening to answer in. A perfect ward (a staff's
@@ -2738,7 +2758,7 @@ impl Survival {
     }
 
     fn revive(&mut self, id: Id) {
-        let c = self.content.clone();
+        let c = self.slim();
         let (spawn, spawn_facing) = match self.below_revive(id).or_else(|| self.siege_revive_at(id)) {
             Some(at) => at,
             None => (
@@ -3232,5 +3252,60 @@ impl Survival {
             }
         }
         self.input(id, Input::Use);
+    }
+}
+
+/// What a hero's step reads of the content, copied out (see `step_player`).
+#[derive(Clone, Copy)]
+struct StepCfg {
+    exhausted_below: f32,
+    sprint_restart: f32,
+    sprint_drain: f32,
+    stamina_regen: f32,
+    stamina_delay: f32,
+    stamina: f32,
+    field_regen_after: f32,
+    rest_regen: f32,
+    field_regen: f32,
+    stamina_waits: bool,
+    dodge_secs: f32,
+    dodge_dash_secs: f32,
+    heart: [f32; 2],
+    rest_radius: f32,
+}
+
+/// Just the tunables the combat steps read, cloned out of the content. `self.content.clone()`
+/// copies every creature, item and ability on each call; a hit on a hero did that every time.
+struct Slim {
+    player: crate::content::PlayerDef,
+    dodge: crate::content::DodgeDef,
+    parry: crate::content::ParryDef,
+    ward: crate::content::WardDef,
+    checks: crate::content::ChecksDef,
+    combat: crate::content::CombatDef,
+    valor: crate::content::ValorDef,
+    pvp: crate::content::PvpDef,
+    world: SlimWorld,
+}
+
+struct SlimWorld {
+    spawn: [f32; 2],
+    spawn_facing: f32,
+}
+
+impl Survival {
+    fn slim(&self) -> Slim {
+        let k = &self.content;
+        Slim {
+            player: k.player.clone(),
+            dodge: k.dodge.clone(),
+            parry: k.parry.clone(),
+            ward: k.ward.clone(),
+            checks: k.checks.clone(),
+            combat: k.combat.clone(),
+            valor: k.valor.clone(),
+            pvp: k.pvp.clone(),
+            world: SlimWorld { spawn: k.world.spawn, spawn_facing: k.world.spawn_facing },
+        }
     }
 }
