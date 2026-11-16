@@ -291,7 +291,7 @@ pub(super) fn run(st: &Stage, class: &str, seed: u64, who: Profile) -> Run {
             out.won = true;
             break;
         }
-        // `BALANCE_TRACE`: where everyone stands every 5 s.
+        // `BALANCE_TRACE`: where everyone stands every 1 s.
         if trace && ((now - start) / 1.0).fract() < DT / 1.0 {
             let who: Vec<String> = ids.iter().map(|i| format!("{} {:?} at {:.1},{:.1},{:.1} hp {}", name(&s, *i), s.mobs[i].state, s.mobs[i].pos[0], s.mobs[i].pos[1], s.mobs[i].pos[2], s.mobs[i].health)).collect();
             println!("{:6.1} hero {:.1},{:.1} hp {} st {:.0} {:?} held {:?} | {}", now - start, me[0], me[1], s.players[&p].health, s.players[&p].stamina, s.players[&p].action, held, who.join("; "));
@@ -755,8 +755,6 @@ fn balance_groups() {
 | group | peak stack (right / sloppy) | dry rolls (right / sloppy) | landed blows (right) |
 | --- | --- | --- | --- |");
     for (f, (name, _)) in groups.iter().enumerate() {
-        let all = |sl: bool, g: &dyn Fn(&Run) -> f32| -> f32 { classes.iter().enumerate().map(|(c, _)| t[f][c].0.runs.iter().chain(if sl { t[f][c].1.runs.iter() } else { [].iter() }).map(g).sum::<f32>()).sum::<f32>() };
-        let _ = all;
         let peak = |sl: bool| classes.iter().enumerate().flat_map(|(c, _)| if sl { t[f][c].1.runs.iter() } else { t[f][c].0.runs.iter() }).map(|r| r.peak_stack).max().unwrap_or(0);
         let dry = |sl: bool| classes.iter().enumerate().map(|(c, _)| if sl { t[f][c].1.mean(|r| r.dry as f32) } else { t[f][c].0.mean(|r| r.dry as f32) }).sum::<f32>() / classes.len() as f32;
         let landed = classes.iter().enumerate().map(|(c, _)| t[f][c].0.mean(|r| r.landed as f32)).sum::<f32>() / classes.len() as f32;
