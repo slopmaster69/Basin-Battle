@@ -1265,6 +1265,8 @@ fn a_heavy_weapon_knocks_a_wind_up_aside() {
     s.content.mobs[b].attack.poise = Some(false);
     // (The maul's slam comes down slowly now: the brute's wind-up is long enough to meet it.)
     s.content.mobs[b].attack.windup += 0.4;
+    // (One long wind-up, whatever the dice pick: the test meets it with the maul.)
+    s.content.mobs[b].patterns.retain(|p| p.name == "cleave");
     let k = mob(&mut s, "overseer", [2.5, 0.0, 0.0]);
     s.engage(k, Foe::Hero(p));
     for _ in 0..40 {
@@ -1873,6 +1875,8 @@ fn a_heavy_creatures_wind_up_shrugs_off_a_light_blow_but_not_a_heavy_one() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     take_up(&mut s, p, "maul");
+    // (One long wind-up, whatever the dice pick.)
+    { let o = s.content.mob("overseer").unwrap(); s.content.mobs[o].patterns.retain(|p| p.name == "cleave"); }
     let k = mob(&mut s, "overseer", [2.5, 0.0, 0.0]);
     s.engage(k, Foe::Hero(p));
     windup_then(&mut s, k);
@@ -1883,6 +1887,8 @@ fn a_heavy_creatures_wind_up_shrugs_off_a_light_blow_but_not_a_heavy_one() {
     // A bash breaks it.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    // (One long wind-up, whatever the dice pick.)
+    { let o = s.content.mob("overseer").unwrap(); s.content.mobs[o].patterns.retain(|p| p.name == "cleave"); }
     let k = mob(&mut s, "overseer", [2.0, 0.0, 0.0]);
     s.engage(k, Foe::Hero(p));
     windup_then(&mut s, k);

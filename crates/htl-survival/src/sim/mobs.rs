@@ -1133,17 +1133,17 @@ impl Survival {
             let fought: Vec<Id> = self.players.iter().filter(|(h, p)| **h == killer || dist2d(p.pos, at) <= TEACH_RANGE).map(|(h, _)| *h).collect();
             self.teach(&fought, &d.teaches, &format!("for felling {}", d.name));
         }
-        if pack.is_some_and(|k| self.content.packs[k].rare) {
-            // A rare creature's fall is news.
-            let by = killer_name.map_or(String::new(), |n| format!(" to {n}"));
-            self.events.push(Event::Banner { player: None, title: format!("{} Falls", d.name), sub: String::new() });
-            self.announce(format!("{} fell{by}.", d.name));
-        }
         // What steps out of it (a shredder's driver): in its place and its pack, so the pack
         // stands until that falls too.
         // A secret form (`then_after`) lies unseen where it fell and rises in a while: the fight
         // seemed won. `then_needs` keeps it for those who found what wakes it.
         let rises = self.content.mob(&d.then).filter(|_| self.then_allowed(&d.then_needs, killer));
+        // A rare creature's fall is news (not a first form's: it isn't down yet).
+        if pack.is_some_and(|k| self.content.packs[k].rare) && rises.is_none() {
+            let by = killer_name.map_or(String::new(), |n| format!(" to {n}"));
+            self.events.push(Event::Banner { player: None, title: format!("{} Falls", d.name), sub: String::new() });
+            self.announce(format!("{} fell{by}.", d.name));
+        }
         if let Some(nd) = rises {
             let at = self.mobs[&mid].pos;
             let s = self.spawn_mob(nd, at, pack, raider);
@@ -1184,8 +1184,11 @@ impl Survival {
             let at = self.mobs[&mid].pos;
             let form = self.mobs[&mid].form_of.is_some();
             self.below_kill(def, home, at, pack, raider, form, laid_to_rest);
-        } else if !raider && !laid_to_rest && pack.is_some() {
-            self.respawns.push((def, home, pack, now + d.respawn));
+        } else if !raider && !laid_to_rest && pack.is_some() && rises.is_none() {
+            // (A creature's last form puts back its first, not itself, and a first form that
+            // rises puts back nothing yet: the fight isn't over.)
+            let first = self.mobs[&mid].form_of.unwrap_or(def);
+            self.respawns.push((first, home, pack, now + self.content.mobs[first].respawn));
         }
         // What it drops goes straight into the killer's bags. Below, the dungeon's own currency
         // goes to every hero in the fight, each their own roll: a band's kills are everyone's
