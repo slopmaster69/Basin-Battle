@@ -1411,3 +1411,171 @@ fn the_one_thrust_hits_only_those_on_its_line() {
     assert!(s.players[&band[0]].health < health[0]);
     assert_eq!(s.players[&band[1]].health, health[1], "the one off the line is left alone");
 }
+
+// --- the last hero leaving, and two events at once ----------------------------------------------
+
+/// The fight put back: no duel, ring or Blackguard left, him home, whole and at ease, no held
+/// pose, raised blades or wind-up mark.
+fn assert_put_back(s: &Survival, id: Id) {
+    assert!(s.players.is_empty());
+    assert!(!s.vancleef.duels.contains_key(&id), "no duel");
+    assert!(s.vancleef.observers.is_empty(), "no guard");
+    assert!(!s.mobs.values().any(|m| s.content.mobs[m.def].key == WATCHER), "no guard in the world");
+    assert!(s.marks.is_empty(), "no mark on the floor");
+    let m = &s.mobs[&id];
+    assert_eq!(m.health, m.max_health, "whole");
+    assert!(matches!(m.state, MobState::Idle { .. }), "at ease, not on his way home: {:?}", m.state);
+    assert!(m.pattern.is_none() && m.phase == 0 && m.posture == 0 && !m.guarding && m.posed_until <= s.clock);
+    assert!(m.stagger_until <= s.clock && !m.riposte && !m.special);
+    assert!(dist2d(m.pos, m.home) < 0.1, "at his post");
+}
+
+/// The next hero finds a fresh pull: the ring placed again, nothing spent, nothing half done.
+fn assert_next_hero_finds_it_fresh(s: &mut Survival, id: Id, ring: bool) {
+    let h = s.join("late", "Late", None);
+    let p = s.players.get_mut(&h).unwrap();
+    p.health = 100_000;
+    p.max_health = 100_000;
+    let at = s.mobs[&id].home;
+    s.move_player(h, [at[0] + 30.0, at[1] + 1.0, at[2]], std::f32::consts::PI, Moving::default());
+    run(s, 0.3);
+    let duel = &s.vancleef.duels[&id];
+    assert_eq!(duel.watchers.len(), if ring { RING_GUARDS } else { 0 });
+    assert!(!duel.began && duel.held.is_empty() && !duel.cried && !duel.alone && !duel.departed && duel.leave == Leave::Watching);
+    assert_eq!(s.mobs[&id].health, s.mobs[&id].max_health);
+}
+
+#[test]
+fn the_last_hero_leaving_mid_fight_puts_the_whole_fight_back_at_once() {
+    for beat in [Beat::Fighting, Beat::Invitation { until: 99.0 }, Beat::Broken, Beat::Retreat { until: 99.0 }, Beat::Arrival { until: 99.0 }] {
+        for hurt in [1.0, 0.5, 0.2] {
+            let (mut s, band, id) = ringed(1);
+            run(&mut s, 2.5);
+            let max = s.mobs[&id].max_health;
+            s.mobs.get_mut(&id).unwrap().health = (max as f32 * hurt) as u32;
+            s.vancleef.duels.get_mut(&id).unwrap().beat = beat;
+            if matches!(beat, Beat::Invitation { .. }) {
+                s.mobs.get_mut(&id).unwrap().guarding = true;
+            }
+            s.mobs.get_mut(&id).unwrap().pos = ring_at(&s, id, 1.0, 5.0);
+            s.duel_open(id, 5.0, false);
+            let _ = s.leave(band[0]);
+            assert_put_back(&s, id);
+            assert_next_hero_finds_it_fresh(&mut s, id, true);
+        }
+    }
+}
+
+#[test]
+fn leaving_mid_windup_or_riposte_or_with_the_blackguards_walking_off_puts_it_back() {
+    // The raised blades with a blow in the air, then the lunge itself.
+    for lunge in [false, true] {
+        let (mut s, band, id) = ringed(1);
+        invitation(&mut s, id, band[0]);
+        if lunge {
+            shot(&mut s, id, band[0], 1.0, HitKind::Projectile);
+            run(&mut s, 0.2);
+        }
+        let _ = s.leave(band[0]);
+        assert_put_back(&s, id);
+        assert_next_hero_finds_it_fresh(&mut s, id, true);
+    }
+    // A wind-up with its mark down.
+    let (mut s, band, id) = ringed(1);
+    let mark = s.mark_as(s.players[&band[0]].pos, 2.0, 5.0, None);
+    s.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe: Foe::Hero(band[0]), t: 1.0, mark: Some(mark), shown: true };
+    let _ = s.leave(band[0]);
+    assert_put_back(&s, id);
+    // At 30% the Blackguards turn, then walk: gone at once, and back (all eight) for the next fight.
+    for after in [0.3, LEAVE_TURN + 1.0, LEAVE_TURN + 5.0] {
+        let (mut s, band, id) = ringed(1);
+        s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health * 3 / 10;
+        s.mobs.get_mut(&id).unwrap().pattern = None;
+        s.mobs.get_mut(&id).unwrap().state = MobState::Recover { foe: Foe::Hero(band[0]), until: s.clock + 1.0 };
+        run(&mut s, after + 0.5);
+        assert!(s.vancleef.duels[&id].departed, "{after}");
+        let _ = s.leave(band[0]);
+        assert_put_back(&s, id);
+        assert_next_hero_finds_it_fresh(&mut s, id, true);
+    }
+}
+
+#[test]
+fn leaving_mid_unbowed_puts_him_back_whole_where_he_rose() {
+    let (mut s, band, id) = fight("dm_vancleef_unbowed", 1);
+    run(&mut s, 3.0);
+    s.mobs.get_mut(&id).unwrap().health /= 3;
+    s.mobs.get_mut(&id).unwrap().pos = [4.0, 3.0, 0.0];
+    s.mobs.get_mut(&id).unwrap().guarding = true;
+    let _ = s.leave(band[0]);
+    assert_put_back(&s, id);
+    assert_next_hero_finds_it_fresh(&mut s, id, false);
+}
+
+#[test]
+fn one_hero_down_one_up_at_the_far_ends_and_the_up_one_leaves_puts_it_back_once_both_have_gone() {
+    let (mut s, band, id) = fight("dm_vancleef", 2);
+    run(&mut s, 2.0);
+    let c = s.vancleef.duels[&id].ring;
+    put(&mut s, band[0], [c[0] + 5.0, c[1], c[2]]);
+    put(&mut s, band[1], [c[0] - 5.0, c[1], c[2]]);
+    s.players.get_mut(&band[0]).unwrap().health = 0;
+    s.foe_gone(band[0]);
+    s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health / 2;
+    run(&mut s, 3.0);
+    assert_eq!(s.mobs[&id].state.foe(), Some(Foe::Hero(band[1])), "he turns on the one standing");
+    let _ = s.leave(band[1]);
+    // The fallen one is still in the world: the fight is not abandoned until they too go.
+    assert!(!s.players.is_empty());
+    let _ = s.leave(band[0]);
+    assert_put_back(&s, id);
+    assert_next_hero_finds_it_fresh(&mut s, id, true);
+}
+
+#[test]
+fn one_hero_leaving_hands_him_to_the_other_and_keeps_the_ring_up() {
+    let (mut s, band, id) = ringed(2);
+    run(&mut s, 2.0);
+    let _ = s.leave(band[0]);
+    run(&mut s, 3.0);
+    assert_eq!(s.mobs[&id].state.foe(), Some(Foe::Hero(band[1])));
+    assert!(s.ring_up(id) && s.vancleef.duels[&id].watchers.len() == RING_GUARDS);
+}
+
+/// A hero at the guards' line while his riposte's lunge goes by: both go on, the shove still sets
+/// them down inside the line and never on him, his lunge ends inside the line, nobody is shoved
+/// out of the fight or into a wall (the real floor's: tests/vancleef_native.rs), and nobody dies.
+#[test]
+fn a_shove_during_his_lunge_sets_the_hero_inside_the_line_and_never_on_him() {
+    for stand in [0.0f32, 0.9, -0.9, 2.0] {
+        for dist in [RING_RADIUS - 0.5, RING_RADIUS - 0.8] {
+            let (mut s, band, id) = ringed(1);
+            let hero = band[0];
+            let c = s.vancleef.duels[&id].ring;
+            s.mobs.get_mut(&id).unwrap().pos = [c[0] + 6.0, c[1], c[2]];
+            let at = ring_at(&s, id, stand, dist);
+            put(&mut s, hero, at);
+            invitation(&mut s, id, hero);
+            shot(&mut s, id, hero, 1.0, HitKind::Projectile);
+            let mut shoves = 0;
+            for _ in 0..40 {
+                let ev = s.step(DT);
+                assert!(s.players[&hero].health > 0, "stand {stand} at {dist}: alive");
+                for (dir, speed) in hops(&ev, hero) {
+                    shoves += 1;
+                    let from = s.players[&hero].pos;
+                    let yards = speed * moves::airtime(SHOVE_LIFT);
+                    let to = [from[0] + dir.cos() * yards, from[1] + dir.sin() * yards, from[2]];
+                    assert!(dist2d(to, c) <= RING_RADIUS - RING_EDGE, "ends inside the line: {}", dist2d(to, c));
+                    assert!(dist2d(to, s.mobs[&id].pos) >= SHOVE_CLEAR - 0.05, "never on him: {}", dist2d(to, s.mobs[&id].pos));
+                    assert!(yards <= SHOVE_MAX + 0.01);
+                }
+                assert!(dist2d(s.mobs[&id].pos, c) <= RING_RADIUS - RING_ROOM + 0.05, "his lunge ends inside the line");
+                // The client walks where the shove sent it (or stays at the line if none came).
+                let p = s.players[&hero].pos;
+                if !matches!(s.players[&hero].action, Action::Stagger { .. } | Action::Dodge { .. }) { put(&mut s, hero, p); }
+            }
+            assert!(shoves >= 1, "stand {stand} at {dist}: the guards still do their part");
+        }
+    }
+}

@@ -1769,6 +1769,7 @@ impl Survival {
         self.machinery_abandoned();
         self.arsenal_abandoned();
         self.firing_abandoned();
+        self.vancleef_abandoned();
         self.perch_abandoned();
         self.events.push(Event::Dirty);
         Some(save)

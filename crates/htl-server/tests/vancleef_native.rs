@@ -316,3 +316,28 @@ fn unbowed_turned_invitation_thrust_stays_on_the_open_deck_wherever_the_hero_sta
         assert!(invitations >= 2 && thrusts >= 2, "the turned Invitation comes round, and the thrust with it: {invitations}, {thrusts}");
     }
 }
+
+/// The last hero leaving mid-fight, on the real deck: he is home and whole at once, the eight
+/// guards are gone, and the next hero finds a fresh pull with all eight back on dry open boards.
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn the_last_hero_leaving_puts_the_deck_fight_back_and_the_next_pull_is_fresh() {
+    for secs in [2.0f32, 8.0, 20.0] {
+        let (mut s, hero, boss) = fight();
+        for _ in 0..(secs / DT) as usize { step(&mut s, hero); }
+        assert_eq!(observers(&s).len(), 8);
+        let home = s.mobs[&boss].home;
+        let max = s.mobs[&boss].max_health;
+        s.mobs.get_mut(&boss).unwrap().health = max / 2;
+        let _ = s.leave(hero);
+        assert!(observers(&s).is_empty(), "{secs}: no guard left on the deck");
+        let m = &s.mobs[&boss];
+        assert!(m.health == m.max_health && dist2d(m.pos, home) < 0.2, "{secs}: home and whole: {:?}", m.pos);
+        let again = s.join("sternproof2", "Sternproof2", None);
+        s.players.get_mut(&again).unwrap().last_safe = home;
+        s.move_player(again, [-66.0, -819.5, 41.0], std::f32::consts::PI, Default::default());
+        for _ in 0..20 { step(&mut s, again); }
+        assert_eq!(observers(&s).len(), 8, "{secs}: the ring is back");
+        assert!(observers(&s).iter().all(|g| !covered(&s, s.mobs[g].pos)));
+    }
+}

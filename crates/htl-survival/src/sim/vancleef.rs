@@ -583,6 +583,57 @@ impl Survival {
         }
     }
 
+    /// The last hero has left (or been taken out of the world) mid-fight. The world takes no steps
+    /// with nobody in it, so the lost fight's end (the ring and the Blackguards gone, the open
+    /// pose and raised blades let go, him home and whole) would wait for the next hero and play in
+    /// front of them, with a wounded VanCleef standing wherever the last blow left him and the
+    /// ring up or half walked off. It is put back now. (`leave`'s `foe_gone` has already sent him
+    /// home.) Unbowed, if it is he, comes back whole where he rose. A pull nobody has begun is left
+    /// as it stands.
+    pub(crate) fn vancleef_abandoned(&mut self) {
+        if !self.players.is_empty() { return; }
+        let ids: Vec<Id> = self.mobs.iter()
+            .filter(|(id, m)| self.is_vancleef(**id) && m.health > 0 && !m.hidden)
+            .map(|(id, _)| *id).collect();
+        for id in ids {
+            let began = self.vancleef.duels.get(&id).is_some_and(|d| d.began || d.entered);
+            let m = &self.mobs[&id];
+            let dirty = began || m.health < m.max_health || m.pattern.is_some() || !matches!(m.state, MobState::Idle { .. });
+            if !dirty { continue; }
+            self.remove_duel(id);
+            if let Some(MobState::Windup { mark: Some(mark), .. }) = self.mobs.get(&id).map(|m| m.state.clone()) { self.unmark(mark); }
+            self.halt(id);
+            self.clear_cc(id);
+            let home = self.mobs[&id].home;
+            let m = self.mobs.get_mut(&id).unwrap();
+            m.pos = home;
+            m.path.clear();
+            m.health = m.max_health;
+            m.fighters = 1;
+            m.pattern = None;
+            m.special = false;
+            m.hold = 0.0;
+            m.string_len = 0;
+            m.held_step = None;
+            m.last_pattern = None;
+            m.voiced = false;
+            m.riposte = false;
+            m.guarding = false;
+            m.enraged = false;
+            m.phase = 0;
+            m.lost_at = None;
+            m.ready_at = self.clock + 0.6;
+            m.stagger_until = 0.0;
+            m.posed_until = 0.0;
+            m.posture = 0;
+            m.posture_guard = 0.0;
+            m.state = MobState::Idle { wander_at: self.clock + 3.0 };
+            let (health, max, facing) = (m.health, m.max_health, m.facing);
+            self.events.push(Event::Health { id, health, max });
+            self.events.push(Event::MobStop { id, pos: home, facing });
+        }
+    }
+
     pub(crate) fn clean_duels(&mut self) {
         let stale: Vec<_> = self.vancleef.duels.iter().filter(|(id, d)| !self.mobs.get(id).is_some_and(|m| m.health > 0
             && !matches!(m.state, MobState::Return) && (!d.began || m.state.foe().is_some()))).map(|(id, _)| *id).collect();
