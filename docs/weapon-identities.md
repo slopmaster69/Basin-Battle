@@ -46,3 +46,27 @@ that hits harder and staggers. Each off-hand hit costs less stamina than a main-
    hand; saves keep `shield` and add `off_hand`; the client shows the off-hand weapon.
 3. Dual wield: the right click as an off-hand attack with its own chain and the alternating
    finisher.
+
+## The identity pass (Nov 15)
+
+Corey, Nov 15: every weapon on the rack must be different in effect, animation or gameplay, not
+just in damage a second; the ones with no purpose go. Done as a series of pull requests: removals,
+a moveset per family, a unique effect per kept weapon, then a test bar that keeps it so.
+
+### Removed
+
+| Weapon | Was | Old saves get | Its foes |
+| --- | --- | --- | --- |
+| Apprentice's Staff | a staff with no bolt | Ember Staff | (no dungeon source) |
+| Squallshaper's Staff | a polearm in staff clothing | Goldshire Halberd | the Squallshaper no longer carries it |
+| Goblin Woodcutter's Axe | a traitless 1H axe | Footman's Axe | the Woodcutter no longer carries it |
+| Engineer's Wrench | a stagger-only mace | Militia Mace | the Engineer and the Craftsman no longer carry it |
+
+Saves are migrated in `save.rs` (`RETIRED_WEAPONS`): in hand, off hand, bag, chest, cache, honed copies.
+
+### Kept for the unique-effect pass
+
+Each of these is a boss's only weapon reward, so it stays (a boss never loses its weapon) and gets
+a fitting unique effect in the third step instead of a removal: Fallen Champion's Greatsword,
+Corpsemaker, Guillotine Axe, Loksey's Boar Spear, Cursed Felblade, Ironspine's Fist, Thornspike,
+Cobrahn's Fang.

@@ -1,6 +1,6 @@
 //! Staffs that cast: with an Ember, Rime or Arcane staff in hand the left click is a bolt from
 //! the staff along the reticle, the heavy attack a heavier one, and the rest of the core (the
-//! shove with the guard up, the Apprentice's Staff's swing, every other weapon) is as it was.
+//! shove with the guard up, every other weapon) is as it was.
 
 use crate::content::Content;
 use crate::land::FlatLand;
@@ -163,14 +163,6 @@ fn with_the_guard_up_the_click_still_shoves_and_a_swinging_staff_still_swings() 
     let ev = s.step(0.0);
     assert!(missiles(&ev, p).is_empty(), "no bolt with the guard up");
     assert!(matches!(&s.players[&p].action, Action::Swing { strike, .. } if strike.kind == StrikeKind::Kick), "a kick, as with any two-handed weapon: {:?}", s.players[&p].action.name());
-    // The Apprentice's Staff has no bolt: it swings.
-    let mut s = world();
-    let p = armed(&mut s, "Ayla", ORIGIN, "apprentice_staff");
-    let _k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
-    s.input(p, Input::Attack);
-    let ev = run(&mut s, 0.3);
-    assert!(missiles(&ev, p).is_empty());
-    assert_eq!(swings(&ev, p), 1, "a swing");
 }
 
 #[test]
@@ -183,7 +175,7 @@ fn a_winded_hero_casts_no_bolt_and_the_rack_offers_the_staffs() {
     assert!(missiles(&ev, p).is_empty());
     assert!(ev.iter().any(|e| matches!(e, Event::Winded { player } if *player == p)), "too winded");
     let rack: Vec<String> = s.rack_view(p).into_iter().map(|(k, _, _, _, _)| k).collect();
-    for staff in ["apprentice_staff", "ember_staff", "rime_staff", "arcane_staff"] {
+    for staff in ["ember_staff", "rime_staff", "arcane_staff"] {
         assert!(rack.contains(&staff.to_string()), "{staff} on the rack");
     }
 }

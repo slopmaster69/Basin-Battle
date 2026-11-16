@@ -1064,27 +1064,12 @@ guard = "haft_guard"
 emote = 38
 subclass = 6
 
-# The staffs: a caster's weapons. Each guards with the ward (`[ward]`). The Apprentice's Staff
-# swings like any two-handed weapon; the others cast: their left click is a bolt from the staff
+# The staffs: a caster's weapons. Each guards with the ward (`[ward]`). They cast: their left click is a bolt from the staff
 # (`bolt`, a benched projectile defined with them, below the abilities) and their heavy attack a
 # heavier one (`heavy_bolt`). Their swing numbers stand for a shove and for the rules that read a
 # weapon's reach. (The Mage design, claude/mage-kit-draft.md.)
 # Reach, through a raised shield (docs/weapon-identities.md).
 through_guard = true
-[[weapon]]
-key = "apprentice_staff"
-windup = 0.40
-active = 0.14
-recovery = 0.50
-stamina = 16.0
-damage = [20, 26]
-range = 3.6
-arc = 120.0
-targets = 2
-two_handed = true
-guard = "arcane_ward"
-emote = 37
-subclass = 10
 
 # Fire: slow bolts that burn.
 [[weapon]]
@@ -1365,16 +1350,6 @@ display = 1243
 icon = "INV_Hammer_01"
 kind = "weapon"
 text = "Two-handed. Very slow and very heavy. Breaks an enemy's windup. Guards with the haft."
-
-# Real staves from the game's data, each with its own icon (Corey: the conjurers' look, 5415, is a
-# totem; it stays free for druids and shamans). A plain wooden long staff.
-[[item]]
-key = "apprentice_staff"
-name = "Apprentice's Staff"
-display = 472
-icon = "INV_Staff_08"
-kind = "weapon"
-text = "Two-handed. Guards with a ward, an arcane barrier with its own bar. A ward raised just as an attack lands costs nothing, restores 20% of its bar and staggers the attacker. A broken ward can't be raised again until its bar is full."
 
 # Blackwing's dark staff with its red-hot tip.
 [[item]]
