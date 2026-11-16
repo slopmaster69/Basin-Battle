@@ -7,7 +7,8 @@ Subject: [PATCH] The client's world API wall prints its count in every run
 harness holds back in a passing run, so the CI logs never showed it and the ceiling could only
 be guessed at (the test only fails when the count is over the ceiling or more than ten under).
 The line now goes straight to stderr, which the harness does not capture, and onto the run's
-summary page too. No behaviour changes; the ceiling is set to the count the first run printed.
+summary page too. No behaviour changes. The first run printed it: 113 leaks, exactly the ceiling,
+so the gate has no slack to spare and 113 stays.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
