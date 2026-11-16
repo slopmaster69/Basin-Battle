@@ -3233,7 +3233,7 @@ impl Survival {
     fn area_tick(&mut self, owner: Id, ability: usize, at: Vec3, radius: f32, dps: f32) {
         let d = self.content.abilities[ability].clone();
         let ff = self.heroes_clash();
-        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| m.health > 0 && dist2d(m.pos, at) <= radius && !self.own_totem(**mid, owner) && !self.content.mobs[m.def].totem).map(|(id, _)| *id).collect();
+        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| m.health > 0 && !m.hidden && dist2d(m.pos, at) <= radius && !self.own_totem(**mid, owner) && !self.content.mobs[m.def].totem).map(|(id, _)| *id).collect();
         let damage = dps.round().max(1.0) as u32;
         for m in &mobs {
             if dps > 0.0 {

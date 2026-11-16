@@ -993,7 +993,7 @@ impl Survival {
                 best = Some((score, toward));
             }
         };
-        for (mid, m) in self.mobs.iter().filter(|(_, m)| m.health > 0) {
+        for (mid, m) in self.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden) {
             consider(where_(*mid, m.pos), self.content.mobs[m.def].body());
         }
         if self.heroes_clash() {
@@ -1547,7 +1547,7 @@ impl Survival {
         let mut hits: Vec<(f32, Id)> = Vec::new();
         let line = w.line > 0.0 && !strike.heavy() && !strike.shove();
         for (&mid, m) in &self.mobs {
-            if m.health == 0 || struck.contains(&mid) || self.own_totem(mid, id) {
+            if m.health == 0 || m.hidden || struck.contains(&mid) || self.own_totem(mid, id) {
                 continue;
             }
             let at = self.pos_at(mid, seen_at).unwrap_or(m.pos);
