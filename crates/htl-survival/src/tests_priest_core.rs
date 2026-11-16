@@ -232,8 +232,17 @@ fn heavy_for(s: &mut Survival, p: Id, secs: f32) -> Vec<Event> {
 
 /// Held to its flare (this cast's, rolled as it began) and let go on it.
 fn heavy_on_flare(s: &mut Survival, p: Id, late: f32) -> Vec<Event> {
+    heavy_on_flare_at(s, p, late, None)
+}
+
+/// As `heavy_on_flare`, with the cast's rolled flare set to `flare` (a bolt let go at a high one
+/// flies on past a nearby dummy, so a test that stands foes at set distances pins it).
+fn heavy_on_flare_at(s: &mut Survival, p: Id, late: f32, flare: Option<f32>) -> Vec<Event> {
     s.input(p, Input::Heavy);
     let mut ev = s.step(0.0);
+    if let Some(f) = flare {
+        s.players.get_mut(&p).unwrap().check_flare = f;
+    }
     let since = match s.players[&p].action {
         Action::Charge { since, .. } => since,
         ref a => panic!("charging: {a:?}"),
@@ -343,7 +352,7 @@ fn greater_smite_off_the_flare_goes_as_charged_and_held_long_past_it_falls_to_it
     let a = mob(&mut s, "training_dummy", [10.0, 0.0, 0.0]);
     let b = mob(&mut s, "training_dummy", [14.0, 0.0, 0.0]);
     let (ha, hb) = (hp(&s, a), hp(&s, b));
-    let mut ev = heavy_on_flare(&mut s, p, 0.2);
+    let mut ev = heavy_on_flare_at(&mut s, p, 0.2, Some(0.75));
     ev.extend(run(&mut s, 1.0));
     let dealt = ha - hp(&s, a);
     assert!((16..=22).contains(&dealt), "as charged: {dealt}");
@@ -355,7 +364,7 @@ fn greater_smite_off_the_flare_goes_as_charged_and_held_long_past_it_falls_to_it
     let a = mob(&mut s, "training_dummy", [10.0, 0.0, 0.0]);
     let ha = hp(&s, a);
     let w = s.content.checks.window;
-    heavy_on_flare(&mut s, p, w + 0.35 + 0.1);
+    heavy_on_flare_at(&mut s, p, w + 0.35 + 0.1, Some(0.75));
     run(&mut s, 1.0);
     assert_eq!(ha - hp(&s, a), 12, "overcharged: its least");
     // Held a whole second: 22.
