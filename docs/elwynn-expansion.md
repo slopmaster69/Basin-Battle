@@ -185,7 +185,13 @@ Built as planned, with these differences, found checking the plan against the co
 - Fire or bile objects appear where his heavy blows land after 50%.
 - A parry fails against him.
 
-## Stage 5: The fifth raid, "The Brotherhood's Price" [ ]
+## Stage 5: The fifth raid, "The Brotherhood's Price" [x]
+
+Built as planned, with these differences, found checking the plan against the code:
+- `turn_rate` is the creature's `[mob.attack] turn_rate`, and it only slows his turning while he winds up (between blows a creature faces its foe at once). At the plan's 90 a hero could not be sure to get round him in one wind-up. It is 70, which the test shows works at the sprint's 12 yd/s.
+- The stomp only punishes hugging if nothing else fits up close, so his maul and sweep have `min_range = 3.6` and the stomp `max_range = 3.5`. A creature stops 4.35 yd from its foe with this reach, so at its natural distance it uses the maul.
+- The weapon is the black two-hand maul (display 1478). The mason wears the blacksmith's look (1500): no dressed human creature display with a mason's clothes turned up.
+- `ELWYNN_GOALS` is 8; no site was added. The stonemason stands at (-9648.5, 716), open ground by `elwynn_probe`.
 
 **The raid.** A new `[[raid.tier]]`.
 - `needs = ["barracks", "infirmary"]`, `from = [-9690, 420]`.

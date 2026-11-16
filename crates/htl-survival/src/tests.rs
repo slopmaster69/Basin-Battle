@@ -2370,12 +2370,17 @@ fn the_last_raid_brings_one_champion_however_often_it_comes() {
     let plan = s.next_raid();
     assert_eq!(plan.title, "Horde Warband");
     assert_eq!(plan.raiders.iter().find(|r| r.0 == "warlord").map(|r| r.1), Some(1));
-    // The last (the Blackrock) again and again: Rak'gash one, the rest growing.
+    // The Blackrock once, Rak'gash one.
+    s.camp.raids_won = 3;
+    let plan = s.next_raid();
+    assert_eq!(plan.title, "Blackrock Assault");
+    assert_eq!(plan.raiders.iter().find(|r| r.0 == "rakgash").map(|r| r.1), Some(1));
+    // The last (the Brotherhood's Price) again and again: Brannick one, the rest growing.
     let last = s.content.raid.count() as u32 - 1;
     s.camp.raids_won = last + 3;
     let plan = s.next_raid();
-    assert_eq!(plan.raiders.iter().find(|r| r.0 == "rakgash").map(|r| r.1), Some(1));
-    assert!(plan.raiders.iter().any(|r| r.0 == "blackrock_grunt" && r.1 > 5), "the rest grow");
+    assert_eq!(plan.raiders.iter().find(|r| r.0 == "brannick").map(|r| r.1), Some(1));
+    assert!(plan.raiders.iter().any(|r| r.0 == "defias_thug" && r.1 > 5), "the rest grow");
 }
 
 #[test]

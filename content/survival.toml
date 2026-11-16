@@ -3384,6 +3384,18 @@ wave_size = 3
 warning = 35.0
 reward = { bronze = 4, silver = 3, ore = 6 }
 
+[[raid.tier]]
+title = "The Brotherhood's Price"
+# The Brotherhood comes to collect once the camp keeps a barracks and an infirmary: Brannick the
+# Mason, who built the wall, at their back.
+needs = ["barracks", "infirmary"]
+from = [-9690.0, 420.0]
+road = "the Goldshire road from the east"
+raiders = [ { mob = "defias_thug", count = 5 }, { mob = "defias_footpad", count = 3 }, { mob = "defias_archer", count = 2 }, { mob = "defias_conjurer", count = 2 }, { mob = "brannick", count = 1 } ]
+wave_size = 3
+warning = 35.0
+reward = { silver = 4, bronze = 4, stone = 6 }
+
 # --- the Proving Ring -----------------------------------------------------------------------------
 # A page of the Smuggler's Logbook at camp, there from the start: a ring of braziers on the level
 # field south of Fargodeep where the Horde comes at you in waves that never end, each worth more
@@ -3735,6 +3747,13 @@ text = "Kill Stitches, who walks the Goldshire road. He is too big to parry. Aft
 kind = "kill"
 what = "stitches"
 reward = { silver = 2, leather = 3 }
+
+[[goal]]
+title = "The Brotherhood's Price"
+text = "Ring the bell and hold against the Brotherhood's Price, once the camp has a barracks and an infirmary. Brannick the Mason leads them. He turns slowly, so work round him, and don't hug him."
+kind = "raid"
+what = "4"
+reward = { silver = 3, bronze = 4 }
 
 [[goal]]
 title = "Every corner"
@@ -9803,6 +9822,94 @@ wait = 15.0
 rare = true
 
 # === end of Stage 4's block ============================================================================
+
+# === Elwynn expansion, Stage 5: the fifth raid, "The Brotherhood's Price" (docs/elwynn-expansion.md) ==
+# Once the camp keeps a barracks and an infirmary, the Brotherhood comes to collect: Brannick the
+# Mason, who built Westbrook's wall, at their back. The raid itself is the `[[raid.tier]]` after the
+# Blackrock Assault's.
+
+# Brannick the Mason: a big man with a mason's maul. He turns slowly (work round him for backstabs)
+# and stomps all round him when he's crowded (don't hug him). At half his health his blows leave
+# burning pitch where they land (the flames are the pitch: Fire's look, for Corey to say).
+[[mob]]
+key = "brannick"
+name = "Brannick the Mason"
+subname = "Defias Brotherhood"
+display = 2323
+clips_from = "GnomeMale"
+scale = 1.3
+health = 720
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 20.0
+leash = 40.0
+weapon = 1478
+grip = "2h"
+boss = true
+posture = 200
+drops = { silver = [1, 2], stone = [2, 3], wool = [2, 3] }
+trophy = { silver = 3, bronze = 2, stone = 4 }
+respawn = 1500.0
+aggro_text = "I built this wall. I know where it breaks."
+  [mob.attack]
+  windup = 1.2
+  damage = 30
+  range = 4.4
+  arc = 100.0
+  recovery = 1.5
+  cooldown = 1.5
+  heavy = true
+  # Slow to turn: he swings where you were. The facing is fixed for the last 0.25 sec of a
+  # wind-up, so a hero who goes round him in one comes out at his back.
+  turn_rate = 70.0
+  lock = 0.25
+  blockable = true
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.9
+  might = 1.1
+  text = "Pitch on the stones, lads."
+  burn = { radius = 3.0, damage = 8, secs = 8.0, look = 22191 }
+  # The mason's overhead, glowing: block it or step out of it. Only from arm's length: closer in
+  # he stomps.
+  [[mob.pattern]]
+  name = "maul"
+  weight = 3.0
+  min_range = 3.6
+  steps = [ { clip = 18, take = 0, windup = 1.3, damage = 34, range = 4.6, recovery = 1.6, kit = 379 } ]
+  # A wide sweep of the maul from arm's length.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 2.0
+  min_range = 3.6
+  steps = [ { clip = 18, take = 1, windup = 1.1, damage = 26, range = 4.6, arc = 150.0, recovery = 1.5 } ]
+  # Crowded, a stomp all round him that nothing blocks: he punishes hugging.
+  [[mob.pattern]]
+  name = "stomp"
+  weight = 4.0
+  max_range = 3.5
+  steps = [ { clip = 18, take = 1, windup = 0.9, damage = 22, range = 4.2, arc = 360.0, blockable = false, recovery = 1.4, kit = 124, look = 10860 } ]
+
+# The mason from Stormwind who comes to mend the wall once Brannick has fallen.
+[[prop]]
+display = 1500
+at = [-9648.5, 716.0]
+facing = 3.9
+after = "kill:brannick"
+clear = 1.2
+npc = true
+name = "Stormwind Stonemason"
+subname = "Westbrook Wall"
+say = "With Brannick fallen, a stonemason from Stormwind comes to mend the wall he built."
+
+[[prop.talk]]
+text = "Brannick laid half this wall, and he laid it well. That's what hurts."
+
+[[prop.talk]]
+after = "raids:5"
+text = "Five raids, and the wall's still up. It's better stone than he gave us credit for."
+
+# === end of Stage 5's block ============================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
