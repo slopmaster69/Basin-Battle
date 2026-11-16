@@ -245,6 +245,9 @@ fn cone_of_colds_meter_rolls_its_sweet_spot_and_grades_the_stop_against_it() {
     let mut s = meter_world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = dummy_at(&mut s, 6.0, 0.0);
+    // (The dice are this seed's from here, whatever the world's content drew getting this far: the
+    // sweep's pace is drawn, and the 0.05 sec steps can carry a "good" stop into the spot.)
+    s.rng = rand::SeedableRng::seed_from_u64(1);
     s.set_cooldowns(p, true);
     s.slot_ability(p, "close", "cone_of_cold").unwrap();
     let cone = s.content.ability("cone_of_cold").unwrap();
