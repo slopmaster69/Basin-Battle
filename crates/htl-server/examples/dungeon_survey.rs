@@ -18,7 +18,10 @@
 //!   everything, whether it's on the way to a boss, and the nearest pack's mob (the place's own
 //!   kind of foe).
 //!
-//! It reads the rules as `Content::builtin()` (or `SURVIVAL_TOML`), the same as the server.
+//! It reads the rules as `Content::builtin()` (or `SURVIVAL_TOML`), the same as the server. "Walkable"
+//! is as a hero walks it: the server's ground kept off the terrain in a hollow under a building's
+//! floor and, in a dungeon walked indoors, off the terrain outside its buildings
+//! (`Columns::off_limits`, as the `arrivals` test walks it).
 use std::collections::VecDeque;
 
 use htl_server::survival::land::DeadminesLand;
@@ -62,7 +65,12 @@ fn main() -> anyhow::Result<()> {
         let g = &loaded.ground;
         let cell = g.cell();
         let start = d.lamps[0].at;
-        let steps = g.reach_steps(start, COMFORT);
+        // Walked as a hero walks it: never over the terrain in a hollow under a building's floor
+        // nor, in a dungeon walked indoors, out onto the terrain outside (Shadowfang Keep's three
+        // spread packs stood on the hillside outside its walls until Nov 2026).
+        let cols = htl_map::deadmines::Columns::load(data, &d.map_dir)?;
+        let off = cols.off_limits(g, cols.walked_indoors(g, start));
+        let steps = g.reach_steps_avoiding(start, COMFORT, &off);
         let (w, h) = g.size();
         // Each pack where it stands: (index, mob, count, kind, at with its floor's height).
         let mut packs = Vec::new();

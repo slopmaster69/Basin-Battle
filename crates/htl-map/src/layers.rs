@@ -374,6 +374,34 @@ impl Layers {
     pub fn water_near(&self, x: f32, y: f32, z: f32) -> bool {
         self.floor_near(x, y, z).is_some_and(|f| f.water)
     }
+    /// A straight walk from `a` to `b` over the smoothed ground ([`Self::height_near`]), looked at
+    /// every half yard as a walker climbs it: the ground's height where it ends, or `None` where it
+    /// meets a wall, deep water or a rise steeper than `max_slope` between two looks. Both a
+    /// dungeon's straight walks and the grid's diagonal steps ([`Self::find_path`]) are held to it,
+    /// so a planned walk never takes a step its straight walk refuses (a diagonal across a stair's
+    /// riser, its corner cells a yard under and over it: Shadowfang Keep's gate stair, Nov 2026).
+    pub fn straight_walk(&self, a: [f32; 3], b: [f32; 3], max_slope: f32) -> Option<f32> {
+        self.straight(a, b, max_slope, true)
+    }
+
+    /// [`Self::straight_walk`]; through deep water too unless `dry`.
+    fn straight(&self, a: [f32; 3], b: [f32; 3], max_slope: f32, dry: bool) -> Option<f32> {
+        let d = (b[0] - a[0]).hypot(b[1] - a[1]);
+        let steps = (d / 0.5).ceil().max(1.0) as usize;
+        let mut z = a[2];
+        for k in 1..=steps {
+            let t = k as f32 / steps as f32;
+            let (x, y) = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
+            let f = self.floor_near(x, y, z)?;
+            let next_z = self.height_near(x, y, z);
+            if f.blocked || (dry && f.water) || (next_z - z).abs() > max_slope * (d / steps as f32) + 0.05 {
+                return None;
+            }
+            z = next_z;
+        }
+        Some(z)
+    }
+
     /// Whether a floor lies between heights `a` and `b` (either way round) over (x, y): a deck or
     /// a ceiling a line between them would pass through.
     pub fn slab_between(&self, x: f32, y: f32, a: f32, b: f32) -> bool {
@@ -435,6 +463,29 @@ impl Layers {
                         };
                         if side(ci + di, cj) && side(ci, cj + dj) {
                             continue;
+                        }
+                        // Nor across a riser its straight walk refuses (the cells either side
+                        // pulling the smoothed ground under and over it). Where both ends and both
+                        // sides are within `band` of each other it can't be (the smoothed ground
+                        // between them changes no faster than twice that along the step, so no more
+                        // than 2 band / looks between two looks): not looked.
+                        let gz = self.floors[g].z;
+                        let side_z = |a: i32, b: i32| self.pick(b as usize * self.w + a as usize, z).map(|s| self.floors[s].z);
+                        let looks = (run / 0.5).ceil().max(1.0);
+                        let band = 0.9 * looks * (max_slope * run / looks + 0.05) / 2.0;
+                        let level = match (side_z(ci + di, cj), side_z(ci, cj + dj)) {
+                            (Some(p), Some(q)) => {
+                                let (lo, hi) = [gz, p, q].iter().fold((z, z), |(lo, hi), &v| (lo.min(v), hi.max(v)));
+                                hi - lo <= band
+                            }
+                            _ => false,
+                        };
+                        if !level {
+                            let [x0, y0] = self.cell_xy(ci as usize, cj as usize);
+                            let [x1, y1] = self.cell_xy(ni as usize, nj as usize);
+                            if self.straight([x0, y0, z], [x1, y1, gz], max_slope, false).is_none_or(|e| (e - gz).abs() >= 1.0) {
+                                continue;
+                            }
                         }
                     }
                     each(nk, g, run);
@@ -602,6 +653,13 @@ impl Layers {
     /// How many steps (cell to cell) a walker takes from `from` to each floor, by floor index
     /// (`u32::MAX` for those it can't reach): a breadth-first [`Self::reachable`].
     pub fn reach_steps(&self, from: [f32; 3], max_slope: f32) -> Vec<u32> {
+        self.reach_steps_avoiding(from, max_slope, &[])
+    }
+
+    /// [`Self::reach_steps`], never stepping onto a floor marked in `avoid` (as
+    /// [`Self::reachable_avoiding`]).
+    pub fn reach_steps_avoiding(&self, from: [f32; 3], max_slope: f32, avoid: &[bool]) -> Vec<u32> {
+        let avoided = |g: usize| avoid.get(g).copied().unwrap_or(false);
         let mut dist = vec![u32::MAX; self.floors.len()];
         let Some((i, j)) = self.cell_at(from[0], from[1]) else {
             return dist;
@@ -617,7 +675,7 @@ impl Layers {
             let mut next = Vec::new();
             self.steps(k, f, max_slope, |nk, g, _| next.push((nk, g)));
             for (nk, g) in next {
-                if dist[g] == u32::MAX {
+                if dist[g] == u32::MAX && !avoided(g) {
                     dist[g] = d + 1;
                     queue.push_back((nk, g));
                 }
@@ -690,6 +748,32 @@ mod tests {
                 liquid: &[],
             },
         )
+    }
+
+    #[test]
+    fn a_path_takes_no_diagonal_across_a_risers_corner() {
+        // Ground rising gently, with a stair's riser across one corner: the cells either side of
+        // the diagonal from (0, 0) to (1, 1) a yard under and over it (Shadowfang Keep's gate stair).
+        let terrain = |x: f32, y: f32| {
+            let (i, j) = (x.round() as i32, y.round() as i32);
+            Some(match (i, j) {
+                (0, 1) => -1.01,
+                (1, 0) => 1.38,
+                (1, 1) => 0.75,
+                _ => 0.375 * (i + j) as f32,
+            })
+        };
+        let g = Layers::build([-10.0, -10.0], [10.0, 10.0], 1.0, &Sources { terrain: &terrain, solid: &[], liquid: &[] });
+        let (a, b) = ([0.0, 0.0, 0.0], [1.0, 1.0, 0.75]);
+        assert!(g.straight_walk(a, b, 1.2).is_none(), "straight across it: too steep where it rises");
+        let path = g.find_path(a, b, 1.2, None).expect("round the corner");
+        assert!(path.len() > 2, "not the one diagonal step: {path:?}");
+        for w in path.windows(2) {
+            let end = g.straight_walk(w[0], w[1], 1.2);
+            assert!(end.is_some_and(|z| (z - w[1][2]).abs() < 1.0), "each step walked straight: {w:?}");
+        }
+        // A diagonal up an even slope is still one step.
+        assert_eq!(g.find_path([-3.0, -3.0, -2.25], [-2.0, -2.0, -1.5], 1.2, None).map(|p| p.len()), Some(2));
     }
 
     #[test]
