@@ -47,6 +47,8 @@ mod tests_floors;
 #[cfg(test)]
 mod tests_meter;
 #[cfg(test)]
+mod tests_melee;
+#[cfg(test)]
 mod tests_siege;
 #[cfg(test)]
 mod tests_control;

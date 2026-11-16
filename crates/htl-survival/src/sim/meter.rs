@@ -89,17 +89,17 @@ enum Kind {
 
 impl Survival {
     /// A lull this long ends a fight.
-    fn fight_gap(&self) -> f32 {
+    pub(super) fn fight_gap(&self) -> f32 {
         self.content.player.combat_secs.max(1.0)
     }
 
     /// Whether a creature is still on hero `id` (chasing them, or mid-blow at them).
-    fn engaged(&self, id: Id) -> bool {
+    pub(super) fn engaged(&self, id: Id) -> bool {
         self.mobs.values().any(|m| m.health > 0 && m.state.target() == Some(id))
     }
 
     /// Whether hero `id`'s fight is still on: a blow within the lull, or a creature still on them.
-    fn fight_on(&self, id: Id) -> bool {
+    pub(super) fn fight_on(&self, id: Id) -> bool {
         let now = self.clock;
         self.meters.get(&id).is_some_and(|m| m.fight.seen && (now - m.fight.last <= self.fight_gap() || self.engaged(id)))
     }
