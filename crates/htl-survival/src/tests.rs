@@ -733,7 +733,7 @@ fn give(s: &mut Survival, p: Id, key: &str, n: u32) {
     *s.players.get_mut(&p).unwrap().bag.entry(i).or_default() += n;
 }
 
-fn build_spot(s: &Survival) -> (Vec3, f32) {
+pub(crate) fn build_spot(s: &Survival) -> (Vec3, f32) {
     // A yard of the building ground clear of the camp's own things (its fire, chest, shelter...)
     // nearest its middle, room for a watchtower there and 7 yards south and 8 north; stand west
     // of it, facing east into it.

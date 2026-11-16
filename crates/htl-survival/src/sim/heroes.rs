@@ -11,14 +11,17 @@ impl Survival {
         let spawn = self.ground(c.world.spawn[0], c.world.spawn[1]);
         let (loadout, owned) = self.fresh_abilities(class);
         let item = |k: &str| c.item(k).map(|i| c.items[i].key.clone()).unwrap_or_default();
+        // A Rogue starts with a blade in each hand (docs/rogue-roles.md); everyone else the axe and
+        // the buckler.
+        let rogue = class == super::rogue::ROGUE;
         crate::save::PlayerSave {
             pos: spawn,
             facing: c.world.spawn_facing,
             health: c.player.health,
             stamina: c.player.stamina,
-            weapon: item(&c.start.weapon),
+            weapon: item(if rogue { &c.rogue.weapon } else { &c.start.weapon }),
             shield: item(&c.start.shield),
-            off_hand: String::new(),
+            off_hand: if rogue { item(&c.rogue.off_hand) } else { String::new() },
             bow: item(&c.start.bow),
             bag: c.start.items.clone(),
             dead: false,

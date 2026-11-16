@@ -57,6 +57,7 @@ mod sleep_tests;
 mod bench_support;
 mod flay;
 pub mod priest;
+pub mod rogue;
 mod orb;
 mod rhythm;
 mod staff;
@@ -886,6 +887,8 @@ pub struct Player {
     pub combos: recasts::Combos,
     /// Grace, the Heal begun with it, a friend's shield on them (the Priest's core).
     pub priest: priest::Priest,
+    /// A Rogue's footwork: the Shadow Cut open after a perfect dodge, the flicker on the body.
+    pub rogue: rogue::Rogue,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -1734,6 +1737,7 @@ impl Survival {
             panic_stride: 0.0,
             combos: recasts::Combos::default(),
             priest: priest::Priest::default(),
+            rogue: rogue::Rogue::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];

@@ -208,7 +208,13 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   Knives has Marked it, and uses the Mark up); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
   Smoke Bomb, a cloud at your feet that hides you and your friends in it and slows foes, Vanish
-  hides you at once (your next blow counts as from behind); Death Mark.
+  hides you at once (your next blow counts as from behind); Death Mark. A hero created as a Rogue
+  fights with two blades and never blocks or parries (`docs/rogue-roles.md`): it starts with two
+  daggers and can't hold a shield, a two-hander, a staff or an axe; the right mouse button swings
+  the off hand (an empty off hand jabs for half); a dodge whose blow lands 0.04 to 0.18 s in is a
+  perfect dodge (20 stamina, 10 Valor, 12% of a boss's posture, the body flickers), and for 0.6 s
+  after it an attack steps behind whoever swung (up to 6 yd) and strikes its back. A dodge in your
+  own wind-up calls the blow off, cuts an off-hand blow short at once, and keeps the two-blade run.
 - **Priest**: Light and Shadow, a choice on every key (see `docs/priest-draft3.md` and
   `docs/priest-draft4.md`). Q: Penance, rings that close on up to 3 bodies in front of you, a bolt
   of light on each as you press on the beat (its EX, **Divine Star**, is a star of light 24 yd out

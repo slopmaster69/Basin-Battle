@@ -752,6 +752,12 @@ impl Survival {
         p.owned = owned;
         p.weapon = item(&c.start.weapon);
         p.shield = item(&c.start.shield);
+        // A Rogue: a blade in each hand.
+        if p.class == super::rogue::ROGUE {
+            p.weapon = item(&c.rogue.weapon);
+            p.off_weapon = c.item(&c.rogue.off_hand);
+            p.off_empty = false;
+        }
         p.bow = item(&c.start.bow);
         p.bag = c.start.items.iter().filter_map(|(k, n)| Some((c.item(k)?, *n))).collect();
         p.armor.clear();

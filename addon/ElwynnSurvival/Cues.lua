@@ -38,6 +38,10 @@ ES.CUE = {
   wall = { stop = 120, shake = { 3.2, 0.24 } },
   -- A killing blow cheated: the world held around the hero a long moment, the view barely moving.
   cheat_death = { stop = 260, shake = { 1.2, 0.4 }, self = true },
+  -- A Rogue's perfect dodge (docs/rogue-roles.md): the blow slipped in its last moment. A short
+  -- stop on the hero alone (less than a parry's 150: a slip, not a clash), no shake, and the
+  -- corners flashed a shadow's violet, the Shadow Cut's 0.6 s open behind it.
+  perfect_dodge = { stop = 90, self = true, edge = { 0.42, 0.30, 0.62, 0.6 } },
   -- The mine coming down (Rhahk'Zor's collapse): near its front the ground rumbles under the
   -- hero (a long low shake, each beat running into the next), and rock or a beam landing beside
   -- them jolts the view. Shakes alone: no stop, nothing held, the hero runs on.

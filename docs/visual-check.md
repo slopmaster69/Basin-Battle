@@ -326,6 +326,13 @@ Invitation (same doc, beat 9) have a dev setup each, not yet run:
 | `smite-rack-show` | Dev setup, markers off: the lit rack, his run there at 66% and 33%, the turn to face the hero, the sword thrown down where it stays, the held health at the rack, the shout as he lifts the axes and the hammer |
 | `vancleef-unbowed-invitation` | Dev setup, not yet run: the rig's bot plays Unbowed's first four turned Invitations with markers off (the red blades and "Stand still, and be finished.", the closing thrust 2 sec later, the roll aside on the red glow, his 2.4 sec opening) |
 
+The Rogue (`docs/rogue-roles.md`) has a scenario per build-plan entry. Each needs a Rogue test
+hero: put a Rogue's name in the settings as `rogue = <name>` (`setup` doesn't make one yet).
+
+| Scenario | What it films |
+| --- | --- |
+| `rogue-perfect-dodge` | Not yet run, markers off: the rig's bot rolls 0.12 sec before a grunt's blow lands, three times, and attacks 0.2 sec after it: the flicker, Vanish's puff and sound, the stop and violet corners, the step behind the grunt and the stab in its back; then a run of both hands with a roll in it and the two-blade finisher |
+
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
 `docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine
 cleared but for him, and the same kind of timer) and, for the real pulls, `_sneed-shredder-bot.txt`
