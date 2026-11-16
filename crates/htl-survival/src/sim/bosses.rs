@@ -1524,6 +1524,25 @@ impl Survival {
         }
     }
 
+    /// The last hero has left (or been taken out of the world) while a collapse stands. The world
+    /// takes no steps with nobody in it, so the lost fight's own end (its rubble in its dust, then
+    /// gone; the lamps lit again; the boss back at its post) would wait for the next hero to come
+    /// and then play in front of them, with the lamps dark until then. It is put back now, whole.
+    pub(crate) fn collapse_abandoned(&mut self) {
+        if !self.players.is_empty() {
+            return;
+        }
+        let Some(boss) = self.bosses.collapse.as_ref().map(|c| c.boss) else { return };
+        if self.mobs.get(&boss).is_some_and(|m| m.health > 0) {
+            self.collapse_lost(boss);
+            self.collapse_cleared(boss);
+            // (Whole too: his heal on the way home is a step nobody is here to take.)
+            if let Some(m) = self.mobs.get_mut(&boss) {
+                m.health = m.max_health;
+            }
+        }
+    }
+
     /// The dungeon resets: no collapse, no face, no rubble, nobody running from one.
     pub(crate) fn collapse_reset(&mut self) {
         let off = self.bosses.looks.off;

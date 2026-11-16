@@ -137,6 +137,11 @@ of equal length.
   torches and faces with it. It is lost the moment the last hero in it is down (his own blow's
   recovery doesn't hold it open), so a hero who wakes at a lamp finds the mine standing. A hero
   farther than 150 yd from the whole route has left the fight: no rock is hurled after them.
+- **The last hero leaves** (closes the game, drops) in a fight still on: the fight is lost for
+  that moment, not the next hero's arrival. The world takes no steps with nobody in it, so the
+  rubble, faces and torches, the dark lamps and his lost health used to wait, frozen, and play out
+  in front of whoever came next. They are put back as the hero goes (`collapse_abandoned`). One
+  hero leaving with another still up changes nothing: he turns on the one who stays.
 - **He falls:** the faces and the rubble stay until the dungeon resets. They are not saved: a
   server restarted in between comes back with the tunnel clear.
 
