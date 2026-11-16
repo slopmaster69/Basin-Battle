@@ -457,6 +457,9 @@ impl SurvivalGame {
                 self.lab_queue();
                 self.lab_steps();
                 let events = self.sim.step(TICK.as_secs_f32());
+                if let Some(line) = event_flood(&events, Instant::now()) {
+                    eprintln!("{line}");
+                }
                 self.lab_trace(&events);
                 self.play(events);
                 self.wreck_tick();
@@ -1229,5 +1232,55 @@ mod load_line_tests {
             lines.insert(line);
         }
         assert_eq!(lines.len(), content.dungeons().count(), "each its own");
+    }
+}
+
+/// A tick whose events run past this many is a flood the clients would choke on (a fight of a
+/// dozen sends tens); written down, at most once every [`FLOOD_GAP`].
+const EVENT_FLOOD: usize = 400;
+const FLOOD_GAP: Duration = Duration::from_secs(30);
+
+/// The host log's line for a flood of events in one tick, with its commonest kinds; `None` for an
+/// ordinary tick or within [`FLOOD_GAP`] of the last line (Corey's Blade Dance freeze, 16 Nov:
+/// the next one says whether the server sent a flood).
+fn event_flood(events: &[htl_survival::Event], now: Instant) -> Option<String> {
+    use std::sync::Mutex;
+    static LAST: Mutex<Option<Instant>> = Mutex::new(None);
+    if events.len() <= EVENT_FLOOD {
+        return None;
+    }
+    let mut last = LAST.lock().ok()?;
+    if last.is_some_and(|t| now.duration_since(t) < FLOOD_GAP) {
+        return None;
+    }
+    *last = Some(now);
+    let mut kinds: HashMap<String, usize> = HashMap::new();
+    for e in events {
+        let d = format!("{e:?}");
+        let k = d.split(|c: char| !c.is_alphanumeric()).next().unwrap_or("").to_string();
+        *kinds.entry(k).or_default() += 1;
+    }
+    let mut kinds: Vec<_> = kinds.into_iter().collect();
+    kinds.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let top: Vec<String> = kinds.iter().take(5).map(|(k, n)| format!("{k} {n}")).collect();
+    Some(format!("[survival] {} events in one tick (most: {})", events.len(), top.join(", ")))
+}
+
+#[cfg(test)]
+mod event_flood_tests {
+    use super::*;
+    use htl_survival::Event;
+
+    #[test]
+    fn a_flood_of_events_in_one_tick_is_written_down_once_in_a_while() {
+        let quiet = vec![Event::Auras { id: 1 }; 30];
+        assert!(event_flood(&quiet, Instant::now()).is_none());
+        let mut flood = vec![Event::Auras { id: 1 }; 450];
+        flood.extend(vec![Event::Stamina { player: 1 }; 20]);
+        let t = Instant::now();
+        let line = event_flood(&flood, t).expect("a flood is written");
+        assert!(line.contains("470 events in one tick") && line.contains("Auras 450") && line.contains("Stamina 20"), "{line}");
+        assert!(event_flood(&flood, t + Duration::from_secs(1)).is_none(), "not again at once");
+        assert!(event_flood(&flood, t + FLOOD_GAP + Duration::from_secs(1)).is_some(), "again later");
     }
 }

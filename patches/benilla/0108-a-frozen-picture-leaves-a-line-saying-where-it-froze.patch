@@ -1,0 +1,321 @@
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 2fc5c265..5490b8b4 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -42,6 +42,7 @@ mod feet;
+ pub(crate) use feet::PlantedFeet;
+ mod flurry;
+ mod strike_trail;
++mod watchdog;
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+ 
+ /// The impact keyframes an attack clip authors (`$AH0`..`$AH3`, `$CAH`), what a blow's timing
+@@ -416,6 +417,9 @@ pub(crate) fn lock_point() -> Option<Vec3> {
+     LOCK_POINT.lock().ok().and_then(|p| *p)
+ }
+ 
++/// The longest camera boom [`unit_hit`] walks (yd); the camera's own reach is far shorter.
++const MAX_BOOM: f32 = 100.0;
++
+ /// How far along a camera boom from `head` (direction `dir`, length `len`) another unit's body
+ /// starts, so the camera can stop short of it; `None` when the way is clear. A body the head is
+ /// already inside (a clinch) is passed through.
+@@ -424,6 +428,12 @@ pub(crate) fn unit_hit(head: Vec3, dir: Vec3, len: f32) -> Option<f32> {
+         let flat = Vec2::new(p.x - feet.x, p.z - feet.z).length();
+         flat < r && p.y > feet.y - 0.2 && p.y < feet.y + h
+     };
++    // A boom no camera has (a non-finite or runaway seat) would march its 0.08 yd steps for ever:
++    // past 2^21 yd a step no longer moves `s` at all. Nothing that far is worth stopping for.
++    if !len.is_finite() || !head.is_finite() || !dir.is_finite() {
++        return None;
++    }
++    let len = len.min(MAX_BOOM);
+     let mut best: Option<f32> = None;
+     for (feet, r, h) in occluders() {
+         if inside(head, feet, r + 0.1, h) {
+@@ -444,6 +454,20 @@ pub(crate) fn unit_hit(head: Vec3, dir: Vec3, len: f32) -> Option<f32> {
+     best
+ }
+ 
++/// Basin Battle: an action call's kind, for the frame watchdog's line.
++fn call_kind(call: &ActionCall) -> &'static str {
++    match call {
++        ActionCall::Anim { .. } => "anim",
++        ActionCall::Stop { .. } => "stop",
++        ActionCall::Flurry { .. } => "flurry",
++        ActionCall::Preload { .. } => "preload",
++        ActionCall::React { .. } => "react",
++        ActionCall::HitStop { .. } => "hitstop",
++        ActionCall::Shake { .. } => "shake",
++        _ => "other",
++    }
++}
++
+ /// A unit named by a script: `"player"`, or a guid in hex (`0x...`) or decimal.
+ fn resolve(name: &str, me: Option<Entity>, index: &GuidIndex) -> Option<Entity> {
+     if name.eq_ignore_ascii_case("player") {
+@@ -834,6 +858,7 @@ pub(super) fn drain_action_calls(
+     let index = index.as_deref().unwrap_or(&empty);
+     let catalog = anim_data.as_deref().map(|d| &d.0);
+     for call in calls {
++        watchdog::note_call(call_kind(&call));
+         match call {
+             ActionCall::Anim {
+                 unit,
+@@ -2033,6 +2058,7 @@ pub(super) fn plugin(app: &mut App) {
+         anim_layer_console,
+     );
+     app.add_observer(on_cvar);
++    watchdog::plugin(app);
+     app.init_resource::<LockOn>()
+         .init_resource::<ClipOwnsBody>()
+         .init_resource::<ImpactWeight>()
+@@ -2168,6 +2194,15 @@ mod tests {
+         // One right behind us is passed through too: the view never ends up in our own head.
+         *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(0.0, 0.0, 1.2), 0.55, 2.1)];
+         assert_eq!(unit_hit(head, dir, 6.0), None);
++        // Basin Battle: a runaway boom (an infinite or enormous seat) returns at once: past 2^21
++        // yd a 0.08 yd step no longer moves the march, which would hang the main thread.
++        *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(5.0, 0.0, 0.0), 0.55, 2.1)];
++        let t = std::time::Instant::now();
++        assert_eq!(unit_hit(head, dir, f32::INFINITY), None);
++        assert_eq!(unit_hit(head, dir, f32::NAN), None);
++        assert_eq!(unit_hit(head, dir, 1.0e9), None);
++        assert_eq!(unit_hit(Vec3::splat(f32::INFINITY), dir, 6.0), None);
++        assert!(t.elapsed().as_millis() < 500, "{:?}", t.elapsed());
+         OCCLUDERS.lock().unwrap().clear();
+     }
+ 
+diff --git a/crates/benilla-app/src/creature_anim/action/watchdog.rs b/crates/benilla-app/src/creature_anim/action/watchdog.rs
+new file mode 100644
+index 00000000..8294e8da
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action/watchdog.rs
+@@ -0,0 +1,227 @@
++//! Basin Battle: the frame watchdog, so a frozen picture says where it froze.
++//!
++//! A player saw the picture stop mid-fight (a Rogue's heavy attack under Blade Dance) and had to
++//! kill the client, which left nothing behind: stderr goes to no file on Windows, and the stall
++//! sampler (`perf::stall`) is a macOS dev instrument. This ships in every build and costs a few
++//! atomic stores a frame.
++//!
++//! - In frame: a main-schedule frame that took longer than [`SLOW_FRAME_SECS`] writes one line
++//!   once it is over, with the live entity count, the afterimages alive and the last action
++//!   calls the add-on made.
++//! - Out of frame: a watchdog thread sees the main heartbeat or the render world's heartbeat go
++//!   stale for [`STUCK_SECS`] and writes one line while it is still stuck (a hang never finishes
++//!   its frame, so only a thread can see it), saying which of the two stopped first.
++//!
++//! Lines go to stderr and to `benilla-config/Diagnostics/stall.log`, at most [`MAX_LINES`] a
++//! session, and the file restarts past [`ROTATE_BYTES`].
++
++use std::io::Write;
++use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
++use std::sync::{Mutex, OnceLock};
++use std::time::{Duration, Instant};
++
++use bevy::ecs::entity::Entities;
++use bevy::prelude::*;
++
++use super::afterimage::Afterimage;
++
++/// A main frame at least this long (wall seconds) is written down once it ends.
++const SLOW_FRAME_SECS: f32 = 1.0;
++/// A heartbeat this stale (seconds) while the app runs is a stuck thread.
++const STUCK_SECS: u64 = 2;
++/// The most lines one session writes, so a long stall loop can't fill the disk.
++const MAX_LINES: u32 = 40;
++/// The size past which a new session starts the file again.
++const ROTATE_BYTES: u64 = 512 * 1024;
++/// The last action calls kept for a line.
++const RECENT_CALLS: usize = 8;
++/// Nothing is written this long after launch: startup and the first world load stall for real.
++const STARTUP_GRACE_MS: u64 = 20_000;
++
++static START: OnceLock<Instant> = OnceLock::new();
++/// Main and render heartbeats, ms since [`START`]; 0 until the first.
++static MAIN_BEAT: AtomicU64 = AtomicU64::new(0);
++static RENDER_BEAT: AtomicU64 = AtomicU64::new(0);
++/// What the last finished main frame saw.
++static ENTITIES: AtomicU32 = AtomicU32::new(0);
++static AFTERIMAGES: AtomicU32 = AtomicU32::new(0);
++static LINES: AtomicU32 = AtomicU32::new(0);
++static THREAD: AtomicBool = AtomicBool::new(false);
++/// Set once `AppExit` is seen: teardown is not a stall.
++static EXITING: AtomicBool = AtomicBool::new(false);
++/// The add-on's last action calls (their kinds), newest last.
++static CALLS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
++
++fn now_ms() -> u64 {
++    START.get_or_init(Instant::now).elapsed().as_millis() as u64
++}
++
++/// Note an action call the add-on made this frame (its kind), for the next line.
++pub(super) fn note_call(kind: &'static str) {
++    if let Ok(mut v) = CALLS.lock() {
++        if v.len() >= RECENT_CALLS {
++            v.remove(0);
++        }
++        v.push(kind);
++    }
++}
++
++fn recent_calls() -> String {
++    CALLS.lock().map(|v| v.join(",")).unwrap_or_default()
++}
++
++/// Write one line, if the session still has lines left.
++fn write_line(line: &str) {
++    if now_ms() < STARTUP_GRACE_MS {
++        return;
++    }
++    if LINES.fetch_add(1, Ordering::Relaxed) >= MAX_LINES {
++        return;
++    }
++    eprintln!("{line}");
++    let Some(dir) = crate::local_state::diagnostics_dir() else {
++        return;
++    };
++    let _ = std::fs::create_dir_all(&dir);
++    let path = dir.join("stall.log");
++    let unix = std::time::SystemTime::now()
++        .duration_since(std::time::UNIX_EPOCH)
++        .map_or(0, |d| d.as_secs());
++    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
++        let _ = writeln!(f, "{unix} {line}");
++    }
++}
++
++/// The file restarts once it has grown past its size, at the session's start.
++fn rotate() {
++    let Some(dir) = crate::local_state::diagnostics_dir() else {
++        return;
++    };
++    let path = dir.join("stall.log");
++    if std::fs::metadata(&path).is_ok_and(|m| m.len() > ROTATE_BYTES) {
++        let _ = std::fs::rename(&path, dir.join("stall.old.log"));
++    }
++}
++
++/// The line for a main frame that took `secs`.
++pub(super) fn slow_frame_line(secs: f32, entities: u32, afterimages: u32, calls: &str) -> String {
++    format!(
++        "[watchdog] slow frame: {secs:.2} s; entities {entities}, afterimages {afterimages}, last action calls [{calls}]"
++    )
++}
++
++/// The line for a heartbeat gone stale: which thread, for how long, which stopped first.
++pub(super) fn stuck_line(main_ms: u64, render_ms: u64, now: u64) -> Option<String> {
++    let stale = |beat: u64| beat != 0 && now.saturating_sub(beat) >= STUCK_SECS * 1000;
++    let (main, render) = (stale(main_ms), stale(render_ms));
++    if !main && !render {
++        return None;
++    }
++    let who = match (main, render) {
++        (true, true) if render_ms < main_ms => "render world stopped first, then the main schedule",
++        (true, true) => "main schedule stopped first, then the render world",
++        (true, false) => "main schedule stuck, render world still beating",
++        (false, true) => "render world stuck, main schedule still beating",
++        (false, false) => unreachable!(),
++    };
++    let since = now.saturating_sub(main_ms.min(render_ms).max(1));
++    Some(format!(
++        "[watchdog] stuck {:.1} s: {who}; last frame saw entities {}, afterimages {}, last action calls [{}]",
++        since as f32 / 1000.0,
++        ENTITIES.load(Ordering::Relaxed),
++        AFTERIMAGES.load(Ordering::Relaxed),
++        recent_calls(),
++    ))
++}
++
++/// `Last`: the main heartbeat, what this frame saw, and a slow frame written down.
++fn main_beat(
++    mut last: Local<Option<Instant>>,
++    entities: &Entities,
++    images: Query<(), With<Afterimage>>,
++    mut exits: MessageReader<AppExit>,
++) {
++    if exits.read().next().is_some() {
++        EXITING.store(true, Ordering::Relaxed);
++    }
++    let n = entities.len();
++    let a = images.iter().count() as u32;
++    ENTITIES.store(n, Ordering::Relaxed);
++    AFTERIMAGES.store(a, Ordering::Relaxed);
++    let now = Instant::now();
++    if let Some(prev) = last.replace(now) {
++        let secs = now.duration_since(prev).as_secs_f32();
++        if secs >= SLOW_FRAME_SECS {
++            write_line(&slow_frame_line(secs, n, a, &recent_calls()));
++        }
++    }
++    MAIN_BEAT.store(now_ms(), Ordering::Relaxed);
++    if !THREAD.swap(true, Ordering::Relaxed) {
++        spawn_thread();
++    }
++}
++
++/// The render world's heartbeat, once a render frame.
++fn render_beat() {
++    RENDER_BEAT.store(now_ms(), Ordering::Relaxed);
++}
++
++fn spawn_thread() {
++    rotate();
++    let _ = std::thread::Builder::new()
++        .name("basin-watchdog".into())
++        .spawn(|| {
++            // One line a stall: the next only once both have beaten again.
++            let mut told = false;
++            loop {
++                std::thread::sleep(Duration::from_millis(500));
++                if EXITING.load(Ordering::Relaxed) {
++                    return;
++                }
++                let line = stuck_line(
++                    MAIN_BEAT.load(Ordering::Relaxed),
++                    RENDER_BEAT.load(Ordering::Relaxed),
++                    now_ms(),
++                );
++                match line {
++                    Some(l) if !told => {
++                        write_line(&l);
++                        told = true;
++                    }
++                    None => told = false,
++                    _ => {}
++                }
++            }
++        });
++}
++
++pub(super) fn plugin(app: &mut App) {
++    START.get_or_init(Instant::now);
++    app.add_systems(Last, main_beat);
++    if let Some(render_app) = app.get_sub_app_mut(bevy::render::RenderApp) {
++        render_app.add_systems(bevy::render::Render, render_beat);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn a_slow_frame_line_names_its_time_and_counts() {
++        let l = slow_frame_line(1.5, 12_000, 3, "anim,dash");
++        assert!(l.contains("1.50 s") && l.contains("entities 12000") && l.contains("afterimages 3") && l.contains("[anim,dash]"), "{l}");
++    }
++
++    #[test]
++    fn a_stale_heartbeat_names_the_thread_that_stopped_first() {
++        // Both fresh: nothing to say. Not yet started (0): nothing either.
++        assert!(stuck_line(9_000, 9_100, 10_000).is_none());
++        assert!(stuck_line(0, 0, 60_000).is_none());
++        let l = stuck_line(5_000, 9_900, 10_000).unwrap();
++        assert!(l.contains("main schedule stuck, render world still beating"), "{l}");
++        assert!(l.contains("stuck 5.0 s"), "{l}");
++        let l = stuck_line(6_000, 4_000, 10_000).unwrap();
++        assert!(l.contains("render world stopped first"), "{l}");
++    }
++}
