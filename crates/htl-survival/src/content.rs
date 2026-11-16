@@ -1400,12 +1400,89 @@ fn capitalize(s: &str) -> String {
     c.next().map_or(String::new(), |f| f.to_uppercase().collect::<String>() + c.as_str())
 }
 
+/// A weapon this long (yards) has the longest reach on the rack.
+pub const LONGEST_REACH: f32 = 5.4;
+
 /// How long a silvered foe stays silvered (a bane foe struck by a silver weapon).
 pub const SILVER_SECS: f32 = 10.0;
 /// The width, either side, of a line blow (a machete clearing brush).
 pub const LINE_HALF_WIDTH: f32 = 0.9;
 
 impl WeaponDef {
+    /// The mechanics a weapon has of its own from the identity pass (docs/weapon-identities.md):
+    /// what it does that no number says. A weapon on the rack with none is a number copy.
+    pub fn unique_mechanics(&self) -> Vec<String> {
+        let on = [
+            (!self.bane.is_empty() && self.bane_damage > 0.0, "bane"),
+            (self.silver, "silver"),
+            (self.hook > 0.0, "hook"),
+            (self.boarding > 0.0, "boarding"),
+            (self.line > 0.0, "line"),
+            (self.no_backstab, "no_backstab"),
+            (self.blink_behind, "blink_behind"),
+            (self.guard_hook > 0.0, "guard_hook"),
+            (self.bloodlust > 0.0, "bloodlust"),
+            (self.reap_heal > 0.0, "reap_heal"),
+            (self.snare > 0.0, "snare"),
+            (self.cow > 0.0, "cow"),
+            (self.knock > 0.0, "knock"),
+            (self.tender > 0.0, "tender"),
+            (self.machine_stun > 0.0, "machine_stun"),
+            (self.mend_ally > 0.0, "mend_ally"),
+            (self.curse > 0.0, "curse"),
+            (self.iron_skin > 0.0, "iron_skin"),
+            (self.lull, "lull"),
+            (self.shatter, "shatter"),
+            (self.burst > 0.0, "burst"),
+            (self.poison > 0.0, "poison"),
+            (self.interrupt > 0.0, "interrupt"),
+            (self.sleep > 0.0, "sleep"),
+            (self.root > 0.0, "root"),
+            (self.shockwave > 0.0, "shockwave"),
+            (self.build > 0.0, "build"),
+            (self.rockfall > 0.0, "rockfall"),
+            (self.rage > 0.0, "rage"),
+            (self.guillotine > 0.0, "guillotine"),
+            (self.rally > 0.0, "rally"),
+        ];
+        on.into_iter().filter(|(on, _)| *on).map(|(_, n)| n.to_string()).collect()
+    }
+
+    /// Everything that sets a weapon apart besides its numbers, the kinds' own traits (a sword's
+    /// parry, an axe's bleed, a staff's bolt) and the pass's mechanics together, as names: two
+    /// weapons with the same moveset and the same names are the same weapon in other numbers.
+    /// A bare stagger or posture counts here (they differ between weapons that differ otherwise)
+    /// but is no mechanic (`unique_mechanics` and the kinds' traits are).
+    pub fn trait_names(&self) -> Vec<String> {
+        let mut s: Vec<String> = Vec::new();
+        let kinds = [
+            (self.parry > 0.0, "parry"),
+            (self.riposte > 0.0, "riposte"),
+            (self.backstab > 0.0, "backstab"),
+            (self.bleed > 0.0, "bleed"),
+            (self.through_guard, "through_guard"),
+            (self.swing_poise, "swing_poise"),
+            (self.execute > 0.0, "execute"),
+            (self.posture > 1.0, "posture"),
+            (self.stagger > 0.0, "stagger"),
+            // (The longest reach on the rack is an identity of its own: the spear's.)
+            (self.range >= LONGEST_REACH, "longest_reach"),
+        ];
+        s.extend(kinds.into_iter().filter(|(on, _)| *on).map(|(_, n)| n.to_string()));
+        s.extend(self.unique_mechanics());
+        if !self.bolt.is_empty() {
+            s.push(format!("bolt:{}", self.bolt));
+        }
+        if !self.heavy_bolt.is_empty() {
+            s.push(format!("heavy_bolt:{}", self.heavy_bolt));
+        }
+        if !self.alt.is_empty() {
+            s.push(format!("alt:{}", self.alt));
+        }
+        s.sort();
+        s
+    }
+
     /// The sentences of its own mechanic (the pass of docs/weapon-identities.md), built from its
     /// numbers so the tooltip never drifts from the rules. An item's `text` has `{fx}` where they
     /// go. Empty for a weapon with none of its own.

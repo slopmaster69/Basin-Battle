@@ -53,12 +53,81 @@ fn hits_on(ev: &[Event], m: Id) -> Vec<(u32, Outcome)> {
         .collect()
 }
 
+/// The weapons that keep what they were: the kinds' own weapons and the two Corey picked, each its
+/// kind's identity and nothing of the pass's (docs/weapon-identities.md). Everything else on the
+/// rack has a mechanic of the pass.
+const KEPT: [&str; 9] = ["sword", "axe", "mace", "dagger", "greatsword", "maul", "warlord_axe", "halberd", "zanjin_spear"];
+
+/// The weapons as written (a honed copy is the lamp's work on one of them, not another weapon).
+fn written(c: &Content) -> impl Iterator<Item = &crate::content::WeaponDef> {
+    c.weapons.iter().filter(|w| !w.key.contains("_honed"))
+}
+
+fn casters(w: &crate::content::WeaponDef) -> bool {
+    !w.bolt.is_empty() || w.guard.contains("ward") || w.key.ends_with("staff")
+}
+
 #[test]
 fn every_weapon_but_a_staff_has_an_identity() {
     let c = Content::dev();
-    for w in c.weapons.iter().filter(|w| !w.guard.contains("ward") && !w.key.ends_with("staff")) {
+    for w in c.weapons.iter().filter(|w| !casters(w)) {
         let has = w.parry > 0.0 || w.riposte > 0.0 || w.bleed > 0.0 || w.posture > 0.0 || w.backstab > 0.0 || w.through_guard || w.swing_poise || w.execute > 0.0 || w.stagger > 0.0;
         assert!(has, "{} has nothing of its own", w.key);
+    }
+}
+
+#[test]
+fn every_weapon_but_a_staff_and_the_kept_ones_has_a_mechanic_and_not_just_a_number() {
+    let c = Content::dev();
+    for w in written(&c).filter(|w| !casters(w)) {
+        if KEPT.contains(&w.key.as_str()) {
+            assert!(w.unique_mechanics().is_empty(), "{} is kept as it was, with none of the pass's", w.key);
+            continue;
+        }
+        // (A bare stagger or posture, a damage or a window isn't one.)
+        assert!(!w.unique_mechanics().is_empty(), "{} is a number copy: it has no mechanic of its own", w.key);
+        assert!(!w.effect_text().is_empty(), "{}: its mechanic has words", w.key);
+        let item = &c.items[c.item(&w.key).unwrap()];
+        assert!(item.text.contains(&w.effect_text()), "{}: its tooltip says its mechanic: {}", w.key, item.text);
+    }
+}
+
+#[test]
+fn the_kept_weapons_keep_their_kinds_identity() {
+    let c = Content::dev();
+    let w = |k: &str| c.weapon(k).unwrap();
+    assert!(w("sword").parry > 0.0 && w("sword").riposte > 1.0, "the duelist");
+    assert!(w("axe").bleed > 0.0, "the bleeder");
+    assert!(w("mace").posture >= 2.0, "the stance breaker");
+    assert!(w("dagger").backstab >= 2.5, "the assassin");
+    assert!(w("greatsword").swing_poise, "the sweeper");
+    assert!(w("maul").stagger >= 1.2 && w("maul").targets == 3, "Corey's maul");
+    assert!(w("warlord_axe").execute > 1.0, "the executioner");
+    assert!(w("halberd").through_guard && w("zanjin_spear").through_guard, "reach");
+    assert!(w("zanjin_spear").range > w("halberd").range, "the spear's longer");
+}
+
+#[test]
+fn no_two_weapons_swing_the_same_set_with_the_same_traits() {
+    let c = Content::dev();
+    let mut seen: std::collections::BTreeMap<(String, Vec<String>), String> = std::collections::BTreeMap::new();
+    for w in written(&c) {
+        let key = (w.moveset_key().to_string(), w.trait_names());
+        if let Some(other) = seen.insert(key.clone(), w.key.clone()) {
+            panic!("{} and {other} are the same weapon in other numbers: set {}, traits {:?}", w.key, key.0, key.1);
+        }
+    }
+}
+
+#[test]
+fn the_doc_names_every_weapon_and_its_mechanic() {
+    let doc = include_str!("../../../docs/weapon-identities.md");
+    let c = Content::dev();
+    for w in written(&c) {
+        assert!(doc.contains(&format!("`{}`", w.key)), "docs/weapon-identities.md has no row for `{}`", w.key);
+        for m in w.unique_mechanics() {
+            assert!(doc.contains(&format!("`{m}`")), "the doc doesn't name `{m}` ({})", w.key);
+        }
     }
 }
 

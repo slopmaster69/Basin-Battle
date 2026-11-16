@@ -90,44 +90,90 @@ about as much as it takes longer; `a_family_set_keeps_the_familys_damage_a_secon
 A mechanic, not a number: the thing this weapon does that no other does. The fields are on
 `WeaponDef`, what they do is in `sim/weapon_fx.rs`, and the tooltip's sentence is built from the same
 numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a bane names are a
-`[[mob]]`'s `tags` (`undead`, `worgen`, `stone`, `mechanical`).
+`[[mob]]`'s `tags` (`undead`, `worgen`, `stone`, `mechanical`). Tests keep it so
+(`tests_weapon_identity.rs`): every weapon but a staff and the kept ones has a mechanic and not just
+a bare stagger or posture, no two weapons swing the same set with the same traits, and this table
+names every weapon and every mechanic.
 
-| Weapon | Mechanic | Field |
-| --- | --- | --- |
-| Footman's Sword | Parry and riposte (the duelist) | `parry`, `riposte` |
-| Silver Sword | 50% more damage to undead and worgen; they stop mending and stay down once slain | `bane`, `bane_damage`, `silver` |
-| Cruel Barb | Its heavy hooks the foe and pulls it 6 yd to you | `hook` |
-| Pirate Cutlass | Its heavy is a 5 yd boarding leap, a gap closer | `boarding` |
-| Sneed's Machete | No backstab; each light hit chops every foe in a 5 yd line | `no_backstab`, `line` |
-| Cursed Felblade | The last blow of the light chain carries you behind the foe | `blink_behind` |
-| Bearded Axe | Its heavy hooks a shield aside: the enemy can't block for 4 sec | `guard_hook` |
-| Bloodlust Edge | Each kill speeds your swings 8%, up to 4 times, for 6 sec | `bloodlust` |
-| Miner's Pick | A posture breaker (3 times towards a stance); 50% more to stone, golem and mechanical | `posture`, `bane` |
-| Horseman's Scythe | A 200 degree reaping sweep of up to 5; each foe struck heals 1% of your health | `reap_heal` |
-| Loksey's Boar Spear | Its thrust slows the foe 40% for 2.5 sec | `snare` |
-| Militia Mace | Stance breaker (its hits count twice) | `posture` |
-| Hogger's Club | Its heavy knocks the foe 5 yd back | `knock` |
-| Cookie's Tenderizer | A hit tenderizes: the next hit on the foe from another ally deals 25% more | `tender` |
-| Gilnid's Wrench | Its heavy stuns mechanical foes and machines 4 sec (not a champion machine) | `machine_stun` |
-| Hand of Righteousness | Each hit heals the most wounded ally within 15 yd (you too) 3% | `mend_ally` |
-| Baron's Scepter | A hit curses the foe; a cursed foe that dies bursts in shadow on those within 5 yd | `curse` |
-| Ironspine's Fist | Each hit gives a 5 point shield, stacking to 30 | `iron_skin` |
-| Poacher's Knife | Backstab (2.5 times from behind) | `backstab` |
-| Hypnotic Blade | Hits make the foe lose interest in you for 4 sec | `lull` |
-| Meteor Shard | A backstab bursts in fire (50%) on foes within 4 yd and is a shatter trigger | `shatter`, `burst` |
-| Bazil's Shiv | Hits poison 3 a sec a stack, up to 5 stacks, for 6 sec | `poison` |
-| Thornspike | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
-| Cobrahn's Fang | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |
-| Footman's Claymore | The sweeper: widest arc, up to 4 foes; a light blow on you doesn't break its swing | `swing_poise` |
-| Fallen Champion's Greatsword | Its heavy rallies allies within 8 yd (you too): 15% less damage for 5 sec | `rally` |
-| Quarry Maul | Unchanged: breaks stances, 3 foes, a 1.2 sec stagger (and the maul's slow overhead set) | |
-| Thornroot Maul | Its heavy roots the foes it hits for 2.5 sec | `root` |
-| Mograine's Might | Its heavy sends a holy shockwave ring (6 yd) for 0.8 of the blow | `shockwave` |
-| Smite's Hammer | The 3rd hit in a row on one foe staggers it 1.5 sec | `build` |
-| Rhahk'Zor's Maul | Its heavy marks the spot; after 1 sec rocks fall for 0.6 of the blow within 2.5 yd | `rockfall` |
-| Warlord's Axe | The executioner: twice the damage on a foe under a third of its health | `execute` |
-| Targorr's Axe | Up to 80% more damage as your health falls | `rage` |
-| Corpsemaker | Its hits cow the foe: 25% less damage and slower wind-ups for 4 sec | `cow` |
-| Guillotine Axe | Its heavy does triple damage to a stunned, asleep, rooted, frozen or staggered foe | `guillotine` |
-| Halberd, Zanjin's Spear | Reach: 5 yd and a thrust through a raised shield | `through_guard` |
-| Staffs (all six) | Unchanged: casting weapons with their own abilities | `bolt`, `alt` |
+Kept as they were: Footman's Sword, Axe, Claymore, Militia Mace, Poacher's Knife, Quarry Maul,
+Gorzak's Cleaver, Goldshire Halberd and Zanjin's Spear, and the six staffs.
+
+
+#### Swords
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Footman's Sword | `sword` | The duelist: a wider parry window and a riposte 1.5 times as hard | `parry`, `riposte` |
+| Silver-Edged Longsword | `silver_sword` | 50% more damage to undead and worgen; they stop mending and stay down once slain | `bane`, `bane_damage`, `silver` |
+| Cruel Barb | `cruel_barb` | Its heavy hooks the foe and pulls it up to 6 yd to you | `hook` |
+| Pirate's Cutlass | `pirate_cutlass` | Its heavy is a 5 yd boarding leap, a gap closer | `boarding` |
+| Sneed's Machete | `sneed_machete` | No backstab; each light hit chops every foe in a 5 yd line | `no_backstab`, `line` |
+| Cursed Felblade | `cursed_felblade` | The last blow of the light chain carries you behind the foe | `blink_behind` |
+
+#### One-hand axes
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Footman's Axe | `axe` | The bleeder: each hit bleeds the foe | `bleed` |
+| Bearded Axe | `bearded_axe` | Its heavy hooks a shield aside: the enemy can't block for 4 sec | `guard_hook` |
+| Bloodlust Edge | `bloodlust_edge` | Each kill speeds your swings 8%, up to 4 times, for 6 sec | `bloodlust` |
+| Defias Miner's Pick | `miner_pick` | A posture breaker; 50% more to stone, golem and mechanical foes | `posture`, `bane` |
+
+#### Maces
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Militia Mace | `mace` | The stance breaker: its hits count twice towards breaking a stance | `posture` |
+| Hogger's Cudgel | `hogger_club` | Its heavy knocks the foe 5 yd back | `knock` |
+| Cookie's Tenderizer | `cookie_tenderizer` | A hit tenderizes: the next hit on the foe from another ally deals 25% more | `tender` |
+| The Smelter's Spanner | `gilnid_wrench` | Its heavy stuns mechanical foes and machines 4 sec (not a champion machine) | `machine_stun` |
+| Hand of Righteousness | `hand_of_righteousness` | Each hit heals the most wounded ally within 15 yd, you too, 3% | `mend_ally` |
+| Baron's Scepter | `barons_scepter` | A hit curses the foe; a cursed foe that dies bursts in shadow on those within 5 yd | `curse` |
+| Ironspine's Fist | `ironspine_fist` | Each hit gives a 5 point shield, stacking to 30 | `iron_skin` |
+
+#### Daggers
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Poacher's Knife | `dagger` | The assassin: 2.5 times the damage from behind | `backstab` |
+| Hypnotic Blade | `hypnotic_blade` | Hits make the foe lose interest in you for 4 sec | `lull` |
+| Meteor Shard | `meteor_shard` | A backstab bursts in fire (50%) on foes within 4 yd and is a shatter trigger | `shatter`, `burst` |
+| Bazil's Shiv | `bazil_shiv` | Hits poison 3 a sec a stack, up to 5 stacks, for 6 sec | `poison` |
+| Thornspike | `thornspike` | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
+| Cobrahn's Fang | `cobrahn_fang` | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |
+
+#### Two-handers
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Footman's Claymore | `greatsword` | The sweeper: widest arc, up to 4 foes; a light blow on you doesn't break its swing | `swing_poise` |
+| Fallen Champion's Greatsword | `champions_greatsword` | Its heavy rallies allies within 8 yd (you too): 15% less damage for 5 sec | `rally` |
+| Quarry Maul | `maul` | Unchanged: breaks stances, 3 foes, a 1.2 sec stagger, and the maul's slow overhead set | `stagger` |
+| Thornroot Maul | `thornroot_maul` | Its heavy roots the foes it hits for 2.5 sec | `root` |
+| Mograine's Might | `mograines_might` | Its heavy sends a holy shockwave ring (6 yd) for 0.8 of the blow | `shockwave` |
+| Smite's Mighty Hammer | `smite_hammer` | The 3rd hit in a row on one foe staggers it 1.5 sec | `build` |
+| Rhahk'Zor's Maul | `rhahkzor_maul` | Its heavy marks the spot; after 1 sec rocks fall for 0.6 of the blow within 2.5 yd | `rockfall` |
+| Gorzak's Cleaver | `warlord_axe` | The executioner: twice the damage on a foe under a third of its health | `execute` |
+| Targorr's Cleaver | `targorr_axe` | Up to 80% more damage as your health falls | `rage` |
+| Corpsemaker | `corpsemaker` | Its hits cow the foe: 25% less damage and slower wind-ups for 4 sec | `cow` |
+| Guillotine Axe | `guillotine_axe` | Its heavy does triple damage to a stunned, asleep, rooted, frozen or staggered foe | `guillotine` |
+
+#### Polearms
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Goldshire Halberd | `halberd` | Reach: 5 yd, and its thrust goes through a raised shield | `through_guard` |
+| Zanjin's Spear | `zanjin_spear` | The longest reach on the rack (5.4 yd) and the same thrust through a shield | `through_guard` |
+| The Horseman's Scythe | `horsemans_scythe` | A 200 degree reaping sweep of up to 5; each foe struck heals you 1% | `reap_heal` |
+| Loksey's Boar Spear | `loksey_boar_spear` | Its thrust slows the foe 40% for 2.5 sec | `snare` |
+
+#### Staffs
+
+| Weapon | Key | Mechanic | Fields |
+| --- | --- | --- | --- |
+| Ember Staff | `ember_staff` | Casts Ember Bolt; guards with a ward | `bolt` |
+| Rime Staff | `rime_staff` | Casts Rime Bolt; guards with a ward | `bolt` |
+| Arcane Staff | `arcane_staff` | Casts Arcane Bolt; guards with a ward | `bolt` |
+| Acolyte's Staff | `acolyte_staff` | Casts Smite; right click aims Healing Gust | `bolt`, `alt` |
+| Shadowcaller's Staff | `shadowcaller_staff` | Casts a shadow bolt; right click channels Dark Reckoning | `bolt`, `alt` |
+| Staff of the Hollow Star | `hollow_star_staff` | Tethers foes with the void; right click is the Hollow Star | `bolt`, `alt` |
