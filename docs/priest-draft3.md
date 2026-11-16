@@ -3,6 +3,10 @@
 Corey's review of draft 2 (Nov 6 2026), Claude's and ChatGPT's answers to it, and Corey's calls
 on them. Most of draft 2 is gone; what's left each asks for a different decision.
 
+> Superseded in part by [draft 4](priest-draft4.md): Greater Penance, Surge of Light, Body and Soul,
+> Psychic Horror, Greater Fade and Vampiric Touch below are gone from Elwynn Survival, and Power Word:
+> Barrier and Shadowguard with them (Shadowguard is benched). Read the EX rows as history.
+
 **Corey's rulings, kept:** Power Word: Shield is the heart of the class (the only way a Priest
 saves a friend from a blow). Priests can't parry. The weapon decides the clicks. Priests aren't
 teleporters. No Mage looks on any Priest spell. Damage over time is the Warlock's. No interrupts.

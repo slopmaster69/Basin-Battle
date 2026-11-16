@@ -2279,7 +2279,7 @@ impl Survival {
             _ => {}
         }
         self.honed_tricks(attacker, victim, outcome, damage > 0 && !dashing);
-        // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
+        // A heavy blow that gets through breaks a fragile charge.
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
             // No word: the charge's glow goes out, the blow lands, and the same crack and beat as a

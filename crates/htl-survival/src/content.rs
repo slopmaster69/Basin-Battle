@@ -540,7 +540,7 @@ pub struct ChecksDef {
     /// A full rhythm chain's Valor (a whole segment).
     pub chain_valor: f32,
     /// The flare (the release check's moment) comes, at random, anywhere from this share of a
-    /// ranged charge's top to the top; a fixed charge's (Pyroblast's) up to `flare_late` seconds
+    /// ranged charge's top to the top; a fixed charge's up to `flare_late` seconds
     /// after it. No two casts keep quite the same time.
     pub flare_from: f32,
     pub flare_late: f32,
