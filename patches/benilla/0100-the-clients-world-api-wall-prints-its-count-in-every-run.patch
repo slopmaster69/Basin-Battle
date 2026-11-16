@@ -1,0 +1,64 @@
+From 932b3a7679805101fe30656078ccf3c04b4a2ffb Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 02:50:23 -0600
+Subject: [PATCH] The client's world API wall prints its count in every run
+
+`the_world_api_doorway_stays_shut` printed the leak count with `eprintln!`, which the test
+harness holds back in a passing run, so the CI logs never showed it and the ceiling could only
+be guessed at (the test only fails when the count is over the ceiling or more than ten under).
+The line now goes straight to stderr, which the harness does not capture, and onto the run's
+summary page too. No behaviour changes. The first run printed it: 113 leaks, exactly the ceiling,
+so the gate has no slack to spare and 113 stays.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/tests/world_api_wall.rs | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/crates/benilla-app/tests/world_api_wall.rs b/crates/benilla-app/tests/world_api_wall.rs
+index 79e50ace..bdbc1e78 100644
+--- a/crates/benilla-app/tests/world_api_wall.rs
++++ b/crates/benilla-app/tests/world_api_wall.rs
+@@ -411,6 +411,18 @@ const LEAK_CEILING: usize = 113;
+ /// lowered: one closure does not fail the gate, a whole stage of work cannot go unrecorded.
+ const LEAK_SLACK: usize = 10;
+ 
++/// A line the test run shows even when the test passes: straight to stderr (the harness captures
++/// only what the print macros write), and onto the GitHub run's summary when there is one.
++fn announce(line: &str) {
++    use std::io::Write;
++    let _ = writeln!(std::io::stderr(), "{line}");
++    if let Some(path) = std::env::var_os("GITHUB_STEP_SUMMARY") {
++        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open(path) {
++            let _ = writeln!(f, "{line}\n");
++        }
++    }
++}
++
+ #[test]
+ fn the_world_api_doorway_stays_shut() {
+     let all = measure();
+@@ -439,15 +451,17 @@ fn the_world_api_doorway_stays_shut() {
+         .keys()
+         .filter(|k| sorted_by.contains_key(k.as_str()))
+         .count();
+-    // Always print the numbers (`--nocapture` shows them).
+-    eprintln!(
++    // Always print the numbers, in a passing run too: a line written straight to stderr is not
++    // held back by the test harness's capture (`eprintln!` is, so CI logs never showed the count
++    // and the ceiling could not be set to it), and the run's summary page gets it as well.
++    announce(&format!(
+         "world API surface: {} items — {n} leaks (ceiling {LEAK_CEILING}, slack {LEAK_SLACK}; \
+          {sorted} sorted, {} unsorted), {} published; + {} named only by the instruments",
+         published.len() + n,
+         n - sorted,
+         published.len(),
+         probes.len()
+-    );
++    ));
+ 
+     // A row no game file names any more must go: a stale published row would let the item cross
+     // again for free.
+-- 
+2.56.0.windows.4
+
