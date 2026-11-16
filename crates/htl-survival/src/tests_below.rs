@@ -650,6 +650,158 @@ fn a_hero_carried_to_a_far_lamp_is_held_still_a_moment_while_the_floor_comes() {
     assert!(!s.players[&id].rooted);
 }
 
+/// Ground at 0 whose lowest floor is `low` (a dungeon with a deep pit somewhere).
+struct Deep {
+    low: f32,
+}
+
+impl crate::land::Land for Deep {
+    fn height(&self, _x: f32, _y: f32) -> f32 {
+        0.0
+    }
+    fn lowest_floor(&self) -> Option<f32> {
+        Some(self.low)
+    }
+}
+
+fn fell_log(ev: &[Event], name: &str) -> Option<String> {
+    ev.iter().find_map(|e| match e {
+        Event::Log(t) if t.starts_with(&format!("{name} fell through the world at")) => Some(t.clone()),
+        _ => None,
+    })
+}
+
+#[test]
+fn a_hero_coming_down_is_held_until_their_client_has_loaded_the_dungeon() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    s.await_load(id);
+    // A slow load (Shadowfang Keep's whole keep streaming in): held, however long, while it loads.
+    let ev = run(&mut s, 10.0);
+    assert!(s.loading(id) && s.players[&id].rooted, "still held while the client loads");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Rooted { player, on: false } if *player == id)), "never let go: {ev:?}");
+    // The client says it has the dungeon: held again from now (the root goes to the loaded
+    // client, as one sent while it was loading may never have reached a body), then let go.
+    s.loaded(id);
+    let ev = run(&mut s, DT);
+    assert!(!s.loading(id));
+    assert!(ev.iter().any(|e| matches!(e, Event::Rooted { player, on: true } if *player == id)), "held anew: {ev:?}");
+    let ev = run(&mut s, ARRIVE_HOLD + 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Rooted { player, on: false } if *player == id)), "then let go");
+    assert!(!s.players[&id].rooted);
+    // The landing counts from the load, not from the 10 s spent loading: a short drop through a
+    // floor that wasn't there yet is still caught.
+    let safe = s.players[&id].last_safe;
+    s.move_player(id, [safe[0], safe[1], safe[2] - 15.0], 0.0, Moving::default());
+    let ev = s.step(DT);
+    assert!((s.players[&id].pos[2] - safe[2]).abs() < 1.0, "caught: {:?}", s.players[&id].pos);
+    let logged = fell_log(&ev, "Ayla").unwrap_or_else(|| panic!("logged: {ev:?}"));
+    assert!(logged.contains("s after arriving"), "{logged}");
+}
+
+#[test]
+fn a_client_that_never_says_it_has_loaded_is_let_go_after_the_grace() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    s.await_load(id);
+    run(&mut s, LOAD_GRACE - 1.0);
+    assert!(s.players[&id].rooted, "held through the grace");
+    let ev = run(&mut s, 1.5);
+    assert!(ev.iter().any(|e| matches!(e, Event::Rooted { player, on: false } if *player == id)), "let go: {ev:?}");
+    assert!(!s.loading(id) && !s.players[&id].rooted);
+    // A word that it has loaded after all, late: held a moment again, as any arrival.
+    s.loaded(id);
+    let ev = run(&mut s, DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Rooted { player, on: true } if *player == id)));
+    // And only once.
+    run(&mut s, ARRIVE_HOLD + 0.2);
+    s.loaded(id);
+    let ev = run(&mut s, DT);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Rooted { player, .. } if *player == id)), "{ev:?}");
+}
+
+#[test]
+fn a_hero_far_under_the_dungeons_lowest_floor_goes_back_to_its_entry() {
+    let mut s = Survival::new_dungeon(content(), Box::new(Deep { low: -20.0 }), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 9.0);
+    // Wherever the last firm ground they stood on is (here, somewhere no floor holds them).
+    s.move_player(id, [60.0, 0.0, 0.0], 0.0, Moving::default());
+    s.players.get_mut(&id).unwrap().last_safe = [60.0, 0.0, -500.0];
+    // In the pit, over its floor's margin: a fall that stands.
+    s.move_player(id, [60.0, 0.0, -20.0 - FELL_OUT + 5.0], 0.0, Moving::default());
+    let ev = s.step(DT);
+    assert!(fell_log(&ev, "Ayla").is_none() && s.players[&id].pos[2] < -40.0, "{ev:?}");
+    // Well under the lowest floor: out of the dungeon, back at its entry (the first lamp).
+    s.move_player(id, [60.0, 0.0, -20.0 - FELL_OUT - 5.0], 0.0, Moving::default());
+    let ev = s.step(DT);
+    let p = &s.players[&id];
+    assert!(p.pos[0].abs() < 0.01 && p.pos[1].abs() < 0.01 && p.pos[2] > 0.0 && p.pos[2] < 1.0, "at the entry: {:?}", p.pos);
+    assert_eq!(p.last_safe, [0.0, 0.0, 0.0], "the entry's floor is their firm ground now");
+    assert!(ev.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == id)));
+    let logged = fell_log(&ev, "Ayla").unwrap_or_else(|| panic!("in the host's log: {ev:?}"));
+    assert!(logged.contains("the dungeon's entry (under its lowest floor)"), "{logged}");
+    assert!(logged.contains("-55.0)"), "where the client said: {logged}");
+}
+
+#[test]
+fn a_hero_who_falls_again_right_after_being_put_back_goes_to_the_entry() {
+    let mut s = Survival::new_dungeon(content(), Box::new(Deep { low: -500.0 }), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 9.0);
+    // Firm ground by the second lamp, then through the world: back on it.
+    s.move_player(id, [60.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.5);
+    assert_eq!(s.players[&id].last_safe, [60.0, 0.0, 0.0]);
+    s.move_player(id, [60.0, 0.0, -70.0], 0.0, Moving::default());
+    let ev = s.step(DT);
+    assert!((s.players[&id].pos[0] - 60.0).abs() < 0.01, "back on the last firm ground: {:?}", s.players[&id].pos);
+    assert!(!fell_log(&ev, "Ayla").unwrap().contains("entry"));
+    // Through it again straight away (that ground has no floor on their client): the entry.
+    run(&mut s, 2.0);
+    s.move_player(id, [60.0, 0.0, -15.0], 0.0, Moving::default());
+    let ev = s.step(DT);
+    let p = &s.players[&id];
+    assert!(p.pos[0].abs() < 0.01 && p.pos[1].abs() < 0.01, "at the entry: {:?}", p.pos);
+    let logged = fell_log(&ev, "Ayla").unwrap_or_else(|| panic!("{ev:?}"));
+    assert!(logged.contains("the dungeon's entry (fell again)"), "{logged}");
+    // Long after, a fall is back to the last firm ground again.
+    s.move_player(id, [60.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 9.0);
+    s.move_player(id, [60.0, 0.0, -70.0], 0.0, Moving::default());
+    s.step(DT);
+    assert!((s.players[&id].pos[0] - 60.0).abs() < 0.01, "{:?}", s.players[&id].pos);
+}
+
+#[test]
+fn every_dungeon_puts_a_hero_who_falls_out_of_it_back_at_its_entry() {
+    let all = Content::builtin();
+    let keys: Vec<String> = all.dungeons().map(|d| d.key.clone()).collect();
+    assert!(keys.len() > 1, "{keys:?}");
+    for key in keys {
+        let c = all.for_dungeon_of(&key);
+        let d = c.dungeon.clone().unwrap();
+        let entry = d.lamps.first().unwrap_or_else(|| panic!("{key} has a lamp to come down at")).at;
+        // The lowest of its own places, as a land with no floors to go by.
+        let low = d.lamps.iter().map(|l| l.at[2]).chain(d.packs.iter().filter_map(|p| p.z)).fold(f32::MAX, f32::min);
+        let mut s = Survival::new_dungeon(c, Box::new(FlatLand { z: low, ..Default::default() }), 3, 1_000_000.0);
+        let id = s.join("ayla", "Ayla", None);
+        s.await_load(id);
+        s.loaded(id);
+        run(&mut s, 0.2);
+        s.move_player(id, [entry[0] + 5.0, entry[1], low - FELL_OUT - 5.0], 0.0, Moving::default());
+        let ev = s.step(DT);
+        let p = &s.players[&id];
+        assert!(
+            (p.pos[0] - entry[0]).abs() < 0.01 && (p.pos[1] - entry[1]).abs() < 0.01 && p.pos[2] >= entry[2] - 0.01,
+            "{key}: back at the entry {entry:?}: {:?}",
+            p.pos
+        );
+        let logged = fell_log(&ev, "Ayla").unwrap_or_else(|| panic!("{key}: logged: {ev:?}"));
+        assert!(logged.contains("the dungeon's entry"), "{key}: {logged}");
+    }
+}
+
 #[test]
 fn a_beaten_run_starts_over_a_while_after_once_nobody_is_below() {
     let mut c = content();

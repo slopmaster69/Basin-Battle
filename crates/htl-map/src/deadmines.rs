@@ -103,6 +103,97 @@ pub fn tiles_of(chain: &mut Chain, map_dir: &str) -> Result<Vec<TileMesh>> {
     Ok(out)
 }
 
+/// What a straight look up and down from a spot meets on an instance map: its terrain, and the
+/// floors and ceilings of its buildings' collision. For checking where heroes are set down: a
+/// spot on the terrain under a building's own floor (Shadowfang Keep's first lamp, Nov 2026,
+/// 4.5 yards under the gatehouse's floor) puts a hero under the floor, which the land's floors
+/// can't tell, as that terrain is a floor of its own there.
+pub struct Columns {
+    chunks: Vec<ChunkMesh>,
+    tris: Vec<[[f32; 3]; 3]>,
+}
+
+/// How far over a spot a building's floor seen from under it still seals the spot in.
+const SEALED_REACH: f32 = 8.0;
+
+impl Columns {
+    /// An instance map's terrain and buildings (no props: what's checked is the floor itself).
+    pub fn load(data_dir: &Path, map_dir: &str) -> Result<Self> {
+        let mut chain = Chain::open(data_dir)
+            .with_context(|| format!("opening the game data in {}", data_dir.display()))?;
+        let tiles = tiles_of(&mut chain, map_dir)?;
+        let mut seen = std::collections::HashSet::new();
+        let mut tris = Vec::new();
+        for w in tiles.iter().flat_map(|t| &t.wmos) {
+            if !seen.insert(w.unique_id) {
+                continue;
+            }
+            let Ok(mesh) = load_wmo_collision_tris(&mut chain, &w.model) else { continue };
+            let m = placement_matrix(w.rotation);
+            let p: Vec<[f32; 3]> = mesh.positions.iter().map(|&v| transform(&m, w.position, v)).collect();
+            tris.extend(mesh.indices.chunks_exact(3).map(|c| [p[c[0] as usize], p[c[1] as usize], p[c[2] as usize]]));
+        }
+        let chunks = tiles.into_iter().flat_map(|t| t.chunks).collect();
+        Ok(Self { chunks, tris })
+    }
+
+    /// Made of these pieces (for tests).
+    pub fn from_parts(chunks: Vec<ChunkMesh>, tris: Vec<[[f32; 3]; 3]>) -> Self {
+        Self { chunks, tris }
+    }
+
+    /// The terrain's height at (x, y), if there is terrain there (not a hole).
+    pub fn terrain(&self, x: f32, y: f32) -> Option<f32> {
+        terrain_height_at(&self.chunks, [x, y, 0.0])
+    }
+
+    /// The buildings' faces over (x, y), lowest first: each one's height and whether it faces up
+    /// (a floor) or down (a ceiling). Walls are left out.
+    pub fn faces(&self, x: f32, y: f32) -> Vec<(f32, bool)> {
+        let mut out = Vec::new();
+        for t in &self.tris {
+            let (a, b, c) = (t[0], t[1], t[2]);
+            let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+            if det.abs() < 1e-9 {
+                continue;
+            }
+            let l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / det;
+            let l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / det;
+            let l3 = 1.0 - l1 - l2;
+            if l1 < 0.0 || l2 < 0.0 || l3 < 0.0 {
+                continue;
+            }
+            let (u, v) = ([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
+            let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+            let nz = n[2] / (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt().max(1e-9);
+            if nz.abs() >= 0.6 {
+                out.push((l1 * a[2] + l2 * b[2] + l3 * c[2], nz > 0.0));
+            }
+        }
+        out.sort_by(|p, q| p.0.total_cmp(&q.0));
+        out
+    }
+
+    /// What a hero set down at `at` stands on: the terrain or a building's floor, at most 1.5
+    /// yards under their feet (or a hair over them).
+    pub fn stands_on(&self, at: [f32; 3]) -> Option<f32> {
+        let near = |z: f32| z <= at[2] + 0.6 && z >= at[2] - 1.5;
+        let floor = self.faces(at[0], at[1]).into_iter().filter(|&(z, up)| up && near(z)).map(|f| f.0).reduce(f32::max);
+        let ground = self.terrain(at[0], at[1]).filter(|&z| near(z));
+        match (floor, ground) {
+            (Some(a), Some(b)) => Some(a.max(b)),
+            (a, b) => a.or(b),
+        }
+    }
+
+    /// A building's floor seen from under it, just over `at`, with no ceiling between: the spot
+    /// is under that floor (in the hollow between it and the terrain), not on it.
+    pub fn sealed_over(&self, at: [f32; 3]) -> Option<f32> {
+        let over = self.faces(at[0], at[1]).into_iter().find(|&(z, _)| z > at[2] + 0.6 && z < at[2] + SEALED_REACH)?;
+        over.1.then_some(over.0)
+    }
+}
+
 /// Every tile the Deadmines' map has.
 pub fn tiles(chain: &mut Chain) -> Result<Vec<TileMesh>> {
     tiles_of(chain, MAP_DIR)
@@ -401,4 +492,39 @@ fn load_variant(
         min,
         max,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Columns;
+
+    /// A square of two triangles at height z over 0..10, facing up (or down).
+    fn quad(z: f32, up: bool) -> Vec<[[f32; 3]; 3]> {
+        let (a, b, c, d) = ([0.0, 0.0, z], [10.0, 0.0, z], [10.0, 10.0, z], [0.0, 10.0, z]);
+        if up {
+            vec![[a, b, c], [a, c, d]]
+        } else {
+            vec![[a, c, b], [a, d, c]]
+        }
+    }
+
+    #[test]
+    fn a_spot_under_a_buildings_floor_is_sealed_in_and_one_on_it_is_not() {
+        // A raised floor at 5 with no underside (a building's floor seen from the hollow under
+        // it, as Shadowfang Keep's gatehouse over the terrain), and a room's ceiling at 9.
+        let mut tris = quad(5.0, true);
+        tris.extend(quad(9.0, false));
+        let cols = Columns::from_parts(Vec::new(), tris);
+        assert_eq!(cols.sealed_over([5.0, 5.0, 0.5]), Some(5.0), "under the floor");
+        assert_eq!(cols.sealed_over([5.0, 5.0, 5.1]), None, "on it: the ceiling is over it");
+        assert_eq!(cols.stands_on([5.0, 5.0, 5.4]), Some(5.0));
+        assert_eq!(cols.stands_on([5.0, 5.0, 0.5]), None, "nothing to stand on down there");
+        // Off the building's footprint: nothing over or under.
+        assert_eq!(cols.sealed_over([20.0, 5.0, 0.5]), None);
+        // A deck with its own underside is a ceiling over what's under it, not a seal.
+        let mut deck = quad(5.0, true);
+        deck.extend(quad(4.7, false));
+        let cols = Columns::from_parts(Vec::new(), deck);
+        assert_eq!(cols.sealed_over([5.0, 5.0, 0.5]), None);
+    }
 }

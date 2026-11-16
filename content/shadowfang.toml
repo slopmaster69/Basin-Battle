@@ -36,7 +36,8 @@ hero_health = 0.7
 # an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
 # same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
 hero_foes = 0.35
-exit = [-234.6, 2117.9, 77.3]
+# (The gate's own floor, where the game itself sets you down coming in: see the gate lamp.)
+exit = [-229.1, 2109.2, 76.9]
 exit_radius = 5.0
 exit_boss = "arugal"
 weapon_chance = 0.08
@@ -50,11 +51,17 @@ tonic = 4
 
 # --- lamps: only two ---------------------------------------------------------------------------------
 
+# On the gate passage's own floor (the keep's model, z 76.9), where the game itself sets you down
+# coming in. It stood at (-234.6, 2117.9, 77.3) until Nov 2026: on the terrain 4.5 yards under the
+# gatehouse's floor (81.8), the land taking that hidden terrain for a floor, so every hero came
+# down, woke and was put back under the keep's floor ("you fall through the floor when you first
+# get to the dungeon"). The test `every_dungeons_lamps_and_exit_stand_on_its_floor` (htl-server,
+# needs the WoW data) keeps every dungeon's lamps and exit off such hollows.
 [[dungeon.lamp]]
 key = "shadowfang_gate"
 name = "The Keep's Gate"
-at = [-234.6, 2117.9, 77.3]
-facing = 1.57
+at = [-229.1, 2109.2, 76.9]
+facing = 1.27
 
 [[dungeon.lamp]]
 key = "shadowfang_hall"

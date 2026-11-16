@@ -302,6 +302,8 @@ impl ElwynnLand {
 /// catwalks over the foundry), each walker on its own.
 pub struct DeadminesLand {
     ground: htl_map::layers::Layers,
+    /// Its lowest floor (worked out once: it's every floor's).
+    lowest: Option<f32>,
     failed:
         std::sync::Mutex<std::collections::HashMap<(i32, i32, i32, i32, i32, i32), std::time::Instant>>,
 }
@@ -317,6 +319,7 @@ impl DeadminesLand {
     /// Ground with floors above floors (the Deadmines, or one of Elwynn's caves).
     pub fn from_layers(ground: htl_map::layers::Layers) -> Self {
         Self {
+            lowest: ground.lowest(),
             ground,
             failed: Default::default(),
         }
@@ -415,6 +418,9 @@ impl Land for DeadminesLand {
             return None;
         }
         self.plan(from, to, BELOW_LOOK)
+    }
+    fn lowest_floor(&self) -> Option<f32> {
+        self.lowest
     }
 }
 
