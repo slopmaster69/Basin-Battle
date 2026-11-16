@@ -83,6 +83,11 @@ pub trait Land: Send + Sync {
     fn in_zone(&self, _x: f32, _y: f32) -> bool {
         true
     }
+    /// The lowest floor anywhere on the land: a hero well under it has fallen out of the world.
+    /// `None`: a land that doesn't know (the rules then go by the dungeon's own places).
+    fn lowest_floor(&self) -> Option<f32> {
+        None
+    }
 }
 
 /// Resolve an authored itinerary into walking corners on its own floors. Every leg must be

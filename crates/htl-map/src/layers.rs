@@ -299,6 +299,11 @@ impl Layers {
     pub fn floor_count(&self) -> usize {
         self.floors.len()
     }
+    /// The lowest floor anywhere on the grid (`None` for a grid with none): nothing a walker
+    /// stands on is under it.
+    pub fn lowest(&self) -> Option<f32> {
+        self.floors.iter().map(|f| f.z).filter(|z| z.is_finite()).reduce(f32::min)
+    }
     pub fn cell_xy(&self, i: usize, j: usize) -> [f32; 2] {
         [
             self.min[0] + i as f32 * self.cell,
@@ -691,6 +696,16 @@ mod tests {
         assert!(!g.blocked_near(20.0, 0.0, 0.0));
         assert!(!g.blocked_near(20.0, 0.0, 10.0));
         assert!(g.slab_between(20.0, 0.0, 1.0, 11.0));
+    }
+
+    #[test]
+    fn the_lowest_floor_is_the_ground_under_everything() {
+        let g = deck_world();
+        assert_eq!(g.lowest(), Some(0.0));
+        // A grid with no ground at all has none.
+        let none = |_x: f32, _y: f32| None;
+        let empty = Layers::build([0.0, 0.0], [2.0, 2.0], 1.0, &Sources { terrain: &none, solid: &[], liquid: &[] });
+        assert_eq!(empty.lowest(), None);
     }
 
     #[test]

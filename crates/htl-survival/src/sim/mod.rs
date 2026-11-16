@@ -548,6 +548,12 @@ const LANDING_FALL: f32 = 10.0;
 pub(crate) const ARRIVE_HOLD: f32 = 1.5;
 /// A hero set down somewhere far lands from this high over the floor, never level with it.
 pub(crate) const ARRIVE_LIFT: f32 = 0.5;
+/// A hero carried down from another world is held (no falling) until their client says it has
+/// loaded this one ([`Survival::loaded`]), and for no longer than this if it never says.
+pub(crate) const LOAD_GRACE: f32 = 20.0;
+/// This far under the dungeon's lowest floor, a hero has fallen out of it altogether: back to its
+/// entry, wherever the last firm ground they stood on was.
+pub(crate) const FELL_OUT: f32 = 30.0;
 
 /// How long the server carries a hero on past their client's last report.
 const RECKON_FOR: f32 = 0.6;
@@ -814,6 +820,11 @@ pub struct Player {
     pub landing_until: f32,
     /// Until when they're held still where they landed (see [`ARRIVE_HOLD`]); 0 when not.
     pub hold_until: f32,
+    /// Until when they're held waiting for their client to load the world they've just been
+    /// carried to (see [`LOAD_GRACE`]); 0 once it has.
+    pub loading_until: f32,
+    /// When they were last put back after a fall through the world.
+    pub fell_at: f32,
     pub preview: Option<world::Preview>,
     /// The station this hero was asked to confirm tearing down.
     pub demolish: Option<Id>,
@@ -1683,6 +1694,8 @@ impl Survival {
             last_safe: spawn,
             landing_until: 0.0,
             hold_until: 0.0,
+            loading_until: 0.0,
+            fell_at: -100.0,
             preview: None,
             demolish: None,
             sent_speed: c.player.run_speed,
@@ -1870,7 +1883,18 @@ impl Survival {
             return;
         }
         // Fallen through the world (the floor not there on arrival): back to the last firm ground.
-        if pos.iter().all(|v| v.is_finite()) && pos[2] < safe[2] - drop && up {
+        // Below, out under the dungeon's lowest floor, or falling again straight after being put
+        // back (that firm ground has no floor on their client): back to the dungeon's entry.
+        let fine = pos.iter().all(|v| v.is_finite()) && up;
+        let out = fine && self.is_below() && self.floor_min().is_some_and(|z| pos[2] < z - FELL_OUT);
+        let again = self.is_below() && self.players.get(&id).is_some_and(|p| self.clock - p.fell_at < LANDING_SECS);
+        if out || (fine && pos[2] < safe[2] - drop) {
+            let entry = (out || again).then(|| self.entry_point()).flatten();
+            let (back, firm, facing, why) = match entry {
+                Some((at, firm, facing)) if out => (at, firm, facing, ", the dungeon's entry (under its lowest floor)"),
+                Some((at, firm, facing)) => (at, firm, facing, ", the dungeon's entry (fell again)"),
+                None => ([safe[0], safe[1], safe[2] + ARRIVE_LIFT], safe, f, ""),
+            };
             // Into the host's log too, with where their client said they were and when: the one
             // record of a fall a player's client keeps no log of (a hero falling on arrival in
             // Shadowfang Keep, Nov 2026, left none).
@@ -1881,15 +1905,24 @@ impl Survival {
                 String::new()
             };
             self.events.push(Event::Log(format!(
-                "{name} fell through the world at ({:.1}, {:.1}, {:.1}){since}: put back at ({:.1}, {:.1}, {:.1})",
-                pos[0], pos[1], pos[2], safe[0], safe[1], safe[2] + ARRIVE_LIFT
+                "{name} fell through the world at ({:.1}, {:.1}, {:.1}){since}: put back at ({:.1}, {:.1}, {:.1}){why}",
+                pos[0], pos[1], pos[2], back[0], back[1], back[2]
             )));
-            self.put_at(id, [safe[0], safe[1], safe[2] + ARRIVE_LIFT], f);
+            self.put_at(id, back, facing);
             self.land_from_far(id);
+            let now = self.clock;
             if let Some(p) = self.players.get_mut(&id) {
-                p.last_safe = safe;
+                p.last_safe = firm;
+                p.fell_at = now;
             }
-            self.tell(id, "You fell through the world. You're back on the last firm ground.");
+            self.tell(
+                id,
+                if entry.is_some() {
+                    "You fell through the world. You're back at the dungeon's entrance."
+                } else {
+                    "You fell through the world. You're back on the last firm ground."
+                },
+            );
             return;
         }
         let now = self.clock;
@@ -1918,6 +1951,56 @@ impl Survival {
             }
             self.update_rooted(id);
         }
+    }
+
+    /// A hero just carried here from another world (their client still loading it): held where
+    /// they landed, no falling, until [`Survival::loaded`] or [`LOAD_GRACE`], and a short drop
+    /// counts as a fall through the world until a while after.
+    pub fn await_load(&mut self, id: Id) {
+        let until = self.clock + LOAD_GRACE;
+        if let Some(p) = self.players.get_mut(&id) {
+            p.loading_until = until;
+            p.hold_until = until;
+            p.landing_until = until + LANDING_SECS;
+        }
+    }
+
+    /// Their client has loaded the world they were carried to: the hold and the landing start
+    /// over from now, and the root goes to it again (one sent while it was loading may never
+    /// have reached a body).
+    pub fn loaded(&mut self, id: Id) {
+        let Some(p) = self.players.get_mut(&id) else { return };
+        if p.loading_until <= 0.0 {
+            return;
+        }
+        p.loading_until = 0.0;
+        p.rooted = false;
+        self.land_from_far(id);
+    }
+
+    /// Whether a hero is still held waiting for their client to load this world.
+    pub fn loading(&self, id: Id) -> bool {
+        self.players.get(&id).is_some_and(|p| p.loading_until > self.clock)
+    }
+
+    /// The lowest floor of this world: the land's, else the lowest of the dungeon's own places
+    /// (its lamps and its packs).
+    pub(crate) fn floor_min(&self) -> Option<f32> {
+        self.land.lowest_floor().or_else(|| {
+            let d = self.dungeon_def()?;
+            d.lamps
+                .iter()
+                .map(|l| l.at[2])
+                .chain(d.packs.iter().filter_map(|p| p.z))
+                .reduce(f32::min)
+        })
+    }
+
+    /// Where a hero who fell out of this dungeon goes: its entry (its first lamp, where everyone
+    /// comes down), as where they land, the firm ground there and the way it faces.
+    pub(crate) fn entry_point(&self) -> Option<(Vec3, Vec3, f32)> {
+        let l = self.dungeon_def()?.lamps.first()?;
+        Some((self.landing_spot(l.at), l.at, l.facing))
     }
 
     /// A far arrival: the next few seconds, a short drop is a fall through the world.

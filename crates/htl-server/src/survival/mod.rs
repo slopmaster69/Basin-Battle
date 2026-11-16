@@ -992,6 +992,9 @@ impl SurvivalGame {
                 self.sim.arrive_at(id, l);
                 // Down from the camp: whole to start the dungeon.
                 self.sim.come_down(id);
+                // Held at the lamp, no falling, until the client says it has the dungeon loaded
+                // (`worldport_ack`), and not left to drop before its floor is there.
+                self.sim.await_load(id);
             }
             _ if self.realm.siege => self.sim.siege_arrive(id),
             _ => {
@@ -1043,9 +1046,16 @@ impl SurvivalGame {
             return;
         }
         w.porting = false;
-        let id = w.id;
+        let (id, name, took) = (w.id, w.name.clone(), w.entered_at.elapsed().as_secs_f32());
         let carry = self.pending_carry.remove(&conn);
         self.finish_entry(conn, id, carry);
+        // Below: how long its client took (a slow load is the first thing to look at when a
+        // hero drops through a dungeon's floor), and the hold at the lamp starts over from now.
+        if self.realm.below {
+            let held = if self.sim.loading(id) { "" } else { " (after the hold had run out)" };
+            println!("[survival] {name}'s client loaded {} in {took:.1} s{held}", self.realm_name());
+            self.sim.loaded(id);
+        }
         self.mark_dirty();
     }
 
