@@ -128,3 +128,20 @@ fn a_departed_heros_windup_never_lands() {
     }
     assert_eq!(s.mobs[&d].health, hp, "nothing landed for the one who left");
 }
+
+/// Found by the soak: a leaver's spoken-refusal clock and crowd-control log were never dropped, a
+/// pair of entries left behind for every hero who ever left (ids are never reused).
+#[test]
+fn a_leaver_takes_their_refusal_clock_and_cc_log_with_them() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla");
+    s.refuse(a, "Out of range.", cues::Vocal::OutOfRange);
+    s.cc_note(a, "stunned".into());
+    s.set_error_speech(a, false);
+    assert!(s.told_vocal.contains_key(&a) || s.no_error_speech.contains(&a), "set up: something was kept for them");
+    assert!(s.cc_log.contains_key(&a));
+    s.leave(a);
+    assert!(!s.told_vocal.contains_key(&a), "refusal clock");
+    assert!(!s.cc_log.contains_key(&a), "cc log");
+    assert!(!s.no_error_speech.contains(&a), "error speech switch");
+}

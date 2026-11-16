@@ -1821,6 +1821,11 @@ impl Survival {
         self.flays.remove(&id);
         self.slips.remove(&id);
         self.lockouts.retain(|(h, _), _| *h != id);
+        // Per-hero notes kept by id: the clock of their last spoken refusal, their crowd-control
+        // log, the Error Speech switch (a leaver each left one behind, found by the soak).
+        self.told_vocal.remove(&id);
+        self.cc_log.remove(&id);
+        self.no_error_speech.remove(&id);
     }
 
     /// Where the client says the hero is (it moves itself; the server trusts it).
