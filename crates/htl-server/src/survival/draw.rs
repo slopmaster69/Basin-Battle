@@ -571,9 +571,11 @@ impl SurvivalGame {
     pub(crate) fn worn_saved(&self, s: &PlayerSave) -> Vec<(u8, u32)> {
         let c = &self.sim.content;
         let armor: Vec<(&str, usize)> = s.armor.iter().filter_map(|(slot, k)| c.item(k).map(|i| (slot.as_str(), i))).collect();
-        let two = c.weapon(&s.weapon).is_some_and(|w| w.two_handed);
+        // (A retired weapon in hand shows as its family's basic one, as it comes in.)
+        let weapon = c.item(&s.weapon).or_else(|| c.item(htl_survival::save::retired_weapon(&s.weapon)));
+        let two = weapon.and_then(|i| c.weapon(&c.items[i].key)).is_some_and(|w| w.two_handed);
         let shield = c.item(&s.shield).filter(|_| !two);
-        worn_of(&armor, c.item(&s.weapon), shield, c.item(&s.bow))
+        worn_of(&armor, weapon, shield, c.item(&s.bow))
     }
 
     /// The character screen's look of what's worn: each slot's display and inventory type.
@@ -1622,5 +1624,24 @@ mod rope_tests {
         // Up a slope: 3 along, 4 up.
         let s = (3.0f32 * 3.0 + 4.0 * 4.0).sqrt();
         assert!(near(turned_x(rope_rotation([1.0, 1.0, 0.0], [1.0, 4.0, 4.0])), [0.0, 3.0 / s, 4.0 / s]));
+    }
+}
+
+#[cfg(test)]
+mod saved_look_tests {
+    /// A hero out of the world whose save still holds a retired weapon shows, on the character
+    /// screen, what they'll hold when they come in: its family's basic weapon (`save::retired_weapon`).
+    #[test]
+    fn a_saved_hero_with_a_retired_weapon_shows_its_familys_weapon() {
+        use htl_survival::{content::Content, land::FlatLand};
+        let mut game = super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
+        let hero = game.sim.join("smith", "Smith", None);
+        let mut save = game.sim.leave(hero).unwrap();
+        for (gone, now) in [("goblin_axe", "axe"), ("goblin_axe_honed1", "axe"), ("squall_staff", "halberd")] {
+            save.weapon = now.into();
+            let want = game.worn_saved(&save);
+            save.weapon = gone.into();
+            assert_eq!(game.worn_saved(&save), want, "{gone} looks like {now}");
+        }
     }
 }

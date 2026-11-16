@@ -313,6 +313,18 @@ fn saved_item(c: &Content, k: &str) -> Option<usize> {
     c.item(k).or_else(|| c.item(retired_weapon(k)))
 }
 
+/// Saved items by key, as items now: a retired weapon is counted with its successor (an old axe
+/// beside a goblin axe is two axes, not one).
+fn saved_items(c: &Content, items: &BTreeMap<String, u32>) -> BTreeMap<usize, u32> {
+    let mut out = BTreeMap::new();
+    for (k, n) in items {
+        if let Some(i) = saved_item(c, k) {
+            *out.entry(i).or_insert(0) += *n;
+        }
+    }
+    out
+}
+
 /// A returning hero is where they left, as hurt as they were: no heal and no trip home for
 /// logging out (only a fall sends them to the camp).
 pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl Fn(f32, f32) -> f32) {
@@ -326,7 +338,7 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
     p.off_empty = s.off_hand == "none";
     p.off_weapon = (!s.off_hand.is_empty() && !p.off_empty).then(|| saved_item(c, &s.off_hand)).flatten().filter(|i| c.items[*i].kind == crate::ItemKind::Weapon);
     p.bow = item(&s.bow, p.bow);
-    p.bag = s.bag.iter().filter_map(|(k, n)| Some((saved_item(c, k)?, *n))).collect();
+    p.bag = saved_items(c, &s.bag);
     p.armor = s.armor.iter().filter_map(|(slot, k)| Some((slot.clone(), saved_item(c, k).filter(|i| c.items[*i].kind == crate::ItemKind::Armor)?))).collect();
     p.pack = s.pack.as_deref().and_then(|k| c.item(k)).filter(|i| c.items[*i].kind == crate::ItemKind::Pack);
     p.quick = s.quick.as_deref().and_then(|k| saved_item(c, k));
@@ -510,11 +522,11 @@ impl Survival {
             }
         }
         for c in &save.caches {
-            let items: BTreeMap<usize, u32> = c.items.iter().filter_map(|(k, n)| Some((saved_item(&s.content, k)?, *n))).collect();
+            let items = saved_items(&s.content, &c.items);
             let id = s.alloc();
             s.objs.insert(id, Obj { kind: ObjKind::Cache { uid: c.uid, owner: c.owner.clone(), items }, pos: c.pos, facing: 0.0 });
         }
-        s.storage = save.storage.iter().filter_map(|(k, n)| Some((saved_item(&s.content, k)?, *n))).collect();
+        s.storage = saved_items(&s.content, &save.storage);
         s.next_uid = s.next_uid.max(save.next_uid).max(
             save.stations.iter().map(|x| x.uid + 1).chain(save.caches.iter().map(|x| x.uid + 1)).max().unwrap_or(1),
         );
@@ -602,11 +614,7 @@ impl Survival {
         s.place_below();
         s.place_packs();
         for c in &save.caches {
-            let items: BTreeMap<usize, u32> = c
-                .items
-                .iter()
-                .filter_map(|(k, n)| Some((saved_item(&s.content, k)?, *n)))
-                .collect();
+            let items = saved_items(&s.content, &c.items);
             let id = s.alloc();
             s.objs.insert(
                 id,
