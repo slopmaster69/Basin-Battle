@@ -1669,7 +1669,9 @@ radius = 2.0
 count = 2
 link = 14.0
 # (Its turn was (-205, -430) until Nov 2026: a walled cell, its open floor a nook the walks reach
-# only by a diagonal across a riser, which no walk takes now. 2.8 yd out onto the open floor.)
+# only by a diagonal across a riser, which no walk takes now. 2.8 yd out onto the open floor.
+# The second miner's own place round it is still the wall, so it turns at the turn itself: until
+# a fix of Nov 2026 its home was in the wall, and a rest set it there to fall through the floor.)
 route = [[-203.0, -428.0]]
 wait = 6.0
 

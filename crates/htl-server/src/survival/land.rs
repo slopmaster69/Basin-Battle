@@ -409,6 +409,9 @@ impl Land for DeadminesLand {
     fn lowest_floor(&self) -> Option<f32> {
         self.lowest
     }
+    fn floors_at(&self, x: f32, y: f32, _z: f32) -> Vec<f32> {
+        self.ground.cell_at(x, y).map_or_else(Vec::new, |(i, j)| self.ground.floors_at(i, j).iter().map(|f| f.z).collect())
+    }
 }
 
 impl DeadminesLand {
