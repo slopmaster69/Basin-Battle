@@ -410,7 +410,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
     let mut s = bh_world();
     let at = |s: &Survival, t: &str| s.content.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
     let first = at(&s, "The messenger");
-    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "Every corner"];
+    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Every corner"];
     for (k, t) in titles.iter().enumerate() {
         assert_eq!(at(&s, t), first + k, "{t} in its place");
     }
@@ -437,7 +437,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
 #[test]
 fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_every_corner() {
     let s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches"].into_iter().collect();
+    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price"].into_iter().collect();
     assert_eq!(new.len(), crate::save::ELWYNN_GOALS, "the goals the expansion has put in, counted");
     let goals = &s.content.goals;
     // The journal as it was before: the same goals without the new ones.
@@ -731,4 +731,168 @@ fn stitches_is_a_blockable_chop_a_swing_that_nothing_blocks_a_lurch_and_a_throw(
     let phase = &m.phases[0];
     assert_eq!(phase.at, 0.5);
     assert!(phase.burn.is_some());
+}
+
+// --- Stage 5: the fifth raid, "The Brotherhood's Price" ----------------------------------------
+
+fn counts(p: &crate::content::RaidPlan) -> BTreeMap<String, usize> {
+    p.raiders.iter().map(|(k, n)| (k.clone(), *n)).collect()
+}
+
+#[test]
+fn the_fifth_raid_is_the_brotherhoods_price_and_the_sixth_comes_back_harder() {
+    let c = Content::builtin();
+    assert_eq!(c.raid.count(), 5, "five raids in all");
+    assert_eq!(c.raid.plan(3).title, "Blackrock Assault", "the fourth is as it was");
+    let p = c.raid.plan(4);
+    assert_eq!(p.title, "The Brotherhood's Price");
+    assert_eq!(p.needs, vec!["barracks".to_string(), "infirmary".to_string()]);
+    assert_eq!(p.from, [-9690.0, 420.0]);
+    let want: BTreeMap<String, usize> = [("defias_thug", 5), ("defias_footpad", 3), ("defias_archer", 2), ("defias_conjurer", 2), ("brannick", 1)].into_iter().map(|(k, n)| (k.to_string(), n)).collect();
+    assert_eq!(counts(&p), want);
+    for k in p.needs.iter() {
+        assert!(c.station(k).is_some(), "{k}");
+    }
+    // Beaten once, it comes back with a raider more of each kind and its title says so.
+    let again = c.raid.plan(5);
+    assert_eq!(again.title, "The Brotherhood's Price (2)");
+    let more: BTreeMap<String, usize> = want.iter().map(|(k, n)| (k.clone(), n + 1)).collect();
+    assert_eq!(counts(&again), more);
+    // The journal asks for it by its place in the list.
+    let g = c.goals.iter().find(|g| g.title == "The Brotherhood's Price").unwrap();
+    assert_eq!((g.kind.as_str(), g.what.as_str()), ("raid", "4"));
+}
+
+fn brannick_bare() -> (Survival, Id, Id) {
+    let (mut s, _) = real_world();
+    s.mobs.clear();
+    let p = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    let def = s.content.mob("brannick").unwrap();
+    let id = s.spawn_mob(def, [4.5, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&id).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    (s, p, id)
+}
+
+/// Brannick's rule: he turns slowly, so a hero who works round him in one wind-up ends up at his
+/// back, and a blow there lands harder.
+#[test]
+fn a_hero_circling_brannick_ends_up_at_his_back_and_the_backstab_applies() {
+    let (mut s, p, id) = brannick_bare();
+    let turn = s.content.mobs[s.mobs[&id].def].attack.turn_rate;
+    assert!(turn <= 90.0, "slow to turn: {turn}");
+    // Wait for a wind-up, then run a circle round him just outside his stomp, at a sprint.
+    let mut behind = false;
+    let mut windup = false;
+    let sprint = s.content.player.sprint_speed;
+    let r = 4.0f32;
+    let mut a = 0.0f32;
+    for _ in 0..(40.0 / 0.05) as usize {
+        let _ = s.step(0.05);
+        s.players.get_mut(&p).unwrap().health = 1_000_000;
+        let m = &s.mobs[&id];
+        if matches!(m.state, MobState::Windup { .. }) {
+            windup = true;
+        }
+        if windup {
+            // Round him at a sprint, from where the hero stood.
+            a += sprint / r * 0.05;
+            let at = [m.pos[0] + a.cos() * r, m.pos[1] + a.sin() * r, 0.0];
+            s.move_player(p, at, a + std::f32::consts::PI, Moving::default());
+            if s.from_behind(id, at) {
+                behind = true;
+                break;
+            }
+        }
+    }
+    assert!(windup, "he wound up");
+    assert!(behind, "the hero came round to his back while he turned");
+    // From behind a blow does the backstab's multiple of what the same blow does from the front.
+    let hit = |behind: bool| {
+        let (mut s, p, id) = brannick_bare();
+        // (He notices no one: the rule under test is the blow's, not his turning.)
+        let d = s.mobs[&id].def;
+        s.content.mobs[d].aggro = 0.0;
+        let m = s.mobs.get_mut(&id).unwrap();
+        m.state = MobState::Idle { wander_at: 1.0e9 };
+        m.ready_at = 1.0e9;
+        m.pos = [0.0, 0.0, 0.0];
+        m.facing = 0.0;
+        let at = if behind { [-1.8, 0.0, 0.0] } else { [1.8, 0.0, 0.0] };
+        s.move_player(p, at, if behind { 0.0 } else { std::f32::consts::PI }, Moving::default());
+        let _ = s.step(0.0);
+        s.input(p, Input::Attack);
+        let ev = run(&mut s, 0.8);
+        ev.iter().find_map(|e| match e {
+            Event::Swing { victim: Some(v), damage, anim: false, .. } if *v == id && *damage > 0 => Some(*damage),
+            _ => None,
+        })
+    };
+    let (front, back) = (hit(false).expect("a blow from the front"), hit(true).expect("a blow from behind"));
+    assert!(back as f32 >= front as f32 * Content::builtin().combat.backstab * 0.9, "from behind {back}, from the front {front}");
+}
+
+#[test]
+fn brannick_stomps_a_hero_hugging_him_and_swings_the_maul_at_arms_length() {
+    let c = Content::builtin();
+    let def = c.mob("brannick").unwrap();
+    let name = |k: usize| c.mobs[def].patterns[k].name.clone();
+    let (mut s, _, id) = brannick_bare();
+    let size = s.content.mobs[def].body();
+    for _ in 0..40 {
+        let k = s.pick_pattern(id, 2.0, size).expect("a blow for a hero hugging him");
+        assert_eq!(name(k), "stomp", "up close it is the stomp");
+    }
+    let mut seen = BTreeSet::new();
+    for _ in 0..80 {
+        let k = s.pick_pattern(id, 4.2, size).expect("a blow at arm's length");
+        seen.insert(name(k));
+    }
+    assert!(!seen.contains("stomp") && seen.contains("maul"), "at arm's length the maul: {seen:?}");
+    let stomp = &c.mobs[def].patterns.iter().find(|p| p.name == "stomp").unwrap().steps[0];
+    assert_eq!((stomp.blockable, stomp.arc), (Some(false), Some(360.0)));
+}
+
+#[test]
+fn brannick_calls_for_pitch_at_half_health_and_his_blows_burn_from_then() {
+    let (mut s, p, id) = brannick_bare();
+    let mut said = Vec::new();
+    let mut take = |ev: Vec<Event>, said: &mut Vec<String>| {
+        for e in ev {
+            if let Event::Yell { text, .. } = e {
+                said.push(text);
+            }
+        }
+    };
+    // He turns on the hero: his line.
+    s.engage(id, Foe::Hero(p));
+    let ev = s.step(0.0);
+    take(ev, &mut said);
+    assert!(said.iter().any(|t| t.contains("I built this wall")), "{said:?}");
+    let max = s.mobs[&id].max_health;
+    s.mobs.get_mut(&id).unwrap().health = (max as f32 * 0.45) as u32;
+    for _ in 0..(14.0 / 0.05) as usize {
+        let ev = s.step(0.05);
+        take(ev, &mut said);
+        s.players.get_mut(&p).unwrap().health = 1_000_000;
+    }
+    assert!(said.iter().any(|t| t.contains("Pitch on the stones")), "{said:?}");
+    assert!(flames_near(&s, s.players[&p].pos, 10.0) > 0, "pitch burns where his heavy blows land");
+}
+
+#[test]
+fn the_stonemason_comes_with_brannicks_fall_and_not_with_the_fifth_raid() {
+    let mut s = Survival::new({ let mut c = Content::builtin(); c.pvp = Default::default(); c }, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    s.mobs.clear();
+    let def = s.content.props.iter().position(|p| p.npc && p.name == "Stormwind Stonemason").expect("the stonemason");
+    assert_eq!(s.content.props[def].after.as_deref(), Some("kill:brannick"));
+    let standing = |s: &Survival| s.objs.values().any(|o| matches!(o.kind, ObjKind::Piece { def: d } if d == def));
+    assert!(!standing(&s));
+    s.camp.raids_won = 5;
+    run(&mut s, 5.5);
+    assert!(!standing(&s), "the raid's end isn't what brings him");
+    s.camp.counts.insert("kill:brannick".into(), 1);
+    let ev = run(&mut s, 5.5);
+    assert!(standing(&s), "Brannick fallen: he comes");
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("stonemason from Stormwind"))));
+    assert!(s.talk_line(def).unwrap().text.contains("Five raids"), "and talks once five are won");
 }

@@ -1242,6 +1242,7 @@ so as it does:
 | The Darkspear Raid beaten | A guard tower over the north-east corner (Elwynn's own, half size), Scout Marten |
 | The Horde Warband beaten | A second tower over the west wall, Marshal Wyle by the fire |
 | The Blackrock Assault beaten | Westbrook's footmen, a second weapon rack |
+| Brannick the Mason killed (in the fifth raid) | A stonemason from Stormwind, who mends the wall he built (`after = "kill:brannick"`) |
 
 **The Brotherhood's hand** (Stage 2 of docs/elwynn-expansion.md). The Brotherhood is selling Elwynn's
 roads to the Horde. The Defias Messenger (not a rare; he respawns after 15 min, and under 35% of
@@ -1272,6 +1273,16 @@ from 6 yd or more, and a cleaver thrown from afar. At 50% health his stitches sp
 blow he lands leaves bile where it falls (8 damage a tick for 8 sec in 3 yd, shown as flames: the
 fire look stands in for a green one, for Corey to say). The rule: keep him walking. The journal asks
 for his fall, and it is told to everyone.
+
+**The Brotherhood's Price** (Stage 5 of docs/elwynn-expansion.md). The fifth raid (`[[raid.tier]]`, once
+the camp has a barracks and an infirmary) is 5 Defias thugs, 3 footpads, 2 lookouts, 2 conjurers and
+**Brannick the Mason**, who built Westbrook's wall: "I built this wall. I know where it breaks." His rule:
+he turns slowly (70 degrees a sec while he winds up), so a hero who goes round him in one wind-up ends up at
+his back for a backstab, but not too close: within 3.5 yd he stomps all round him, and nothing blocks it.
+At arm's length he swings his maul (an overhead, glowing, or a wide sweep). At 50% health he says "Pitch on
+the stones, lads." and every heavy blow leaves burning pitch where it lands (Fire's look: the flames are
+the pitch, for Corey to say). When he falls a stonemason from Stormwind comes to the camp. What comes
+back after the raid is the next one, a raider more of each kind. The goal is the raid's place in the list (4).
 
 The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
 A camp from before the move keeps its stations: each standing outside the new building ground is
@@ -1411,7 +1422,7 @@ the second raid, the Darkspear camp, the Overseer, the mine yard, bronze, a pali
    (a cooking fire and an anvil) up the Goldshire road, then the **Darkspear Raid** through the woods
    to the north-east (a tanning rack and a cauldron), then the **Horde Warband** with **Warlord
    Gorzak** over the Westfall bridge (a workbench and a crate bulwark), then the **Blackrock
-   Assault** along the Goldshire road with **Rak'gash the Herald** (a watchtower and a bulwark); once all four are beaten the last comes back, a raider more of each kind every time. The road they'll come by is marked;
+   Assault** along the Goldshire road with **Rak'gash the Herald** (a watchtower and a bulwark), then **The Brotherhood's Price** with **Brannick the Mason** (a barracks and an infirmary); once all five are beaten the last comes back, a raider more of each kind every time. The road they'll come by is marked;
    they come a few at a time and go for the stations, the defences first. Kill them all for the
    spoils; if everyone is down for long, the camp falls: the stations they reached burn and can be
    mended at the station.
