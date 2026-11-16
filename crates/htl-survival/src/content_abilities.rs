@@ -413,6 +413,18 @@ pub struct AbilityDef {
     pub behind_effects: Vec<AbilityEffect>,
     #[serde(default)]
     pub calm_only: bool,
+    /// The Rogue's Venom (`sim::rogue`): a weapon art that adds this share of the weapon's damage
+    /// for each Venom on the enemy, and uses them all up (Eviscerate).
+    #[serde(default)]
+    pub per_venom: f32,
+    /// With Venom's trait (Coated Blade), each of its hits on an enemy lays this many Venom (Fan
+    /// of Knives' knives).
+    #[serde(default)]
+    pub coats: f32,
+    /// A weapon art that, from behind, breaks the cast an enemy is winding up (a boss's too): it
+    /// reels this long (Garrote).
+    #[serde(default)]
+    pub breaks_cast: f32,
     /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
     /// (Holy Shock).
     #[serde(default)]
@@ -1321,16 +1333,24 @@ pub const CC_KINDS: [&str; 11] = ["stun", "incapacitate", "petrify", "panic", "d
 /// landed for its time: it keeps its foe and starts no blow, and a blow from its front ends it; a
 /// boss only glances; a hero is untouched: `sim::rogue`), `cloak` (each attack first steps behind
 /// the nearest enemy, up to `amount` steps: Cloak and Dagger).
-pub const OTHER_EFFECTS: [&str; 31] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl", "distract", "cloak",
+///
+/// The Rogue's Venom (docs/rogue-roles.md, Venom): `venom` (lays `amount` Venom on a creature:
+/// stacks to `[rogue] venom_most`, ticking `venom_dps` a stack), `rupture` (every hero's blow on
+/// it lays 1 Venom for its Rogue), `garrote` (a silence that, on a creature, also keeps it from
+/// starting a cast; a boss shrugs it off), `choked` (a creature's wind-ups `amount` slower, a
+/// boss's not), `leech` (the hero's Venom ticks heal them as much), `feint` (the enemies on the
+/// hero within `amount` yd lose interest for its time, or turn to another hero; a boss halves
+/// the hero's threat).
+pub const OTHER_EFFECTS: [&str; 37] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl", "distract", "cloak", "venom", "rupture", "garrote", "choked", "leech", "feint",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 21] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl", "cloak"];
+pub const BOONS: [&str; 23] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl", "cloak", "leech", "feint"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 16] = ["poison", "stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated"];
+pub const HARMFUL: [&str; 19] = ["poison", "stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated", "venom", "rupture", "choked"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius

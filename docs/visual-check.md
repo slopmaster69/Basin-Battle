@@ -333,6 +333,7 @@ hero: put a Rogue's name in the settings as `rogue = <name>` (`setup` doesn't ma
 | --- | --- |
 | `rogue-perfect-dodge` | Not yet run, markers off: the rig's bot rolls 0.12 sec before a grunt's blow lands, three times, and attacks 0.2 sec after it: the flicker, Vanish's puff and sound, the stop and violet corners, the step behind the grunt and the stab in its back; then a run of both hands with a roll in it and the two-blade finisher |
 | `rogue-shadow` | Not yet run, markers off: Distract lobbed between two still grunts (the pouch, no ring, both turning to it), Shadowstep to the near one's back (a puff at both ends, Shrouded Step's see-through second) and Backstab; Cloak and Dagger through two grunts, a step and a stab in each back; Sap on a grunt with its back turned (the stun stars) |
+| `rogue-venom` | Not yet run, markers off: a run of both hands on a still grunt to 5 Venom (Poison State's green on its body at each off-hand hit, Poison Cloud's once ripe, a drip and a number each second), Eviscerate with both blades (the look goes out); Rupture, then a run of main-hand blows that coat it; Garrote from behind on a casting Kobold Geomancer (the cast bar breaks, the silence, the blood burst each second); Choking Cloud at the Rogue's feet with two grunts in it (the green cloud, their wind-ups slow) |
 
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
 `docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine

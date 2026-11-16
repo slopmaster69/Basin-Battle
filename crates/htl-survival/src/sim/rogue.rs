@@ -28,6 +28,17 @@
 //! glances), **Sap** drops one from behind before its fight, and **Cloak and Dagger** steps behind
 //! an enemy before every blow. None of it resets a boss (#75): a boss sees through the shroud,
 //! glances at a Distract and is never Sapped.
+//!
+//! **Venom** (docs/rogue-roles.md, "Venom: build it on, cash it in"): the second tree, the
+//! column's second choice. Venom is a coat on a creature: stacks up to `[rogue] venom_most`, each
+//! ticking `venom_dps` a second, for `venom_secs` from the latest. Its trait, **Coated Blade**,
+//! lays it with every off-hand hit (the two-blade finisher too) and every Fan of Knives knife.
+//! **Eviscerate** spends it from any side, **Rupture** lets every hero's blow lay it, **Garrote**
+//! breaks a cast from behind and silences, **Feint** hands the enemies on the Rogue to a friend,
+//! **Leeching Venom** heals the Rogue by its ticks and **Choking Cloud** slows wind-ups and lays it.
+//! It reads with no floor marker: the poison's look on the body (a deeper one once ripe), a drip
+//! and its number at every tick. It is apart from a Bazil's Shiv's own `poison`: a dagger's
+//! poison and the Rogue's Venom stack side by side, and Eviscerate spends only Venom.
 
 use super::*;
 use crate::land::clear_line;
@@ -55,6 +66,11 @@ pub struct OnMob {
     pub distract_at: Option<Vec3>,
     /// A boss: no glance at a Distract before then.
     pub glance_ready: f32,
+    /// Garroted: it starts no cast until then (its silence on a creature).
+    pub silenced_until: f32,
+    /// Feinted while winding up a blow at a Rogue: once the blow is done, it loses interest in
+    /// that Rogue for this long (or turns to another hero).
+    pub feint_from: Option<(Id, f32)>,
 }
 
 /// The Rogue's class key.
@@ -387,6 +403,11 @@ impl Survival {
         if matches!(m.state, mobs::MobState::Windup { .. }) {
             return false;
         }
+        // Feinted mid-blow: the blow done, it looks away (Venom's Feint).
+        if m.rogue.feint_from.is_some() {
+            self.feint_after_blow(id);
+        }
+        let Some(m) = self.mobs.get(&id) else { return false };
         if self.has_cc(id, "distract") {
             if let Some(at) = m.rogue.distract_at {
                 self.face_point(id, at);
@@ -487,5 +508,195 @@ impl Survival {
         self.unsheathe(id);
         self.start_swing(id, kind);
         true
+    }
+}
+
+// --- Venom ------------------------------------------------------------------------------------------
+
+/// The Rogue column's second choice: Venom's cards.
+pub const VENOM: u32 = 2;
+
+impl Survival {
+    /// The Venom on a unit now (0: none).
+    pub fn venom_on(&self, id: Id) -> u32 {
+        let now = self.clock;
+        self.cc_of(id).iter().find(|c| c.kind == "venom" && c.until > now).map_or(0, |c| c.amount.round() as u32)
+    }
+
+    /// Lay `n` Venom on a creature for hero `owner` (up to the most, its time from now). Ripe, at
+    /// the most: the deeper look, and a burst of it as it turns. Heroes take none (a duel's blows
+    /// land a round trip late, and an 8 sec coat on a hero is outside the PvP budget).
+    pub(crate) fn lay_venom(&mut self, owner: Id, mid: Id, n: u32) {
+        let r = &self.content.rogue;
+        let (most, secs, aura, ripe_aura, drip) = (r.venom_most, r.venom_secs, r.venom_aura, r.ripe_aura, r.venom_drip);
+        let Some(m) = self.mobs.get(&mid) else { return };
+        let d = &self.content.mobs[m.def];
+        if n == 0 || most == 0 || m.health == 0 || d.totem || (d.inert() && !d.dummy) {
+            return;
+        }
+        let have = self.venom_on(mid);
+        let now_n = (have + n).min(most);
+        let ripe = now_n >= most;
+        let look = if ripe { ripe_aura } else { aura };
+        // (A refresh keeps the higher count: `apply_cc` keeps an effect's larger amount.)
+        if self.apply_cc_look(mid, owner, "venom", secs, now_n as f32, 0.0, "Venom", look) && ripe && have < most && drip != 0 {
+            self.events.push(Event::Visual { id: mid, kit: drip, by: Some(owner) });
+        }
+    }
+
+    /// All the Venom on a creature, used up (Eviscerate): how much there was. Its look goes out.
+    pub(crate) fn take_venom(&mut self, mid: Id) -> u32 {
+        let n = self.venom_on(mid);
+        if n > 0 {
+            self.cleanse(mid, &["venom"]);
+        }
+        n
+    }
+
+    /// A Venom tick on a creature: its damage (the stacks' share, its fractions carried over by
+    /// `step_cc`), a drip of poison on the body and its number; with Leeching Venom on its Rogue,
+    /// as much healed.
+    pub(crate) fn venom_tick(&mut self, mid: Id, from: Id, damage: u32) {
+        if damage == 0 || !self.mobs.get(&mid).is_some_and(|m| m.health > 0) {
+            return;
+        }
+        let drip = self.content.rogue.venom_drip;
+        self.events.push(Event::Swing { attacker: from, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
+        if drip != 0 {
+            self.events.push(Event::Visual { id: mid, kit: drip, by: None });
+        }
+        self.hurt_mob_as(mid, from, damage, "Venom");
+        if self.players.get(&from).is_some_and(|p| p.health > 0) && self.has_cc(from, "leech") {
+            self.heal_hero_by(from, damage, from, "Leeching Venom");
+        }
+    }
+
+    /// A hero's blow landed on a creature: Venom for it. Under Rupture, any hero's blow lays 1 for
+    /// the Rupture's Rogue; otherwise a Rogue with Coated Blade lays 1 with the off hand (and the
+    /// two-blade finisher). One a blow, at most.
+    pub(crate) fn blow_coats(&mut self, hero: Id, mid: Id, off_hand: bool) {
+        let now = self.clock;
+        if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) {
+            return;
+        }
+        if let Some(owner) = self.cc_of(mid).iter().find(|c| c.kind == "rupture" && c.until > now).map(|c| c.from) {
+            self.lay_venom(owner, mid, 1);
+            return;
+        }
+        if off_hand && self.players.get(&hero).is_some_and(|p| self.rogue_trait(p, VENOM)) {
+            self.lay_venom(hero, mid, 1);
+        }
+    }
+
+    /// An ability's hit that lays Venom with the trait (Fan of Knives' knives).
+    pub(crate) fn ability_coats(&mut self, owner: Id, victim: Id, ability: usize) {
+        let n = self.content.abilities[ability].coats.round() as u32;
+        if n > 0 && self.players.get(&owner).is_some_and(|p| self.rogue_trait(p, VENOM)) {
+            self.lay_venom(owner, victim, n);
+        }
+    }
+
+    /// Garrote's silence: a hero can't use abilities; a creature starts no cast for its time (a
+    /// boss shrugs it off, as it does any silence). The silence's look shows either way.
+    pub(crate) fn garrote(&mut self, owner: Id, victim: Id, secs: f32, source: &str) {
+        if !self.apply_cc(victim, owner, "silence", secs, 0.0, 0.0, source) {
+            return;
+        }
+        let until = self.clock + secs;
+        if let Some(m) = self.mobs.get_mut(&victim) {
+            m.rogue.silenced_until = m.rogue.silenced_until.max(until);
+        }
+    }
+
+    /// A creature Garrote silenced: it starts no cast (`caster_waits`); a creature that fights up
+    /// close fights on.
+    pub(crate) fn garroted(&self, mid: Id) -> bool {
+        self.mobs.get(&mid).is_some_and(|m| m.rogue.silenced_until > self.clock && m.health > 0)
+    }
+
+    /// From behind, a cast an enemy is winding up breaks: it reels `secs` and its cast ends. A
+    /// boss's too (it loses only the cast: Garrote's silence doesn't take on a boss).
+    pub(crate) fn break_cast(&mut self, mid: Id, secs: f32) -> bool {
+        let casting = self.mobs.get(&mid).is_some_and(|m| m.health > 0 && matches!(m.state, mobs::MobState::Windup { .. })) && self.attack_now(mid).ranged;
+        if casting {
+            self.stagger_mob(mid, secs, false);
+        }
+        casting
+    }
+
+    /// A creature that is a boss.
+    fn boss_of(&self, mid: Id) -> bool {
+        self.mobs.get(&mid).is_some_and(|m| self.content.mobs[m.def].boss)
+    }
+
+    /// A creature Choking Cloud slows: its wind-ups this much slower (a boss's not at all, as
+    /// Cowed's).
+    pub(crate) fn choked_slow(&self, mid: Id) -> f32 {
+        if self.boss_of(mid) {
+            return 0.0;
+        }
+        let now = self.clock;
+        self.cc_of(mid).iter().filter(|c| c.kind == "choked" && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max)
+    }
+
+    /// Feint: every creature within `reach` yd on the Rogue loses interest for `secs`, or turns to
+    /// another hero near it. One winding up a blow finishes it first. A boss halves the Rogue's
+    /// threat instead.
+    pub(crate) fn feint(&mut self, id: Id, secs: f32, reach: f32) {
+        let Some(at) = self.players.get(&id).map(|p| p.pos) else { return };
+        let on: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && !m.friendly && m.state.target() == Some(id) && dist2d(m.pos, at) <= reach).map(|(k, _)| *k).collect();
+        for mid in on {
+            if self.boss_of(mid) {
+                let now = self.clock;
+                let half = self.content.ai.threat_half.max(0.1);
+                if let Some(t) = self.mobs.get_mut(&mid).and_then(|m| m.threat.iter_mut().find(|t| t.0 == id)) {
+                    // (What's left of it now, halved, from now.)
+                    t.1 = t.1 * 0.5f32.powf((now - t.2) / half) * 0.5;
+                    t.2 = now;
+                }
+                continue;
+            }
+            if matches!(self.mobs[&mid].state, mobs::MobState::Windup { .. }) {
+                self.mobs.get_mut(&mid).unwrap().rogue.feint_from = Some((id, secs));
+            } else {
+                self.feint_turn(mid, id, secs);
+            }
+        }
+    }
+
+    /// A feinted creature looks away from the Rogue: to the nearest other hero within
+    /// `[rogue] feint_turn` yd it can see, else at nobody, for `secs`. Either way it takes no
+    /// notice of the Rogue for that long.
+    fn feint_turn(&mut self, mid: Id, rogue: Id, secs: f32) {
+        let now = self.clock;
+        let Some(pos) = self.mobs.get(&mid).map(|m| m.pos) else { return };
+        let turn = self.content.rogue.feint_turn;
+        let friend = self
+            .players
+            .iter()
+            .filter(|(h, p)| **h != rogue && p.health > 0 && dist2d(p.pos, pos) <= turn && !self.unseen_by(mid, **h) && clear_line(self.land.as_ref(), pos, p.pos))
+            .min_by(|a, b| dist2d(a.1.pos, pos).total_cmp(&dist2d(b.1.pos, pos)))
+            .map(|(h, _)| *h);
+        if friend.is_none() {
+            self.halt_mob(mid);
+        }
+        let Some(m) = self.mobs.get_mut(&mid) else { return };
+        m.pattern = None;
+        m.state = match friend {
+            Some(h) => mobs::MobState::Chase { foe: mobs::Foe::Hero(h) },
+            None => mobs::MobState::Idle { wander_at: now + secs },
+        };
+        m.fx.lulled = Some((rogue, now + secs));
+        m.rogue.feint_from = None;
+    }
+
+    /// A creature Feinted mid-blow: once the blow is done, it looks away (`step_shadowed`).
+    fn feint_after_blow(&mut self, mid: Id) {
+        let Some((rogue, secs)) = self.mobs.get(&mid).and_then(|m| m.rogue.feint_from) else { return };
+        if self.mobs[&mid].state.target() == Some(rogue) {
+            self.feint_turn(mid, rogue, secs);
+        } else if let Some(m) = self.mobs.get_mut(&mid) {
+            m.rogue.feint_from = None;
+        }
     }
 }

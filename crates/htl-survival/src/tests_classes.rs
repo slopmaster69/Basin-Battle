@@ -89,6 +89,11 @@ fn every_card_and_its_charged_up_version_goes_off_on_creatures() {
             let is_ex = which != k;
             s.mobs.clear();
             let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+            // A two-blade card (Eviscerate) with a blade in each hand.
+            if c.abilities[k].needs_two_blades || d.needs_two_blades {
+                let knife = s.content.item("dagger").unwrap();
+                s.players.get_mut(&p).unwrap().off_weapon = Some(knife);
+            }
             // Foes in front at every reach, one to the side.
             let near = |s: &mut Survival, at: Vec3| {
                 let def = s.content.mob("grunt").unwrap();

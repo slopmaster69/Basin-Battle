@@ -454,6 +454,27 @@ impl Survival {
             for (from, amount, source) in ticks {
                 self.dot_tick(id, from, amount, &source);
             }
+            // A Rogue's Venom: its stacks' damage a second, the fractions carried to the next tick
+            // (`left`), so 1.5 a stack is 1.5 a stack (`sim::rogue`).
+            let per = self.content.rogue.venom_dps;
+            let venom: Vec<(Id, u32)> = self
+                .cc
+                .get_mut(&id)
+                .map(|l| {
+                    l.iter_mut()
+                        .filter(|c| c.kind == "venom" && c.next_tick <= now && c.since < c.until)
+                        .map(|c| {
+                            c.next_tick += 1.0;
+                            let due = c.amount * per + c.left;
+                            c.left = due - due.floor();
+                            (c.from, due.floor() as u32)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            for (from, damage) in venom {
+                self.venom_tick(id, from, damage);
+            }
             // Mending: its share of their health a second.
             let mends: Vec<(Id, f32, String)> = self
                 .cc
@@ -484,7 +505,7 @@ impl Survival {
                     .abilities
                     .iter()
                     .find(|a| a.name == source)
-                    .and_then(|a| a.effects.iter().chain(a.ally_effects.iter()).chain(a.self_effects.iter()).find(|e| e.kind == kind && e.mark != 0).map(|e| (e.mark, e.mark_every)));
+                    .and_then(|a| a.effects.iter().chain(a.ally_effects.iter()).chain(a.self_effects.iter()).chain(a.behind_effects.iter()).find(|e| e.kind == kind && e.mark != 0).map(|e| (e.mark, e.mark_every)));
                 if let Some(c) = self.cc.get_mut(&id).and_then(|l| l.get_mut(i)) {
                     c.next_mark = match mark {
                         Some((_, every)) if every > 0.0 => now + every,

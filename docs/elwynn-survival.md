@@ -212,10 +212,16 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   hides you and your friends in it and slows foes, Vanish hides you at once (your next blow counts
   as from behind); Cloak and Dagger, 6 s in which every attack first steps behind the nearest foe
   within 8 yd. A Rogue with 3 of its 5 keys on Shadow's cards has Shrouded Step: a step that lands
-  behind a foe hides it 1 s from every creature but a boss. Venom's cards so far are the second
-  choice: Fan of Knives, three poisoned knives that all land up close (its EX, Kidney Shot, is a
-  close stab that stuns one foe for 3 s, 1 s longer if Fan of Knives has Marked it, and uses the
-  Mark up), and Death Mark. A hero created as a Rogue
+  behind a foe hides it 1 s from every creature but a boss. Venom is the second choice: a coat of
+  up to 5 Venom on a foe, 1.5 damage a second each for 8 s. With 3 of its 5 keys on Venom's cards
+  (Coated Blade), a Rogue's off-hand hits (and the two-blade finisher) lay 1 each, as does each of
+  Fan of Knives' three poisoned knives (its EX, Kidney Shot, is a close stab that stuns one foe
+  for 3 s, 1 s longer if Fan of Knives has Marked it, and uses the Mark up). Eviscerate, both
+  blades for 80% and 35% more a Venom, spends it all from any side (its EX, Rupture, lets every
+  hero's melee blow lay 1 for 8 s); Garrote from behind breaks a cast, silences 3 s (no new cast;
+  not a boss), bleeds and lays 2 (its EX, Feint, hops back and the foes on you look away for 2 s
+  or turn on a friend); Leeching Venom heals you by your Venom's ticks for 6 s (its EX, Choking
+  Cloud, slows wind-ups 40% and lays 1 a second); Death Mark. A hero created as a Rogue
   fights with two blades and never blocks or parries (`docs/rogue-roles.md`): it starts with two
   daggers and can't hold a shield, a two-hander, a staff or an axe; the right mouse button swings
   the off hand (an empty off hand jabs for half); a dodge whose blow lands 0.04 to 0.18 s in is a

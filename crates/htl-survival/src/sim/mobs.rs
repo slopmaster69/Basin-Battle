@@ -1743,6 +1743,10 @@ impl Survival {
     /// Whether a caster holds its cast at `foe`: a blow up close winds up at the same hero. (With
     /// one string at a time and a breath after each, there are gaps to cast in.)
     pub(crate) fn caster_waits(&self, id: Id, foe: Foe) -> bool {
+        // Garroted: no cast until its silence is over (`sim::rogue`).
+        if self.garroted(id) {
+            return true;
+        }
         let Foe::Hero(h) = foe else { return false };
         if self.content.ai.turn_beat <= 0.0 {
             return false;
@@ -2839,6 +2843,11 @@ impl Survival {
         let slow = self.cowed_slow(id);
         if slow > 0.0 {
             a.windup *= 1.0 + slow;
+        }
+        // Choking Cloud (a Rogue's Venom): its wind-ups slower still, a boss's not.
+        let choke = self.choked_slow(id);
+        if choke > 0.0 {
+            a.windup *= 1.0 + choke;
         }
         // A string's first blow up close (or a lone one) never comes quicker than a hero can
         // answer from inside their own swing.

@@ -5,8 +5,9 @@ Warrior, the Mage and the Priest were: three trees, every skill one job, its num
 reasons, and a build plan of small pull requests at the end. It lives in Elwynn Survival, where
 the dodge, posture and the beat are. This page is the design the pull requests in the
 [build plan](#build-plan) follow. Built so far: entry 1, the core (two blades, no guard, the
-perfect dodge and the Shadow Cut), and entry 2, Shadow (Distract and Sap, Shadowstep to a back,
-Cloak and Dagger, Shrouded Step); see [Decided while building](#decided-while-building).
+perfect dodge and the Shadow Cut), entry 2, Shadow (Distract and Sap, Shadowstep to a back,
+Cloak and Dagger, Shrouded Step), and entry 3, Venom (Coated Blade, Eviscerate and Rupture, Garrote
+and Feint, Leeching Venom and Choking Cloud); see [Decided while building](#decided-while-building).
 
 ## How the Rogue plays
 
@@ -233,8 +234,8 @@ enemy: up to **5**, for **8 sec**, refreshed by each new one, 1.5 damage a secon
 At 5 its poison look deepens: the body tells you it is ripe. The off hand delivers; the main hand
 never does. Why: an off-hand blow lands about every other blow, so 5 Venom takes about 5 sec of
 string; 7.5 a second is about a third more on a coated enemy, the tree's reward for staying on one.
-Built on the Shiv's poison stacks (`weapon_fx.rs`, `POISON_STACKS`), with its own numbers, kept
-apart from Bazil's Shiv's own poison.
+Built like the Shiv's poison stacks (`weapon_fx.rs`, `POISON_STACKS`), with its own numbers, kept
+apart from Bazil's Shiv's own poison: a Shiv in the off hand lays both, side by side.
 
 | Key | Skill · *EX* | Its job | Numbers, and why | With floor markers off | Not a copy of |
 | --- | --- | --- | --- | --- | --- |
@@ -400,6 +401,53 @@ What the design left open, decided in the pull request that built it:
     only with the trait. Its 10 steps are the effect's `amount`.
   - **Truly needs a client patch**: nothing. A shadow trail between the two ends of a step would
     add to it (PR 6).
+- **Venom (entry 3)**:
+  - **Venom is laid on creatures only.** A duel's blows land a round trip late (`strike_fair`),
+    and an 8 sec coat on a hero would sit outside the PvP budget. On a hero, Eviscerate is its 80%,
+    Garrote silences 1.5 sec and bleeds; nothing coats.
+  - **The off hand's coat includes the two-blade finisher**, whichever button pressed it: both
+    blades strike, so the off blade is in it. One Venom a blow at most: under Rupture the Rogue's
+    off hand lays 1, not 2.
+  - **A coat has one owner**, the latest hero to lay it; what a friend's blow lays under Rupture is
+    the Rupture's Rogue's. Its ticks are the owner's damage, and Leeching Venom heals its owner.
+    Two Rogues on one enemy share one coat.
+  - **The ticks** are 1.5 a stack with the fractions carried (`Cc::left`): one stack ticks 1, 2, 1,
+    2. Its looks: Poison State (12881, state kit 221) on the body while it holds, Poison Cloud's
+    (3815, state kit 288) in its place once ripe at 5, with a burst of the drip as it turns, and at
+    every tick a drip (kit 805, `Poison_ImpactDot_Med_Base`) and its number. All to be checked when
+    first filmed.
+  - **Beside a dagger's own poison.** Of the daggers (#413), only Bazil's Shiv poisons: its
+    `poison` is its own effect, stacks by its own rule (3 a sec a stack, 5, 6 sec) and shows as it
+    did. A Shiv in the off hand lays both, side by side; Eviscerate spends only Venom and leaves the
+    Shiv's poison be. Nothing in `weapon_fx.rs` changed.
+  - **Eviscerate spends the Venom only when its blow lands**: one that finds nothing (slipped by a
+    creature gone home, dodged by a dummy) leaves the coat on.
+  - **Rupture** counts melee blows, any hero's (weapon blows and weapon arts), not missiles. Its own
+    cut lays none. It shows as Rend's blood burst (kit 220) every 1.5 sec on the body, no aura.
+  - **Garrote** breaks a cast from behind with 0.5 sec of reeling (the cast cut, not a stun), a
+    boss's too. Its silence, on a creature, keeps it from starting a cast for 3 sec (`caster_waits`):
+    a Rogue's own mark (`garroted`), so Avenger's Shield's silence is left as it was. A boss shrugs
+    the silence off (it is control) but still bleeds and takes the 2 Venom. The bleed is a burn
+    shown as Rend's blood burst every second (aura 772, which draws nothing, in place of a burn's
+    fire). Its clip is the stab (85), as Sap's and Kidney Shot's.
+  - **Feint** is a leap backward, 4 yd, 0.3 sec in the air (`lift = 3`). A creature on the Rogue
+    within 8 yd turns on the nearest other hero it can see within 10 yd of it (`[rogue] feint_turn`),
+    else stands; either way it takes no notice of the Rogue for 2 sec (the lull). One winding up a
+    blow at the Rogue finishes it first, then looks away. A boss halves the Rogue's threat and stays.
+  - **Choking Cloud's slow is its own effect, `choked`**, not Cowed: Cowed's slow is a fixed 15%,
+    it also softens blows, and it is the Warrior's. A boss isn't slowed (as Cowed), but takes the
+    Venom. The slow holds 1.5 sec past each second's touch (Smoke Bomb's), so it lasts from tick to
+    tick. Its cloud is the Poison spell's (28158, `Poison_Cloud_Grobbulus`), to be checked when
+    filmed for its size.
+  - **Leeching Venom** wears Poison State's green on the Rogue and starts with Deadly Poison's
+    green hands (2818).
+  - **The trait is said in words** on Eviscerate and Fan of Knives ("With 3 Venom abilities on your
+    keys..."), since nothing else tells a player the off hand coats.
+  - **Where they're learned**: Eviscerate is a first card (a class's whole Q and E rows) and the
+    Dead Drop teaches it too; Morgan's Stash teaches Garrote and Leeching Venom beside Shadowstep
+    and Smoke Bomb.
+  - **Truly needs a client patch**: nothing. A green sheen or drip on the off-hand blade while the
+    trait is on, and a trail on Eviscerate's two blades, would add to it (PR 6).
 
 ## Build plan
 
