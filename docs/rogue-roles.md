@@ -306,11 +306,12 @@ Rogue's families: dagger, one-handed sword, one-handed mace, fist.
 | **Twin Fangs** | dagger + dagger | A Shadow Cut doesn't count toward the enemy's backstab memory. The quickest run (both wind-ups a dagger's 0.18 sec) | The perfect dodge is the hardest timing in the kit; its backstab stays whole | Shadow |
 | **Blade and Shiv** | sword + dagger | The finisher takes the sword's reach (3.0 yd) and the dagger's backstab (×2.5) | A finisher that lands from a step farther off, and still stabs | Venom |
 | **Crossed Swords** | sword + sword | The finisher is a cross-cut: it strikes every enemy in a 150° arc in reach | #60 found the Rogue falls to a big pack; this is its answer | Blades |
-| **Breaker's Pair** | mace + any blade | The finisher counts 3 times toward a champion's posture (the mace's own ×2 on its blows stays) | With no parry, the Rogue needs a stance-breaker for bosses | Any |
-| **Iron Knuckles** (new family) | fist + fist | A run of 6 quicker blows (wind-up 0.15 sec); the finisher wheels a non-boss enemy round so its back is to you (it turns back at its own rate). A boss: the finisher's posture counts twice | The fists' job is making backs | Shadow, Blades |
+| **Breaker's Pair** | mace + dagger, sword or mace | The finisher counts 3 times toward a champion's posture (the mace's own ×2 on its blows stays) | With no parry, the Rogue needs a stance-breaker for bosses | Any |
+| **Iron Knuckles** (new family) | a fist weapon, one item in both hands | A run of 6 quicker blows (wind-up 0.15 sec); the finisher wheels a non-boss enemy round so its back is to you (it turns back at its own rate). A boss: the finisher's posture counts twice | The fists' job is making backs | Shadow, Blades |
 
-The Rogue starts with Twin Fangs (two Poacher's Knives). Fist weapons are new `[[weapon]]` and item
-entries: a `fist` family, a moveset with `AttackUnarmed` (clip 16; 35 is NPCGoodbye), on the rack where the other
+The Rogue starts with Twin Fangs (two Poacher's Knives). A fist weapon is one item that fills both
+hands, always Iron Knuckles (Corey, Nov 16): no fist with a dagger, a sword or a mace. Fist weapons
+are new `[[weapon]]` and item entries: a `fist` family, a moveset with `AttackUnarmed` (clip 16; 35 is NPCGoodbye), on the rack where the other
 weapons are, with a 1.12 fist weapon's display id checked in an ignored test against `WOW_DATA`.
 
 ## A team notices its Rogue
@@ -526,7 +527,9 @@ What the design left open, decided in the pull request that built it:
     fist), in either hand. "A mace and any blade" is a mace with anything a Rogue holds, a second
     mace or a fist too: no pair should leave a mace's hands with nothing. **A fist with a dagger or
     a sword is no pair**: each hand keeps its own mechanic and the run is the plain 4. Why: the
-    table names none, and a sixth rule would be a guess. An empty off hand (it jabs) is no pair.
+    table names none, and a sixth rule would be a guess. (Since Nov 16 a fist weapon fills both
+    hands, so neither a mace with a fist nor a fist with a blade happens: see "Fist weapons fill
+    both hands" below.) An empty off hand (it jabs) is no pair.
     Only a hero created as a Rogue has one; a Warrior's two daggers are as they were.
   - **Twin Fangs**: a Shadow Cut's backstab is not remembered **and** takes its whole bonus
     whatever the creature remembers ("its backstab stays whole"). The wheel round on whoever stabs
@@ -558,7 +561,8 @@ What the design left open, decided in the pull request that built it:
     15720, `hand_1h_knuckle_a_01`) gives 3 stamina back a hit (`wind`); **Cutpurse's Claw** (display
     4687, `hand_1h_claw_a_01`) does 50% more within 1 sec of a dodge that slipped a blow (`slip`,
     any dodge that evades, not only a perfect one). The off hand shows the same model as the main
-    hand: 1.12 keeps left-hand fist models as their own displays, to be checked when filmed.
+    hand: 1.12 keeps left-hand fist models as their own displays, to be checked when filmed. (Since
+    Nov 16 the claw's off hand shows its own left-hand model: below.)
   - **How a player learns the pair**: equipping a hand at the rack tells a Rogue its pair in one
     line ("Your pair is Iron Knuckles. ..."), built from the numbers (`pair_words`). No add-on
     change: the server's chat line carries it.
@@ -612,6 +616,56 @@ What the design left open, decided in the pull request that built it:
     left-hand display).
   - **The client's own guards**: `PlayUnitAfterimage` is on the list of globals past 1.12
     (`reference_surface.rs`) and in the VM surface golden, both in the patch.
+
+- **Fist weapons fill both hands (Corey, Nov 16)**: a fist weapon is one item that fills both
+  hands, a pair of knuckles, and always plays as Iron Knuckles. No fist with a dagger, a sword or
+  a mace. Decided while building it:
+  - **One item, held in both hand fields**: a fist pair is the same item as the main hand and the
+    off hand's weapon (`fists_of`). Why: a save keeps the shape it has (`weapon` and `off_hand`, the
+    same key), and each hand's blow already runs its own weapon's mechanic, so Footpad's Knuckles'
+    stamina back and Cutpurse's Claw's counter after a slipped blow come from both hands with no new
+    rule in the blow.
+  - **Equipping one, from anywhere** (either rack button, the bags, storage, a forge) fills both
+    hands (`rogue_grip`, `put_on`). A second blade in the off hand goes where the main hand's goes:
+    to the bags from the bags, to storage from storage or a forge. Bags with no room for both refuse
+    the swap, as a swap always has. At the rack nothing is put away: its weapons are free, as every
+    rack swap has been.
+  - **A one-hander over fists takes them off**: in the main hand, the off hand is left empty (it
+    jabs, as any Rogue's empty hand); in the off hand, the main hand takes the Rogue's start blade
+    (`[rogue] weapon`, a Poacher's Knife). Why: a main hand is never empty, and the start blade is
+    free at the rack and makes a pair (Twin Fangs) with a dagger. The chat line names it: "You
+    equipped the Footman's Sword in your off hand and the Poacher's Knife in your main hand."
+  - **`.arm none` with fists on is refused** ("Fist weapons take both hands already."), as a
+    two-hander's is: there is no off hand to empty.
+  - **Pairs**: Iron Knuckles is a fist with itself; Breaker's Pair is a mace with a dagger, a sword
+    or a mace. A fist with anything else is no pair (each hand its own, the run of 4), which only an
+    old save with full bags can hold.
+  - **Old saves**: a Rogue saved with a fist in one hand loads holding it in both (`rogue_hands`).
+    Two different fists: the main hand's wins, the other goes to the bags. What the other hand held
+    goes to the bags; with no room there the hands load as they were, and are put right on a later
+    load once there is room. Why not drop it: it may be a honed or found weapon. The pack loads
+    before the hands, so a pack's room counts. A test: `tests_old_saves.rs` with
+    `testdata/old_saves/v0_5_rogue_one_fist.toml`.
+  - **Honing** a worn fist weapon hones both hands (it's one item).
+  - **Words** (docs/writing-style.md): the rack row's kind is "both hands" for a Rogue (the add-on
+    shows it as the row's tag and gives only "one-handed" rows an Off hand button, so a fist row has
+    one Equip button: no add-on change), and its words start "Equipped in both hands." Equipping one
+    says "You equipped the Footpad's Knuckles in both hands." and then the pair's line, "Your pair is
+    Iron Knuckles. Your strikes alternate fists, and the 6th is with both. It turns an enemy's back
+    to you for 1 sec. On a boss it breaks stances 100% faster instead." (was "Alternating weapons,
+    your 6th strike is with both fists", which read as two weapons).
+  - **The off hand's look**: 1.12's `ItemDisplayInfo` has the claw's own left-hand model
+    (`hand_1h_claw_a_01left`) with its silver skin as displays 21144, 21855, 24109 and 26594, and no
+    left-hand knuckles (no `hand_1h_knuckle_a_01left` at all). Cutpurse's Claw names 26594
+    (`off_display`, from the 26592-26597 fist set) and the server sends a Rogue's off hand as its own
+    item template with that display (`LEFT_ENTRY`); the knuckles show the same model in both hands.
+    The ignored test `rogue_fist_displays` checks both against `WOW_DATA` (run on this PC). The
+    off-hand slot's icon on the character sheet is 26594's (`INV_Gauntlets_07`): no left-hand claw
+    display carries the claw's own icon.
+  - **Anyone but a Rogue is as before**: a fist weapon is a one-hander for them, in either hand,
+    beside a shield or another blade, with no pair and its usual look; the rack row says
+    "one-handed". Why: the owner kept every other class as it is, and a Warrior's dual wield with
+    any two one-handers is already how they play two weapons.
 
 ## Build plan
 

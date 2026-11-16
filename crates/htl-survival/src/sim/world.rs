@@ -721,12 +721,20 @@ impl Survival {
                     self.events.push(Event::Dirty);
                     return Ok(());
                 }
+                // (A Rogue's fists fill both hands: a second blade goes to storage too.)
+                let freed = self.off_freed(id, out);
                 let old = self.put_on(id, out);
                 self.events.push(Event::Gear { player: id });
                 match old {
                     Some(old) => {
-                        self.tell(id, format!("You {verb} {name} and equipped it. {what} Your {} went to storage.", c.items[old].name));
-                        *self.storage.entry(old).or_default() += 1;
+                        let went = match freed {
+                            Some(f) => format!("{} and {}", c.items[old].name, c.items[f].name),
+                            None => c.items[old].name.clone(),
+                        };
+                        self.tell(id, format!("You {verb} {name} and equipped it. {what} Your {went} went to storage."));
+                        for i in [Some(old), freed].into_iter().flatten() {
+                            *self.storage.entry(i).or_default() += 1;
+                        }
                         self.events.push(Event::Storage);
                     }
                     None => self.tell(id, format!("You {verb} {name} and equipped it. {what}")),
@@ -752,11 +760,19 @@ impl Survival {
         }
     }
 
-    /// Wear or wield `item`: what it replaces, if anything.
+    /// Wear or wield `item`: what it replaces, if anything. (A Rogue's fist weapon fills both
+    /// hands: what that takes off the off hand besides is [`Self::off_freed`].)
     pub(crate) fn put_on(&mut self, id: Id, item: usize) -> Option<usize> {
         let d = self.content.items[item].clone();
+        let grip = self.rogue_grip(id, item, false);
         let p = self.players.get_mut(&id)?;
         match d.kind {
+            ItemKind::Weapon if grip.is_some() => {
+                let (main, off, _) = grip.unwrap();
+                p.off_weapon = off;
+                p.off_empty = off.is_none();
+                Some(std::mem::replace(&mut p.weapon, main))
+            }
             ItemKind::Weapon => Some(std::mem::replace(&mut p.weapon, item)),
             ItemKind::Shield => Some(std::mem::replace(&mut p.shield, item)),
             ItemKind::Bow => Some(std::mem::replace(&mut p.bow, item)),
@@ -764,6 +780,12 @@ impl Survival {
             ItemKind::Pack => p.pack.replace(item),
             ItemKind::Resource | ItemKind::Food => None,
         }
+    }
+
+    /// What equipping `item` (as [`Self::put_on`] does) takes off the off hand besides what it
+    /// replaces: a Rogue's second blade, as a fist weapon fills both hands.
+    pub(crate) fn off_freed(&self, id: Id, item: usize) -> Option<usize> {
+        self.rogue_grip(id, item, false).and_then(|g| g.2)
     }
 
     /// Swap to gear kept in the chest (at the chest).
@@ -788,13 +810,15 @@ impl Survival {
                 return Err("Your bags hold more than that pack can. Bank something first.".into());
             }
         }
+        // (A Rogue's fists fill both hands: a second blade goes to storage too.)
+        let freed = self.off_freed(id, item);
         let old = self.put_on(id, item);
         let s = self.storage.get_mut(&item).unwrap();
         *s -= 1;
         if *s == 0 {
             self.storage.remove(&item);
         }
-        if let Some(old) = old {
+        for old in [old, freed].into_iter().flatten() {
             *self.storage.entry(old).or_default() += 1;
         }
         self.events.push(Event::Bags { player: id });
@@ -825,12 +849,14 @@ impl Survival {
             ItemKind::Armor => p.armor.get(&d.slot).copied(),
             _ => p.pack,
         };
+        // (A Rogue's fists fill both hands: a second blade comes off too.)
+        let freed = self.off_freed(id, item);
         // The bags as they'd be: this one out, what it replaces in.
         let mut bag = p.bag.clone();
         if let Some(n) = bag.get_mut(&item) {
             *n -= 1;
         }
-        if let Some(o) = old {
+        for o in [old, freed].into_iter().flatten() {
             *bag.entry(o).or_default() += 1;
         }
         let pack = if d.kind == ItemKind::Pack { Some(item) } else { p.pack };
@@ -842,9 +868,16 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             p.bag = bag;
         }
-        let said = match old {
-            Some(o) => format!("You equipped the {}. Your {} went to your bags.", d.name, self.content.items[o].name),
-            None => format!("You equipped the {}.", d.name),
+        let names = |i: usize| self.content.items[i].name.clone();
+        let went = match (old, freed) {
+            (Some(o), Some(f)) => Some(format!("{} and {}", names(o), names(f))),
+            (o, f) => o.or(f).map(names),
+        };
+        // A Rogue's fists say they fill both hands.
+        let both = if self.players.get(&id).is_some_and(|p| self.fists_of(p)) { " in both hands" } else { "" };
+        let said = match went {
+            Some(w) => format!("You equipped the {}{both}. Your {w} went to your bags.", d.name),
+            None => format!("You equipped the {}{both}.", d.name),
         };
         self.tell(id, said.clone());
         self.events.push(Event::Bags { player: id });
@@ -869,8 +902,11 @@ impl Survival {
             // dungeon's own until the camp has found one ([`Self::rack_has`]).
             .filter(|(_, d)| !self.content.is_trophy(&d.key) && d.hone == 0 && self.rack_has(&d.key))
             .filter_map(|(i, d)| {
+                // A Rogue's fist weapon: one item that fills both hands.
+                let fists = self.is_rogue(p) && rogue::is_fist(&self.content, i);
                 let kind = match d.kind {
                     ItemKind::Weapon if self.content.weapon(&d.key).is_some_and(|w| w.two_handed) => "two-handed",
+                    ItemKind::Weapon if fists => "both hands",
                     ItemKind::Weapon => "one-handed",
                     ItemKind::Shield => "shield",
                     // Bows and crossbows aren't fought with any more (no shot on the board), so
@@ -884,6 +920,7 @@ impl Survival {
                     Some(stats) => format!("{} {stats}", d.text),
                     None => d.text.clone(),
                 };
+                let text = if fists { format!("Equipped in both hands. {text}") } else { text };
                 Some((d.key.clone(), d.name.clone(), kind, held, text))
             })
             .collect()
@@ -959,6 +996,9 @@ impl Survival {
         if self.weapon_of(p).two_handed {
             return Err("A two-handed weapon takes both hands already.".into());
         }
+        if self.fists_of(p) {
+            return Err("Fist weapons take both hands already.".into());
+        }
         if !matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. }) {
             return Err("Finish what you're doing first.".into());
         }
@@ -1006,8 +1046,16 @@ impl Survival {
         if off && (kind != ItemKind::Weapon || self.content.weapon(key).is_none_or(|w| w.two_handed || !w.bolt.is_empty() || !w.alt.is_empty())) {
             return Err("Only a one-handed weapon goes in the off hand.".into());
         }
+        // A Rogue's hands: a fist weapon fills both, and any other takes it off.
+        let grip = self.rogue_grip(id, item, off);
         let p = self.players.get_mut(&id).unwrap();
         match kind {
+            ItemKind::Weapon if grip.is_some() => {
+                let (main, off, _) = grip.unwrap();
+                p.weapon = main;
+                p.off_weapon = off;
+                p.off_empty = off.is_none();
+            }
             ItemKind::Weapon if off => {
                 p.off_weapon = Some(item);
                 p.off_empty = false;

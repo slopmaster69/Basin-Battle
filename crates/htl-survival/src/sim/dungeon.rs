@@ -1537,6 +1537,8 @@ impl Survival {
         let base = self.content.item(if it.honed_from.is_empty() { &it.key } else { &it.honed_from }).ok_or("No such item.")?;
         let next = self.content.honed(base, it.hone + 1);
         let coin = self.content.item(&d.plunder).ok_or("No currency.")?;
+        // A Rogue's fist weapon is one item in both hands: honed, both hands hold the honed one.
+        let fists = self.players.get(&id).is_some_and(|p| self.fists_of(p) && p.weapon == item);
         let p = self.players.get_mut(&id).unwrap();
         let c = p.bag.get_mut(&coin).unwrap();
         *c -= price;
@@ -1552,6 +1554,9 @@ impl Survival {
             *p.bag.entry(next).or_default() += 1;
         } else if p.weapon == item {
             p.weapon = next;
+            if fists {
+                p.off_weapon = Some(next);
+            }
         } else if p.shield == item {
             p.shield = next;
         } else if let Some(slot) = p.armor.iter().find(|(_, v)| **v == item).map(|(k, _)| k.clone()) {

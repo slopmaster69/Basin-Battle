@@ -1780,6 +1780,10 @@ pub struct ItemDef {
     pub key: String,
     pub name: String,
     pub display: u32,
+    /// A weapon's look in the off hand, where 1.12 keeps a left-hand model of its own (a claw's
+    /// `...left` model): 0 shows `display` in either hand.
+    #[serde(default)]
+    pub off_display: u32,
     /// Its icon (`Interface\Icons\` name), for the add-on's windows.
     #[serde(default)]
     pub icon: String,
@@ -3750,6 +3754,21 @@ impl RaidDef {
 }
 
 impl Content {
+    /// How many of `item` make a stack in bags with `pack` on (a pack stacks resources higher).
+    pub fn stack_for(&self, item: usize, pack: Option<usize>) -> u32 {
+        let d = &self.items[item];
+        let carry = match (d.kind, pack) {
+            (ItemKind::Resource, Some(k)) => self.items[k].carry,
+            _ => 0.0,
+        };
+        ((d.stack.max(1) as f32) * (1.0 + carry)).round().max(1.0) as u32
+    }
+
+    /// The slots these bags take with `pack` on: each item a slot per full stack.
+    pub fn bag_slots_with(&self, bag: &std::collections::BTreeMap<usize, u32>, pack: Option<usize>) -> usize {
+        bag.iter().filter(|(_, n)| **n > 0).map(|(i, n)| n.div_ceil(self.stack_for(*i, pack)) as usize).sum()
+    }
+
     /// The built-in rules as a dev world has them (every card owned), for tests.
     #[cfg(test)]
     pub fn dev() -> Self {

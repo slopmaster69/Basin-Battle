@@ -10,7 +10,9 @@
 //! - `S\t<item~name~count~gear>^...`: the camp chest, while its window is open.
 //! - `W\t<station>\t<name>\t<recipe~output~cost~can>^...`: a station's work.
 //! - `BM\t<key~name~cost~can~built~text>^...`: the build menu.
-//! - `AR\t<key~name~kind~held~text>^...`: the weapon rack.
+//! - `AR\t<key~name~kind~held~text>^...`: the weapon rack. `kind` is `one-handed` (it may go in
+//!   the off hand too), `two-handed`, `shield`, or `both hands` (a Rogue's fist weapon, one item
+//!   that fills both hands: one Equip button, as any kind but `one-handed` has).
 //! - `FL\t<text>`: words flashed big: a refusal (out of range, not ready, too winded) or a hint,
 //!   never an outcome. A refusal's voice comes with it as `SMSG_PLAY_SOUND` (the hero's race and
 //!   sex voice, `sim::cues::vocal_sound`), which the stock client plays: no line for it. Only
@@ -1994,10 +1996,20 @@ impl SurvivalGame {
             // `.arm <key>`, `.arm <key> off` (the off hand), `.arm none` (one weapon alone).
             "arm" => {
                 let off = arg2.trim() == "off";
+                let main_was = self.sim.players.get(&me).map(|p| p.weapon);
                 let done = if arg == "none" { self.sim.stow_off(me) } else if off { self.sim.arm_off(me, &arg) } else { self.sim.arm(me, &arg) };
                 done.map(|name| {
+                    // A Rogue's fist weapon fills both hands; a blade in the off hand over it puts
+                    // the start blade in the main hand.
+                    let p = self.sim.players.get(&me);
+                    let fists = p.is_some_and(|p| self.sim.fists_of(p));
+                    let main_now = p.map(|p| p.weapon).filter(|w| off && Some(*w) != main_was);
                     let said = if arg == "none" {
                         "Your off hand is empty: you fight with one weapon alone.".to_string()
+                    } else if fists {
+                        format!("You equipped the {name} in both hands.")
+                    } else if let Some(w) = main_now {
+                        format!("You equipped the {name} in your off hand and the {} in your main hand.", self.sim.content.items[w].name)
                     } else if off {
                         format!("You took the {name} in your off hand.")
                     } else {
@@ -2869,5 +2881,51 @@ mod board_tests {
             assert_eq!((c[3].as_str(), c[22].as_str()), ("rogue", "3"), "{k}: the Rogue's third choice");
         }
         assert!(super::THIRD_CHOICE_ADDON <= super::ADDON_NEWEST);
+    }
+}
+
+#[cfg(test)]
+mod rack_tests {
+    use super::*;
+    use crossbeam_channel::Receiver;
+
+    /// A Rogue at the open rack on connection 1, and what their client is sent.
+    fn rogue_at_rack() -> (SurvivalGame, Receiver<Packet>) {
+        use htl_survival::{content::Content, land::FlatLand};
+        let mut c = Content::builtin();
+        c.world.armory = true;
+        let mut game = SurvivalGame::new(c, Box::new(FlatLand::default()), None, 7);
+        let account = "racktest/ayla".to_string();
+        let save = game.sim.fresh_save(&account, "Ayla", "rogue", Default::default());
+        let id = game.sim.join(&account, "Ayla", Some(&save));
+        let rack = game.sim.objs[&game.sim.rack_id()].pos;
+        game.sim.players.get_mut(&id).unwrap().pos = rack;
+        let guid = SurvivalGame::player_guid(&account);
+        game.bind(id, guid);
+        let (tx, rx) = crossbeam_channel::unbounded();
+        game.sessions.insert(1, Session { account: "racktest".into(), hero: account, out: tx, world: Some(InWorld::new(guid, id, "Ayla".into(), rack[2])), watching: None });
+        (game, rx)
+    }
+
+    fn told(rx: &Receiver<Packet>, words: &str) -> bool {
+        rx.try_iter().any(|p| p.opcode == op::SMSG_MESSAGECHAT && p.body.windows(words.len()).any(|w| w == words.as_bytes()))
+    }
+
+    /// The rack's chat says a fist weapon fills both hands and names the pair, from either button;
+    /// a blade in the off hand over it names the start blade the main hand took.
+    #[test]
+    fn the_rack_says_a_rogues_fist_weapon_fills_both_hands() {
+        let (mut game, rx) = rogue_at_rack();
+        for cmd in ["es arm footpad_knuckles", "es arm cutpurse_claw off"] {
+            let name = if cmd.contains("footpad") { "Footpad's Knuckles" } else { "Cutpurse's Claw" };
+            let _ = rx.try_iter().count();
+            game.command(1, cmd);
+            let sent: Vec<Packet> = rx.try_iter().collect();
+            let said = |w: &str| sent.iter().any(|p| p.opcode == op::SMSG_MESSAGECHAT && p.body.windows(w.len()).any(|x| x == w.as_bytes()));
+            assert!(said(&format!("You equipped the {name} in both hands.")), "{cmd}");
+            assert!(said("Your pair is Iron Knuckles. Your strikes alternate fists, and the 6th is with both."), "{cmd}");
+        }
+        game.command(1, "es arm sword off");
+        assert!(told(&rx, "You equipped the Footman's Sword in your off hand and the Poacher's Knife in your main hand."));
     }
 }

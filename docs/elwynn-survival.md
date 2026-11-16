@@ -241,11 +241,12 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   What a Rogue holds is its weapon path, a pair judged on both hands: Twin Fangs (two daggers, a
   Shadow Cut's backstab always whole), Blade and Shiv (a sword and a dagger, the finisher with the
   sword's 3 yd reach and the dagger's 2.5x from behind), Crossed Swords (two swords, the finisher
-  striking every enemy in 150 degrees), Breaker's Pair (a mace and any other, the finisher counting
-  3 times toward posture) and Iron Knuckles (two fist weapons, a run of 6 whose finisher turns a
-  creature's back to the Rogue for 1 s; a boss's posture twice instead). The fists, Footpad's
-  Knuckles (3 stamina back a hit) and Cutpurse's Claw (50% more within 1 s of a slipped blow), are
-  on the rack.
+  striking every enemy in 150 degrees), Breaker's Pair (a mace with a dagger, a sword or a mace,
+  the finisher counting 3 times toward posture) and Iron Knuckles (a fist weapon, one item that
+  fills both hands, a run of 6 whose finisher turns a creature's back to the Rogue for 1 s; a
+  boss's posture twice instead). The fists, Footpad's Knuckles (3 stamina back a hit) and
+  Cutpurse's Claw (50% more within 1 s of a slipped blow), are on the rack; a blade in either hand
+  takes them off.
 - **Priest**: Light and Shadow, a choice on every key (see `docs/priest-draft3.md` and
   `docs/priest-draft4.md`). Q: Penance, rings that close on up to 3 bodies in front of you, a bolt
   of light on each as you press on the beat (its EX, **Divine Star**, is a star of light 24 yd out
