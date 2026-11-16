@@ -721,6 +721,34 @@ fn a_client_that_never_says_it_has_loaded_is_let_go_after_the_grace() {
 }
 
 #[test]
+fn a_foe_follows_a_hero_into_a_shallow_stream() {
+    // Level ground with a shallow stream across it (wet, not deep: a hero wades it).
+    struct Stream;
+    impl crate::land::Land for Stream {
+        fn height(&self, _x: f32, _y: f32) -> f32 { 0.0 }
+        fn wet_near(&self, x: f32, _y: f32, _z: f32) -> bool { x > 38.0 && x < 46.0 }
+    }
+    let mut s = Survival::new_dungeon(content(), Box::new(Stream), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 9.0);
+    s.move_player(id, [42.0, 0.0, 0.0], 0.0, Moving::default());
+    let grunt = s.content.mob("grunt").unwrap();
+    let foe = *s.mobs.iter().find(|(_, m)| m.def == grunt).unwrap().0;
+    s.engage(foe, mobs::Foe::Hero(id));
+    let mut set_back = false;
+    for _ in 0..(6.0 / DT) as usize {
+        let p = s.players.get_mut(&id).unwrap();
+        p.health = p.max_health;
+        let ev = s.step(DT);
+        set_back |= ev.iter().any(|e| matches!(e, Event::Log(t) if t.contains("put back")));
+    }
+    // It came into the water after her (Nov 2026: it stopped at the bank, the stream no footing).
+    let m = &s.mobs[&foe];
+    assert!(dist2d(m.pos, s.players[&id].pos) < 4.0, "at her side in the stream: {:?}", m.pos);
+    assert!(!set_back, "not put back as if it had fallen through the floor");
+}
+
+#[test]
 fn a_hero_far_under_the_dungeons_lowest_floor_goes_back_to_its_entry() {
     let mut s = Survival::new_dungeon(content(), Box::new(Deep { low: -20.0 }), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);

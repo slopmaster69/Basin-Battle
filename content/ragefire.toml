@@ -1390,7 +1390,9 @@ link = 12.0
 [[dungeon.pack]]
 mob = "rf_warlock"
 at = [-93.3, -34.5]
-z = -25.4
+# (The rock's own height there: -25.4 until Nov 2026 stood it 1.5 yd over it, and no walk to its
+# spot quite closed.)
+z = -26.9
 radius = 0.0
 count = 1
 link = 12.0

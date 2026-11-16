@@ -129,7 +129,9 @@ count = 1
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-74.0, -922.0]
-z = 32.0
+# (The sand's own height there: 32.0 until Nov 2026 stood them 1.1 yd over it, and no walk to
+# their spot quite closed.)
+z = 30.9
 radius = 2.0
 count = 2
 link = 14.0
