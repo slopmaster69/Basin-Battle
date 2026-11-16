@@ -523,7 +523,7 @@ fn fenros_rises_after_4_seconds_with_his_yell_and_falls_for_good_with_the_news_o
     s.hurt_mob(first[0], h, max);
     let mut said = Vec::new();
     let mut banners = Vec::new();
-    let mut take = |ev: Vec<Event>, said: &mut Vec<String>, banners: &mut Vec<String>| {
+    let take = |ev: Vec<Event>, said: &mut Vec<String>, banners: &mut Vec<String>| {
         for e in ev {
             match e {
                 Event::Yell { text, .. } => said.push(text),
@@ -865,7 +865,7 @@ fn brannick_stomps_a_hero_hugging_him_and_swings_the_maul_at_arms_length() {
 fn brannick_calls_for_pitch_at_half_health_and_his_blows_burn_from_then() {
     let (mut s, p, id) = brannick_bare();
     let mut said = Vec::new();
-    let mut take = |ev: Vec<Event>, said: &mut Vec<String>| {
+    let take = |ev: Vec<Event>, said: &mut Vec<String>| {
         for e in ev {
             if let Event::Yell { text, .. } = e {
                 said.push(text);

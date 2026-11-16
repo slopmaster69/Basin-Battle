@@ -715,7 +715,7 @@ fn a_hauled_hero_has_time_to_block_or_step_from_the_clearing_cut() {
     let (free, _, _) = hauled(11.0, "none");
     eprintln!("hauled from 11 yd: {free:.2} sec on their feet before the cut lands");
     assert!(free >= crate::tests_fair::REACTION + 0.4, "time to answer once up: {free}");
-    let (_, lost, blocked) = hauled(11.0, "guard");
+    let (_, lost, _) = hauled(11.0, "guard");
     assert!(lost == 0, "a guard raised once up blocks the cut: lost {lost}");
     let (_, lost, _) = hauled(11.0, "step");
     assert_eq!(lost, 0, "two yards away once up is out of the cut: lost {lost}");

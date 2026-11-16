@@ -1081,22 +1081,6 @@ fn wyle_names_the_lord_and_the_deadmines_once_the_satchel_is_open() {
     assert!(s.content.dungeons().any(|d| d.key == "deadmines"));
 }
 
-/// The first Windup of `m` after `from` sec, as seconds into the run (None if it never comes in `secs`).
-fn windup_after(s: &mut Survival, h: Id, m: Id, secs: f32, each: &mut dyn FnMut(&mut Survival)) -> Option<f32> {
-    let t0 = s.clock;
-    for _ in 0..(secs / 0.02) as usize {
-        each(s);
-        let _ = s.step(0.02);
-        if let Some(p) = s.players.get_mut(&h) {
-            p.health = 1_000_000;
-        }
-        if matches!(s.mobs[&m].state, MobState::Windup { .. }) {
-            return Some(s.clock - t0);
-        }
-    }
-    None
-}
-
 /// Marzon's rule: he answers every swing. A hero who swings and misses in reach is stabbed within
 /// 0.3 sec of the moment they are open; one who stands still waits about his (slow) pace.
 #[test]
