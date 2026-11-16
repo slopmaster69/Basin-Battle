@@ -912,7 +912,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Smugglers' Ford (the river's south bank) | the Brotherhood's paymaster, Paymaster Voss, and his strongbox (guarded), with thugs, lookouts and a conjurer. The Defias Messenger who walks the Goldshire road to Jerod's Landing carries the key to the Messenger's Drop at the dock |
 | Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
 | The Goldshire road, north-west of the crossroads | Stitches (rare), a flesh golem who walks the cobbled road between the bridge and the crossroads |
-| The Maclure Vineyards and Stonefield | kobolds raiding the farms; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
+| The Maclure Vineyards and Stonefield | kobolds raiding the farms; the Stonefield Wagon, a hold against three kobold waves with Fedfennel, with Tommy Joe Stonefield helping; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista; Gruff Swiftbite (rare, three spots in the west) and the Riverpaw Tribute he sits on |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
 
@@ -1336,6 +1336,26 @@ two choices. *Arrest Him*: he is taken away, Marshal Dughan stands in his place 
 and the Stormwind Bounty opens (3 silver, 2 bronze). *Free Him*: he stays, tells where the man in black meets
 his buyers (past Jasperlode), and his stash at the Maclure well opens (2 silver, 2 pearls). The chest of the
 option not taken stays shut, with its own words. The journal asks for the choice.
+
+**Hold the Stonefield Wagon** (Stage 9 of docs/elwynn-expansion.md). The Stonefield Wagon at the farm is a hold.
+Using it begins a 90 sec defense (`hold`, with waves in `trial`): kobolds from Fargodeep come in three waves, at 0,
+30 and 60 sec, each announced ("Kobolds pour out of the Fargodeep road.", "Tunnelers come up under the fence.",
+"Fedfennel comes for the grain himself."): 3 laborers, then 2 tunnelers and a geomancer, then Fedfennel and 2
+laborers. Tommy Joe Stonefield takes up his bow for the hold (`shoots`) and stands down after it. The hold is
+held at 90 sec once the last wave has fallen (and not before, however long that takes), and the opener gets the
+loot (2 silver, 6 meat, 4 linen) and reads the Defias note: the parley is at the standing stones past
+Jasperlode. A hero near the wagon keeps it alive; with none within 60 yd for 12 sec the waves go back unseen,
+whole, and "The wagon is lost. Use it again to load it." (the wagon stays shut). It is full again 30 min
+after it is held. The hold's engine: a chest's `trial` works without `teaches` (the opener gets the loot on a
+pass); `hold` seconds and `wave_text` (said as each wave comes); `hold_title`, `held_title` and `lost_text` for
+its banners; a `trial` entry is a wave of one pack or several joined with `+`; packs in `ambush` wake when the
+hold begins. A friendly creature with `shoots` (damage, range, every, optionally a spell) shoots the nearest
+foe in reach that is fighting a hero, with a clear line, like a tower, and what it finishes counts for the
+camp; one set by a pack stands where it was put, and enemies can't target it.
+**Fedfennel**, the foreman, has a shield (`block = 0.9`) that takes light blows from the front, within 70
+degrees, in the chase or between his blows. It doesn't take a heavy blow, a shove, a thrust through the guard or
+a blow struck as he winds up, nor from the side or behind, and not while a Bearded Axe holds his guard down. His
+rule: hit him as he winds up, from the side, or heavy. He chops, and holds his pick high, glowing amber.
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set

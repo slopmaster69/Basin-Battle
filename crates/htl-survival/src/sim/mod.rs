@@ -1276,6 +1276,8 @@ pub struct Survival {
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
+    /// When each friendly shooter may shoot next (`sim::explore`).
+    pub(crate) ally_at: BTreeMap<Id, f32>,
     /// The beta page's mechanics in play: yanks, echoes, tethers, shields that burst, pads.
     pub(crate) beta: beta::Beta,
     /// The Warlord's (the Warrior's second choices): Tackles under way.
@@ -1290,13 +1292,16 @@ pub struct Survival {
     pub(crate) kitchen: kitchen::Kitchen,
 }
 
-/// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
+/// A trial at a shrine, a relic or a hold: its guardians are up until they fall (it teaches, or opens) or no hero
 /// stays near (they go back to waiting).
 #[derive(Debug, Clone)]
 pub(crate) struct Trial {
     pub obj: Id,
     pub by: Id,
     pub near_at: f32,
+    /// When it began, and how many of its waves have been called (a hold calls them over its time).
+    pub started: f32,
+    pub called: usize,
 }
 
 impl Survival {
@@ -1394,6 +1399,7 @@ impl Survival {
             grown_at: 0.0,
             yielded: BTreeMap::new(),
             trials: BTreeMap::new(),
+            ally_at: BTreeMap::new(),
             beta: beta::Beta::default(),
             warlord: warlord::Warlord::default(),
             bosses: bosses::Bosses::default(),

@@ -116,6 +116,8 @@ fn a_raised_guard_draws_the_blow_no_guard_stops() {
 fn now_and_then_it_gives_ground_after_a_string() {
     let mut s = world();
     s.content.ai.retreat = 1.0;
+    // (Its own quirks come from its id: none here, so the test isn't at the mercy of the dice.)
+    s.content.ai.quirk = 0.0;
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [2.2, 0.0, 0.0]);
     s.players.get_mut(&p).unwrap().health = 100_000;

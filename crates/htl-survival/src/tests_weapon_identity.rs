@@ -223,6 +223,10 @@ fn with_two_blades_the_right_click_swings_the_off_hand_instead_of_guarding() {
 fn left_and_right_alternating_four_times_ends_in_a_finisher() {
     let (mut s, p) = world();
     wield(&mut s, p, "sword");
+    // (Each blow at the top of its range: this test is about the finisher, not the dice.)
+    for w in s.content.weapons.iter_mut() {
+        w.damage = [w.damage[1], w.damage[1]];
+    }
     s.players.get_mut(&p).unwrap().off_weapon = s.content.item("sword");
     let m = foe(&mut s, "dm_woodcutter");
     s.mobs.get_mut(&m).unwrap().health = 100_000;

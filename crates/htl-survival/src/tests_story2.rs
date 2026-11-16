@@ -475,14 +475,14 @@ fn the_choice_counts_for_the_journal_and_a_save_keeps_it() {
     let (mut s, h, _) = remy_world();
     let g = s.content.goals.iter().position(|g| g.title == "Remy Two Times").unwrap();
     let corner = s.content.goals.iter().position(|g| g.title == "Every corner").unwrap();
-    assert_eq!(g + 1, corner, "just before Every corner");
+    assert!(g < corner, "ahead of Every corner");
     assert_eq!((s.content.goals[g].kind.as_str(), s.content.goals[g].what.as_str()), ("chose", "remy"));
     s.camp.goal = g;
     s.step_goals();
     assert_eq!(s.camp.goal, g, "not before the choice");
     s.choose(h, "remy:arrest").unwrap();
     s.step_goals();
-    assert_eq!(s.camp.goal, corner, "the choice is the goal");
+    assert_eq!(s.camp.goal, g + 1, "the choice is the goal");
     // A save keeps the choice: Remy is still gone, the Marshal still stands, the bounty still opens.
     let save = s.save(&BTreeMap::new());
     let mut back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
@@ -553,4 +553,426 @@ fn a_prop_with_until_never_stands_once_it_holds_even_at_the_start() {
     s2.objs.retain(|_, o| !matches!(o.kind, ObjKind::Piece { .. }));
     s2.place_props();
     assert!(!stands(&s2, REMY), "never set out at all");
+}
+
+// --- Stage 9: Hold the Stonefield Wagon --------------------------------------------------------
+
+/// The built-in world on flat ground with only the wagon's creatures standing, and a hero beside it.
+fn wagon_world() -> (Survival, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    let keep: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key.starts_with("sf_"))).map(|(id, _)| *id).collect();
+    s.mobs.retain(|id, _| keep.contains(id));
+    s.respawns.clear();
+    let h = bh_hero(&mut s, [-9893.5, 370.0, 0.0]);
+    (s, h)
+}
+
+/// Every creature of the wagon's waves that is up (awake and alive), not the farmer's son.
+fn wave_mobs(s: &Survival) -> Vec<Id> {
+    s.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && !m.friendly && m.pack.is_some_and(|k| s.content.packs[k].key.starts_with("sf_wave"))).map(|(id, _)| *id).collect()
+}
+
+fn step_keeping_alive(s: &mut Survival, h: Id) -> Vec<Event> {
+    let ev = s.step(0.05);
+    if let Some(p) = s.players.get_mut(&h) {
+        p.health = 1_000_000;
+    }
+    ev
+}
+
+/// The wagon's use: the work of opening it begins the hold (the hold's clock starts as it ends).
+fn load_wagon(s: &mut Survival, h: Id) -> Vec<Event> {
+    open_at(s, h, "sf_wagon")
+}
+
+fn wagon_def(s: &Survival) -> usize {
+    s.content.chests.iter().position(|c| c.key == "sf_wagon").unwrap()
+}
+
+#[test]
+fn the_waves_come_at_0_30_and_60_sec_with_their_texts() {
+    let (mut s, h) = wagon_world();
+    let def = wagon_def(&s);
+    let c = &s.content.chests[def];
+    assert_eq!((c.hold, c.trial.len(), c.wave_text.len()), (90.0, 3, 3));
+    assert!(wave_mobs(&s).is_empty(), "nothing in sight before the wagon is used");
+    let ev = load_wagon(&mut s, h);
+    let t = &s.trials[&def];
+    let started = t.started;
+    let mut said: Vec<(f32, String)> = ev.iter().filter_map(|e| match e { Event::Announce { text } => Some((s.clock - started, text.clone())), _ => None }).collect();
+    let titles: Vec<String> = ev.iter().filter_map(|e| match e { Event::Banner { title, sub, .. } if title == "Hold the Wagon" => Some(sub.clone()), _ => None }).collect();
+    assert_eq!(titles, ["Stay near it for 90 sec"], "{ev:?}");
+    let first = wave_mobs(&s);
+    assert_eq!(first.len(), 3, "wave 1: 3 kobold laborers");
+    assert!(first.iter().all(|id| s.content.mobs[s.mobs[id].def].key == "kobold_laborer"));
+    // Run on, keeping the hero up, and note when each text comes.
+    for _ in 0..(75.0 / 0.05) as usize {
+        for e in step_keeping_alive(&mut s, h) {
+            if let Event::Announce { text } = e {
+                said.push((s.clock - started, text));
+            }
+        }
+    }
+    let said: Vec<(f32, String)> = said.into_iter().filter(|(_, t)| !t.contains("fell") && !t.contains("completed")).collect();
+    let want = [(0.0, "Kobolds pour out of the Fargodeep road."), (30.0, "Tunnelers come up under the fence."), (60.0, "Fedfennel comes for the grain himself.")];
+    assert_eq!(said.len(), 3, "{said:?}");
+    for ((at, text), (w_at, w_text)) in said.iter().zip(want) {
+        assert_eq!(text, w_text);
+        assert!((at - w_at).abs() < 0.6, "{text} came at {at:.2}, not {w_at}");
+    }
+    // Wave 2 is 2 tunnelers and a geomancer, wave 3 Fedfennel and 2 laborers.
+    let keys: Vec<String> = wave_mobs(&s).iter().map(|id| s.content.mobs[s.mobs[id].def].key.clone()).collect();
+    assert_eq!(keys.iter().filter(|k| *k == "fedfennel").count(), 1);
+    assert_eq!(keys.iter().filter(|k| *k == "kobold_tunneler").count(), 2);
+    assert_eq!(keys.iter().filter(|k| *k == "kobold_geomancer").count(), 1);
+}
+
+#[test]
+fn the_hold_passes_at_90_sec_once_the_last_wave_is_dead_and_not_before() {
+    // Fell everything that comes: the hold still runs its 90 sec, then passes.
+    let (mut s, h) = wagon_world();
+    // (What the felled drop is theirs too: only the chest's loot is counted.)
+    for m in s.content.mobs.iter_mut() {
+        m.drops.clear();
+    }
+    let def = wagon_def(&s);
+    load_wagon(&mut s, h);
+    let started = s.trials[&def].started;
+    let mut banners = Vec::new();
+    let mut tells = Vec::new();
+    let mut passed_at = None;
+    for _ in 0..(100.0 / 0.05) as usize {
+        for id in wave_mobs(&s) {
+            fell(&mut s, h, id);
+        }
+        for e in step_keeping_alive(&mut s, h) {
+            match e {
+                Event::Banner { title, .. } => banners.push(title),
+                Event::Tell { text, .. } => tells.push(text),
+                _ => {}
+            }
+        }
+        if passed_at.is_none() && !s.trials.contains_key(&def) {
+            passed_at = Some(s.clock - started);
+        }
+    }
+    let at = passed_at.expect("the hold passed");
+    assert!(at >= 89.9 && at < 91.0, "passed at {at:.2} sec");
+    assert!(banners.iter().any(|b| b == "Wagon Held"), "{banners:?}");
+    assert!(tells.iter().any(|t| t.contains("Grain for Westbrook")), "the find is read");
+    assert!(s.camp_has("open:sf_wagon") && chest(&s, "sf_wagon").is_none(), "opened, and spent");
+    let bag = &s.players[&h].bag;
+    for (k, n) in [("silver", 2), ("meat", 6), ("linen", 4)] {
+        assert_eq!(bag.get(&s.content.item(k).unwrap()), Some(&n), "{k}");
+    }
+    // The wagon fills again in its time, for another hold.
+    s.move_player(h, [4000.0, 4000.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 1900.0);
+    assert!(chest(&s, "sf_wagon").is_some(), "full again");
+}
+
+#[test]
+fn the_hold_waits_for_the_last_wave_to_fall_even_after_90_sec() {
+    let (mut s, h) = wagon_world();
+    let def = wagon_def(&s);
+    load_wagon(&mut s, h);
+    let started = s.trials[&def].started;
+    // Waves 1 and 2 are felled as they come; wave 3 is left standing.
+    for _ in 0..(95.0 / 0.05) as usize {
+        for id in wave_mobs(&s) {
+            let key = s.content.mobs[s.mobs[&id].def].key.clone();
+            if s.clock - started < 60.0 || key != "fedfennel" && key != "kobold_laborer" {
+                fell(&mut s, h, id);
+            }
+        }
+        let _ = step_keeping_alive(&mut s, h);
+    }
+    assert!(s.clock - started >= 95.0);
+    assert!(s.trials.contains_key(&def), "the last wave still stands, so the hold goes on");
+    assert!(!s.camp_has("open:sf_wagon"));
+    // The last of them falls, and it is held at once.
+    for id in wave_mobs(&s) {
+        fell(&mut s, h, id);
+    }
+    let _ = step_keeping_alive(&mut s, h);
+    assert!(!s.trials.contains_key(&def));
+    assert!(s.camp_has("open:sf_wagon"));
+}
+
+#[test]
+fn leaving_for_12_sec_resets_the_waves_and_the_wagon_stays_shut() {
+    let (mut s, h) = wagon_world();
+    let def = wagon_def(&s);
+    load_wagon(&mut s, h);
+    for _ in 0..(40.0 / 0.05) as usize {
+        let _ = step_keeping_alive(&mut s, h);
+    }
+    assert_eq!(s.trials[&def].called, 2, "two waves have come");
+    assert!(!wave_mobs(&s).is_empty());
+    // The hero goes off: more than 60 yd from the wagon, for more than 12 sec.
+    s.move_player(h, [-9893.5, 470.0, 0.0], 0.0, Moving::default());
+    let mut lost = Vec::new();
+    for _ in 0..(14.0 / 0.05) as usize {
+        for e in step_keeping_alive(&mut s, h) {
+            if let Event::Announce { text } = e {
+                lost.push(text);
+            }
+        }
+    }
+    assert!(!s.trials.contains_key(&def), "given up");
+    assert!(lost.iter().any(|t| t == "The wagon is lost. Use it again to load it."), "{lost:?}");
+    assert!(wave_mobs(&s).is_empty(), "the waves are unseen again");
+    assert!(s.mobs.values().filter(|m| !m.friendly).all(|m| m.health == m.max_health), "and whole");
+    assert!(chest(&s, "sf_wagon").is_some() && !s.camp_has("open:sf_wagon"), "the wagon stays shut");
+    // Used again, it begins from the first wave.
+    let ev = load_wagon(&mut s, h);
+    assert_eq!(s.trials[&def].called, 1);
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text == "Kobolds pour out of the Fargodeep road.")));
+    assert_eq!(wave_mobs(&s).len(), 3);
+}
+
+#[test]
+fn tommy_joe_wakes_with_the_hold_and_stands_down_after_it() {
+    let (mut s, h) = wagon_world();
+    let tommy: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.friendly).map(|(id, _)| *id).collect();
+    assert_eq!(tommy.len(), 1);
+    let t = tommy[0];
+    assert!(s.mobs[&t].hidden, "unseen until the wagon is used");
+    let ev = load_wagon(&mut s, h);
+    assert!(!s.mobs[&t].hidden, "at his post for the hold");
+    assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == t)));
+    let at = s.mobs[&t].pos;
+    for _ in 0..200 {
+        let _ = step_keeping_alive(&mut s, h);
+    }
+    assert!(dist2d(s.mobs[&t].pos, at) < 0.1, "he stands where he was put");
+    assert_ne!(s.mobs[&t].state.foe().map(|_| ()), Some(()), "he fights no hero");
+    for id in wave_mobs(&s) {
+        fell(&mut s, h, id);
+    }
+    // The hold passes, then he stands down.
+    for _ in 0..(95.0 / 0.05) as usize {
+        for id in wave_mobs(&s) {
+            fell(&mut s, h, id);
+        }
+        let _ = step_keeping_alive(&mut s, h);
+    }
+    assert!(s.camp_has("open:sf_wagon"));
+    assert!(s.mobs[&t].hidden, "and stands down after it");
+}
+
+/// The ally shoots only foes that are fighting a hero, never an idle pack and never a hero.
+#[test]
+fn tommy_joe_shoots_kobolds_fighting_a_hero_and_never_an_idle_pack() {
+    let (mut s, h) = wagon_world();
+    let t = *s.mobs.iter().find(|(_, m)| m.friendly).map(|(id, _)| id).unwrap();
+    let laborer = s.content.mob("kobold_laborer").unwrap();
+    let tommy_at = s.mobs[&t].pos;
+    // Before the hold he is unseen, and shoots nothing even at a kobold on a hero.
+    let near = s.spawn_mob(laborer, [tommy_at[0] + 8.0, tommy_at[1], tommy_at[2]], None, false);
+    s.mobs.get_mut(&near).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    let hp = s.mobs[&near].health;
+    run(&mut s, 5.0);
+    assert!(s.mobs.get(&near).is_none_or(|m| m.health >= hp.min(m.max_health) || m.health == hp), "no shot before the hold");
+    // The hold begins.
+    s.mobs.remove(&near);
+    load_wagon(&mut s, h);
+    // An idle kobold within his reach, unseen by the hero: never shot.
+    let idle = s.spawn_mob(laborer, [tommy_at[0] - 17.0, tommy_at[1] + 10.0, tommy_at[2]], None, false);
+    s.mobs.get_mut(&idle).unwrap().state = MobState::Idle { wander_at: 1e9 };
+    let idle_hp = s.mobs[&idle].health;
+    // One fighting the hero, within his reach.
+    let busy = s.spawn_mob(laborer, [tommy_at[0] + 10.0, tommy_at[1] - 10.0, tommy_at[2]], None, false);
+    s.mobs.get_mut(&busy).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    s.mobs.get_mut(&busy).unwrap().ready_at = 1e9;
+    s.mobs.get_mut(&busy).unwrap().pos = [tommy_at[0] + 10.0, tommy_at[1] - 10.0, tommy_at[2]];
+    // The wave's own kobolds are felled so only these two are in play.
+    for id in wave_mobs(&s) {
+        s.mobs.remove(&id);
+    }
+    let busy_hp = s.mobs[&busy].health;
+    let mut shots = Vec::new();
+    for _ in 0..(6.0 / 0.05) as usize {
+        for e in step_keeping_alive(&mut s, h) {
+            if let Event::Missile { caster, target, .. } = e {
+                if caster == t {
+                    shots.push(target);
+                }
+            }
+        }
+        s.mobs.get_mut(&busy).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+        s.mobs.get_mut(&busy).unwrap().pos = [tommy_at[0] + 10.0, tommy_at[1] - 10.0, tommy_at[2]];
+        s.mobs.get_mut(&busy).unwrap().health = s.mobs[&busy].health.max(1);
+    }
+    assert!(shots.len() >= 2 && shots.len() <= 4, "a shot every 2 sec: {}", shots.len());
+    assert!(shots.iter().all(|t| *t == Target::Unit(busy)), "only the one on a hero: {shots:?}");
+    assert!(!shots.iter().any(|t| *t == Target::Unit(h)), "never a hero");
+    assert!(s.mobs[&busy].health < busy_hp, "and it hurts");
+    assert_eq!(s.mobs[&idle].health, idle_hp, "the idle one is never shot");
+}
+
+#[test]
+fn a_creature_tommy_joe_finishes_counts_for_the_camp() {
+    let (mut s, h) = wagon_world();
+    load_wagon(&mut s, h);
+    for id in wave_mobs(&s) {
+        s.mobs.remove(&id);
+    }
+    let t = *s.mobs.iter().find(|(_, m)| m.friendly).map(|(id, _)| id).unwrap();
+    let at = s.mobs[&t].pos;
+    let laborer = s.content.mob("kobold_laborer").unwrap();
+    let k = s.spawn_mob(laborer, [at[0] + 8.0, at[1], at[2]], None, false);
+    s.mobs.get_mut(&k).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    s.mobs.get_mut(&k).unwrap().ready_at = 1e9;
+    s.mobs.get_mut(&k).unwrap().health = 5;
+    assert!(!s.camp_has("kill:kobold_laborer"));
+    for _ in 0..(4.0 / 0.05) as usize {
+        let _ = step_keeping_alive(&mut s, h);
+    }
+    assert!(s.mobs.get(&k).is_none_or(|m| m.health == 0), "he finished it");
+    assert!(s.camp_has("kill:kobold_laborer"), "and it counts for the camp");
+}
+
+// Fedfennel: his shield takes light blows from the front between his blows.
+
+/// Fedfennel in the chase facing the hero, a hero 2 yd off facing him.
+fn fed_bare(seed: u64) -> (Survival, Id, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), seed, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    let p = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    let def = s.content.mob("fedfennel").unwrap();
+    let k = s.spawn_mob(def, [2.0, 0.0, 0.0], None, false);
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.facing = std::f32::consts::PI;
+    m.state = MobState::Recover { foe: Foe::Hero(p), until: 1e9 };
+    m.ready_at = 1e9;
+    (s, p, k)
+}
+
+/// The outcomes of the hero's blows on `k` over `swings` tries of `input`, the mob set as `set` each time.
+fn swings(s: &mut Survival, p: Id, k: Id, input: Input, swings: usize, secs: f32, set: &dyn Fn(&mut Survival, Id)) -> Vec<Outcome> {
+    let mut out = Vec::new();
+    for _ in 0..swings {
+        let max = s.mobs[&k].max_health;
+        s.mobs.get_mut(&k).unwrap().health = max;
+        s.mobs.get_mut(&k).unwrap().posture = 0;
+        if let Some(pl) = s.players.get_mut(&p) {
+            pl.stamina = 1000.0;
+        }
+        set(s, k);
+        s.input(p, input);
+        for _ in 0..(secs / 0.05) as usize {
+            for e in s.step(0.05) {
+                if let Event::Swing { victim: Some(v), outcome, anim: false, style, .. } = e {
+                    if v == k && style != Blow::Dot {
+                        out.push(outcome);
+                    }
+                }
+            }
+            set(s, k);
+        }
+    }
+    out
+}
+
+fn between_blows(s: &mut Survival, k: Id) {
+    let foe = s.mobs[&k].state.foe().unwrap_or(Foe::Hero(1));
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.facing = std::f32::consts::PI;
+    m.state = MobState::Recover { foe, until: 1e9 };
+}
+
+#[test]
+fn fedfennels_shield_blocks_at_least_80_percent_of_light_blows_from_the_front() {
+    let (mut s, p, k) = fed_bare(5);
+    let out = swings(&mut s, p, k, Input::Attack, 40, 0.8, &between_blows);
+    assert!(out.len() >= 40, "{} blows landed on him", out.len());
+    let blocked = out.iter().filter(|o| **o == Outcome::Blocked).count();
+    assert!(blocked * 100 >= out.len() * 80, "{blocked} of {} blocked", out.len());
+}
+
+#[test]
+fn fedfennels_shield_does_not_help_from_behind_on_a_heavy_or_while_he_winds_up() {
+    // From behind (he faces away): nothing is blocked.
+    let (mut s, p, k) = fed_bare(5);
+    let behind = |s: &mut Survival, k: Id| {
+        let foe = s.mobs[&k].state.foe().unwrap_or(Foe::Hero(1));
+        let m = s.mobs.get_mut(&k).unwrap();
+        m.facing = 0.0;
+        m.state = MobState::Recover { foe, until: 1e9 };
+    };
+    let out = swings(&mut s, p, k, Input::Attack, 25, 0.8, &behind);
+    assert!(out.len() >= 25 && !out.contains(&Outcome::Blocked), "from behind: {out:?}");
+    // A heavy blow, from the front: none blocked.
+    let (mut s, p, k) = fed_bare(5);
+    let out = swings(&mut s, p, k, Input::Heavy, 20, 1.6, &between_blows);
+    assert!(!out.is_empty() && !out.contains(&Outcome::Blocked), "heavy: {out:?}");
+    // While he winds up a blow (poised or not): none blocked.
+    let (mut s, p, k) = fed_bare(5);
+    let winding = |s: &mut Survival, k: Id| {
+        let foe = s.mobs[&k].state.foe().unwrap_or(Foe::Hero(1));
+        let m = s.mobs.get_mut(&k).unwrap();
+        m.facing = std::f32::consts::PI;
+        m.state = MobState::Windup { foe, t: 0.0, mark: None, shown: true };
+    };
+    let out = swings(&mut s, p, k, Input::Attack, 25, 0.4, &winding);
+    assert!(!out.is_empty() && !out.contains(&Outcome::Blocked), "windup: {out:?}");
+}
+
+#[test]
+fn fedfennel_is_a_boss_with_a_shield_and_two_blows_one_glowing_amber() {
+    let c = Content::builtin();
+    let f = &c.mobs[c.mob("fedfennel").unwrap()];
+    assert!(f.boss && f.shield == 18399 && f.block == 0.9);
+    // (Every boss is drawn `combat.boss_scale` times its scale.)
+    assert_eq!((f.display, f.health), (2152, 520));
+    assert!((f.scale - 1.3 * c.combat.boss_scale).abs() < 1e-3, "{}", f.scale);
+    let chop = f.patterns.iter().find(|p| p.name == "pick chop").unwrap();
+    assert_eq!(chop.steps[0].kit, 0, "the chop is plain");
+    let high = f.patterns.iter().find(|p| p.name == "overhead").unwrap();
+    assert_eq!(high.steps[0].kit, 379, "the overhead glows amber");
+    // Tommy Joe is a friendly shooter and no one else is.
+    let t = &c.mobs[c.mob("tommy_joe_stonefield").unwrap()];
+    assert!(t.friendly);
+    let sh = t.shoots.as_ref().unwrap();
+    assert_eq!((sh.damage, sh.range, sh.every), (9, 25.0, 2.0));
+    assert_eq!(c.mobs.iter().filter(|m| m.shoots.is_some()).count(), 1);
+}
+
+#[test]
+fn a_hold_and_a_shooter_must_be_made_right_or_validate_refuses_them() {
+    let text = source("survival.toml");
+    let dungeon = source("deadmines.toml");
+    assert!(Content::parse_with(&text, &dungeon).is_ok());
+    let swap = |from: &str, to: &str| {
+        let at = text.find(from).unwrap_or_else(|| panic!("no {from}"));
+        let mut t = text.clone();
+        t.replace_range(at..at + from.len(), to);
+        Content::parse_with(&t, &dungeon)
+    };
+    // A wave that names a pack that doesn't wake on the wagon.
+    let err = swap("\"sf_wave2_tunnelers+sf_wave2_geomancer\"", "\"sf_wave2_tunnelers+nope\"").unwrap_err();
+    assert!(format!("{err:#}").contains("nope"), "{err:#}");
+    // More wave texts than waves.
+    let err = swap("\"Fedfennel comes for the grain himself.\"]", "\"Fedfennel comes for the grain himself.\", \"One too many.\"]").unwrap_err();
+    assert!(format!("{err:#}").contains("wave texts"), "{err:#}");
+    // A shooter that isn't friendly.
+    let err = swap("friendly = true\nshoots", "shoots").unwrap_err();
+    assert!(format!("{err:#}").contains("only a friendly creature shoots"), "{err:#}");
+}
+
+#[test]
+fn the_wagon_is_a_goal_and_the_journal_keeps_its_place() {
+    let c = Content::builtin();
+    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
+    assert_eq!(at("The Stonefield wagon") + 1, at("Every corner"));
+    let g = &c.goals[at("The Stonefield wagon")];
+    assert_eq!((g.kind.as_str(), g.what.as_str()), ("open", "sf_wagon"));
+    assert_eq!(crate::save::ELWYNN_GOALS, 12);
+    assert_eq!(c.goals[at("Every corner")].count as usize, c.sites.len());
 }
