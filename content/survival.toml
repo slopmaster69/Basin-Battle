@@ -3541,7 +3541,7 @@ reward = { linen = 3 }
 
 [[goal]]
 title = "Cookie's stew pot"
-text = "Kill Cookie once, by his stew pot at the pier in the cove below. At 50% health he throws his stew, so step out of the rings."
+text = "Kill Cookie once, by his stew pot at the pier in the cove below. He lifts a mug of stew and throws it where you stand, so step away before it lands."
 kind = "kill"
 what = "dm_cookie"
 reward = { whetstone = 2, linen = 2 }
@@ -6693,7 +6693,7 @@ slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
 key = "dominate_mind"
 name = "Dominate Mind"
 ex_of = "fade"
-text = "Bends the first creature along your reticle, up to 30 yd away, to your will for 6 sec: it fights for you. Bosses can't be taken. A hero it strikes walks toward you and can't act for 1.5 sec."
+text = "Bends the first enemy along your reticle, up to 30 yd away, to your will for 6 sec: it fights for you. Bosses can't be taken. A hero it strikes walks toward you and can't act for 1.5 sec."
 icon = "Spell_Shadow_ShadowWordDominate"
 slot = "utility"
 kind = "projectile"
@@ -6772,7 +6772,7 @@ impact_kit = 2709
 key = "psychic_ward"
 name = "Psychic Ward"
 ex_of = "vampiric_embrace"
-text = "Wards the ally under your reticle, up to 30 yd away, or you, for 6 sec. The first enemy to strike them is struck back in the mind for 20 damage and horrified for 1.5 sec (3 sec for creatures)."
+text = "Wards the ally under your reticle, up to 30 yd away, or you, for 6 sec. The first enemy to strike them is struck back in the mind for 20 damage and horrified for 3 sec (1.5 sec against heroes)."
 icon = "Spell_Shadow_PsychicHorrors"
 slot = "defense"
 kind = "ally"
@@ -7971,7 +7971,7 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
 key = "searing_dash"
 name = "Searing Dash"
 ex_of = "phase_dash"
-text = "A longer dash, 14 yd. Every enemy you pass through burns and is slowed by 40% for 2 sec."
+text = "A longer dash, 14 yd. Each enemy you pass through takes 4 damage, burns for 4 damage per sec for 3 sec and is slowed by 40% for 2 sec."
 icon = "Spell_Fire_FlameShock"
 slot = "utility"
 kind = "dash"
