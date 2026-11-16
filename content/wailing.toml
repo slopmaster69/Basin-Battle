@@ -1558,6 +1558,8 @@ kind = "weapon"
 text = "Blows from behind deal 340% damage. {fx} \"Lord Cobrahn's. A serpent's tooth on a hilt.\""
 perks = [{ kind = "might", amount = 0.03 }]
 
+# Verdan's maul roots: its heavy holds every foe it strikes in place 2.5 sec (a champion shrugs it
+# off, as any control).
 [[weapon]]
 key = "thornroot_maul"
 windup = 0.68
@@ -1573,6 +1575,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 5
+root = 2.5
 moveset = "maul"
 
 [[item]]
@@ -1581,7 +1584,7 @@ name = "Thornroot Maul"
 display = 1206
 icon = "INV_Hammer_03"
 kind = "weapon"
-text = "Verdan's. A root as thick as a man, and as hard as stone."
+text = "{fx} \"Verdan's. A root as thick as a man, and as hard as stone.\""
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------

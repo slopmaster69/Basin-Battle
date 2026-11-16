@@ -1283,8 +1283,8 @@ pub struct WeaponDef {
     /// Its heavy blow knocks the foe back this many yards.
     #[serde(default)]
     pub knock: f32,
-    /// A hit tenderizes the foe for `TENDER_SECS`: the next hit on it from any ally does this
-    /// much more.
+    /// A hit tenderizes the foe for `TENDER_SECS`: the next hit on it from another ally (not the
+    /// wielder) does this much more.
     #[serde(default)]
     pub tender: f32,
     /// Its heavy blow stuns a mechanical foe (a machine that isn't a champion) this many seconds.
@@ -1324,7 +1324,43 @@ pub struct WeaponDef {
     /// A blow from behind puts the foe to sleep this many seconds (any damage wakes it).
     #[serde(default)]
     pub sleep: f32,
+    /// Its heavy blow roots every foe it strikes this many seconds.
+    #[serde(default)]
+    pub root: f32,
+    /// Its heavy blow sends a holy shockwave out to `SHOCK_RADIUS`: this many times the weapon's
+    /// average blow, on every foe in it.
+    #[serde(default)]
+    pub shockwave: f32,
+    /// Hits in a row on the same foe (within `BUILD_WINDOW` of one another) build: the
+    /// `BUILD_HITS`th staggers it this many seconds.
+    #[serde(default)]
+    pub build: f32,
+    /// Its heavy blow brings rocks down on the foe's spot after `ROCK_DELAY`: this many times the
+    /// weapon's average blow on every foe within `ROCK_RADIUS`.
+    #[serde(default)]
+    pub rockfall: f32,
+    /// Its blows do up to this much more as the hero's health falls (at none left).
+    #[serde(default)]
+    pub rage: f32,
+    /// Its heavy blow on a helpless foe (stunned, asleep, rooted, frozen or staggered) does this
+    /// many times the damage.
+    #[serde(default)]
+    pub guillotine: f32,
+    /// Its heavy blow rallies the heroes within `RALLY_RADIUS` (the wielder too): they take this
+    /// much less damage for `RALLY_SECS`.
+    #[serde(default)]
+    pub rally: f32,
 }
+
+/// The shockwave's reach, the build's hits and window, the rockfall's delay and radius, the
+/// rally's reach and length.
+pub const SHOCK_RADIUS: f32 = 6.0;
+pub const BUILD_HITS: u32 = 3;
+pub const BUILD_WINDOW: f32 = 3.0;
+pub const ROCK_DELAY: f32 = 1.0;
+pub const ROCK_RADIUS: f32 = 2.5;
+pub const RALLY_RADIUS: f32 = 8.0;
+pub const RALLY_SECS: f32 = 5.0;
 
 /// How long a lulled foe takes no notice, the fire burst's radius, the poison's stacks and length.
 pub const LULL_SECS: f32 = 4.0;
@@ -1413,7 +1449,7 @@ impl WeaponDef {
             s.push(format!("Heavy attacks knock the enemy back {} yd.", self.knock));
         }
         if self.tender > 0.0 {
-            s.push(format!("Hits tenderize the enemy for {} sec. The next hit on it from any ally deals {}% more.", TENDER_SECS, (self.tender * 100.0).round()));
+            s.push(format!("Hits tenderize the enemy for {} sec. The next hit on it from another ally deals {}% more.", TENDER_SECS, (self.tender * 100.0).round()));
         }
         if self.machine_stun > 0.0 {
             s.push(format!("Heavy attacks stun mechanical enemies and machines for {} sec.", self.machine_stun));
@@ -1445,6 +1481,29 @@ impl WeaponDef {
         }
         if self.sleep > 0.0 {
             s.push(format!("Blows from behind put the enemy to sleep for {} sec. Damage wakes it.", self.sleep));
+        }
+        if self.root > 0.0 {
+            s.push(format!("Heavy attacks root the enemies they hit for {} sec.", self.root));
+        }
+        if self.shockwave > 0.0 {
+            let n = ((self.damage[0] + self.damage[1]) as f32 / 2.0 * self.shockwave).round();
+            s.push(format!("Heavy attacks send a holy shockwave out to {} yd that deals {} damage to every enemy in it.", SHOCK_RADIUS, n));
+        }
+        if self.build > 0.0 {
+            s.push(format!("The {}rd hit in a row on the same enemy within {} sec staggers it for {} sec.", BUILD_HITS, BUILD_WINDOW, self.build));
+        }
+        if self.rockfall > 0.0 {
+            let n = ((self.damage[0] + self.damage[1]) as f32 / 2.0 * self.rockfall).round();
+            s.push(format!("Heavy attacks call rocks down on the enemy's spot after {} sec, dealing {} damage to enemies within {} yd.", ROCK_DELAY, n, ROCK_RADIUS));
+        }
+        if self.rage > 0.0 {
+            s.push(format!("Deals up to {}% more damage as your health falls.", (self.rage * 100.0).round()));
+        }
+        if self.guillotine > 0.0 {
+            s.push(format!("Heavy attacks on a stunned, asleep, rooted, frozen or staggered enemy deal {}% damage.", (self.guillotine * 100.0).round()));
+        }
+        if self.rally > 0.0 {
+            s.push(format!("Heavy attacks rally allies within {} yd, you included: they take {}% less damage for {} sec.", RALLY_RADIUS, (self.rally * 100.0).round(), RALLY_SECS));
         }
         if self.blink_behind {
             s.push("The last blow of a light chain carries you behind the enemy.".into());

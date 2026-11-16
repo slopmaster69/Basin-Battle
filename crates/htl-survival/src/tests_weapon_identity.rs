@@ -614,7 +614,7 @@ fn the_clubs_heavy_knocks_a_foe_back_and_the_maces_doesnt() {
 }
 
 #[test]
-fn a_tenderized_foe_takes_more_from_the_next_hit_of_anyone_once() {
+fn a_tenderized_foe_takes_more_from_the_next_hit_of_another_hero_once() {
     let (mut s, p) = world();
     let q = s.join("bren", "Bren", None);
     s.move_player(q, [0.0, 1.0, 0.0], 0.0, Moving::default());
@@ -630,6 +630,11 @@ fn a_tenderized_foe_takes_more_from_the_next_hit_of_anyone_once() {
     reset_foe(&mut s, m);
     swing(&mut s, p);
     assert!(s.mobs[&m].fx.tender.1 > s.clock);
+    // The wielder's own next blow doesn't use it up.
+    reset_foe(&mut s, m);
+    let own = first_hit(&swing(&mut s, p), m);
+    assert!(own <= 30, "the wielder's own blow is untouched: {own}");
+    assert!(s.mobs[&m].fx.tender.0 > 0.0, "still tender");
     reset_foe(&mut s, m);
     let tender = first_hit(&swing(&mut s, q), m);
     assert!((17..=24).contains(&tender), "the ally's hit does a quarter more: {tender}");
@@ -722,7 +727,7 @@ fn the_maces_tooltips_say_their_mechanics_from_their_numbers() {
     let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
     let w = |k: &str| c.weapon(k).unwrap();
     assert!(text("hogger_club").contains(&format!("knock the enemy back {} yd", w("hogger_club").knock)), "{}", text("hogger_club"));
-    assert!(text("cookie_tenderizer").contains(&format!("tenderize the enemy for {} sec. The next hit on it from any ally deals {}% more", crate::content::TENDER_SECS, (w("cookie_tenderizer").tender * 100.0).round())), "{}", text("cookie_tenderizer"));
+    assert!(text("cookie_tenderizer").contains(&format!("tenderize the enemy for {} sec. The next hit on it from another ally deals {}% more", crate::content::TENDER_SECS, (w("cookie_tenderizer").tender * 100.0).round())), "{}", text("cookie_tenderizer"));
     assert!(text("gilnid_wrench").contains(&format!("stun mechanical enemies and machines for {} sec", w("gilnid_wrench").machine_stun)));
     assert!(text("hand_of_righteousness").contains(&format!("most wounded ally within {} yd, you included, for {}% of their health", crate::content::MEND_RANGE, (w("hand_of_righteousness").mend_ally * 100.0).round())));
     assert!(text("barons_scepter").contains(&format!("dies bursts in shadow for 44 damage to enemies within {} yd", crate::content::CURSE_RADIUS)), "{}", text("barons_scepter"));
@@ -881,4 +886,171 @@ fn the_daggers_tooltips_say_their_mechanics_from_their_numbers() {
     assert!(text("bazil_shiv").contains(&format!("poison the enemy for {} damage a sec, stacking up to {} times, for {} sec", b.poison, crate::content::POISON_STACKS, crate::content::POISON_SECS)), "{}", text("bazil_shiv"));
     assert!(text("thornspike").contains(&format!("stagger it for {} sec", w("thornspike").interrupt)));
     assert!(text("cobrahn_fang").contains(&format!("to sleep for {} sec", w("cobrahn_fang").sleep)));
+}
+
+// --- two-handers: the pass's fifth batch ---------------------------------------------------------------
+
+/// One light swing of a slow weapon, and the moment after.
+fn slow_swing(s: &mut Survival, p: Id) -> Vec<Event> {
+    s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    s.input(p, Input::Attack);
+    let mut ev = Vec::new();
+    for _ in 0..150 {
+        ev.extend(s.step(0.02));
+    }
+    ev
+}
+
+#[test]
+fn the_thornroot_mauls_heavy_roots_what_it_strikes() {
+    for (weapon, rooted) in [("thornroot_maul", true), ("maul", false)] {
+        let (mut s, p) = world();
+        wield(&mut s, p, weapon);
+        let m = sturdy_foe(&mut s, "dm_woodcutter");
+        heavy_swing(&mut s, p);
+        assert_eq!(s.has_cc(m, "root"), rooted, "{weapon}");
+    }
+}
+
+#[test]
+fn a_heavy_blow_of_mograines_hammer_sends_a_ring_round_the_hero() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "mograines_might");
+    let near = sturdy_foe(&mut s, "dm_woodcutter");
+    let behind = sturdy_foe(&mut s, "dm_woodcutter");
+    let far = sturdy_foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&behind).unwrap().pos = [-4.0, 0.0, 0.0];
+    s.mobs.get_mut(&far).unwrap().pos = [-12.0, 0.0, 0.0];
+    let (b0, f0) = (s.mobs[&behind].health, s.mobs[&far].health);
+    let _ = near;
+    heavy_swing(&mut s, p);
+    let w = s.content.weapon("mograines_might").unwrap();
+    let ring = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.shockwave).round() as u32;
+    assert_eq!(b0 - s.mobs[&behind].health, ring, "the one behind takes the ring");
+    assert_eq!(s.mobs[&far].health, f0, "the one out of the ring doesn't");
+    // A light blow sends none.
+    let (mut s, p) = world();
+    wield(&mut s, p, "mograines_might");
+    let behind = sturdy_foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&behind).unwrap().pos = [-4.0, 0.0, 0.0];
+    slow_swing(&mut s, p);
+    assert_eq!(s.mobs[&behind].health, 1_000_000);
+}
+
+#[test]
+fn smites_hammer_staggers_on_the_third_hit_in_a_row_on_one_foe() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "smite_hammer");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    for n in 1..=3u32 {
+        reset_foe(&mut s, m);
+        slow_swing(&mut s, p);
+        let build = s.players[&p].fx.build;
+        if n < 3 {
+            assert!(build.is_some_and(|(foe, hits, _)| foe == m && hits == n), "hit {n}: {build:?}");
+        } else {
+            assert!(build.is_none(), "the third spends it: {build:?}");
+        }
+    }
+    // (The stagger came as the third landed: it was set past the clock then.)
+    let hit_third = s.mobs[&m].stagger_until;
+    assert!(hit_third > 0.0, "it was staggered");
+}
+
+#[test]
+fn rhahkzors_heavy_marks_a_spot_and_the_rocks_come_down_on_it_a_moment_later() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "rhahkzor_maul");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    s.input(p, Input::Heavy);
+    let mut marked = false;
+    let mut hit_at = None;
+    let before = s.mobs[&m].health;
+    let mut at_hit = before;
+    for _ in 0..300 {
+        let ev = s.step(0.02);
+        marked |= ev.iter().any(|e| matches!(e, Event::Mark { .. }));
+        if hit_at.is_none() && hits_on(&ev, m).iter().any(|(d, _)| *d > 0) {
+            hit_at = Some(s.clock);
+            at_hit = s.mobs[&m].health;
+        }
+    }
+    assert!(marked, "the spot is marked first");
+    assert!(hit_at.is_some());
+    let w = s.content.weapon("rhahkzor_maul").unwrap();
+    let rocks = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.rockfall).round() as u32;
+    assert!(at_hit - s.mobs[&m].health >= rocks, "the rocks came down on it: {} of {rocks}", at_hit - s.mobs[&m].health);
+    assert!(s.fx_pending.is_empty(), "and are spent");
+}
+
+#[test]
+fn targorrs_axe_hits_harder_as_the_hero_falls() {
+    let blow = |health_share: f32| {
+        let (mut s, p) = world();
+        wield(&mut s, p, "targorr_axe");
+        let m = sturdy_foe(&mut s, "dm_woodcutter");
+        let max = s.players[&p].max_health;
+        s.players.get_mut(&p).unwrap().health = ((max as f32 * health_share).round() as u32).max(1);
+        first_hit(&slow_swing(&mut s, p), m)
+    };
+    let whole = blow(1.0);
+    let half = blow(0.5);
+    let low = blow(0.1);
+    assert!((50..=63).contains(&whole), "{whole}");
+    assert!(half >= 68 && low >= 80, "half {half}, low {low}");
+}
+
+#[test]
+fn the_corpsemaker_cows_and_the_guillotine_falls_on_the_helpless_and_the_rally_covers_allies() {
+    // Corpsemaker.
+    let (mut s, p) = world();
+    wield(&mut s, p, "corpsemaker");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    swing(&mut s, p);
+    assert!(s.has_cc(m, "cowed"), "cowed");
+    // Guillotine: a heavy on a foe held fast does three times a heavy on one that isn't.
+    let heavy = |held: bool| {
+        let (mut s, p) = world();
+        wield(&mut s, p, "guillotine_axe");
+        let m = sturdy_foe(&mut s, "dm_woodcutter");
+        s.mobs.get_mut(&m).unwrap().pos = [2.0, 0.0, 0.0];
+        if held {
+            s.apply_cc(m, p, "root", 20.0, 0.0, 0.0, "Test root");
+        }
+        let before = s.mobs[&m].health;
+        heavy_swing(&mut s, p);
+        before - s.mobs[&m].health
+    };
+    let (free, rooted) = (heavy(false), heavy(true));
+    assert!(rooted as f32 >= free as f32 * 2.2, "{rooted} against {free}");
+    // The Champion's greatsword.
+    let (mut s, p) = world();
+    let q = s.join("bren", "Bren", None);
+    s.move_player(q, [0.0, 4.0, 0.0], 0.0, Moving::default());
+    let r = s.join("cal", "Cal", None);
+    s.move_player(r, [0.0, 30.0, 0.0], 0.0, Moving::default());
+    wield(&mut s, p, "champions_greatsword");
+    sturdy_foe(&mut s, "dm_woodcutter");
+    heavy_swing(&mut s, p);
+    assert!(s.has_cc(q, "hallowed") && s.has_cc(p, "hallowed"), "rallied");
+    assert!(!s.has_cc(r, "hallowed"), "not the one out of reach");
+}
+
+#[test]
+fn the_two_handers_tooltips_say_their_mechanics_from_their_numbers() {
+    let c = Content::dev();
+    let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
+    let w = |k: &str| c.weapon(k).unwrap();
+    assert!(text("thornroot_maul").contains(&format!("root the enemies they hit for {} sec", w("thornroot_maul").root)), "{}", text("thornroot_maul"));
+    let m = w("mograines_might");
+    let ring = ((m.damage[0] + m.damage[1]) as f32 / 2.0 * m.shockwave).round();
+    assert!(text("mograines_might").contains(&format!("holy shockwave out to {} yd that deals {} damage", crate::content::SHOCK_RADIUS, ring)), "{}", text("mograines_might"));
+    assert!(text("smite_hammer").contains(&format!("The {}rd hit in a row on the same enemy within {} sec staggers it for {} sec", crate::content::BUILD_HITS, crate::content::BUILD_WINDOW, w("smite_hammer").build)), "{}", text("smite_hammer"));
+    let r = w("rhahkzor_maul");
+    let rocks = ((r.damage[0] + r.damage[1]) as f32 / 2.0 * r.rockfall).round();
+    assert!(text("rhahkzor_maul").contains(&format!("rocks down on the enemy's spot after {} sec, dealing {} damage to enemies within {} yd", crate::content::ROCK_DELAY, rocks, crate::content::ROCK_RADIUS)), "{}", text("rhahkzor_maul"));
+    assert!(text("targorr_axe").contains(&format!("up to {}% more damage as your health falls", (w("targorr_axe").rage * 100.0).round())));
+    assert!(text("corpsemaker").contains(&format!("deals {}% less damage", (w("corpsemaker").cow * 100.0).round())), "{}", text("corpsemaker"));
+    assert!(text("guillotine_axe").contains(&format!("deal {}% damage", (w("guillotine_axe").guillotine * 100.0).round())), "{}", text("guillotine_axe"));
+    assert!(text("champions_greatsword").contains(&format!("take {}% less damage for {} sec", (w("champions_greatsword").rally * 100.0).round(), crate::content::RALLY_SECS)), "{}", text("champions_greatsword"));
 }

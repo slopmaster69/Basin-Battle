@@ -3,7 +3,7 @@
 //! hero's blow lands on a creature (`combat.rs`) and the few where a creature falls or mends.
 
 use super::*;
-use crate::content::{WeaponDef, AbilityEffect, BURST_RADIUS, LULL_SECS, POISON_SECS, POISON_STACKS, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SNARE_SECS, TENDER_SECS};
+use crate::content::{WeaponDef, AbilityEffect, BUILD_HITS, BUILD_WINDOW, RALLY_RADIUS, RALLY_SECS, ROCK_DELAY, ROCK_RADIUS, SHOCK_RADIUS, BURST_RADIUS, LULL_SECS, POISON_SECS, POISON_STACKS, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SNARE_SECS, TENDER_SECS};
 
 /// What weapons have done to a creature, kept on it.
 #[derive(Debug, Clone, Default)]
@@ -12,8 +12,8 @@ pub struct MobFx {
     pub silvered_until: f32,
     /// A hook has taken its shield aside until: it can't block.
     pub guard_down_until: f32,
-    /// Tenderized: the next hit does this much more, until when.
-    pub tender: (f32, f32),
+    /// Tenderized: the next hit from another hero does this much more, until when, and by whom.
+    pub tender: (f32, f32, Id),
     /// Cursed until, by whom, and the burst it ends in.
     pub curse: Option<(f32, Id, u32)>,
     /// Lulled: it takes no notice of this hero until.
@@ -25,6 +25,17 @@ pub struct MobFx {
 pub struct HeroFx {
     /// Bloodlust: kills in a row, and until when the latest one counts.
     pub bloodlust: (u32, f32),
+    /// The build: the foe struck in a row, how many times, and when the latest was.
+    pub build: Option<(Id, u32, f32)>,
+}
+
+/// Rocks coming down: when, whose, where, what each does and how far it reaches.
+#[derive(Debug, Clone)]
+pub struct Rockfall {
+    pub at: f32,
+    pub by: Id,
+    pub pos: Vec3,
+    pub damage: u32,
 }
 
 impl Survival {
@@ -39,12 +50,28 @@ impl Survival {
     }
 
     /// How much more (or less) a blow of this weapon does to this creature: a bane foe takes more.
-    pub(crate) fn weapon_share(&self, mid: Id, w: &WeaponDef, strike: &Strike) -> f32 {
+    pub(crate) fn weapon_share(&self, id: Id, mid: Id, w: &WeaponDef, strike: &Strike) -> f32 {
         let mut k = 1.0;
         if w.bane_damage > 0.0 && !strike.shove() && w.bane.iter().any(|t| self.has_tag(mid, t)) {
             k += w.bane_damage;
         }
+        // The dread axe: the worse off the hero, the harder it falls.
+        if w.rage > 0.0 && !strike.shove() {
+            if let Some(p) = self.players.get(&id) {
+                k += w.rage * (1.0 - p.health as f32 / p.max_health.max(1) as f32).clamp(0.0, 1.0);
+            }
+        }
+        // The guillotine: a heavy blow on what can't move.
+        if w.guillotine > 0.0 && strike.heavy() && self.helpless(mid) {
+            k *= w.guillotine;
+        }
         k
+    }
+
+    /// A foe that can't act: stunned, asleep, rooted, frozen or staggered.
+    pub(crate) fn helpless(&self, mid: Id) -> bool {
+        let reeling = self.mobs.get(&mid).is_some_and(|m| m.stagger_until > self.clock);
+        reeling || ["stun", "incapacitate", "root", "petrify"].iter().any(|k| self.has_cc(mid, k))
     }
 
     /// What a blow does as it lands, before its damage: silver marks the foe, so the blow that
@@ -88,7 +115,7 @@ impl Survival {
         // The meat mallet tenderizes: the next hit on it, from anyone, does more.
         if w.tender > 0.0 && self.alive(mid) {
             if let Some(m) = self.mobs.get_mut(&mid) {
-                m.fx.tender = (w.tender, now + TENDER_SECS);
+                m.fx.tender = (w.tender, now + TENDER_SECS, id);
             }
         }
         // The wrench shorts a machine out.
@@ -147,6 +174,32 @@ impl Survival {
         if w.sleep > 0.0 && behind && self.alive(mid) {
             self.apply_cc(mid, id, "incapacitate", w.sleep, 0.0, 0.0, "Slumber");
         }
+        // The thornroot: a heavy blow roots what it strikes.
+        if w.root > 0.0 && strike.heavy() && self.alive(mid) {
+            self.apply_cc(mid, id, "root", w.root, 0.0, 0.0, "Thornroot");
+        }
+        // Smite's hammer builds: blows in a row on the same foe, the third staggers it.
+        if w.build > 0.0 && self.alive(mid) {
+            let (n, last) = self.players.get(&id).and_then(|p| p.fx.build).filter(|(m, _, t)| *m == mid && now - *t <= BUILD_WINDOW).map_or((0, 0.0), |(_, n, t)| (n, t));
+            let _ = last;
+            let n = n + 1;
+            if n >= BUILD_HITS {
+                self.stagger_mob(mid, w.build, false);
+                if let Some(p) = self.players.get_mut(&id) {
+                    p.fx.build = None;
+                }
+            } else if let Some(p) = self.players.get_mut(&id) {
+                p.fx.build = Some((mid, n, now));
+            }
+        }
+        // Rhahk'Zor's cave-in: after a short warning, rocks come down on the spot.
+        if w.rockfall > 0.0 && strike.heavy() {
+            if let Some(pos) = self.mobs.get(&mid).map(|m| m.pos) {
+                let dmg = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.rockfall).round() as u32;
+                self.mark(pos, ROCK_RADIUS, ROCK_DELAY);
+                self.fx_pending.push(Rockfall { at: now + ROCK_DELAY, by: id, pos, damage: dmg });
+            }
+        }
         // The pin and the fright: a slow, a weaker foe.
         if w.snare > 0.0 && self.alive(mid) {
             self.apply_cc(mid, id, "snare", SNARE_SECS, w.snare, 0.0, "Hamstring");
@@ -169,10 +222,15 @@ impl Survival {
     }
 
     /// The next hit on a tenderized foe does more, and uses it up.
-    pub(crate) fn take_tender(&mut self, mid: Id) -> f32 {
+    /// Not the hero who tenderized it: a team debuff, so the wielder's own next blow doesn't use it.
+    pub(crate) fn take_tender(&mut self, mid: Id, hero: Id) -> f32 {
         let now = self.clock;
         match self.mobs.get_mut(&mid) {
-            Some(m) if m.fx.tender.1 > now => std::mem::take(&mut m.fx.tender).0,
+            Some(m) if m.fx.tender.1 > now && m.fx.tender.2 != hero => {
+                let t = m.fx.tender.0;
+                m.fx.tender = (0.0, 0.0, hero);
+                t
+            }
             _ => 0.0,
         }
     }
@@ -188,6 +246,44 @@ impl Survival {
             .map(|(h, p)| (*h, p.max_health));
         if let Some((h, max)) = target {
             self.heal_hero_by(h, (max as f32 * share).round() as u32, id, "Mending");
+        }
+    }
+
+    /// What a heavy swing does round the hero whether or not it struck (the shockwave, the rally).
+    pub(crate) fn weapon_heavy_swing(&mut self, id: Id, w: &WeaponDef) {
+        let Some(at) = self.players.get(&id).map(|p| p.pos) else { return };
+        let now = self.clock;
+        if w.shockwave > 0.0 {
+            let dmg = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.shockwave).round() as u32;
+            let near: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && dist2d(m.pos, at) <= SHOCK_RADIUS).map(|(k, _)| *k).collect();
+            self.events.push(Event::Visual { id, kit: super::combat::KIT_SLAM, by: None });
+            for k in near {
+                self.hurt_mob_as(k, id, dmg, "Shockwave");
+            }
+        }
+        if w.rally > 0.0 {
+            let allies: Vec<Id> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= RALLY_RADIUS).map(|(h, _)| *h).collect();
+            for h in allies {
+                self.apply_cc(h, id, "hallowed", RALLY_SECS, w.rally, 0.0, "Rally");
+            }
+        }
+        let _ = now;
+    }
+
+    /// The rocks come down.
+    pub(crate) fn step_weapon_fx(&mut self) {
+        let now = self.clock;
+        if self.fx_pending.is_empty() {
+            return;
+        }
+        let (due, keep): (Vec<Rockfall>, Vec<Rockfall>) = std::mem::take(&mut self.fx_pending).into_iter().partition(|r| r.at <= now);
+        self.fx_pending = keep;
+        for r in due {
+            let near: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && dist2d(m.pos, r.pos) <= ROCK_RADIUS).map(|(k, _)| *k).collect();
+            for k in near {
+                self.events.push(Event::Visual { id: k, kit: super::combat::KIT_DUST, by: None });
+                self.hurt_mob_as(k, r.by, r.damage, "Rockfall");
+            }
         }
     }
 

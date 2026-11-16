@@ -1327,6 +1327,7 @@ kind = "weapon"
 text = "Quick. Blows from behind deal 360% damage. {fx} \"Charlga's. A thorn of Agamaggan himself, filed to a point.\""
 perks = [{ kind = "stamina", amount = 0.06 }]
 
+# The Corpsemaker's dread: a hit cows the foe 4 sec, so it deals 25% less and winds up slower.
 [[weapon]]
 key = "corpsemaker"
 windup = 0.5
@@ -1342,6 +1343,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 1
+cow = 0.25
 moveset = "axe_two_hand"
 
 [[item]]
@@ -1350,7 +1352,7 @@ name = "Corpsemaker"
 display = 8499
 icon = "INV_Axe_10"
 kind = "weapon"
-text = "Ramtusk's. The quillboar named it, and meant it."
+text = "{fx} \"Ramtusk's. The quillboar named it, and meant it.\""
 perks = [{ kind = "might", amount = 0.03 }]
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a

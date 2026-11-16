@@ -107,7 +107,7 @@ numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a ban
 | Loksey's Boar Spear | Its thrust slows the foe 40% for 2.5 sec | `snare` |
 | Militia Mace | Stance breaker (its hits count twice) | `posture` |
 | Hogger's Club | Its heavy knocks the foe 5 yd back | `knock` |
-| Cookie's Tenderizer | A hit tenderizes: the next hit on the foe from any ally deals 25% more | `tender` |
+| Cookie's Tenderizer | A hit tenderizes: the next hit on the foe from another ally deals 25% more | `tender` |
 | Gilnid's Wrench | Its heavy stuns mechanical foes and machines 4 sec (not a champion machine) | `machine_stun` |
 | Hand of Righteousness | Each hit heals the most wounded ally within 15 yd (you too) 3% | `mend_ally` |
 | Baron's Scepter | A hit curses the foe; a cursed foe that dies bursts in shadow on those within 5 yd | `curse` |
@@ -118,3 +118,16 @@ numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a ban
 | Bazil's Shiv | Hits poison 3 a sec a stack, up to 5 stacks, for 6 sec | `poison` |
 | Thornspike | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
 | Cobrahn's Fang | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |
+| Footman's Claymore | The sweeper: widest arc, up to 4 foes; a light blow on you doesn't break its swing | `swing_poise` |
+| Fallen Champion's Greatsword | Its heavy rallies allies within 8 yd (you too): 15% less damage for 5 sec | `rally` |
+| Quarry Maul | Unchanged: breaks stances, 3 foes, a 1.2 sec stagger (and the maul's slow overhead set) | |
+| Thornroot Maul | Its heavy roots the foes it hits for 2.5 sec | `root` |
+| Mograine's Might | Its heavy sends a holy shockwave ring (6 yd) for 0.8 of the blow | `shockwave` |
+| Smite's Hammer | The 3rd hit in a row on one foe staggers it 1.5 sec | `build` |
+| Rhahk'Zor's Maul | Its heavy marks the spot; after 1 sec rocks fall for 0.6 of the blow within 2.5 yd | `rockfall` |
+| Warlord's Axe | The executioner: twice the damage on a foe under a third of its health | `execute` |
+| Targorr's Axe | Up to 80% more damage as your health falls | `rage` |
+| Corpsemaker | Its hits cow the foe: 25% less damage and slower wind-ups for 4 sec | `cow` |
+| Guillotine Axe | Its heavy does triple damage to a stunned, asleep, rooted, frozen or staggered foe | `guillotine` |
+| Halberd, Zanjin's Spear | Reach: 5 yd and a thrust through a raised shield | `through_guard` |
+| Staffs (all six) | Unchanged: casting weapons with their own abilities | `bolt`, `alt` |

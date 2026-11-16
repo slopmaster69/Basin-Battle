@@ -1228,6 +1228,8 @@ pub struct Survival {
     pub(crate) trails: BTreeMap<Id, std::collections::VecDeque<(f32, Vec3)>>,
     /// Danger marks still on the ground: until when; the friends' among them.
     marks: Vec<(Id, f32)>,
+    /// Rocks on their way down (`weapon_fx`).
+    pub(crate) fx_pending: Vec<weapon_fx::Rockfall>,
     friendly_marks: BTreeSet<Id>,
     pub raid: raid::Raid,
     /// The Proving Ring's run, if one's on.
@@ -1363,6 +1365,7 @@ impl Survival {
             pending: Vec::new(),
             trails: BTreeMap::new(),
             marks: Vec::new(),
+            fx_pending: Vec::new(),
             friendly_marks: BTreeSet::new(),
             raid: raid::Raid::default(),
             arena: arena::Arena::default(),
@@ -1458,6 +1461,7 @@ impl Survival {
         }
         self.step_nodes();
         self.step_marks();
+        self.step_weapon_fx();
         self.step_previews();
         if self.is_below() {
             self.step_below();
