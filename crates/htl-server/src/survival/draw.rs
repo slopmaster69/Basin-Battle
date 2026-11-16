@@ -691,8 +691,13 @@ impl SurvivalGame {
         // Put away for a meal too, the hero's own toggle untouched (Corey's review: eating with
         // the axe still in hand).
         let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed || matches!(p.action, htl_survival::Action::Eat { .. }));
-        // Weapons out: the axe and shield in hand, or the bow; put away (R), on the back.
-        f.set(idx::UNIT_BYTES_2, if sheathed { 0 } else if kit == Kit::Bow { 2 } else { 1 });
+        // Weapons out: the axe and shield in hand, or the bow; put away (R), on the back. Byte 0
+        // is 1.12's sheath state. Byte 1, which 1.12 leaves zero, is the hero's count of R presses
+        // (`sheath_hand`): a client with patch 0104 plays the sheathe animation when the state
+        // changes with a new count, and snaps it otherwise, as 1.12 does.
+        let state = if sheathed { 0 } else if kit == Kit::Bow { 2 } else { 1 };
+        let hand = self.sim.players.get(&id).map_or(0, |p| p.sheath_hand);
+        f.set(idx::UNIT_BYTES_2, state | u32::from(hand) << 8);
         if let Some(p) = self.sim.players.get(&id) {
             if let Some(w) = self.sim.content.weapon(&self.sim.content.items[p.weapon].key) {
                 f.set_f32(idx::UNIT_MINDAMAGE, w.damage[0] as f32).set_f32(idx::UNIT_MAXDAMAGE, w.damage[1] as f32);
@@ -1581,6 +1586,36 @@ mod rope_tests {
             game.sim.step(0.05);
         }
         assert_eq!(seen, [true; 3], "exercise the stick, the flames and the fallen pole");
+    }
+
+    /// A hero's `UNIT_FIELD_BYTES_2`: byte 0 the sheath state, byte 1 the count of R presses,
+    /// which moves with R and stays put when a blow draws the weapons.
+    #[test]
+    fn the_sheath_byte_carries_the_r_count_beside_the_state() {
+        use crate::fields::{idx, Fields};
+        use htl_survival::{content::Content, land::FlatLand, Input};
+        let mut game = super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
+        game.sim.mobs.clear();
+        let hero = game.sim.join("smith", "Smith", None);
+        let bytes = |game: &super::SurvivalGame| {
+            let mut f = Fields::new();
+            game.gear_fields(hero, &mut f);
+            f.get(idx::UNIT_BYTES_2).unwrap()
+        };
+        let drawn = bytes(&game) & 0xff;
+        assert_ne!(drawn, 0, "weapons out to begin with");
+        assert_eq!(bytes(&game) >> 8, 0, "no press yet");
+        game.sim.input(hero, Input::Sheathe);
+        game.sim.step(0.05);
+        assert_eq!(bytes(&game), 1 << 8, "put away, the first press");
+        game.sim.input(hero, Input::Sheathe);
+        game.sim.step(0.05);
+        assert_eq!(bytes(&game), drawn | 2 << 8, "drawn, the second");
+        game.sim.input(hero, Input::Sheathe);
+        game.sim.step(0.05);
+        game.sim.input(hero, Input::Attack);
+        game.sim.step(0.05);
+        assert_eq!(bytes(&game), drawn | 3 << 8, "a blow draws them with the count unchanged");
     }
 
     #[test]

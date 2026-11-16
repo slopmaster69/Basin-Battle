@@ -895,6 +895,10 @@ pub struct Player {
     pub last_cast: Option<(usize, f32)>,
     /// The weapons put away (R).
     pub sheathed: bool,
+    /// How many times R has put the weapons away or drawn them, wrapping. A sheath change that
+    /// comes with a new count is the hero's own, which the clients play as the sheathe animation;
+    /// any other (a blow that draws, a meal that puts away) snaps.
+    pub sheath_hand: u8,
     /// Held still by an effect (their client told so).
     pub rooted: bool,
     /// A panic's last stride.
@@ -1751,6 +1755,7 @@ impl Survival {
             rested_at: None,
             last_cast: None,
             sheathed: false,
+            sheath_hand: 0,
             rooted: false,
             panic_stride: 0.0,
             combos: recasts::Combos::default(),

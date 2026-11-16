@@ -2593,6 +2593,56 @@ fn a_meal_puts_the_weapons_away_and_takes_them_out_again() {
     assert_eq!(gear(&ev), 1, "out again as it ends");
 }
 
+/// R puts the weapons away or draws them with no words (Corey, 16 Nov 2026: "it should just do
+/// it"), counting the press so the clients play the sheathe animation for it. A press while busy
+/// is a silent nothing; a blow that draws, or a meal that puts away, leaves the count.
+#[test]
+fn r_sheathes_and_draws_without_a_word_and_counts_the_press() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    give(&mut s, p, "roast", 1);
+    s.players.get_mut(&p).unwrap().health = 50;
+    let gear = |ev: &[Event]| ev.iter().filter(|e| matches!(e, Event::Gear { player } if *player == p)).count();
+    let told = |ev: &[Event]| ev.iter().any(|e| matches!(e, Event::Tell { player, .. } if *player == p));
+
+    s.input(p, Input::Sheathe);
+    let ev = s.step(DT);
+    assert!(s.players[&p].sheathed, "put away");
+    assert_eq!(s.players[&p].sheath_hand, 1, "by hand");
+    assert_eq!(gear(&ev), 1, "the body shows it");
+    assert!(!told(&ev), "no words");
+
+    s.input(p, Input::Sheathe);
+    let ev = s.step(DT);
+    assert!(!s.players[&p].sheathed, "drawn");
+    assert_eq!(s.players[&p].sheath_hand, 2);
+    assert_eq!(gear(&ev), 1);
+    assert!(!told(&ev), "no words drawing either");
+
+    // Mid-meal the press is refused, silently and with nothing changed.
+    s.input(p, Input::Use);
+    s.step(DT);
+    assert_eq!(s.players[&p].action.name(), "eat");
+    s.input(p, Input::Sheathe);
+    let ev = s.step(DT);
+    assert!(!s.players[&p].sheathed && s.players[&p].sheath_hand == 2, "nothing changed");
+    assert!(!told(&ev), "no refusal said");
+    let secs = s.content.items[s.content.item("roast").unwrap()].use_secs;
+    run(&mut s, secs + 0.3);
+    assert_eq!(s.players[&p].action, Action::Ready, "eaten");
+    assert_eq!(s.players[&p].sheath_hand, 2, "the meal's put-away isn't counted");
+
+    // Put away by hand, then drawn by a blow: drawn, the count unchanged (the clients snap it).
+    s.input(p, Input::Sheathe);
+    s.step(DT);
+    assert!(s.players[&p].sheathed && s.players[&p].sheath_hand == 3);
+    s.input(p, Input::Attack);
+    let ev = s.step(DT);
+    assert!(!s.players[&p].sheathed, "a blow draws");
+    assert_eq!(s.players[&p].sheath_hand, 3, "not by hand");
+    assert!(!told(&ev));
+}
+
 #[test]
 fn a_blow_from_behind_is_a_backstab() {
     let mut s = world();

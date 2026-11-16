@@ -1,0 +1,411 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 14:12:53 -0600
+Subject: [PATCH] A hero's own sheathe press plays the sheathe and unsheathe
+ clips on every client (patch 0104)
+
+Elwynn Survival's R goes to the server, which changes UNIT_FIELD_BYTES_2 byte 0, and 1.12 adopts
+a changed byte with an instant SetSheatheState (0x604c70): the weapons jumped between hand and
+back with no movement, for the hero and for everyone watching. Only a Z press (ToggleSheath)
+played the Sheath 89 / HipSheath 90 clips.
+
+The server now also counts the hero's presses in byte 1, which 1.12 leaves zero. A sheath byte
+that changes together with that count is played as the ceremony, on any unit: the same per-arm
+masked stow and draw legs as a Z press, each weapon moving at its arm's $SHR/$SHL key, with the
+draw/stow sound. A change that leaves the count (a blow drawing, a meal putting away) still
+snaps, and ends a ceremony still playing; so does an add-on's swing taking the body. A model
+without both clips, a rider, or a unit first seen snaps as before.
+
+Each arm now takes its own key ($SHR right, $SHL left) where a model keys them apart
+(HumanFemale's HipSheath, 0.40 and 0.67 sec), and a new ceremony stops one still playing.
+---
+ .../benilla-app/src/creature_anim/driver.rs   |  43 +++++-
+ .../src/creature_anim/driver/tests.rs         | 132 ++++++++++++++++++
+ .../benilla-app/src/creature_anim/sheath.rs   |  69 ++++++++-
+ .../src/messages/update_object/fields/unit.rs |   7 +
+ 4 files changed, 241 insertions(+), 10 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/driver.rs b/crates/benilla-app/src/creature_anim/driver.rs
+index 75315b80..673a4103 100644
+--- a/crates/benilla-app/src/creature_anim/driver.rs
++++ b/crates/benilla-app/src/creature_anim/driver.rs
+@@ -23,7 +23,8 @@ use super::select::{
+     swing_anim_main, swing_anim_off, unify, Mode, OneShotRoute, DEATH, DEFAULT_WALK_SPEED, STAND,
+ };
+ use super::sheath::{
+-    advance_sheath_ceremony, model_refuses_toggle, setter_refuses, start_sheath_ceremony,
++    advance_sheath_ceremony, by_hand, model_refuses_toggle, setter_refuses, start_sheath_ceremony,
++    stop_sheath_ceremony,
+ };
+ use super::{
+     find_resolved, move_flags, AnimData, AnimDriver, AutoRepeatArmed, BaseAnimRecompute, CastHold,
+@@ -562,7 +563,8 @@ pub(super) fn drive_animations(
+         mv.stealthed = store.is_some_and(|s| s.0.unit_is_stealthed());
+         // Basin Battle: the legs' motion for the walk under a swing, by the flags the animation
+         // plays (the action layer reads it after the clocks advance).
+-        drv.legs.step(mv.flags, mv.speed, mounted, time.delta_secs());
++        drv.legs
++            .step(mv.flags, mv.speed, mounted, time.delta_secs());
+         let moving = mv.flags & move_flags::ANY_MOVE != 0;
+         // An arc's launch vertical speed splits a jump (the JumpStart/Jump bracket; jump
+         // `0x60e480`, land `0x602c60`) from a step-off fall, which has no bracket and keeps the
+@@ -750,10 +752,16 @@ pub(super) fn drive_animations(
+ 
+         // ── Sheath state: the committed cache (`[+0xd40]`), not the descriptor byte, adopting the
+         // byte whenever it changes (`0x604c70`). Every SetSheatheState (`0x611cf0`) snaps except
+-        // the manual toggle's ceremony, which carries the draw/stow sound.
++        // the manual toggle's ceremony, which carries the draw/stow sound, and (Basin Battle) a
++        // byte the server changed for the hero's own press.
+         let sheath_frame_start = committed.driven;
+         let fields = store.map(|s| &s.0);
+         let sheath_byte = fields.and_then(|f| f.unit_sheath_state()).unwrap_or(0);
++        let sheath_hand = fields.and_then(|f| f.unit_sheath_hand()).unwrap_or(0);
++        // An add-on's clip owning the body (a swing) takes the arms: no ceremony plays under it.
++        let body_owned = clip_owns
++            .as_deref()
++            .is_some_and(|o| o.muted(entity, time.elapsed_secs()));
+         // The constructor seeds the state from the byte untested (`0x5fafa0`), once per unit: a
+         // driver rebuilt for a new model finds it seeded. A later change goes through the setter
+         // (`0x604c70`: `0x611cf0(byte, 1, 0)`), whose class test can refuse it.
+@@ -762,10 +770,37 @@ pub(super) fn drive_animations(
+             committed.byte = Some(sheath_byte);
+         } else if committed.byte != Some(sheath_byte) {
+             committed.byte = Some(sheath_byte);
+-            if !setter_refuses(sheath_byte, fields, classes) {
++            let was = committed.cur.unwrap_or(0);
++            if !setter_refuses(sheath_byte, fields, classes) && was != sheath_byte {
+                 committed.cur = Some(sheath_byte);
++                // Basin Battle: the server puts the weapons away or draws them for the hero's R
++                // (its press count moved with the byte), so every client plays the sheathe and
++                // unsheathe clips as for a Z press, each weapon moving at its clip's `$SHL`/`$SHR`
++                // key. A model the toggle refuses, a rider or a body a swing owns snaps as 1.12.
++                if by_hand(committed.hand, sheath_hand)
++                    && !mounted
++                    && !body_owned
++                    && !model_refuses_toggle(anims, armed_id(&drv, &player, &tr, anims))
++                {
++                    debug!("sheath: unit {entity} {was} -> {sheath_byte} (by hand, ceremony)");
++                    start_sheath_ceremony(
++                        &mut commands,
++                        entity,
++                        &mut drv,
++                        &mut player,
++                        anims,
++                        wielded,
++                        was,
++                        sheath_byte,
++                        catalog,
++                    );
++                }
+             }
+         }
++        committed.hand = Some(sheath_hand);
++        if body_owned {
++            stop_sheath_ceremony(&mut commands, entity, &mut drv, &mut player);
++        }
+         // The setter: a no-op when unchanged (`newState == CUR`), else commit, volunteer
+         // `CMSG_SETSHEATHED` for the local player, and for the manual toggle play the ceremony,
+         // per-arm masked overlays (`0x60b770`) by each item's stow family (hip 90, back 89).
+diff --git a/crates/benilla-app/src/creature_anim/driver/tests.rs b/crates/benilla-app/src/creature_anim/driver/tests.rs
+index ec39305c..ac862be7 100644
+--- a/crates/benilla-app/src/creature_anim/driver/tests.rs
++++ b/crates/benilla-app/src/creature_anim/driver/tests.rs
+@@ -2213,6 +2213,138 @@ fn a_melee_to_ranged_toggle_stows_both_hands_before_it_reaches_for_the_bow() {
+     );
+ }
+ 
++/// Basin Battle: the server puts a hero's weapons away for their own press (R) by changing the
++/// sheath byte with its press count (`UNIT_FIELD_BYTES_2` byte 1) moved too, and every client,
++/// the hero's and the onlookers', plays the stow and draw clips for it as for a Z press. A byte
++/// changed with the count left (a blow drawing, a meal) snaps as 1.12's `0x604c70` does, and ends
++/// a ceremony still playing; so does a swing of an add-on's that owns the body.
++#[test]
++fn a_sheath_byte_changed_with_the_press_count_plays_the_ceremony_on_any_unit() {
++    use bevy::animation::graph::{AnimationGraph, AnimationGraphHandle};
++    use bevy::animation::AnimationClip;
++
++    let mut app = app();
++    const DUR: f32 = 0.1;
++    let handles: Vec<_> = (0..5)
++        .map(|_| {
++            let mut c = AnimationClip::default();
++            c.set_duration(DUR);
++            app.world_mut()
++                .resource_mut::<Assets<AnimationClip>>()
++                .add(c)
++        })
++        .collect();
++    let (graph, nodes) = AnimationGraph::from_clips(handles);
++    let graph_handle = app
++        .world_mut()
++        .resource_mut::<Assets<AnimationGraph>>()
++        .add(graph);
++    let family = |id: u16, right: usize, left: usize| {
++        let mut c = clip(id, 0, false);
++        c.node = nodes[right];
++        c.duration = DUR;
++        c.blend_time = 0.0;
++        c.arm_nodes = Some((nodes[right], nodes[left]));
++        c
++    };
++    let mut stand = clip(0, 0, true);
++    stand.node = nodes[0];
++    stand.duration = DUR;
++    // `UNIT_FIELD_BYTES_2` (164): byte 0 the sheath state, byte 1 the press count.
++    let bytes =
++        |state: u32, count: u32| crate::net::ObjectStore(alive(&[(164, state | count << 8)]));
++    // Another hero seen from here (no `SelfPlayer`): a hip sword and a shield on the back.
++    let unit = app
++        .world_mut()
++        .spawn((
++            ModelAnimations {
++                graph: graph_handle.clone(),
++                clips: vec![stand, family(90, 1, 2), family(89, 3, 4)],
++                hand_close: [None, None],
++                playable_animation_lookup: Vec::new(),
++                animation_lookup: lookup(&[0, 90, 89]),
++                global_bones: Vec::new(),
++                first_seq: None,
++                pose: Default::default(),
++            },
++            AnimationPlayer::default(),
++            AnimationTransitions::new(),
++            AnimationGraphHandle(graph_handle),
++            AnimDriver::default(),
++            Wielded {
++                main: Some((2, 0x7)),
++                off: Some((4, 6)),
++                main_sheath: 3,
++                off_sheath: 4,
++                materials: [1, 6, 0],
++                ..Default::default()
++            },
++            bytes(1, 7),
++        ))
++        .id();
++    let visual = |app: &App| {
++        app.world()
++            .entity(unit)
++            .get::<crate::creature_anim::VisualSheath>()
++            .map(|v| v.0)
++    };
++    app.update();
++    assert_eq!(sheath_of(&app, unit), Some(1), "seeded drawn");
++    assert_eq!(visual(&app), None, "first seen: nothing plays");
++
++    // R: put away, the count moved with it. Both hands hold on until their clips' keys.
++    app.world_mut().entity_mut(unit).insert(bytes(0, 8));
++    app.update();
++    assert_eq!(sheath_of(&app, unit), Some(0));
++    assert_eq!(
++        visual(&app),
++        Some([1, 1]),
++        "the stow clips play, the weapons still in hand"
++    );
++    let mut seen = vec![[1u8, 1]];
++    for _ in 0..30 {
++        advance(&mut app, 20);
++        match visual(&app) {
++            Some(v) if seen.last() != Some(&v) => seen.push(v),
++            None => break,
++            _ => {}
++        }
++    }
++    assert_eq!(
++        seen.last(),
++        Some(&[0, 0]),
++        "each weapon put away at its key (saw {seen:?})"
++    );
++    assert_eq!(visual(&app), None, "and the ceremony done");
++
++    // A blow draws: the count left as it was, so a snap.
++    app.world_mut().entity_mut(unit).insert(bytes(1, 8));
++    app.update();
++    assert_eq!(sheath_of(&app, unit), Some(1), "drawn");
++    assert_eq!(visual(&app), None, "snapped, no clip");
++
++    // R again, then a blow before the clips are done: the snap ends the ceremony at once.
++    app.world_mut().entity_mut(unit).insert(bytes(0, 9));
++    app.update();
++    assert!(visual(&app).is_some(), "stowing");
++    app.world_mut().entity_mut(unit).insert(bytes(1, 9));
++    app.update();
++    app.update();
++    assert_eq!(sheath_of(&app, unit), Some(1));
++    assert_eq!(visual(&app), None, "the blow's draw ends the stow");
++
++    // R once more, and an add-on's swing takes the body: the ceremony gives way.
++    app.world_mut().entity_mut(unit).insert(bytes(0, 10));
++    app.update();
++    assert!(visual(&app).is_some(), "stowing");
++    let mut owns = super::super::action::ClipOwnsBody::default();
++    owns.0.insert(unit, f32::MAX);
++    app.insert_resource(owns);
++    app.update();
++    assert_eq!(visual(&app), None, "a swing owning the body ends it");
++    assert_eq!(sheath_of(&app, unit), Some(0), "the state stands");
++}
++
+ /// An AnimationLookup (`0x711960`'s table) that authors `ids`.
+ fn lookup(ids: &[u16]) -> Vec<u16> {
+     let mut table = vec![0xffff; 256];
+diff --git a/crates/benilla-app/src/creature_anim/sheath.rs b/crates/benilla-app/src/creature_anim/sheath.rs
+index 2f9f7a50..9ba0ff51 100644
+--- a/crates/benilla-app/src/creature_anim/sheath.rs
++++ b/crates/benilla-app/src/creature_anim/sheath.rs
+@@ -23,6 +23,8 @@ pub(crate) struct CommittedSheath {
+     /// The state the driver's last pass left, so a change made between its passes, such as a
+     /// script call's, still meets its leave-ranged edge.
+     pub(super) driven: Option<u8>,
++    /// The descriptor's last count of the hero's own sheathe presses ([`by_hand`]).
++    pub(super) hand: Option<u8>,
+ }
+ 
+ impl CommittedSheath {
+@@ -88,6 +90,8 @@ pub(super) struct SheathSwap {
+     arms: [Option<SheathArm>; 2],
+     /// The state the ceremony left (the client's `+0xd3c` PREV); phase 2's gate.
+     prev: u8,
++    /// The state it goes to: a committed state that moves anywhere else meanwhile (a snap) ends it.
++    to: u8,
+ }
+ 
+ impl SheathSwap {
+@@ -117,6 +121,14 @@ impl SheathSwap {
+ /// arming gives it the arm outright.
+ const SHEATH_OVERLAY_WEIGHT: f32 = 8.0;
+ 
++/// Whether a sheath byte the server changed is the hero's own press, played as the ceremony
++/// rather than snapped (Basin Battle, not in 1.12.1, where `0x604c70` always snaps): byte 1 of
++/// `UNIT_FIELD_BYTES_2`, the count of presses, moved with it. `seen` is the count before, `None`
++/// for a unit never driven; a server that leaves byte 1 zero never moves it, so nothing changes.
++pub(super) fn by_hand(seen: Option<u8>, hand: u8) -> bool {
++    seen.is_some_and(|s| s != hand)
++}
++
+ /// A sheath state change, the client's one setter `SetSheatheState(newState, bInstant,
+ /// bFireEvent)` (`0x611cf0`), which `drive_animations` executes. Of its 24 call sites only the
+ /// manual `ToggleSheath` passes `bInstant = 0`: every other change snaps.
+@@ -313,13 +325,19 @@ fn arm_leg(
+     let active = player.play(node);
+     active.replay();
+     active.set_weight(SHEATH_OVERLAY_WEIGHT);
+-    Some(SheathArm {
+-        node,
+-        swap_at: c
+-            .events
++    // The arm's own key, `$SHR` for the right and `$SHL` for the left: a few models key the two
++    // apart (HumanFemale's HipSheath, 0.40 and 0.67 sec), so either one moved the right hand early.
++    let own: &[u8; 4] = if arm == ARM_RIGHT { b"$SHR" } else { b"$SHL" };
++    let key = |want: &[&[u8; 4]]| {
++        c.events
+             .iter()
+-            .find(|e| matches!(&e.ident, b"$SHL" | b"$SHR"))
++            .find(|e| want.contains(&&e.ident))
+             .map(|e| e.time)
++    };
++    Some(SheathArm {
++        node,
++        swap_at: key(&[own])
++            .or_else(|| key(&[b"$SHL", b"$SHR"]))
+             .unwrap_or(c.duration * 0.5),
+         drawing: leg.drawing,
+         // A ranged state moves the ranged slot; otherwise the arm is the slot.
+@@ -340,6 +358,8 @@ pub(super) fn start_sheath_ceremony(
+     new_state: u8,
+     catalog: Option<&AnimDataCatalog>,
+ ) {
++    // A ceremony still playing gives way to this one, its legs stopped.
++    stop_sheath_ceremony(commands, entity, drv, player);
+     let w = wielded.copied().unwrap_or_default();
+     let legs = sheath_phase1(old_state, new_state, &w);
+     let mut arms: [Option<SheathArm>; 2] = [None, None];
+@@ -353,6 +373,7 @@ pub(super) fn start_sheath_ceremony(
+         let swap = SheathSwap {
+             arms,
+             prev: old_state,
++            to: new_state,
+         };
+         commands.entity(entity).insert(VisualSheath([
+             swap.arm_state(0, new_state),
+@@ -362,8 +383,26 @@ pub(super) fn start_sheath_ceremony(
+     }
+ }
+ 
++/// End a ceremony at once: its legs stopped and [`VisualSheath`] dropped, so the weapons show the
++/// committed state. Nothing without one.
++pub(super) fn stop_sheath_ceremony(
++    commands: &mut Commands,
++    entity: Entity,
++    drv: &mut AnimDriver,
++    player: &mut AnimationPlayer,
++) {
++    let Some(swap) = drv.sheath_swap.take() else {
++        return;
++    };
++    for leg in swap.arms.into_iter().flatten() {
++        player.stop(leg.node);
++    }
++    commands.entity(entity).remove::<VisualSheath>();
++}
++
+ /// Advance a ceremony: cross each arm's swap point, hand a finished stow to [`sheath_phase2`], and
+-/// drop [`VisualSheath`] once no arm has a leg left.
++/// drop [`VisualSheath`] once no arm has a leg left. A committed state that left the ceremony's
++/// (a snap: a blow drawing, a meal putting away) ends it.
+ pub(super) fn advance_sheath_ceremony(
+     commands: &mut Commands,
+     entity: Entity,
+@@ -375,6 +414,10 @@ pub(super) fn advance_sheath_ceremony(
+     catalog: Option<&AnimDataCatalog>,
+     swaps: &mut MessageWriter<SheathSwapMessage>,
+ ) {
++    if drv.sheath_swap.as_ref().is_some_and(|s| s.to != cur) {
++        stop_sheath_ceremony(commands, entity, drv, player);
++        return;
++    }
+     let Some(mut swap) = drv.sheath_swap.take() else {
+         return;
+     };
+@@ -507,6 +550,20 @@ mod tests {
+         );
+     }
+ 
++    /// The press count in `UNIT_FIELD_BYTES_2` byte 1: a change that moves it is the hero's own,
++    /// one that leaves it (a blow drawing, a meal) snaps, and a unit first seen never plays one.
++    #[test]
++    fn a_sheath_change_is_played_only_when_the_press_count_moves_with_it() {
++        assert!(by_hand(Some(4), 5), "pressed");
++        assert!(by_hand(Some(255), 0), "the count wraps");
++        assert!(
++            !by_hand(Some(5), 5),
++            "drawn by a blow, or put away for a meal"
++        );
++        assert!(!by_hand(None, 5), "first seen");
++        assert!(!by_hand(Some(0), 0), "a server that leaves byte 1 zero");
++    }
++
+     /// Sword, shield and bow: sheath types 3 (hip, 90), 4 (back, 89) and 1 (back, 89).
+     fn warrior() -> Wielded {
+         Wielded {
+diff --git a/crates/benilla-protocol/src/messages/update_object/fields/unit.rs b/crates/benilla-protocol/src/messages/update_object/fields/unit.rs
+index 20c2450e..2e94c22b 100644
+--- a/crates/benilla-protocol/src/messages/update_object/fields/unit.rs
++++ b/crates/benilla-protocol/src/messages/update_object/fields/unit.rs
+@@ -378,6 +378,13 @@ impl ObjectFields {
+     pub fn unit_sheath_state(&self) -> Option<u8> {
+         self.get_u32(FIELD_UNIT_BYTES_2).map(|v| (v & 0xff) as u8)
+     }
++    /// `UNIT_FIELD_BYTES_2` byte 1, which 1.12 leaves zero: Elwynn Survival's count of the hero's
++    /// own sheathe presses (R), wrapping. A sheath state that changes with a new count is played
++    /// as the sheathe animation rather than snapped (Basin Battle, not in 1.12.1).
++    pub fn unit_sheath_hand(&self) -> Option<u8> {
++        self.get_u32(FIELD_UNIT_BYTES_2)
++            .map(|v| (v >> 8 & 0xff) as u8)
++    }
+     /// `UNIT_FIELD_STAT0 + i`: primary stat `i` after buffs, 0 Str, 1 Agi, 2 Sta, 3 Int, 4 Spi.
+     pub fn unit_stat(&self, i: u8) -> Option<u32> {
+         (i < 5).then(|| self.get_u32(FIELD_UNIT_STAT0 + u16::from(i)))?
+-- 
+2.56.0.windows.4
+
