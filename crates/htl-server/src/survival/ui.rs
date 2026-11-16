@@ -567,7 +567,9 @@ pub(crate) const VERSION: u32 = 2;
 /// answers come as `AN`, links in chat; a note, a secret, the book's record and a run's tally
 /// (`NT` of those kinds) are told in chat. An older add-on is told the answers as commands to
 /// type, and still opens those pages.
-pub(crate) const ADDON_NEWEST: u32 = 74;
+/// 75: the health-bar watch keeps its list of plates and the Ledger's font sweep walks a few frames
+/// a tick, so neither costs a frame spike in a crowd (Corey's laggy Elwynn). No line changes.
+pub(crate) const ADDON_NEWEST: u32 = 75;
 /// The first add-on that shows a person's answers (`AN`) as links in chat.
 pub(crate) const SPEECH_ADDON: u32 = 74;
 /// The first add-on that lays a column's third choice on the board.
