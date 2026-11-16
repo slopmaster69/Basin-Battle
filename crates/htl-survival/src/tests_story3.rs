@@ -583,3 +583,146 @@ fn the_bargain_follows_the_lions_knife_in_the_journal() {
     s.step_goals();
     assert!(s.camp.goal > at("The Lion's Bargain"));
 }
+
+// --- Stage 13: Sable, the Lion's Hound ---------------------------------------------------------
+
+/// The built-in world on flat ground with only Sable's pack, and a hero far off.
+fn sable_world() -> (Survival, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let keep: Vec<Id> = s.mobs.iter().filter(|(_, m)| s.content.mobs[m.def].key == "sable").map(|(id, _)| *id).collect();
+    s.mobs.retain(|id, _| keep.contains(id));
+    s.respawns.clear();
+    let h = bh_hero(&mut s, [-9000.0, 0.0, 0.0]);
+    (s, h)
+}
+
+fn sable(s: &Survival) -> Id {
+    *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "sable").map(|(id, _)| id).expect("Sable")
+}
+
+#[test]
+fn sable_lies_unseen_on_the_roads_until_the_camp_has_answered_venn_then_steps_out_on_a_hero() {
+    let (mut s, h) = sable_world();
+    let k = sable(&s);
+    assert!(s.mobs[&k].hidden);
+    let at = s.mobs[&k].pos;
+    // Before the answer: a hero walks right past her and nothing comes.
+    s.move_player(h, [at[0] + 5.0, at[1], at[2]], 0.0, Moving::default());
+    run(&mut s, 6.0);
+    assert!(s.mobs[&k].hidden && s.mobs[&k].state.foe().is_none(), "nothing before the camp answers");
+    // Either answer sends her.
+    s.camp.counts.insert("chose:letter".into(), 1);
+    s.camp.counts.insert("chose:letter:sell".into(), 1);
+    s.move_player(h, [at[0] + 30.0, at[1], at[2]], 0.0, Moving::default());
+    run(&mut s, 6.0);
+    assert!(s.mobs[&k].hidden, "still unseen until a hero comes near");
+    s.move_player(h, [at[0] + 10.0, at[1], at[2]], 0.0, Moving::default());
+    let ev = run(&mut s, 0.5);
+    assert!(!s.mobs[&k].hidden, "she steps out within 12 yd");
+    assert_eq!(s.mobs[&k].state.foe(), Some(Foe::Hero(h)));
+    assert!(ev.iter().any(|e| matches!(e, Event::Yell { text, .. } if text == "His lordship sends his regards.")), "and says why");
+}
+
+#[test]
+fn sable_walks_three_spots_round_the_camp_clear_of_it_and_of_stitches() {
+    let c = Content::builtin();
+    let p = c.packs.iter().find(|p| p.mob == "sable").unwrap();
+    assert!(p.rare && p.hidden == 12.0 && p.after.as_deref() == Some("chose:letter"));
+    let camp = c.world.build_center;
+    for sp in &p.spots {
+        let d = dist2d([sp[0], sp[1], 0.0], [camp[0], camp[1], 0.0]);
+        assert!(d > 100.0, "{sp:?} is {d} yd from the camp");
+        for st in c.packs.iter().filter(|q| q.mob == "stitches") {
+            for r in std::iter::once(&st.at).chain(st.route.iter()) {
+                assert!(dist2d([sp[0], sp[1], 0.0], [r[0], r[1], 0.0]) > 60.0, "{sp:?} clear of Stitches' road");
+            }
+        }
+    }
+}
+
+/// Sable on a hero 2.5 yd off, in the chase.
+fn sable_bare() -> (Survival, Id, Id) {
+    let mut s = world();
+    let h = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    s.rng = rand::SeedableRng::seed_from_u64(4);
+    let def = s.content.mob("sable").unwrap();
+    let k = s.spawn_mob(def, [2.5, 0.0, 0.0], None, false);
+    s.engage(k, Foe::Hero(h));
+    (s, h, k)
+}
+
+/// Seconds until Sable winds up at the hero, the hero turning to face her each step (`face`) or
+/// keeping their back to her; none within `secs`.
+fn first_windup(s: &mut Survival, h: Id, k: Id, face: bool, secs: f32) -> Option<f32> {
+    let start = s.clock;
+    for _ in 0..(secs / 0.05) as usize {
+        let (me, her) = (s.players[&h].pos, s.mobs[&k].pos);
+        let toward = (her[1] - me[1]).atan2(her[0] - me[0]);
+        let f = if face { toward } else { toward + std::f32::consts::PI };
+        s.move_player(h, me, f, Moving::default());
+        let _ = s.step(0.05);
+        keep_up(s, h);
+        if matches!(s.mobs[&k].state, MobState::Windup { .. }) {
+            return Some(s.clock - start);
+        }
+    }
+    None
+}
+
+#[test]
+fn sable_only_strikes_a_back_turn_with_her_and_she_circles() {
+    let (mut s, h, k) = sable_bare();
+    assert_eq!(s.content.mobs[s.mobs[&k].def].temper, "stalker");
+    // Facing her, idle (no opening): she circles and never winds up.
+    assert_eq!(first_windup(&mut s, h, k, true, 8.0), None, "no blow at a hero who turns with her");
+    // Her back turned: the cut comes quickly.
+    let at = first_windup(&mut s, h, k, false, 6.0);
+    assert!(at.is_some_and(|t| t < 4.0), "a back is cut: {at:?}");
+}
+
+#[test]
+fn at_half_her_health_sable_throws_down_the_heroes_beside_her_once_no_adds_no_enrage() {
+    let c = Content::builtin();
+    let m = &c.mobs[c.mob("sable").unwrap()];
+    assert!(m.boss);
+    assert_eq!(m.phases.len(), 1);
+    let ph = &m.phases[0];
+    assert_eq!((ph.at, ph.shove, ph.speed, ph.might), (0.5, 4.0, 1.0, 1.0));
+    assert!(ph.summon.is_empty() && ph.text == "You'll tire before I do.");
+}
+
+#[test]
+fn sables_fall_is_told_and_the_camp_has_words_for_it() {
+    let (mut s, h) = sable_world();
+    s.camp.counts.insert("chose:letter".into(), 1);
+    s.camp.counts.insert("chose:letter:keep".into(), 1);
+    let k = sable(&s);
+    let at = s.mobs[&k].pos;
+    s.move_player(h, [at[0] + 8.0, at[1], at[2]], 0.0, Moving::default());
+    run(&mut s, 0.5);
+    let max = s.mobs[&k].max_health;
+    s.hurt_mob(k, h, max);
+    let ev = run(&mut s, 0.5);
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("Sable"))), "her fall is told");
+    assert!(s.camp_has("kill:sable"));
+    let c = &s.content;
+    for name in ["Marshal Wyle", "Scout Marten", "Aldric Pell"] {
+        let p = c.props.iter().find(|p| p.npc && p.name == name).unwrap();
+        assert_eq!(p.talk.last().unwrap().after.as_deref(), Some("kill:sable"), "{name}'s last word is on her");
+    }
+}
+
+#[test]
+fn the_hound_closes_round_three_in_the_journal() {
+    let c = Content::builtin();
+    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
+    assert_eq!(at("The Lion's Hound"), at("The Lion's Bargain") + 1);
+    assert_eq!(at("Every corner"), at("The Lion's Hound") + 1);
+    let g = &c.goals[at("The Lion's Hound")];
+    assert_eq!((g.kind.as_str(), g.what.as_str()), ("kill", "sable"));
+    assert_eq!(crate::save::ELWYNN_GOALS, 19);
+    assert_eq!(c.sites.len(), 39);
+    assert_eq!(c.goals[at("Every corner")].count, 39);
+}

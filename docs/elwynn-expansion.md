@@ -325,3 +325,16 @@ Built as planned, with these differences, found checking the plan against the co
 - Displays: Venn 7011 (a black suit, `npcfind`), the archers 1984. Unchecked in the client.
 - `ELWYNN_GOALS` is 18. No site was added.
 - Probed with `elwynn_probe near`: Venn (-9673, 692), the purse (-9675, 688) and the archers (-9678, 674) and (-9678, 702) are open ground; the plan's first spots by the statues had walls beside them.
+
+## Stage 13: Sable, the Lion's Hound [x] (roaming hunter; content on E7)
+
+Built as planned, with these differences, found checking the plan against the code:
+- Content only. Her pack is `hidden = 12`, `rare`, with three `spots` and `after = "chose:letter"` (E7 keeps her from stepping out before the camp answers, whichever answer). The `stalker` temper is the existing `backstab` rule (`sim/mobs.rs`: a backstabber waits unless its hero's back is to it or they are open) with `flank`, `punish`, `retreat 0.5` over 5 yd and `pace 0.9`; tempers apply to a boss.
+- Her 50% turn is a `shove` of 4 yd (every hero beside her thrown down) with her line, not the plan's "unseen for a moment": a `run_to` needs fixed points and she wanders between spots. No adds, no enrage (`speed` and `might` stay 1).
+- Three spots, not four: the Goldshire road east of the camp is Stitches' (his bridge end is at (-9744, 470)), and (-9752, 540) is on the stream's bridge. Her spots are (-9752, 640), (-9764, 790) and (-9705, 760), each more than 100 yd from the camp and 60 from Stitches' road.
+- Display 1297 (a woman in black and red leathers, `npcfind`), two daggers. Unchecked in the client.
+- Lines: Wyle, Marten and Pell (only there if the letter was kept) each have a last word at `kill:sable`.
+- `ELWYNN_GOALS` is 19; no site was added, so "Every corner" stays 39.
+- Probed with `elwynn_probe near`: the three spots are open ground; (-9752, 540) and (-9790, 700) failed (water, a wall) and were dropped.
+
+Round three is built.

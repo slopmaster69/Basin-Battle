@@ -970,7 +970,7 @@ hero comes near; spiders drop out of the dark at Jasperlode.
 
 **Rares** wander between spots and come back somewhere else a while after they fall; their fall,
 and their return (and where they've been seen), is told to everyone: Hogger, Garrick Padfoot, Taskmaster Snivvle, Grizzlefin, Mother Fang, Goldtooth,
-Princess, Gruff Swiftbite. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
+Princess, Gruff Swiftbite, Sable. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
 a parry only fills a boss's posture (it never stun-locks one), so Goldtooth's, Morgan's and Paymaster
 Voss's flurries carry `parry_ends = true`, which ends the string at a parry without a reel
 (`tests_boss_rules.rs` checks every such comment against the sim). Every champion and rare leaves a trophy in the chest the first time (Hogger's Cudgel,
@@ -1408,6 +1408,16 @@ camp's gate for good, friendly shooters that shoot a raider on its way to, or at
 what fights a hero. A pack's `after` now works on any pack: one whose condition doesn't hold is unseen (an ambusher
 lying in wait never steps out) until it does, and the camp is looked over as it grows; it stays standing from then,
 across saves. The journal asks for the answer.
+
+**Sable, the Lion's Hound** (Stage 13 of docs/elwynn-expansion.md). Sold or kept, his lordship sends a hunter. Sable,
+a rare, lies unseen on the roads round the camp (the junction below the gate, the Westfall road, the woods by the
+north-west road: `spots`, more than 100 yd from the camp) until a hero comes within 12 yd, and only once the camp has
+answered Venn (her pack's `after`). She steps out ("His lordship sends his regards.") and comes back 30 min after she
+falls. Her temper, `stalker`, strikes only a back, or at an opening (a swing's follow-through, a cast, a meal), and
+works round and gives ground otherwise. Her rule: turn with her and she circles; give her your back and she cuts it.
+Two quick cuts (parry the first and the second never comes) and a lunge at a back. At half her health ("You'll tire
+before I do.") she throws down every hero within 4 yd, once, and goes round them as they rise: get up facing her. Her
+fall is told; Wyle, Marten and (if he stayed) Pell have a last word on her, and the journal asks for her.
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set
