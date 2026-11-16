@@ -24,6 +24,21 @@ if [ ! -f benilla/benilla-config/config.toml ]; then
     mkdir -p benilla/benilla-config
     cp dist/windows/benilla-config/config.toml benilla/benilla-config/config.toml
 fi
+# A settings file the client wrote itself (a game started before this one, or by hand) may lack
+# the agreements, and the Terms of Use then stops the game at a screen whose Accept never lights.
+# Only those two keys are set; the player's mouse speed and the rest stay.
+cfg=benilla/benilla-config/config.toml
+for key in readEULA readTOS; do
+    if ! grep -Eq "^[[:space:]]*$key[[:space:]]*=[[:space:]]*\"1\"" "$cfg"; then
+        if grep -Eq "^[[:space:]]*$key[[:space:]]*=" "$cfg"; then
+            awk -v k="$key" '$0 ~ "^[[:space:]]*" k "[[:space:]]*=" { print k " = \"1\""; next } { print }' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+        elif grep -q '^\[cvars\]' "$cfg"; then
+            awk -v k="$key" '{ print } /^\[cvars\]/ { print k " = \"1\"" }' "$cfg" > "$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+        else
+            printf '[cvars]\n%s = "1"\n' "$key" >> "$cfg"
+        fi
+    fi
+done
 # The add-ons (Basin Battle's card picker and trackers; Elwynn Survival's action layout and
 # windows), fresh from this folder every launch. Each sleeps on the other's realm.
 mkdir -p benilla/benilla-config/AddOns

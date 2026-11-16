@@ -588,6 +588,8 @@ pub(crate) fn out_of_date(version: u32, level: u8) -> Option<String> {
 const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
+/// How long a hero's client has to say hello before the host's log notes it has no add-on.
+const NO_ADDON_AFTER: Duration = Duration::from_secs(20);
 const PING_EVERY: Duration = Duration::from_secs(2);
 /// What was last sent of each key's recast window and empower (see [`SurvivalGame::combo_lines`]).
 const RC_SENT: [&str; 5] = ["RC0", "RC1", "RC2", "RC3", "RC4"];
@@ -950,6 +952,22 @@ impl SurvivalGame {
     }
 
     /// Each tick: what changed on every add-on's screen.
+    /// A hero whose client hasn't said hello (`.es hello`) a few seconds after coming in has no
+    /// add-on (or it didn't load): the host's log says so once, since they play the stock
+    /// interface and the screens that need it are missing.
+    pub(crate) fn log_heroes_without_addon(&mut self) {
+        let late: Vec<ConnId> = self.in_world().filter(|(_, _, w)| !w.addon && !w.porting && !w.no_addon_logged && w.entered_at.elapsed() >= NO_ADDON_AFTER).map(|(c, _, _)| *c).collect();
+        for conn in late {
+            let Some(w) = self.world_mut(conn) else { continue };
+            w.no_addon_logged = true;
+            println!(
+                "[survival] {} has no add-on: no hello {} s after coming in, so they have the stock interface. On a Mac, play through Play or scripts/play.sh, which copy the add-ons in.",
+                w.name,
+                NO_ADDON_AFTER.as_secs()
+            );
+        }
+    }
+
     pub(crate) fn ui_flush(&mut self) {
         /// The HUD lines that don't depend on the hero.
         struct SharedLines {
@@ -965,6 +983,7 @@ impl SurvivalGame {
         let meters_due = self.meters_due();
         let storage = std::mem::take(&mut self.storage_dirty);
         let chest = self.sim.storage_id();
+        self.log_heroes_without_addon();
         let conns: Vec<(ConnId, Id, Option<Id>)> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, w)| (*c, w.id, w.station)).collect();
         // A cooldown coming back changes the bar too.
         let now = self.sim.clock;

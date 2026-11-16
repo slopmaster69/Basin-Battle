@@ -234,3 +234,22 @@ fn perf_net_deadmines_boss_5_heroes() {
         run(&format!("boss {key} + 20 adds"), game, heroes, TICKS);
     }
 }
+
+/// The host's log notes a hero with no add-on once, a while after they come in, and never one
+/// whose client said hello.
+#[test]
+fn a_hero_without_the_addon_is_noted_once_after_a_grace() {
+    let content = htl_survival::Content::builtin().for_dungeon_of("deadmines");
+    let mut game = SurvivalGame::new_in(Realm::BELOW, content, Box::new(Flat), None, 11);
+    let (_, _rx1) = hero(&mut game, 1, 0, false);
+    let (_, _rx2) = hero(&mut game, 2, 1, false);
+    game.world_mut(1).unwrap().addon = false;
+    game.log_heroes_without_addon();
+    assert!(!game.world_of(1).unwrap().no_addon_logged, "a new arrival gets time to say hello");
+    for c in [1, 2] {
+        game.world_mut(c).unwrap().entered_at = Instant::now() - Duration::from_secs(60);
+    }
+    game.log_heroes_without_addon();
+    assert!(game.world_of(1).unwrap().no_addon_logged, "no hello after the grace: noted");
+    assert!(!game.world_of(2).unwrap().no_addon_logged, "an add-on hero is not");
+}
