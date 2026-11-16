@@ -10,7 +10,9 @@
 //! - `S\t<item~name~count~gear>^...`: the camp chest, while its window is open.
 //! - `W\t<station>\t<name>\t<recipe~output~cost~can>^...`: a station's work.
 //! - `BM\t<key~name~cost~can~built~text>^...`: the build menu.
-//! - `AR\t<key~name~kind~held~text>^...`: the weapon rack.
+//! - `AR\t<key~name~kind~held~text>^...`: the weapon rack. `kind` is `one-handed` (it may go in
+//!   the off hand too), `two-handed`, `shield`, or `both hands` (a Rogue's fist weapon, one item
+//!   that fills both hands: one Equip button, as any kind but `one-handed` has).
 //! - `FL\t<text>`: words flashed big: a refusal (out of range, not ready, too winded) or a hint,
 //!   never an outcome. A refusal's voice comes with it as `SMSG_PLAY_SOUND` (the hero's race and
 //!   sex voice, `sim::cues::vocal_sound`), which the stock client plays: no line for it. Only
