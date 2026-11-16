@@ -10956,6 +10956,8 @@ leash = 30.0
 grip = "bow"
 bow = 2826
 friendly = true
+# About 5 a sec each, as Tommy Joe's 9 every 2 sec: help, not a tower. 40 yd so that from outside
+# the gate they reach raiders coming in by it (the camp's heart is 55 yd off).
 shoots = { damage = 12, range = 40.0, every = 2.5 }
 respawn = 600.0
   [mob.attack]
