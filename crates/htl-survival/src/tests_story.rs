@@ -636,7 +636,7 @@ fn stitches_walks_the_goldshire_road_with_a_hero_near_and_keeps_clear_of_the_cam
     let camp = [c.world.build_center[0], c.world.build_center[1], 0.0];
     for p in std::iter::once(&pack.at).chain(pack.route.iter()) {
         let far = dist2d([p[0], p[1], 0.0], camp);
-        assert!(far > 110.0, "{p:?} is {far:.0} yd from the camp");
+        assert!(far > 200.0, "{p:?} is {far:.0} yd from the camp (the plan asks for 110 at least, this road keeps 200)");
     }
     let (mut s, _) = real_world();
     let id = mob_of(&s, "stitches")[0];
