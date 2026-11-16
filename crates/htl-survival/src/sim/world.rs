@@ -767,6 +767,7 @@ impl Survival {
         if self.storage.get(&item).copied().unwrap_or(0) == 0 {
             return Err("Storage has none.".into());
         }
+        self.can_hold(id, item)?;
         let chest = self.objs.get(&self.storage_id()).map(|o| o.pos).ok_or("No storage.")?;
         if dist2d(self.players.get(&id).ok_or("No hero.")?.pos, chest) > INTERACT_RANGE + 2.0 {
             return Err("Go to Camp Storage.".into());
@@ -807,6 +808,7 @@ impl Survival {
         if p.bag.get(&item).copied().unwrap_or(0) == 0 {
             return Err(format!("You carry no {}.", d.name));
         }
+        self.can_hold(id, item)?;
         let old = match d.kind {
             ItemKind::Weapon => Some(p.weapon),
             ItemKind::Shield => Some(p.shield),
@@ -982,6 +984,8 @@ impl Survival {
             return Err("The rack holds no bows.".into());
         }
         let p = self.players.get(&id).ok_or("No such hero.")?;
+        // A Rogue's hands: no shield, two-hander, staff or axe.
+        self.can_hold(id, item)?;
         // The nearest rack (a Siege camp has its own).
         let rack = self.objs.values().filter(|o| o.kind == ObjKind::Rack).map(|o| o.pos).min_by(|a, b| dist2d(*a, p.pos).total_cmp(&dist2d(*b, p.pos))).ok_or("No rack.")?;
         if dist2d(p.pos, rack) > INTERACT_RANGE + 2.0 {

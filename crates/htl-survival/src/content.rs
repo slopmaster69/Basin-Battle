@@ -148,6 +148,10 @@ pub struct Content {
     /// What a hit in a creature's back looks like, whoever lands it.
     #[serde(default)]
     pub backstab: BackstabDef,
+    /// A hero created as a Rogue: two blades and no guard, and what a perfect dodge pays
+    /// (docs/rogue-roles.md, "The core").
+    #[serde(default)]
+    pub rogue: RogueDef,
     /// How the ice shatters off a frozen foe: the same for every class.
     #[serde(default)]
     pub shatter: ShatterDef,
@@ -357,9 +361,18 @@ pub struct DodgeDef {
     /// A spell whose cast look (a whoosh and a dust trail, no animation) marks the dash; 0 for none.
     #[serde(default)]
     pub spell: u32,
-    /// A roll through a blow (a perfect dodge) gives back this much stamina.
+    /// A roll through a blow gives back this much stamina.
     #[serde(default)]
     pub refund: f32,
+    /// A Rogue's perfect dodge: the blow lands from `evade_from` to this long after the dodge
+    /// starts (0: no perfect dodge). It gives back `perfect_refund` stamina in place of `refund`,
+    /// and fills `perfect_posture` of a boss's or champion's posture (docs/rogue-roles.md).
+    #[serde(default)]
+    pub perfect_to: f32,
+    #[serde(default)]
+    pub perfect_refund: f32,
+    #[serde(default)]
+    pub perfect_posture: f32,
 }
 
 impl DodgeDef {
@@ -4415,6 +4428,12 @@ impl Content {
         if self.shield(&self.start.shield).is_none() {
             bail!("start: {} isn't a [[shield]]", self.start.shield);
         }
+        for k in [&self.rogue.weapon, &self.rogue.off_hand] {
+            item(k, "rogue")?;
+            if self.weapon(k).is_none() || self.item(k).is_none_or(|i| self.rogue_can_hold(i).is_err()) {
+                bail!("rogue: {k} isn't a weapon a Rogue can hold");
+            }
+        }
         for i in &self.items {
             match i.kind {
                 ItemKind::Weapon if self.weapon(&i.key).is_none() => bail!("item {}: no [[weapon]] of that key", i.key),
@@ -5237,5 +5256,66 @@ pub struct BackstabDef {
 impl Default for BackstabDef {
     fn default() -> Self {
         Self { kit: 220 }
+    }
+}
+
+/// A hero created as a Rogue (docs/rogue-roles.md, "The core"): what its hands may hold and what
+/// they start with, the Shadow Cut a perfect dodge opens, and how a perfect dodge shows.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct RogueDef {
+    /// The main hand and the off hand a new Rogue starts with.
+    pub weapon: String,
+    pub off_hand: String,
+    /// The weapon kinds a Rogue may hold, by the client's item subclass (15 dagger, 7 sword, 4
+    /// mace, 13 fist), one-handed only. No shield, two-hander, staff or axe.
+    pub weapons: Vec<u32>,
+    /// The Shadow Cut: this long after a perfect dodge, either attack steps behind the one who
+    /// swung, up to this far away, and strikes from there.
+    pub cut_secs: f32,
+    pub cut_reach: f32,
+    /// A dodge cuts an off-hand blow's follow-through short from this share of its recovery
+    /// (`[combat] cancel_after` for the main hand).
+    pub off_cancel_after: f32,
+    /// An empty off hand jabs for this share of the main-hand weapon's blow.
+    pub jab: f32,
+    /// The perfect dodge's flicker: this spell's state look on the body for this long.
+    pub flicker_aura: u32,
+    pub flicker_secs: f32,
+    /// The puff of smoke where the blow fell, and at both ends of the Shadow Cut's step.
+    pub puff: u32,
+}
+
+impl Default for RogueDef {
+    fn default() -> Self {
+        Self {
+            weapon: "dagger".into(),
+            off_hand: "dagger".into(),
+            weapons: vec![15, 7, 4, 13],
+            cut_secs: 0.6,
+            cut_reach: 6.0,
+            off_cancel_after: 0.0,
+            jab: 0.5,
+            flicker_aura: 5215,
+            flicker_secs: 0.3,
+            puff: 1856,
+        }
+    }
+}
+
+impl Content {
+    /// Whether a Rogue may hold this item, and if not, the words why.
+    pub fn rogue_can_hold(&self, item: usize) -> Result<(), &'static str> {
+        let Some(d) = self.items.get(item) else { return Ok(()) };
+        match d.kind {
+            ItemKind::Shield => Err("Rogues can't use shields."),
+            ItemKind::Weapon => match self.weapon(&d.key) {
+                Some(w) if w.two_handed => Err("Rogues can't use two-handed weapons."),
+                Some(w) if w.subclass == 0 => Err("Rogues can't use axes."),
+                Some(w) if !self.rogue.weapons.contains(&w.subclass) => Err("Rogues can't use that weapon."),
+                _ => Ok(()),
+            },
+            _ => Ok(()),
+        }
     }
 }

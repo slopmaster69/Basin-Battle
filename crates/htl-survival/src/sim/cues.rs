@@ -55,6 +55,9 @@ pub const SOUND_READIED: u32 = 6774;
 pub const SOUND_ABSORB: u32 = 3334;
 /// `LOOTWINDOWCOINSOUND`: coins taken from loot, gold earned.
 pub const SOUND_COINS: u32 = 120;
+/// `Vanish` (`Sound\Spells\Vanish.wav`): a Rogue's perfect dodge, the body slipping the blow.
+/// Check on video.
+pub const SOUND_PERFECT_DODGE: u32 = 3324;
 
 // --- the beats (the hero's own camera, by the add-on: `CU\t<beat>`) ----------------------------------
 
@@ -68,6 +71,9 @@ pub const BEAT_WALL: &str = "wall";
 pub const BEAT_CHEAT_DEATH: &str = "cheat_death";
 pub const BEAT_READIED: &str = "readied";
 pub const BEAT_VALOR_BACK: &str = "valor";
+/// A Rogue's perfect dodge: a short stop on the hero alone and a shadow-coloured edge (an older
+/// add-on ignores a beat it doesn't know).
+pub const BEAT_PERFECT_DODGE: &str = "perfect_dodge";
 /// Thrown up by a blow's leap (Raptor Strike's Uppercut): the camera in and tipped down on the
 /// fight, to aim the dive. A camera beat, no stop and no shake.
 pub const BEAT_RISE: &str = "rise";

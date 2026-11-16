@@ -236,9 +236,22 @@ impl Survival {
                 return true;
             }
         }
-        // Two weapons in hand (dual wield): no guard at all. The right click swings the off hand,
-        // and a click with it held is a click (no bash or kick: there's no shield to bash with).
-        if self.players.get(&id).is_some_and(|p| self.off_weapon_of(p).is_some()) {
+        // A Rogue's Shadow Cut, open just after a perfect dodge: either attack steps behind the one
+        // who swung and strikes its back.
+        let rogue = self.players.get(&id).is_some_and(|p| self.is_rogue(p));
+        let cut = match input {
+            Input::Attack => Some(StrikeKind::Light),
+            Input::Heavy => Some(StrikeKind::Heavy),
+            Input::Guard if rogue => Some(StrikeKind::Off),
+            _ => None,
+        };
+        if cut.is_some_and(|k| self.shadow_cut(id, k)) {
+            return true;
+        }
+        // Two weapons in hand (dual wield), or a Rogue: no guard at all. The right click swings the
+        // off hand, and a click with it held is a click (no bash or kick: there's no shield to bash
+        // with).
+        if self.players.get(&id).is_some_and(|p| self.two_hands(p)) {
             match input {
                 Input::Guard => return self.off_press(id),
                 Input::GuardUp => return true,
@@ -453,6 +466,11 @@ impl Survival {
                 if self.held_still(id) || matches!(p.action, Action::Stance { .. } | Action::Dash { .. }) {
                     return true;
                 }
+                // A Rogue's dodge-feint: pressed in their own wind-up, the blow is called off.
+                if fresh && self.players[&id].stamina >= self.content.dodge.needs() {
+                    self.dodge_feint(id);
+                }
+                let p = &self.players[&id];
                 let free = matches!(p.action, Action::Ready | Action::Guard);
                 if !(free || busy_soft || self.cancelable(p) || matches!(p.action, Action::Cast { .. })) {
                     return false;
@@ -623,7 +641,14 @@ impl Survival {
         let c = &self.content.combat;
         match &p.action {
             Action::Swing { t, strike, .. } => {
-                let share = if strike.heavy() { c.heavy_cancel_after } else { c.cancel_after };
+                // A Rogue's off hand never commits them: a dodge cuts it short as soon as it lands.
+                let share = if strike.heavy() {
+                    c.heavy_cancel_after
+                } else if strike.kind == StrikeKind::Off && self.is_rogue(p) {
+                    self.content.rogue.off_cancel_after
+                } else {
+                    c.cancel_after
+                };
                 *t >= strike.windup + strike.active + strike.recovery * share
             }
             _ => false,
@@ -646,9 +671,13 @@ impl Survival {
         let c = &self.content;
         let p = &self.players[&id];
         // The off hand's blow: its own weapon, and the off hand's chain.
-        let (w, set) = match (kind, self.off_weapon_of(p)) {
-            (StrikeKind::Off, Some(o)) => (o, c.movesets.iter().find(|m| m.key == OFF_HAND_MOVES).unwrap_or_else(|| c.moveset_of(o))),
-            _ => (self.weapon_of(p), c.moveset_of(self.weapon_of(p))),
+        // (A Rogue's empty off hand jabs: the off hand's blows, at the main hand's weapon, for a
+        // share of it.)
+        let off_moves = |w| c.movesets.iter().find(|m| m.key == OFF_HAND_MOVES).unwrap_or_else(|| c.moveset_of(w));
+        let (w, set, share) = match (kind, self.off_weapon_of(p)) {
+            (StrikeKind::Off, Some(o)) => (o, off_moves(o), 1.0),
+            (StrikeKind::Off, None) => (self.weapon_of(p), off_moves(self.weapon_of(p)), c.rogue.jab),
+            _ => (self.weapon_of(p), c.moveset_of(self.weapon_of(p)), 1.0),
         };
         let h = &c.heavy;
         let step = step % set.light.len();
@@ -669,7 +698,7 @@ impl Survival {
             windup: windup * m.windup * quick * cowed,
             active: w.active,
             recovery: recovery * m.recovery * quick,
-            damage: m.damage * if heavy { h.damage } else { 1.0 },
+            damage: m.damage * if heavy { h.damage } else { 1.0 } * share,
             range: w.range * m.range,
             arc: w.arc,
             stagger: if heavy { w.stagger.max(h.stagger) } else { w.stagger },
@@ -709,7 +738,7 @@ impl Survival {
         true
     }
 
-    fn start_swing(&mut self, id: Id, kind: StrikeKind) {
+    pub(crate) fn start_swing(&mut self, id: Id, kind: StrikeKind) {
         self.start_swing_with(id, kind, true);
     }
 
@@ -749,7 +778,7 @@ impl Survival {
         };
         // Dual wield: blows from alternate hands build a run; the run's last is the finisher with
         // both blades.
-        let dual = self.players.get(&id).is_some_and(|p| self.off_weapon_of(p).is_some());
+        let dual = self.players.get(&id).is_some_and(|p| self.two_hands(p));
         if dual && matches!(kind, StrikeKind::Light | StrikeKind::Off) {
             let p = &self.players[&id];
             let alternate = p.dual_run > 0 && p.dual_last_off != off && self.clock <= p.combo_until + DUAL_WINDOW;
@@ -1013,6 +1042,7 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             p.dodge_attack = false;
         }
+        self.run_through_dodge(id);
         let c = self.content.dodge.clone();
         let p = &self.players[&id];
         let m = p.moving;
@@ -1075,6 +1105,7 @@ impl Survival {
         for id in self.player_ids() {
             self.check_lock(id);
             self.step_player(id, dt);
+            self.step_rogue(id);
         }
     }
 
@@ -1493,7 +1524,9 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return };
         // The held guard comes back up, unless it's a ward still broken.
         // (A weapon whose right click is an ability has no guard to come back up.)
-        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) && !self.weapon_of(p).has_alt() && self.off_weapon_of(p).is_none() { Action::Guard } else { Action::Ready };
+        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) && !self.weapon_of(p).has_alt() && !self.two_hands(p) { Action::Guard } else { Action::Ready };
+        // A Rogue mid-run: the attack out of a dodge is the run's next blow, not a roll's.
+        let out_of_dodge = if self.is_rogue(p) && p.dual_run > 0 { StrikeKind::Light } else { StrikeKind::Roll };
         let buffered = p.buffered;
         // A dodge with an attack pressed in it: the attack out of it, now, or as the hero lands.
         if matches!(p.action, Action::Dodge { .. }) && p.dodge_attack {
@@ -1504,7 +1537,7 @@ impl Survival {
             p.buffered = None;
             match air {
                 Some(a) => p.landing_attack = Some(if a.corey { StrikeKind::Leap } else { StrikeKind::Roll }),
-                None => self.attack_out_of(id, StrikeKind::Roll),
+                None => self.attack_out_of(id, out_of_dodge),
             }
             return;
         }
@@ -2271,14 +2304,20 @@ impl Survival {
         }
         match outcome {
             Outcome::Dodged if !dashing && damage > 0 => {
-                self.gain_valor(victim, c.valor.roll);
+                // A Rogue's dodge in its perfect moment pays more, and opens the Shadow Cut.
+                let perfect = self.dodged_perfectly(victim, &doing);
+                self.gain_valor(victim, if perfect { c.valor.perfect } else { c.valor.roll });
                 self.prime_wild(victim);
                 // Rolled through it, not just away: a little breath back.
-                if c.dodge.refund > 0.0 {
+                let refund = if perfect { c.dodge.perfect_refund } else { c.dodge.refund };
+                if refund > 0.0 {
                     if let Some(p) = self.players.get_mut(&victim) {
-                        p.stamina = (p.stamina + c.dodge.refund).min(c.player.stamina);
+                        p.stamina = (p.stamina + refund).min(c.player.stamina);
                         self.events.push(Event::Stamina { player: victim });
                     }
+                }
+                if perfect {
+                    self.perfect_dodge(victim, attacker);
                 }
             }
             _ => {}
@@ -2935,7 +2974,13 @@ impl Survival {
         }
         let (at, f) = target?;
         // Behind it; where that's a wall or a drop, round its side.
-        for turn in [0.0f32, 0.6, -0.6, 1.2, -1.2] {
+        self.spot_behind(at, f, &[0.0, 0.6, -0.6, 1.2, -1.2])
+    }
+
+    /// Just behind a body at `at` facing `f`, facing its back: the first of these turns off
+    /// squarely behind (radians) that isn't in a wall nor off a drop (`None`: none of them).
+    pub(crate) fn spot_behind(&self, at: Vec3, f: f32, turns: &[f32]) -> Option<(Vec3, f32)> {
+        for turn in turns {
             let a = f + std::f32::consts::PI + turn;
             let spot = self.ground_near(at[0] + a.cos() * 1.3, at[1] + a.sin() * 1.3, at[2] + 1.0);
             if !self.land.blocked_near(spot[0], spot[1], spot[2]) && (spot[2] - at[2]).abs() <= 2.0 {

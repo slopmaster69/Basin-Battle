@@ -399,6 +399,9 @@ pub struct AbilityDef {
     /// Only with a one-handed weapon and its shield (Shield Wall): with a two-hander it won't go.
     #[serde(default)]
     pub needs_shield: bool,
+    /// Only with a blade in each hand (the Rogue's two-blade cards): with one it won't go.
+    #[serde(default)]
+    pub needs_two_blades: bool,
     /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
     /// (Holy Shock).
     #[serde(default)]
@@ -1441,6 +1444,8 @@ pub struct ValorDef {
     pub parry: f32,
     /// Rolling through an attack.
     pub roll: f32,
+    /// A Rogue's perfect dodge (in place of `roll`).
+    pub perfect: f32,
     pub counter: f32,
     pub kill: f32,
     /// One segment of the bar (EX versions cost one or two).
@@ -1449,7 +1454,7 @@ pub struct ValorDef {
 
 impl Default for ValorDef {
     fn default() -> Self {
-        Self { max: 100.0, start: 25.0, light: 2.0, heavy: 6.0, ability: 6.0, parry: 10.0, roll: 8.0, counter: 15.0, kill: 3.0, segment: 25.0 }
+        Self { max: 100.0, start: 25.0, light: 2.0, heavy: 6.0, ability: 6.0, parry: 10.0, roll: 8.0, perfect: 10.0, counter: 15.0, kill: 3.0, segment: 25.0 }
     }
 }
 

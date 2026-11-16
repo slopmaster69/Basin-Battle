@@ -145,6 +145,16 @@ back_step = [8.0, 3.0]
 spell = 0
 # Rolling through a blow, not just rolling: a little breath back, the reward for reading it.
 refund = 10.0
+# A Rogue's perfect dodge (docs/rogue-roles.md): the blow lands 0.04 to 0.18 sec after the dodge
+# starts, pressed in its last moment. 0.14 sec of perfect against a parry's 0.25 sec window: harder
+# to earn, and never punished, since a dodge outside it still evades up to 0.32 sec.
+perfect_to = 0.18
+# It gives back 20 stamina in place of 10: the dodge cost 15, so a perfect one leaves the Rogue 5 up
+# and a plain one 5 down (a parry gives 25).
+perfect_refund = 20.0
+# And fills 12% of a boss's or champion's posture (a parry fills 25%): with no parry, the Rogue still
+# breaks a stance, about twice as slowly, and never staggers it with one dodge.
+perfect_posture = 0.12
 
 [heavy]
 # The heavy attack (Shift + left mouse): the weapon's wind-up and recovery this much longer, its
@@ -1739,6 +1749,33 @@ items = { roast = 1 }
 # The rows of their class's column a new hero knows (Q and E); the 1, 2 and 3 cards are learned out
 # in Elwynn.
 cards = ["ranged", "close"]
+
+# A hero created as a Rogue (docs/rogue-roles.md, "The core"): two blades, no guard, no block and no
+# parry. The right click swings the off hand; a perfect dodge pays instead of a parry.
+[rogue]
+# Two Poacher's Knives (Twin Fangs): the quickest run, and 2.5 times the damage from behind.
+weapon = "dagger"
+off_hand = "dagger"
+# WoW 1.12's Rogue weapons, one-handed only: dagger (15), sword (7), mace (4), fist (13). No shield,
+# two-hander, staff or axe.
+weapons = [15, 7, 4, 13]
+# The Shadow Cut: for 0.6 sec after a perfect dodge (about a dagger blow's whole length: 0.18 wind-up,
+# 0.24 recovery), either attack steps behind the one who swung and strikes its back. Up to 6 yd: the
+# dodge's 4 yd dash and a reach.
+cut_secs = 0.6
+cut_reach = 6.0
+# A dodge cuts an off-hand blow short from the moment it lands (the main hand waits for 45% of its
+# recovery): the off hand is the safe poke, the main hand the commitment.
+off_cancel_after = 0.0
+# An empty off hand (a save fixed up, a blade sold) jabs for half the main hand's blow, so the right
+# click never guards and the rhythm never goes away.
+jab = 0.5
+# The perfect dodge reads on the body with no floor marker: the Stealth look (5215, as Prowl wears
+# it) flickers the body see-through for 0.3 sec, and Vanish's puff of smoke (1856) bursts where
+# the blow fell and at both ends of the Shadow Cut's step.
+flicker_aura = 5215
+flicker_secs = 0.3
+puff = 1856
 
 # --- stations -------------------------------------------------------------------------------------
 
@@ -3858,6 +3895,8 @@ heavy = 6.0
 ability = 6.0
 parry = 10.0
 roll = 8.0
+# A Rogue's perfect dodge pays what a parry does (the Rogue has no parry).
+perfect = 10.0
 counter = 15.0
 kill = 3.0
 

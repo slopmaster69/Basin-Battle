@@ -808,6 +808,11 @@ impl Survival {
             self.events.push(Event::Flash { player: id, text: format!("{} requires a shield", d.name) });
             return true;
         }
+        // A Rogue never blocks nor parries; a two-blade card wants a blade in each hand.
+        if let Some(text) = self.hands_refuse_card(id, &d) {
+            self.events.push(Event::Flash { player: id, text });
+            return true;
+        }
         // Berserker Rage goes off the ground (a knockdown is a stun); nothing else does.
         let breaking_free = d.breaks_free && !self.has_cc(id, "silence") && !self.cc_of(id).iter().any(|c| c.until > self.clock && matches!(c.kind.as_str(), "incapacitate" | "petrify" | "panic" | "disorient"));
         if (self.silenced(id) && !breaking_free) || self.immune(id) {

@@ -762,6 +762,8 @@ impl Survival {
             }
             // The Priest's own: an Empowered staff, Salvation's wings.
             out.extend(self.priest_auras(id));
+            // A Rogue's perfect dodge: the flicker on the body.
+            out.extend(self.rogue_auras(p));
         }
         // A creature's own look (a spirit beast's glow), while it lives: Unbowed's dark swirl
         // burned on his body after he fell (Nov 13 filming, take 421).
