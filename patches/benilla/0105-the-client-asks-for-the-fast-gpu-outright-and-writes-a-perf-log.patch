@@ -1,0 +1,530 @@
+From 8ef834a63cd210f943fc033682f688e3a7b975f2 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 14:32:36 -0600
+Subject: [PATCH] The client asks for the fast GPU outright and writes a perf
+ log every ten seconds
+
+Corey's laptop has an Intel integrated GPU and an RTX 5070 Laptop, and Elwynn ran badly there with
+no log to say which one drew it or where the frame went.
+
+- The GPU: `tuned_default_plugins` sets `WgpuSettings::power_preference` to `HighPerformance`
+  (still `WGPU_POWER_PREF` first), which is bevy's default today but now said outright: under it
+  wgpu ranks a discrete adapter before an integrated one. On Windows the binary also exports
+  `NvOptimusEnablement` and `AmdPowerXpressRequestHighPerformance` (`build.rs` passes MSVC's
+  linker `/EXPORT`, since an executable exports nothing on its own), the hints NVIDIA's and AMD's
+  laptop drivers read to put a process on the discrete GPU.
+- The log: `benilla-config/perf.log`, always on (`perf::perf_log`). At start, the adapter in use
+  (name, backend, device type, vendor, driver), with a warning on an integrated or software one;
+  whenever they change, the window, present mode, refresh rate, render scale, MSAA, farclip and
+  the look's reach, shadows, fog and AO; every ten seconds the zone and subzone, the position, the
+  fps, the wall frame time's p50, p95, p99 and max, the frames over 33 and 100 ms, the CPU per
+  frame (main thread and process), the GPU per frame and its six costliest passes (bevy's per-pass
+  timestamps), the meshes drawn after the frustum cull and the entity count. Per frame it pushes
+  one float. Past 2 MB the file moves to `perf.old.log` at the next start.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/lib.rs           |   3 +
+ crates/benilla-app/src/perf/mod.rs      |   8 +-
+ crates/benilla-app/src/perf/perf_log.rs | 364 ++++++++++++++++++++++++
+ crates/benilla-world/src/boot.rs        |  15 +
+ crates/benilla/build.rs                 |  12 +-
+ crates/benilla/src/main.rs              |  16 ++
+ 6 files changed, 415 insertions(+), 3 deletions(-)
+ create mode 100644 crates/benilla-app/src/perf/perf_log.rs
+
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index d6b5c108..449e3cf3 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -439,6 +439,9 @@ fn launch(build: BuildId, extend: Option<Extension<'_>>) -> AppExit {
+     // cost and the GPU's per-pass split to `benilla-config/Diagnostics/fps-journal.csv`;
+     // `WOW_FPS_JOURNAL=<csv>` is the harness lever.
+     .add_plugins(perf::FpsJournalPlugin)
++    // The perf log ships and is always on: the GPU in use at start, and every ten seconds the
++    // zone, the frame time's percentiles and the CPU and GPU split, in `benilla-config/perf.log`.
++    .add_plugins(perf::PerfLogPlugin)
+     // The game as one group on top of the engine; `game_plugins.rs` has its members, its
+     // load-bearing ordering edges and the test that builds it headless.
+     .add_plugins(game_plugins::GamePlugins {
+diff --git a/crates/benilla-app/src/perf/mod.rs b/crates/benilla-app/src/perf/mod.rs
+index 2f4dd206..acbbff6c 100644
+--- a/crates/benilla-app/src/perf/mod.rs
++++ b/crates/benilla-app/src/perf/mod.rs
+@@ -11,9 +11,11 @@
+ //! - [`trace`] / [`journal`]: the CSV instruments (`WOW_STREAM_TRACE`, `WOW_FPS_JOURNAL`); the
+ //!   journal also answers the `fpsJournal` CVar, in every build,
+ //! - [`stall`]: the stuck-main-thread self-sampler (macOS),
+-//! - [`census`]: the env-gated premise counters.
++//! - [`census`]: the env-gated premise counters,
++//! - [`perf_log`]: the always-on `benilla-config/perf.log`, the GPU in use and a summary every
++//!   ten seconds.
+ //!
+-//! `clock` and `journal` compile in the player build; everything else is
++//! `clock`, `journal` and `perf_log` compile in the player build; everything else is
+ //! `#[cfg(feature = "dev")]`, and the journal depends on nothing on the dev side.
+ //!
+ //! Apple GPUs lack `TIMESTAMP_QUERY_INSIDE_PASSES`, so bevy's render diagnostics carry CPU spans
+@@ -32,6 +34,7 @@ mod gpu;
+ #[cfg(feature = "dev")]
+ mod hud;
+ mod journal;
++mod perf_log;
+ #[cfg(feature = "dev")]
+ mod main_split;
+ #[cfg(feature = "dev")]
+@@ -55,6 +58,7 @@ pub(crate) use gpu::{GpuMsShared, WgpuCensusShared};
+ #[cfg(feature = "dev")]
+ pub(crate) use hud::PerfHud;
+ pub(crate) use journal::FpsJournalPlugin;
++pub(crate) use perf_log::PerfLogPlugin;
+ #[cfg(test)]
+ pub(crate) use journal::{on_cvar, FpsJournalSetting};
+ #[cfg(feature = "dev")]
+diff --git a/crates/benilla-app/src/perf/perf_log.rs b/crates/benilla-app/src/perf/perf_log.rs
+new file mode 100644
+index 00000000..e3f56fd5
+--- /dev/null
++++ b/crates/benilla-app/src/perf/perf_log.rs
+@@ -0,0 +1,364 @@
++//! The always-on perf log, `benilla-config/perf.log`: a few lines a session that a player can
++//! send back after a slow run, with no console and no CVar to turn on first.
++//!
++//! - At start, once the renderer is up: the GPU the client draws on (name, backend, device type,
++//!   vendor, driver), with a warning line when that is an integrated GPU or a software one.
++//! - Whenever they change: the window, the present mode and the look's costliest settings.
++//! - Every [`EVERY_SECS`]: the zone and subzone, where the player stands, the fps, the wall frame
++//!   time's p50, p95, p99 and max, the frames over 33 and 100 ms, the CPU per frame (the main
++//!   thread's and the whole process's), the GPU per frame and its costliest passes (bevy's per-pass
++//!   timestamps, where the device has them), the meshes drawn after the frustum cull and the
++//!   entity count.
++//!
++//! Per frame it pushes one float; the rest runs once a window. The file restarts as
++//! `perf.old.log` once it passes [`ROTATE_BYTES`], so a long run never grows it without bound.
++//! The FPS journal (`fpsJournal`) is the finer instrument, a row a second, off by default.
++
++use std::io::Write;
++use std::path::PathBuf;
++
++use bevy::diagnostic::DiagnosticsStore;
++use bevy::prelude::*;
++use bevy::render::renderer::RenderAdapterInfo;
++use bevy::time::Real;
++use bevy::window::{Monitor, PrimaryWindow};
++
++use super::clock::{main_thread_cpu_secs, process_cpu_secs};
++
++pub(crate) struct PerfLogPlugin;
++
++/// How often a summary line is written, in seconds of wall time.
++const EVERY_SECS: f32 = 10.0;
++
++/// The size past which a new session moves the old file to `perf.old.log`.
++const ROTATE_BYTES: u64 = 2 * 1024 * 1024;
++
++/// How long to wait for the renderer's adapter before the header says it is unknown.
++const ADAPTER_WAIT_SECS: f32 = 5.0;
++
++/// How many of the costliest GPU passes a summary names.
++const TOP_PASSES: usize = 6;
++
++impl Plugin for PerfLogPlugin {
++    fn build(&self, app: &mut App) {
++        app.insert_resource(PerfLog {
++            path: crate::local_state::home().map(|h| h.join("perf.log")),
++            started: false,
++            header_done: false,
++            frames: Vec::with_capacity(4096),
++            window_start: None,
++            cpu_at: None,
++            main_at: None,
++            settings: String::new(),
++        })
++        .add_systems(Last, write_perf_log);
++    }
++}
++
++#[derive(Resource)]
++struct PerfLog {
++    /// `None` with no state folder (a capture run): nothing is written.
++    path: Option<PathBuf>,
++    /// The session line is written and the file rotated.
++    started: bool,
++    /// The GPU line is written (or given up on).
++    header_done: bool,
++    /// This window's wall frame times, in ms.
++    frames: Vec<f32>,
++    /// Wall seconds at this window's start.
++    window_start: Option<f32>,
++    /// Process and main-thread CPU seconds at this window's start.
++    cpu_at: Option<f64>,
++    main_at: Option<f64>,
++    /// The last settings line written; a new one goes in only when it differs.
++    settings: String,
++}
++
++impl PerfLog {
++    fn append(&self, text: &str) {
++        let Some(path) = self.path.as_ref() else {
++            return;
++        };
++        if let Some(dir) = path.parent() {
++            let _ = std::fs::create_dir_all(dir);
++        }
++        if let Ok(mut f) = std::fs::OpenOptions::new()
++            .create(true)
++            .append(true)
++            .open(path)
++        {
++            let _ = f.write_all(text.as_bytes());
++        }
++    }
++}
++
++/// The frame-time percentiles of one window: `(p50, p95, p99, max)` in ms, of the sorted `v`.
++fn percentiles(v: &[f32]) -> (f32, f32, f32, f32) {
++    if v.is_empty() {
++        return (0.0, 0.0, 0.0, 0.0);
++    }
++    let at = |q: f32| v[(((v.len() - 1) as f32) * q).round() as usize];
++    (at(0.50), at(0.95), at(0.99), v[v.len() - 1])
++}
++
++/// The adapter line, and a warning when the client is not drawing on a discrete GPU.
++fn adapter_lines(adapter: Option<&RenderAdapterInfo>) -> String {
++    let Some(a) = adapter else {
++        return "gpu: unknown (no renderer reported an adapter)\n".to_string();
++    };
++    let driver = format!("{} {}", a.driver, a.driver_info).trim().to_string();
++    let mut s = format!(
++        "gpu: {} | backend {:?} | type {:?} | vendor {:#06x} device {:#06x} | driver {}\n",
++        a.name,
++        a.backend,
++        a.device_type,
++        a.vendor,
++        a.device,
++        if driver.is_empty() { "?" } else { &driver },
++    );
++    match a.device_type {
++        wgpu::DeviceType::IntegratedGpu => s.push_str(
++            "WARNING: drawing on the integrated GPU. On a laptop with two GPUs, set benilla.exe to \
++             High performance in Windows Settings > System > Display > Graphics.\n",
++        ),
++        wgpu::DeviceType::Cpu => {
++            s.push_str("WARNING: drawing on a software renderer: the GPU driver is missing.\n")
++        }
++        _ => {}
++    }
++    s
++}
++
++/// The GPU's per-frame total and its costliest passes, from bevy's per-pass timestamps (the
++/// recent frames' average each). Empty where the device cannot time passes.
++fn gpu_summary(store: Option<&DiagnosticsStore>) -> String {
++    let Some(store) = store else {
++        return String::new();
++    };
++    let mut passes: Vec<(String, f64)> = store
++        .iter()
++        .filter_map(|d| {
++            let path = d.path().as_str();
++            let pass = path.strip_prefix("render/")?.strip_suffix("/elapsed_gpu")?;
++            // A nested span's parent already carries it.
++            if pass.contains('/') {
++                return None;
++            }
++            Some((pass.to_string(), d.average()?))
++        })
++        .collect();
++    if passes.is_empty() {
++        return String::new();
++    }
++    let total: f64 = passes.iter().map(|(_, ms)| ms).sum();
++    passes.sort_by(|a, b| b.1.total_cmp(&a.1));
++    let top: Vec<String> = passes
++        .iter()
++        .take(TOP_PASSES)
++        .map(|(p, ms)| format!("{p} {ms:.1}"))
++        .collect();
++    format!(" gpu={total:.1} [{}]", top.join(", "))
++}
++
++/// What the costliest settings are now, in one line.
++#[derive(bevy::ecs::system::SystemParam)]
++struct PerfSettings<'w, 's> {
++    window: Query<'w, 's, &'static Window, With<PrimaryWindow>>,
++    monitors: Query<'w, 's, &'static Monitor>,
++    view: Option<Res<'w, benilla_world::view::ViewDistance>>,
++    look: Option<Res<'w, benilla_world::look::WorldLook>>,
++    shadows: Option<Res<'w, benilla_world::look::LookShadows>>,
++    air: Option<Res<'w, benilla_world::look::LookAir>>,
++    ao: Option<Res<'w, benilla_world::look::LookAo>>,
++    scale: Option<Res<'w, crate::world_backdrop::RenderScale>>,
++    msaa: Option<Res<'w, benilla_world::view::MsaaSetting>>,
++}
++
++impl PerfSettings<'_, '_> {
++    fn line(&self) -> String {
++        let mut s = String::from("settings:");
++        if let Ok(w) = self.window.single() {
++            s.push_str(&format!(
++                " window {}x{} {:?} present {:?}",
++                w.resolution.physical_width(),
++                w.resolution.physical_height(),
++                w.mode,
++                w.present_mode,
++            ));
++        }
++        let hz = self
++            .monitors
++            .iter()
++            .filter_map(|m| m.refresh_rate_millihertz)
++            .max();
++        if let Some(mhz) = hz {
++            s.push_str(&format!(" refresh {}Hz", mhz / 1000));
++        }
++        if let Some(scale) = self.scale.as_deref() {
++            s.push_str(&format!(" renderScale {:.2}", scale.0));
++        }
++        if let Some(m) = self.msaa.as_deref() {
++            s.push_str(&format!(" msaa {}", m.samples));
++        }
++        if let Some(v) = self.view.as_deref() {
++            s.push_str(&format!(" farclip {:.0} reach {:.0}", v.farclip, v.reach()));
++        }
++        if let Some(l) = self.look.as_deref() {
++            s.push_str(&format!(" worldLook {}", u8::from(l.on)));
++        }
++        if let Some(sh) = self.shadows.as_deref() {
++            s.push_str(&format!(" worldShadows {}", sh.level));
++        }
++        if let Some(a) = self.air.as_deref() {
++            s.push_str(&format!(" worldFog {} q{}", u8::from(a.fog), a.fog_quality));
++        }
++        if let Some(a) = self.ao.as_deref() {
++            s.push_str(&format!(" worldAO {}", u8::from(a.on)));
++        }
++        s.push('\n');
++        s
++    }
++}
++
++/// Where the player is: the zone and subzone names, and the raw WoW coordinates.
++#[derive(bevy::ecs::system::SystemParam)]
++struct PerfPlace<'w> {
++    area: Option<Res<'w, benilla_world::terrain_stream::CurrentArea>>,
++    areas: Option<Res<'w, crate::area::AreaTableRes>>,
++    player: Option<Res<'w, crate::player::Player>>,
++}
++
++impl PerfPlace<'_> {
++    fn text(&self) -> String {
++        let mut s = String::new();
++        let leaf = self.area.as_deref().and_then(|a| a.0);
++        match (leaf, self.areas.as_deref()) {
++            (Some(leaf), Some(areas)) => {
++                let row = areas.0.get(leaf);
++                let zone = row
++                    .map(|r| if r.zone_id == 0 { leaf } else { r.zone_id })
++                    .unwrap_or(leaf);
++                let zone_name = areas.0.name(zone).unwrap_or("?");
++                s.push_str(&format!("zone=\"{zone_name}\""));
++                if zone != leaf {
++                    s.push_str(&format!(" sub=\"{}\"", areas.0.name(leaf).unwrap_or("?")));
++                }
++            }
++            _ => s.push_str("zone=-"),
++        }
++        if let Some(p) = self.player.as_deref().filter(|p| p.active) {
++            let w = benilla_assets::coords::bevy_to_wow(p.pos);
++            s.push_str(&format!(" pos={:.0},{:.0},{:.0}", w[0], w[1], w[2]));
++        }
++        s
++    }
++}
++
++/// Pinned to the main thread: [`main_thread_cpu_secs`] reads the calling thread's clock.
++#[allow(clippy::too_many_arguments)]
++fn write_perf_log(
++    _pin_to_main_thread: bevy::ecs::system::NonSendMarker,
++    mut log: ResMut<PerfLog>,
++    time: Res<Time<Real>>,
++    adapter: Option<Res<RenderAdapterInfo>>,
++    store: Option<Res<DiagnosticsStore>>,
++    settings: PerfSettings,
++    place: PerfPlace,
++    drawn: Query<&ViewVisibility, With<Mesh3d>>,
++    entities: Query<()>,
++) {
++    if log.path.is_none() {
++        return;
++    }
++    let now = time.elapsed_secs();
++    if !log.started {
++        log.started = true;
++        if let Some(path) = log.path.as_ref() {
++            if std::fs::metadata(path).is_ok_and(|m| m.len() > ROTATE_BYTES) {
++                let _ = std::fs::rename(path, path.with_file_name("perf.old.log"));
++            }
++        }
++        let unix = std::time::SystemTime::now()
++            .duration_since(std::time::UNIX_EPOCH)
++            .map_or(0, |d| d.as_secs());
++        log.append(&format!(
++            "\n=== benilla session, unix time {unix}, every {EVERY_SECS:.0} s: fps, wall frame ms \
++             (p50 p95 p99 max), frames over 33/100 ms, CPU ms a frame (main thread, process), GPU \
++             ms a frame [costliest passes], meshes drawn/with a mesh, entities ===\n"
++        ));
++    }
++    if !log.header_done && (adapter.is_some() || now > ADAPTER_WAIT_SECS) {
++        log.header_done = true;
++        let text = adapter_lines(adapter.as_deref());
++        log.append(&text);
++        info!("{}", text.trim_end());
++    }
++
++    let start = *log.window_start.get_or_insert(now);
++    if log.frames.is_empty() {
++        log.cpu_at = process_cpu_secs();
++        log.main_at = main_thread_cpu_secs();
++    }
++    log.frames.push(time.delta_secs() * 1000.0);
++    if now - start < EVERY_SECS {
++        return;
++    }
++
++    // The window is full: the settings if they moved, then the summary.
++    let line = settings.line();
++    if line != log.settings {
++        log.append(&line);
++        log.settings = line;
++    }
++    let mut v = std::mem::take(&mut log.frames);
++    let n = v.len().max(1);
++    let elapsed = (now - start).max(1e-3);
++    let fps = v.len() as f32 / elapsed;
++    let over_33 = v.iter().filter(|&&ms| ms > 33.3).count();
++    let over_100 = v.iter().filter(|&&ms| ms > 100.0).count();
++    v.sort_by(f32::total_cmp);
++    let (p50, p95, p99, max) = percentiles(&v);
++    v.clear();
++    log.frames = v;
++    let per_frame = |t0: Option<f64>, t1: Option<f64>| match (t0, t1) {
++        (Some(a), Some(b)) => format!("{:.1}", (b - a) * 1000.0 / n as f64),
++        _ => "?".to_string(),
++    };
++    let cpu_main = per_frame(log.main_at, main_thread_cpu_secs());
++    let cpu_proc = per_frame(log.cpu_at, process_cpu_secs());
++    let (mut meshes, mut shown) = (0usize, 0usize);
++    for v in &drawn {
++        meshes += 1;
++        if v.get() {
++            shown += 1;
++        }
++    }
++    let text = format!(
++        "t={now:.0} {} fps={fps:.1} ms p50={p50:.1} p95={p95:.1} p99={p99:.1} max={max:.1} \
++         over33={over_33} over100={over_100} cpu main={cpu_main} proc={cpu_proc}{} \
++         meshes={shown}/{meshes} entities={}\n",
++        place.text(),
++        gpu_summary(store.as_deref()),
++        entities.iter().len(),
++    );
++    log.append(&text);
++    log.window_start = Some(now);
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_percentiles_read_the_sorted_window() {
++        let v: Vec<f32> = (1..=100).map(|i| i as f32).collect();
++        assert_eq!(percentiles(&v), (51.0, 95.0, 99.0, 100.0));
++        assert_eq!(percentiles(&[7.0]), (7.0, 7.0, 7.0, 7.0));
++        assert_eq!(percentiles(&[]), (0.0, 0.0, 0.0, 0.0));
++    }
++
++    #[test]
++    fn no_adapter_says_so() {
++        assert!(adapter_lines(None).starts_with("gpu: unknown"));
++    }
++}
+diff --git a/crates/benilla-world/src/boot.rs b/crates/benilla-world/src/boot.rs
+index b727ecb9..0505d444 100644
+--- a/crates/benilla-world/src/boot.rs
++++ b/crates/benilla-world/src/boot.rs
+@@ -13,6 +13,21 @@ pub fn tuned_default_plugins(primary_window: Window) -> PluginGroupBuilder {
+             primary_window: Some(primary_window),
+             ..default()
+         })
++        // The fast GPU, said outright: on a laptop with an integrated GPU and a discrete one, wgpu
++        // ranks the discrete one first only under `HighPerformance`. Bevy's default is the same
++        // today (`WGPU_POWER_PREF` still overrides it); spelled here so a change of default
++        // upstream cannot move a player onto the slow GPU. The binary also exports NVIDIA's and
++        // AMD's switchable-graphics hints (`benilla/src/main.rs`), and `perf::perf_log` writes the
++        // adapter chosen to `benilla-config/perf.log`.
++        .set(bevy::render::RenderPlugin {
++            render_creation: bevy::render::settings::WgpuSettings {
++                power_preference: bevy::render::settings::PowerPreference::from_env()
++                    .unwrap_or(bevy::render::settings::PowerPreference::HighPerformance),
++                ..default()
++            }
++            .into(),
++            ..default()
++        })
+         // Deliberately no `AssetPlugin::file_path`: a baked source path resolves only on the build
+         // machine. Every shader is embedded (`embedded://<crate>/shaders/…`), so no root is read.
+         // Quiet wgpu/naga; the ring keeps the last stderr lines for the crash report (`log_ring`).
+diff --git a/crates/benilla/build.rs b/crates/benilla/build.rs
+index 89c95e58..c28fd008 100644
+--- a/crates/benilla/build.rs
++++ b/crates/benilla/build.rs
+@@ -1,5 +1,15 @@
+-//! Stamps the commit this binary was built from.
++//! Stamps the commit this binary was built from, and on Windows exports the switchable-graphics
++//! hints `main.rs` defines.
+ 
+ fn main() {
+     benilla_buildstamp::emit();
++    // An executable exports no symbol on its own, and NVIDIA's and AMD's laptop drivers look the
++    // two hints up in the export table. MSVC's linker exports by name; the GNU toolchain (a local
++    // build, never a player's) goes without, as it did before.
++    let windows = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
++    let msvc = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc");
++    if windows && msvc {
++        println!("cargo:rustc-link-arg-bins=/EXPORT:NvOptimusEnablement");
++        println!("cargo:rustc-link-arg-bins=/EXPORT:AmdPowerXpressRequestHighPerformance");
++    }
+ }
+diff --git a/crates/benilla/src/main.rs b/crates/benilla/src/main.rs
+index 266130ac..8a81e7cd 100644
+--- a/crates/benilla/src/main.rs
++++ b/crates/benilla/src/main.rs
+@@ -3,6 +3,22 @@
+ 
+ use benilla_app::BuildId;
+ 
++/// NVIDIA's switchable-graphics hint: a laptop's driver reads this export from the executable at
++/// launch and puts the process on the discrete GPU rather than the integrated one, whatever its
++/// own guess. `build.rs` exports it (an executable exports nothing on its own).
++#[cfg(windows)]
++#[allow(non_upper_case_globals)]
++#[unsafe(no_mangle)]
++#[used]
++pub static NvOptimusEnablement: u32 = 1;
++
++/// AMD's twin of [`NvOptimusEnablement`], for a laptop with AMD switchable graphics.
++#[cfg(windows)]
++#[allow(non_upper_case_globals)]
++#[unsafe(no_mangle)]
++#[used]
++pub static AmdPowerXpressRequestHighPerformance: i32 = 1;
++
+ fn main() -> benilla_app::AppExit {
+     benilla_app::run(BuildId {
+         version: env!("CARGO_PKG_VERSION"),
+-- 
+2.56.0.windows.4
+
