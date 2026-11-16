@@ -19,7 +19,7 @@ window = [[-330.0, 2040.0], [-40.0, 2350.0]]
 icon = "Spell_Shadow_Charm"
 blurb = "Arugal's keep in Silverpine, full of his worgen and its old lords' ghosts"
 first_page = "The keep's gate, under the broken portcullis. The howling starts past the courtyard."
-welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old lords haven't left either. There are 2 lamps, at the gate and at the far end of the great hall. Rest at a lamp to heal, refill your Draughts (T) and send the keep's dwellers back to their posts. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
+welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old lords haven't left either. There are 2 lamps, at the gate and at the great hall's door. Rest at a lamp to heal, refill your Draughts (T) and send the keep's dwellers back to their posts. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): Shadowfang Keep: the middle (22 to 30).
 tier = 2
@@ -55,19 +55,21 @@ tonic = 4
 # coming in. It stood at (-234.6, 2117.9, 77.3) until Nov 2026: on the terrain 4.5 yards under the
 # gatehouse's floor (81.8), the land taking that hidden terrain for a floor, so every hero came
 # down, woke and was put back under the keep's floor ("you fall through the floor when you first
-# get to the dungeon"). The test `every_dungeons_lamps_and_exit_stand_on_its_floor` (htl-server,
-# needs the WoW data) keeps every dungeon's lamps and exit off such hollows.
+# get to the dungeon"). The test `every_dungeons_places_stand_on_its_floor` (htl-server,
+# needs the WoW data) keeps every dungeon's places off such hollows.
 [[dungeon.lamp]]
 key = "shadowfang_gate"
 name = "The Keep's Gate"
 at = [-229.1, 2109.2, 76.9]
 facing = 1.27
 
+# At the great hall's door, on the keep's floor (94). Until Nov 2026 it stood at (-66.5, 2153.5,
+# 87.6), on the terrain outside the keep's walls, where no floor of the keep reaches.
 [[dungeon.lamp]]
 key = "shadowfang_hall"
 name = "The Great Hall's Hearth"
-at = [-66.5, 2153.5, 87.6]
-facing = 3.14
+at = [-156.0, 2167.5, 94.0]
+facing = 0.0
 
 # --- secrets -----------------------------------------------------------------------------------------
 
@@ -109,7 +111,7 @@ look = "A Rack of Meat Nobody Touched"
 scale = 0.8
 name = "The Butcher's Larder"
 kind = "hidden"
-at = [-210.0, 2273.0, 73.6]
+at = [-209.0, 2268.5, 77.4]
 find = 3.5
 reveals = ["larder_cache"]
 text = "found a larder behind the butcher's block that nobody wanted to open. Under the meat lay someone's savings."
@@ -118,7 +120,7 @@ page = "The meat on the hooks has hung so long it no longer smells of anything. 
 [[dungeon.box]]
 key = "larder_cache"
 name = "Silverlaine Strongbox"
-at = [-209.0, 2275.0, 73.6]
+at = [-208.5, 2270.5, 77.4]
 facing = 1.57
 loot = { moonsilver = 16, tonic = 1 }
 
@@ -129,7 +131,7 @@ display = 19
 look = "A Frosted Soldier's Marker"
 name = "The Deathsworn's Corner"
 kind = "hidden"
-at = [-162.2, 2237.8, 77.1]
+at = [-159.2, 2232.3, 83.9]
 find = 4.0
 reveals = ["deathsworn"]
 text = "felt the air go cold in the courtyard's far corner. A captain of the dead turned from his watch."
@@ -144,7 +146,7 @@ clue = "Arugal wrote everything down in his study, high in the west wing."
 display = 183
 scale = 1.3
 name = "A Kirin Tor Report"
-at = [-222.7, 2117.8, 77.7]
+at = [-222.7, 2117.8, 79.3]
 facing = 1.57
 text = "\"Arugal summoned the worgen to fight the Scourge. He calls them his children. He has locked himself in the top of the keep with them. His study in the west wing is where he wrote everything down, if anyone can reach it.\""
 
@@ -155,7 +157,7 @@ clue = "The butcher keeps something behind his block. The dead keep their watch 
 display = 164
 scale = 1.3
 name = "A Servant's Note"
-at = [-233.8, 2177.5, 77.7]
+at = [-233.8, 2177.5, 82.5]
 facing = 0.0
 text = "\"The butcher keeps more than meat behind his block. And don't go in the courtyard's far corner after dark. The dead Deathsworn still keep their watch there.\""
 
@@ -174,14 +176,14 @@ link = 12.0
 mob = "sf_rethilgore"
 key = "rethilgore"
 at = [-222.5, 2177.5]
-z = 78.5
+z = 79.8
 radius = 0.0
 count = 1
 
 [[dungeon.pack]]
 mob = "sf_darksoul"
 at = [-210.5, 2201.5]
-z = 78.5
+z = 79.8
 radius = 3.0
 count = 2
 link = 12.0
@@ -189,15 +191,15 @@ link = 12.0
 [[dungeon.pack]]
 mob = "sf_worg"
 at = [-186.8, 2213.9]
-z = 78.4
+z = 79.8
 radius = 3.0
 count = 2
 link = 12.0
 
 [[dungeon.pack]]
 mob = "sf_servitor"
-at = [-210.6, 2237.7]
-z = 78.3
+at = [-209.1, 2238.2]
+z = 79.8
 radius = 3.0
 count = 2
 link = 10.0
@@ -207,7 +209,7 @@ link = 10.0
 mob = "sf_razorclaw"
 key = "razorclaw"
 at = [-198.5, 2261.5]
-z = 73.8
+z = 76.2
 radius = 0.0
 count = 1
 
@@ -215,33 +217,36 @@ count = 1
 [[dungeon.pack]]
 mob = "sf_deathsworn"
 key = "deathsworn"
-at = [-162.2, 2225.3]
-z = 77.0
+at = [-161.7, 2224.3]
+z = 82.1
 radius = 0.0
 count = 1
 rare = true
 
-# The great hall: Baron Silverlaine's ghost, and his servants.
+# The great hall (the keep's floor at 94): Baron Silverlaine's ghost, and his servants. Until
+# Nov 2026 these, and most of the keep's ground-floor places, stood on the terrain under the keep's
+# floors (see the gate lamp); each now stands on the floor over its old spot, or the nearest open
+# floor of that room (the test `every_dungeons_places_stand_on_its_floor` checks them all).
 [[dungeon.pack]]
 mob = "sf_servitor"
-at = [-138.3, 2153.8]
-z = 87.5
+at = [-137.3, 2156.8]
+z = 94.0
 radius = 3.0
 count = 2
 link = 12.0
 
 [[dungeon.pack]]
 mob = "sf_moonwalker"
-at = [-126.5, 2165.5]
-z = 87.5
+at = [-128.5, 2165.5]
+z = 94.0
 radius = 0.0
 count = 1
 
 [[dungeon.pack]]
 mob = "sf_silverlaine"
 key = "silverlaine"
-at = [-102.5, 2153.5]
-z = 87.5
+at = [-127.5, 2169.5]
+z = 94.0
 radius = 0.0
 count = 1
 
@@ -1536,11 +1541,11 @@ perks = [{ kind = "focus", amount = 0.08 }]
 [[dungeon.pack]]
 mob = "sf_wolfguard"
 at = [-224.2, 2198.0]
-z = 77.0
+z = 79.8
 radius = 2.0
 count = 2
 link = 12.0
-route = [ [-222.8, 2214.0], [-221.5, 2228.0] ]
+route = [ [-221.8, 2214.0], [-219.0, 2224.5] ]
 wait = 6.0
 
 # A patrol.
@@ -1567,8 +1572,8 @@ hidden = 6.0
 # Asleep in the dark until a hero comes near.
 [[dungeon.pack]]
 mob = "sf_worg"
-at = [-211.8, 2258.4]
-z = 74.3
+at = [-212.8, 2255.9]
+z = 77.1
 radius = 1.5
 count = 2
 link = 10.0
@@ -1577,8 +1582,8 @@ hidden = 6.0
 # A caster behind the fighters.
 [[dungeon.pack]]
 mob = "sf_moonwalker"
-at = [-229.9, 2134.0]
-z = 77.2
+at = [-228.9, 2134.0]
+z = 80.8
 radius = 0.0
 count = 1
 link = 12.0
@@ -1604,9 +1609,9 @@ link = 12.0
 # Waiting by the strongbox, unseen, for whoever opens it.
 [[dungeon.pack]]
 mob = "sf_darksoul"
-at = [-209.4, 2272.0]
-z = 73.9
-radius = 1.5
+at = [-208.9, 2269.0]
+z = 77.4
+radius = 1.0
 count = 2
 link = 10.0
 wake = "larder_cache"
