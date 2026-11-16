@@ -1346,7 +1346,9 @@ impl Survival {
                 continue;
             }
             // Far from every hero, a creature at rest sleeps (the land is wide).
-            if heroes.iter().all(|p| dist2d(*p, self.mobs[&id].pos) > SLEEP_RANGE) {
+            // (Never a raider: with no foe it waits for one, and a raid that has a raider asleep in
+            // the hills never ends.)
+            if !self.mobs[&id].raider && heroes.iter().all(|p| dist2d(*p, self.mobs[&id].pos) > SLEEP_RANGE) {
                 let m = &self.mobs[&id];
                 if matches!(m.state, MobState::Idle { .. }) && m.path.is_empty() {
                     continue;
