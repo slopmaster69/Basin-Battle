@@ -500,6 +500,69 @@ running = { from = "ScourgeMale", clip = 19, take = 1, recovery = 1.1, damage = 
 roll = { from = "ScourgeMale", clip = 19, take = 2, windup = 0.85, recovery = 1.1, damage = 1.1, lunge = 1.8 }
 leap = { from = "ScourgeMale", clip = 18, take = 0, windup = 0.9, recovery = 1.35, damage = 1.4, stamina = 1.3, lunge = 4.0, range = 1.1 }
 
+# The weapon identity pass (Corey, Nov 15): the axes and the maces play differently from the
+# swords, whatever their numbers. Each set keeps its family's damage a second about where the
+# grip's set had it (a slower step hits harder by about as much as it takes longer: pinned by
+# `tests_weapon_identity`), and is picked from the same vetted clips (the census above), so it
+# changes timing and feel and which swing reads as which. Sword, dagger, greatsword, polearm and
+# staff keep the grip's sets.
+
+# The one-hander's axe: wide hacking cleaves. Every step's a chop that goes a step further in, and
+# the last one, a two-hander's wide swing, takes the whole line. (Its timing is the grip's: the
+# Footman's Axe is the starting weapon, and every drill and duel is tuned to its pace.)
+[[moveset]]
+key = "axe_one_hand"
+light = [
+  { from = "ScourgeMale", clip = 17, take = 1, lunge = 0.9 },
+  { from = "ScourgeMale", clip = 17, take = 2, recovery = 1.05, lunge = 0.9 },
+  { from = "ScourgeMale", clip = 18, take = 2, windup = 1.2, recovery = 1.25, damage = 1.35, stamina = 1.2, lunge = 1.1 },
+]
+heavy = { from = "ScourgeMale", clip = 17, take = 2, lunge = 1.1 }
+running = { from = "ScourgeMale", clip = 17, take = 2, recovery = 1.1, damage = 1.2, lunge = 2.4 }
+roll = { from = "ScourgeMale", clip = 17, take = 1, windup = 0.8, recovery = 1.1, damage = 1.1, lunge = 1.6 }
+leap = { from = "ScourgeMale", clip = 18, take = 2, windup = 0.85, recovery = 1.35, damage = 1.45, stamina = 1.3, lunge = 3.6, range = 1.1 }
+
+# The one-hander's mace: overhead slams, slower and heavier. Every step comes down from above
+# (the dwarf's overhead), each a beat slower and a bit harder than the last.
+[[moveset]]
+key = "mace_one_hand"
+light = [
+  { from = "DwarfMale", clip = 57, take = 0, windup = 1.25, recovery = 1.2, damage = 1.15, lunge = 0.5 },
+  { from = "DwarfMale", clip = 57, take = 0, windup = 1.3, recovery = 1.25, damage = 1.25, lunge = 0.5 },
+  { from = "DwarfMale", clip = 57, take = 0, windup = 1.45, recovery = 1.4, damage = 1.6, stamina = 1.3, lunge = 0.8 },
+]
+heavy = { from = "DwarfMale", clip = 57, take = 0, lunge = 0.8 }
+running = { from = "DwarfMale", clip = 57, take = 0, windup = 1.1, recovery = 1.2, damage = 1.25, lunge = 2.2 }
+roll = { from = "DwarfMale", clip = 17, take = 0, windup = 0.9, recovery = 1.15, damage = 1.15, lunge = 1.4 }
+leap = { from = "DwarfMale", clip = 57, take = 0, windup = 0.85, recovery = 1.4, damage = 1.55, stamina = 1.3, lunge = 3.2, range = 1.1 }
+
+# The two-hander's axe: big diagonal cleaves, a long arc across the body with the last, the
+# widest, closing the chain.
+[[moveset]]
+key = "axe_two_hand"
+light = [
+  { from = "ScourgeMale", clip = 18, take = 0, windup = 1.05, lunge = 1.0 },
+  { from = "ScourgeMale", clip = 19, take = 1, windup = 1.15, recovery = 1.1, damage = 1.12, lunge = 1.0 },
+  { from = "ScourgeMale", clip = 18, take = 2, windup = 1.25, recovery = 1.2, damage = 1.3, stamina = 1.15, lunge = 1.2 },
+]
+heavy = { from = "ScourgeMale", clip = 19, take = 2, lunge = 1.4 }
+running = { from = "ScourgeMale", clip = 18, take = 0, recovery = 1.1, damage = 1.2, lunge = 2.6 }
+roll = { from = "ScourgeMale", clip = 18, take = 2, windup = 0.85, recovery = 1.1, damage = 1.1, lunge = 1.7 }
+leap = { from = "ScourgeMale", clip = 19, take = 2, windup = 0.9, recovery = 1.35, damage = 1.4, stamina = 1.3, lunge = 3.8, range = 1.1 }
+
+# The maul and the hammers: a slow overhead slam, every blow. Two steps (the chain's short),
+# the polearm's slow overhead for each, and a heavy that holds its coil longest.
+[[moveset]]
+key = "maul"
+light = [
+  { from = "ScourgeMale", clip = 19, take = 0, windup = 1.3, recovery = 1.25, damage = 1.25, lunge = 0.6 },
+  { from = "ScourgeMale", clip = 19, take = 0, windup = 1.35, recovery = 1.3, damage = 1.32, stamina = 1.1, lunge = 0.6 },
+]
+heavy = { from = "ScourgeMale", clip = 19, take = 0, lunge = 0.9 }
+running = { from = "ScourgeMale", clip = 19, take = 0, windup = 1.1, recovery = 1.2, damage = 1.25, lunge = 2.4 }
+roll = { from = "ScourgeMale", clip = 19, take = 0, windup = 0.9, recovery = 1.15, damage = 1.1, lunge = 1.5 }
+leap = { from = "ScourgeMale", clip = 19, take = 0, windup = 0.95, recovery = 1.4, damage = 1.5, stamina = 1.3, lunge = 3.4, range = 1.1 }
+
 # The guard breakers. An attack with the guard up bashes with the shield (with a two-handed weapon,
 # it kicks); a heavy attack with the guard up kicks. Either knocks a creature's wind-up aside (a
 # boss's only when it's a cast: `shove_bosses`) and tears `guard_break` stamina from a raised
@@ -924,6 +987,7 @@ range = 3.2
 arc = 110.0
 targets = 2
 subclass = 0
+moveset = "axe_one_hand"
 # Identity: the bleeder; each hit bleeds 4 a second for 3 sec (docs/weapon-identities.md).
 bleed = 4.0
 [[weapon]]
@@ -938,6 +1002,7 @@ arc = 110.0
 targets = 2
 stagger = 0.5
 subclass = 0
+moveset = "axe_one_hand"
 # The bleeder (docs/weapon-identities.md).
 bleed = 6.0
 [[weapon]]
@@ -966,6 +1031,7 @@ arc = 100.0
 targets = 1
 stagger = 0.8
 subclass = 4
+moveset = "mace_one_hand"
 # Identity: the stance breaker; its hits count twice towards a foe's stance (docs/weapon-identities.md).
 posture = 2.0
 [[weapon]]
@@ -1028,6 +1094,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 5
+moveset = "maul"
 
 # The Warlord's own axe: only from the Warlord.
 [[weapon]]
@@ -1045,6 +1112,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 1
+moveset = "axe_two_hand"
 
 # The Shadow Hunter's spear: only from him.
 # Identity: the executioner; twice the damage on a foe under a third of its health (docs/weapon-identities.md).
@@ -10861,6 +10929,7 @@ arc = 100.0
 targets = 1
 stagger = 1.0
 subclass = 4
+moveset = "mace_one_hand"
 
 # A silver-edged sword: the sword's quickness, the axe's bite.
 # The stance breaker (docs/weapon-identities.md).

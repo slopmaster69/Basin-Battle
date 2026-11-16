@@ -1101,6 +1101,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 5
+moveset = "maul"
 
 [[item]]
 key = "mograines_might"
@@ -1122,6 +1123,7 @@ arc = 100.0
 targets = 1
 stagger = 0.85
 subclass = 4
+moveset = "mace_one_hand"
 
 [[item]]
 key = "hand_of_righteousness"

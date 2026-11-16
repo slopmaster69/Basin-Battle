@@ -1570,6 +1570,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 5
+moveset = "maul"
 
 [[item]]
 key = "thornroot_maul"

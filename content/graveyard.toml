@@ -1078,6 +1078,7 @@ arc = 100.0
 targets = 1
 stagger = 1.0
 subclass = 4
+moveset = "mace_one_hand"
 
 [[item]]
 key = "ironspine_fist"

@@ -1442,6 +1442,7 @@ arc = 100.0
 targets = 1
 stagger = 0.95
 subclass = 4
+moveset = "mace_one_hand"
 parry = 0.08
 
 [[item]]
@@ -1468,6 +1469,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 1
+moveset = "axe_two_hand"
 
 [[item]]
 key = "guillotine_axe"

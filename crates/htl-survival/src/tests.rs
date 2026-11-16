@@ -1263,6 +1263,8 @@ fn a_heavy_weapon_knocks_a_wind_up_aside() {
     // (The brute's own poise shrugs off a light blow: that's the next test.)
     let b = s.content.mob("overseer").unwrap();
     s.content.mobs[b].attack.poise = Some(false);
+    // (The maul's slam comes down slowly now: the brute's wind-up is long enough to meet it.)
+    s.content.mobs[b].attack.windup += 0.4;
     let k = mob(&mut s, "overseer", [2.5, 0.0, 0.0]);
     s.engage(k, Foe::Hero(p));
     for _ in 0..40 {
@@ -1273,7 +1275,7 @@ fn a_heavy_weapon_knocks_a_wind_up_aside() {
     }
     assert!(matches!(s.mobs[&k].state, MobState::Windup { .. }));
     s.input(p, Input::Attack);
-    let ev = run(&mut s, 0.9);
+    let ev = run(&mut s, 1.2);
     assert!(!hits_on(&ev, k).is_empty(), "the maul lands");
     assert!(hits_on(&ev, p).is_empty(), "and the brute's blow never comes: {:?}", hits_on(&ev, p));
     assert!(s.mobs[&k].stagger_until > s.clock, "it reels");
@@ -1662,6 +1664,7 @@ fn strike_of(s: &Survival, p: Id) -> Option<Strike> {
 fn light_attacks_chain_through_the_set_late_in_each_recovery() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    take_up(&mut s, p, "sword");
     s.input(p, Input::Attack);
     let first = strike_of(&s, p).unwrap();
     assert_eq!((first.step, first.clip, first.take), (0, 17, 1));
