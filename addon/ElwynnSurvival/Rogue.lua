@@ -1,0 +1,111 @@
+-- Elwynn Survival: the Rogue's Flourish (Blades' trait) beside the reticle.
+-- Each perfect dodge with 3 Blades abilities on the keys gives one, up to five, and a hit on the
+-- Rogue takes them all (the server's [rogue]). Five violet diamonds under the reticle, one lit
+-- for each: a chime and a flare as one comes, a crack and the diamonds bursting as they're lost.
+-- Nothing on the ground: it reads with floor markers off. Line: SK flourish <n> <most>.
+-- Written for the 1.12 client's Lua 5.0: no #, no %, table.getn, `this`.
+
+local ES = ElwynnSurvival
+if not ES then return end
+
+local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
+local PIP, GAP = 12, 4
+
+local fl = CreateFrame("Frame", "ElwynnSurvivalFlourish", WorldFrame)
+fl:SetWidth(1)
+fl:SetHeight(1)
+fl:SetPoint("CENTER", WorldFrame, "CENTER", 0, -44)
+fl:SetFrameStrata("HIGH")
+fl:Hide()
+fl.pips = {}
+fl.n, fl.most = 0, 5
+fl.stepAt, fl.lostAt = nil, nil
+
+local function Pip(i)
+  local t = fl.pips[i]
+  if t then return t end
+  t = fl:CreateTexture(nil, "OVERLAY")
+  t:SetTexture(ART .. "diamond")
+  t:SetBlendMode("ADD")
+  fl.pips[i] = t
+  return t
+end
+
+local function Lay()
+  local w = fl.most * PIP + (fl.most - 1) * GAP
+  for i = 1, 8 do
+    local t = Pip(i)
+    if i <= fl.most then
+      t:ClearAllPoints()
+      t:SetPoint("CENTER", fl, "CENTER", -w / 2 + PIP / 2 + (i - 1) * (PIP + GAP), 0)
+      t:Show()
+    else
+      t:Hide()
+    end
+  end
+end
+
+-- `SK flourish <n> <most>`: the Rogue's Flourish now (other kinds are the staffs' and the Priest's).
+function ES.RogueStacksLine(f)
+  if f[2] ~= "flourish" then return end
+  local n = tonumber(f[3]) or 0
+  local most = math.max(1, math.min(8, tonumber(f[4]) or 5))
+  local now = GetTime()
+  if most ~= fl.most then
+    fl.most = most
+    Lay()
+  end
+  if n > fl.n then
+    fl.stepAt = now
+    PlaySoundFile("Sound\\interface\\MagicClick.wav")
+  elseif n == 0 and fl.n > 0 then
+    -- Lost (a hit) or run out: they burst and fade.
+    fl.lostAt = now
+    PlaySoundFile("Sound\\Spells\\Fizzle\\FizzleShadowA.wav")
+  end
+  fl.lit = (n > 0) and n or fl.n
+  fl.n = n
+  Lay()
+  fl:Show()
+end
+
+fl:SetScript("OnUpdate", function()
+  local now = GetTime()
+  local lost = this.lostAt and (now - this.lostAt) or nil
+  if this.n == 0 and (not lost or lost > 0.5) then
+    this.lostAt = nil
+    this:Hide()
+    return
+  end
+  -- The newest swells and flashes white as it comes.
+  local step = this.stepAt and (now - this.stepAt) or 9
+  for i = 1, this.most do
+    local t = Pip(i)
+    local size, a = PIP, 0.28
+    local r, g, b = 0.55, 0.35, 0.9
+    if lost then
+      -- Every lit one bursts outward and fades over half a second.
+      if i <= (this.lit or 0) then
+        size = PIP * (1 + lost * 2.4)
+        a = math.max(0, 0.9 * (1 - lost / 0.5))
+        r, g, b = 0.85, 0.6, 1.0
+      else
+        a = math.max(0, 0.28 * (1 - lost / 0.5))
+      end
+    elseif i <= this.n then
+      a = 0.95
+      r, g, b = 0.75, 0.5, 1.0
+      if i == this.n and step < 0.25 then
+        size = PIP * (1.8 - step * 3.2)
+        r, g, b = 1, 0.9, 1
+      end
+      -- Full: they breathe.
+      if this.n >= this.most then
+        a = 0.75 + 0.25 * math.sin(now * 8)
+      end
+    end
+    t:SetWidth(size)
+    t:SetHeight(size)
+    t:SetVertexColor(r, g, b, a)
+  end
+end)

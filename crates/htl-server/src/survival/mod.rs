@@ -104,6 +104,8 @@ impl Realm {
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct Carry {
     pub addon: bool,
+    /// The add-on's own version (`.es hello`), 0 for none told.
+    pub addon_v: u32,
     pub anim: bool,
     pub local: bool,
     pub level: u8,
@@ -163,6 +165,8 @@ pub(crate) struct InWorld {
     pub counter: u32,
     /// The client runs the survival add-on.
     pub addon: bool,
+    /// The add-on's own version, as its `.es hello` said (0: not said yet).
+    pub addon_v: u32,
     /// The client plays clips, hit-stops and rolls itself (the action-combat client's second
     /// round): it gets the `AN`, `IM` and `RO` lines in place of emotes.
     pub anim: bool,
@@ -203,6 +207,7 @@ impl InWorld {
             fresh_items: BTreeSet::new(),
             counter: 0,
             addon: false,
+            addon_v: 0,
             anim: false,
             local: false,
             level: 0,
@@ -902,6 +907,7 @@ impl SurvivalGame {
                 // From the other world: the add-on carries on as it was.
                 if let Some(w) = self.world_mut(conn) {
                     w.addon = c.addon;
+                    w.addon_v = c.addon_v;
                     w.anim = c.anim;
                     w.local = c.local;
                     w.level = c.level;
@@ -956,6 +962,7 @@ impl SurvivalGame {
         let w = self.sessions.get_mut(&conn).and_then(|s| s.world.take())?;
         let carry = Carry {
             addon: w.addon,
+            addon_v: w.addon_v,
             anim: w.anim,
             local: w.local,
             level: w.level,
@@ -1028,6 +1035,7 @@ impl SurvivalGame {
             let mut w = InWorld::new(guid, id, name, pos[2]);
             w.porting = true;
             w.addon = carry.addon;
+            w.addon_v = carry.addon_v;
             s.world = Some(w);
         }
         self.pending_carry.insert(conn, carry);

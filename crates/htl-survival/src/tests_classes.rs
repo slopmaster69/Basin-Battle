@@ -212,8 +212,9 @@ fn the_board_keeps_to_its_budgets() {
         assert!(!d.text.is_empty() && !d.icon.is_empty(), "{}: its words and icon", d.key);
         // (A shout's look is on each friend it reaches: `ally_spell`; a Tackle's is its Crash; a
         // leap's own clip, Ensnaring Retreat's flip, is its look without a spell's.)
-        // (A slip's look is the add-on's afterimage on the hero, `PL fade`, for everyone.)
-        assert!(d.spell != 0 || d.ally_spell != 0 || d.kind == "art" || d.crash.is_some() || d.leap_flip || d.leap_clip != 0 || d.slip, "{}: its look", d.key);
+        // (A slip's look is the add-on's afterimage on the hero, `PL fade`, for everyone; a
+        // Quickstep's is the dodge's own dash.)
+        assert!(d.spell != 0 || d.ally_spell != 0 || d.kind == "art" || d.crash.is_some() || d.leap_flip || d.leap_clip != 0 || d.slip || d.quickstep, "{}: its look", d.key);
         if d.kind == "art" {
             continue;
         }

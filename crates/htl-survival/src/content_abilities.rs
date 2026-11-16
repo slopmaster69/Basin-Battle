@@ -425,6 +425,22 @@ pub struct AbilityDef {
     /// reels this long (Garrote).
     #[serde(default)]
     pub breaks_cast: f32,
+    /// The Rogue's Blades (`sim::rogue`): a Quickstep, a free dodge that cuts the hero's own blow
+    /// at any point, the wind-up's stamina back (`[rogue] quick_speed` along the ground).
+    #[serde(default)]
+    pub quickstep: bool,
+    /// A Quickstep that leaves a shade where the hero stood for this long, and every enemy on the
+    /// hero turns to it for `shade_turn` (a Distract; a boss only glances) (Afterimage).
+    #[serde(default)]
+    pub shade: f32,
+    #[serde(default)]
+    pub shade_turn: f32,
+    /// Blade Flurry: this many cuts, alternating hands, the last the two-blade finisher.
+    #[serde(default)]
+    pub cuts: u32,
+    /// A projectile that, striking, counts as a hand in the two-blade run (Darting Knife).
+    #[serde(default)]
+    pub hand: bool,
     /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
     /// (Holy Shock).
     #[serde(default)]
@@ -1341,16 +1357,23 @@ pub const CC_KINDS: [&str; 11] = ["stun", "incapacitate", "petrify", "panic", "d
 /// boss's not), `leech` (the hero's Venom ticks heal them as much), `feint` (the enemies on the
 /// hero within `amount` yd lose interest for its time, or turn to another hero; a boss halves
 /// the hero's threat).
-pub const OTHER_EFFECTS: [&str; 37] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl", "distract", "cloak", "venom", "rupture", "garrote", "choked", "leech", "feint",
+///
+/// The Rogue's Blades (docs/rogue-roles.md, Blades): `pinned` (a creature can't turn, a boss
+/// turns at `[rogue] pinned_boss_turn` of its speed; a hero's facing is their own), `hemorrhage`
+/// (a backstab on it costs the next none of its bonus), `evasion` (the perfect dodge's window
+/// widened to `amount` sec, a dodge `[rogue] evasion_cost` stamina), `adrenaline` (blows and
+/// dodges cost no stamina), `blade_dance` (every dodge that evades a blow is perfect and free,
+/// and cuts the striker for `amount` of the weapon, from behind).
+pub const OTHER_EFFECTS: [&str; 42] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl", "distract", "cloak", "venom", "rupture", "garrote", "choked", "leech", "feint", "pinned", "hemorrhage", "evasion", "adrenaline", "blade_dance",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 23] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl", "cloak", "leech", "feint"];
+pub const BOONS: [&str; 26] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl", "cloak", "leech", "feint", "evasion", "adrenaline", "blade_dance"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 19] = ["poison", "stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated", "venom", "rupture", "choked"];
+pub const HARMFUL: [&str; 21] = ["poison", "stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated", "venom", "rupture", "choked", "pinned", "hemorrhage"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius

@@ -6,8 +6,10 @@ reasons, and a build plan of small pull requests at the end. It lives in Elwynn 
 the dodge, posture and the beat are. This page is the design the pull requests in the
 [build plan](#build-plan) follow. Built so far: entry 1, the core (two blades, no guard, the
 perfect dodge and the Shadow Cut), entry 2, Shadow (Distract and Sap, Shadowstep to a back,
-Cloak and Dagger, Shrouded Step), and entry 3, Venom (Coated Blade, Eviscerate and Rupture, Garrote
-and Feint, Leeching Venom and Choking Cloud); see [Decided while building](#decided-while-building).
+Cloak and Dagger, Shrouded Step), entry 3, Venom (Coated Blade, Eviscerate and Rupture, Garrote
+and Feint, Leeching Venom and Choking Cloud), and entry 4, Blades (Flourish, Darting Knife and
+Pinning Knife, Blade Flurry and Hemorrhage, Quickstep and Afterimage, Evasion and Adrenaline Rush,
+Blade Dance) with the board's third choice; see [Decided while building](#decided-while-building).
 
 ## How the Rogue plays
 
@@ -272,7 +274,7 @@ Bloodlust Edge's stacks (`BLOODLUST_STACKS`), with its own trigger.
 | E | *Hemorrhage* (EX, 25) | Open it for the team. | A cut, 60% weapon. For **8 sec** the enemy forgets its backstabs: no backstab on it loses bonus to the ones before (`backstab_bonus`), anyone's. It may still wheel on whoever is at its back. Why: lets a band take turns at one back without the decay; the wheel stays, it is the boss's answer. | The enemy bleeding (Rend's blood look) while it lasts. | Sunder Armor (Basin) strips armor for everyone; Hemorrhage keeps the back open. |
 | 1 | **Quickstep** (new) | More dodges than stamina allows. | A 5 yd dash along the movement keys (back with none), **2 charges** of 10 sec, no stamina. It evades as a dodge does, so a perfect one pays (and gives Flourish). It cancels your own blow at any point, wind-up included, stamina back. Why: two charges is a chain of three evasions with the dodge; 10 sec keeps it a utility. | The dash and the body's flicker on a perfect one, as the dodge. | Fade is one 5 yd sidestep that slows the striker; Blink is a 20 yd teleport. Quickstep is charges of dodge that cut your own blow. |
 | 1 | *Afterimage* (EX, 25) | Leave a decoy. | A Quickstep that leaves a **shade** where you started, for 2 sec. Every enemy on you turns to the shade (Distract, 1.5 sec; a boss glances, 0.8 sec). Why: the shade is where they last saw you; their back is to wherever you went. | The shade: a creature body with a rogue's look (a Defias Cutpurse's display), see-through under the Stealth aura, and the enemies turning to it. | No one else leaves a body behind. |
-| 2 | **Evasion** (new, the name back from #40, not the old stance) | Make the perfect dodge easier, for a while. | **5 sec**: the perfect window widens from 0.18 to **0.28 sec**, and a dodge costs 8 stamina, not 15. 20 sec cooldown. Not a stance: you keep moving and striking. Why: inside the 0.32 sec evade, so it widens the reward, never the dodge itself. | A lasting shimmer on the body (Evasion's own look in 1.12). | The old Evasion and Ice Block stand still and soak; this keeps you dancing. |
+| 2 | **Evasion** (new, the name back from #40, not the old stance; key `blade_evasion`) | Make the perfect dodge easier, for a while. | **5 sec**: the perfect window widens from 0.18 to **0.28 sec**, and a dodge costs 8 stamina, not 15. 20 sec cooldown. Not a stance: you keep moving and striking. Why: inside the 0.32 sec evade, so it widens the reward, never the dodge itself. | A lasting shimmer on the body (Evasion's own look in 1.12). | The old Evasion and Ice Block stand still and soak; this keeps you dancing. |
 | 2 | *Adrenaline Rush* (EX, 50) | The all-in. | **6 sec**: blows and dodges cost no stamina. Why 50 Valor: it is the strongest moment of the tree that isn't the ultimate. | A burst on you as it starts and a lasting glow. | The Warrior's Rallying Cry gives a band full stamina once; this is yours, for a while. |
 | 3 | **Blade Dance** (new) | Every dodge a perfect one. | **8 sec**, 100 Valor, 40 sec cooldown. Every dodge that evades a blow counts as perfect (its Shadow Cut, stamina, Valor, Flourish), dodges cost nothing, and each throws a free cut at whoever swung (60% weapon, from behind). Why: the ultimate is the tree's whole idea at full strength; it hurts only what attacks you. | The body flickering through the whole 8 sec, a counter-cut and a backstab burst on every striker. | Bladestorm hurts everything round you; Retaliation blocks and sweeps. Blade Dance only answers blows that miss you. |
 
@@ -448,6 +450,73 @@ What the design left open, decided in the pull request that built it:
     and Smoke Bomb.
   - **Truly needs a client patch**: nothing. A green sheen or drip on the off-hand blade while the
     trait is on, and a trail on Eviscerate's two blades, would add to it (PR 6).
+- **Blades (entry 4)**:
+  - **Flourish comes only with the trait** (3 of 5 keys on Blades' cards, a hero created as a
+    Rogue), from any perfect dodge: the dodge's, Quickstep's, Blade Dance's. It makes the hands'
+    blows harder and quicker (every blow of the run, Blade Flurry's cuts, the Shadow Cut), not
+    weapon arts or other abilities. "A blow that lands" is any blow, a creature's or a hero's, that
+    deals the Rogue damage (`strike_player`); a burn's tick or a spell doesn't take it.
+  - **How Flourish reads**: Slice and Dice's look (5171) on the body while any holds, for everyone;
+    on the Rogue's own screen, five violet diamonds under the reticle (`Rogue.lua`, the `SK
+    flourish` line, add-on 71), one lit with a chime as each comes, all five breathing when full,
+    and bursting with a crack when a blow takes them or they run out. An older add-on shows only
+    the body's look. The look is to be checked when first filmed.
+  - **Darting Knife's hand**: a knife (Darting or Pinning) that hits a creature carries the
+    thrower's two-blade run one hand on, never to its finisher (at most the 3rd), and the next blow
+    of either hand goes on from it. It holds the run 1.5 sec (`[rogue] knife_window`), not the
+    run's 0.8, so two knives, a few steps in and two blows reach the finisher. A knife on a hero
+    counts for nothing. Its look is 1.12's Throw (2764).
+  - **Pinning Knife**: a pinned creature stands where it is and keeps its facing. While its foe is
+    in front of it and in reach it still thinks and strikes, where it stands and as it faces; a
+    wind-up begun keeps no turn. A boss turns at half speed in its wind-ups (`[rogue]
+    pinned_boss_turn`) and moves as ever. A hero's facing is their own client's: on a hero it is
+    only the knife ("Heroes ignore it"). Its look is Crippling Poison's (3409), to be checked when
+    filmed; the body staying put as the Rogue circles it is the tell.
+  - **Blade Flurry** is paid at once (20 stamina); its cuts are the hands' own blows (Flourish
+    counts), cost nothing, and give nothing back to a dodge pressed in one's wind-up. Between two
+    cuts means from the moment a cut has struck (the off hand's rule for every cut) or in a cut's
+    wind-up (the dodge-feint): either way the string ends. Each cut's 1 yd step is the client's
+    lunge (`lunge`), as the weapon's own lunges are. Its look as it begins is 1.12's Blade Flurry
+    (13877).
+  - **Hemorrhage**: while it holds, a backstab on the enemy is not remembered, so each keeps the
+    whole bonus, and none counts after it ends. The wheel round on whoever stabs (`backstabbed`) is
+    still rolled. Its look is Rend's blood burst every 1.5 sec, as Rupture's.
+  - **Quickstep is a dodge** (`Action::Dodge`, the dodge's own evade and perfect windows) that costs
+    nothing and dashes at 20 yd a second for the dodge's 0.25 sec (5 yd; with no movement key, the
+    dodge's own hop back). It goes from inside the Rogue's own blow at any point (the wind-up's
+    stamina back and the run ended, as the dodge-feint; later, nothing back) and from inside a
+    dodge (the chain). Rooted, it refuses ("Can't move"). It has no spell look: the dash and, on a
+    perfect one, the flicker are its look.
+  - **Afterimage's shade** is a creature (`rogue_shade`: a Defias Footpad's body, 2338, under the
+    Stealth look, 5215) set down as a totem that never pulses, 10 health, gone after 2 sec. "Every
+    enemy on you" is every creature whose foe is the Rogue, however far; each is Distracted toward
+    the shade for 1.5 sec (a boss glances, by Distract's rule). Vanish's puff where the Rogue was.
+  - **Evasion's key is `blade_evasion`**: the old `evasion` key stays Smoke Bomb's in old saves
+    (`RENAMED`). Under it the perfect window runs to its `amount` (0.28, checked to sit inside the
+    dodge's evade window) and a dodge costs and needs 8 stamina, not the 18 a dodge needs to start.
+    Its look is 1.12's Evasion (5277), to be checked when filmed.
+  - **Adrenaline Rush** is its own effect (`adrenaline`), not the Warrior's `fury`: it makes the
+    hero tireless as a fury does (blows, weapon arts and stamina abilities free) and its dodges
+    free, and adds no damage. Its look is 1.12's Adrenaline Rush (13750).
+  - **Blade Dance**: for a Rogue, every dodge that evades (0.04 to 0.32 sec) is perfect. The
+    counter-cut is 60% of a weapon roll times the backstab's bonus (a dagger's 2.5, with the
+    backstab memory's decay unless Hemorrhage holds), with the backstab's burst, sound and beat; on
+    a hero (a duel), 60% with no backstab. A non-Rogue who borrows it has free dodges only (the
+    perfect dodge is the class's). The body wears the Stealth look the whole 8 sec.
+  - **The board's third choice** goes only to an add-on that lays it (71 and on, `.es hello`'s
+    version kept with the connection): an older add-on reads any choice but 2 as the first and
+    would lay Blades over Shadow, so it is sent the first two only and told to update. The Rogue's
+    column draws its cards shorter, three in a row's height (`FitCard`); other columns are as they
+    were.
+  - **Charges**: a cooldown is shared by its charges (Fan of Knives' 8 over 2), so "3 charges of 5
+    sec" is Darting Knife's 15 over 3 and "2 charges of 10 sec" Quickstep's 20 over 2: each charge
+    comes back in the time the table says.
+  - **Where they're learned**: Darting Knife and Blade Flurry are first cards (a class's whole Q
+    and E rows) and the Dead Drop teaches them too; Morgan's Stash teaches Quickstep and Evasion;
+    Morgan the Collector teaches Blade Dance beside Death Mark and Cloak and Dagger.
+  - **Truly needs a client patch**: nothing. A copy of the hero's own body and gear for the shade,
+    a blade trail on Blade Flurry's cuts, and a knife left standing in a pinned enemy would add to
+    it (PR 6).
 
 ## Build plan
 

@@ -486,8 +486,8 @@ fn shrouded_step_hides_the_rogue_1_sec_after_a_step_behind_and_a_boss_sees_throu
     fighting(&mut s, b, p);
     fighting(&mut s, m, p);
     s.players.get_mut(&p).unwrap().rogue.shroud_until = s.clock + 1.0;
-    assert!(s.step_shadowed(m), "a creature stands");
-    assert!(!s.step_shadowed(b), "a boss keeps on");
+    assert!(s.step_shadowed(m, DT), "a creature stands");
+    assert!(!s.step_shadowed(b, DT), "a boss keeps on");
 }
 
 #[test]
@@ -550,8 +550,8 @@ fn shadow_is_the_rogues_first_choice_on_every_key_and_venoms_cards_the_second() 
     assert_eq!(h.loadout.get("close").map(String::as_str), Some("backstab"));
     assert!(h.owned.contains("fan_of_knives"));
     let shrine = s.content.chests.iter().find(|c| c.key == "shrine_rogue").unwrap();
-    // (And Venom's Eviscerate, the tree's E: entry 3.)
-    assert_eq!(shrine.teaches, ["distract", "backstab", "fan_of_knives", "eviscerate"]);
+    // (And Venom's Eviscerate, the tree's E: entry 3; Blades' Q and E: entry 4.)
+    assert_eq!(shrine.teaches, ["distract", "backstab", "fan_of_knives", "eviscerate", "darting_knife", "blade_flurry"]);
 }
 
 #[test]
