@@ -428,3 +428,147 @@ fn a_swords_tooltip_says_its_mechanic_from_its_numbers() {
         assert!(!text(k).contains("{fx}"), "{k}: the mark is filled");
     }
 }
+
+// --- axes and polearms: the pass's second batch ------------------------------------------------------
+
+fn sturdy_foe(s: &mut Survival, key: &str) -> Id {
+    let m = foe(s, key);
+    s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+    s.mobs.get_mut(&m).unwrap().max_health = 1_000_000;
+    m
+}
+
+#[test]
+fn the_bearded_axes_heavy_hooks_a_guard_aside_for_a_while() {
+    let (mut s, p) = world();
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    s.content.mobs[pirate].block = 1.0;
+    wield(&mut s, p, "bearded_axe");
+    let m = sturdy_foe(&mut s, "dm_pirate");
+    let hold = |s: &mut Survival| {
+        let x = s.mobs.get_mut(&m).unwrap();
+        x.pos = [2.0, 0.0, 0.0];
+        x.facing = std::f32::consts::PI;
+        x.state = MobState::Recover { foe: Foe::Hero(p), until: 1.0e9 };
+    };
+    hold(&mut s);
+    let ev = swing(&mut s, p);
+    assert!(hits_on(&ev, m).iter().all(|(_, o)| *o == Outcome::Blocked), "the shield takes a light blow: {:?}", hits_on(&ev, m));
+    for _ in 0..80 {
+        s.step(0.02);
+    }
+    hold(&mut s);
+    s.input(p, Input::Heavy);
+    let mut heavy = Vec::new();
+    for _ in 0..90 {
+        heavy.extend(s.step(0.02));
+    }
+    assert!(hits_on(&heavy, m).iter().any(|(d, _)| *d > 0), "the heavy lands");
+    for _ in 0..40 {
+        s.step(0.02);
+    }
+    hold(&mut s);
+    let ev = swing(&mut s, p);
+    assert!(hits_on(&ev, m).iter().any(|(d, o)| *d > 0 && *o == Outcome::Hit), "the guard stays aside: {:?}", hits_on(&ev, m));
+}
+
+#[test]
+fn each_kill_with_the_bloodlust_edge_quickens_the_swing_and_it_fades() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "bloodlust_edge");
+    let base = s.strike_at(p, StrikeKind::Light, 0).windup;
+    let lust = s.content.weapon("bloodlust_edge").unwrap().bloodlust;
+    let kill = |s: &mut Survival| {
+        let m = foe(s, "dm_woodcutter");
+        s.hurt_mob(m, p, 1_000_000);
+    };
+    kill(&mut s);
+    let one = s.strike_at(p, StrikeKind::Light, 0).windup;
+    assert!((one - base / (1.0 + lust)).abs() < 1.0e-4, "one kill: {one} of {base}");
+    for _ in 0..6 {
+        kill(&mut s);
+    }
+    let many = s.strike_at(p, StrikeKind::Light, 0).windup;
+    let cap = crate::content::BLOODLUST_STACKS as f32;
+    assert!((many - base / (1.0 + lust * cap)).abs() < 1.0e-4, "it stacks to {cap} and no more: {many}");
+    for _ in 0..((crate::content::BLOODLUST_SECS + 1.0) / 0.05) as usize {
+        s.step(0.05);
+    }
+    assert!((s.strike_at(p, StrikeKind::Light, 0).windup - base).abs() < 1.0e-4, "it fades");
+    // Another weapon builds nothing.
+    wield(&mut s, p, "sword");
+    let plain = s.strike_at(p, StrikeKind::Light, 0).windup;
+    kill(&mut s);
+    assert_eq!(s.strike_at(p, StrikeKind::Light, 0).windup, plain);
+}
+
+#[test]
+fn the_miners_pick_breaks_stances_and_hits_stone_and_machines_harder() {
+    let w = Content::dev().weapon("miner_pick").unwrap().clone();
+    assert!(w.posture >= 3.0, "a posture breaker");
+    for (key, bane) in [("rockling", true), ("dm_shredder", true), ("dm_woodcutter", false)] {
+        let (mut s, p) = world();
+        wield(&mut s, p, "miner_pick");
+        let m = sturdy_foe(&mut s, key);
+        let d = first_hit(&swing(&mut s, p), m);
+        let (lo, hi) = if bane { (33, 44) } else { (22, 29) };
+        assert!((lo..=hi).contains(&d), "{key}: {d}");
+    }
+}
+
+#[test]
+fn the_scythes_sweep_heals_the_reaper_for_each_foe_it_strikes() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "horsemans_scythe");
+    let foes: Vec<Id> = (0..3).map(|_| sturdy_foe(&mut s, "dm_woodcutter")).collect();
+    s.mobs.get_mut(&foes[1]).unwrap().pos = [1.5, 1.5, 0.0];
+    s.mobs.get_mut(&foes[2]).unwrap().pos = [1.5, -1.5, 0.0];
+    let max = s.players[&p].max_health;
+    s.players.get_mut(&p).unwrap().health = max / 2;
+    let ev = swing(&mut s, p);
+    let struck = foes.iter().filter(|m| hits_on(&ev, **m).iter().any(|(d, _)| *d > 0)).count();
+    assert_eq!(struck, 3, "all three are in the sweep");
+    let w = s.content.weapon("horsemans_scythe").unwrap();
+    let each = (max as f32 * w.reap_heal).round() as u32;
+    assert_eq!(s.players[&p].health, max / 2 + 3 * each, "{each} a foe");
+}
+
+#[test]
+fn the_boar_spear_slows_what_it_hits() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "loksey_boar_spear");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&m).unwrap().pos = [4.0, 0.0, 0.0];
+    assert!(!s.has_cc(m, "snare"));
+    swing(&mut s, p);
+    assert!(s.has_cc(m, "snare"), "slowed");
+    let keep = 1.0 - s.content.weapon("loksey_boar_spear").unwrap().snare;
+    assert!((s.speed_share(m) - keep).abs() < 1.0e-4, "{}", s.speed_share(m));
+}
+
+#[test]
+fn an_axes_and_polearms_tooltips_say_their_mechanics_from_their_numbers() {
+    let c = Content::dev();
+    let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
+    let w = |k: &str| c.weapon(k).unwrap();
+    assert!(text("bearded_axe").contains(&format!("can't block for {} sec", w("bearded_axe").guard_hook)), "{}", text("bearded_axe"));
+    let l = w("bloodlust_edge");
+    assert!(text("bloodlust_edge").contains(&format!("speeds your swings by {}% for {} sec, up to {} times", (l.bloodlust * 100.0).round(), crate::content::BLOODLUST_SECS, crate::content::BLOODLUST_STACKS)));
+    let m = w("miner_pick");
+    assert!(text("miner_pick").contains(&format!("Deals {}% more damage to stone, golem and mechanical", (m.bane_damage * 100.0).round())), "{}", text("miner_pick"));
+    assert!(text("miner_pick").contains(&format!("Breaks stances {}% faster", ((m.posture - 1.0) * 100.0).round())));
+    assert!(text("horsemans_scythe").contains(&format!("Restores {}% of your health for each enemy", (w("horsemans_scythe").reap_heal * 100.0).round())));
+    assert!(text("loksey_boar_spear").contains(&format!("Slows the enemy by {}% for {} sec", (w("loksey_boar_spear").snare * 100.0).round(), crate::content::SNARE_SECS)));
+}
+
+#[test]
+fn the_blow_that_fells_a_foe_under_silver_lays_it_to_rest_too() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "silver_sword");
+    let m = foe(&mut s, "risen_skeleton");
+    s.mobs.get_mut(&m).unwrap().health = 1;
+    assert!(!s.silvered(m));
+    let ev = swing(&mut s, p);
+    assert!(hits_on(&ev, m).iter().any(|(d, _)| *d > 0), "the blow lands");
+    assert!(s.mobs[&m].health == 0 && s.silvered(m), "felled by the first blow, and silvered by it");
+}

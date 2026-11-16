@@ -661,7 +661,7 @@ impl Survival {
         };
         let heavy = kind == StrikeKind::Heavy;
         // Rallying Cry: every blow comes that much quicker. Cowed, it winds up slower.
-        let quick = 1.0 / (1.0 + self.rallied_haste(id));
+        let quick = 1.0 / (1.0 + self.rallied_haste(id) + self.bloodlust_haste(id));
         let cowed = 1.0 + self.cowed_slow(id);
         Strike {
             kind,
@@ -1647,6 +1647,7 @@ impl Survival {
                 d.block > 0.0
                     && d.shield != 0
                     && m.stagger_until <= self.clock
+                    && m.fx.guard_down_until <= self.clock
                     && matches!(m.state, mobs::MobState::Chase { .. } | mobs::MobState::Recover { .. })
                     && angle_between(m.facing, facing(m.pos, pos)) <= 70.0
             });
@@ -1734,6 +1735,7 @@ impl Survival {
                     StrikeKind::Kick => "Kick",
                     _ => "Melee",
                 };
+                self.weapon_before(mid, w, strike);
                 self.hurt_mob_as(mid, id, damage, label);
                 // An axe's hit bleeds.
                 if w.bleed > 0.0 && !strike.shove() && self.alive(mid) {

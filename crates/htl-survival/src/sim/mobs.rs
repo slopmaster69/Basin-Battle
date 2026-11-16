@@ -1015,6 +1015,7 @@ impl Survival {
 
     pub(crate) fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
+        self.weapon_kill(killer);
         self.drop_perch(mid);
         self.remove_perch_crew(mid);
         self.death_mark_reset(mid);
