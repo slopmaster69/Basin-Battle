@@ -192,7 +192,7 @@ Each weapon's tooltip sentence is built from its numbers, so check the sentence 
 - [ ] Bearded Axe, heavy, against a shield-bearer: they can't block for 4 sec ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 - [ ] Bloodlust Edge: each kill speeds your swing 8%, up to 4 times, fading 6 sec after the last ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 - [ ] Defias Miner's Pick on a golem, a rockling or the Shredder: 50% more damage, and stances break quicker ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
-- [ ] The Horseman's Scythe: a 200 degree sweep of up to 5 foes, and each foe struck heals you 1% of its health ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
+- [ ] The Horseman's Scythe: a 200 degree sweep of up to 5 foes, and each foe struck heals you 1% of your health ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 - [ ] Loksey's Boar Spear: its thrust slows the foe 40% for 2.5 sec ([#407](https://github.com/slopmaster69/Basin-Battle/pull/407)).
 
 ### Maces

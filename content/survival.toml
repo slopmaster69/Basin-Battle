@@ -10052,6 +10052,7 @@ links = [".es lore shadowfang~Shadowfang Keep"]
 
 [[mob]]
 key = "stitches"
+tags = ["golem"]
 name = "Stitches"
 subname = "Abomination"
 # The flesh golem model, the big display (1693).

@@ -101,6 +101,8 @@ mod tests_release;
 #[cfg(test)]
 mod tests_weapon_identity;
 #[cfg(test)]
+mod tests_playtest_weapons;
+#[cfg(test)]
 mod tests_rogue_core;
 #[cfg(test)]
 mod tests_rogue_shadow;
