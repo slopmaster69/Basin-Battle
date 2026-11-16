@@ -3763,11 +3763,18 @@ what = "gruff_swiftbite"
 reward = { silver = 2, hide = 3 }
 
 [[goal]]
+title = "The mason's marks"
+text = "Open Brannick's marked stones at the Mason's Cairn, above Stone Cairn Lake, in his order. The Stormwind stonemason knows it. A wrong stone wakes the Brotherhood."
+kind = "open"
+what = "mason_cache"
+reward = { silver = 2, stone = 4 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
 what = "any"
-count = 36
+count = 37
 reward = { silver = 4, pearl = 2, silk = 4 }
 
 # --- abilities ------------------------------------------------------------------------------------
@@ -9918,6 +9925,14 @@ text = "Brannick laid half this wall, and he laid it well. That's what hurts."
 after = "raids:5"
 text = "Five raids, and the wall's still up. It's better stone than he gave us credit for."
 
+[[prop.talk]]
+after = "found:mason_cairn"
+text = "Brannick signed every wall the same. Plumb, then trowel, then key. He said a wall goes up in that order or it comes down."
+
+[[prop.talk]]
+after = "open:mason_cache"
+text = "So he kept books too. Neat hand. He always did measure twice."
+
 # === end of Stage 5's block ============================================================================
 
 # === Elwynn expansion, round two, Stage 6: Gruff Swiftbite (docs/elwynn-expansion.md) ===============
@@ -9990,6 +10005,95 @@ text = "Brotherhood silver, paid by the head, and a mason's tally stick. It read
 # (Its goal, "Gruff Swiftbite", sits with the journal's other goals, just before "Every corner".)
 
 # === end of Stage 6's block ============================================================================
+
+# === Elwynn expansion, round two, Stage 7: The Mason's Marks (docs/elwynn-expansion.md) ===============
+# Brannick marked his cairn above Stone Cairn Lake with stones cut with a mason's marks. Three of
+# them open, and only in his order: plumb, then trowel, then key (a chest's `after` can now be a
+# condition, `open:<chest>`). Two more, the crown and the lion, are the Brotherhood waiting for a
+# wrong guess: each wakes two hidden footpads and fills again after 5 min.
+
+[[site]]
+key = "mason_cairn"
+name = "The Mason's Cairn"
+at = [-8890.0, -840.0]
+radius = 30.0
+kind = "landmark"
+text = "Stones stacked above Stone Cairn Lake, each cut with a mason's mark."
+reward = { stone = 3 }
+
+# The true stones are once a world (`respawn = 0`).
+[[chest]]
+key = "mason_plumb"
+name = "Stone Marked with a Plumb"
+at = [-8884.0, -832.0]
+display = 235
+scale = 0.8
+respawn = 0.0
+text = "The plumb line hangs true. Something below it shifts."
+
+[[chest]]
+key = "mason_trowel"
+name = "Stone Marked with a Trowel"
+at = [-8898.0, -846.0]
+display = 235
+scale = 0.8
+after = "open:mason_plumb"
+locked = "The trowel's stone won't move. Something was laid before it."
+respawn = 0.0
+text = "Mortar gives way under the trowel's mark."
+
+[[chest]]
+key = "mason_cache"
+name = "Stone Marked with a Key"
+at = [-8880.0, -852.0]
+display = 235
+scale = 0.8
+after = "open:mason_trowel"
+locked = "The key's stone is set fast. The trowel comes before it."
+respawn = 0.0
+loot = { silver = 2, pearl = 1, stone = 6 }
+text = "Brannick's road book. Every road Westbrook watches, and beside each, 'paid to R. at the Lion's Pride, for the roster.'"
+
+# The decoys: no loot, and the Brotherhood was waiting for a wrong guess.
+[[chest]]
+key = "mason_crown"
+name = "Stone Marked with a Crown"
+at = [-8894.0, -828.0]
+display = 235
+scale = 0.8
+respawn = 300.0
+ambush = ["mason_crown_ambush"]
+text = "Not Brannick's mark. The Brotherhood was waiting for a wrong guess."
+
+[[chest]]
+key = "mason_lion"
+name = "Stone Marked with a Lion"
+at = [-8902.0, -838.0]
+display = 235
+scale = 0.8
+respawn = 300.0
+ambush = ["mason_lion_ambush"]
+text = "Not Brannick's mark. The Brotherhood was waiting for a wrong guess."
+
+[[pack]]
+mob = "defias_footpad"
+at = [-8890.0, -822.0]
+radius = 2.0
+count = 2
+link = 8.0
+key = "mason_crown_ambush"
+wake = "mason_crown"
+
+[[pack]]
+mob = "defias_footpad"
+at = [-8906.0, -836.0]
+radius = 2.0
+count = 2
+link = 8.0
+key = "mason_lion_ambush"
+wake = "mason_lion"
+
+# === end of Stage 7's block ============================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.

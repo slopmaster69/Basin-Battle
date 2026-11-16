@@ -243,3 +243,10 @@ Built as planned, with these differences, found checking the plan against the co
 - His spots are all probed clear: (-9930, 600), (-10010, 660) and (-9880, 720), each more than 250 yd from the camp and at least 20 yd from Hogger's.
 
 Rule: "He steps out of every heavy. Parry him, and the heavy lands while he reels." The Riverpaw Tribute (259) at (-9965, 628) stays shut while he lives.
+## Stage 7: The Mason's Marks [x] (puzzle; engine change E1)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E1.** `use_chest` (`sim/explore.rs`) reads a chest's `after` through `chest_unlocked`: with a colon it is `camp_has`, a bare key is the camp's `kill:<key>` count as before. `validate()` accepts only `open:`, `found:` and `kill:` for a chest, checks the name is real, and refuses a chest that waits on itself. The locked text of a chest with a condition and no `locked` line is "<name> is shut."
+- The stones' display is 235 (the plain runestone). The plan's 1364 has no game-object row in the real data (it is a creature display).
+- `ELWYNN_GOALS` is 10. The site is a `landmark`, so "Every corner" is 37 for the 37 sites.
+- Probed with `elwynn_probe near`: every stone is on open ground. The crown's footpads stood at (-8896, -824), which has a trunk or wall next to it, so they stand at (-8890, -822).

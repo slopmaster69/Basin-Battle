@@ -150,12 +150,29 @@ impl Survival {
         id
     }
 
-    /// Use a chest: shut until its guardian falls, else the work of opening it begins.
+    /// Whether a chest's `after` holds: a creature's key (the camp has killed one), or, with a colon
+    /// in it, a camp condition (`open:<chest>`, `found:<site>`, `kill:<mob>`) read as `camp_has`.
+    pub(crate) fn chest_unlocked(&self, after: &str) -> bool {
+        if after.contains(':') {
+            self.camp_has(after)
+        } else {
+            self.camp.counts.get(&format!("kill:{after}")).copied().unwrap_or(0) > 0
+        }
+    }
+
+    /// Use a chest: shut until its guardian falls (or its condition holds), else the work of
+    /// opening it begins.
     pub(crate) fn use_chest(&mut self, id: Id, def: usize, obj: Id) {
         let c = self.content.chests[def].clone();
-        if !c.after.is_empty() && self.camp.counts.get(&format!("kill:{}", c.after)).copied().unwrap_or(0) == 0 {
-            let who = self.content.mob(&c.after).map_or(c.after.clone(), |m| self.content.mobs[m].name.clone());
-            let text = if c.locked.is_empty() { format!("{} won't open while {who} lives.", c.name) } else { c.locked.clone() };
+        if !c.after.is_empty() && !self.chest_unlocked(&c.after) {
+            let text = if !c.locked.is_empty() {
+                c.locked.clone()
+            } else if c.after.contains(':') {
+                format!("{} is shut.", c.name)
+            } else {
+                let who = self.content.mob(&c.after).map_or(c.after.clone(), |m| self.content.mobs[m].name.clone());
+                format!("{} won't open while {who} lives.", c.name)
+            };
             self.tell(id, text);
             return;
         }

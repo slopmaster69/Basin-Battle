@@ -903,6 +903,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | The Tower of Azora | the mage's shrine; Defias conjurers; living embers; the Unbound Flame (the mage's champion); mageroyal; the mage's relic in the dens nearby |
 | Heroes' Vigil (on Stone Cairn Lake's island) | the paladin's shrine; Forsaken defilers and darkcasters; Defiler Morvane (the paladin's champion); a grave whose dead rise |
 | The Stone Cairn | the shaman's shrine; rocklings; Rumbler (the shaman's champion); earthroot, stone |
+| The Mason's Cairn (above Stone Cairn Lake, north of the Stone Cairn) | Brannick's marked stones: plumb, then trowel, then key opens his road book; the crown and the lion are decoys that wake the Brotherhood's footpads |
 | The burnt farm | the warlock's shrine; the cult, its imps and voidwalker; Summoner Vexx (the warlock's champion) |
 | Brackwell Pumpkin Patch | the rogue's shrine; the Brotherhood's camp; Morgan the Collector (the rogue's champion); Princess (rare); pumpkins; a strongbox in the barn (guarded) |
 | Eastvale Logging Camp | the hunter's shrine; prowlers and black bears; timber |
@@ -959,7 +960,7 @@ The Deadmines aren't touched.
 
 **Chests** (`[[chest]]`): some in plain sight and full again after a while (dens, the farms, the
 smugglers' crate), some shut until the camp has killed their guardian (the Westbrook and Ridgepoint
-armories, the champions' hoards), some **secret**, and some guarded by an **ambush** that steps out
+armories, the champions' hoards, or a chest's own condition: `after = "open:<chest>"` keeps the mason's stones in order), some **secret**, and some guarded by an **ambush** that steps out
 as they're opened (the Brackwell barn, the smugglers, the sunken strongbox, the footman's grave).
 What's in one goes to the opener's bags (what won't fit, to the camp's chest). Ambushers also lie in
 wait on the roads (the Northshire road, the east road's bridge, the west road) and step out as a
@@ -1294,6 +1295,16 @@ so a parry makes him reel. The rule: he steps out of every heavy attack wound up
 quick strings (parry the first and he reels) and lunges from 5 to 12 yd. The Riverpaw Tribute (Brotherhood
 silver and a mason's tally stick) stays shut while he lives. The journal asks for his fall, and Wren says a
 word once he is gone.
+
+**The Mason's Marks** (Stage 7 of docs/elwynn-expansion.md). The Mason's Cairn is a landmark above Stone
+Cairn Lake (a place to find, so "Every corner" is 37). Brannick cut five stones with a mason's mark. A chest's
+`after` that holds a colon is a condition the camp meets, read as `camp_has` (`open:<chest>`, `found:<site>`,
+`kill:<mob>`); a bare key stays a creature the camp must have killed, as ever. The true stones open in his
+order, each shut with its own words until the one before it is open: the plumb, then the trowel, then the key,
+whose road book holds silver, a pearl and stone. They are once a world. The crown and the lion are decoys with
+no loot: each wakes 2 hidden footpads on the opener and fills again after 5 min. Once the cairn is found the
+Stormwind stonemason tells the order, and after the road book he says what it tells. `Content::validate` refuses a chest
+whose condition names nothing, isn't `open:`, `found:` or `kill:`, or waits on itself.
 
 The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
 A camp from before the move keeps its stations: each standing outside the new building ground is
