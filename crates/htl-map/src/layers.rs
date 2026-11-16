@@ -569,6 +569,13 @@ impl Layers {
 
     /// Every floor a walker can reach from `from`, by floor index.
     pub fn reachable(&self, from: [f32; 3], max_slope: f32) -> Vec<bool> {
+        self.reachable_avoiding(from, max_slope, &[])
+    }
+
+    /// [`Self::reachable`], never stepping onto a floor marked in `avoid` (by floor index; one
+    /// past its end is not avoided).
+    pub fn reachable_avoiding(&self, from: [f32; 3], max_slope: f32, avoid: &[bool]) -> Vec<bool> {
+        let avoided = |g: usize| avoid.get(g).copied().unwrap_or(false);
         let mut seen = vec![false; self.floors.len()];
         let Some((i, j)) = self.cell_at(from[0], from[1]) else {
             return seen;
@@ -583,7 +590,7 @@ impl Layers {
             let mut next = Vec::new();
             self.steps(k, f, max_slope, |nk, g, _| next.push((nk, g)));
             for (nk, g) in next {
-                if !seen[g] {
+                if !seen[g] && !avoided(g) {
                     seen[g] = true;
                     stack.push((nk, g));
                 }
@@ -683,6 +690,28 @@ mod tests {
                 liquid: &[],
             },
         )
+    }
+
+    #[test]
+    fn a_walk_kept_off_some_floors_doesnt_cross_them() {
+        let g = deck_world();
+        let deck = |seen: &[bool]| {
+            let (i, j) = g.cell_at(20.0, 0.0).unwrap();
+            g.floor_range(i, j).any(|f| seen[f] && g.floor(f).z > 9.0)
+        };
+        assert!(deck(&g.reachable([-5.0, 0.0, 0.0], 1.2)), "up the ramp onto the deck");
+        // Kept off the ramp's floors (between the ground and the deck): no way up.
+        let (w, h) = g.size();
+        let mut ramp = vec![false; g.floor_count()];
+        for j in 0..h {
+            for i in 0..w {
+                for f in g.floor_range(i, j) {
+                    ramp[f] = g.floor(f).z > 0.5 && g.floor(f).z < 9.5;
+                }
+            }
+        }
+        assert!(!deck(&g.reachable_avoiding([-5.0, 0.0, 0.0], 1.2, &ramp)));
+        assert!(deck(&g.reachable_avoiding([-5.0, 0.0, 0.0], 1.2, &[])), "nothing avoided: as reachable");
     }
 
     #[test]

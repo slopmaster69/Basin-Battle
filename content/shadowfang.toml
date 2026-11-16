@@ -298,28 +298,33 @@ z = 97.8
 radius = 0.0
 count = 1
 
-# The upper rooms: Fenrus the Devourer.
+# The upper rooms: Fenrus the Devourer, in the room past the walk Odo keeps (the keep's floor at
+# 93.9). Until Nov 2026 he and Nandos's rampart stood on the hillside outside the keep's walls
+# (Fenrus at (-99, 2229, 106.1), Nandos at (-78, 2299, 108.2), his worgs at (-66.1, 2299.2)), the
+# server's ground reaching them only under the courtyard's floor or out round the hill: no hero
+# could. Each now stands on the keep's own floor, on the way from Odo to Arugal (the test
+# `every_dungeons_places_stand_on_its_floor` walks to every place inside the keep).
 [[dungeon.pack]]
 mob = "sf_fenrus"
 key = "fenrus"
-at = [-99.0, 2229.0]
-z = 106.1
+at = [-249.0, 2179.0]
+z = 93.9
 radius = 0.0
 count = 1
 
-# The rampart: Wolf Master Nandos and his pack.
+# The rampart: Wolf Master Nandos and his pack, on the long floor at 100 past Fenrus's room.
 [[dungeon.pack]]
 mob = "sf_nandos"
 key = "nandos"
-at = [-78.0, 2299.0]
-z = 108.2
+at = [-240.0, 2144.0]
+z = 100.0
 radius = 0.0
 count = 1
 
 [[dungeon.pack]]
 mob = "sf_worg"
-at = [-66.1, 2299.2]
-z = 103.3
+at = [-250.0, 2143.0]
+z = 100.0
 radius = 3.0
 count = 3
 link = 14.0
@@ -345,9 +350,11 @@ warn = 1.4
 spell = 27812
 boss = "arugal"
 
+# (At (-131, 2175, 113.1) until Nov 2026: off the edge of Arugal's floor, 19 yards over the great
+# hall's. Now on his floor, the nearest open spot to it.)
 [[dungeon.hazard]]
 name = "Arugal's void"
-at = [-131.0, 2175.0, 113.1]
+at = [-130.5, 2177.5, 112.7]
 radius = 3.5
 damage = 22
 every = 7.0
@@ -1548,11 +1555,12 @@ link = 12.0
 route = [ [-221.8, 2214.0], [-219.0, 2224.5] ]
 wait = 6.0
 
-# A patrol.
+# A patrol, along the passage west from the kitchen. (It stood at (-240, 2270, 73.8) until Nov 2026:
+# on the terrain outside the passage's wall.)
 [[dungeon.pack]]
 mob = "sf_darksoul"
-at = [-240.0, 2270.0]
-z = 73.8
+at = [-240.0, 2276.0]
+z = 75.0
 radius = 2.0
 count = 2
 link = 12.0
@@ -1620,27 +1628,31 @@ wake = "larder_cache"
 # Each where the survey found the most ground farthest from any foe, near the way to a boss and
 # clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
 # one, a caster stands in the middle of the pack, linked: guards to get through to it.
+# (These three stood on the terrain outside the keep's walls, at (-136, 2220), (-198, 2084) and
+# (-166, 2154), until Nov 2026: the survey's ground ran out of the keep. Each is now in an empty
+# stretch of the keep's own floor on the way: the far end of Odo's walk, the passage from the
+# gate to its stair, and the courtyard's south-east corner.)
 
 [[dungeon.pack]]
 mob = "sf_moonwalker"
-at = [-136.0, 2220.0]
-z = 96.4
+at = [-260.0, 2248.0]
+z = 100.9
 radius = 3.0
 count = 2
 link = 12.0
 
 [[dungeon.pack]]
 mob = "sf_moonwalker"
-at = [-198.0, 2084.0]
-z = 73.6
+at = [-207.0, 2102.0]
+z = 76.9
 radius = 3.0
 count = 2
 link = 12.0
 
 [[dungeon.pack]]
 mob = "sf_servitor"
-at = [-166.0, 2154.0]
-z = 79.5
+at = [-194.0, 2161.0]
+z = 79.8
 radius = 3.0
 count = 2
 link = 12.0
