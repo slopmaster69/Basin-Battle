@@ -62,6 +62,11 @@ pub(super) struct Run {
     pub dodged: u32,
     pub parried: u32,
     pub landed: u32,
+    /// The most blows from different creatures due to land within 0.4 s of each other (a dodge's
+    /// whole safe window is 0.28 s): what a pack stacks on one hero at once.
+    pub peak_stack: u32,
+    /// Steps in which a roll was wanted with too little stamina to start one.
+    pub dry: u32,
 }
 
 #[derive(Clone)]
@@ -286,10 +291,10 @@ pub(super) fn run(st: &Stage, class: &str, seed: u64, who: Profile) -> Run {
             out.won = true;
             break;
         }
-        // `BALANCE_TRACE`: where everyone stands every 5 s.
-        if trace && ((now - start) / 5.0).fract() < DT / 5.0 {
+        // `BALANCE_TRACE`: where everyone stands every 1 s.
+        if trace && ((now - start) / 1.0).fract() < DT / 1.0 {
             let who: Vec<String> = ids.iter().map(|i| format!("{} {:?} at {:.1},{:.1},{:.1} hp {}", name(&s, *i), s.mobs[i].state, s.mobs[i].pos[0], s.mobs[i].pos[1], s.mobs[i].pos[2], s.mobs[i].health)).collect();
-            println!("{:6.1} hero {:.1},{:.1} hp {} {:?} held {:?} | {}", now - start, me[0], me[1], s.players[&p].health, s.players[&p].action, held, who.join("; "));
+            println!("{:6.1} hero {:.1},{:.1} hp {} st {:.0} {:?} held {:?} | {}", now - start, me[0], me[1], s.players[&p].health, s.players[&p].stamina, s.players[&p].action, held, who.join("; "));
         }
         for ms in &s.missiles {
             if !seen_bolts.contains(&ms.mark) && dist2d(ms.at, me) <= ms.radius + 1.0 {
@@ -302,6 +307,16 @@ pub(super) fn run(st: &Stage, class: &str, seed: u64, who: Profile) -> Run {
             }
         }
         threats.retain(|t| t.land + 0.3 > now);
+        {
+            let due: Vec<&Threat> = threats.iter().filter(|t| t.land > now).collect();
+            for a in &due {
+                let mut from: Vec<Id> = due.iter().filter(|b| (b.land - a.land).abs() < 0.4).map(|b| b.from).collect();
+                from.sort_unstable();
+                from.dedup();
+                let n = from.len() as u32;
+                out.peak_stack = out.peak_stack.max(n);
+            }
+        }
         casts.retain(|c| c.2 > now && s.mobs.get(&c.0).is_some_and(|m| matches!(m.state, MobState::Windup { .. })));
         let acting = s.players[&p].action.clone();
         let free = matches!(acting, Action::Ready | Action::Guard);
@@ -351,6 +366,9 @@ pub(super) fn run(st: &Stage, class: &str, seed: u64, who: Profile) -> Run {
             s.input(p, Input::GuardUp);
         }
         let dodge = dodge && parry.is_none();
+        if dodge && !ready && !rolling {
+            out.dry += 1;
+        }
         if dodge && ready {
             if held.is_some() {
                 s.input(p, Input::Cancel);
@@ -483,6 +501,9 @@ pub(super) fn run(st: &Stage, class: &str, seed: u64, who: Profile) -> Run {
                     }
                 }
                 Event::Swing { attacker, victim: Some(v), damage, style, .. } if v == p && damage > 0 && ids.contains(&attacker) && !matches!(style, Blow::Dot) => {
+                    if trace {
+                        println!("{:6.2}   LANDS {} {} hp {} ({:?}, {:?})", now - start, name(&s, attacker), damage, s.players[&p].health, style, s.players[&p].action);
+                    }
                     out.landed += 1;
                 }
                 _ => {}
@@ -640,6 +661,105 @@ fn balance_table() {
     let pt = table(&packs, &classes, seeds(5));
     print("Packs between them", &packs, &classes, &pt);
     println!("\n{:.0} s of real time.", t.elapsed().as_secs_f32());
+}
+
+/// The packs the way the route meets them: neighbours whose `link` pulls them in together (the
+/// table's pack rows fight each pack alone). Route order.
+fn linked_groups() -> Vec<(String, Stage)> {
+    let g = |name: &str, foes: &[(&str, usize)]| -> (String, Stage) {
+        let v = foes.iter().flat_map(|(k, n)| vec![format!("dm_{k}"); *n]).collect();
+        (name.to_string(), Stage::Pack(v))
+    };
+    vec![
+        g("Cove: Pirate x2 + Squallshaper", &[("pirate", 2), ("squallshaper", 1)]),
+        g("Scaffold: Pirate x2 + Squallshaper + Wizard", &[("pirate", 2), ("squallshaper", 1), ("wizard", 1)]),
+        g("Deck foot: Pirate x2 + Evoker x2", &[("pirate", 2), ("evoker", 2)]),
+        g("Deck: Pirate x2 + Squallshaper x2", &[("pirate", 2), ("squallshaper", 2)]),
+        g("Gallery: Pirate x2 + Woodcutter x2", &[("pirate", 2), ("woodcutter", 2)]),
+        g("Climb: Woodcutter x2 + Engineer", &[("woodcutter", 2), ("engineer", 1)]),
+        g("Foundry: Engineer x2", &[("engineer", 2)]),
+        g("Alcove: Blackguard x3 + Evoker", &[("blackguard", 3), ("evoker", 1)]),
+        g("Passage: Miner x2 + Dynamiter", &[("miner", 2), ("dynamiter", 1)]),
+        g("Galleries: Overseer + Miner x2", &[("overseer", 1), ("miner", 2)]),
+        g("Galleries: Overseer + Miner x2 + Wizard", &[("overseer", 1), ("miner", 2), ("wizard", 1)]),
+        g("Wizards: Wizard + Evoker", &[("wizard", 1), ("evoker", 1)]),
+        g("Wizards (before): Wizard x2 + Evoker", &[("wizard", 2), ("evoker", 1)]),
+        g("Taskmaster + Strip Miner x3", &[("taskmaster", 1), ("strip_miner", 3)]),
+    ]
+}
+
+/// The packs of the route that a pull brings in together (a pack's `link` reaches the next, either
+/// way), as lists of creature keys.
+fn pulled_together() -> Vec<Vec<String>> {
+    let c = content();
+    let d = c.dungeon.as_ref().expect("the Deadmines");
+    let n = d.packs.len();
+    let mut group: Vec<usize> = (0..n).collect();
+    for a in 0..n {
+        for b in 0..a {
+            let reach = d.packs[a].link.max(d.packs[b].link);
+            let apart = ((d.packs[a].at[0] - d.packs[b].at[0]).powi(2) + (d.packs[a].at[1] - d.packs[b].at[1]).powi(2)).sqrt();
+            if reach > 0.0 && apart <= reach {
+                let (ga, gb) = (group[a], group[b]);
+                group.iter_mut().filter(|g| **g == ga).for_each(|g| *g = gb);
+            }
+        }
+    }
+    let mut out: Vec<Vec<String>> = Vec::new();
+    for g in 0..n {
+        let keys: Vec<String> = (0..n).filter(|i| group[*i] == g).flat_map(|i| vec![d.packs[i].mob.clone(); d.packs[i].count.max(1)]).collect();
+        if !keys.is_empty() {
+            out.push(keys);
+        }
+    }
+    out
+}
+
+/// Casters answer each other's rolls badly: every one casts on its own clock, and a roll costs
+/// stamina the third bolt finds spent. Wizard x2 + Evoker, with no blade in front of them, felled a
+/// right-playing warrior 3 and a hunter 4 times in 30 (two casters, 0 in 30); so a pull of three
+/// shooters or casters has a creature up close in it.
+#[test]
+fn no_pull_is_three_casters_with_nobody_up_close() {
+    let c = content();
+    for keys in pulled_together() {
+        let ranged = |k: &String| c.mob(k).is_some_and(|d| c.mobs[d].attack.ranged);
+        let (far, near) = (keys.iter().filter(|k| ranged(k)).count(), keys.iter().filter(|k| !ranged(k)).count());
+        assert!(far <= 2 || near > 0, "{keys:?}: {far} casters or shooters and nobody up close");
+    }
+}
+
+/// The pull that was Wizard x2 + Evoker is two casters now, and a right-playing hero of every class
+/// wins it (it fell a warrior in 10% of runs and a hunter in 13% before).
+#[test]
+fn the_caster_pair_at_the_deck_is_won_by_a_right_playing_hero_of_every_class() {
+    let pair = Stage::Pack(vec!["dm_wizard".into(), "dm_evoker".into()]);
+    for class in CLASSES {
+        for seed in 1..=8 {
+            let r = run(&pair, class, seed, RIGHT);
+            assert!(r.won && !r.fell && r.damage * 10 < r.max_health * 9, "{class} seed {seed}: {r:?}");
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn balance_groups() {
+    let only = std::env::var("BALANCE_ONLY").ok();
+    let groups: Vec<_> = linked_groups().into_iter().filter(|(n, _)| only.as_ref().is_none_or(|o| n.contains(o.as_str()))).collect();
+    let classes = classes_wanted();
+    let seeds = std::env::var("BALANCE_SEEDS").ok().and_then(|x| x.parse().ok()).unwrap_or(5);
+    let t = table(&groups, &classes, seeds);
+    print("Linked groups", &groups, &classes, &t);
+    println!("
+| group | peak stack (right / sloppy) | dry rolls (right / sloppy) | landed blows (right) |
+| --- | --- | --- | --- |");
+    for (f, (name, _)) in groups.iter().enumerate() {
+        let peak = |sl: bool| classes.iter().enumerate().flat_map(|(c, _)| if sl { t[f][c].1.runs.iter() } else { t[f][c].0.runs.iter() }).map(|r| r.peak_stack).max().unwrap_or(0);
+        let dry = |sl: bool| classes.iter().enumerate().map(|(c, _)| if sl { t[f][c].1.mean(|r| r.dry as f32) } else { t[f][c].0.mean(|r| r.dry as f32) }).sum::<f32>() / classes.len() as f32;
+        let landed = classes.iter().enumerate().map(|(c, _)| t[f][c].0.mean(|r| r.landed as f32)).sum::<f32>() / classes.len() as f32;
+        println!("| {} | {} / {} | {:.0} / {:.0} | {:.1} |", name, peak(false), peak(true), dry(false), dry(true), landed);
+    }
 }
 
 #[test]

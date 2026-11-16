@@ -134,7 +134,7 @@ Each cell: mean seconds (mean seconds of the wins) · damage taken as a share of
 |  | mage | 9 s (wins 9) · 2% · 0.0 · 0/5 · 5/5 | 12 s (wins 10) · 58% · 0.0 · 2/5 · 3/5 |
 |  | priest | 8 s (wins 8) · 2% · 0.0 · 0/5 · 5/5 | 13 s (wins 7) · 80% · 0.0 · 4/5 · 1/5 |
 |  | hunter | 10 s (wins 10) · 3% · 0.0 · 0/5 · 5/5 | 9 s (wins 9) · 9% · 0.0 · 0/5 · 5/5 |
-| 38, 43: Defias Wizard x1 | warrior | 5 s (wins 5) · 0% · 0.0 · 0/5 · 5/5 | 5 s (wins 5) · 10% · 0.0 · 0/5 · 5/5 |
+| 38, 43, 46: Defias Wizard x1 | warrior | 5 s (wins 5) · 0% · 0.0 · 0/5 · 5/5 | 5 s (wins 5) · 10% · 0.0 · 0/5 · 5/5 |
 |  | mage | 6 s (wins 6) · 0% · 0.0 · 0/5 · 5/5 | 6 s (wins 6) · 5% · 0.0 · 0/5 · 5/5 |
 |  | priest | 5 s (wins 5) · 0% · 0.0 · 0/5 · 5/5 | 5 s (wins 5) · 7% · 0.0 · 0/5 · 5/5 |
 |  | hunter | 7 s (wins 7) · 0% · 0.0 · 0/5 · 5/5 | 7 s (wins 7) · 5% · 0.0 · 0/5 · 5/5 |
@@ -162,10 +162,6 @@ Each cell: mean seconds (mean seconds of the wins) · damage taken as a share of
 |  | mage | 6 s (wins 6) · 2% · 0.0 · 0/5 · 5/5 | 6 s (wins 6) · 5% · 0.0 · 0/5 · 5/5 |
 |  | priest | 5 s (wins 5) · 0% · 0.0 · 0/5 · 5/5 | 5 s (wins 5) · 5% · 0.0 · 0/5 · 5/5 |
 |  | hunter | 6 s (wins 6) · 0% · 0.0 · 0/5 · 5/5 | 7 s (wins 7) · 2% · 0.0 · 0/5 · 5/5 |
-| 46: Defias Wizard x2 | warrior | 7 s (wins 7) · 2% · 0.0 · 0/5 · 5/5 | 7 s (wins 7) · 19% · 0.0 · 0/5 · 5/5 |
-|  | mage | 7 s (wins 7) · 2% · 0.0 · 0/5 · 5/5 | 7 s (wins 7) · 14% · 0.0 · 0/5 · 5/5 |
-|  | priest | 16 s (wins 16) · 0% · 0.0 · 0/5 · 5/5 | 10 s (wins 10) · 29% · 0.0 · 0/5 · 5/5 |
-|  | hunter | 20 s (wins 20) · 5% · 0.0 · 0/5 · 5/5 | 14 s (wins 14) · 24% · 0.0 · 0/5 · 5/5 |
 | 49: Defias Squallshaper x2 | warrior | 12 s (wins 12) · 2% · 0.0 · 0/5 · 5/5 | 10 s (wins 10) · 32% · 0.2 · 0/5 · 5/5 |
 |  | mage | 12 s (wins 12) · 0% · 0.0 · 0/5 · 5/5 | 11 s (wins 11) · 7% · 0.0 · 0/5 · 5/5 |
 |  | priest | 25 s (wins 25) · 5% · 0.0 · 0/5 · 5/5 | 14 s (wins 14) · 35% · 0.2 · 0/5 · 5/5 |
@@ -197,7 +193,7 @@ What else stands out:
   under 15% of health, bar Blackguard x3 for the mage (25%); most are 0%. A sloppy hero falls in a
   pack only against the Overseer (mage 2/5, priest 4/5), Blackguard x3 (2/5 for every class), the
   Taskmaster (mage 1/5) and the Pirate pairs (priest 1/5 in one). Nothing in the packs is far from
-  a target; whether a pack of 3 stacks blows with no answer is Job 7's, not this table's.
+  a target; whether a pack of 3 stacks blows with no answer is [deadmines-packs.md](deadmines-packs.md)'s (linked groups), not this table's; it found Wizard x2 + Evoker did, and pack 46 is now one wizard.
 - **Cookie is by far the shortest boss**: 25 to 35 s, and a sloppy hero hardly takes a scratch
   (21 to 30 s, 48 to 87% of its health, never falls). His pot is the design, not the numbers; see
   the owner's call below.
