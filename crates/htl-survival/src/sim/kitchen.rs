@@ -343,6 +343,77 @@ impl Survival {
         }
     }
 
+    /// The last hero has left (or been taken out of the world) mid-fight. The world takes no steps
+    /// with nobody in it, so the lost fight's end would wait for the next hero and play in front
+    /// of them: a wounded cook at his scoop or mid-pour, his puddle and steam puffs still showing,
+    /// the tankard in his hand, Gorged half way through his swell. It is put back now: the cook
+    /// whole at his post with his own hand, his puddle, puffs and wind-up mark gone, and the pot
+    /// full again (Cookie) or empty (Gorged, who has already drunk it, and stands at his full
+    /// size). A pull nobody has begun is left as it stands; a Gorged still waiting to rise (his
+    /// timer is a clock that does not run either) rises when the next hero is there.
+    pub(crate) fn kitchen_abandoned(&mut self) {
+        if !self.players.is_empty() { return; }
+        let ids: Vec<Id> = self.mobs.iter()
+            .filter(|(id, m)| self.is_kitchen(**id) && m.health > 0 && !m.hidden && m.rise_at.is_none())
+            .map(|(id, _)| *id).collect();
+        for id in ids {
+            let m = &self.mobs[&id];
+            let rising = matches!(self.kitchen.cooks.get(&id).and_then(|c| c.stage), Some(Stage::Rising(_)));
+            let dirty = self.kitchen.cooks.contains_key(&id) || m.health < m.max_health || m.pattern.is_some()
+                || !matches!(m.state, MobState::Idle { .. });
+            if !dirty { continue; }
+            let (def, pos) = (m.def, m.pos);
+            let cook = self.kitchen.cooks.get(&id).map(|c| (c.pot, c.scale));
+            if let Some(MobState::Windup { mark: Some(mark), .. }) = self.mobs.get(&id).map(|m| m.state.clone()) { self.unmark(mark); }
+            self.remove_kitchen(id);
+            self.halt(id);
+            self.clear_cc(id);
+            // The pot: full for the next pull of Cookie; Gorged drank it and stands full size.
+            if self.is_gorged(id) {
+                let pot = cook.and_then(|c| c.0).or_else(|| self.kitchen.pots.iter()
+                    .find(|(_, p)| dist2d(p.at, pos) < 15.0).map(|(k, _)| *k));
+                if let Some(pot) = pot {
+                    if let Some(p) = self.kitchen.pots.get_mut(&pot) { p.helpings = 0; p.down_until = None; }
+                    self.kitchen_show_stew(pot);
+                }
+                if rising || cook.is_some_and(|c| c.1 != self.content.mobs[def].scale) {
+                    self.events.push(Event::Grow { id, scale: self.content.mobs[def].scale });
+                }
+            } else if let Some(pot) = cook.and_then(|c| c.0) {
+                if let Some(p) = self.kitchen.pots.get_mut(&pot) { p.helpings = HELPINGS; p.down_until = None; }
+                self.kitchen_show_stew(pot);
+            }
+            let home = self.mobs[&id].home;
+            let wait = if rising { SECOND_FORM_WAIT } else { 0.6 };
+            let m = self.mobs.get_mut(&id).unwrap();
+            m.pos = home;
+            m.path.clear();
+            m.health = m.max_health;
+            m.fighters = 1;
+            m.pattern = None;
+            m.special = false;
+            m.hold = 0.0;
+            m.string_len = 0;
+            m.held_step = None;
+            m.last_pattern = None;
+            m.voiced = false;
+            m.riposte = false;
+            m.guarding = false;
+            m.enraged = false;
+            m.phase = 0;
+            m.lost_at = None;
+            m.ready_at = self.clock + wait;
+            m.stagger_until = 0.0;
+            m.posed_until = 0.0;
+            m.posture = 0;
+            m.posture_guard = 0.0;
+            m.state = MobState::Idle { wander_at: self.clock + 3.0 };
+            let (health, max, facing) = (m.health, m.max_health, m.facing);
+            self.events.push(Event::Health { id, health, max });
+            self.events.push(Event::MobStop { id, pos: home, facing });
+        }
+    }
+
     /// A dungeon reset: every cook and every pot goes.
     pub(crate) fn reset_kitchens(&mut self) {
         let ids: Vec<_> = self.kitchen.cooks.keys().copied().collect();

@@ -81,6 +81,13 @@ and they're seen to slip them (`kitchen_evading`, the dodge clip a creature walk
 leash uses), so standing where they can't walk buys no free hits. If no way opens in 10 sec they
 give up and go home, as any creature does.
 
+**The last hero leaving.** The world takes no steps with nobody in it, so `Survival::leave` puts the
+kitchen back at once (`kitchen_abandoned`): Cookie or Gorged home, whole and at ease, with his own
+hand, his puddle, steam puffs and wind-up mark gone; the pot full again for Cookie, empty and Gorged
+at his full size for Gorged (a rise cut short is finished). A Gorged still waiting to rise rises for
+the next hero. When one of two heroes leaves mid-pour, the pour's mark goes with the wind-up
+(`foe_gone`) and he turns on the other.
+
 **The open look.** The murloc has no StandWound or kneel. His openings (the knocked pot, the
 steam's recovery, the belch's cough) hold CombatWound (clip 9) for their whole length (`HoldPose`),
 with MurlocWound (418). Hit him while it's held.
