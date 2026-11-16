@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 77
+local VERSION = 78
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -651,6 +651,8 @@ local function PlayMine(kind, step, move)
   else
     ES.comboNext, ES.comboUntil = 0, nil
   end
+  -- Its place in the chain, under the reticle (Chain.lua).
+  if ES.ChainMine then ES.ChainMine(kind, step) end
   ES.predicted = GetTime()
   ES.predictedClip = move.clip
   ES.predictedTake = move.take
@@ -806,13 +808,19 @@ function ES.SwingLine(f)
     -- A main hand's blow, "<colour>/-", stands as we guessed it.)
     if same and hands and ES.predictedTrail ~= hands and not string.find(hands, "/-", 1, true) then same = nil end
     ES.predicted = nil
-    if same then return end
+    -- (Its place in the chain, the server's word on it: Chain.lua.)
+    if same then
+      if ES.ChainHeard then ES.ChainHeard(f, true) end
+      return
+    end
     -- The server's blow, not the one we guessed: it plays now.
     if ActionLayer() and ES.moves then
       PlayMine(kind, step, { clip = clip, take = take, impact = impact, recovery = recovery, lunge = lunge, stamina = 0, from = from, trail = hands })
       ES.predicted = nil
+      if ES.ChainHeard then ES.ChainHeard(f, false) end
       return
     end
+    if ES.ChainHeard then ES.ChainHeard(f, false) end
     guid = "player"
   end
   PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, ES.SwingBody(kind), from)
@@ -865,6 +873,7 @@ function ES.ReactLine(f)
     if hold > 0 or fit > 0 then
       ES.mine = nil
       ES.comboUntil = nil
+      if ES.ChainDrop then ES.ChainDrop() end
     end
   end
   -- A flinch takes any of the model's takes on it, a little different each time.
@@ -1072,6 +1081,8 @@ function ES.Markers()
   local list = TakeActionMarkers()
   for i = 1, table.getn(list) do
     if list[i] == "impact player" then
+      -- (The finisher's flash on us, struck or not: Chain.lua.)
+      if ES.ChainImpact then ES.ChainImpact() end
       ES.OwnImpact()
     end
   end
@@ -1657,6 +1668,8 @@ function ES.Guard(state)
     if ES.mine and MineBusy() and GetTime() - ES.mine.start < ES.mine.move.impact then
       CancelMine()
       ES.comboUntil = nil
+      -- (A feint drops the chain; with two weapons the right click is the off hand's blow.)
+      if ES.ChainDrop and not ES.chainTwo then ES.ChainDrop() end
     elseif mv and MineBusy() and MineAt((ES.mine.kind == "heavy") and mv.heavyCancel or mv.cancelAfter) then
       CancelMine()
     end
@@ -6735,6 +6748,7 @@ function ES.Sleep()
   if SetCameraShoulder then SetCameraShoulder(0) end
   ES.predicted, ES.predictedRoll = nil, nil
   ES.mine, ES.comboUntil, ES.moves, ES.lockOn = nil, nil, nil, nil
+  ES.chain, ES.chainTwo = nil, nil
   ES.timers = {}
   if SetLockOn then SetLockOn(nil) end
   ES.aimCam = nil
@@ -6876,6 +6890,7 @@ function ES.Line(line)
     if f[3] == "1" then
       if ES.mine or ES.castHeld then
         if StopUnitAnimation then StopUnitAnimation("player", 0.1) end
+        if ES.mine and ES.ChainDrop then ES.ChainDrop() end
         ES.mine = nil
         ES.castHeld = nil
       end
@@ -6973,7 +6988,9 @@ function ES.Line(line)
   elseif verb == "NT" then
     -- Words to read go to chat (Words.lua); a wager's page and the board stay pages.
     if not (ES.Words and ES.Words(f)) and ES.Letter then ES.Letter(f) end
-  elseif verb == "AN" then
+  elseif verb == "AN" and not tonumber(f[3] or "") then
+    -- A person's answers (`AN <who> <links>`). A swing's `AN` carries its clip in that field and
+    -- goes on to SwingLine below (from add-on 74 to 77 every swing stopped here).
     if ES.Answers then ES.Answers(f) end
   elseif verb == "WT" then
     if ES.WagerLine then ES.WagerLine(f) end

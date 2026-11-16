@@ -237,7 +237,9 @@ impl SurvivalGame {
                             // A Rogue's blow trails the blade of the hand that struck (both on the
                             // finisher), for a client that draws a hand each.
                             let hands = self.sim.is_rogue(p).then(|| super::ui::rogue_trail(trail, strike.kind == htl_survival::StrikeKind::Off, strike.finish));
-                            Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind, from, hands))
+                            // Its place in the chain, for the hero's own pips (`Chain.lua`).
+                            let chain = format!("{}/{}\t{:.2}\t{}", strike.chain.0, strike.chain.1, self.sim.chain_window(strike.run), u8::from(self.sim.two_hands(p)));
+                            Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind, from, hands, chain))
                         }
                         _ => None,
                     });
@@ -250,7 +252,7 @@ impl SurvivalGame {
                             continue;
                         }
                         match &clip {
-                            Some((clip, take, impact, recovery, lunge, step, trail, ms, kind, from, hands)) if anim_client => {
+                            Some((clip, take, impact, recovery, lunge, step, trail, ms, kind, from, hands, chain)) if anim_client => {
                                 let me = u8::from(mine == Some(c));
                                 let trail = match hands {
                                     Some(h) if level >= super::ui::ROGUE_LOOKS_LEVEL => h.as_str(),
@@ -258,7 +260,7 @@ impl SurvivalGame {
                                 };
                                 self.ui_line(
                                     c,
-                                    &format!("AN\t{a:#X}\t{clip}\t{impact:.3}\t{trail}\t{ms}\t{me}\t{take}\t{recovery:.3}\t{lunge:.2}\t{kind}\t{step}\t{from}"),
+                                    &format!("AN\t{a:#X}\t{clip}\t{impact:.3}\t{trail}\t{ms}\t{me}\t{take}\t{recovery:.3}\t{lunge:.2}\t{kind}\t{step}\t{from}\t{chain}"),
                                 );
                             }
                             _ => self.send(c, p.clone()),
@@ -652,9 +654,13 @@ impl SurvivalGame {
             Event::Visual { id, kit, by } => {
                 if let Some(g) = self.guid_of(id) {
                     let p = packets::play_spell_visual(g, kit);
-                    // The striker's own client (the fourth round) flashed its own blow already.
+                    // The striker's own client (the fourth round) flashed its own blow already
+                    // (the finisher's on the swinger, from an add-on that plays it).
                     let own = [htl_survival::KIT_HEAVY, htl_survival::KIT_SLAM, htl_survival::KIT_BASH, htl_survival::KIT_CLEAVE].contains(&kit);
-                    let striker = by.and_then(|b| self.conn_of(b)).filter(|c| own && self.world_of(*c).is_some_and(|w| w.level >= 4));
+                    let finisher = kit == htl_survival::KIT_FINISHER;
+                    let striker = by.and_then(|b| self.conn_of(b)).filter(|c| {
+                        self.world_of(*c).is_some_and(|w| w.level >= 4 && (own || (finisher && w.addon && w.addon_v >= super::ui::CHAIN_ADDON)))
+                    });
                     match striker {
                         Some(c) => self.broadcast_except(c, &p),
                         None => self.broadcast(&p),
@@ -1461,5 +1467,87 @@ mod tests {
             assert_eq!(clip_body_word(ClipBody::Upper, level), "upper");
             assert_eq!(clip_body_word(ClipBody::Lower, level), "lower");
         }
+    }
+
+    // --- the light chain on the hero's screen (`Chain.lua`) -------------------------------------
+
+    struct Flat;
+    impl htl_survival::Land for Flat {
+        fn height(&self, _: f32, _: f32) -> f32 {
+            0.0
+        }
+        fn height_near(&self, _: f32, _: f32, z: f32) -> f32 {
+            z
+        }
+    }
+
+    /// A hero in the camp on connection `conn`, on an action-combat client of the fourth round
+    /// or later with add-on `addon_v`; what their client is sent.
+    fn hero(game: &mut SurvivalGame, conn: ConnId, name: &str, addon_v: u32) -> (Id, u64, crossbeam_channel::Receiver<Packet>) {
+        let account = format!("chaintest/{}", name.to_lowercase());
+        let id = game.sim.join(&account, name, None);
+        let pos = game.sim.players[&id].pos;
+        let guid = SurvivalGame::player_guid(&account);
+        game.bind(id, guid);
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let mut w = InWorld::new(guid, id, name.to_string(), pos[2]);
+        (w.addon, w.addon_v, w.anim, w.local, w.level) = (true, addon_v, true, true, 32);
+        game.sessions.insert(conn, Session { account: "chaintest".into(), hero: account, out: tx, world: Some(w), watching: None });
+        (id, guid, rx)
+    }
+
+    fn game() -> SurvivalGame {
+        SurvivalGame::new_in(Realm::CAMP, htl_survival::Content::builtin(), Box::new(Flat), None, 11)
+    }
+
+    fn sent(rx: &crossbeam_channel::Receiver<Packet>, p: &Packet) -> bool {
+        rx.try_iter().any(|q| q.opcode == p.opcode && q.body == p.body)
+    }
+
+    /// The add-on lines a client was sent that begin with `verb`.
+    fn lines(rx: &crossbeam_channel::Receiver<Packet>, verb: &str) -> Vec<String> {
+        let want = format!("\t{verb}\t");
+        rx.try_iter()
+            .filter(|p| p.opcode == op::SMSG_MESSAGECHAT)
+            .filter_map(|p| {
+                let text = String::from_utf8_lossy(&p.body).to_string();
+                text.find(&want).map(|at| text[at + 1..].trim_end_matches('\0').to_string())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_finishers_flash_is_left_to_the_swingers_own_addon_and_sent_to_everyone_else() {
+        let mut game = game();
+        let (a, ga, rx_a) = hero(&mut game, 1, "Chainer", super::super::ui::CHAIN_ADDON);
+        let (_, _, rx_b) = hero(&mut game, 2, "Watcher", super::super::ui::CHAIN_ADDON);
+        let flash = packets::play_spell_visual(ga, htl_survival::KIT_FINISHER);
+        game.event(Event::Visual { id: a, kit: htl_survival::KIT_FINISHER, by: Some(a) });
+        assert!(!sent(&rx_a, &flash), "the swinger's add-on plays it at the impact itself");
+        assert!(sent(&rx_b, &flash), "everyone near sees it");
+        // An add-on from before the chain cue never plays it: the server's own reaches it.
+        game.world_mut(1).unwrap().addon_v = super::super::ui::CHAIN_ADDON - 1;
+        game.event(Event::Visual { id: a, kit: htl_survival::KIT_FINISHER, by: Some(a) });
+        assert!(sent(&rx_a, &flash), "an older add-on is sent it");
+    }
+
+    #[test]
+    fn a_swings_line_carries_its_place_in_the_chain_and_how_long_it_stays_open() {
+        let mut game = game();
+        let (a, _, rx_a) = hero(&mut game, 1, "Chainer", super::super::ui::CHAIN_ADDON);
+        let len = {
+            let p = &game.sim.players[&a];
+            game.sim.content.moveset_of(game.sim.weapon_of(p)).light.len()
+        };
+        assert!(len >= 2, "the hero's weapon has a chain");
+        let grace = game.sim.chain_window(false);
+        game.sim.players.get_mut(&a).unwrap().stamina = 100.0;
+        game.sim.input(a, htl_survival::Input::Attack);
+        for e in game.sim.step(0.0) {
+            game.event(e);
+        }
+        let an = lines(&rx_a, "AN");
+        let want = format!("\t1/{len}\t{grace:.2}\t0");
+        assert!(an.iter().any(|l| l.ends_with(&want)), "the first blow of {len}, open {grace:.2} sec after: {an:?}");
     }
 }
