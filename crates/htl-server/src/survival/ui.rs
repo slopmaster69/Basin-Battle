@@ -615,6 +615,14 @@ impl SurvivalGame {
         }
     }
 
+    /// `ui_line_changed` for a line shared by several heroes: copied only for one it's sent to.
+    fn ui_line_changed_shared(&mut self, conn: ConnId, verb: &'static str, line: &str) {
+        if self.world_of(conn).is_some_and(|w| w.sent.get(verb).is_some_and(|s| s == line)) {
+            return;
+        }
+        self.ui_line_changed(conn, verb, line.to_string());
+    }
+
     pub(crate) fn has_addon(&self, conn: ConnId) -> bool {
         self.world_of(conn).is_some_and(|w| w.addon)
     }
@@ -943,6 +951,13 @@ impl SurvivalGame {
 
     /// Each tick: what changed on every add-on's screen.
     pub(crate) fn ui_flush(&mut self) {
+        /// The HUD lines that don't depend on the hero.
+        struct SharedLines {
+            goal: String,
+            journal: String,
+            wager: Option<String>,
+            pins: Option<String>,
+        }
         let hud_due = self.hud_at.elapsed() >= HUD_EVERY;
         if hud_due {
             self.hud_at = Instant::now();
@@ -960,6 +975,19 @@ impl SurvivalGame {
                 }
             }
         }
+        // The lines that are the same for every hero (the goal, the journal, the map's places, the
+        // wager) are built once a flush, not once a hero.
+        let shared = if hud_due && !conns.is_empty() {
+            let (below, siege) = (self.realm.below, self.realm.siege);
+            Some(SharedLines {
+                goal: self.goal_line(),
+                journal: self.journal_line(),
+                wager: below.then(|| self.wager_line()),
+                pins: (!below && !siege).then(|| self.pins_line()),
+            })
+        } else {
+            None
+        };
         for (conn, id, station) in conns {
             if let Some((line, started)) = self.action_line(id) {
                 // A new action, or the same kind started again.
@@ -985,18 +1013,15 @@ impl SurvivalGame {
                 if let Some(ef) = self.effects_line(id) {
                     self.ui_line_changed(conn, "EF", ef);
                 }
-                let gl = self.goal_line();
-                self.ui_line_changed(conn, "GL", gl);
-                let gj = self.journal_line();
-                self.ui_line_changed(conn, "GJ", gj);
-                if self.realm.below {
-                    let wt = self.wager_line();
-                    self.ui_line_changed(conn, "WT", wt);
+                let shared = shared.as_ref().expect("built when the HUD is due");
+                self.ui_line_changed_shared(conn, "GL", &shared.goal);
+                self.ui_line_changed_shared(conn, "GJ", &shared.journal);
+                if let Some(wt) = &shared.wager {
+                    self.ui_line_changed_shared(conn, "WT", wt);
                 }
                 if !self.realm.below {
-                    if !self.realm.siege {
-                        let pm = self.pins_line();
-                        self.ui_line_changed(conn, "PM", pm);
+                    if let Some(pm) = &shared.pins {
+                        self.ui_line_changed_shared(conn, "PM", pm);
                     }
                     // Placing a station: the building ground laid on the ground (a friend's
                     // green), for this hero alone; gone once they're done.
