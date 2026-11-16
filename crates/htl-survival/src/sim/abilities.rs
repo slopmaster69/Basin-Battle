@@ -1440,6 +1440,7 @@ impl Survival {
                             // step reads as one (a blink, not a teleport).
                             self.events.push(Event::Missile { caster: id, spell: 1856, target: Target::Point(from) });
                             self.set_down(id, spot, f);
+                            self.drop_aim(id);
                             self.events.push(Event::Missile { caster: id, spell: 1856, target: Target::Point(spot) });
                             self.shrouded_step(id);
                         }
@@ -3884,6 +3885,7 @@ impl Survival {
         if let Some((spot, face)) = d.behind_foe.then(|| self.ambush_spot(id, range)).flatten() {
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
             self.set_down(id, spot, face);
+            self.drop_aim(id);
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(spot) });
             if d.cleanse {
                 self.cleanse(id, &["root", "snare"]);

@@ -2066,6 +2066,17 @@ impl Survival {
         self.put_at(id, [at[0], at[1], at[2] + ARRIVE_LIFT], facing);
     }
 
+    /// The reticle's line (and its point) forgotten: it was laid from where they stood and faced,
+    /// so an art pressed on the next beat would turn them back along it, away from the back a
+    /// Rogue's step has just put them behind. Till a new line comes they face where they were put.
+    /// (Only the Rogue's steps: a blink that shoots on landing still reads its own line.)
+    pub(crate) fn drop_aim(&mut self, id: Id) {
+        if let Some(p) = self.players.get_mut(&id) {
+            p.aim_line = None;
+            p.aim_at = None;
+        }
+    }
+
     pub(crate) fn put_at(&mut self, id: Id, pos: Vec3, facing: f32) {
         let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
@@ -2073,10 +2084,6 @@ impl Survival {
         p.facing = facing;
         p.moved_at = now;
         p.last_safe = pos;
-        // The reticle's line was laid from where they stood and faced: an art pressed on the next
-        // beat must not turn them back along it, away from the back they were just put behind.
-        p.aim_line = None;
-        p.aim_at = None;
         self.events.push(Event::Teleport { player: id, pos, facing });
     }
 

@@ -334,6 +334,7 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(from) });
         }
         self.set_down(id, spot, face);
+        self.drop_aim(id);
         if puff != 0 {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(spot) });
         }
@@ -589,6 +590,7 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(from) });
         }
         self.set_down(id, spot, face);
+        self.drop_aim(id);
         if puff != 0 {
             self.events.push(Event::Missile { caster: id, spell: puff, target: Target::Point(spot) });
         }

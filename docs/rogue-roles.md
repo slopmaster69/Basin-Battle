@@ -680,8 +680,9 @@ What the design left open, decided in the pull request that built it:
     the Garrote pressed 0.2 sec later swung along that old line, away from the back: a miss that
     still spent the 14 sec cooldown, so the next two presses were refused. A real client sends a
     new line with every key and its camera decides, as with every art; the scripted press sent none.
-    Fixed in the server: a teleport (`put_at`: Shadowstep, the Cloak's step, the Shadow Cut) drops
-    the stored line and point, so the next press faces where she was put until a new line comes.
+    Fixed in the server: a Rogue's step (Shadowstep, Ambush, the Cloak's step, the Shadow Cut)
+    drops the stored line and point (`drop_aim`), so the next press faces where she was put until a
+    new line comes. Other classes' blinks keep theirs (a blink that shoots on landing reads it).
     The reach, the facing from behind, the cast, the effects and the targeting were checked in a
     sim test that plays the scenario's steps (`garrote_pressed_just_after_a_shadowstep_lands_in_the_back_it_was_put_behind`).
     The scenario's comment says so, and its second and third presses are spares.

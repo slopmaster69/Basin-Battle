@@ -765,14 +765,17 @@ fn garrote_pressed_just_after_a_shadowstep_lands_in_the_back_it_was_put_behind()
     assert!(ev.iter().any(|e| matches!(e, Event::Swing { attacker, outcome: Outcome::Hit, .. } if *attacker == p)), "a hit");
 }
 
-/// A teleport drops the reticle's old line (and its point): till a new one comes, she faces where
-/// she was put. (A key sent with a fresh line still aims where that line goes, as every art does.)
+/// A Rogue's step (here Shadowstep) drops the reticle's old line and its point: till a new one
+/// comes she faces where she was put. A blink that isn't a step behind keeps its line.
 #[test]
-fn a_teleport_drops_the_reticles_old_line() {
+fn a_rogues_step_drops_the_reticles_old_line() {
     let mut s = world();
     let p = rogue(&mut s);
-    s.set_aim_line(p, 0.0, 0.0);
-    s.put_at(p, [5.0, 0.0, 0.0], PI);
+    s.slot_ability(p, "utility", "shadowstep").unwrap();
+    mob(&mut s, "grunt", [12.0, 0.0, 0.0], PI);
+    s.set_aim_line(p, 0.0, -(1.9f32).atan2(12.0));
+    press(&mut s, p, "utility", false);
+    assert!(s.players[&p].pos[0] > 12.5, "behind it");
     assert!(s.players[&p].aim_line.is_none() && s.players[&p].aim_at.is_none());
-    assert!((s.aim_of(p).0 - PI).abs() < 1e-3, "her facing, till a new line comes");
+    assert!((s.aim_of(p).0 - PI).abs() < 0.3, "her facing, till a new line comes: {}", s.aim_of(p).0);
 }
