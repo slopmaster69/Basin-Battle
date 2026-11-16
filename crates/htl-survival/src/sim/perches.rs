@@ -1214,6 +1214,46 @@ impl Survival {
         pos[2] - at[2] > OVER && (self.perches.crews.contains_key(&owner) || self.perches.workers.contains_key(&owner))
     }
 
+    /// The last hero has left while the crew stands. The world takes no steps with nobody in it,
+    /// so the lost fight's end (the planks, poles, torches, the stick in the air, the steam and
+    /// fire of the channel, the man himself back at his post and whole) would wait for the next
+    /// hero and play in front of them, with the old fight's props standing until then. It is put
+    /// back now, whole. (`leave`'s `foe_gone` has already sent him home.)
+    pub(crate) fn perch_abandoned(&mut self) {
+        if !self.players.is_empty() {
+            return;
+        }
+        let owners: Vec<Id> = self.perches.crews.keys().copied().collect();
+        for owner in owners {
+            self.remove_perch_crew(owner);
+            let Some(m) = self.mobs.get(&owner) else { continue };
+            if m.health == 0 { continue; }
+            let home = m.home;
+            if let MobState::Windup { mark: Some(mk), .. } = m.state { self.unmark(mk); }
+            if let Some((_, mk)) = self.mobs.get_mut(&owner).and_then(|m| m.lob.take()) { self.unmark(mk); }
+            self.clear_cc(owner);
+            self.halt(owner);
+            let m = self.mobs.get_mut(&owner).unwrap();
+            m.pos = home;
+            m.health = m.max_health;
+            m.fighters = 1;
+            m.posture = 0;
+            m.pattern = None;
+            m.special = false;
+            m.enraged = false;
+            m.phase = 0;
+            m.voiced = false;
+            m.lost_at = None;
+            m.stagger_until = 0.0;
+            m.posed_until = 0.0;
+            m.state = MobState::Idle { wander_at: self.clock + 3.0 };
+            let (health, max) = (m.health, m.max_health);
+            self.events.push(Event::Health { id: owner, health, max });
+            self.events.push(Event::MobStop { id: owner, pos: home, facing: self.mobs[&owner].facing });
+            self.boss_home(owner);
+        }
+    }
+
     pub(crate) fn remove_perch_crew(&mut self, owner: Id) {
         let Some(c) = self.perches.crews.remove(&owner) else { return };
         self.events.push(Event::CastEnd { caster: owner });
