@@ -1776,6 +1776,21 @@ jab = 0.5
 flicker_aura = 5215
 flicker_secs = 0.3
 puff = 1856
+# Shadow's trait, Shrouded Step (docs/rogue-roles.md, Shadow): on while 3 of the 5 keys hold Shadow's
+# cards. 3 of 5 is most of the bar: a pure tree has its trait, a 3 + 2 mix has one, never two.
+trait_keys = 3
+# A step that lands behind an enemy hides the Rogue for 1 sec from every creature but a boss: none
+# starts a blow at them. One dagger blow and a step out: long enough to land, too short to camp in.
+# The Stealth look (5215) shows it on the body, see-through, as the perfect dodge's flicker does.
+shroud_secs = 1.0
+shroud_aura = 5215
+# Distract on a boss: a glance of 0.8 sec (one dagger blow in its back), at most once every 15 sec
+# and never in the middle of a string, so a boss is never held by it.
+glance_secs = 0.8
+glance_every = 15.0
+# Cloak and Dagger's step: up to 8 yd, the dodge's 4 yd dash and twice a reach, so it finds the next
+# back in a pack without crossing the field.
+cloak_reach = 8.0
 
 # --- stations -------------------------------------------------------------------------------------
 
@@ -4445,11 +4460,14 @@ effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 [[ability]]
 key = "shadowstep"
 name = "Shadowstep"
-text = "Steps through the shadows to the reticle, up to 20 yd, breaking roots and slows. Press again within 3 sec to step straight back to where you were. \"Dive, stab, gone.\""
+text = "Steps through the shadows behind the enemy under the reticle, up to 20 yd, or to the reticle if there is none. Breaks roots and slows. Press again within 3 sec to step straight back to where you were. \"Dive, stab, gone.\""
 icon = "Ability_Vanish"
 school = "rogue"
 slot = "utility"
 kind = "blink"
+# Behind the enemy under the reticle (Ambush's find, within 20 deg of the line), facing its back:
+# the Rogue's step goes to a back, the Mage's Blink to a point.
+behind_foe = true
 range = [20.0, 20.0]
 cooldown = 12.0
 cleanse = true
@@ -4861,6 +4879,8 @@ text = "Fires a bolt for 20 damage that marks the target for death. For 8 sec it
 icon = "Ability_Hunter_SniperShot"
 school = "rogue"
 slot = "ultimate"
+# Venom's (docs/rogue-roles.md): the second choice. Shadow's Cloak and Dagger is the first.
+choice = 2
 kind = "projectile"
 valor = 100
 damage = [20.0, 20.0]
@@ -4871,6 +4891,26 @@ cooldown = 40.0
 spell = 686
 impact_kit = 2709
 effects = [{ kind = "deathmark", secs = [8.0, 8.0], amount = 0.3 }]
+
+# Shadow: every blow from behind, for a moment. Each attack press first steps the Rogue behind the
+# nearest enemy within 8 yd ([rogue] cloak_reach), one not yet struck in it first, then strikes as
+# that hand's blow. The backstab's decay (`backstab_bonus`) makes spreading the steps over a pack
+# the strong play; on a lone boss it is about six backstabs, each worth less.
+[[ability]]
+key = "cloak_and_dagger"
+name = "Cloak and Dagger"
+text = "For 6 sec, each attack first steps you through the shadows behind the nearest enemy within 8 yd, then strikes its back. Prefers an enemy you haven't struck yet. Up to 10 steps."
+icon = "Ability_Stealth"
+school = "rogue"
+slot = "ultimate"
+kind = "buff"
+valor = 100
+cooldown = 40.0
+# Vanish's puff as it begins, and at both ends of every step.
+spell = 1856
+# 6 sec and 10 steps: a dagger's run of blows is about 0.5 sec each, so 10 is about all a run can
+# use; the time ends it, and the cap keeps a quicker hand honest.
+effects = [{ kind = "cloak", secs = [6.0, 6.0], amount = 10.0 }]
 
 # The Warden: sanctuary.
 [[ability]]
@@ -6357,6 +6397,8 @@ text = "Flicks 3 poisoned knives in a fan for 8 damage each. Each knife poisons 
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
+# Venom's (docs/rogue-roles.md): the second choice. Shadow's Distract is the first.
+choice = 2
 kind = "projectile"
 damage = [8.0, 8.0]
 range = [16.0, 16.0]
@@ -6397,6 +6439,53 @@ clip = 85
 spell = 408
 effects = [{ kind = "stun", secs = [3.0, 3.0] }]
 
+# Shadow: make them look away. A pouch lobbed at a spot; the enemies near where it lands turn to
+# it, and their backs are the Rogue's. No damage.
+[[ability]]
+key = "distract"
+name = "Distract"
+text = "Lobs a pouch at the reticle, up to 25 yd. Every enemy within 6 yd of where it lands turns to face it for 2.5 sec and starts no attack. A hit from its front ends it. A boss only glances at it, for 0.8 sec, at most once every 15 sec. Heroes ignore it."
+icon = "Ability_Rogue_Distract"
+school = "rogue"
+slot = "ranged"
+kind = "projectile"
+# Over anyone in the way, as Lava Burst flies: it is thrown at a spot, not at a body.
+lob = true
+damage = [0.0, 0.0]
+range = [25.0, 25.0]
+radius = [0.5, 0.5]
+# Every enemy within 6 yd of where it lands: a pack, not a room.
+splash = 6.0
+# Lava Burst's flight: about 0.8 sec at 25 yd, a third of that at 10.
+speed = 30.0
+# 10 sec: a utility's pace though it is on Q (it deals nothing, so the poke budget is untouched).
+cooldown = 10.0
+# The pouch and its glittering burst where it lands: 1.12's own Distract.
+spell = 1725
+# 2.5 sec: a Backstab and two blows from behind.
+effects = [{ kind = "distract", secs = [2.5, 2.5] }]
+
+# Distract's EX, Sap: the pre-pull. A short blow to one enemy; from its back (or out of a veil) it
+# drops it for 6 sec, time to deal with the rest of its pack. Never a boss, never one already
+# fighting: it is how a fight starts, not a stun inside one.
+[[ability]]
+key = "sap"
+name = "Sap"
+ex_of = "distract"
+text = "After a 0.2 sec windup, strikes one enemy in melee reach for 60% weapon damage. From behind or from hiding, it also incapacitates the enemy for 6 sec (1.5 sec against heroes), and any damage ends it. Doesn't incapacitate bosses or enemies already in a fight."
+icon = "Ability_Sap"
+slot = "ranged"
+kind = "art"
+valor = 25
+windup = 0.2
+weapon = 0.6
+one_target = true
+stamina = 14.0
+clip = 85
+spell = 6770
+calm_only = true
+behind_effects = [{ kind = "incapacitate", secs = [6.0, 6.0], hero_secs = 1.5 }]
+
 [[ability]]
 key = "blinding_step"
 name = "Blinding Step"
@@ -6405,6 +6494,7 @@ text = "Shadowstep, and a cloud of blinding powder bursts where you come out. Ev
 icon = "Ability_Gouge"
 slot = "utility"
 kind = "blink"
+behind_foe = true
 valor = 25
 range = [20.0, 20.0]
 cleanse = true
@@ -11203,7 +11293,7 @@ boss = true
 posture = 140
 drops = { wool = [2, 4], bronze = [1, 1] }
 trophy = { defias_jerkin = 1, silver = 2 }
-teaches = ["death_mark"]
+teaches = ["death_mark", "cloak_and_dagger"]
 respawn = 1200.0
   [mob.attack]
   windup = 0.4
@@ -14348,10 +14438,10 @@ name = "The Brotherhood's Dead Drop"
 at = [-9782.0, -888.0]
 display = 18
 scale = 1.0
-teaches = ["fan_of_knives", "backstab"]
+teaches = ["distract", "backstab", "fan_of_knives"]
 keep = true
 secs = 3.0
-text = "Under the crate, a Defias training ledger. Throwing knives, and where to put a blade."
+text = "Under the crate, a Defias training ledger. How to turn a head, how to throw a knife, and where to put a blade."
 trial = ["trial_shrine_rogue_0", "trial_shrine_rogue_1"]
 
 [[chest]]

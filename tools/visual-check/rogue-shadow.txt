@@ -1,0 +1,52 @@
+# The Rogue's Shadow tree (docs/rogue-roles.md, build plan 2), floor markers off. Two grunts
+# stand still 9 and 13 yd ahead, facing the Rogue. Distract is lobbed at the ground between them
+# (11 yd): look for the pouch's flight and its burst (1.12's Distract, spell 1725), no ring on the
+# ground, and both grunts turning to face where it landed (the turn is the tell). Shadowstep to the
+# near one's back (a puff where she leaves and where she lands, the body see-through for 1 sec:
+# Shrouded Step, the Stealth look), then Backstab into its back (the blood burst, the backstab's
+# sound and stop). Then Cloak and Dagger on two fresh grunts 4 and 7 yd ahead: each left click
+# steps her behind the next grunt with a puff at both ends and stabs its back, the one not yet
+# struck first. Last, Sap (Q's EX) on a fresh grunt with its back to her: it slumps (the stun
+# stars) and stands there until struck.
+# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>` (the `setup`
+# scenario makes only the hunter, the warrior and the cameraman). Not run yet.
+hero rogue
+cam 90 -12 8
+include _setup
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot q distract
+4.4 .es slot e backstab
+4.4 .es slot 1 shadowstep
+4.4 .es slot 2 smoke_bomb
+4.4 .es slot 3 cloak_and_dagger
+4.6 .es target grunt 9 still
+4.7 .es target grunt 13 still
+5.0 video
+5.4 .es in ab 0 0                       # Q: Distract, aiming
+5.8 .es in a {facing} -0.17             # the ground about 11 yd ahead, between them
+5.9 .es in au
+5.6 shots distract 30 0.1
+8.0 .es in ab 2 0                       # 1: Shadowstep, aiming
+8.3 .es in a {facing} -0.2              # at the near grunt
+8.4 .es in au
+8.7 .es in ab 1 0                       # E: Backstab into its back
+8.0 shots step 20 0.1
+11.0 .es target clear
+11.2 .es target grunt 4 still
+11.3 .es target grunt 7 still
+11.5 .es valor full
+12.0 .es in ab 4 0                      # 3: Cloak and Dagger
+12.6 .es in a
+12.7 .es in au
+13.3 .es in a
+13.4 .es in au
+14.0 .es in a
+14.1 .es in au
+12.0 shots cloak 30 0.1
+17.0 .es target clear
+17.2 .es target grunt 3 still away
+17.5 .es valor full
+18.0 .es in ab 0 1                      # Q's EX: Sap, into its back
+18.0 shots sap 30 0.1
+23 end

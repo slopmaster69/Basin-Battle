@@ -237,7 +237,7 @@ impl Survival {
             }
         }
         // A Rogue's Shadow Cut, open just after a perfect dodge: either attack steps behind the one
-        // who swung and strikes its back.
+        // who swung and strikes its back. Under Cloak and Dagger, behind the nearest enemy.
         let rogue = self.players.get(&id).is_some_and(|p| self.is_rogue(p));
         let cut = match input {
             Input::Attack => Some(StrikeKind::Light),
@@ -245,7 +245,7 @@ impl Survival {
             Input::Guard if rogue => Some(StrikeKind::Off),
             _ => None,
         };
-        if cut.is_some_and(|k| self.shadow_cut(id, k)) {
+        if cut.is_some_and(|k| self.shadow_cut(id, k) || self.cloak_step(id, k)) {
             return true;
         }
         // Two weapons in hand (dual wield), or a Rogue: no guard at all. The right click swings the
@@ -3040,6 +3040,8 @@ impl Survival {
             struck.push(v);
             let from_veil = self.players[&id].veil_strike_until > self.clock;
             let behind = d.ambush > 0.0 || from_veil || angle_between(vf, facing(at, pos)) >= BACKSTAB_ARC;
+            // Sap's: at rest before this blow draws it into a fight, and no boss (a hero: always).
+            let calm = self.mobs.get(&v).is_none_or(|m| matches!(m.state, mobs::MobState::Idle { .. }) && !self.content.mobs[m.def].boss);
             let mut base = self.roll(w.damage) as f32 * d.weapon * might;
             if behind && d.behind > 0.0 {
                 base *= d.behind;
@@ -3056,6 +3058,10 @@ impl Survival {
                 self.strike_fair_as(id, v, dmg, pos, !d.unblockable, true, !d.unblockable, Blow::Heavy, None, Follow::Ability { ability, share: 1.0 }, HitKind::Melee);
             } else {
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
+            }
+            // What it does only from behind (Sap): from the front it was only the blow.
+            if behind && !d.behind_effects.is_empty() && (calm || !d.calm_only) && self.alive(v) {
+                self.apply_effects(id, v, &d.behind_effects, 1.0, &d.name);
             }
             let kit = if behind { KIT_RIPOSTE } else { KIT_SLAM };
             if self.alive(v) {

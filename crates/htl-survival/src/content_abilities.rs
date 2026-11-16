@@ -402,6 +402,17 @@ pub struct AbilityDef {
     /// Only with a blade in each hand (the Rogue's two-blade cards): with one it won't go.
     #[serde(default)]
     pub needs_two_blades: bool,
+    /// A blink that lands behind the enemy under the reticle (Ambush's find), facing its back,
+    /// else at the reticle's point as any blink (Shadowstep).
+    #[serde(default)]
+    pub behind_foe: bool,
+    /// A weapon art's effects that take only from behind (or out of a veil): from the front it is
+    /// only its blow (Sap). With `calm_only`, never on a boss nor on a creature already in a
+    /// fight (judged before the art's own blow).
+    #[serde(default)]
+    pub behind_effects: Vec<AbilityEffect>,
+    #[serde(default)]
+    pub calm_only: bool,
     /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
     /// (Holy Shock).
     #[serde(default)]
@@ -1305,12 +1316,17 @@ pub const CC_KINDS: [&str; 11] = ["stun", "incapacitate", "petrify", "panic", "d
 ///
 /// The Druid's: `prowl` (with a `veil`: the hidden Druid's next attack stuns and hits harder,
 /// `sim::cc::PROWL_BONUS` and `PROWL_STUN`; any damage on them ends both).
-pub const OTHER_EFFECTS: [&str; 29] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl",
+///
+/// The Rogue's (docs/rogue-roles.md, Shadow): `distract` (a creature faces where the ability
+/// landed for its time: it keeps its foe and starts no blow, and a blow from its front ends it; a
+/// boss only glances; a hero is untouched: `sim::rogue`), `cloak` (each attack first steps behind
+/// the nearest enemy, up to `amount` steps: Cloak and Dagger).
+pub const OTHER_EFFECTS: [&str; 31] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "momentum", "war_banner", "embrace", "ward", "prowl", "distract", "cloak",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 20] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl"];
+pub const BOONS: [&str; 21] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner", "embrace", "ward", "prowl", "cloak"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).

@@ -430,6 +430,7 @@ impl Survival {
                 voiced: false,
                 backstabs: Vec::new(),
                 turn_on: None,
+                rogue: Default::default(),
                 face_sent: None,
                 face_seen: 0.0,
                 fighters: 1,
@@ -670,6 +671,10 @@ impl Survival {
             return;
         }
         if damage > 0 { self.perch_hurt(mid, by); }
+        // Distracted, a blow from its front makes it look back (`sim::rogue`).
+        if damage > 0 {
+            self.distract_struck(mid, by);
+        }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         // A boss whose collapse is still coming down is held above its last stand (`sim::bosses`).
@@ -1423,6 +1428,10 @@ impl Survival {
                 continue;
             }
             if self.disabled(id) {
+                continue;
+            }
+            // A Rogue's Shadow: distracted, or its foe shrouded, it stands (`sim::rogue`).
+            if self.step_shadowed(id) {
                 continue;
             }
             // A boss on its run (`sim::bosses`): its run is its thinking.
