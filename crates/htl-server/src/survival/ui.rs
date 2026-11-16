@@ -1941,6 +1941,10 @@ impl SurvivalGame {
                         format!("You equipped the {name}.")
                     };
                     self.tell(conn, &said);
+                    // A Rogue's two hands as a pair: its rule (docs/rogue-roles.md, "Weapon paths").
+                    if let Some(pair) = self.sim.players.get(&me).and_then(|p| self.sim.pair_words(p)) {
+                        self.tell(conn, &pair);
+                    }
                     let rack = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Rack))).unwrap_or_else(|| self.sim.rack_id());
                     self.ui_station(conn, me, rack);
                 })

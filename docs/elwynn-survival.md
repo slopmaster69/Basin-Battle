@@ -238,6 +238,14 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   perfect dodge (20 stamina, 10 Valor, 12% of a boss's posture, the body flickers), and for 0.6 s
   after it an attack steps behind whoever swung (up to 6 yd) and strikes its back. A dodge in your
   own wind-up calls the blow off, cuts an off-hand blow short at once, and keeps the two-blade run.
+  What a Rogue holds is its weapon path, a pair judged on both hands: Twin Fangs (two daggers, a
+  Shadow Cut's backstab always whole), Blade and Shiv (a sword and a dagger, the finisher with the
+  sword's 3 yd reach and the dagger's 2.5x from behind), Crossed Swords (two swords, the finisher
+  striking every enemy in 150 degrees), Breaker's Pair (a mace and any other, the finisher counting
+  3 times toward posture) and Iron Knuckles (two fist weapons, a run of 6 whose finisher turns a
+  creature's back to the Rogue for 1 s; a boss's posture twice instead). The fists, Footpad's
+  Knuckles (3 stamina back a hit) and Cutpurse's Claw (50% more within 1 s of a slipped blow), are
+  on the rack.
 - **Priest**: Light and Shadow, a choice on every key (see `docs/priest-draft3.md` and
   `docs/priest-draft4.md`). Q: Penance, rings that close on up to 3 bodies in front of you, a bolt
   of light on each as you press on the beat (its EX, **Divine Star**, is a star of light 24 yd out

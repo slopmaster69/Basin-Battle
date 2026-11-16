@@ -715,6 +715,8 @@ impl Survival {
             art: None,
             from: m.from.clone(),
             finish: false,
+            pair: None,
+            cut: false,
         }
     }
 
@@ -790,7 +792,8 @@ impl Survival {
             // (After a Darting Knife, either hand carries the run on.)
             let alternate = p.dual_run > 0 && (p.dual_last_off != off || p.rogue.any_hand) && self.clock <= p.combo_until + DUAL_WINDOW;
             let run = if alternate { p.dual_run + 1 } else { 1 };
-            let finish = run >= DUAL_FINISH_AT;
+            // (A Rogue's Iron Knuckles run longer.)
+            let finish = run >= self.run_length(p);
             if finish {
                 strike.damage *= DUAL_FINISH_DAMAGE;
                 strike.stagger = strike.stagger.max(DUAL_FINISH_STAGGER);
@@ -799,6 +802,8 @@ impl Survival {
                 strike.from = None;
                 strike.finish = true;
             }
+            // A Rogue's pair: its rule on the finisher (`sim::rogue`, "the dual-wield pairs").
+            self.pair_blow(id, &mut strike);
             let p = self.players.get_mut(&id).unwrap();
             p.dual_run = if finish { 0 } else { run };
             p.dual_last_off = off;
@@ -877,6 +882,8 @@ impl Survival {
             art: None,
             from: None,
             finish: false,
+            pair: None,
+            cut: false,
         };
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;
@@ -1657,7 +1664,8 @@ impl Survival {
         }
         // The nearest first, as many as the weapon strikes in one swing (a shove, one).
         hits.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let most = if strike.wall_bash() { WALL_BASH.targets } else if strike.shove() { 1 } else { w.targets.max(1) };
+        // (Crossed Swords' cross-cut: every enemy in its arc.)
+        let most = if strike.wall_bash() { WALL_BASH.targets } else if strike.shove() { 1 } else if self.sweeps_all(strike) { usize::MAX } else { w.targets.max(1) };
         let room = most.saturating_sub(struck.len());
         let lean = if strike.heavy() { self.content.combat.lean_heavy } else { self.content.combat.lean_light };
         for (_, mid) in hits.into_iter().take(room) {
@@ -1754,9 +1762,13 @@ impl Survival {
             // From behind (a backstab): harder, unless it's a riposte already.
             let behind = !reeling && !w.no_backstab && self.from_behind(mid, pos);
             let stab = if w.backstab > 0.0 { w.backstab } else { self.content.combat.backstab };
+            // (Blade and Shiv's finisher: the dagger's, whichever hand pressed it.)
+            let stab = self.pair_stab(id, strike, stab);
             // Stabbed in the back again and again, it's ready for it: each backstab lately (more
-            // so with more heroes on it) takes from the next one's bonus.
-            let stab = if behind { self.backstab_bonus(mid, stab) } else { stab };
+            // so with more heroes on it) takes from the next one's bonus. A Twin Fangs Shadow
+            // Cut's is whole, and not remembered.
+            let whole = self.whole_stab(strike);
+            let stab = if behind && !whole { self.backstab_bonus(mid, stab) } else { stab };
             let damage = if behind {
                 (rolled as f32 * stab).round() as u32
             } else if reeling && w.riposte > 0.0 && !strike.shove() {
@@ -1779,7 +1791,7 @@ impl Survival {
             // The first blow out of Prowl: its bonus damage, and its stun.
             let damage = if damage > 0 && !strike.shove() { damage + self.prowl_strike(id, mid) } else { damage };
             if behind {
-                self.backstabbed(mid, id);
+                self.backstabbed_as(mid, id, !whole);
             }
             // A backstab says so in its blow, not a word: the riposte's stab (below), a dagger's
             // crit into flesh and a sharp beat on the striker's screen.
@@ -1802,7 +1814,17 @@ impl Survival {
                     _ => "Melee",
                 };
                 self.weapon_before(mid, w, strike);
+                // A Rogue's blow counts toward posture by its own hand (and its pair's finisher).
+                let heft = self.pair_heft(id, mid, w, strike);
+                if let (Some(h), Some(p)) = (heft, self.players.get_mut(&id)) {
+                    p.rogue.blow_heft = h;
+                }
                 self.hurt_mob_as(mid, id, damage, label);
+                if let Some(p) = self.players.get_mut(&id) {
+                    p.rogue.blow_heft = 0.0;
+                }
+                // Iron Knuckles' finisher wheels it round.
+                self.pair_wheel(id, mid, strike);
                 // An axe's hit bleeds.
                 if w.bleed > 0.0 && !strike.shove() && self.alive(mid) {
                     let bleed = crate::content_abilities::AbilityEffect { kind: "burn".into(), secs: [BLEED_SECS, BLEED_SECS], amount: w.bleed, ..Default::default() };
@@ -2327,6 +2349,10 @@ impl Survival {
         }
         match outcome {
             Outcome::Dodged if !dashing && damage > 0 => {
+                // (A slipping weapon's window: `sim::weapon_fx`.)
+                if let Some(p) = self.players.get_mut(&victim) {
+                    p.fx.slipped_at = Some(self.clock);
+                }
                 // A Rogue's dodge in its perfect moment pays more, and opens the Shadow Cut.
                 let perfect = self.dodged_perfectly(victim, &doing);
                 self.gain_valor(victim, if perfect { c.valor.perfect } else { c.valor.roll });
@@ -3326,11 +3352,16 @@ impl Survival {
     /// long while another holds it.
     /// (Under a Rogue's Hemorrhage, not remembered; it may still wheel.)
     pub(crate) fn backstabbed(&mut self, mid: Id, by: Id) {
+        self.backstabbed_as(mid, by, true);
+    }
+
+    /// [`Self::backstabbed`], remembered or not (a Twin Fangs Shadow Cut isn't: it may still wheel).
+    pub(crate) fn backstabbed_as(&mut self, mid: Id, by: Id, remember: bool) {
         let now = self.clock;
         let heroes = self.heroes_on(mid);
         let open = self.has_cc(mid, "hemorrhage");
         let Some(m) = self.mobs.get_mut(&mid) else { return };
-        if !open {
+        if !open && remember {
             m.backstabs.push(now);
         }
         let boss = self.content.mobs[m.def].boss || self.content.mobs[m.def].posture > 0;

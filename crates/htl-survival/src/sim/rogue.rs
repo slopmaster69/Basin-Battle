@@ -49,6 +49,13 @@
 //! enemies turn to, **Evasion** widens the perfect window, **Adrenaline Rush** makes blows and
 //! dodges free and **Blade Dance** makes every evading dodge perfect and cuts the striker. It reads
 //! with no floor marker: the body's looks, the count beside the reticle (`SK flourish`), the beat.
+//!
+//! **The pairs** (docs/rogue-roles.md, "Weapon paths"): what a Rogue holds in its two hands is its
+//! weapon path, one rule on the two-blade finisher judged on both hands' families ([`Pair`]):
+//! Twin Fangs, Blade and Shiv, Crossed Swords, Breaker's Pair and Iron Knuckles. Each weapon keeps
+//! its own mechanic in its own hand (`sim::weapon_fx`), and a Rogue's blows count toward posture by
+//! the hand that struck. It reads on the bodies: the finisher's both-hands clip, the creatures it
+//! cuts, a wheeled creature's own turn.
 
 use super::*;
 use crate::land::clear_line;
@@ -78,6 +85,9 @@ pub struct Rogue {
     pub flurry_cuts: u32,
     /// A Darting Knife struck: the next blow of either hand carries the two-blade run on.
     pub any_hand: bool,
+    /// The blow landing now counts this many times toward posture (0: the main hand's weight, as
+    /// for anyone): the striking hand's own, or its pair's finisher's.
+    pub blow_heft: f32,
 }
 
 /// What a Rogue's Shadow keeps on a creature.
@@ -309,6 +319,9 @@ impl Survival {
         self.set_action(id, Action::Ready);
         self.unsheathe(id);
         self.start_swing(id, kind);
+        if let Some(Action::Swing { strike, .. }) = self.players.get_mut(&id).map(|p| &mut p.action) {
+            strike.cut = true;
+        }
         true
     }
 
@@ -861,9 +874,10 @@ impl Survival {
         }
         let window = self.content.rogue.knife_window;
         let swinging = matches!(p.action, Action::Swing { .. });
+        let most = self.run_length(p) - 1;
         let p = self.players.get_mut(&id).unwrap();
         let going = p.dual_run > 0 && (swinging || now <= p.combo_until + DUAL_WINDOW);
-        p.dual_run = if going { p.dual_run + 1 } else { 1 }.min(DUAL_FINISH_AT - 1);
+        p.dual_run = if going { p.dual_run + 1 } else { 1 }.min(most);
         p.rogue.any_hand = true;
         if !swinging {
             p.combo_until = p.combo_until.max(now + window - DUAL_WINDOW);
@@ -888,14 +902,16 @@ impl Survival {
     fn flurry_cut(&mut self, id: Id) {
         let now = self.clock;
         let (gap, step) = (self.content.rogue.flurry_gap, self.content.rogue.flurry_step);
-        let Some(p) = self.players.get_mut(&id) else { return };
+        let Some(p) = self.players.get(&id) else { return };
+        let length = self.run_length(p);
+        let p = self.players.get_mut(&id).unwrap();
         let (left, cuts) = (p.rogue.flurry_left, p.rogue.flurry_cuts);
         if left == 0 {
             return;
         }
         let off = (cuts - left) % 2 == 1;
         // The run as it would stand before this cut, so the last is the finisher.
-        p.dual_run = DUAL_FINISH_AT.saturating_sub(left.min(DUAL_FINISH_AT as u32) as u8);
+        p.dual_run = length.saturating_sub(left.min(length as u32) as u8);
         p.dual_last_off = !off;
         p.combo_until = f32::INFINITY;
         p.rogue.any_hand = false;
@@ -1037,6 +1053,184 @@ impl Survival {
         for m in on {
             self.distract(id, m, turn, "Afterimage");
         }
+        self.fx_from = was;
+    }
+}
+
+// --- the dual-wield pairs ---------------------------------------------------------------------------
+
+/// The client's item subclass of each weapon family a Rogue holds (`[[weapon]] subclass`).
+pub const DAGGER: u32 = 15;
+pub const SWORD: u32 = 7;
+pub const MACE: u32 = 4;
+pub const FIST: u32 = 13;
+
+/// A Rogue's two hands as a pair (docs/rogue-roles.md, "Weapon paths: the dual-wield pairs"). Each
+/// weapon keeps its own mechanic in its own hand; the pair adds one rule to the two-blade run, the
+/// finisher's (a Twin Fangs Shadow Cut's too). A pair is judged on both hands' families, so an
+/// empty off hand (it jabs) is none, and only a hero created as a Rogue has one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pair {
+    /// Dagger and dagger: a Shadow Cut's backstab is whole and isn't remembered.
+    TwinFangs,
+    /// Sword and dagger: the finisher has the sword's reach and the dagger's backstab.
+    BladeAndShiv,
+    /// Sword and sword: the finisher is a cross-cut, every enemy in `[rogue] cross_arc`.
+    CrossedSwords,
+    /// A mace and any other: the finisher counts `[rogue] breaker_heft` times toward posture.
+    BreakersPair,
+    /// Fist and fist: a run of `[rogue] knuckle_run`; the finisher wheels a creature round, and
+    /// counts `knuckle_boss_heft` times toward a boss's posture.
+    IronKnuckles,
+}
+
+impl Pair {
+    /// The pair two weapon families make, in either hand. None: a fist with a dagger or a sword
+    /// (each hand keeps its own, and the run is the plain one).
+    pub fn of(a: u32, b: u32) -> Option<Pair> {
+        match (a.min(b), a.max(b)) {
+            (DAGGER, DAGGER) => Some(Pair::TwinFangs),
+            (SWORD, DAGGER) => Some(Pair::BladeAndShiv),
+            (SWORD, SWORD) => Some(Pair::CrossedSwords),
+            (MACE, MACE | SWORD | FIST | DAGGER) => Some(Pair::BreakersPair),
+            (FIST, FIST) => Some(Pair::IronKnuckles),
+            _ => None,
+        }
+    }
+
+    /// Its name, as the rack says it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Pair::TwinFangs => "Twin Fangs",
+            Pair::BladeAndShiv => "Blade and Shiv",
+            Pair::CrossedSwords => "Crossed Swords",
+            Pair::BreakersPair => "Breaker's Pair",
+            Pair::IronKnuckles => "Iron Knuckles",
+        }
+    }
+}
+
+impl Survival {
+    /// A hero's pair: a hero created as a Rogue with a weapon in each hand. Any other class's two
+    /// blades, and a Rogue's empty off hand, make none.
+    pub fn pair_of(&self, p: &Player) -> Option<Pair> {
+        if !self.is_rogue(p) {
+            return None;
+        }
+        let off = self.off_weapon_of(p)?;
+        Pair::of(self.weapon_of(p).subclass, off.subclass)
+    }
+
+    /// What a Rogue's pair does, in the words the rack says it as a hand is equipped (built from
+    /// the numbers, so it never drifts from the rules). None: no pair.
+    pub fn pair_words(&self, p: &Player) -> Option<String> {
+        let pair = self.pair_of(p)?;
+        let r = &self.content.rogue;
+        let off = self.off_weapon_of(p)?;
+        let main = self.weapon_of(p);
+        // (Survival's words for the finisher: "the 4th strike is with both blades", Blade Flurry's.)
+        let rule = match pair {
+            Pair::TwinFangs => "Your Shadow Cuts always deal full damage from behind.".to_string(),
+            Pair::BladeAndShiv => format!(
+                "Your strike with both blades reaches {} yd. It deals {}% damage from behind.",
+                main.range.max(off.range),
+                (main.backstab.max(off.backstab) * 100.0).round()
+            ),
+            Pair::CrossedSwords => format!("Your strike with both blades hits every enemy within {} degrees in front of you.", r.cross_arc),
+            Pair::BreakersPair => format!("Your strike with both weapons breaks stances {}% faster.", ((r.breaker_heft - 1.0) * 100.0).round()),
+            Pair::IronKnuckles => format!(
+                "Alternating weapons, your {}th strike is with both fists. It turns an enemy's back to you for {} sec. On a boss it breaks stances {}% faster instead.",
+                r.knuckle_run,
+                r.wheel_secs,
+                ((r.knuckle_boss_heft - 1.0) * 100.0).round()
+            ),
+        };
+        Some(format!("Your pair is {}. {rule}", pair.name()))
+    }
+
+    /// How many blows the hero's two-blade run takes, its finisher the last: Iron Knuckles' run is
+    /// longer, every other the same 4.
+    pub fn run_length(&self, p: &Player) -> u8 {
+        match self.pair_of(p) {
+            Some(Pair::IronKnuckles) => self.content.rogue.knuckle_run.max(2),
+            _ => DUAL_FINISH_AT,
+        }
+    }
+
+    /// A Rogue's blow of the two-blade run takes the pair; the finisher its rule's reach, arc and
+    /// look as it starts.
+    pub(crate) fn pair_blow(&self, id: Id, strike: &mut Strike) {
+        let Some(p) = self.players.get(&id) else { return };
+        let pair = self.pair_of(p);
+        strike.pair = pair;
+        if !strike.finish {
+            return;
+        }
+        let r = &self.content.rogue;
+        match pair {
+            // The sword's reach.
+            Some(Pair::BladeAndShiv) => {
+                let reach = self.off_weapon_of(p).map_or(0.0, |o| o.range).max(self.weapon_of(p).range);
+                strike.range = strike.range.max(reach);
+            }
+            Some(Pair::CrossedSwords) => strike.arc = strike.arc.max(r.cross_arc),
+            Some(Pair::IronKnuckles) if r.knuckle_clip != 0 => strike.clip = r.knuckle_clip,
+            _ => {}
+        }
+    }
+
+    /// The backstab's bonus a blow of these hands carries: Blade and Shiv's finisher has the better
+    /// hand's (the dagger's), any other the weapon's own `stab`.
+    pub(crate) fn pair_stab(&self, id: Id, strike: &Strike, stab: f32) -> f32 {
+        if !(strike.finish && strike.pair == Some(Pair::BladeAndShiv)) {
+            return stab;
+        }
+        let Some(p) = self.players.get(&id) else { return stab };
+        let best = self.weapon_of(p).backstab.max(self.off_weapon_of(p).map_or(0.0, |o| o.backstab));
+        stab.max(best)
+    }
+
+    /// A Twin Fangs Shadow Cut: its backstab is whole and the creature doesn't remember it.
+    pub(crate) fn whole_stab(&self, strike: &Strike) -> bool {
+        strike.cut && strike.pair == Some(Pair::TwinFangs)
+    }
+
+    /// Crossed Swords' cross-cut strikes every enemy in its arc and reach.
+    pub(crate) fn sweeps_all(&self, strike: &Strike) -> bool {
+        strike.finish && strike.pair == Some(Pair::CrossedSwords)
+    }
+
+    /// How many times a Rogue's blow on creature `mid` counts toward its posture: the striking
+    /// hand's own weight (a mace's 2, in either hand), Breaker's Pair's finisher
+    /// `[rogue] breaker_heft`, Iron Knuckles' finisher on a boss `knuckle_boss_heft`. None for
+    /// anyone but a Rogue (the main hand's weight, as ever).
+    pub(crate) fn pair_heft(&self, id: Id, mid: Id, w: &crate::content::WeaponDef, strike: &Strike) -> Option<f32> {
+        let p = self.players.get(&id)?;
+        if !self.is_rogue(p) || strike.shove() {
+            return None;
+        }
+        let own = w.posture.max(1.0);
+        let r = &self.content.rogue;
+        Some(match strike.pair {
+            Some(Pair::BreakersPair) if strike.finish => own.max(r.breaker_heft),
+            Some(Pair::IronKnuckles) if strike.finish && self.boss_of(mid) => own.max(r.knuckle_boss_heft),
+            _ => own,
+        })
+    }
+
+    /// Iron Knuckles' finisher wheels a creature (not a boss) round, its back to the Rogue: it
+    /// faces away for `[rogue] wheel_secs` (a Distract toward the far side of it, so a blow in its
+    /// back leaves it be), then turns back to its foe at its own pace.
+    pub(crate) fn pair_wheel(&mut self, id: Id, mid: Id, strike: &Strike) {
+        if !(strike.finish && strike.pair == Some(Pair::IronKnuckles)) || self.boss_of(mid) || !self.alive(mid) {
+            return;
+        }
+        let (Some(from), Some(at)) = (self.players.get(&id).map(|p| p.pos), self.mobs.get(&mid).map(|m| m.pos)) else { return };
+        let away = facing(from, at);
+        let beyond = [at[0] + away.cos() * 5.0, at[1] + away.sin() * 5.0, at[2]];
+        let secs = self.content.rogue.wheel_secs;
+        let was = self.fx_from.replace(beyond);
+        self.distract(id, mid, secs, "Iron Knuckles");
         self.fx_from = was;
     }
 }

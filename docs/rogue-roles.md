@@ -9,7 +9,9 @@ perfect dodge and the Shadow Cut), entry 2, Shadow (Distract and Sap, Shadowstep
 Cloak and Dagger, Shrouded Step), entry 3, Venom (Coated Blade, Eviscerate and Rupture, Garrote
 and Feint, Leeching Venom and Choking Cloud), and entry 4, Blades (Flourish, Darting Knife and
 Pinning Knife, Blade Flurry and Hemorrhage, Quickstep and Afterimage, Evasion and Adrenaline Rush,
-Blade Dance) with the board's third choice; see [Decided while building](#decided-while-building).
+Blade Dance) with the board's third choice, and entry 5, the dual-wield pairs (Twin Fangs, Blade
+and Shiv, Crossed Swords, Breaker's Pair, Iron Knuckles) with the fist weapons; see
+[Decided while building](#decided-while-building).
 
 ## How the Rogue plays
 
@@ -308,7 +310,7 @@ Rogue's families: dagger, one-handed sword, one-handed mace, fist.
 | **Iron Knuckles** (new family) | fist + fist | A run of 6 quicker blows (wind-up 0.15 sec); the finisher wheels a non-boss enemy round so its back is to you (it turns back at its own rate). A boss: the finisher's posture counts twice | The fists' job is making backs | Shadow, Blades |
 
 The Rogue starts with Twin Fangs (two Poacher's Knives). Fist weapons are new `[[weapon]]` and item
-entries: a `fist` family, a moveset with `AttackUnarmed` (clip 35), on the rack where the other
+entries: a `fist` family, a moveset with `AttackUnarmed` (clip 16; 35 is NPCGoodbye), on the rack where the other
 weapons are, with a 1.12 fist weapon's display id checked in an ignored test against `WOW_DATA`.
 
 ## A team notices its Rogue
@@ -517,6 +519,50 @@ What the design left open, decided in the pull request that built it:
   - **Truly needs a client patch**: nothing. A copy of the hero's own body and gear for the shade,
     a blade trail on Blade Flurry's cuts, and a knife left standing in a pinned enemy would add to
     it (PR 6).
+
+- **The pairs (entry 5)**:
+  - **Which hands make which pair**: families by the item subclass (15 dagger, 7 sword, 4 mace, 13
+    fist), in either hand. "A mace and any blade" is a mace with anything a Rogue holds, a second
+    mace or a fist too: no pair should leave a mace's hands with nothing. **A fist with a dagger or
+    a sword is no pair**: each hand keeps its own mechanic and the run is the plain 4. Why: the
+    table names none, and a sixth rule would be a guess. An empty off hand (it jabs) is no pair.
+    Only a hero created as a Rogue has one; a Warrior's two daggers are as they were.
+  - **Twin Fangs**: a Shadow Cut's backstab is not remembered **and** takes its whole bonus
+    whatever the creature remembers ("its backstab stays whole"). The wheel round on whoever stabs
+    a boss is still rolled, as under Hemorrhage.
+  - **Blade and Shiv**: the finisher, whichever hand presses it, reaches as far as the longer hand
+    (the sword's 3.0 yd) and stabs with the better hand's bonus (the dagger's 2.5). A Sneed's
+    Machete keeps its own "no backstab" in its own hand.
+  - **Crossed Swords**: the cross-cut is the finisher's arc opened to `[rogue] cross_arc` (150) and
+    no cap on how many it strikes; the three blows before it strike one, as ever.
+  - **Breaker's Pair, and posture by hand**: a Rogue's blow counts toward posture by **the hand
+    that struck it** (a mace's 2 from either hand), not the main hand's as for everyone else, so the
+    mace's ×2 stays on its own blows wherever it is. Breaker's Pair's finisher counts
+    `[rogue] breaker_heft` (3) whichever hand pressed it, not 3 × 2. Other classes are untouched (a
+    test pins a Warrior's off-hand mace at the main hand's weight).
+  - **Iron Knuckles' wheel is a Distract** toward a point 5 yd beyond the creature, away from the
+    Rogue, for `[rogue] wheel_secs` (1.0): the creature turns at once (its body is the tell, as
+    Distract's), starts no blow, a backstab leaves it be and a blow from its front ends it; then it
+    turns back. A champion (not a boss) is wheeled; a boss never, its posture counts
+    `knuckle_boss_heft` (2) instead. The run of 6 also sets how far a Darting Knife carries it (the
+    5th) and where Blade Flurry starts so its 4 cuts still end in the finisher.
+  - **Clip 16, not 35**: the page said AttackUnarmed is 35; in 1.12's AnimationData 35 is
+    NPCGoodbye and AttackUnarmed is 16 (tools/clip-census). The fists' set is the dwarf's
+    AttackUnarmed (take 0) for its jabs, the dagger's overhead for the heavy, and the finisher plays
+    16 for both fists (`[rogue] knuckle_clip`).
+  - **The fist weapons**: a `fist` family with its own set (within 5% of the one-hander's damage a
+    second, as every family's), a 0.15 sec wind-up, and `backstab = 2.0` as its family identity
+    (the identity test needs one; "the fists' job is making backs"). Two on the rack for anyone,
+    each with a mechanic no other weapon has, both for the dodge: **Footpad's Knuckles** (display
+    15720, `hand_1h_knuckle_a_01`) gives 3 stamina back a hit (`wind`); **Cutpurse's Claw** (display
+    4687, `hand_1h_claw_a_01`) does 50% more within 1 sec of a dodge that slipped a blow (`slip`,
+    any dodge that evades, not only a perfect one). The off hand shows the same model as the main
+    hand: 1.12 keeps left-hand fist models as their own displays, to be checked when filmed.
+  - **How a player learns the pair**: equipping a hand at the rack tells a Rogue its pair in one
+    line ("Your pair is Iron Knuckles. ..."), built from the numbers (`pair_words`). No add-on
+    change: the server's chat line carries it.
+  - **Truly needs a client patch**: nothing. A ribbon on both blades during the finisher, and a
+    left-hand fist model in the off hand, would add to it (PR 6).
 
 ## Build plan
 

@@ -321,11 +321,13 @@ fn a_retired_weapon_beside_its_familys_basic_one_adds_to_it() {
 }
 
 /// The families that play their own set (the item subclass of each, the set it swings).
-const FAMILY_SETS: [(u32, bool, &str, &str); 4] = [
+const FAMILY_SETS: [(u32, bool, &str, &str); 5] = [
     (0, false, "axe_one_hand", "one_hand"),
     (4, false, "mace_one_hand", "one_hand"),
     (1, true, "axe_two_hand", "two_hand"),
     (5, true, "maul", "two_hand"),
+    // The fists (docs/rogue-roles.md, "Weapon paths"): quick punches.
+    (13, false, "fist", "one_hand"),
 ];
 
 #[test]
@@ -1304,4 +1306,79 @@ fn the_hands_mend_and_the_rally_pass_over_heroes_held_in_a_duel() {
     heavy_swing(&mut s, p);
     assert!(s.has_cc(p, "hallowed"), "the wielder rallied");
     assert!(!s.has_cc(q, "hallowed") && !s.has_cc(r, "hallowed"), "not the duellists");
+}
+
+// --- fists: the Rogue's new family (docs/rogue-roles.md, "Weapon paths") ----------------------------
+
+#[test]
+fn the_knuckles_hits_give_stamina_back_and_a_daggers_dont() {
+    for (weapon, back) in [("footpad_knuckles", true), ("dagger", false)] {
+        let (mut s, p) = world();
+        wield(&mut s, p, weapon);
+        let m = foe(&mut s, "dm_woodcutter");
+        s.players.get_mut(&p).unwrap().stamina = 50.0;
+        s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+        s.input(p, Input::Attack);
+        let cost = 50.0 - s.players[&p].stamina;
+        let mut ev = Vec::new();
+        for _ in 0..12 {
+            ev.extend(s.step(0.02));
+        }
+        assert!(!hits_on(&ev, m).is_empty(), "{weapon} lands");
+        let w = s.content.weapon(weapon).unwrap().wind;
+        let have = s.players[&p].stamina;
+        // (Stamina comes back on its own too, a little, after its delay.)
+        assert_eq!(have >= 50.0 - cost + w - 0.5 && w > 0.0, back, "{weapon}: {have} after a {cost} blow");
+    }
+}
+
+/// One light blow's damage from a hero holding `weapon`, `slipped` a blow just before or not.
+fn slip_blow(weapon: &str, slipped: Option<f32>) -> u32 {
+    let (mut s, p) = world();
+    wield(&mut s, p, weapon);
+    for w in s.content.weapons.iter_mut() {
+        w.damage = [w.damage[1], w.damage[1]];
+    }
+    let m = foe(&mut s, "dm_woodcutter");
+    let now = s.clock;
+    s.players.get_mut(&p).unwrap().fx.slipped_at = slipped.map(|ago| now - ago);
+    let ev = swing(&mut s, p);
+    hits_on(&ev, m).iter().map(|h| h.0).max().unwrap_or(0)
+}
+
+#[test]
+fn the_claw_hits_harder_just_after_a_dodge_slips_a_blow() {
+    let plain = slip_blow("cutpurse_claw", None);
+    let slipped = slip_blow("cutpurse_claw", Some(0.2));
+    let slip = Content::dev().weapon("cutpurse_claw").unwrap().slip;
+    assert!(slip > 0.0);
+    let ratio = slipped as f32 / plain as f32;
+    assert!((ratio - (1.0 + slip)).abs() < 0.08, "{} more: {slipped} / {plain}", slip);
+    // Too long after (its window and the swing's wind-up), and for a weapon without it, nothing.
+    assert_eq!(slip_blow("cutpurse_claw", Some(crate::content::SLIP_SECS + 0.1)), plain);
+    assert_eq!(slip_blow("footpad_knuckles", Some(0.2)), slip_blow("footpad_knuckles", None));
+}
+
+#[test]
+fn a_dodge_that_slips_a_blow_opens_the_claws_window() {
+    let (mut s, p) = world();
+    let m = foe(&mut s, "dm_woodcutter");
+    s.players.get_mut(&p).unwrap().stamina = 100.0;
+    s.input(p, Input::Dodge);
+    for _ in 0..5 {
+        s.step(0.02);
+    }
+    assert_eq!(s.strike_player(m, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Dodged);
+    assert!(s.players[&p].fx.slipped_at.is_some_and(|t| (s.clock - t).abs() < 1e-3), "slipped just now");
+}
+
+#[test]
+fn the_fists_tooltips_say_their_mechanics_from_their_numbers() {
+    let c = Content::dev();
+    let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
+    let k = c.weapon("footpad_knuckles").unwrap();
+    assert_eq!(k.effect_text(), format!("Each hit restores {} stamina.", k.wind));
+    let cl = c.weapon("cutpurse_claw").unwrap();
+    assert_eq!(cl.effect_text(), format!("Hits within {} sec of a dodge that slips a blow deal {}% more damage.", crate::content::SLIP_SECS, (cl.slip * 100.0).round()));
+    assert!(text("footpad_knuckles").contains(&k.effect_text()) && text("cutpurse_claw").contains(&cl.effect_text()));
 }

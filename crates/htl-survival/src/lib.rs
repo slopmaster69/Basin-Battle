@@ -105,6 +105,8 @@ mod tests_rogue_venom;
 #[cfg(test)]
 mod tests_rogue_blades;
 #[cfg(test)]
+mod tests_rogue_pairs;
+#[cfg(test)]
 mod tests_old_saves;
 #[cfg(test)]
 mod tests_sweep;

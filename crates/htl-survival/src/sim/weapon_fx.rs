@@ -3,7 +3,7 @@
 //! hero's blow lands on a creature (`combat.rs`) and the few where a creature falls or mends.
 
 use super::*;
-use crate::content::{WeaponDef, AbilityEffect, SLEEP_IMMUNE_SECS, BUILD_HITS, BUILD_WINDOW, RALLY_RADIUS, RALLY_SECS, ROCK_DELAY, ROCK_RADIUS, SHOCK_RADIUS, BURST_RADIUS, LULL_SECS, POISON_SECS, POISON_STACKS, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SNARE_SECS, TENDER_SECS};
+use crate::content::{WeaponDef, AbilityEffect, SLEEP_IMMUNE_SECS, BUILD_HITS, BUILD_WINDOW, RALLY_RADIUS, RALLY_SECS, ROCK_DELAY, ROCK_RADIUS, SHOCK_RADIUS, BURST_RADIUS, LULL_SECS, POISON_SECS, POISON_STACKS, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SLIP_SECS, SNARE_SECS, TENDER_SECS};
 
 /// What weapons have done to a creature, kept on it.
 #[derive(Debug, Clone, Default)]
@@ -29,6 +29,8 @@ pub struct HeroFx {
     pub bloodlust: (u32, f32),
     /// The build: the foe struck in a row, how many times, and when the latest was.
     pub build: Option<(Id, u32, f32)>,
+    /// When a dodge of theirs last slipped a blow (a slipping weapon's window).
+    pub slipped_at: Option<f32>,
 }
 
 /// Rocks coming down: when, whose, where, what each does and how far it reaches.
@@ -66,6 +68,10 @@ impl Survival {
         // The punisher: a foe in its recovery, between its own blows, takes more.
         if w.punish > 0.0 && !strike.shove() && self.mobs.get(&mid).is_some_and(|m| matches!(m.state, mobs::MobState::Recover { .. })) {
             k += w.punish;
+        }
+        // The claw's counter: just after a dodge slipped a blow.
+        if w.slip > 0.0 && !strike.shove() && self.players.get(&id).and_then(|p| p.fx.slipped_at).is_some_and(|t| self.clock - t <= SLIP_SECS) {
+            k += w.slip;
         }
         // The guillotine: a heavy blow on what can't move.
         if w.guillotine > 0.0 && strike.heavy() && self.helpless(mid) {
@@ -137,6 +143,14 @@ impl Survival {
             let burst = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.curse).round() as u32;
             if let Some(m) = self.mobs.get_mut(&mid) {
                 m.fx.curse = Some((now + CURSE_SECS, id, burst));
+            }
+        }
+        // The knuckles' quick jabs: breath back for the next dodge.
+        if w.wind > 0.0 {
+            let most = self.content.player.stamina;
+            if let Some(p) = self.players.get_mut(&id) {
+                p.stamina = (p.stamina + w.wind).min(most);
+                self.events.push(Event::Stamina { player: id });
             }
         }
         // The fist hardens its wielder.
