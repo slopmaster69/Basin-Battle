@@ -3688,6 +3688,34 @@ what = "3"
 reward = { silver = 3, bronze = 4 }
 
 [[goal]]
+title = "The messenger"
+text = "Kill the Defias messenger on the Goldshire road. He walks it to Jerod's Landing and back."
+kind = "kill"
+what = "bh_messenger"
+reward = { linen = 3 }
+
+[[goal]]
+title = "The drop at the dock"
+text = "Open the messenger's drop at Jerod's Landing. It stays shut while he lives."
+kind = "open"
+what = "bh_drop"
+reward = { silver = 1 }
+
+[[goal]]
+title = "The Smugglers' Ford"
+text = "Find the Smugglers' Ford on the river's south bank. The map in the drop points to it."
+kind = "explore"
+what = "smugglers_ford"
+reward = { wool = 3 }
+
+[[goal]]
+title = "The Paymaster"
+text = "Open the strongbox at the ford and kill Paymaster Voss. Kill his hirelings or him, and don't wait."
+kind = "kill"
+what = "bh_paymaster"
+reward = { silver = 2, bronze = 2 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
@@ -9166,6 +9194,220 @@ respawn = 240.0
   weight = 4.0
   steps = [ { clip = 58, take = 0, ranged = false, windup = 0.4, damage = 8, range = 2.4, arc = 80.0, heavy = true, recovery = 0.8 } ]
 
+# === Elwynn expansion, Stage 2: the Brotherhood's hand (docs/elwynn-expansion.md) ===================
+# The Brotherhood sells Elwynn's roads to the Horde. A messenger walks the Goldshire road to Jerod's
+# Landing with the orders (he drops the key to a lockbox at the dock), and the price is paid at a
+# ford on the river's south bank, to a paymaster whose boat waits.
+
+# The messenger: a footpad's blows, quick on his feet, and under a third of his health he runs.
+[[mob]]
+key = "bh_messenger"
+name = "Defias Messenger"
+subname = "Defias Brotherhood"
+display = 2338
+clips_from = "OrcFemale"
+scale = 0.95
+health = 80
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 12.0
+leash = 30.0
+weapon = 2699
+grip = "dagger"
+off_hand = 2635
+evade = 0.4
+temper = "coward"
+drops = { wool = [1, 2], linen = [1, 2] }
+respawn = 900.0
+  [mob.attack]
+  windup = 0.35
+  damage = 9
+  range = 2.3
+  arc = 70.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 300.0
+  lock = 0.25
+  blockable = true
+  # A stab.
+  [[mob.pattern]]
+  name = "stab"
+  weight = 3.0
+  steps = [ { from = "TrollFemale", clip = 17, take = 0, windup = 0.35, damage = 9 } ]
+  # A flurry of three: parry the first and the rest never come.
+  [[mob.pattern]]
+  name = "flurry"
+  weight = 1.5
+  steps = [ { from = "ScourgeMale", clip = 17, take = 0, windup = 0.4, damage = 6, recovery = 0.08 }, { from = "GnomeFemale", clip = 17, take = 1, windup = 0.22, damage = 6, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 0, windup = 0.25, damage = 8, recovery = 1.0 } ]
+
+# Paymaster Voss, who counts out the Brotherhood's silver: a big man with a club and a dagger who
+# lets his hirelings do the work. While they stand he circles off (kill them, or go in after him).
+# At 35% health he runs for his boat and leaves his men to hold you, and fights again at the water
+# once a hero comes within 10 yd.
+[[mob]]
+key = "bh_paymaster"
+name = "Paymaster Voss"
+subname = "Defias Brotherhood"
+display = 2323
+clips_from = "GnomeMale"
+scale = 1.15
+health = 460
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 40.0
+weapon = 1378
+grip = "1h"
+off_hand = 2635
+temper = "commander"
+boss = true
+posture = 160
+drops = { wool = [2, 3], linen = [2, 3], silver = [1, 2] }
+trophy = { silver = 2 }
+respawn = 1500.0
+aggro_text = "You're not on the list."
+death_text = "Tell them... the price was fair."
+  [mob.attack]
+  windup = 0.55
+  damage = 15
+  range = 2.9
+  arc = 90.0
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  # Club, then dagger.
+  [[mob.pattern]]
+  name = "club and dagger"
+  weight = 3.0
+  steps = [ { from = "GnomeFemale", clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 1, windup = 0.4, damage = 12, recovery = 1.0 } ]
+  # Three quick dagger stabs: parry the first and the rest never come.
+  [[mob.pattern]]
+  name = "stabs"
+  weight = 1.5
+  steps = [ { from = "TrollFemale", clip = 17, take = 0, windup = 0.45, damage = 7, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.25, damage = 7, recovery = 0.08 }, { from = "GnomeMale", clip = 17, take = 0, windup = 0.28, damage = 9, recovery = 1.1 } ]
+  # A lunge to close the gap when he's tired of waiting.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 9.0
+  steps = [ { from = "TrollMale", clip = 17, take = 0, windup = 0.6, lunge = 4.5, damage = 16, recovery = 1.0 } ]
+  [[mob.phase]]
+  at = 0.35
+  speed = 0.9
+  might = 1.1
+  text = "Hold them. You're paid till sundown."
+  summon = ["defias_thug", "defias_thug"]
+  run_to = [[-9938.0, -520.0, 31.4], [-9930.0, -515.0, 26.6]]
+  wait_for = 10.0
+  arrive_text = "The boat leaves without me, then."
+
+# The messenger walks the Goldshire road to Jerod's Landing and back, waiting at each corner.
+[[pack]]
+mob = "bh_messenger"
+at = [-9480.0, 60.0]
+radius = 0.0
+count = 1
+link = 0.0
+route = [[-9520.0, 30.0], [-9600.0, -10.0], [-9660.0, -30.0], [-9720.0, -55.0], [-9780.0, -70.0], [-9860.0, -100.0], [-9940.0, -145.0]]
+wait = 12.0
+
+# What he carried: shut until he's dead.
+[[chest]]
+key = "bh_drop"
+name = "The Messenger's Drop"
+at = [-9928.0, -152.0]
+display = 5743
+after = "bh_messenger"
+locked = "The drop is chained shut. The messenger carries its key."
+secs = 2.0
+loot = { silver = 1, linen = 2 }
+text = "Orders in a Defias cipher, and a map of Elwynn's roads. Westbrook's three are marked in red, with a price beside each."
+
+# The Smugglers' Ford: where the Brotherhood is paid.
+[[site]]
+key = "smugglers_ford"
+name = "Smugglers' Ford"
+at = [-9950.0, -530.0]
+radius = 40.0
+kind = "foes"
+text = "A paymaster counts out silver on the river's south bank. The Brotherhood's boat waits at the water."
+reward = { wool = 2, silver = 1 }
+
+[[pack]]
+mob = "defias_thug"
+at = [-9940.0, -560.0]
+radius = 4.0
+count = 2
+link = 12.0
+
+[[pack]]
+mob = "defias_archer"
+at = [-9935.0, -545.0]
+radius = 2.0
+count = 2
+link = 12.0
+
+[[pack]]
+mob = "defias_conjurer"
+at = [-9968.0, -548.0]
+radius = 2.0
+count = 1
+link = 12.0
+
+# The strongbox, and what steps out as it opens: the paymaster and his hirelings, on the opener.
+[[chest]]
+key = "bh_strongbox"
+name = "The Paymaster's Strongbox"
+at = [-9955.0, -535.0]
+display = 259
+respawn = 1800.0
+secs = 2.5
+ambush = ["bh_paymaster", "bh_hirelings"]
+loot = { silver = 2, wool = 3 }
+roll = { bronze = [1, 2], pearl = [0, 1] }
+text = "The Brotherhood's price for three roads, counted twice. Its paymaster was waiting."
+
+[[pack]]
+mob = "bh_paymaster"
+at = [-9950.0, -530.0]
+radius = 0.0
+count = 1
+link = 8.0
+key = "bh_paymaster"
+wake = "bh_strongbox"
+
+[[pack]]
+mob = "defias_thug"
+at = [-9948.0, -527.0]
+radius = 3.0
+count = 2
+link = 10.0
+key = "bh_hirelings"
+wake = "bh_strongbox"
+
+[[prop]]
+display = 396
+at = [-9948.0, -527.0]
+scale = 0.9
+facing = 0.0
+
+[[prop]]
+display = 396
+at = [-9962.0, -540.0]
+scale = 0.9
+facing = 0.0
+
+[[prop]]
+display = 3678
+at = [-9968.0, -532.0]
+scale = 1.0
+facing = 2.1
+
+# === end of Stage 2's block ============================================================================
+
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
 [[mob]]
@@ -13439,6 +13681,11 @@ text = "Three raids. Three roads. Every one the road we'd left bare. Someone is 
 [[prop.talk]]
 after = "raids:4"
 text = "Four raids, and the Blackrock came by the Goldshire road we did watch. Whoever sells Elwynn sells it to every bidder."
+
+[[prop.talk]]
+after = "kill:bh_paymaster"
+text = "The Brotherhood paid the Horde's way, and the orders came from below Moonbrook."
+links = [".es lore deadmines~The Deadmines"]
 
 [[prop]]
 display = 624

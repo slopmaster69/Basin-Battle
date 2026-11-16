@@ -3089,6 +3089,8 @@ fn a_camp_done_with_its_journal_goes_on_to_steps_added_since() {
     s.camp.goal = ladder;
     let mut save = s.save(&BTreeMap::new());
     save.goal_title = None;
+    // (Read by its place in the journal as it was before the expansion's goals went in ahead of the ladder.)
+    save.goal = ladder - crate::save::ELWYNN_GOALS;
     let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
     assert_eq!(back.camp.goal, ladder, "on to the ladder's first step");
     // Done with this one: still done.

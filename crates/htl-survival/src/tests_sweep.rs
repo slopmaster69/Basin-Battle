@@ -91,11 +91,18 @@ fn sweep(s: &mut Survival, p: Id) {
     assert_eq!(s.players[&p].action.name(), "sweep", "{:?}", s.players[&p].action.name());
     // Each cast rolls its way across and its pace; these tests sweep the plain way: left to
     // right in the ability's own time (`every_sweep_rolls...` tests the roll).
-    let secs = s.content.abilities[s.content.ability("cone_of_cold").unwrap()].secs;
+    let d = &s.content.abilities[s.content.ability("cone_of_cold").unwrap()];
+    let (secs, width) = (d.secs, d.sweep.to_radians());
     let pl = s.players.get_mut(&p).unwrap();
+    // (It began from the rolled side: a roll the other way starts from the far edge, so bring
+    // it round to the left one, or the three foes in front are never in its path.)
+    let rolled = pl.sweep_dir;
     pl.sweep_dir = 1.0;
     pl.sweep_secs = secs;
-    if let Action::Sweep { since, until, .. } = &mut pl.action {
+    if let Action::Sweep { since, until, from, .. } = &mut pl.action {
+        if rolled < 0.0 {
+            *from += width;
+        }
         *until = *since + secs;
     }
 }
