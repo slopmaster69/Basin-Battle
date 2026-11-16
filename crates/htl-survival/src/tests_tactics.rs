@@ -120,6 +120,9 @@ fn now_and_then_it_gives_ground_after_a_string() {
     s.content.ai.quirk = 0.0;
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [2.2, 0.0, 0.0]);
+    // (The dice are this seed's from here, whatever the world's content drew getting this far: the
+    // way it steps back is drawn, and 1 draw in 12 or so lands short of 4 yd.)
+    s.rng = rand::SeedableRng::seed_from_u64(1);
     s.players.get_mut(&p).unwrap().health = 100_000;
     s.players.get_mut(&p).unwrap().max_health = 100_000;
     s.engage(k, Foe::Hero(p));

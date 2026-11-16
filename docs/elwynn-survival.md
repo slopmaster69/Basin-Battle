@@ -913,6 +913,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
 | The Goldshire road, north-west of the crossroads | Stitches (rare), a flesh golem who walks the cobbled road between the bridge and the crossroads |
 | The Parley Stones (the woods past Jasperlode) | the Brotherhood's parley table; Marzon the Silent Blade, who answers every swing, and the Blackrock Envoy; Dughan or Remy helps, as the camp chose; the satchel with the lion's seal |
+| The Stormwind Gate (the north road's end, where the city's bridge begins) | where Aldric Pell is walked from his hiding place by the road, under Lescovar's knives and Crane, the Lion's Knife; Pell stands there once he is through |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; the Stonefield Wagon, a hold against three kobold waves with Fedfennel, with Tommy Joe Stonefield helping; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista; Gruff Swiftbite (rare, three spots in the west) and the Riverpaw Tribute he sits on |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
@@ -1372,6 +1373,30 @@ glowing red and blocked by nothing (it is not an enrage). His trophy is **The Si
 mechanic does 75% more damage to an enemy in its recovery. His satchel stays shut until he falls: a letter under a
 lion's seal, signed "G. L." Marshal Wyle then names Lord Gregor Lescovar and links the Deadmines page. Three goals
 follow (the stones, Marzon, the seal), and "Every corner" counts the 38 places.
+
+**The Witness** (Stage 11 of docs/elwynn-expansion.md). Wyle's word on the seal now ends: Stormwind won't hang a lord
+on ink, but Aldric Pell, who cut the seal, hides by the north road. His satchel there (shut until Marzon's satchel is
+read) starts an **escort**: Pell wakes and walks the road to the Stormwind gate, a new landmark (so "Every corner" is
+39). An escort is a chest with `escort` (the key of a pack of one friendly creature that wakes on it) and `route` (the
+points he walks, from his pack's `at`), its waves in `trial`. He walks at his own pace while a hero is within 20 yd of
+him and nothing is fighting him, and waits otherwise. Wave `i` of `n` comes as he sets off from point `i * len / n`
+of his route (here at his start, his fourth point and his seventh of eight), and its creatures come for him, not the
+heroes (`Foe::Mob`: a creature can fight a friendly one; its blows hurt him, and are never a kill for the camp). A
+hero's blow on one draws it off him for good, as a raider is drawn off a station, and one sent after him never gives
+up for its leash. It is passed once he reaches the end and every wave has fallen (the opener gets the satchel's
+silver and bronze and Pell's sworn word, "Pell Is Through"), and lost if he is struck down ("Aldric Pell is struck
+down...") or no hero has been within 60 yd of him for 12 sec: the knives go back unseen and whole, and he waits at
+his start, whole, to try again. It is once a world. The waves are 3 footpads ("Knives in the trees. They want Pell."),
+2 thugs ("More of them on the road ahead. Someone sold them the hour.") and **Crane, the Lion's Knife** ("Crane comes
+for the witness himself."). Remy's choice is paid again: a camp that freed him meets 2 more footpads in the second
+wave (he sold Pell's hour too, and says so after), and one that had him arrested finds a Goldshire watchman of
+Dughan's at Pell's side with a bow (a friendly shooter, who shoots what is on Pell too), and Dughan says so after.
+Crane is a **hunter** (`hunts`): a hero who strikes him turns him for one string (a blow he was winding up at Pell
+turns on that hero), and then he turns his back on that hero and goes for Pell again. His rule: keep hitting him.
+Two quick cuts (parry the first and the second never comes) and a lunge; from half his health ("Hold still, old
+man.") a slow throat-cut, glowing red, that nothing blocks: struck as he winds it up at Pell, it comes at the hero
+instead, so step out of it. Once Pell is through he stands at the gate with words of his own, and Wyle has a new
+line. Two goals follow (the seal-cutter, the Lion's Knife).
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set

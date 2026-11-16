@@ -3805,11 +3805,25 @@ what = "marzon_satchel"
 reward = { silver = 3, pearl = 2 }
 
 [[goal]]
+title = "The seal-cutter"
+text = "Walk Aldric Pell from his hiding place on the north road to the Stormwind gate. Lescovar's knives come for him, not you: strike them to draw them off."
+kind = "open"
+what = "pell_satchel"
+reward = { silver = 3, bronze = 2 }
+
+[[goal]]
+title = "The Lion's Knife"
+text = "Kill Crane, the Lion's Knife. Strike him and he answers you, but only once before he turns back for Pell."
+kind = "kill"
+what = "crane"
+reward = { silver = 2, pearl = 1 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
 what = "any"
-count = 38
+count = 39
 reward = { silver = 4, pearl = 2, silk = 4 }
 
 # --- abilities ------------------------------------------------------------------------------------
@@ -10158,6 +10172,11 @@ links = [".es choose remy:arrest~Arrest Him", ".es choose remy:free~Free Him"]
 after = "chose:remy:free"
 text = "You never saw me. The man in black meets his buyers past Jasperlode. That one's free."
 
+# (Stage 11) Freed, he sold Pell's hour too.
+[[prop.talk]]
+after = "open:pell_satchel"
+text = "They knew your seal-cutter's hour? Don't look at me. I only sold it once this week."
+
 # Marshal Dughan takes him to the Stockade.
 [[prop]]
 display = 1504
@@ -10173,6 +10192,11 @@ say = "Marshal Dughan takes Remy \"Two Times\" to the Stockade."
 [[prop.talk]]
 text = "Remy sold the rosters, and Stormwind will hear him sing. The man in black is your business now."
 links = [".es lore stockade~The Stockade"]
+
+# (Stage 11) Arrested, Remy's word put a watchman on Pell's road.
+[[prop.talk]]
+after = "open:pell_satchel"
+text = "My man walked your seal-cutter's first mile. Remy's word put him there."
 
 # Stormwind pays for informers, once they stop informing.
 [[chest]]
@@ -10631,6 +10655,241 @@ count = 1
 link = 12.0
 
 # === end of Stage 10's block ===========================================================================
+
+# === Elwynn expansion, round three, Stage 11: The Witness (docs/elwynn-expansion.md) ==================
+# A letter is ink: Stormwind needs a man to swear whose ring cut the seal. Aldric Pell cut the House of
+# Nobles' seals, Lescovar's among them, and hides by the north road. Walk him to the Stormwind gate (an
+# escort: `escort` and `route` on the chest that starts it) while Lescovar's knives come for him, not
+# for you. A hero's blow on one of them draws it off him; Crane, the Lion's Knife, is a hunter
+# (`hunts`): drawn off, he answers that hero for one string and goes back for Pell. Remy's choice is
+# paid again: freed, he sold the knives Pell's hour (two more on the road); arrested, a Goldshire
+# watchman of Dughan's waits at Pell's side with a bow.
+
+[[site]]
+key = "stormwind_gate"
+name = "The Stormwind Gate"
+at = [-9070.0, 428.0]
+radius = 25.0
+kind = "landmark"
+text = "Where Elwynn's north road meets the city's bridge. The City Guard takes in whoever reaches it."
+reward = { silver = 1 }
+
+# Aldric Pell: the old seal-cutter. Nothing fights for him but the heroes; he walks while one is near
+# him and nothing is on him.
+[[mob]]
+key = "aldric_pell"
+name = "Aldric Pell"
+subname = "Seal-Cutter"
+display = 1724
+scale = 1.0
+health = 450
+run_speed = 6.0
+walk_speed = 2.6
+aggro = 0.0
+leash = 30.0
+friendly = true
+respawn = 600.0
+  [mob.attack]
+  windup = 0.6
+  damage = 1
+  range = 2.6
+  arc = 90.0
+  recovery = 0.8
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+
+# Crane, the Lion's Knife: Lescovar's own, sent to close the witness's mouth. He wants Pell, not you:
+# a hero who strikes him draws one string (a blow he is winding up at Pell turns on that hero), and
+# then he turns his back on that hero to go for Pell again. Two quick cuts (parry the first and the
+# second never comes) and a lunge; from half his health a slow throat-cut, glowing red, that nothing
+# blocks: strike him as he winds it up at Pell and it comes at you instead, so step out of it.
+[[mob]]
+key = "crane"
+name = "Crane"
+subname = "The Lion's Knife"
+display = 3358
+scale = 1.1
+health = 650
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 20.0
+leash = 60.0
+weapon = 2699
+grip = "dagger"
+off_hand = 2635
+boss = true
+hunts = true
+posture = 170
+drops = { wool = [2, 3], linen = [2, 3], silver = [1, 2] }
+trophy = { silver = 3, bronze = 2 }
+respawn = 1500.0
+aggro_text = "The old man talks too much."
+death_text = "His lordship has more knives than you have days."
+  [mob.attack]
+  windup = 0.45
+  damage = 13
+  range = 2.6
+  arc = 80.0
+  recovery = 0.8
+  cooldown = 1.2
+  turn_rate = 260.0
+  lock = 0.25
+  blockable = true
+  # Two quick cuts: parry the first and the second never comes.
+  [[mob.pattern]]
+  name = "two cuts"
+  weight = 3.0
+  parry_ends = true
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 11, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.3, damage = 13, recovery = 1.0 } ]
+  # A lunge to close the gap.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 10.0
+  steps = [ { clip = 17, take = 0, windup = 0.6, lunge = 5.0, damage = 16, recovery = 1.0 } ]
+  # From half his health: the throat-cut, glowing red. Nothing blocks it; struck as he winds it up
+  # at Pell, he turns it on the hero who struck him.
+  [[mob.pattern]]
+  name = "throat-cut"
+  weight = 1.5
+  below = 0.5
+  steps = [ { clip = 17, take = 1, windup = 1.4, damage = 40, blockable = false, recovery = 1.3, kit = 124 } ]
+  [[mob.phase]]
+  at = 0.5
+  pattern = "throat-cut"
+  text = "Hold still, old man."
+
+# A Goldshire watchman of Dughan's, if the camp took Remy to the Stockade: he waits at Pell's side with
+# a bow and shoots what comes for Pell or a hero there.
+[[mob]]
+key = "pell_watchman"
+name = "Goldshire Watchman"
+subname = "Marshal Dughan's"
+display = 1984
+scale = 1.0
+health = 200
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+grip = "bow"
+bow = 2826
+friendly = true
+shoots = { damage = 12, range = 25.0, every = 1.5 }
+respawn = 600.0
+  [mob.attack]
+  windup = 0.6
+  damage = 1
+  range = 2.6
+  arc = 90.0
+  recovery = 0.8
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+
+# The satchel Pell packed for the road: using it sets him walking. Three waves come for him as he goes,
+# at his first point, his fourth and his seventh of eight. Once a world.
+[[chest]]
+key = "pell_satchel"
+name = "The Seal-Cutter's Satchel"
+at = [-9241.0, 178.0]
+display = 5743
+after = "open:marzon_satchel"
+locked = "A satchel packed for a long road. Whoever packed it isn't ready to go."
+respawn = 0.0
+secs = 2.0
+escort = "pell_walk"
+route = [[-9214.0, 209.0], [-9190.0, 228.0], [-9178.0, 280.0], [-9170.0, 330.0], [-9152.0, 360.0], [-9124.0, 389.0], [-9098.0, 413.0], [-9074.0, 427.0]]
+trial = ["pell_wave1", "pell_wave2+pell_wave2_sold", "pell_crane"]
+ambush = ["pell_watch"]
+wave_text = ["Knives in the trees. They want Pell.", "More of them on the road ahead. Someone sold them the hour.", "Crane comes for the witness himself."]
+hold_title = "The Seal-Cutter's Road"
+held_title = "Pell Is Through"
+lost_text = "Aldric Pell is struck down, and the knives slip back into the trees. He waits by the road to try again."
+loot = { silver = 3, bronze = 2 }
+text = "Pell's sworn word, sealed in the City Guard's wax. 'The ring is the House of Lescovar's. I cut it.'"
+
+[[pack]]
+mob = "aldric_pell"
+at = [-9238.0, 182.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "pell_walk"
+wake = "pell_satchel"
+
+[[pack]]
+mob = "defias_footpad"
+at = [-9255.0, 215.0]
+radius = 2.0
+count = 3
+link = 10.0
+key = "pell_wave1"
+wake = "pell_satchel"
+
+[[pack]]
+mob = "defias_thug"
+at = [-9155.0, 310.0]
+radius = 2.0
+count = 2
+link = 10.0
+key = "pell_wave2"
+wake = "pell_satchel"
+
+# Remy sold the knives Pell's hour, if the camp let him go.
+[[pack]]
+mob = "defias_footpad"
+at = [-9155.0, 310.0]
+radius = 3.0
+count = 2
+link = 10.0
+key = "pell_wave2_sold"
+wake = "pell_satchel"
+after = "chose:remy:free"
+
+[[pack]]
+mob = "crane"
+at = [-9105.0, 380.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "pell_crane"
+wake = "pell_satchel"
+
+# Dughan's watchman, if the camp had Remy arrested.
+[[pack]]
+mob = "pell_watchman"
+at = [-9236.0, 186.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "pell_watch"
+wake = "pell_satchel"
+after = "chose:remy:arrest"
+
+# Pell, once he is through: at the gate, with the City Guard's leave to talk.
+[[prop]]
+display = 1724
+at = [-9076.0, 424.0]
+facing = 3.6
+after = "open:pell_satchel"
+clear = 1.2
+npc = true
+name = "Aldric Pell"
+subname = "Seal-Cutter"
+say = "Aldric Pell is through the Stormwind gate, and the City Guard has his word."
+
+[[prop.talk]]
+text = "Lescovar's ring, my cut. I'd know it in the dark. The House will call me a liar. Let them say it to the Guard."
+
+# (Its goals, "The seal-cutter" and "The Lion's Knife", sit with the journal's other goals, just
+# before "Every corner". Wyle's, Remy's and Dughan's lines for it stand with their people.)
+
+# === end of Stage 11's block ===========================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
@@ -14921,8 +15180,13 @@ links = [".es lore deadmines~The Deadmines"]
 
 [[prop.talk]]
 after = "open:marzon_satchel"
-text = "Lord Gregor Lescovar. A seat in the House of Nobles. Stormwind hangs a Defias on our word. It won't hang a lord. Not yet."
+text = "Lord Gregor Lescovar. A seat in the House of Nobles. Stormwind hangs a Defias on our word. It won't hang a lord on ink. Aldric Pell cut that seal, and he hides by the north road. Walk him to the city gate."
 links = [".es lore deadmines~The Deadmines"]
+
+# (Stage 11) Pell is through.
+[[prop.talk]]
+after = "open:pell_satchel"
+text = "Pell's word and the lord's letter, both in Stormwind's hands. Now we learn what a lord's seal is worth."
 
 [[prop]]
 display = 624

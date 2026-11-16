@@ -1065,8 +1065,11 @@ pub struct Mob {
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
     pub retarget_at: f32,
-    /// A raider at a station struck by this hero: it ends the string it's in and turns on them.
+    /// A raider at a station (or one on an escort's walker) struck by this hero: it ends the
+    /// string it's in and turns on them.
     pub drawn_off: Option<Id>,
+    /// The friendly creature it was set on (an escort's walker): a hunter goes back to it.
+    pub ward: Option<Id>,
     /// Called up by this creature in its fight (a boss's adds, at a turn): it goes when that
     /// fight ends, its own or the boss's, instead of standing where the boss stood.
     pub summoned_by: Option<Id>,
@@ -1315,6 +1318,9 @@ pub(crate) struct Trial {
     /// When it began, and how many of its waves have been called (a hold calls them over its time).
     pub started: f32,
     pub called: usize,
+    /// An escort's walker, and the point of its route it is making for (0: its first).
+    pub walker: Option<Id>,
+    pub leg: usize,
 }
 
 impl Survival {
