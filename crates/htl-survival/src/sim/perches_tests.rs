@@ -1169,3 +1169,135 @@ fn each_spill_section_hisses_steam_and_kindles_a_flame_before_it_catches_whateve
     assert!(until(&mut s, 2.0, |s| s.clock >= lands + 0.05));
     assert!(!steam(&s, at), "the steam gives way to the fire");
 }
+
+// --- the last hero leaves: the world takes no steps, so the fight is put back at once ---------
+
+/// Everything a boss's fight put in the world, taken, and the man himself whole at his post.
+fn assert_gilnid_put_back(s: &Survival, boss: Id, crew: &[Id], baseline: usize, what: &str) {
+    assert!(s.perches.crews.is_empty() && s.perches.workers.is_empty(), "{what}: no crew");
+    assert_eq!(s.objs.len(), baseline, "{what}: planks, poles, torches, sticks, steam and flames all taken");
+    assert!(crew.iter().all(|id| !s.mobs.contains_key(id)), "{what}: the engineers gone");
+    assert!(s.missiles.iter().all(|m| m.owner != boss && !crew.contains(&m.owner)), "{what}: no stick or fire in the air");
+    let m = &s.mobs[&boss];
+    assert_eq!(m.health, m.max_health, "{what}: whole");
+    assert!(m.state.foe().is_none() && !matches!(m.state, MobState::Windup { .. } | MobState::Chase { .. }), "{what}: idle");
+    assert!(dist2d(m.pos, m.home) < 0.5, "{what}: at his post");
+    assert_eq!(m.posture, 0, "{what}: no posture");
+    assert_eq!(s.perch_stage(boss), None, "{what}: no stage");
+}
+
+fn baseline(s: &Survival, boss: Id) -> usize {
+    s.objs.len() - s.perches.crews[&boss].props.len()
+}
+
+#[test]
+fn the_last_hero_leaving_puts_the_whole_fight_back_at_once_at_every_stage() {
+    // The pull, a stick in the air, the demonstration, and every beat of the valve.
+    let early: [(&str, fn(&Survival, Id) -> bool); 3] = [
+        ("pull", |_, _| true),
+        ("stick", |s, b| !s.perches.crews[&b].sticks.is_empty()),
+        ("spill", |s, b| s.perches.crews[&b].demo.is_some()),
+    ];
+    for (at, ready) in early {
+        let (mut s, hero, boss, crew) = fight();
+        let base = baseline(&s, boss);
+        assert!(until(&mut s, 30.0, |s| ready(s, boss)), "{at}");
+        assert!(s.perches.crews[&boss].props.len() >= 6);
+        s.leave(hero);
+        assert!(s.players.is_empty());
+        // No step at all: it is whole now, not when the next hero comes.
+        assert_gilnid_put_back(&s, boss, &crew, base, at);
+    }
+    for at in ["to valve", "working", "steam", "fire"] {
+        let (mut s, hero, boss) = race();
+        let base = s.objs.len() - s.perches.crews[&boss].props.len();
+        let crew: Vec<Id> = s.perches.workers.keys().copied().collect();
+        assert!(until(&mut s, 8.0, |s| stage(s, boss) == at));
+        if at == "fire" { tick(&mut s, 0.6); }
+        assert!(vapour(&s) > 0 || at == "to valve" || at == "working", "{at}");
+        s.leave(hero);
+        assert_gilnid_put_back(&s, boss, &crew, base, at);
+    }
+}
+
+#[test]
+fn after_the_last_hero_left_a_new_one_meets_a_fresh_fight() {
+    let (mut s, hero, boss, _) = fight();
+    assert!(until(&mut s, 30.0, |s| s.perches.crews[&boss].demo.is_some()));
+    s.leave(hero);
+    let again = s.join("again", "Again", None);
+    let p = s.players.get_mut(&again).unwrap();
+    p.pos = [0.0, 0.0, 0.0];
+    p.health = 100_000;
+    p.max_health = 100_000;
+    s.step_perch_crews();
+    assert_eq!(s.perches.crews.len(), 1);
+    assert_eq!(s.perches.workers.len(), 2);
+    assert_eq!(s.perches.crews[&boss].props.len(), 6, "two planks, two poles, two torches");
+    assert!(s.perches.crews[&boss].demo.is_none() && s.perches.crews[&boss].sticks.is_empty());
+    assert!(s.perches.workers.values().all(|w| matches!(w.state, Place::Perched)));
+    assert!(s.mobs.values().filter(|m| m.health > 0 && s.content.mobs[m.def].key == "dm_gilnid").count() == 1);
+}
+
+#[test]
+fn one_hero_leaving_while_another_fights_on_ends_nothing_and_a_dead_one_does_not_keep_it_standing() {
+    let (mut s, first, boss, crew) = fight();
+    let second = friend(&mut s, "second", [2.0, 0.0, 0.0]);
+    tick(&mut s, 0.2);
+    assert!(until(&mut s, 30.0, |s| s.perches.crews[&boss].demo.is_some()));
+    s.leave(first);
+    assert_eq!(s.perches.crews[&boss].workers, crew, "the same crew, still up");
+    assert!(s.mobs[&boss].state.foe().is_some());
+    // The other falls, and the one who was dead stays on the list: the world still steps,
+    // so the fight ends in its own way and puts everything back.
+    let dead = friend(&mut s, "dead", [-30.0, 0.0, 0.0]);
+    s.players.get_mut(&dead).unwrap().health = 0;
+    s.players.get_mut(&second).unwrap().health = 0;
+    s.foe_gone(second);
+    assert!(until(&mut s, 5.0, |s| s.perches.crews.is_empty()), "lost with one dead hero lying in the room");
+    assert!(s.objs.is_empty());
+    s.leave(second);
+    s.leave(dead);
+    assert!(s.objs.is_empty() && s.perches.workers.is_empty());
+}
+
+#[test]
+fn the_pole_struck_while_the_spill_burns_changes_nothing_for_anyone_standing_by() {
+    let (mut s, hero, boss, crew) = fight();
+    let far = friend(&mut s, "far", [20.0, 15.0, 0.0]);
+    assert!(until(&mut s, 30.0, |s| s.perches.crews[&boss].demo.is_some()));
+    let (a, b) = (s.players[&hero].pos, s.players[&far].pos);
+    // The second man's pole cracks while the spill still runs to the first's.
+    s.perch_pole_struck(crew[1], hero);
+    assert!(matches!(s.perches.workers[&crew[1]].state, Place::Falling { .. }));
+    assert!(perched(&s, crew[0]), "the first waits for the spill");
+    assert!(s.perches.crews[&boss].demo.is_some(), "the demonstration goes on");
+    assert!(until(&mut s, 8.0, |s| s.perches.workers.values().all(|w| matches!(w.state, Place::Ground))));
+    assert_eq!(s.perches.crews[&boss].workers.len(), 2);
+    assert!(s.perches.crews[&boss].demo.is_none());
+    // Nobody was moved by any of it, and both men are on the floor and fighting.
+    assert_eq!((s.players[&hero].pos, s.players[&far].pos), (a, b), "no hero shoved");
+    for id in &crew {
+        let m = &s.mobs[id];
+        assert!(m.health > 0 && s.content.mobs[m.def].key == "dm_ground_engineer", "on the ground, a wrench in hand");
+    }
+    // The owner still ends with the same rule: all down, then the valve.
+    for id in &crew { s.hurt_mob_as(*id, hero, 10_000, "test"); }
+    s.clock += 5.0;
+    tick(&mut s, 0.2);
+    assert_eq!(stage(&s, boss), "to valve");
+}
+
+#[test]
+fn the_pole_struck_just_as_the_spill_lands_drops_the_man_once() {
+    let (mut s, hero, boss, crew) = fight();
+    assert!(until(&mut s, 30.0, |s| s.perches.crews[&boss].demo.is_some()));
+    // Strike the first man's own pole at the moment the spill reaches it.
+    assert!(until(&mut s, 6.0, |s| s.perches.crews[&boss].demo.as_ref().is_some_and(|d| d.alight)));
+    s.perch_pole_struck(crew[0], hero);
+    tick(&mut s, 3.0);
+    assert!(matches!(s.perches.workers[&crew[0]].state, Place::Ground));
+    assert!(s.perches.crews[&boss].demo.is_none());
+    assert!(perched(&s, crew[1]), "the second is not taken down with him");
+    assert_eq!(s.perches.crews[&boss].props.iter().filter(|id| display(&s, **id) == Some(PLANK)).count() >= 1, true);
+}
