@@ -19,7 +19,11 @@
 # blow times are a first guess (a dagger's swing is about 0.5 sec), tune them on the first run.
 hero rogue
 cam 90 -12 8
+camera duel                            # a cameraman films from the hero's side, so both hands, a dodge's copy and the target are in frame
 include _setup
+4.0 .es goto -9638 671                  # the open grass by the rack: a dodge here never backs into the inn
+4.1 .es arm dagger                      # the Rogue is bare-handed at the rack: Twin Fangs, a Poacher's Knife in each hand
+4.15 .es arm dagger off
 4.2 .es dummy clear
 4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 4.4 .es slot q darting_knife
@@ -27,13 +31,13 @@ include _setup
 4.4 .es slot 1 quickstep
 4.4 .es slot 2 blade_evasion
 4.4 .es slot 3 blade_dance
-4.5 lua RB = { q = {}, on = false, n = 0, most = 5 }
+4.5 lua RB = { q = {}, on = false, n = 0, most = 5, m = { 0.2, 0.26, 0.17, 0.23, 0.14 } }
 4.5 lua function RB.say(t) SendChatMessage(t, "SAY") end
 4.5 lua function RB.after(d, f) table.insert(RB.q, { GetTime() + d, f }) end
 4.5 lua function RB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
 4.5 lua function RB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
-4.5 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= RB.most then return end RB.n = RB.n + 1 RB.log("wind-up " .. w) RB.after(math.max(0, w - 0.12), function() RB.say(".es in d") end) end
-4.5 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) end end
+4.5 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= RB.most then return end RB.n = RB.n + 1 RB.log("wind-up " .. w) RB.after(math.max(0, w - (RB.m[RB.n] or 0.2)), function() RB.say(".es in d") RB.log("dodge sent") end) end
+4.5 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) end if f[1] == "AI" or f[1] == "RO" then RB.log("line " .. l) end end
 4.5 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) RB.line(l) return old(l) end
 4.5 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end end)
 4.6 .es target grunt 3 still

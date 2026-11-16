@@ -13,6 +13,9 @@
 hero rogue
 cam 90 -12 8
 include _setup
+4.0 .es goto -9638 671                  # the open grass by the rack: a dodge here never backs into the inn
+4.1 .es arm dagger                      # the Rogue is bare-handed at the rack: Twin Fangs, a Poacher's Knife in each hand
+4.15 .es arm dagger off
 4.2 .es dummy clear
 4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
 4.4 lua RB = { q = {}, on = false, n = 0 }
