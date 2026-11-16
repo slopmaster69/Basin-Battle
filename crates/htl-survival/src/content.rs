@@ -1367,6 +1367,8 @@ pub const LULL_SECS: f32 = 4.0;
 pub const BURST_RADIUS: f32 = 4.0;
 pub const POISON_STACKS: u32 = 5;
 pub const POISON_SECS: f32 = 6.0;
+/// How long after a sleep a foe can't be put to sleep again (after the sleep itself).
+pub const SLEEP_IMMUNE_SECS: f32 = 6.0;
 
 /// The tenderized foe's window, the mending hand's reach, the curse's length and burst radius, the
 /// iron skin's length and cap.
@@ -1480,7 +1482,7 @@ impl WeaponDef {
             s.push(format!("Hits interrupt an enemy that is casting and stagger it for {} sec.", self.interrupt));
         }
         if self.sleep > 0.0 {
-            s.push(format!("Blows from behind put the enemy to sleep for {} sec. Damage wakes it.", self.sleep));
+            s.push(format!("Blows from behind put the enemy to sleep for {} sec. Damage wakes it, and it can't be put to sleep again for {} sec.", self.sleep, SLEEP_IMMUNE_SECS));
         }
         if self.root > 0.0 {
             s.push(format!("Heavy attacks root the enemies they hit for {} sec.", self.root));

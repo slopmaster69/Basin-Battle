@@ -1311,7 +1311,7 @@ pub const BOONS: [&str; 20] = ["freedom", "steed", "wrath", "hallowed", "steadfa
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 15] = ["stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated"];
+pub const HARMFUL: [&str; 16] = ["poison", "stun", "incapacitate", "petrify", "panic", "disorient", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "dominated"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius

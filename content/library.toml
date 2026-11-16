@@ -633,7 +633,8 @@ set = "arcanist"
 perks = [{ kind = "focus", amount = 0.05 }]
 
 # The hypnotic blade: each hit makes the foe lose interest in the wielder (it drops them for 4 sec and
-# looks for another), the dagger's answer to a pack: stab, step aside, let it wander. Not a champion.
+# looks for another), the dagger's answer to a pack: stab, step aside, let it wander. Not a champion,
+# a totem or a foe in an unblockable wind-up (`holds_ground`), and not again while it's lulled.
 [[weapon]]
 key = "hypnotic_blade"
 windup = 0.18

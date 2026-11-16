@@ -443,7 +443,7 @@ impl Survival {
                 .get_mut(&id)
                 .map(|l| {
                     l.iter_mut()
-                        .filter(|c| c.kind == "burn" && c.next_tick <= now && c.since < c.until)
+                        .filter(|c| (c.kind == "burn" || c.kind == "poison") && c.next_tick <= now && c.since < c.until)
                         .map(|c| {
                             c.next_tick += 1.0;
                             (c.from, c.amount, c.source.clone())

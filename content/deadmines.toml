@@ -280,7 +280,7 @@ text = "Fires 1 bolt at full power for 42 damage. Reloads for 2.1 sec."
 
 # Cookie's: a blow that lands on a wind-up knocks it aside, whatever the blow.
 # The tenderizer softens for the team: a hit leaves the foe tender for 6 sec and the next hit on it,
-# from any ally, deals 25% more (one use).
+# from another ally (not the wielder), deals 25% more (one use).
 [[weapon]]
 key = "cookie_tenderizer"
 windup = 0.34

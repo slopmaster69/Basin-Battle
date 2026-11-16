@@ -3,7 +3,7 @@
 //! hero's blow lands on a creature (`combat.rs`) and the few where a creature falls or mends.
 
 use super::*;
-use crate::content::{WeaponDef, AbilityEffect, BUILD_HITS, BUILD_WINDOW, RALLY_RADIUS, RALLY_SECS, ROCK_DELAY, ROCK_RADIUS, SHOCK_RADIUS, BURST_RADIUS, LULL_SECS, POISON_SECS, POISON_STACKS, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SNARE_SECS, TENDER_SECS};
+use crate::content::{WeaponDef, AbilityEffect, SLEEP_IMMUNE_SECS, BUILD_HITS, BUILD_WINDOW, RALLY_RADIUS, RALLY_SECS, ROCK_DELAY, ROCK_RADIUS, SHOCK_RADIUS, BURST_RADIUS, LULL_SECS, POISON_SECS, POISON_STACKS, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SNARE_SECS, TENDER_SECS};
 
 /// What weapons have done to a creature, kept on it.
 #[derive(Debug, Clone, Default)]
@@ -18,6 +18,8 @@ pub struct MobFx {
     pub curse: Option<(f32, Id, u32)>,
     /// Lulled: it takes no notice of this hero until.
     pub lulled: Option<(Id, f32)>,
+    /// Asleep before: no new sleep takes until (a foe woken by a blow isn't put straight back).
+    pub sleep_immune_until: f32,
 }
 
 /// What a weapon has built up in the hero holding it.
@@ -139,7 +141,7 @@ impl Survival {
             self.apply_cc(id, id, "shield", IRON_SKIN_SECS, (have + w.iron_skin).min(IRON_SKIN_CAP), 0.0, "Iron skin");
         }
         // The hypnotic blade: the foe loses interest, and looks elsewhere.
-        if w.lull && self.alive(mid) && !self.holds_ground(mid) {
+        if w.lull && self.alive(mid) && !self.holds_ground(mid) && !self.lulled(mid, id) {
             self.halt_mob(mid);
             if let Some(m) = self.mobs.get_mut(&mid) {
                 m.state = super::mobs::MobState::Idle { wander_at: now + LULL_SECS };
@@ -159,9 +161,9 @@ impl Survival {
         }
         // The shiv's venom builds a stack a hit.
         if w.poison > 0.0 && self.alive(mid) {
-            let have = self.cc_of(mid).iter().find(|c| c.kind == "burn" && c.source == "Poison" && c.until > now).map_or(0.0, |c| c.amount);
+            let have = self.cc_of(mid).iter().find(|c| c.kind == "poison" && c.until > now).map_or(0.0, |c| c.amount);
             let amount = (have + w.poison).min(w.poison * POISON_STACKS as f32);
-            self.apply_cc(mid, id, "burn", POISON_SECS, amount, 0.0, "Poison");
+            self.apply_cc(mid, id, "poison", POISON_SECS, amount, 0.0, "Poison");
         }
         // The thorn breaks a cast.
         if w.interrupt > 0.0 && self.alive(mid) && !self.content.mobs[self.mobs[&mid].def].boss {
@@ -171,8 +173,12 @@ impl Survival {
             }
         }
         // The fang's sleep: a blow from behind.
-        if w.sleep > 0.0 && behind && self.alive(mid) {
-            self.apply_cc(mid, id, "incapacitate", w.sleep, 0.0, 0.0, "Slumber");
+        if w.sleep > 0.0 && behind && self.alive(mid) && self.mobs.get(&mid).is_some_and(|m| m.fx.sleep_immune_until <= now) {
+            if self.apply_cc(mid, id, "incapacitate", w.sleep, 0.0, 0.0, "Slumber") {
+                if let Some(m) = self.mobs.get_mut(&mid) {
+                    m.fx.sleep_immune_until = now + w.sleep + SLEEP_IMMUNE_SECS;
+                }
+            }
         }
         // The thornroot: a heavy blow roots what it strikes.
         if w.root > 0.0 && strike.heavy() && self.alive(mid) {

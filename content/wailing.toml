@@ -1534,7 +1534,8 @@ name = "The Fanglords' Vestments"
 bonus = [ { pieces = 2, kind = "regen", amount = 0.003 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
 
 # The fang's sleep: a blow from behind puts the foe to sleep 3 sec (the Druids of the Fang's own
-# slumber); any damage wakes it, so the hero chooses the moment.
+# slumber); any damage wakes it, and it can't be put to sleep again for 6 sec after, so the hero chooses
+# the moment. A champion shrugs it off, as any control.
 [[weapon]]
 key = "cobrahn_fang"
 windup = 0.18

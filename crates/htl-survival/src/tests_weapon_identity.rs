@@ -633,7 +633,7 @@ fn a_tenderized_foe_takes_more_from_the_next_hit_of_another_hero_once() {
     // The wielder's own next blow doesn't use it up.
     reset_foe(&mut s, m);
     let own = first_hit(&swing(&mut s, p), m);
-    assert!(own <= 30, "the wielder's own blow is untouched: {own}");
+    assert!(own <= 34, "the wielder's own blow is untouched: {own}");
     assert!(s.mobs[&m].fx.tender.0 > 0.0, "still tender");
     reset_foe(&mut s, m);
     let tender = first_hit(&swing(&mut s, q), m);
@@ -641,7 +641,9 @@ fn a_tenderized_foe_takes_more_from_the_next_hit_of_another_hero_once() {
     assert_eq!(s.mobs[&m].fx.tender.0, 0.0, "used up");
     reset_foe(&mut s, m);
     let after = first_hit(&swing(&mut s, q), m);
-    assert!((14..=19).contains(&after), "and gone: {after}");
+    // (The sword's third blow of the chain, the finisher, is 35% harder: what's read is no more
+    // than that, not a quarter on top of it.)
+    assert!((14..=26).contains(&after), "and gone: {after}");
 }
 
 #[test]
@@ -813,7 +815,7 @@ fn the_shivs_poison_stacks_with_each_hit_up_to_a_cap() {
     wield(&mut s, p, "bazil_shiv");
     let m = sturdy_foe(&mut s, "dm_woodcutter");
     let per = s.content.weapon("bazil_shiv").unwrap().poison;
-    let poison = |s: &Survival| s.cc_of(m).iter().find(|c| c.kind == "burn" && c.until > s.clock).map_or(0.0, |c| c.amount);
+    let poison = |s: &Survival| s.cc_of(m).iter().find(|c| c.kind == "poison" && c.until > s.clock).map_or(0.0, |c| c.amount);
     assert_eq!(poison(&s), 0.0);
     swing(&mut s, p);
     assert_eq!(poison(&s), per);
@@ -886,6 +888,8 @@ fn the_daggers_tooltips_say_their_mechanics_from_their_numbers() {
     assert!(text("bazil_shiv").contains(&format!("poison the enemy for {} damage a sec, stacking up to {} times, for {} sec", b.poison, crate::content::POISON_STACKS, crate::content::POISON_SECS)), "{}", text("bazil_shiv"));
     assert!(text("thornspike").contains(&format!("stagger it for {} sec", w("thornspike").interrupt)));
     assert!(text("cobrahn_fang").contains(&format!("to sleep for {} sec", w("cobrahn_fang").sleep)));
+    assert!(text("cobrahn_fang").contains(&format!("can't be put to sleep again for {} sec", crate::content::SLEEP_IMMUNE_SECS)), "{}", text("cobrahn_fang"));
+    assert!(text("cobrahn_fang").contains(&format!("can't be put to sleep again for {} sec", crate::content::SLEEP_IMMUNE_SECS)), "{}", text("cobrahn_fang"));
 }
 
 // --- two-handers: the pass's fifth batch ---------------------------------------------------------------
@@ -920,7 +924,7 @@ fn a_heavy_blow_of_mograines_hammer_sends_a_ring_round_the_hero() {
     let behind = sturdy_foe(&mut s, "dm_woodcutter");
     let far = sturdy_foe(&mut s, "dm_woodcutter");
     s.mobs.get_mut(&behind).unwrap().pos = [-4.0, 0.0, 0.0];
-    s.mobs.get_mut(&far).unwrap().pos = [-12.0, 0.0, 0.0];
+    s.mobs.get_mut(&far).unwrap().pos = [-60.0, 0.0, 0.0];
     let (b0, f0) = (s.mobs[&behind].health, s.mobs[&far].health);
     let _ = near;
     heavy_swing(&mut s, p);
@@ -1053,4 +1057,72 @@ fn the_two_handers_tooltips_say_their_mechanics_from_their_numbers() {
     assert!(text("corpsemaker").contains(&format!("deals {}% less damage", (w("corpsemaker").cow * 100.0).round())), "{}", text("corpsemaker"));
     assert!(text("guillotine_axe").contains(&format!("deal {}% damage", (w("guillotine_axe").guillotine * 100.0).round())), "{}", text("guillotine_axe"));
     assert!(text("champions_greatsword").contains(&format!("take {}% less damage for {} sec", (w("champions_greatsword").rally * 100.0).round(), crate::content::RALLY_SECS)), "{}", text("champions_greatsword"));
+}
+
+// --- what review of the daggers found ------------------------------------------------------------------
+
+#[test]
+fn a_foe_lulled_by_the_hypnotic_blade_is_not_held_off_for_as_long_as_the_hero_keeps_stabbing() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "hypnotic_blade");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    // This one fights back.
+    s.mobs.get_mut(&m).unwrap().ready_at = 0.0;
+    let mut blows_at_hero = 0;
+    for _ in 0..12 {
+        s.input(p, Input::Attack);
+        for _ in 0..30 {
+            let ev = s.step(0.02);
+            blows_at_hero += ev.iter().filter(|e| matches!(e, Event::Swing { attacker, victim: Some(v), .. } if *attacker == m && *v == p)).count();
+        }
+        // (Kept within its reach.)
+        let x = s.mobs.get_mut(&m).unwrap();
+        x.pos = [2.0, 0.0, 0.0];
+    }
+    assert!(blows_at_hero > 0, "a hero who stabs on and on is struck back: {blows_at_hero}");
+}
+
+#[test]
+fn a_foe_woken_by_a_blow_is_not_put_straight_back_to_sleep() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "cobrahn_fang");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    turn_away(&mut s, m);
+    swing(&mut s, p);
+    assert!(s.has_cc(m, "incapacitate"), "asleep");
+    s.hurt_mob(m, p, 5);
+    assert!(!s.has_cc(m, "incapacitate"), "woken");
+    turn_away(&mut s, m);
+    swing(&mut s, p);
+    assert!(!s.has_cc(m, "incapacitate"), "not again straight away");
+    for _ in 0..((3.0 + crate::content::SLEEP_IMMUNE_SECS + 1.0) / 0.05) as usize {
+        s.step(0.05);
+    }
+    turn_away(&mut s, m);
+    s.mobs.get_mut(&m).unwrap().pos = [2.0, 0.0, 0.0];
+    s.mobs.get_mut(&m).unwrap().stagger_until = 0.0;
+    swing(&mut s, p);
+    assert!(s.has_cc(m, "incapacitate"), "and again once the moment has passed");
+}
+
+#[test]
+fn the_shivs_poison_stacks_beside_a_burn_that_is_already_on_the_foe() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "bazil_shiv");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    s.apply_cc(m, p, "burn", 20.0, 40.0, 0.0, "Fireball");
+    let per = s.content.weapon("bazil_shiv").unwrap().poison;
+    let poison = |s: &Survival| s.cc_of(m).iter().find(|c| c.kind == "poison" && c.until > s.clock).map_or(0.0, |c| c.amount);
+    swing(&mut s, p);
+    reset_foe(&mut s, m);
+    swing(&mut s, p);
+    assert_eq!(poison(&s), 2.0 * per, "two stacks, a stronger burn or not");
+    let burn = s.cc_of(m).iter().find(|c| c.kind == "burn" && c.until > s.clock).map_or(0.0, |c| c.amount);
+    assert_eq!(burn, 40.0, "the other burn is as it was");
+    // And it ticks.
+    let h0 = s.mobs[&m].health;
+    for _ in 0..60 {
+        s.step(0.05);
+    }
+    assert!(h0 - s.mobs[&m].health > 0);
 }

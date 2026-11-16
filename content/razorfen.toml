@@ -1303,7 +1303,7 @@ name = "Thornweave"
 bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
 
 # The thorn breaks a spell: a hit on a foe mid-cast interrupts it and staggers it 1.5 sec (Charlga's
-# own crew are shamans; a champion's cast is not broken).
+# own crew are shamans; a champion's (`boss`) cast is not broken).
 [[weapon]]
 key = "thornspike"
 windup = 0.18
