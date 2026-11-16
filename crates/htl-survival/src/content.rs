@@ -4740,6 +4740,9 @@ impl Content {
             if !e.pop.is_empty() && e.kind != "shield" {
                 bail!("{what}: only a shield bursts as it ends (`pop`)");
             }
+            if e.kind == "venom" && e.amount < 1.0 {
+                bail!("{what}: venom lays a whole number of stacks (`amount`, 1 or more)");
+            }
             if e.kind == "cheat_death" && !(0.0..=1.0).contains(&e.amount) {
                 bail!("{what}: cheat_death mends a share of their health (`amount`, 0 to 1)");
             }
@@ -5026,6 +5029,10 @@ impl Content {
             }
             if (!a.behind_effects.is_empty() || a.calm_only) && a.kind != "art" {
                 bail!("{what}: only a weapon art has effects from behind (`behind_effects`, `calm_only`)");
+            }
+            // The Rogue's Venom: an art spends it or breaks a cast from behind.
+            if (a.per_venom > 0.0 || a.breaks_cast > 0.0) && a.kind != "art" {
+                bail!("{what}: only a weapon art spends Venom or breaks a cast (`per_venom`, `breaks_cast`)");
             }
             if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
                 bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
@@ -5331,6 +5338,17 @@ pub struct RogueDef {
     pub glance_every: f32,
     /// Cloak and Dagger: each attack steps behind an enemy this near first.
     pub cloak_reach: f32,
+    /// Venom (`sim::rogue`): stacks on an enemy up to this many, for this long from the latest,
+    /// each dealing this much damage a second. Its look on the body (a deeper one once it's ripe,
+    /// at the most), and the drip of its ticks (a spell visual kit).
+    pub venom_most: u32,
+    pub venom_secs: f32,
+    pub venom_dps: f32,
+    pub venom_aura: u32,
+    pub ripe_aura: u32,
+    pub venom_drip: u32,
+    /// Feint: a creature on the Rogue turns to another hero this near it, else loses interest.
+    pub feint_turn: f32,
 }
 
 impl Default for RogueDef {
@@ -5352,6 +5370,13 @@ impl Default for RogueDef {
             glance_secs: 0.8,
             glance_every: 15.0,
             cloak_reach: 8.0,
+            venom_most: 5,
+            venom_secs: 8.0,
+            venom_dps: 1.5,
+            venom_aura: 12881,
+            ripe_aura: 3815,
+            venom_drip: 805,
+            feint_turn: 10.0,
         }
     }
 }

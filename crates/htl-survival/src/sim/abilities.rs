@@ -2719,6 +2719,10 @@ impl Survival {
             } else {
                 self.apply_effects(owner, victim, &effects, share, &d.name);
             }
+            // Venom's trait: each knife lays Venom (Fan of Knives).
+            if d.coats > 0.0 {
+                self.ability_coats(owner, victim, ability);
+            }
             self.fx_pull_look = was;
         }
         if d.drain > 0.0 && damage > 0 {
@@ -2794,6 +2798,11 @@ impl Survival {
                     self.cloak_begins(victim, e.amount);
                 }
             }
+            // The Rogue's Venom (`sim::rogue`): Venom laid on a creature; Garrote's silence, which
+            // also keeps a creature from casting; Feint, the enemies on you looking away.
+            "venom" => self.lay_venom(owner, victim, e.amount.round() as u32),
+            "garrote" => self.garrote(owner, victim, secs, source),
+            "feint" => self.feint(victim, secs, e.amount),
             "burn" | "mark" => {
                 self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
             }

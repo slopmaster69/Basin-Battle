@@ -1791,6 +1791,24 @@ glance_every = 15.0
 # Cloak and Dagger's step: up to 8 yd, the dodge's 4 yd dash and twice a reach, so it finds the next
 # back in a pack without crossing the field.
 cloak_reach = 8.0
+# Venom (docs/rogue-roles.md, Venom): a coat on a creature. Up to 5, for 8 sec from the latest, 1.5
+# damage a second each (7.5 at 5). An off-hand blow lands about every other blow, so 5 takes about
+# 5 sec of the two-blade string; 7.5 a second is about a third more on a coated enemy, the tree's
+# reward for staying on one. Laid by the trait, Coated Blade (3 of 5 keys on Venom's cards: the
+# same `trait_keys`), Fan of Knives' knives with it, Garrote, Rupture and Choking Cloud.
+venom_most = 5
+venom_secs = 8.0
+venom_dps = 1.5
+# How it reads with no floor marker: the poison's green on the body (Poison State, 12881, state
+# kit 221) while it holds; once ripe, at 5, Poison Cloud's (3815, state kit 288) in its place and a
+# burst of it as it turns; at every tick a drip of poison (kit 805, Poison_ImpactDot_Med_Base) and
+# its number. All three are to be checked when first filmed.
+venom_aura = 12881
+ripe_aura = 3815
+venom_drip = 805
+# Feint: a creature on the Rogue turns on another hero within 10 yd of it (a creature's reach and a
+# step or two: the friend it can see beside you), else stands and takes no notice of the Rogue.
+feint_turn = 10.0
 
 # --- stations -------------------------------------------------------------------------------------
 
@@ -6393,7 +6411,7 @@ flurry = { from = "OrcMale", cuts = [[88, 0], [87, 0], [18, 1], [17, 1], [88, 0]
 [[ability]]
 key = "fan_of_knives"
 name = "Fan of Knives"
-text = "Flicks 3 poisoned knives in a fan for 8 damage each. Each knife poisons for 3 damage per sec for 4 sec and Marks the target for 6 sec. Up close all 3 hit. From farther off only 1 lands. A Backstab on a Marked enemy crits. Holds 2 charges."
+text = "Flicks 3 poisoned knives in a fan for 8 damage each. Each knife poisons for 3 damage per sec for 4 sec and Marks the target for 6 sec. Up close all 3 hit. From farther off only 1 lands. A Backstab on a Marked enemy crits. With 3 Venom abilities on your keys, each knife also lays 1 Venom. Holds 2 charges."
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
@@ -6416,6 +6434,8 @@ clip = 107
 valor_hit = 2.0
 # Each knife also Marks (6 s): a Backstab on a Marked foe crits, the rogue's opener.
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }, { kind = "mark", secs = [6.0, 6.0], amount = 0.1 }]
+# Venom's trait (Coated Blade): each knife lays 1 Venom, so a point-blank fan is 3 of the 5.
+coats = 1.0
 
 # Fan of Knives' EX, Kidney Shot: the rogue's close-in stun, on the same key. A short windup, then
 # a stab for 40% weapon damage at one body in reach and a 3 sec stun (1.5 on a hero). A Marked
@@ -6438,6 +6458,135 @@ stamina = 14.0
 clip = 85
 spell = 408
 effects = [{ kind = "stun", secs = [3.0, 3.0] }]
+
+# Venom: the cash-in, from any side. Both blades come down at once (the finisher's clip, 17) and
+# spend every Venom on the enemy, 35% weapon damage each: 255% at 5. Backstab from behind is 360%,
+# so Eviscerate is less, but from the front, and only after the build. 6 sec: about the time the
+# off hand takes to lay 5 again.
+[[ability]]
+key = "eviscerate"
+name = "Eviscerate"
+text = "After a 0.3 sec windup, strikes one enemy in melee reach with both weapons for 80% weapon damage, plus 35% for each Venom on it. Uses up all its Venom. Requires a weapon in each hand. With 3 Venom abilities on your keys, each off-hand hit lays 1 Venom. Venom stacks up to 5 and deals 1.5 damage per sec each for 8 sec."
+icon = "Ability_Rogue_Eviscerate"
+school = "rogue"
+slot = "close"
+# Venom's (docs/rogue-roles.md): the second choice. Shadow's Backstab is the first.
+choice = 2
+kind = "art"
+windup = 0.3
+weapon = 0.8
+per_venom = 0.35
+one_target = true
+needs_two_blades = true
+stamina = 14.0
+cooldown = 6.0
+clip = 17
+spell = 2098
+
+# Eviscerate's EX, Rupture: the team coats. A cut that spends nothing; for 8 sec every melee hit on
+# the enemy, by any hero, lays 1 Venom for the Rogue, as the Rogue's off hand does. The band hits
+# often: 8 sec fills the coat for one Eviscerate. It bleeds while it lasts (Rend's blood burst, kit
+# 220, every 1.5 sec).
+[[ability]]
+key = "rupture"
+name = "Rupture"
+ex_of = "eviscerate"
+text = "After a 0.3 sec windup, cuts one enemy in melee reach for 60% weapon damage. For 8 sec, every melee hit on it by any hero lays 1 Venom. Uses no Venom."
+icon = "Ability_Rogue_Rupture"
+slot = "close"
+kind = "art"
+valor = 25
+windup = 0.3
+weapon = 0.6
+one_target = true
+stamina = 14.0
+clip = 85
+spell = 1943
+effects = [{ kind = "rupture", secs = [8.0, 8.0], mark = 220, mark_every = 1.5 }]
+
+# Venom: the interrupt, from behind. The other interrupts reach from range (Avenger's Shield); the
+# Rogue's asks for the back. From behind it breaks the spell a foe is winding up (0.5 sec of reeling:
+# the cast cut, not a stun), silences it 3 sec (on a creature, no new cast), bleeds it 4 a second
+# for 6 sec and lays 2 Venom. A boss loses only the spell: it shrugs the silence off. From the
+# front, a 50% cut. 14 sec: a utility's pace.
+[[ability]]
+key = "garrote"
+name = "Garrote"
+text = "After a 0.3 sec windup, strikes one enemy in melee reach for 50% weapon damage. From behind, it also interrupts the spell the enemy is casting, silences it for 3 sec (1.5 sec against heroes), makes it bleed for 4 damage per sec for 6 sec and lays 2 Venom on it. Bosses aren't silenced."
+icon = "Ability_Rogue_Garrote"
+school = "rogue"
+slot = "utility"
+choice = 2
+kind = "art"
+windup = 0.3
+weapon = 0.5
+one_target = true
+breaks_cast = 0.5
+stamina = 14.0
+cooldown = 14.0
+clip = 85
+spell = 703
+# The bleed shows as Rend's blood burst (kit 220) every second, not a burn's fire.
+behind_effects = [{ kind = "garrote", secs = [3.0, 3.0], hero_secs = 1.5 }, { kind = "burn", secs = [6.0, 6.0], amount = 4.0, aura = 772, mark = 220, mark_every = 1.0 }, { kind = "venom", amount = 2.0 }]
+
+# Garrote's EX, Feint: hand the enemy to a friend. A quick hop back (0.3 sec in the air, a quarter
+# yd up: the dodge's back step, not a leap), and every creature within 8 yd that is on you looks
+# away for 2 sec (the Hypnotic Blade's lull, shorter: one turn of the fight) or turns on another
+# hero near it; the one that turns to your friend shows you its back. A boss halves your threat
+# instead. One winding up a blow at you finishes it first: the hop is the answer to that one.
+[[ability]]
+key = "feint"
+name = "Feint"
+ex_of = "garrote"
+text = "Hops 4 yd backward. Every enemy within 8 yd attacking you loses interest in you for 2 sec, or turns on another hero within 10 yd of it. Bosses halve your threat instead."
+icon = "Ability_Rogue_Feint"
+slot = "utility"
+kind = "leap"
+back = true
+valor = 25
+range = [4.0, 4.0]
+lift = 3.0
+spell = 1966
+self_effects = [{ kind = "feint", secs = [2.0, 2.0], amount = 8.0 }]
+
+# Venom: live off the coat. For 6 sec every tick of your Venom on any enemy heals you as much: at 5
+# Venom on one enemy, 45 over the 6 sec; on two, 90. A defense that pays only while the coat is up,
+# so the tree's defense is its offense. 18 sec: a defense's pace (Smoke Bomb is 16).
+[[ability]]
+key = "leeching_venom"
+name = "Leeching Venom"
+text = "For 6 sec, every tick of your Venom on any enemy heals you for the damage it deals."
+icon = "Ability_Poisons"
+school = "rogue"
+slot = "defense"
+choice = 2
+kind = "buff"
+cooldown = 18.0
+# Deadly Poison's green on the hands as it starts, and the poison's green on you while it lasts.
+spell = 2818
+effects = [{ kind = "leech", secs = [6.0, 6.0], aura = 12881 }]
+
+# Leeching Venom's EX, Choking Cloud: make their blows slow to come. A cloud at your feet for 4 sec:
+# creatures in it wind up 40% slower (a boss not at all, as Cowed) and gain 1 Venom a second. A
+# slower wind-up is a wider chance at the perfect dodge: defense through the dodge, not a wall. The
+# slow lasts 1.5 sec past each second's touch, so it holds from tick to tick (Smoke Bomb's).
+[[ability]]
+key = "choking_cloud"
+name = "Choking Cloud"
+ex_of = "leeching_venom"
+text = "Fills 5 yd around you with choking poison for 4 sec. Enemies inside wind up their attacks 40% slower. Each sec, enemies inside gain 1 Venom. Bosses aren't slowed."
+icon = "Spell_Nature_NullifyDisease"
+slot = "defense"
+kind = "ground"
+at_self = true
+valor = 25
+radius = [5.0, 5.0]
+linger = 4.0
+# A splash of poison at your feet (Mind-numbing Poison's impact), and a green cloud on the ground
+# while it lasts (the Poison spell's cloud, 28158), to be checked when first filmed.
+spell = 25810
+linger_spell = 28158
+effects = [{ kind = "choked", secs = [1.5, 1.5], amount = 0.4 }, { kind = "venom", amount = 1.0 }]
 
 # Shadow: make them look away. A pouch lobbed at a spot; the enemies near where it lands turn to
 # it, and their backs are the Rogue's. No damage.
@@ -14438,10 +14587,10 @@ name = "The Brotherhood's Dead Drop"
 at = [-9782.0, -888.0]
 display = 18
 scale = 1.0
-teaches = ["distract", "backstab", "fan_of_knives"]
+teaches = ["distract", "backstab", "fan_of_knives", "eviscerate"]
 keep = true
 secs = 3.0
-text = "Under the crate, a Defias training ledger. How to turn a head, how to throw a knife, and where to put a blade."
+text = "Under the crate, a Defias training ledger. How to turn a head, how to throw a knife, where to put a blade, and how to finish it."
 trial = ["trial_shrine_rogue_0", "trial_shrine_rogue_1"]
 
 [[chest]]
@@ -14546,12 +14695,12 @@ trial = ["trial_relic_warlock_0"]
 key = "relic_rogue"
 name = "Morgan's Stash"
 at = [-9968.0, -150.0]
-teaches = ["shadowstep", "smoke_bomb"]
+teaches = ["shadowstep", "smoke_bomb", "garrote", "leeching_venom"]
 loot = { wool = 3, bronze = 1 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Under the dock at Jerod's Landing, Morgan the Collector's stash, and his notes on getting away."
+text = "Under the dock at Jerod's Landing, Morgan the Collector's stash, his notes on getting away, and a vial of something green."
 trial = ["trial_relic_rogue_0", "trial_relic_rogue_1"]
 
 [[chest]]

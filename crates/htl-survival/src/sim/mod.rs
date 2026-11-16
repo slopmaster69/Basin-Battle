@@ -161,6 +161,8 @@ pub struct Strike {
     pub art: Option<usize>,
     /// Another character model whose take on the clip the clients play (`MoveDef::from`).
     pub from: Option<String>,
+    /// The two-blade run's finisher, both blades at once (dual wield).
+    pub finish: bool,
 }
 
 impl Strike {

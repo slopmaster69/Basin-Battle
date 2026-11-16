@@ -709,6 +709,7 @@ impl Survival {
             stamina: w.stamina * m.stamina * if heavy { h.stamina } else { 1.0 },
             art: None,
             from: m.from.clone(),
+            finish: false,
         }
     }
 
@@ -790,6 +791,7 @@ impl Survival {
                 strike.clip = DUAL_FINISH_CLIP;
                 strike.take = 0;
                 strike.from = None;
+                strike.finish = true;
             }
             let p = self.players.get_mut(&id).unwrap();
             p.dual_run = if finish { 0 } else { run };
@@ -867,6 +869,7 @@ impl Survival {
             stamina: d.stamina,
             art: None,
             from: None,
+            finish: false,
         };
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;
@@ -1793,6 +1796,12 @@ impl Survival {
                 }
                 // What the weapon's own mechanic sets off (silver, the hook, the fel step...).
                 self.weapon_hit(id, mid, w, strike, damage, behind);
+                // Venom (`sim::rogue`): the off hand's coat (the two-blade finisher's too), or any
+                // hero's blow under Rupture.
+                if !strike.shove() {
+                    let off = strike.kind == StrikeKind::Off || strike.finish;
+                    self.blow_coats(id, mid, off);
+                }
             }
             if damage > 0 && !self.content.mobs[self.mobs[&mid].def].totem {
                 let v = if strike.heavy() { self.content.valor.heavy } else { self.content.valor.light };
@@ -3042,7 +3051,9 @@ impl Survival {
             let behind = d.ambush > 0.0 || from_veil || angle_between(vf, facing(at, pos)) >= BACKSTAB_ARC;
             // Sap's: at rest before this blow draws it into a fight, and no boss (a hero: always).
             let calm = self.mobs.get(&v).is_none_or(|m| matches!(m.state, mobs::MobState::Idle { .. }) && !self.content.mobs[m.def].boss);
-            let mut base = self.roll(w.damage) as f32 * d.weapon * might;
+            // Eviscerate: the Venom on it spent, each for its share more.
+            let venom = if d.per_venom > 0.0 && self.mobs.contains_key(&v) { self.take_venom(v) } else { 0 };
+            let mut base = self.roll(w.damage) as f32 * (d.weapon + d.per_venom * venom as f32) * might;
             if behind && d.behind > 0.0 {
                 base *= d.behind;
             }
@@ -3057,7 +3068,15 @@ impl Survival {
                 let dmg = self.ability_damage(id, v, ability, base);
                 self.strike_fair_as(id, v, dmg, pos, !d.unblockable, true, !d.unblockable, Blow::Heavy, None, Follow::Ability { ability, share: 1.0 }, HitKind::Melee);
             } else {
+                // Under Rupture, an art's blow coats as any blow does (not the one that spends it).
+                if d.per_venom <= 0.0 {
+                    self.blow_coats(id, v, false);
+                }
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
+            }
+            // Garrote: from behind, the cast it's winding up breaks.
+            if behind && d.breaks_cast > 0.0 && self.alive(v) {
+                self.break_cast(v, d.breaks_cast);
             }
             // What it does only from behind (Sap): from the front it was only the blow.
             if behind && !d.behind_effects.is_empty() && (calm || !d.calm_only) && self.alive(v) {

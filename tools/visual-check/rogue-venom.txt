@@ -1,0 +1,72 @@
+# The Rogue's Venom tree (docs/rogue-roles.md, build plan 3), floor markers off. All five keys on
+# Venom's cards, so the trait (Coated Blade) is on. A still grunt 2 yd ahead: left, right, left,
+# right (the 4th the two-blade finisher), twice over. Look for the poison's green on its body
+# (Poison State, 12881) from the first off-hand hit, the deeper look once it is ripe at 5 (Poison
+# Cloud's, 3815) with a burst as it turns, and at every second a drip on the body (kit 805) and a
+# small number. Then Eviscerate: both blades come down at once (clip 17, Eviscerate's own hands,
+# 2098) and the green goes out. Then Rupture (E's EX): Rend's blood burst on the grunt every 1.5
+# sec, and three main-hand blows that each bring the green back a stack.
+# Then Garrote on a casting Kobold Geomancer: it comes at her and casts; Shadowstep puts her at its
+# back, the 1 key is changed to Garrote and pressed. Look for its cast bar breaking, its stagger,
+# the silence's look, the blood burst each second, and no new cast for 3 sec.
+# Last, Choking Cloud (2's EX) between two grunts that come at her: the green cloud on the ground
+# (28158, to be checked for its size against the 5 yd), and their wind-ups visibly slower.
+# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>` (the `setup`
+# scenario makes only the hunter, the warrior and the cameraman). Not run yet: the Garrote times
+# are a first guess, tune them on the first run.
+hero rogue
+cam 90 -12 8
+include _setup
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot q fan_of_knives
+4.4 .es slot e eviscerate
+4.4 .es slot 1 garrote
+4.4 .es slot 2 leeching_venom
+4.4 .es slot 3 death_mark
+4.6 .es target grunt 2 still
+5.0 video
+5.4 .es in a                            # left: the main hand
+5.5 .es in au
+5.9 .es in g                            # right: the off hand, 1 Venom
+6.0 .es in gu
+6.4 .es in a
+6.5 .es in au
+6.9 .es in g                            # the finisher, both blades: 2
+7.0 .es in gu
+7.6 .es in g                            # a new run: 3
+7.7 .es in gu
+8.1 .es in a
+8.2 .es in au
+8.6 .es in g                            # 4
+8.7 .es in gu
+9.1 .es in a                            # the finisher on the main hand's button: 5, ripe
+9.2 .es in au
+5.4 shots coat 40 0.1
+11.0 .es in ab 1 0                      # E: Eviscerate, the green goes out
+11.0 shots eviscerate 20 0.1
+13.0 .es valor full
+13.2 .es in ab 1 1                      # E's EX: Rupture
+14.0 .es in a
+14.1 .es in au
+14.6 .es in a
+14.7 .es in au
+15.2 .es in a
+15.3 .es in au
+13.2 shots rupture 30 0.1
+18.0 .es target clear
+18.2 .es target kobold_geomancer 12
+18.4 .es slot 1 shadowstep
+19.6 .es in ab 2 0                      # 1: Shadowstep, aiming at the geomancer as it casts
+19.8 .es in a {facing} -0.15
+19.9 .es in au
+20.0 .es slot 1 garrote
+20.1 .es in ab 2 0                      # 1: Garrote, into its back
+19.4 shots garrote 40 0.1
+25.0 .es target clear
+25.2 .es target grunt 3
+25.3 .es target grunt 4
+25.6 .es valor full
+26.0 .es in ab 3 1                      # 2's EX: Choking Cloud
+26.0 shots cloud 30 0.1
+31 end

@@ -550,7 +550,8 @@ fn shadow_is_the_rogues_first_choice_on_every_key_and_venoms_cards_the_second() 
     assert_eq!(h.loadout.get("close").map(String::as_str), Some("backstab"));
     assert!(h.owned.contains("fan_of_knives"));
     let shrine = s.content.chests.iter().find(|c| c.key == "shrine_rogue").unwrap();
-    assert_eq!(shrine.teaches, ["distract", "backstab", "fan_of_knives"]);
+    // (And Venom's Eviscerate, the tree's E: entry 3.)
+    assert_eq!(shrine.teaches, ["distract", "backstab", "fan_of_knives", "eviscerate"]);
 }
 
 #[test]
