@@ -3819,6 +3819,13 @@ what = "crane"
 reward = { silver = 2, pearl = 1 }
 
 [[goal]]
+title = "The Lion's Bargain"
+text = "Hear Steward Venn of House Lescovar at the camp's gate, and answer him: sell the lord his letter, or keep it."
+kind = "chose"
+what = "letter"
+reward = { silver = 2 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
@@ -10877,6 +10884,8 @@ display = 1724
 at = [-9076.0, 424.0]
 facing = 3.6
 after = "open:pell_satchel"
+# (Stage 12) Sold, the letter goes back and so does his word: he leaves.
+until = "chose:letter:sell"
 clear = 1.2
 npc = true
 name = "Aldric Pell"
@@ -10886,10 +10895,102 @@ say = "Aldric Pell is through the Stormwind gate, and the City Guard has his wor
 [[prop.talk]]
 text = "Lescovar's ring, my cut. I'd know it in the dark. The House will call me a liar. Let them say it to the Guard."
 
+# (Stage 12) Kept: he stays to swear before the House.
+[[prop.talk]]
+after = "chose:letter:keep"
+text = "The Guard keeps me at the gate until the House sits. You kept the letter. I'll keep my word."
+
 # (Its goals, "The seal-cutter" and "The Lion's Knife", sit with the journal's other goals, just
 # before "Every corner". Wyle's, Remy's and Dughan's lines for it stand with their people.)
 
 # === end of Stage 11's block ===========================================================================
+
+# === Elwynn expansion, round three, Stage 12: The Lion's Bargain (docs/elwynn-expansion.md) ==========
+# Once Pell is through, the House of Lescovar sends its steward to the camp's gate with an offer for the
+# letter: the camp's second choice (`.es choose letter:sell` or `letter:keep`), made once. Sold, the
+# Lion's Purse opens at the gate and Pell leaves the city's gate. Kept, Pell stays to swear before the
+# House, and two Stormwind archers stand at the camp's gate for good (packs with an `after`: unseen until
+# the camp has chosen), shooting raiders as they come.
+
+# Steward Venn, House Lescovar: he waits outside the gate, not asked in, and goes once the camp answers.
+[[prop]]
+display = 7011
+at = [-9673.0, 692.0]
+facing = 0.0
+after = "open:pell_satchel"
+until = "chose:letter"
+clear = 1.2
+npc = true
+name = "Steward Venn"
+subname = "House Lescovar"
+say = "A steward of House Lescovar waits at the camp's gate, his hat in his hands."
+
+[[prop.talk]]
+text = "His lordship hears the camp has something of his. He is generous with things that are returned. He is less generous with things that are not."
+links = [".es choose letter:sell~Sell the Letter", ".es choose letter:keep~Keep the Letter"]
+
+# Sold: Lescovar's silver, at the gate where Venn stood.
+[[chest]]
+key = "lion_purse"
+name = "The Lion's Purse"
+at = [-9675.0, 688.0]
+display = 5743
+after = "chose:letter:sell"
+locked = "Nobody has sold the House of Lescovar anything yet."
+respawn = 0.0
+loot = { silver = 8, bronze = 4, pearl = 2 }
+text = "Lescovar's silver, counted twice. The letter went back under the lion's own wax."
+
+# Kept: Stormwind's archers on the camp's gate.
+[[mob]]
+key = "stormwind_archer"
+name = "Stormwind Archer"
+subname = "City Guard"
+display = 1984
+scale = 1.0
+health = 300
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+grip = "bow"
+bow = 2826
+friendly = true
+shoots = { damage = 12, range = 40.0, every = 2.5 }
+respawn = 600.0
+  [mob.attack]
+  windup = 0.6
+  damage = 1
+  range = 2.6
+  arc = 90.0
+  recovery = 0.8
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+
+[[pack]]
+mob = "stormwind_archer"
+at = [-9678.0, 674.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "letter_archer_east"
+after = "chose:letter:keep"
+
+[[pack]]
+mob = "stormwind_archer"
+at = [-9678.0, 702.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "letter_archer_west"
+after = "chose:letter:keep"
+
+# (Its goal, "The Lion's Bargain", sits with the journal's other goals, just before "Every corner".
+# Wyle's and Pell's lines for it stand with them.)
+
+# === end of Stage 12's block ===========================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
@@ -15187,6 +15288,15 @@ links = [".es lore deadmines~The Deadmines"]
 [[prop.talk]]
 after = "open:pell_satchel"
 text = "Pell's word and the lord's letter, both in Stormwind's hands. Now we learn what a lord's seal is worth."
+
+# (Stage 12) The camp's answer to House Lescovar.
+[[prop.talk]]
+after = "chose:letter:sell"
+text = "We sold it. Like everyone else in Elwynn."
+
+[[prop.talk]]
+after = "chose:letter:keep"
+text = "Stormwind has it now, and two of its archers on our gate. Let the House of Nobles choke on it."
 
 [[prop]]
 display = 624

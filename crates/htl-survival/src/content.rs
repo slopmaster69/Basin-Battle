@@ -3210,7 +3210,8 @@ pub struct PackDef {
     #[serde(default)]
     pub rare: bool,
     /// It wakes (on its chest's opener, a `wake` pack) only if this holds (a condition as a prop's
-    /// `after`: `chose:remy:arrest`); otherwise it stays asleep.
+    /// `after`: `chose:remy:arrest`); otherwise it stays asleep. Any other pack stays unseen (and an
+    /// ambusher lying in wait never steps out) until it holds, and stands from then on.
     #[serde(default)]
     pub after: Option<String>,
 }
@@ -4291,9 +4292,6 @@ impl Content {
             }
             if let Some(cond) = &p.after {
                 self.check_camp_condition(cond, &format!("pack of {}", p.mob))?;
-                if p.wake.is_empty() {
-                    bail!("pack of {}: `after` only decides whether a pack that wakes on a chest wakes", p.mob);
-                }
             }
             if !p.wake.is_empty() && !self.chests.iter().any(|c| c.key == p.wake) {
                 bail!("pack of {}: it wakes on chest {}, and there's none", p.mob, p.wake);

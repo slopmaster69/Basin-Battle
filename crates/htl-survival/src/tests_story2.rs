@@ -1263,5 +1263,7 @@ fn a_pack_after_must_be_real_and_belong_to_a_chest_or_validate_refuses_it() {
     let err = swap("after = \"chose:remy:arrest\"\n\n[[pack]]\nmob = \"parley_remy\"", "after = \"chose:remy:nope\"\n\n[[pack]]\nmob = \"parley_remy\"").unwrap_err();
     assert!(format!("{err:#}").contains("nope"), "{err:#}");
     let err = swap("key = \"parley_remy\"\nwake = \"parley_price\"\nafter = \"chose:remy:free\"", "key = \"parley_remy\"\nafter = \"chose:remy:free\"").unwrap_err();
-    assert!(format!("{err:#}").contains("only decides whether a pack that wakes"), "{err:#}");
+    // (A pack's `after` may stand on its own now, round three's E7, but the parley table still
+    // names it in its ambush, and an ambush wakes on its chest.)
+    assert!(format!("{err:#}").contains("ambush parley_remy needs a [[pack]]"), "{err:#}");
 }

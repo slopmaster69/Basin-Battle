@@ -315,3 +315,13 @@ Built as planned, with these differences, found checking the plan against the co
 - Two tests elsewhere (`tests_tactics`'s give-ground, `tests_warlord`'s tackle) drew their dice from the world's content, which this stage's packs move; each now seeds its own dice (both pass on 11 of 12 seeds).
 - `ELWYNN_GOALS` is 17 and "Every corner" is 39 for the 39 sites.
 - Probed with `elwynn_probe near`: the satchel, Pell's start, every point of the road, the wave spots and the gate are open ground. The route's fifth point moved from (-9150, 365), which has a wall within 6 yd, to (-9152, 360).
+
+## Stage 12: The Lion's Bargain [x] (a second camp choice; engine change E7)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E7.** `PackDef.after` on any pack: `spawn_mob` keeps one whose condition doesn't hold unseen (`pack_due`), an ambusher lying in wait doesn't step out before it holds, and `grow_camp` (every 5 sec, and as a choice is made) brings into sight the packs whose time has come (`packs_come`). `validate()` dropped its "only for a pack that wakes" rule; round two's test now reads the parley's ambush error instead.
+- `allies_shoot` also shoots a raider (any state but fallen), so the archers help in a raid.
+- Venn, the purse and the archers stand outside the camp's building ground (55 yd from its heart, past the gate's lion statues), so nothing built can stand on them. Pell leaves only if the letter is sold (`until = "chose:letter:sell"`); kept, he stays at the gate with a new line.
+- Displays: Venn 7011 (a black suit, `npcfind`), the archers 1984. Unchecked in the client.
+- `ELWYNN_GOALS` is 18. No site was added.
+- Probed with `elwynn_probe near`: Venn (-9673, 692), the purse (-9675, 688) and the archers (-9678, 674) and (-9678, 702) are open ground; the plan's first spots by the statues had walls beside them.
