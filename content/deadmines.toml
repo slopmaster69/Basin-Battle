@@ -279,6 +279,8 @@ kind = "bow"
 text = "Fires 1 bolt at full power for 42 damage. Reloads for 2.1 sec."
 
 # Cookie's: a blow that lands on a wind-up knocks it aside, whatever the blow.
+# The tenderizer softens for the team: a hit leaves the foe tender for 6 sec and the next hit on it,
+# from any ally, deals 25% more (one use).
 [[weapon]]
 key = "cookie_tenderizer"
 windup = 0.34
@@ -291,6 +293,7 @@ arc = 100.0
 targets = 1
 stagger = 1.0
 subclass = 4
+tender = 0.25
 moveset = "mace_one_hand"
 
 [[item]]
@@ -299,7 +302,7 @@ name = "Cookie's Tenderizer"
 display = 1161
 icon = "INV_Mace_06"
 kind = "weapon"
-text = "Light and heavy blows that land during an enemy's wind-up knock it aside and stagger the enemy for 1 sec. Does not work on bosses, on an enemy staggered a moment ago, or on a heavy enemy's braced wind-up, which only a heavy blow breaks. \"Cookie's meat mallet.\""
+text = "Light and heavy blows that land during an enemy's wind-up knock it aside and stagger the enemy for 1 sec. {fx} \"Cookie's meat mallet.\""
 
 # Mr. Smite's: the heaviest swing there is.
 [[weapon]]
@@ -1222,6 +1225,8 @@ count = 1
 # --- gear from the Foundry and the Mast Room --------------------------------------------------------
 
 # Gilnid's: one hand, and it breaks a stance like a two-hander.
+# Gilnid's wrench knows machines: its heavy stuns a mechanical foe 4 sec, a stall long enough to
+# work it over. (A champion machine, the Shredder, shrugs control off as it ever did.)
 [[weapon]]
 key = "gilnid_wrench"
 windup = 0.34
@@ -1234,6 +1239,7 @@ arc = 105.0
 targets = 1
 stagger = 0.6
 subclass = 4
+machine_stun = 4.0
 moveset = "mace_one_hand"
 posture = 1.6
 
@@ -1243,7 +1249,7 @@ name = "The Smelter's Spanner"
 display = 1653
 icon = "INV_Misc_Wrench_01"
 kind = "weapon"
-text = "One-handed. Breaks stances 60% faster, more than most two-handers. \"Gilnid's own.\""
+text = "One-handed. Breaks stances 60% faster, more than most two-handers. {fx} \"Gilnid's own.\""
 
 # Sneed's: quick, and cruel from behind.
 # The machete clears brush: no backstab (it never stabbed), and each light hit chops the 5 yd line ahead,

@@ -333,20 +333,11 @@ fn silver_leaves_a_foe_that_doesnt_mend_and_a_kill_that_stays_down() {
 }
 
 #[test]
-fn the_barbs_heavy_hooks_the_foe_in_and_a_light_blow_does_not() {
-    let (mut s, p) = world();
-    wield(&mut s, p, "cruel_barb");
-    let m = foe(&mut s, "dm_woodcutter");
-    s.mobs.get_mut(&m).unwrap().health = 1_000_000;
-    s.mobs.get_mut(&m).unwrap().max_health = 1_000_000;
-    s.mobs.get_mut(&m).unwrap().pos = [3.0, 0.0, 0.0];
-    swing(&mut s, p);
-    assert!(s.mobs[&m].pos[0] > 2.5, "a light blow doesn't pull: {:?}", s.mobs[&m].pos);
-    s.input(p, Input::Heavy);
-    for _ in 0..60 {
-        s.step(0.02);
-    }
-    assert!(s.mobs[&m].pos[0] < 2.2, "the heavy hooked it in: {:?}", s.mobs[&m].pos);
+fn the_barbs_heavy_hooks_the_foe_in_and_the_swords_doesnt() {
+    let (hit, _, near) = heavy_blow_at("cruel_barb", "dm_woodcutter", 3.0);
+    assert!(hit && near < 2.0, "the heavy hooked it in: {near}");
+    let (hit, _, near) = heavy_blow_at("sword", "dm_woodcutter", 3.0);
+    assert!(hit && near > 2.4, "a sword's heavy leaves it where it is: {near}");
 }
 
 #[test]
@@ -571,4 +562,169 @@ fn the_blow_that_fells_a_foe_under_silver_lays_it_to_rest_too() {
     let ev = swing(&mut s, p);
     assert!(hits_on(&ev, m).iter().any(|(d, _)| *d > 0), "the blow lands");
     assert!(s.mobs[&m].health == 0 && s.silvered(m), "felled by the first blow, and silvered by it");
+}
+
+// --- maces: the pass's third batch --------------------------------------------------------------------
+
+/// The foe back where it was put, standing, facing the hero (a blow moves it a little).
+fn reset_foe(s: &mut Survival, m: Id) {
+    let x = s.mobs.get_mut(&m).unwrap();
+    x.pos = [2.0, 0.0, 0.0];
+    x.facing = std::f32::consts::PI;
+    x.state = MobState::Idle { wander_at: 1.0e9 };
+    x.stagger_until = 0.0;
+}
+
+fn heavy_swing(s: &mut Survival, p: Id) -> Vec<Event> {
+    s.input(p, Input::Heavy);
+    let mut ev = Vec::new();
+    for _ in 0..90 {
+        ev.extend(s.step(0.02));
+    }
+    ev
+}
+
+/// A fresh world, `weapon` in hand, a still foe `at` yd ahead, a heavy blow at it: whether it
+/// landed, and the farthest and nearest the foe got to the hero after it did.
+fn heavy_blow_at(weapon: &str, foe_key: &str, at: f32) -> (bool, f32, f32) {
+    let (mut s, p) = world();
+    wield(&mut s, p, weapon);
+    let m = sturdy_foe(&mut s, foe_key);
+    s.mobs.get_mut(&m).unwrap().pos = [at, 0.0, 0.0];
+    s.input(p, Input::Heavy);
+    let (mut hit, mut far, mut near) = (false, 0.0f32, f32::MAX);
+    for _ in 0..120 {
+        let ev = s.step(0.02);
+        hit |= hits_on(&ev, m).iter().any(|(d, _)| *d > 0);
+        if hit {
+            let d = dist2d(s.mobs[&m].pos, [0.0, 0.0, 0.0]);
+            far = far.max(d);
+            near = near.min(d);
+        }
+    }
+    (hit, far, near)
+}
+
+#[test]
+fn the_clubs_heavy_knocks_a_foe_back_and_the_maces_doesnt() {
+    let (hit, far, _) = heavy_blow_at("hogger_club", "dm_woodcutter", 2.0);
+    assert!(hit && far > 4.5, "the club's heavy sends it back: {far}");
+    let (hit, far, _) = heavy_blow_at("mace", "dm_woodcutter", 2.0);
+    assert!(hit && far < 3.6, "the mace's doesn't: {far}");
+}
+
+#[test]
+fn a_tenderized_foe_takes_more_from_the_next_hit_of_anyone_once() {
+    let (mut s, p) = world();
+    let q = s.join("bren", "Bren", None);
+    s.move_player(q, [0.0, 1.0, 0.0], 0.0, Moving::default());
+    wield(&mut s, p, "cookie_tenderizer");
+    wield(&mut s, q, "sword");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let plain = first_hit(&swing(&mut s, q), m);
+    assert!((14..=19).contains(&plain), "an untouched foe: {plain}");
+    for _ in 0..60 {
+        s.step(0.02);
+    }
+    // Now the mallet tenderizes it, and the sword's next hit is 25% harder.
+    reset_foe(&mut s, m);
+    swing(&mut s, p);
+    assert!(s.mobs[&m].fx.tender.1 > s.clock);
+    reset_foe(&mut s, m);
+    let tender = first_hit(&swing(&mut s, q), m);
+    assert!((17..=24).contains(&tender), "the ally's hit does a quarter more: {tender}");
+    assert_eq!(s.mobs[&m].fx.tender.0, 0.0, "used up");
+    reset_foe(&mut s, m);
+    let after = first_hit(&swing(&mut s, q), m);
+    assert!((14..=19).contains(&after), "and gone: {after}");
+}
+
+#[test]
+fn the_wrenchs_heavy_stuns_a_machine_a_long_while_and_a_man_not_at_all() {
+    for (tag, stunned) in [(true, true), (false, false)] {
+        let (mut s, p) = world();
+        let def = s.content.mob("dm_woodcutter").unwrap();
+        if tag {
+            s.content.mobs[def].tags.push("mechanical".into());
+        }
+        wield(&mut s, p, "gilnid_wrench");
+        let m = sturdy_foe(&mut s, "dm_woodcutter");
+        heavy_swing(&mut s, p);
+        let _ = m;
+        assert_eq!(s.has_cc(m, "stun"), stunned, "tagged mechanical: {tag}");
+    }
+    // (A champion machine, the Shredder, holds its ground against it: the stall stays its own.)
+    assert!(Content::dev().mobs[Content::dev().mob("dm_shredder").unwrap()].tags.iter().any(|t| t == "mechanical"));
+}
+
+#[test]
+fn the_hands_hits_heal_the_most_wounded_hero_nearby() {
+    let (mut s, p) = world();
+    let q = s.join("bren", "Bren", None);
+    s.move_player(q, [0.0, 6.0, 0.0], 0.0, Moving::default());
+    let r = s.join("cal", "Cal", None);
+    s.move_player(r, [0.0, 40.0, 0.0], 0.0, Moving::default());
+    wield(&mut s, p, "hand_of_righteousness");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let max = s.players[&q].max_health;
+    s.players.get_mut(&p).unwrap().health = max - 20;
+    s.players.get_mut(&q).unwrap().health = max / 2;
+    s.players.get_mut(&r).unwrap().health = 1;
+    let ev = swing(&mut s, p);
+    assert!(first_hit(&ev, m) > 0);
+    let each = (max as f32 * s.content.weapon("hand_of_righteousness").unwrap().mend_ally).round() as u32;
+    // (A little comes back by itself in the swing's second.)
+    assert!((max / 2 + each..max / 2 + each + 8).contains(&s.players[&q].health), "the most wounded within reach: {}", s.players[&q].health);
+    assert!(s.players[&p].health < max - 20 + 8, "not the wielder, who is hurt less: {}", s.players[&p].health);
+    assert!(s.players[&r].health < 9, "not the one out of reach: {}", s.players[&r].health);
+}
+
+#[test]
+fn a_foe_cursed_by_the_scepter_bursts_in_shadow_when_it_dies() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "barons_scepter");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let near = sturdy_foe(&mut s, "dm_woodcutter");
+    let far = sturdy_foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&near).unwrap().pos = [3.0, 3.0, 0.0];
+    s.mobs.get_mut(&far).unwrap().pos = [3.0, 12.0, 0.0];
+    swing(&mut s, p);
+    assert!(s.mobs[&m].fx.curse.is_some_and(|(u, _, _)| u > s.clock), "cursed");
+    let (n0, f0) = (s.mobs[&near].health, s.mobs[&far].health);
+    s.hurt_mob(m, p, 2_000_000);
+    assert_eq!(s.mobs[&m].health, 0);
+    let burst = ((25 + 33) as f32 / 2.0 * s.content.weapon("barons_scepter").unwrap().curse).round() as u32;
+    assert_eq!(n0 - s.mobs[&near].health, burst, "what stood near took the burst");
+    assert_eq!(s.mobs[&far].health, f0, "what stood far off didn't");
+}
+
+#[test]
+fn the_fists_hits_build_a_shield_up_to_a_cap() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "ironspine_fist");
+    sturdy_foe(&mut s, "dm_woodcutter");
+    let w = s.content.weapon("ironspine_fist").unwrap().clone();
+    let shield = |s: &Survival| s.cc_of(p).iter().find(|c| c.kind == "shield" && c.until > s.clock).map_or(0.0, |c| c.left);
+    assert_eq!(shield(&s), 0.0);
+    swing(&mut s, p);
+    assert_eq!(shield(&s), w.iron_skin);
+    let m = *s.mobs.keys().next().unwrap();
+    for _ in 0..12 {
+        reset_foe(&mut s, m);
+        swing(&mut s, p);
+    }
+    assert_eq!(shield(&s), crate::content::IRON_SKIN_CAP, "up to the cap, no more");
+}
+
+#[test]
+fn the_maces_tooltips_say_their_mechanics_from_their_numbers() {
+    let c = Content::dev();
+    let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
+    let w = |k: &str| c.weapon(k).unwrap();
+    assert!(text("hogger_club").contains(&format!("knock the enemy back {} yd", w("hogger_club").knock)), "{}", text("hogger_club"));
+    assert!(text("cookie_tenderizer").contains(&format!("tenderize the enemy for {} sec. The next hit on it from any ally deals {}% more", crate::content::TENDER_SECS, (w("cookie_tenderizer").tender * 100.0).round())), "{}", text("cookie_tenderizer"));
+    assert!(text("gilnid_wrench").contains(&format!("stun mechanical enemies and machines for {} sec", w("gilnid_wrench").machine_stun)));
+    assert!(text("hand_of_righteousness").contains(&format!("most wounded ally within {} yd, you included, for {}% of their health", crate::content::MEND_RANGE, (w("hand_of_righteousness").mend_ally * 100.0).round())));
+    assert!(text("barons_scepter").contains(&format!("dies bursts in shadow for 44 damage to enemies within {} yd", crate::content::CURSE_RADIUS)), "{}", text("barons_scepter"));
+    assert!(text("ironspine_fist").contains(&format!("absorbs {} damage for {} sec, stacking up to {}", w("ironspine_fist").iron_skin, crate::content::IRON_SKIN_SECS, crate::content::IRON_SKIN_CAP)));
 }

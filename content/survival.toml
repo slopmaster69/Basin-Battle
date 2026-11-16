@@ -10918,7 +10918,7 @@ name = "Hogger's Cudgel"
 display = 1115
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "Staggers enemies it hits. \"Hogger's own spiked club.\""
+text = "Staggers enemies it hits. {fx} \"Hogger's own spiked club.\""
 
 [[item]]
 key = "silver_sword"
@@ -10929,6 +10929,8 @@ kind = "weapon"
 text = "Quick. {fx} \"Bronze with a silver edge.\""
 
 # Hogger's club: a one-handed mace that hits like a heavy one.
+# Hogger's club sends them flying: its heavy knocks the foe 5 yd back (a knockback's usual reach is
+# 4 to 6), which is room to breathe in a pack and a shove off a ledge.
 [[weapon]]
 key = "hogger_club"
 windup = 0.4
@@ -10941,6 +10943,7 @@ arc = 100.0
 targets = 1
 stagger = 1.0
 subclass = 4
+knock = 5.0
 moveset = "mace_one_hand"
 
 # A silver-edged sword: the sword's quickness, the axe's bite.

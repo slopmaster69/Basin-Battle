@@ -1709,7 +1709,8 @@ impl Survival {
             // An executioner's blow on a foe near its end.
             let low = self.mobs.get(&mid).is_some_and(|m| (m.health as f32) < m.max_health as f32 / 3.0);
             let damage = if w.execute > 0.0 && low && !strike.shove() { (damage as f32 * w.execute).round() as u32 } else { damage };
-            let damage = (damage as f32 * self.taken_share(mid) * self.weapon_share(mid, w, strike)).round() as u32;
+            let tender = if strike.shove() { 0.0 } else { self.take_tender(mid) };
+            let damage = (damage as f32 * self.taken_share(mid) * self.weapon_share(mid, w, strike) * (1.0 + tender)).round() as u32;
             // The first blow out of Prowl: its bonus damage, and its stun.
             let damage = if damage > 0 && !strike.shove() { damage + self.prowl_strike(id, mid) } else { damage };
             if behind {

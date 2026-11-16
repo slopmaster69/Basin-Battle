@@ -3,7 +3,7 @@
 //! hero's blow lands on a creature (`combat.rs`) and the few where a creature falls or mends.
 
 use super::*;
-use crate::content::{WeaponDef, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, SILVER_SECS, SNARE_SECS};
+use crate::content::{WeaponDef, AbilityEffect, BLOODLUST_SECS, BLOODLUST_STACKS, COW_SECS, CURSE_RADIUS, CURSE_SECS, IRON_SKIN_CAP, IRON_SKIN_SECS, MEND_RANGE, SILVER_SECS, SNARE_SECS, TENDER_SECS};
 
 /// What weapons have done to a creature, kept on it.
 #[derive(Debug, Clone, Default)]
@@ -12,6 +12,10 @@ pub struct MobFx {
     pub silvered_until: f32,
     /// A hook has taken its shield aside until: it can't block.
     pub guard_down_until: f32,
+    /// Tenderized: the next hit does this much more, until when.
+    pub tender: (f32, f32),
+    /// Cursed until, by whom, and the burst it ends in.
+    pub curse: Option<(f32, Id, u32)>,
 }
 
 /// What a weapon has built up in the hero holding it.
@@ -74,6 +78,37 @@ impl Survival {
             let amount = self.players.get(&id).map_or(0, |p| (p.max_health as f32 * w.reap_heal).round() as u32);
             self.heal_hero_by(id, amount, id, "Reaping");
         }
+        // Hogger's heavy knocks the foe back.
+        if w.knock > 0.0 && strike.heavy() && self.alive(mid) {
+            let push = AbilityEffect { kind: "knockback".into(), amount: w.knock, from_caster: true, ..Default::default() };
+            self.displace(id, mid, &push);
+        }
+        // The meat mallet tenderizes: the next hit on it, from anyone, does more.
+        if w.tender > 0.0 && self.alive(mid) {
+            if let Some(m) = self.mobs.get_mut(&mid) {
+                m.fx.tender = (w.tender, now + TENDER_SECS);
+            }
+        }
+        // The wrench shorts a machine out.
+        if w.machine_stun > 0.0 && strike.heavy() && self.alive(mid) && self.has_tag(mid, "mechanical") {
+            self.apply_cc(mid, id, "stun", w.machine_stun, 0.0, 0.0, "Short circuit");
+        }
+        // The Hand mends the most wounded hero near.
+        if w.mend_ally > 0.0 {
+            self.mend_nearest_hurt(id, w.mend_ally);
+        }
+        // The scepter curses: its burst waits on the foe's death.
+        if w.curse > 0.0 && self.alive(mid) {
+            let burst = ((w.damage[0] + w.damage[1]) as f32 / 2.0 * w.curse).round() as u32;
+            if let Some(m) = self.mobs.get_mut(&mid) {
+                m.fx.curse = Some((now + CURSE_SECS, id, burst));
+            }
+        }
+        // The fist hardens its wielder.
+        if w.iron_skin > 0.0 {
+            let have = self.cc_of(id).iter().find(|c| c.kind == "shield" && c.until > now).map_or(0.0, |c| c.left);
+            self.apply_cc(id, id, "shield", IRON_SKIN_SECS, (have + w.iron_skin).min(IRON_SKIN_CAP), 0.0, "Iron skin");
+        }
         // The pin and the fright: a slow, a weaker foe.
         if w.snare > 0.0 && self.alive(mid) {
             self.apply_cc(mid, id, "snare", SNARE_SECS, w.snare, 0.0, "Hamstring");
@@ -87,6 +122,41 @@ impl Survival {
             if strike.step as usize == last && last > 0 {
                 self.step_behind(id, mid);
             }
+        }
+    }
+
+    /// The next hit on a tenderized foe does more, and uses it up.
+    pub(crate) fn take_tender(&mut self, mid: Id) -> f32 {
+        let now = self.clock;
+        match self.mobs.get_mut(&mid) {
+            Some(m) if m.fx.tender.1 > now => std::mem::take(&mut m.fx.tender).0,
+            _ => 0.0,
+        }
+    }
+
+    /// The most wounded hero within reach of `id` (themselves too) is healed this share of their health.
+    fn mend_nearest_hurt(&mut self, id: Id, share: f32) {
+        let Some(at) = self.players.get(&id).map(|p| p.pos) else { return };
+        let target = self
+            .players
+            .iter()
+            .filter(|(_, p)| p.health > 0 && p.health < p.max_health && dist2d(p.pos, at) <= MEND_RANGE)
+            .min_by(|a, b| (a.1.health as f32 / a.1.max_health as f32).total_cmp(&(b.1.health as f32 / b.1.max_health as f32)))
+            .map(|(h, p)| (*h, p.max_health));
+        if let Some((h, max)) = target {
+            self.heal_hero_by(h, (max as f32 * share).round() as u32, id, "Mending");
+        }
+    }
+
+    /// A cursed foe's fall: it bursts in shadow, and what stands near takes it.
+    pub(crate) fn curse_burst(&mut self, mid: Id) {
+        let now = self.clock;
+        let Some((_, by, damage)) = self.mobs.get(&mid).and_then(|m| m.fx.curse).filter(|(u, _, _)| *u > now) else { return };
+        let Some(at) = self.mobs.get(&mid).map(|m| m.pos) else { return };
+        self.mobs.get_mut(&mid).unwrap().fx.curse = None;
+        let near: Vec<Id> = self.mobs.iter().filter(|(k, m)| **k != mid && m.health > 0 && dist2d(m.pos, at) <= CURSE_RADIUS).map(|(k, _)| *k).collect();
+        for k in near {
+            self.hurt_mob_as(k, by, damage, "Curse");
         }
     }
 

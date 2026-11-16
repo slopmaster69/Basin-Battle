@@ -105,3 +105,10 @@ numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a ban
 | Miner's Pick | A posture breaker (3 times towards a stance); 50% more to stone, golem and mechanical | `posture`, `bane` |
 | Horseman's Scythe | A 200 degree reaping sweep of up to 5; each foe struck heals 1% of your health | `reap_heal` |
 | Loksey's Boar Spear | Its thrust slows the foe 40% for 2.5 sec | `snare` |
+| Militia Mace | Stance breaker (its hits count twice) | `posture` |
+| Hogger's Club | Its heavy knocks the foe 5 yd back | `knock` |
+| Cookie's Tenderizer | A hit tenderizes: the next hit on the foe from any ally deals 25% more | `tender` |
+| Gilnid's Wrench | Its heavy stuns mechanical foes and machines 4 sec (not a champion machine) | `machine_stun` |
+| Hand of Righteousness | Each hit heals the most wounded ally within 15 yd (you too) 3% | `mend_ally` |
+| Baron's Scepter | A hit curses the foe; a cursed foe that dies bursts in shadow on those within 5 yd | `curse` |
+| Ironspine's Fist | Each hit gives a 5 point shield, stacking to 30 | `iron_skin` |
