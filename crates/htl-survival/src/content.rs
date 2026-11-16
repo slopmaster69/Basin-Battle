@@ -3117,7 +3117,7 @@ pub struct GoalDef {
 }
 
 impl GoalDef {
-    pub const KINDS: [&'static str; 14] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn", "cleared"];
+    pub const KINDS: [&'static str; 15] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn", "cleared", "chose"];
 }
 
 /// A string of blows a creature commits to: each a step (its clip, wind-up, reach, damage...)
@@ -3320,6 +3320,10 @@ pub struct PropDef {
     /// How far the camp must have come for it to stand (see above); none: from the start.
     #[serde(default)]
     pub after: Option<String>,
+    /// It goes once the camp has come this far (a condition as `after`: `chose:remy:arrest`): a
+    /// person taken away, a thing cleared. It stays gone, and never stands again.
+    #[serde(default)]
+    pub until: Option<String>,
     /// Ground it keeps: nothing is built within this of it (0: none).
     #[serde(default)]
     pub clear: f32,
@@ -3354,7 +3358,7 @@ pub struct TalkDef {
 }
 
 /// The conditions a prop's or a line's `after` may name, each with what follows its colon.
-pub const CAMP_CONDITIONS: [&str; 7] = ["start", "raids", "goal", "built", "found", "kill", "open"];
+pub const CAMP_CONDITIONS: [&str; 8] = ["start", "raids", "goal", "built", "found", "kill", "open", "chose"];
 
 fn chest_display() -> u32 {
     259
@@ -3980,6 +3984,17 @@ impl Content {
         self.item(&k).unwrap_or(item)
     }
 
+    /// The choices the camp's people offer: each `(group, option)` of a `.es choose group:option`
+    /// link in a talk line.
+    pub fn choices(&self) -> Vec<(String, String)> {
+        self.props
+            .iter()
+            .flat_map(|p| p.talk.iter().flat_map(|t| t.links.iter()))
+            .filter_map(|l| l.split('~').next()?.trim().strip_prefix(".es choose ").map(str::trim).map(str::to_string))
+            .filter_map(|c| c.split_once(':').map(|(g, o)| (g.to_string(), o.to_string())))
+            .collect()
+    }
+
     /// A condition on how far the camp has come (`raids:2`, `kill:hogger`) that names something real.
     fn check_camp_condition(&self, cond: &str, what: &str) -> Result<()> {
         let (kind, arg) = cond.split_once(':').unwrap_or((cond, ""));
@@ -3994,6 +4009,11 @@ impl Content {
             "built" => self.station(arg).is_some(),
             "found" => self.sites.iter().any(|s| s.key == arg),
             "kill" => self.mob(arg).is_some(),
+            // `chose:<group>` or `chose:<group>:<option>`: one a person's `.es choose` link offers.
+            "chose" => {
+                let (group, option) = arg.split_once(':').map_or((arg, None), |(g, o)| (g, Some(o)));
+                self.choices().iter().any(|(g, o)| g == group && option.is_none_or(|x| x == o))
+            }
             _ => self.chests.iter().any(|c| c.key == arg),
         };
         if !real {
@@ -4238,12 +4258,12 @@ impl Content {
                 card(k, &format!("chest {}", c.key))?;
             }
             // A bare key is a creature (shut until the camp has killed one); with a colon it is a
-            // condition the camp meets (`open:<chest>`, `found:<site>`, `kill:<mob>`).
+            // condition the camp meets (`open:<chest>`, `found:<site>`, `kill:<mob>`, `chose:<group>:<option>`).
             if c.after.contains(':') {
                 let what = format!("chest {}", c.key);
                 let kind = c.after.split(':').next().unwrap_or("").trim();
-                if !["open", "found", "kill"].contains(&kind) {
-                    bail!("{what}: after {:?}: a chest waits on open:, found: or kill:", c.after);
+                if !["open", "found", "kill", "chose"].contains(&kind) {
+                    bail!("{what}: after {:?}: a chest waits on open:, found:, kill: or chose:", c.after);
                 }
                 if c.after.trim() == format!("open:{}", c.key) {
                     bail!("{what}: after {:?}: it would wait on itself", c.after);
@@ -4269,6 +4289,9 @@ impl Content {
             if let Some(a) = &p.after {
                 self.check_camp_condition(a, &what)?;
             }
+            if let Some(u) = &p.until {
+                self.check_camp_condition(u, &what)?;
+            }
             if !p.talk.is_empty() && !p.npc {
                 bail!("{what}: talk lines are for an npc");
             }
@@ -4283,7 +4306,27 @@ impl Content {
                     if l.split_once('~').is_none_or(|(c, n)| c.trim().is_empty() || n.trim().is_empty()) {
                         bail!("{what}: link {l:?} is not `command~label`");
                     }
+                    // `.es choose <group>:<option>`: a group and one option, nothing else.
+                    let command = l.split('~').next().unwrap_or("").trim();
+                    if let Some(c) = command.strip_prefix(".es choose") {
+                        if c.trim().split_once(':').is_none_or(|(g, o)| g.is_empty() || o.is_empty() || o.contains(':') || c.trim().contains(' ')) {
+                            bail!("{what}: link {l:?} is not `.es choose <group>:<option>`");
+                        }
+                    }
                 }
+            }
+        }
+        // Every choice offered is waited on: some line, person or chest names its option.
+        let mut waits: Vec<&str> = Vec::new();
+        for p in &self.props {
+            waits.extend(p.after.as_deref().into_iter().chain(p.until.as_deref()));
+            waits.extend(p.talk.iter().filter_map(|t| t.after.as_deref()));
+        }
+        waits.extend(self.chests.iter().map(|c| c.after.as_str()));
+        for (g, o) in self.choices() {
+            let one = format!("chose:{g}:{o}");
+            if !waits.iter().any(|w| w.trim() == one) {
+                bail!("choice {g}:{o}: nothing waits on it (a line, person or chest `after = \"{one}\"`)");
             }
         }
         for t in 0..self.raid.count() {
@@ -4406,6 +4449,8 @@ impl Content {
                 "secret" | "learn" => g.what == "any",
                 // A dungeon cleared (every boss down in one run), by its key.
                 "cleared" => self.dungeons().any(|d| d.key == g.what),
+                // A choice made (a group a person's `.es choose` link offers).
+                "chose" => self.choices().iter().any(|(grp, _)| *grp == g.what),
                 // Below: the book read, a lamp lit (by its key), out of any dungeon's way out
                 // (`end`) or one's (`end:<dungeon>`).
                 "delve" => {

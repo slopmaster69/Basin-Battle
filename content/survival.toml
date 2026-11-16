@@ -3770,6 +3770,13 @@ what = "mason_cache"
 reward = { silver = 2, stone = 4 }
 
 [[goal]]
+title = "Remy Two Times"
+text = "Talk to Remy Two Times at the Lion's Pride in Goldshire, and decide what's done with him."
+kind = "chose"
+what = "remy"
+reward = { silver = 2, bronze = 2 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
@@ -10094,6 +10101,76 @@ key = "mason_lion_ambush"
 wake = "mason_lion"
 
 # === end of Stage 7's block ============================================================================
+
+# === Elwynn expansion, round two, Stage 8: Remy "Two Times" (docs/elwynn-expansion.md) ==============
+# Remy sold the watch rosters to a man in black. Once the mason's road book is open he stands outside
+# the Lion's Pride, and the camp decides what is done with him: arrest him (Marshal Dughan takes him
+# away and Stormwind pays a bounty) or free him (he tells where the man in black meets his buyers and
+# leaves his stash at the Maclure well). The choice is made once for the whole camp with
+# `.es choose remy:arrest` or `.es choose remy:free` (the links on his page), and any hero can make it.
+
+# Remy "Two Times": a talk line with two choices. He goes once he is arrested (`until`).
+[[prop]]
+display = 1466
+at = [-9444.0, 30.0]
+facing = 3.14
+after = "open:mason_cache"
+until = "chose:remy:arrest"
+clear = 1.2
+npc = true
+name = "Remy \"Two Times\""
+subname = "Lion's Pride"
+say = "A man called Remy \"Two Times\" waits outside the Lion's Pride, watching the road."
+
+[[prop.talk]]
+text = "Rosters. Who walks which road, and when. A quiet man in black paid 2 silver a road. Westbrook's came cheapest. Nobody guards the cheap ones."
+links = [".es choose remy:arrest~Arrest Him", ".es choose remy:free~Free Him"]
+
+[[prop.talk]]
+after = "chose:remy:free"
+text = "You never saw me. The man in black meets his buyers past Jasperlode. That one's free."
+
+# Marshal Dughan takes him to the Stockade.
+[[prop]]
+display = 1504
+at = [-9465.0, 75.0]
+facing = 4.4
+after = "chose:remy:arrest"
+clear = 1.2
+npc = true
+name = "Marshal Dughan"
+subname = "Goldshire"
+say = "Marshal Dughan takes Remy \"Two Times\" to the Stockade."
+
+[[prop.talk]]
+text = "Remy sold the rosters, and Stormwind will hear him sing. The man in black is your business now."
+links = [".es lore stockade~The Stockade"]
+
+# Stormwind pays for informers, once they stop informing.
+[[chest]]
+key = "remy_bounty"
+name = "Stormwind Bounty"
+at = [-9463.0, 70.0]
+display = 259
+after = "chose:remy:arrest"
+locked = "Nobody has been taken to the Marshal yet."
+respawn = 0.0
+loot = { silver = 3, bronze = 2 }
+text = "Stormwind pays for informers, once they stop informing."
+
+# What Remy saved, at the Maclure well, once he is free to say where.
+[[chest]]
+key = "remy_stash"
+name = "Remy's Stash"
+at = [-9990.0, 75.0]
+display = 259
+after = "chose:remy:free"
+locked = "Nobody has told you where Remy hides his silver."
+respawn = 0.0
+loot = { silver = 2, pearl = 2 }
+text = "Two silver a road, saved. Remy never spent a coin he could hide."
+
+# === end of Stage 8's block ============================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.

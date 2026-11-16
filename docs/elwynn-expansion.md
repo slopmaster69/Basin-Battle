@@ -250,3 +250,13 @@ Built as planned, with these differences, found checking the plan against the co
 - The stones' display is 235 (the plain runestone). The plan's 1364 has no game-object row in the real data (it is a creature display).
 - `ELWYNN_GOALS` is 10. The site is a `landmark`, so "Every corner" is 37 for the 37 sites.
 - Probed with `elwynn_probe near`: every stone is on open ground. The crown's footpads stood at (-8896, -824), which has a trunk or wall next to it, so they stand at (-8890, -822).
+
+## Stage 8: Remy "Two Times" [x] (camp choice; engine change E4)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E4.** `Survival::choose` (`sim/explore.rs`, called by `.es choose` in `htl-server/src/survival/ui.rs`) checks, in this order, that the group is not yet decided ("That is already decided."), then that a person within 6 yd has a current line with that link. It counts `chose:<group>` and `chose:<group>:<option>`, then runs `grow_camp` at once so the people stand or go now. No save-format change: it all lives in `camp.counts`, and the add-on is untouched (its link buttons already send any command), so no `VERSION` bump.
+- `CAMP_CONDITIONS` has `chose`, `GoalDef::KINDS` has `chose`, and `PropDef.until` removes a standing piece (and stops it being set out) once its condition holds.
+- `validate()` checks each `.es choose` link is `group:option`, each `chose:` condition names an option some link offers, each goal of kind `chose` names a group, and each option is waited on by some line, person or chest (a choice with no consequence is refused).
+- A chest's `after` can be `chose:...` too, so the bounty and the stash are chests that stand but stay shut, with their own words, until the choice. (A chest has no way to stand later. The plan's "stand only after arrest" is read as "open only".)
+- Displays from `npcfind` on the real data: Remy is 1466 (a cloth swashbuckler's shirt over black, human male), Dughan is 1504 (copper mail), not the plan's fallbacks (1295 is a woman's look). The Stockade link uses the real key `stockade`.
+- Remy stands at (-9444, 30): the plan's (-9450, 30) has a wall beside it. The bounty chest is at (-9463, 70), not (-9466, 78), which sits in a pocket of walls. Dughan (-9465, 75) and the stash (-9990, 75) are open ground. `ELWYNN_GOALS` is 11; no site was added, so "Every corner" stays 37.
