@@ -1,0 +1,239 @@
+From 53e8d3bfeffc489784ce58f964ca376be1d59171 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 14:32:38 -0600
+Subject: [PATCH] The sun shadows' far slices redraw every other frame while
+ the camera walks
+
+The look's shadow pass redrew every caster into every slice every frame. The far slices cover the
+most ground and the most casters, and from one frame to the next their box barely moves.
+
+`shadows::hold_far_slices` lets one far slice a frame keep last frame's map: low's second slice,
+high's third and fourth in turn. A held slice keeps last frame's box too, so the rows the
+receivers read still match the map its layer holds, and the pass neither clears nor draws it. A
+slice is held only when its box has drifted under 5 % of its half-size since last frame and the
+light has turned under 2e-4 rad (a tenth of low's far texel 70 yd out), and never two frames
+running, so a turning camera, a rising sun or a change of level redraws every slice. A creature's
+shadow in a far slice lags its body by a frame at most. `WOW_SHADOW_EVERY_FRAME=1` turns it off.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-world/src/look/shadow_pass.rs |  10 ++
+ crates/benilla-world/src/look/shadows.rs     | 146 ++++++++++++++++++-
+ 2 files changed, 154 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-world/src/look/shadow_pass.rs b/crates/benilla-world/src/look/shadow_pass.rs
+index d15f9a63..5dbc8858 100644
+--- a/crates/benilla-world/src/look/shadow_pass.rs
++++ b/crates/benilla-world/src/look/shadow_pass.rs
+@@ -755,6 +755,10 @@ fn prepare_shadows(
+         };
+         let inst = gpu.insts.push(c.inst) as u32;
+         for (i, slice) in frame.slices.iter().enumerate().take(frame.cascades) {
++            // A held slice keeps last frame's draw (`shadows::hold_far_slices`).
++            if frame.held[i] {
++                continue;
++            }
+             if i >= tune::SMALL_CASTER_SLICES && c.radius < tune::SMALL_CASTER_RADIUS {
+                 continue;
+             }
+@@ -906,6 +910,12 @@ impl ViewNode for LookShadowNode {
+         let mut counts = [(0u32, 0u32); 4];
+         let diagnostics = render_context.diagnostic_recorder();
+         for c in 0..frame.cascades {
++            // A held slice's layer keeps last frame's draw, which its box (last frame's too) and
++            // the receivers' rows still describe (`shadows::hold_far_slices`): not cleared, not
++            // drawn.
++            if frame.held[c] {
++                continue;
++            }
+             let mut pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+                 label: Some("look_shadow"),
+                 color_attachments: &[],
+diff --git a/crates/benilla-world/src/look/shadows.rs b/crates/benilla-world/src/look/shadows.rs
+index 9b53c58b..004b2a12 100644
+--- a/crates/benilla-world/src/look/shadows.rs
++++ b/crates/benilla-world/src/look/shadows.rs
+@@ -17,7 +17,9 @@
+ //! 3. **the pass** (`look::shadow_pass`): a depth-only draw of the casters into one layer of
+ //!    [`benilla_assets::materials::SHADOW_MAP`] per slice, before the main pass: the static
+ //!    world's doodads, WMO exteriors and props, every creature, hero and object model, and the
+-//!    terrain, each culled per slice, with alpha-tested leaves cut by their texture;
++//!    terrain, each culled per slice, with alpha-tested leaves cut by their texture; the far
++//!    slices redraw only every other frame while the camera walks or stands, keeping their last
++//!    box and draw between ([`hold_far_slices`]);
+ //! 4. **the receivers** (`terrain.wgsl`, `wow_model.wgsl`, `static_gx.wgsl`, `sun_shadow`): the
+ //!    packed rows ([`pack_rows`], the shared light buffer's shadow block) pick a slice by eye
+ //!    depth, filter the map by hand (`textureLoad`, no sampler: Metal's sixteen are spoken for),
+@@ -371,6 +373,63 @@ pub struct ShadowFrame {
+     pub map: Option<u8>,
+     /// The camera, which the drawn map marks.
+     pub cam: Vec3,
++    /// The far slices the pass leaves as they are this frame ([`hold_far_slices`]): each keeps
++    /// last frame's box, and its layer of the map keeps last frame's draw.
++    pub held: [bool; 4],
++}
++
++/// The far slices refresh every other frame: a slice may keep last frame's map when the camera
++/// has moved its box less than this share of its half-size since, and the light has turned less
++/// than [`HOLD_TURN`]. A turning camera swings the far boxes further, so they redraw every frame
++/// while it turns. `WOW_SHADOW_EVERY_FRAME=1` redraws every slice every frame, as before.
++pub const HOLD_DRIFT: f32 = 0.05;
++
++/// The light's turn (radians) under which a held slice still lines up with the receivers: 2e-4 rad
++/// moves a point 70 yd out by 0.014 yd, a tenth of low's far texel.
++pub const HOLD_TURN: f32 = 2e-4;
++
++/// The first slice that may be held: the far half of the slices (low's second, high's last two).
++fn first_held(cascades: usize) -> usize {
++    (cascades / 2).max(1)
++}
++
++/// `WOW_SHADOW_EVERY_FRAME=1`: no slice is ever held.
++fn hold_disabled() -> bool {
++    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *OFF.get_or_init(|| {
++        std::env::var("WOW_SHADOW_EVERY_FRAME").is_ok_and(|v| !v.is_empty() && v != "0")
++    })
++}
++
++/// This frame's fit `next`, with at most one far slice held from `prev`, last frame's: the first
++/// far slice that was drawn last frame, whose box has drifted under [`HOLD_DRIFT`] of its size,
++/// under a light that has turned less than [`HOLD_TURN`]. A held slice takes `prev`'s box, so the
++/// rows the receivers read match the map its layer keeps. No slice is held two frames running, so
++/// each far slice redraws at least every other frame; on high the two far slices take turns.
++pub fn hold_far_slices(prev: &ShadowFrame, mut next: ShadowFrame) -> ShadowFrame {
++    next.held = [false; 4];
++    if next.cascades < 2
++        || prev.cascades != next.cascades
++        || prev.res != next.res
++        || prev.distance != next.distance
++        || prev.travel.cross(next.travel).length() >= HOLD_TURN
++        || prev.travel.dot(next.travel) <= 0.0
++    {
++        return next;
++    }
++    for i in first_held(next.cascades)..next.cascades {
++        let (was, now) = (prev.slices[i], next.slices[i]);
++        if prev.held[i] || was.half != now.half || was.range != now.range {
++            continue;
++        }
++        if (now.center - was.center).length() > HOLD_DRIFT * now.half {
++            continue;
++        }
++        next.slices[i] = was;
++        next.held[i] = true;
++        break;
++    }
++    next
+ }
+ 
+ impl ShadowFrame {
+@@ -497,6 +556,7 @@ pub fn fit(
+         slices,
+         map: None,
+         cam: cam_pos,
++        held: [false; 4],
+     }
+ }
+ 
+@@ -577,7 +637,12 @@ impl ShadowInputs<'_, '_> {
+         sun: Vec3,
+         moon: Vec3,
+     ) -> [[f32; 4]; SHADOW_ROWS] {
+-        let frame = self.fit(cam, sun, moon);
++        let mut frame = self.fit(cam, sun, moon);
++        // The far slices redraw every other frame (`hold_far_slices`); the map view draws a
++        // slice as it is, so it holds none.
++        if frame.map.is_none() && !hold_disabled() {
++            frame = hold_far_slices(&self.frame, frame);
++        }
+         if *self.frame != frame {
+             *self.frame = frame;
+         }
+@@ -738,6 +803,83 @@ mod tests {
+         assert!(a.right.dot(a.travel).abs() < 1e-5 && a.up.dot(a.travel).abs() < 1e-5);
+     }
+ 
++    fn frame_with(pos: Vec3, fwd: Vec3, cascades: usize, sun_deg: f32) -> ShadowFrame {
++        fit(
++            pos,
++            fwd,
++            std::f32::consts::FRAC_PI_4,
++            16.0 / 9.0,
++            shadow_light(body(sun_deg), body(-10.0)).unwrap(),
++            cascades,
++            if cascades > 2 { 2048 } else { 1024 },
++            if cascades > 2 { 180.0 } else { 120.0 },
++        )
++    }
++
++    /// Under a still camera low's far slice is drawn every other frame and its near one every
++    /// frame; a held slice keeps last frame's box exactly.
++    #[test]
++    fn low_holds_its_far_slice_every_other_frame() {
++        let at = Vec3::new(-9000.0, 60.0, 300.0);
++        let mut prev = ShadowFrame::default();
++        let mut held = Vec::new();
++        for _ in 0..6 {
++            let next = hold_far_slices(&prev, frame_with(at, Vec3::X, 2, 30.0));
++            assert!(!next.held[0], "the near slice is never held");
++            if next.held[1] {
++                assert_eq!(next.slices[1], prev.slices[1]);
++            }
++            held.push(next.held[1]);
++            prev = next;
++        }
++        // The first frame has nothing to hold from.
++        assert_eq!(held, [false, true, false, true, false, true]);
++    }
++
++    /// High holds one of its two far slices a frame, in turn, and never its near two.
++    #[test]
++    fn high_takes_its_far_slices_in_turn() {
++        let at = Vec3::new(-9000.0, 60.0, 300.0);
++        let mut prev = hold_far_slices(&ShadowFrame::default(), frame_with(at, Vec3::X, 4, 30.0));
++        let mut seen = Vec::new();
++        for _ in 0..4 {
++            let next = hold_far_slices(&prev, frame_with(at, Vec3::X, 4, 30.0));
++            assert!(!next.held[0] && !next.held[1]);
++            assert!(next.held.iter().filter(|h| **h).count() <= 1);
++            seen.push((next.held[2], next.held[3]));
++            prev = next;
++        }
++        assert_eq!(
++            seen,
++            [(true, false), (false, true), (true, false), (false, true)]
++        );
++    }
++
++    /// A walk keeps the far slice's cadence; a turn that swings its box, a light that turns, or
++    /// a change of level redraws every slice.
++    #[test]
++    fn a_turn_or_a_new_light_redraws_every_slice() {
++        let at = Vec3::new(-9000.0, 60.0, 300.0);
++        let first = hold_far_slices(&ShadowFrame::default(), frame_with(at, Vec3::X, 2, 30.0));
++        // A step of a tenth of a yard, a frame's walk.
++        let step = frame_with(at + Vec3::X * 0.1, Vec3::X, 2, 30.0);
++        assert!(hold_far_slices(&first, step).held[1]);
++        // A quarter turn.
++        let turned = frame_with(at, Vec3::Z, 2, 30.0);
++        assert!(!hold_far_slices(&first, turned).held[1]);
++        // The sun a degree further on.
++        let later = frame_with(at, Vec3::X, 2, 31.0);
++        assert!(!hold_far_slices(&first, later).held[1]);
++        // Low to high.
++        let high = frame_with(at, Vec3::X, 4, 30.0);
++        assert_eq!(hold_far_slices(&first, high).held, [false; 4]);
++        // Shadows off.
++        assert_eq!(
++            hold_far_slices(&first, ShadowFrame::default()).held,
++            [false; 4]
++        );
++    }
++
+     /// Every point the camera sees within a slice's depths sits in its box, and a caster up to
+     /// the reach sunward of it too.
+     #[test]
+-- 
+2.56.0.windows.4
+

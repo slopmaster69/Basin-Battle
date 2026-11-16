@@ -1,0 +1,244 @@
+From 7685a0bf2d8799e89d3f5cfa3c5eed783b1b1019 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 14:32:41 -0600
+Subject: [PATCH] The model visibility walk takes a quarter of the parts a
+ frame while only the camera moves
+
+`apply_model_visibility` skips its walk when nothing moved, but every frame the camera moves (all
+of play) it re-tested every resident model part: the far wall, the distance fade, the portal and
+window gates, about 100k parts in a city.
+
+While only the camera's place or turn moved, outdoors (the window gate open, no room claimed), a
+part whose own row is still is walked one frame in four, by its entity index. Its verdicts move
+with the camera by a fraction of a yard a frame, and the far wall's straddlers dissolve per pixel,
+so a part a few frames late reads the same. Every part is walked on any other change (a setting, a
+portal, a room, the lens), when the camera is 4 yd from the last whole walk (a teleport, a
+gallop's every half second), and on the first still frame after a sliced one, so no part keeps a
+late verdict once the camera stops. Indoors every part is walked every frame, as the window gate
+turns with the camera. `WOW_VIS_EVERY_FRAME=1` turns it off.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/model_render/visibility.rs            | 164 +++++++++++++++++-
+ 1 file changed, 161 insertions(+), 3 deletions(-)
+
+diff --git a/crates/benilla-world/src/model_render/visibility.rs b/crates/benilla-world/src/model_render/visibility.rs
+index 594a15a6..8cd82262 100644
+--- a/crates/benilla-world/src/model_render/visibility.rs
++++ b/crates/benilla-world/src/model_render/visibility.rs
+@@ -14,6 +14,80 @@ use crate::view::WorldCamera;
+ use crate::wmo_portal::{WmoGroupVis, WmoPortalInstance};
+ use benilla_assets::materials::WowModelMaterial;
+ 
++/// While only the camera moves, outdoors, a part whose own row is still is walked one frame in
++/// [`SLICES`], in turn by its entity index: its verdicts (the far wall, the distance fade) move
++/// with the camera by a fraction of a yard a frame, so a part a few frames late reads the same,
++/// and the walk costs a [`SLICES`]th. Anything else that moves (a part, a portal, a setting, the
++/// camera's room) walks every part that frame, as does a camera [`SLICE_REACH`] yards from where
++/// the last whole walk stood (a teleport, a gallop's every half second), and the first still frame
++/// after a sliced one, so no part keeps a late verdict once the camera stops. Indoors the window
++/// gate turns with the camera, so every part is walked every frame. `WOW_VIS_EVERY_FRAME=1` walks
++/// every part every frame, as before.
++pub const SLICES: u32 = 4;
++
++/// How far the camera may move (yd) between two whole walks.
++pub const SLICE_REACH: f32 = 4.0;
++
++/// Where the last whole walk stood, which slice walks next, and whether a slice walked since.
++#[derive(Default)]
++pub(super) struct VisSlices {
++    anchor: Option<Vec3>,
++    phase: u32,
++    pending: bool,
++}
++
++/// Which parts this frame walks, besides any whose own row moved.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum Walk {
++    /// None: nothing but a part's own row moved.
++    Still,
++    /// Those whose entity index is this modulo [`SLICES`].
++    Slice(u32),
++    /// Every part.
++    Whole,
++}
++
++/// `WOW_VIS_EVERY_FRAME=1`: no slicing.
++fn slicing_disabled() -> bool {
++    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *OFF.get_or_init(|| {
++        std::env::var("WOW_VIS_EVERY_FRAME").is_ok_and(|v| !v.is_empty() && v != "0")
++    })
++}
++
++impl VisSlices {
++    /// This frame's walk: `still` is a frame where nothing moved, `camera_only` one whose one
++    /// moving input is the camera, `outdoors` one whose exterior gate is open and whose camera
++    /// claims no room, `cam` the camera's position; `enabled` is false under
++    /// `WOW_VIS_EVERY_FRAME`.
++    fn pick(
++        &mut self,
++        still: bool,
++        camera_only: bool,
++        outdoors: bool,
++        cam: Option<Vec3>,
++        enabled: bool,
++    ) -> Walk {
++        if still && !self.pending {
++            return Walk::Still;
++        }
++        let near_anchor = match (self.anchor, cam) {
++            (Some(a), Some(c)) => a.distance(c) <= SLICE_REACH,
++            _ => false,
++        };
++        if !still && camera_only && outdoors && near_anchor && enabled {
++            let phase = self.phase;
++            self.phase = (self.phase + 1) % SLICES;
++            self.pending = true;
++            Walk::Slice(phase)
++        } else {
++            self.anchor = cam;
++            self.pending = false;
++            Walk::Whole
++        }
++    }
++}
++
+ /// Shows or hides each model submesh. A doodad or WMO part is culled once its bound lies wholly
+ /// past the far-clip wall ([`crate::view::within_farclip`]), so a straddler dissolves through the
+ /// per-pixel wall. Writes only on a flip.
+@@ -60,6 +134,7 @@ pub(super) fn apply_model_visibility(
+         Option<Ref<super::FarSideOfWater>>,
+         Option<&crate::billboard::BillboardCard>,
+     )>,
++    mut slices: Local<VisSlices>,
+     // A building's MLIQ surfaces: a `WmoGroupVis` but no `ModelPart`, so none of the submesh
+     // rules. A query here rather than a second writer, so a culled room's water goes with it.
+     mut group_only: Query<
+@@ -80,15 +155,20 @@ pub(super) fn apply_model_visibility(
+     // Every whole-scene input still since last frame: a part whose own row is still too would
+     // come out unchanged, so it skips the walk. The camera's local `Transform` counts too: this
+     // runs before propagation, so a teleport's move shows only there.
+-    let scene_still = cam_view.as_ref().is_some_and(|(t, p, l)| {
++    let camera_still = cam_view.as_ref().is_some_and(|(t, p, l)| {
+         !t.is_changed() && !p.is_changed() && !l.as_ref().is_some_and(|l| l.is_changed())
+-    }) && !debug.is_changed()
++    });
++    let rest_still = !debug.is_changed()
+         && !view.is_changed()
+         && !windows.is_changed()
+         && !claim.is_changed()
+         && !far_twins.is_changed()
+         && new_portals.is_empty()
+         && owner_flips.is_empty();
++    let scene_still = camera_still && rest_still;
++    // Only the camera's place or turn moved: its lens is as it was.
++    let camera_only =
++        !camera_still && rest_still && cam_view.as_ref().is_some_and(|(_, p, _)| !p.is_changed());
+     let cam_pos = cam_t.map(|t| t.translation());
+     let cam_fwd = cam_t.map(|t| Vec3::from(t.forward()));
+     let gate = crate::exterior_cull::ExteriorGate::build(
+@@ -97,6 +177,15 @@ pub(super) fn apply_model_visibility(
+     );
+     // The placement the camera stands in, exempt from its own window gate.
+     let own_instance = claim.0.map(|c| c.room.instance);
++    let outdoors =
++        own_instance.is_none() && matches!(gate, crate::exterior_cull::ExteriorGate::Open);
++    let walk = slices.pick(
++        scene_still,
++        camera_only,
++        outdoors,
++        cam_pos,
++        !slicing_disabled(),
++    );
+     // Parallel over every resident model submesh (~100k in a city); every write is change-gated.
+     let unmarked: bevy::platform::collections::HashSet<Entity> = unmarked.read().collect();
+     let unmarked = &unmarked;
+@@ -116,7 +205,13 @@ pub(super) fn apply_model_visibility(
+             far_side,
+             card,
+         )| {
+-            if scene_still
++            // A part waits for its slice only while its own row is still.
++            let walked = match walk {
++                Walk::Still => false,
++                Walk::Slice(s) => entity.index_u32() % SLICES == s,
++                Walk::Whole => true,
++            };
++            if !walked
+                 && !unmarked.contains(&entity)
+                 && !xf.is_changed()
+                 && !group_vis.as_ref().is_some_and(|g| g.is_changed())
+@@ -402,6 +497,69 @@ mod tests {
+     use benilla_assets::BillboardInfo;
+     use benilla_formats::{BillboardKind, ModelBlend};
+ 
++    /// A camera walking outdoors walks the parts a slice a frame, in turn; the first still frame
++    /// after catches every part up, and the frames after skip.
++    #[test]
++    fn a_walking_camera_walks_the_parts_a_slice_a_frame() {
++        let mut s = VisSlices::default();
++        let at = |x: f32| Some(Vec3::new(x, 0.0, 0.0));
++        // Nothing moved, nothing pending.
++        assert_eq!(s.pick(true, false, true, at(0.0), true), Walk::Still);
++        // The first move has no anchor: a whole walk, which sets one.
++        assert_eq!(s.pick(false, true, true, at(0.0), true), Walk::Whole);
++        let walks: Vec<Walk> = (1..=5)
++            .map(|i| s.pick(false, true, true, at(i as f32 * 0.1), true))
++            .collect();
++        assert_eq!(
++            walks,
++            [
++                Walk::Slice(0),
++                Walk::Slice(1),
++                Walk::Slice(2),
++                Walk::Slice(3),
++                Walk::Slice(0)
++            ]
++        );
++        // The camera stops: one whole walk, then nothing.
++        assert_eq!(s.pick(true, false, true, at(0.5), true), Walk::Whole);
++        assert_eq!(s.pick(true, false, true, at(0.5), true), Walk::Still);
++    }
++
++    /// A camera past the reach from the last whole walk, indoors, or with something else moving
++    /// walks every part; so does every frame under `WOW_VIS_EVERY_FRAME`.
++    #[test]
++    fn a_far_step_a_room_or_another_change_walks_every_part() {
++        let at = |x: f32| Some(Vec3::new(x, 0.0, 0.0));
++        let anchored = || {
++            let mut s = VisSlices::default();
++            assert_eq!(s.pick(false, true, true, at(0.0), true), Walk::Whole);
++            s
++        };
++        let mut s = anchored();
++        assert_eq!(
++            s.pick(false, true, true, at(SLICE_REACH + 0.5), true),
++            Walk::Whole
++        );
++        // The new anchor is where that walk stood.
++        assert_eq!(
++            s.pick(false, true, true, at(SLICE_REACH + 1.0), true),
++            Walk::Slice(0)
++        );
++        assert_eq!(
++            anchored().pick(false, true, false, at(0.1), true),
++            Walk::Whole
++        );
++        assert_eq!(
++            anchored().pick(false, false, true, at(0.1), true),
++            Walk::Whole
++        );
++        assert_eq!(
++            anchored().pick(false, true, true, at(0.1), false),
++            Walk::Whole
++        );
++        assert_eq!(anchored().pick(false, true, true, None, true), Walk::Whole);
++    }
++
+     #[test]
+     fn a_card_follows_its_owners_verdict() {
+         let mut app = App::new();
+-- 
+2.56.0.windows.4
+
