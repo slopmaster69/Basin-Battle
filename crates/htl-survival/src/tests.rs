@@ -2409,6 +2409,9 @@ fn a_crowded_shaman_throws_you_down_with_thunder_then_backs_off() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "shaman", [2.5, 0.0, 0.0]);
+    // (The dice are this seed's from here, whatever the world's content drew getting this far: the
+    // way it backs off is drawn, and about 1 draw in 3 stops it short of 4.5 yd.)
+    s.rng = rand::SeedableRng::seed_from_u64(3);
     s.mobs.get_mut(&k).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
     let _ = s.step(DT);
     let m = &s.mobs[&k];

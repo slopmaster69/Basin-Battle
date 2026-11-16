@@ -417,3 +417,169 @@ fn the_witness_follows_the_seal_in_the_journal_and_the_gate_is_a_place() {
     s.step_goals();
     assert_eq!(s.camp.goal, seal + 3);
 }
+
+// --- Stage 12: The Lion's Bargain --------------------------------------------------------------
+
+/// Whether the camp's person called `name` stands.
+fn stands(s: &Survival, name: &str) -> bool {
+    s.content.props.iter().position(|p| p.npc && p.name == name).is_some_and(|def| s.objs.values().any(|o| matches!(o.kind, ObjKind::Piece { def: d } if d == def)))
+}
+
+/// Pell through and the steward at the camp's gate, a hero beside him.
+fn venn_world() -> (Survival, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 1, 1_000_000.0);
+    // Only the archers' packs stand (unseen until the camp keeps the letter).
+    let keep: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key.starts_with("letter_"))).map(|(id, _)| *id).collect();
+    s.mobs.retain(|id, _| keep.contains(id));
+    s.respawns.clear();
+    s.camp.counts.insert("open:pell_satchel".into(), 1);
+    s.camp.raids_won = 3;
+    run(&mut s, 5.5);
+    let (_, id) = person(&s, "Steward Venn");
+    let h = beside(&mut s, id);
+    // (The purse beside him, which `beside` cleared away, back where it stands.)
+    s.replace_chests();
+    (s, h)
+}
+
+fn archers(s: &Survival) -> Vec<Id> {
+    s.mobs.iter().filter(|(_, m)| s.content.mobs[m.def].key == "stormwind_archer" && !m.hidden && m.health > 0).map(|(id, _)| *id).collect()
+}
+
+#[test]
+fn steward_venn_waits_for_pell_and_offers_to_buy_the_letter_back() {
+    let mut s = world();
+    run(&mut s, 5.5);
+    assert!(!stands(&s, "Steward Venn"), "not before Pell is through");
+    let (mut s, h) = venn_world();
+    s.interact(h, None);
+    let said = letters(&s.step(0.0));
+    assert_eq!(said.len(), 1);
+    assert!(said[0].2.starts_with("His lordship hears the camp has something of his."));
+    let links: Vec<(&str, &str)> = said[0].3.iter().map(|(c, n)| (c.as_str(), n.as_str())).collect();
+    assert_eq!(links, [(".es choose letter:sell", "Sell the Letter"), (".es choose letter:keep", "Keep the Letter")]);
+    // A building can't go up on him (he keeps his ground), and he stands outside the camp's ground.
+    let venn = s.content.props.iter().find(|p| p.name == "Steward Venn").unwrap();
+    let c = s.content.world.build_center;
+    assert!(dist2d([venn.at[0], venn.at[1], 0.0], [c[0], c[1], 0.0]) > s.content.world.build_radius, "outside the gate");
+}
+
+#[test]
+fn sold_the_purse_opens_pell_leaves_and_no_archers_come() {
+    let (mut s, h) = venn_world();
+    assert!(stands(&s, "Aldric Pell"));
+    let ev = open_at(&mut s, h, "lion_purse");
+    assert!(ev.iter().any(|e| matches!(e, Event::Tell { text, .. } if text.contains("Nobody has sold"))), "shut before the choice");
+    let (_, id) = person(&s, "Steward Venn");
+    let at = s.objs[&id].pos;
+    s.move_player(h, [at[0] + 1.5, at[1], at[2]], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    assert!(s.choose(h, "letter:sell").is_ok());
+    assert!(s.choose(h, "letter:keep").unwrap_err().contains("already decided"));
+    let _ = s.step(0.05);
+    assert!(!stands(&s, "Steward Venn"), "he goes with the answer");
+    assert!(!stands(&s, "Aldric Pell"), "Pell goes too");
+    open_at(&mut s, h, "lion_purse");
+    let bag = &s.players[&h].bag;
+    for (k, n) in [("silver", 8), ("bronze", 4), ("pearl", 2)] {
+        assert_eq!(bag.get(&s.content.item(k).unwrap()), Some(&n), "{k}");
+    }
+    run(&mut s, 6.0);
+    assert!(archers(&s).is_empty(), "no archers for a camp that sold");
+    let (wdef, _) = person(&s, "Marshal Wyle");
+    assert_eq!(s.talk_line(wdef).unwrap().text, "We sold it. Like everyone else in Elwynn.");
+}
+
+#[test]
+fn kept_pell_stays_and_two_stormwind_archers_stand_at_the_gate_for_good() {
+    let (mut s, h) = venn_world();
+    assert!(archers(&s).is_empty(), "unseen before the camp answers");
+    let (_, id) = person(&s, "Steward Venn");
+    let at = s.objs[&id].pos;
+    s.move_player(h, [at[0] + 1.5, at[1], at[2]], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    assert!(s.choose(h, "letter:keep").is_ok());
+    run(&mut s, 6.0);
+    assert!(!stands(&s, "Steward Venn"));
+    assert_eq!(archers(&s).len(), 2, "the archers come");
+    assert!(archers(&s).iter().all(|a| s.mobs[a].friendly));
+    let (pdef, _) = person(&s, "Aldric Pell");
+    assert!(s.talk_line(pdef).unwrap().text.starts_with("The Guard keeps me at the gate"));
+    let ev = open_at(&mut s, h, "lion_purse");
+    assert!(ev.iter().any(|e| matches!(e, Event::Tell { text, .. } if text.contains("Nobody has sold"))), "no purse for a camp that kept it");
+    // A save keeps them: read back, the archers stand at once.
+    let save = s.save(&std::collections::BTreeMap::new());
+    let back = Survival::load(s.content.clone(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    assert_eq!(archers(&back).len(), 2);
+}
+
+#[test]
+fn the_archers_shoot_a_raider_at_the_camps_buildings() {
+    let (mut s, h) = venn_world();
+    s.camp.counts.insert("chose:letter".into(), 1);
+    s.camp.counts.insert("chose:letter:keep".into(), 1);
+    run(&mut s, 6.0);
+    let a = archers(&s)[0];
+    let at = s.mobs[&a].pos;
+    // A raider near them, on its way to a station (no hero in its fight).
+    let def = s.content.mob("defias_thug").unwrap();
+    let r = s.spawn_mob(def, [at[0] + 10.0, at[1], at[2]], None, false);
+    s.mobs.get_mut(&r).unwrap().raider = true;
+    s.move_player(h, [at[0] - 30.0, at[1] - 30.0, at[2]], 0.0, Moving::default());
+    let before = s.mobs[&r].health;
+    run(&mut s, 3.0);
+    assert!(s.mobs.get(&r).is_none_or(|m| m.health < before), "shot");
+    // An idle creature that isn't raiding is left alone.
+    let idle = s.spawn_mob(def, [at[0] + 10.0, at[1] + 6.0, at[2]], None, false);
+    let before = s.mobs[&idle].health;
+    for id in s.mobs.keys().copied().collect::<Vec<_>>() {
+        if id != idle && !s.mobs[&id].friendly {
+            s.mobs.remove(&id);
+        }
+    }
+    run(&mut s, 3.0);
+    assert_eq!(s.mobs[&idle].health, before);
+}
+
+#[test]
+fn a_pack_with_a_condition_of_its_own_stays_unseen_until_it_holds() {
+    let mut s = world();
+    let k = s.content.packs.iter().position(|p| p.key == "letter_archer_east").unwrap();
+    let def = s.content.mob("stormwind_archer").unwrap();
+    let at = s.content.packs[k].at;
+    let m = s.spawn_mob(def, [at[0], at[1], 0.0], Some(k), false);
+    assert!(s.mobs[&m].hidden, "unseen before the choice");
+    run(&mut s, 6.0);
+    assert!(s.mobs[&m].hidden);
+    s.camp.counts.insert("chose:letter".into(), 1);
+    s.camp.counts.insert("chose:letter:sell".into(), 1);
+    run(&mut s, 6.0);
+    assert!(s.mobs[&m].hidden, "the other option doesn't bring them");
+    let mut s = world();
+    let m = s.spawn_mob(def, [at[0], at[1], 0.0], Some(k), false);
+    s.camp.counts.insert("chose:letter".into(), 1);
+    s.camp.counts.insert("chose:letter:keep".into(), 1);
+    let ev = run(&mut s, 6.0);
+    assert!(!s.mobs[&m].hidden);
+    assert!(ev.iter().any(|e| matches!(e, Event::MobSpawned { id } if *id == m)), "drawn as it comes");
+}
+
+#[test]
+fn the_bargain_follows_the_lions_knife_in_the_journal() {
+    let c = Content::builtin();
+    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
+    assert_eq!(at("The Lion's Bargain"), at("The Lion's Knife") + 1);
+    let g = &c.goals[at("The Lion's Bargain")];
+    assert_eq!((g.kind.as_str(), g.what.as_str()), ("chose", "letter"));
+    assert!(crate::save::ELWYNN_GOALS >= 18);
+    let mut s = world();
+    s.camp.goal = at("The Lion's Bargain");
+    s.step_goals();
+    assert_eq!(s.camp.goal, at("The Lion's Bargain"));
+    s.camp.counts.insert("chose:letter".into(), 1);
+    s.camp.counts.insert("chose:letter:keep".into(), 1);
+    s.step_goals();
+    assert!(s.camp.goal > at("The Lion's Bargain"));
+}

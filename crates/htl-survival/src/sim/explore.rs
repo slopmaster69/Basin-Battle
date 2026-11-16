@@ -57,6 +57,33 @@ impl Survival {
         self.grow_camp(false);
     }
 
+    /// Whether pack `k`'s condition holds (its `after`; none: always).
+    pub(crate) fn pack_due(&self, k: usize) -> bool {
+        self.content.packs[k].after.as_deref().is_none_or(|a| self.camp_has(a))
+    }
+
+    /// Packs that stand once the camp has come this far (`after`, not woken by a chest nor lying in
+    /// wait): those whose condition holds now come into sight.
+    fn packs_come(&mut self) {
+        let due: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.hidden && m.health > 0)
+            .filter(|(_, m)| m.pack.is_some_and(|k| {
+                let p = &self.content.packs[k];
+                p.after.is_some() && p.wake.is_empty() && p.hidden <= 0.0 && self.pack_due(k)
+            }))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in due {
+            self.mobs.get_mut(&id).unwrap().hidden = false;
+            self.events.push(Event::MobSpawned { id });
+            if self.content.mobs[self.mobs[&id].def].aura != 0 {
+                self.events.push(Event::Auras { id });
+            }
+        }
+    }
+
     /// Whether prop `k` has gone: its `until` holds.
     fn prop_gone(&self, k: usize) -> bool {
         self.content.props[k].until.as_deref().is_some_and(|u| self.camp_has(u))
@@ -155,6 +182,8 @@ impl Survival {
         if self.is_below() || self.is_siege() {
             return;
         }
+        // Packs whose time has come stand.
+        self.packs_come();
         // What the camp has outgrown goes (a person taken away: `until`), and never stands again.
         let gone: Vec<Id> = self
             .objs
@@ -666,8 +695,9 @@ impl Survival {
     }
 
     /// Each friendly shooter (`shoots` on its `[[mob]]`) shoots the nearest foe in reach that is
-    /// fighting a hero, every so often, if it can see it: a hero's helper, as a tower is, and a
-    /// foe it finishes counts for the camp. It never shoots an idle pack, nor a hero.
+    /// fighting a hero (or one the heroes guard), or a raider on its way to or at a station, every
+    /// so often, if it can see it: a hero's helper, as a tower is, and a foe it finishes counts for
+    /// the camp. It never shoots an idle pack, nor a hero.
     pub(crate) fn allies_shoot(&mut self) {
         let now = self.clock;
         let shooters: Vec<(Id, Vec3, crate::content::ShootDef)> = self
@@ -687,7 +717,10 @@ impl Survival {
                 .mobs
                 .iter()
                 .filter(|(id, m)| **id != a && m.health > 0 && !m.hidden && !m.friendly && !self.content.mobs[m.def].inert())
-                .filter(|(_, m)| matches!(m.state, mobs::MobState::Chase { foe: mobs::Foe::Hero(_) | mobs::Foe::Mob(_) } | mobs::MobState::Windup { foe: mobs::Foe::Hero(_) | mobs::Foe::Mob(_), .. }))
+                .filter(|(_, m)| {
+                    matches!(m.state, mobs::MobState::Chase { foe: mobs::Foe::Hero(_) | mobs::Foe::Mob(_) } | mobs::MobState::Windup { foe: mobs::Foe::Hero(_) | mobs::Foe::Mob(_), .. })
+                        || (m.raider && !matches!(m.state, mobs::MobState::Dead { .. }))
+                })
                 .filter(|(_, m)| dist2d(m.pos, at) <= sh.range && crate::land::clear_line(self.land.as_ref(), eye, [m.pos[0], m.pos[1], m.pos[2] + 1.0]))
                 .min_by(|x, y| dist2d(x.1.pos, at).total_cmp(&dist2d(y.1.pos, at)))
                 .map(|(id, _)| *id);
@@ -766,7 +799,7 @@ impl Survival {
             .filter(|(_, m)| m.hidden && m.health > 0)
             .filter_map(|(id, m)| {
                 let p = &self.content.packs[m.pack?];
-                (p.wake.is_empty() && p.hidden > 0.0).then_some((*id, m.pos, p.hidden))
+                (p.wake.is_empty() && p.hidden > 0.0 && self.pack_due(m.pack?)).then_some((*id, m.pos, p.hidden))
             })
             .collect();
         for (m, pos, r) in waiting {

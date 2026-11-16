@@ -1249,6 +1249,7 @@ so as it does:
 | The Horde Warband beaten | A second tower over the west wall, Marshal Wyle by the fire |
 | The Blackrock Assault beaten | Westbrook's footmen, a second weapon rack |
 | Brannick the Mason killed (in the fifth raid) | A stonemason from Stormwind, who mends the wall he built (`after = "kill:brannick"`) |
+| The letter kept from House Lescovar (Stage 12) | Two Stormwind archers outside the gate, who shoot raiders (`after = "chose:letter:keep"` on their packs) |
 
 **The Brotherhood's hand** (Stage 2 of docs/elwynn-expansion.md). The Brotherhood is selling Elwynn's
 roads to the Horde. The Defias Messenger (not a rare; he respawns after 15 min, and under 35% of
@@ -1397,6 +1398,16 @@ Two quick cuts (parry the first and the second never comes) and a lunge; from ha
 man.") a slow throat-cut, glowing red, that nothing blocks: struck as he winds it up at Pell, it comes at the hero
 instead, so step out of it. Once Pell is through he stands at the gate with words of his own, and Wyle has a new
 line. Two goals follow (the seal-cutter, the Lion's Knife).
+
+**The Lion's Bargain** (Stage 12 of docs/elwynn-expansion.md). Once Pell is through, Steward Venn of House Lescovar
+waits outside the camp's gate (not asked in) with an offer for the letter: the camp's second choice, `.es choose
+letter:sell` or `letter:keep`, made once, by any hero, and he goes with the answer. *Sell the Letter*: the Lion's
+Purse at the gate opens (8 silver, 4 bronze, 2 pearls), Pell leaves the city's gate, and Wyle says what he thinks of
+it. *Keep the Letter*: Pell stays at the gate to swear before the House, and two Stormwind archers stand at the
+camp's gate for good, friendly shooters that shoot a raider on its way to, or at, the camp's buildings, as well as
+what fights a hero. A pack's `after` now works on any pack: one whose condition doesn't hold is unseen (an ambusher
+lying in wait never steps out) until it does, and the camp is looked over as it grows; it stays standing from then,
+across saves. The journal asks for the answer.
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set
