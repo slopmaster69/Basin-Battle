@@ -99,3 +99,7 @@ solo/duo dungeon clears, and a full fight with optional floor markers disabled.
   stalls: at most 14 sec (plus the 7 sec the axes show) before he can be hurt again.
 - **Left out:** the axes thrown down at 33%. No known object display shows an axe; it needs a
   native-data lookup of one. The sword and the waiting hammer are the objects left on the floor.
+- **The last hero leaving puts it all back at once** (`arsenal_abandoned`, called from
+  `Survival::leave`). The world takes no steps with nobody in it, so the rack, its lamps, the
+  weapons lying there, the stage he had reached and his held health would have stood until the
+  next hero came. They go now: the sword back in his hand, his health whole, he at his post.

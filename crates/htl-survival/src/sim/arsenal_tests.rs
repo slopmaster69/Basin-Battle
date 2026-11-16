@@ -357,3 +357,121 @@ fn a_lost_fight_puts_the_hold_and_the_stages_back() {
     assert_eq!(s.mobs[&boss].phase, 0);
     assert!(s.arsenal.racks.is_empty());
 }
+
+fn props_standing(s: &Survival) -> usize {
+    s.objs.values().filter(|o| matches!(o.kind, ObjKind::Prop { .. })).count()
+}
+
+fn assert_rack_put_back(s: &Survival, boss: Id) {
+    assert!(s.arsenal.racks.is_empty(), "the rack is gone");
+    assert_eq!(props_standing(s), 0, "no rack, lamp or weapon left standing");
+    let m = &s.mobs[&boss];
+    assert_eq!(m.phase, 0, "the sword back in his hand");
+    assert_eq!(m.health, m.max_health, "his health whole");
+    assert_eq!(m.pos, m.home, "at his post");
+    assert!(matches!(m.state, MobState::Idle { .. }), "at rest");
+    assert!(m.pattern.is_none());
+}
+
+#[test]
+fn the_last_hero_leaving_at_the_rack_puts_the_whole_fight_back_at_once() {
+    let (mut s, h, boss, _) = fight(false);
+    hurt_to(&mut s, h, boss, 0.6);
+    let until = s.clock + 20.0;
+    while !s.arsenal_hands_empty(boss) && s.clock < until { tick(&mut s, 0.05); }
+    assert!(s.arsenal_hands_empty(boss) && lying(&s, SWORD_LEFT));
+    s.leave(h);
+    assert_rack_put_back(&s, boss);
+}
+
+#[test]
+fn the_last_hero_leaving_with_the_hammer_waiting_or_taken_puts_it_back() {
+    for stage in [1usize, 2] {
+        let (mut s, h, boss, _) = fight(false);
+        hurt_to(&mut s, h, boss, 0.6);
+        wait_stage(&mut s, boss, 1, 20.0);
+        if stage == 2 {
+            hurt_to(&mut s, h, boss, 0.3);
+            wait_stage(&mut s, boss, 2, 30.0);
+            tick(&mut s, 1.0);
+        }
+        s.leave(h);
+        assert_rack_put_back(&s, boss);
+        // The next hero finds the sword and a fresh rack: the hammer waiting, the lamps lit.
+        let n = s.join("next", "Next", None);
+        s.players.get_mut(&n).unwrap().pos = [2.5, 0.0, 0.0];
+        tick(&mut s, 0.2);
+        assert_eq!(s.arsenal.racks.len(), 1);
+        assert!(lying(&s, HAMMER_WAITING) && !lying(&s, SWORD_LEFT));
+        assert_eq!(s.arsenal_loadout(boss).unwrap().grip, "sword");
+    }
+}
+
+#[test]
+fn a_rack_at_rest_is_left_standing_when_a_hero_passes_by_and_leaves() {
+    let (mut s, h, boss, _) = fight(false);
+    s.mobs.get_mut(&boss).unwrap().state = MobState::Idle { wander_at: 100.0 };
+    s.arsenal.racks.get_mut(&boss).unwrap().began_fight = false;
+    let rack = s.arsenal.racks[&boss].prop;
+    s.leave(h);
+    assert!(s.objs.contains_key(&rack));
+}
+
+#[test]
+fn one_hero_leaving_keeps_the_fight_and_the_rack_for_the_other() {
+    let (mut s, h, boss, other) = fight(true);
+    let other = other.unwrap();
+    hurt_to(&mut s, h, boss, 0.6);
+    while s.arsenal.racks[&boss].transition.is_none() { tick(&mut s, 0.05); }
+    s.leave(h);
+    assert!(!s.arsenal.racks.is_empty());
+    assert_eq!(s.mobs[&boss].state.target(), Some(other));
+    wait_stage(&mut s, boss, 1, 20.0);
+    assert_eq!(s.mobs[&boss].phase, 1);
+}
+
+#[test]
+fn the_dead_hero_left_in_the_room_does_not_hold_the_fight_up() {
+    // One dead, one alive at the far end of the room; the live one leaves: the dead one is still
+    // in the world, so the world steps and the fight is put back by its own end.
+    let (mut s, h, boss, other) = fight(true);
+    let other = other.unwrap();
+    s.players.get_mut(&other).unwrap().health = 0;
+    s.players.get_mut(&h).unwrap().pos = [-12.0, 0.0, 0.0];
+    hurt_to(&mut s, h, boss, 0.6);
+    while s.arsenal.racks[&boss].transition.is_none() { tick(&mut s, 0.05); }
+    s.leave(h);
+    tick(&mut s, 3.0);
+    assert!(s.arsenal.racks.is_empty() || s.arsenal.racks.values().all(|r| !r.began_fight) , "the rack of the lost fight is gone");
+    assert_eq!(s.mobs[&boss].phase, 0);
+}
+
+#[test]
+fn the_hold_stops_a_big_blow_a_burn_and_another_heros_hits_alike() {
+    let (mut s, h, boss, other) = fight(true);
+    let other = other.unwrap();
+    let max = s.mobs[&boss].max_health;
+    let line1 = (0.66 * max as f32).floor() as u32;
+    // Another hero's single blow bigger than the whole gap.
+    s.hurt_mob(boss, other, max);
+    assert_eq!(s.mobs[&boss].health, line1);
+    // Damage over time (any label) and more blows, at the rack and after: still held.
+    for label in ["Burn", "Bleed", "Melee"] {
+        s.hurt_mob_as(boss, h, max, label);
+        assert_eq!(s.mobs[&boss].health, line1, "{label} held at the line");
+    }
+    assert_eq!(s.mobs[&boss].phase, 0, "no stage skipped");
+    wait_stage(&mut s, boss, 1, 20.0);
+    s.hurt_mob_as(boss, other, max, "Burn");
+    assert_eq!(s.mobs[&boss].health, (0.33 * max as f32).floor() as u32);
+}
+
+#[test]
+fn a_held_smite_with_nobody_hitting_still_finishes_the_change() {
+    // The hold must never stall him: with the blow gone, he still reaches the rack and stands.
+    let (mut s, h, boss, _) = fight(false);
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, h, max);
+    s.players.get_mut(&h).unwrap().pos = [2.5, 0.0, 0.0];
+    wait_stage(&mut s, boss, 1, CHANGE_LIMIT + 6.0);
+}
