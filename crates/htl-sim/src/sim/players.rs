@@ -765,8 +765,10 @@ impl Sim {
         self.events.push(Event::Talents { player: id });
         if let Some(pet) = self.entities.get(&id).and_then(|e| e.player()).and_then(|p| p.pet) {
             self.halt_enemy(pet);
-            self.entities.remove(&pet);
-            self.events.push(Event::Despawn { id: pet });
+            // (A new run's `reset` has despawned every ally, pets among them, already: once only.)
+            if self.entities.remove(&pet).is_some() {
+                self.events.push(Event::Despawn { id: pet });
+            }
             if let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) {
                 p.pet = None;
                 p.pet_back_at = 0.0;

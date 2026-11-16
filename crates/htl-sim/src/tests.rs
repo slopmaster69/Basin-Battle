@@ -4046,3 +4046,23 @@ fn shadow_priest_silences_and_embraces() {
     assert!(broke, "Silence broke the cast");
     assert!(s.health_for_test(ally).0 > hurt, "Vampiric Embrace mended the hurt warrior");
 }
+
+/// Found by the soak: a new run despawned every ally in `reset`, and `reset_player` then despawned
+/// the Hunter's pet a second time (`p.pet` still named it), so the stream said an entity was gone
+/// twice in the one tick.
+#[test]
+fn a_new_run_despawns_a_hunters_pet_once() {
+    let mut s = sim();
+    s.add_player("Ayla", "hunter", Luck::default());
+    let mut l = Ledger::new(&s);
+    for _ in 0..100 {
+        let ev = s.step(0.05);
+        l.see(&s, &ev);
+    }
+    let pet = s.entities().into_iter().find(|e| matches!(e.what, What::Ally { pet: true, .. })).expect("the hunter's pet is out").id;
+    s.restart();
+    let ev = s.step(0.05);
+    let gone = ev.iter().filter(|e| matches!(e, Event::Despawn { id } if *id == pet)).count();
+    assert_eq!(gone, 1, "the pet is despawned once: {ev:?}");
+    l.see(&s, &ev);
+}
