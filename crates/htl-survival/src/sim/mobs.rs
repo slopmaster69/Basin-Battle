@@ -815,6 +815,22 @@ impl Survival {
         true
     }
 
+    /// A parried blow of a string marked `parry_ends` ends the string (a creature that isn't
+    /// staggered by the parry, a boss, still loses the rest of it; its own cooldown then runs).
+    pub(crate) fn end_string_parried(&mut self, mid: Id) {
+        let now = self.clock;
+        let Some(m) = self.mobs.get(&mid) else { return };
+        let Some((k, _)) = m.pattern else { return };
+        if !self.content.mobs[m.def].patterns.get(k).is_some_and(|p| p.parry_ends) {
+            return;
+        }
+        let cd = self.string_cooldown(self.content.mobs[m.def].attack.cooldown * self.pace(mid));
+        let m = self.mobs.get_mut(&mid).unwrap();
+        m.pattern = None;
+        m.string_len = 0;
+        m.ready_at = m.ready_at.max(now + cd);
+    }
+
     /// Whether creature `mid` is reeling from a broken stance now.
     pub fn stance_broken(&self, mid: Id) -> bool {
         self.mobs.get(&mid).is_some_and(|m| m.posture_guard > self.clock + POSTURE_GRACE && m.stagger_until > self.clock)
