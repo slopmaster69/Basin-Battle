@@ -1,0 +1,68 @@
+# Hand-built from the v0.4.x save shape: a Warrior with an off hand, armor, a pack, retired
+# weapons (in hand, off hand, bag, chest, a cache, honed copies), old card keys, a goal by title,
+# a Deadmines run. Made by hand; not a real save.
+version = 1
+next_uid = 40
+raids_won = 6
+goal = 20
+goal_title = "The Overseer"
+found = ["fargodeep"]
+
+[counts]
+grunts = 12
+
+[opened]
+chest_a = 1000900.0
+
+[storage]
+goblin_axe = 1
+squall_staff_honed2 = 1
+wood = 5
+
+[[caches]]
+uid = 9
+owner = "ayla"
+pos = [4.0, 4.0, 0.0]
+[caches.items]
+goblin_wrench = 1
+ore = 3
+
+[below]
+lit = ["landing"]
+open = ["gate_a"]
+slain = ["rhahkzor"]
+looted = ["box_a"]
+run_at = 1000200.0
+[below.heroes.ayla]
+lamp = "landing"
+draughts = 3
+flasks = 2
+
+[players.ayla]
+pos = [5.0, 6.0, 0.0]
+facing = 0.5
+health = 60
+stamina = 30.0
+weapon = "goblin_axe_honed1"
+shield = "buckler"
+off_hand = "goblin_wrench"
+bow = "bow"
+dead = false
+class = "warrior"
+owner = ""
+name = "Ayla"
+valor = 33.0
+quick = "apprentice_staff"
+pack = "no_such_pack_any_more"
+owned = ["aimed_throw", "sundering_blow", "unstoppable_blow", "avatar", "onslaught", "ravager", "gone_card"]
+[players.ayla.bag]
+goblin_axe = 1
+squall_staff = 1
+apprentice_staff_honed2 = 1
+ore = 3
+a_vanished_item = 4
+[players.ayla.armor]
+head = "leather_cap"
+[players.ayla.loadout]
+ranged = "aimed_throw"
+close = "sundering_blow"

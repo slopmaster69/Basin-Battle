@@ -1,0 +1,63 @@
+# Hand-built from the v0.1.0 save shape: no class, no off hand, no cards, no goal title, no
+# Valor, no found places. Made by hand; not a real save.
+version = 1
+next_uid = 7
+raids_won = 2
+goal = 5
+
+[storage]
+wood = 9
+ore = 4
+
+[[stations]]
+uid = 3
+key = "cooking"
+pos = [10.0, 12.0, 0.0]
+facing = 1.5
+health = 80
+damaged = true
+
+[[nodes]]
+key = "wood-1"
+item = "wood"
+pos = [30.0, 30.0, 0.0]
+facing = 0.0
+uses = 0
+ready = false
+back_at = 1000500.0
+
+[[caches]]
+uid = 5
+owner = "bren"
+pos = [4.0, 4.0, 0.0]
+[caches.items]
+ore = 2
+
+[raid]
+warning = false
+timer = 12.5
+queue = ["grunt", "grunt", "overseer"]
+
+[players.ayla]
+pos = [5.0, 6.0, 0.0]
+facing = 0.5
+health = 77
+stamina = 40.0
+weapon = "sword"
+shield = "buckler"
+bow = "bow"
+dead = false
+[players.ayla.bag]
+ore = 3
+wood = 2
+
+[players.bren]
+pos = [1.0, 1.0, 0.0]
+facing = 0.0
+health = 0
+stamina = 10.0
+weapon = "axe"
+shield = "buckler"
+bow = "bow"
+dead = true
+[players.bren.bag]

@@ -1,0 +1,25 @@
+# Hand-built: a Priest as the early drafts saved one (Mind Blast on the close key, Mind Flay on
+# the ranged key, Leap of Faith, Dispersion, Shadowguard, the Barrier on the defense key).
+# Made by hand; not a real save.
+version = 1
+next_uid = 2
+
+[players.mira]
+pos = [0.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "ember_staff"
+shield = "buckler"
+bow = "bow"
+dead = false
+class = "priest"
+name = "Mira"
+valor = 10.0
+owned = ["mind_flay", "mind_blast", "leap_of_faith", "dispersion", "shadowguard", "power_word_barrier"]
+[players.mira.bag]
+[players.mira.loadout]
+ranged = "mind_flay"
+close = "mind_blast"
+utility = "leap_of_faith"
+defense = "power_word_barrier"
