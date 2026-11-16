@@ -9,9 +9,9 @@
 //! ```
 //!
 //! - `SOAK_MINUTES` (default 120): simulated minutes in all, at 20 Hz. Elwynn gets 45 %, the
-//!   dungeons together 40 %, the Basin Battle siege 15 %. The whole journal takes about 70
-//!   simulated minutes of Elwynn (so 160 here); give it more to see what the finished camp does
-//!   over hours (a run of 2000 is 15 minutes of real time).
+//!   dungeons together 40 %, the Basin Battle siege 15 %. The whole journal takes about 170
+//!   simulated minutes of Elwynn (so a run of at least 400 here); give it more to see what the
+//!   finished camp does over hours (a run of 1500 is 15 minutes of real time).
 //! - `SOAK_SEED` (default 20261115): the seed. It is printed at the start of every phase, so a
 //!   failure reproduces with the same two variables.
 //! - `SOAK_ONLY` (optional): `elwynn`, `dungeons` or `siege`, to run one phase alone.
