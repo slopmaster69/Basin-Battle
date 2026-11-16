@@ -220,3 +220,26 @@ Built as planned, with these differences, found checking the plan against the co
 - Label every PR "needs playtest". NO filming.
 - Run `elwynn_probe` if the WoW data is present; otherwise list placements as unverified.
 - No new client patch. All models are stock 1.12.
+
+# Round two: "The Lion's Seal" (stages 6 to 10)
+
+Designed 16 Nov 2026 from origin/main @23ff9db1, built from the plan's approved defaults. Stages are ticked as they land.
+
+Defaults for Corey's open questions, all reversible:
+- Lescovar is the buyer. That is our own addition: in vanilla his treason is with the Defias.
+- The invented names stay: the Mason's Cairn, the Parley Stones, the Blackrock Envoy, the Silent Blade and the marked stones.
+- Remy's choice is camp-wide and one-time, and any hero can make it.
+- A true escort stays deferred (it needs a `Foe::Mob` target).
+
+Story spine: Gruff's Riverpaw were paid in Brotherhood silver. A tally stick points to Brannick's cairn. His road book names "R. at the Lion's Pride". Remy "Two Times" sold the watch rosters to a man in black. The Stonefield wagon note names a parley. At the parley Marzon the Silent Blade sells the Redridge road to a Blackrock envoy, and his satchel carries Lord Gregor Lescovar's seal.
+
+Journal: every new goal goes just before "Every corner". `ELWYNN_GOALS` in `save.rs` goes 8, 9, 10, 11, 12, 15. "Every corner" equals the site count (36, then 37 in Stage 7, then 38 in Stage 10). Every placement was probed with `elwynn_probe` against the real data in `C:\WoW\Data` (its `near` mode), and a failing spot was moved nearby. The tests are in `tests_story2.rs`, with `tests_story.rs`'s old-save, goal-order and sites-equal-corner tests extended.
+
+## Stage 6: Gruff Swiftbite [x] (content only)
+
+Built as planned, with these differences, found checking the plan against the code:
+- `evade` is a creature field, and `evade_heavy` (in `sim/mobs.rs`) is the mechanism: it runs as a hero's heavy begins, for a creature in `Chase` with `stagger_until <= clock`, within 4.5 yd and 60 degrees of the hero's facing. A parried Gruff reels, so he cannot step back, exactly as the plan says.
+- His goal is placed with the other goals before "Every corner", not in his block (a goal's place in the journal is its place in the file). `ELWYNN_GOALS` is 9.
+- His spots are all probed clear: (-9930, 600), (-10010, 660) and (-9880, 720), each more than 250 yd from the camp and at least 20 yd from Hogger's.
+
+Rule: "He steps out of every heavy. Parry him, and the heavy lands while he reels." The Riverpaw Tribute (259) at (-9965, 628) stays shut while he lives.

@@ -912,7 +912,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
 | The Goldshire road, north-west of the crossroads | Stitches (rare), a flesh golem who walks the cobbled road between the bridge and the crossroads |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
-| Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista |
+| Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista; Gruff Swiftbite (rare, three spots in the west) and the Riverpaw Tribute he sits on |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
 
 **Characters.** Each login can have up to ten characters, made on the client's own creation
@@ -967,7 +967,7 @@ hero comes near; spiders drop out of the dark at Jasperlode.
 
 **Rares** wander between spots and come back somewhere else a while after they fall; their fall,
 and their return (and where they've been seen), is told to everyone: Hogger, Garrick Padfoot, Taskmaster Snivvle, Grizzlefin, Mother Fang, Goldtooth,
-Princess. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
+Princess, Gruff Swiftbite. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
 a parry only fills a boss's posture (it never stun-locks one), so Goldtooth's, Morgan's and Paymaster
 Voss's flurries carry `parry_ends = true`, which ends the string at a parry without a reel
 (`tests_boss_rules.rs` checks every such comment against the sim). Every champion and rare leaves a trophy in the chest the first time (Hogger's Cudgel,
@@ -1286,6 +1286,14 @@ At arm's length he swings his maul (an overhead, glowing, or a wide sweep). At 5
 the stones, lads." and every heavy blow leaves burning pitch where it lands (Fire's look: the flames are
 the pitch, for Corey to say). When he falls a stonemason from Stormwind comes to the camp. What comes
 back after the raid is the next one, a raider more of each kind. The goal is the raid's place in the list (4).
+
+**Gruff Swiftbite** (Stage 6 of docs/elwynn-expansion.md). A rare gnoll runner of the Riverpaw runs between three
+spots in Forest's Edge, clear of Hogger's (`spots`), and comes back 25 min after he falls. He is not a `boss`,
+so a parry makes him reel. The rule: he steps out of every heavy attack wound up at him from the front
+(`evade = 0.95`), and his backstep is the tell. Parry him, and the heavy lands while he reels. He bites in
+quick strings (parry the first and he reels) and lunges from 5 to 12 yd. The Riverpaw Tribute (Brotherhood
+silver and a mason's tally stick) stays shut while he lives. The journal asks for his fall, and Wren says a
+word once he is gone.
 
 The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
 A camp from before the move keeps its stations: each standing outside the new building ground is

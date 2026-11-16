@@ -3756,6 +3756,13 @@ what = "4"
 reward = { silver = 3, bronze = 4 }
 
 [[goal]]
+title = "Gruff Swiftbite"
+text = "Kill Gruff Swiftbite, who runs with the Riverpaw at Forest's Edge. He steps out of every heavy attack, so parry him first."
+kind = "kill"
+what = "gruff_swiftbite"
+reward = { silver = 2, hide = 3 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
@@ -9913,6 +9920,77 @@ text = "Five raids, and the wall's still up. It's better stone than he gave us c
 
 # === end of Stage 5's block ============================================================================
 
+# === Elwynn expansion, round two, Stage 6: Gruff Swiftbite (docs/elwynn-expansion.md) ===============
+# Gruff Swiftbite runs with the Riverpaw at Forest's Edge, in Hogger's country but never on his
+# ground. He steps out of every heavy attack wound up at him, and a parry makes him reel: parry him,
+# and the heavy lands while he reels. (He is a rare and not a `boss`: a parry only fills a boss's
+# posture, and Gruff has to reel.) The tell is his backstep.
+
+[[mob]]
+key = "gruff_swiftbite"
+name = "Gruff Swiftbite"
+subname = "Riverpaw Runner"
+display = 383
+scale = 1.25
+health = 380
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 18.0
+leash = 45.0
+# He steps back out of nearly every heavy attack, from the front, while he is in the chase.
+evade = 0.95
+drops = { hide = [2, 3], meat = [1, 2], linen = [1, 2] }
+trophy = { silver = 2 }
+respawn = 1500.0
+  [mob.attack]
+  windup = 0.5
+  damage = 13
+  range = 3.0
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 260.0
+  lock = 0.25
+  blockable = true
+  # Three quick bites: parry the first and he reels.
+  [[mob.pattern]]
+  name = "bite string"
+  weight = 3.0
+  steps = [ { clip = 16, take = 0, windup = 0.45, damage = 9, recovery = 0.1 }, { clip = 16, take = 1, windup = 0.25, damage = 9, recovery = 0.1 }, { clip = 16, take = 0, windup = 0.27, damage = 12, recovery = 1.0 } ]
+  # A lunge from a few strides off.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 12.0
+  steps = [ { clip = 19, take = 1, windup = 0.7, lunge = 6.0, damage = 18, recovery = 1.1 } ]
+
+# Where he runs: three spots in Forest's Edge, away from the camp and from Hogger's three.
+[[pack]]
+mob = "gruff_swiftbite"
+at = [-9930.0, 600.0]
+radius = 0.0
+count = 1
+link = 0.0
+spots = [[-9930.0, 600.0], [-10010.0, 660.0], [-9880.0, 720.0]]
+rare = true
+
+# What the Riverpaw were paid. It stays shut while Gruff lives.
+[[chest]]
+key = "riverpaw_tribute"
+name = "Riverpaw Tribute"
+at = [-9965.0, 628.0]
+display = 259
+after = "gruff_swiftbite"
+locked = "Gruff Swiftbite sits on it."
+respawn = 1800.0
+loot = { silver = 2, hide = 3 }
+text = "Brotherhood silver, paid by the head, and a mason's tally stick. It reads 'Rest at the cairn above the lake. B.'"
+
+# (Its goal, "Gruff Swiftbite", sits with the journal's other goals, just before "Every corner".)
+
+# === end of Stage 6's block ============================================================================
+
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
 [[mob]]
@@ -14053,6 +14131,10 @@ text = "Hides are worth more than the meat. The boars know it too, from how they
 [[prop.talk]]
 after = "raids:1"
 text = "A raider left a boot in my snare. One boot. I'd like the rest of him to keep his distance."
+
+[[prop.talk]]
+after = "kill:gruff_swiftbite"
+text = "Swiftbite's gone. The Riverpaw were paid to keep the west road busy, and they earned it."
 
 # Once there's a cauldron: the herbalist and her sacks.
 [[prop]]
