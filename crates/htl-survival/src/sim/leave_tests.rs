@@ -145,3 +145,19 @@ fn a_leaver_takes_their_refusal_clock_and_cc_log_with_them() {
     assert!(!s.cc_log.contains_key(&a), "cc log");
     assert!(!s.no_error_speech.contains(&a), "error speech switch");
 }
+
+/// Found by the soak: the Hunter's Call of the Wild chain and the Priest's per-hero notes were
+/// kept by hero id for good, a few entries for every Hunter or Priest who ever left.
+#[test]
+fn a_leaver_takes_their_class_notes_with_them() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla");
+    s.hunt.wild.insert(a, hunter::Wild::default());
+    s.light.deaths.insert(a, true);
+    s.light.recoiled.insert(a, 1.0);
+    s.light.last_bolt.insert(a, 1.0);
+    s.light.empower_shown.insert(a);
+    s.leave(a);
+    assert!(s.hunt.wild.is_empty(), "the wild chain");
+    assert!(s.light.deaths.is_empty() && s.light.recoiled.is_empty() && s.light.last_bolt.is_empty() && s.light.empower_shown.is_empty(), "the priest's notes");
+}
