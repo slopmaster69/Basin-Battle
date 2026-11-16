@@ -951,7 +951,6 @@ impl SurvivalGame {
         }
     }
 
-    /// Each tick: what changed on every add-on's screen.
     /// A hero whose client hasn't said hello (`.es hello`) a few seconds after coming in has no
     /// add-on (or it didn't load): the host's log says so once, since they play the stock
     /// interface and the screens that need it are missing.
@@ -968,6 +967,7 @@ impl SurvivalGame {
         }
     }
 
+    /// Each tick: what changed on every add-on's screen.
     pub(crate) fn ui_flush(&mut self) {
         /// The HUD lines that don't depend on the hero.
         struct SharedLines {
