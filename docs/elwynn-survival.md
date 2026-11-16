@@ -1240,7 +1240,6 @@ so as it does:
 
 | When | What comes |
 | --- | --- |
-| The letter kept from House Lescovar (Stage 12) | Two Stormwind archers outside the gate, who shoot raiders (`after = "chose:letter:keep"` on their packs) |
 | A cooking fire built | A supply wagon; Quartermaster Hale by the stores, Tobin the cook by the fire |
 | An anvil built | A forge in the west yard, a lumber pile, Garrick Stone the smith |
 | A tanning rack built | A meat rack by the shelter; Wren Ashby, a trapper |
@@ -1250,6 +1249,7 @@ so as it does:
 | The Horde Warband beaten | A second tower over the west wall, Marshal Wyle by the fire |
 | The Blackrock Assault beaten | Westbrook's footmen, a second weapon rack |
 | Brannick the Mason killed (in the fifth raid) | A stonemason from Stormwind, who mends the wall he built (`after = "kill:brannick"`) |
+| The letter kept from House Lescovar (Stage 12) | Two Stormwind archers outside the gate, who shoot raiders (`after = "chose:letter:keep"` on their packs) |
 
 **The Brotherhood's hand** (Stage 2 of docs/elwynn-expansion.md). The Brotherhood is selling Elwynn's
 roads to the Horde. The Defias Messenger (not a rare; he respawns after 15 min, and under 35% of
