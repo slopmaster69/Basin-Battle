@@ -16,6 +16,7 @@
 # are a first guess, tune them on the first run.
 hero rogue
 cam 90 -12 8
+camera duel                                         # a cameraman films from the hero's side, so both hands, a dodge's copy and the target are in frame
 include _setup
 4.2 .es dummy clear
 4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
@@ -62,6 +63,8 @@ include _setup
 19.9 .es in au
 20.0 .es slot 1 garrote
 20.1 .es in ab 2 0                      # 1: Garrote, into its back
+20.5 .es in ab 2 0                      # again if the first was out of reach (it is 14 sec to cool)
+20.9 .es in ab 2 0
 19.4 shots garrote 40 0.1
 25.0 .es target clear
 25.2 .es target grunt 3
