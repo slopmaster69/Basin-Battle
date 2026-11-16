@@ -6,7 +6,6 @@
 ## Version: 43
 ElwynnSurvival.lua
 BetaBoard.lua
-Ledger.lua
 Letter.lua
 Words.lua
 Wager.lua

@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 76
+local VERSION = 77
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2097,8 +2097,7 @@ vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 vit.healthText:SetWidth(120)
 vit.healthText:SetJustifyH("RIGHT")
 vit.healthText:SetTextColor(1, 0.92, 0.85)
--- What a spend just took drains in amber: the old pale green read as the bar itself on the
--- parchment (play-test).
+-- What a spend just took drains in amber: the old pale green read as the bar itself (play-test).
 vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66, b = 0.27 }, { r = 1.0, g = 0.62, b = 0.1 })
 
 -- Lit while the guard is up, and when a swing would reach someone.

@@ -146,7 +146,7 @@ short flavor for what has a story, numbers as numerals, and one word list.
 - **Content tuning** (`content/*.toml`) is the easiest place to collide. Keep tuning changes in
   their own small pull requests, with the reason in a comment beside the number.
 - **The add-on's main chunk is near Lua 5.0's limit of 200 locals.** Group new state in tables,
-  or put a new feature in its own file listed in the `.toc` (as `Ledger.lua` does).
+  or put a new feature in its own file listed in the `.toc` (as `Wager.lua` does).
 - **Windows builds.** Releases carry the Windows zip; don't commit zips or executables.
 
 ## Never commit

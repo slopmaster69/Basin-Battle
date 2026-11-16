@@ -6,7 +6,7 @@
 -- The server sends `NT kind title place text clue links`: kind is wager or board here; `{n}`
 -- breaks a line in the text; links are `command~label` with `^` between.
 --
--- Plain colors and the game's own font; it needs nothing from Ledger.lua.
+-- Plain colors and the game's own font.
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
@@ -82,8 +82,6 @@ local function Text(size, color, justify)
   t:SetJustifyH(justify or "LEFT")
   if t.SetJustifyV then t:SetJustifyV("TOP") end
   t:SetWidth(INNER)
-  -- Ledger.lua leaves a string marked like this as it is.
-  t.ledgerKeep = true
   return t
 end
 
@@ -105,7 +103,6 @@ f.x.label:SetFont(FACE, 14, "")
 f.x.label:SetShadowOffset(0, 0)
 f.x.label:SetPoint("CENTER", f.x, "CENTER", 0, 0)
 f.x.label:SetText("X")
-f.x.label.ledgerKeep = true
 f.x.label:SetTextColor(FADED[1], FADED[2], FADED[3])
 f.x:SetScript("OnEnter", function() this.label:SetTextColor(1, 1, 1) end)
 f.x:SetScript("OnLeave", function() this.label:SetTextColor(FADED[1], FADED[2], FADED[3]) end)
@@ -124,7 +121,6 @@ for i = 1, MAX_LINKS do
   b.label:SetShadowOffset(0, 0)
   b.label:SetPoint("CENTER", b, "CENTER", 0, 0)
   b.label:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
-  b.label.ledgerKeep = true
   b:SetScript("OnEnter", function()
     this.bg:SetTexture(0.22, 0.25, 0.32, 1)
     this.label:SetTextColor(1, 1, 1)
