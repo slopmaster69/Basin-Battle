@@ -1826,6 +1826,15 @@ impl Survival {
         self.told_vocal.remove(&id);
         self.cc_log.remove(&id);
         self.no_error_speech.remove(&id);
+        // The Hunter's Call of the Wild chain, a half-laid tripwire, and the Priest's per-hero notes
+        // (Shadow Word: Death just cast, Greater Smite's recoil, the shadow staff's last bolt and
+        // who wears its Empowered look): each kept by hero id, and each one a leak per leaver.
+        self.hunt.wild.remove(&id);
+        self.hunt.first_arrows.remove(&id);
+        self.light.deaths.remove(&id);
+        self.light.recoiled.remove(&id);
+        self.light.last_bolt.remove(&id);
+        self.light.empower_shown.remove(&id);
     }
 
     /// Where the client says the hero is (it moves itself; the server trusts it).
