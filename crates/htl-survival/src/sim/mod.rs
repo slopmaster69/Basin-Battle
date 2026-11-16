@@ -1008,6 +1008,10 @@ pub struct Mob {
     pub backstabs: Vec<f32>,
     /// The hero at its back it means to turn on as soon as it's free to.
     pub turn_on: Option<Id>,
+    /// The facing the clients were last told while it stood turning in place, and when; and the
+    /// facing it wanted on the tick before (`Survival::tell_facing`).
+    pub face_sent: Option<(f32, f32)>,
+    pub face_seen: f32,
     /// Heroes in its fight, the most there have been since it was last at rest at home: its
     /// health and its blows grow with them (`combat.hero_health`, `hero_damage`).
     pub fighters: u32,

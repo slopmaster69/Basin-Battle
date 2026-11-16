@@ -3756,3 +3756,107 @@ fn a_creature_voices_the_start_of_its_string_from_where_it_stands_not_each_blow(
     let second: Vec<Event> = s.step(0.0);
     assert!(!second.iter().any(|e| matches!(e, Event::Sound { id, .. } if *id == m)), "none for the second blow");
 }
+
+/// A wolf stood turning to a hero walking round it, as `tell_facing` is asked each tick: what the
+/// clients are told, as (clock, facing).
+fn turning_wolf_run(s: &mut Survival, k: Id, seconds: f32, rate: f32) -> Vec<(f32, f32)> {
+    let mut told = Vec::new();
+    let pos = s.mobs[&k].pos;
+    let mut ang = 0.3f32;
+    let mut t = 0.0;
+    while t < seconds {
+        ang += rate * DT;
+        s.clock += DT;
+        s.mobs.get_mut(&k).unwrap().facing = ang;
+        s.tell_facing(k, pos, ang);
+        for e in std::mem::take(&mut s.events) {
+            if let Event::MobStop { id, facing, .. } = e {
+                if id == k {
+                    told.push((s.clock, facing));
+                }
+            }
+        }
+        t += DT;
+    }
+    told
+}
+
+#[test]
+fn a_creature_turning_to_follow_a_hero_tells_its_facing_sparingly_and_ends_exact() {
+    let mut s = world();
+    let k = mob(&mut s, "wolf", ORIGIN);
+    // A hero walking round it at about 60 degrees a second.
+    let ticks = (3.0 / DT) as usize;
+    let told = turning_wolf_run(&mut s, k, 3.0, 1.0);
+    assert!(!told.is_empty(), "it does tell");
+    assert!(told.len() * 2 < ticks, "fewer than half the ticks tell: {} of {ticks}", told.len());
+    let mut off = 0.0f32;
+    let mut prev = (0.0f32, 0.3f32);
+    for w in told.windows(2) {
+        assert!(w[1].0 - w[0].0 <= crate::sim::mobs::TURN_TELL_EVERY + DT + 1e-3, "gap {w:?}");
+        off = off.max(angle_between(w[1].1, w[0].1));
+        prev = w[1];
+    }
+    assert!(off <= crate::sim::mobs::TURN_TELL + 60.0 * DT + 1.0, "no jump past what the threshold and a tick's turn allow: {off}");
+    // The hero stops: the exact final facing is told within a couple of ticks.
+    let pos = s.mobs[&k].pos;
+    let want = s.mobs[&k].facing;
+    let mut last = prev.1;
+    for _ in 0..3 {
+        s.clock += DT;
+        s.tell_facing(k, pos, want);
+        for e in std::mem::take(&mut s.events) {
+            if let Event::MobStop { id, facing, .. } = e {
+                if id == k {
+                    last = facing;
+                }
+            }
+        }
+    }
+    assert!(angle_between(last, want) < 0.01, "exact: told {last}, true {want}");
+    // And it doesn't go on telling a creature standing still.
+    s.clock += 1.0;
+    s.tell_facing(k, pos, want);
+    assert!(s.events.iter().all(|e| !matches!(e, Event::MobStop { .. })), "nothing new to tell");
+}
+
+#[test]
+fn a_creature_that_is_stopped_to_hold_facing_tells_it_once() {
+    let mut s = world();
+    let k = mob(&mut s, "wolf", ORIGIN);
+    s.mobs.get_mut(&k).unwrap().path = vec![[5.0, 0.0, 0.0]];
+    s.mobs.get_mut(&k).unwrap().speed = 2.5;
+    s.events.clear();
+    s.hold_facing(k, [0.0, 4.0, 0.0]);
+    let stops: Vec<f32> = s.events.iter().filter_map(|e| if let Event::MobStop { id, facing, .. } = e { (*id == k).then_some(*facing) } else { None }).collect();
+    assert_eq!(stops.len(), 1, "one stop: {stops:?}");
+    assert!(angle_between(stops[0], std::f32::consts::FRAC_PI_2) < 0.01, "and the turned facing: {stops:?}");
+}
+
+#[test]
+fn a_creature_that_turns_to_wind_up_tells_the_exact_facing() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", [1.2, 0.0, 0.0], 0.0);
+    let k = mob(&mut s, "wolf", ORIGIN);
+    s.mobs.get_mut(&k).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    s.mobs.get_mut(&k).unwrap().ready_at = 1e9;
+    run(&mut s, 0.5);
+    for i in 0..20 {
+        let a = i as f32 * 0.05;
+        s.players.get_mut(&p).unwrap().pos = [1.2 * a.cos(), 1.2 * a.sin(), 0.0];
+        s.step(DT);
+    }
+    // Ready now: it winds up, and tells the facing it winds up on, whatever it was told before.
+    s.mobs.get_mut(&k).unwrap().ready_at = 0.0;
+    let mut windup_face = None;
+    for _ in 0..40 {
+        let ev = s.step(DT);
+        if let (Some(Event::MobStop { facing, .. }), true) = (ev.iter().rev().find(|e| matches!(e, Event::MobStop { id, .. } if *id == k)), matches!(s.mobs[&k].state, MobState::Windup { .. })) {
+            windup_face = Some(*facing);
+            break;
+        }
+    }
+    let f = windup_face.expect("it wound up and told its facing");
+    let to = s.players[&p].pos;
+    assert!(angle_between(f, facing(s.mobs[&k].pos, to)) < 0.01, "windup facing exact: {f}");
+}
