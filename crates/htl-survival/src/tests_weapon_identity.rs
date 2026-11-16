@@ -294,6 +294,32 @@ fn a_save_holding_a_retired_weapon_loads_the_familys_basic_one() {
     assert!(bag.contains(&"halberd".to_string()) && bag.contains(&"ember_staff".to_string()), "{bag:?}");
 }
 
+/// A retired weapon kept beside its family's basic one (in the bag, the camp's chest or a cache)
+/// adds to it: neither is lost when the save is read.
+#[test]
+fn a_retired_weapon_beside_its_familys_basic_one_adds_to_it() {
+    let (mut s, p) = world();
+    let mut save = s.leave(p).unwrap();
+    save.bag.insert("axe".into(), 1);
+    save.bag.insert("goblin_axe".into(), 1);
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let axe = s.content.item("axe").unwrap();
+    assert_eq!(s.players[&q].bag.get(&axe).copied(), Some(2), "both axes in the bag");
+    let mut world = s.save(&std::collections::BTreeMap::new());
+    world.storage.insert("mace".into(), 3);
+    world.storage.insert("goblin_wrench".into(), 2);
+    world.caches.push(crate::save::CacheSave { uid: 9_000, owner: "ayla".into(), pos: [5.0, 0.0, 0.0], items: [("ember_staff".to_string(), 1), ("apprentice_staff_honed2".to_string(), 1)].into_iter().collect() });
+    let back = Survival::load(Content::dev(), Box::new(FlatLand::default()), 5, 1_000_000.0, &world);
+    let mace = back.content.item("mace").unwrap();
+    assert_eq!(back.storage.get(&mace).copied(), Some(5), "every mace in the chest");
+    let staff = back.content.item("ember_staff").unwrap();
+    let cache = back.objs.values().find_map(|o| match &o.kind {
+        ObjKind::Cache { uid: 9_000, items, .. } => Some(items.clone()),
+        _ => None,
+    });
+    assert_eq!(cache.and_then(|i| i.get(&staff).copied()), Some(2), "both staves in the cache");
+}
+
 /// The families that play their own set (the item subclass of each, the set it swings).
 const FAMILY_SETS: [(u32, bool, &str, &str); 4] = [
     (0, false, "axe_one_hand", "one_hand"),
