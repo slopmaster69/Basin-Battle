@@ -123,6 +123,22 @@ pub(crate) struct VanCleef {
     observers: BTreeSet<Id>,
 }
 
+impl VanCleef {
+    /// How many of each thing it holds (for the soak's growth checks).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        vec![
+            ("duels", self.duels.len()),
+            ("observers", self.observers.len()),
+            ("duels.watchers", self.duels.values().map(|d| d.watchers.len()).sum()),
+            ("duels.held", self.duels.values().map(|d| d.held.len()).sum()),
+            ("duels.shoved", self.duels.values().map(|d| d.shoved.len()).sum()),
+            ("duels.warned", self.duels.values().map(|d| d.warned.len()).sum()),
+            ("duels.lines", self.duels.values().map(|d| d.lines.len()).sum()),
+        ]
+    }
+}
+
 #[derive(Default)]
 struct Duel {
     began: bool,

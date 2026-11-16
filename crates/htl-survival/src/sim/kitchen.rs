@@ -113,6 +113,14 @@ pub(crate) struct Kitchen {
     pots: BTreeMap<Id, Pot>,
 }
 
+impl Kitchen {
+    /// How many of each thing it holds (for the soak's growth checks).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        vec![("cooks", self.cooks.len()), ("pots", self.pots.len()), ("pots.stew", self.pots.values().map(|p| p.stew.len()).sum())]
+    }
+}
+
 struct Pot {
     at: Vec3,
     /// Where a cook stands to scoop: beside it, side-on.
