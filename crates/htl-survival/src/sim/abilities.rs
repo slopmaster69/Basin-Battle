@@ -1430,6 +1430,7 @@ impl Survival {
                             self.events.push(Event::Missile { caster: id, spell: 1856, target: Target::Point(from) });
                             self.set_down(id, spot, f);
                             self.events.push(Event::Missile { caster: id, spell: 1856, target: Target::Point(spot) });
+                            self.shrouded_step(id);
                         }
                         None => {
                             self.set_action(id, Action::Ready);
@@ -2095,9 +2096,11 @@ impl Survival {
         let splash = self.content.abilities[ability].splash;
         let dist = len(sub(at, from));
         let flight = dist / speed.max(1.0);
+        // A Distract's pouch harms nobody: no ring, no warning (the pouch's flight is its look).
+        let quiet = self.content.abilities[ability].effects.iter().any(|e| e.kind == "distract");
         let tele = Telegraph::hero_shape(id, splash, 360.0, 0.0, flight, Some((at, 0.0)));
-        let mark = Some(self.mark_as(at, splash, flight + 0.1, Some(tele)));
-        let foes: Vec<Id> = self.players.iter().filter(|(h, x)| self.hostile(id, **h) && x.health > 0 && dist2d(x.pos, at) <= splash + 4.0).map(|(h, _)| *h).collect();
+        let mark = (!quiet).then(|| self.mark_as(at, splash, flight + 0.1, Some(tele)));
+        let foes: Vec<Id> = if quiet { Vec::new() } else { self.players.iter().filter(|(h, x)| self.hostile(id, **h) && x.health > 0 && dist2d(x.pos, at) <= splash + 4.0).map(|(h, _)| *h).collect() };
         for h in foes {
             self.events.push(Event::Danger { player: h, secs: flight, from: None });
         }
@@ -2783,6 +2786,14 @@ impl Survival {
             "knockback" | "pull" => self.displace(owner, victim, e),
             "knockdown" => self.knock_down(owner, victim, secs, source),
             "rallied" => self.warrior_effect(owner, victim, e, secs, source),
+            // The Rogue's Shadow (`sim::rogue`): a Distract turns it to where the pouch landed;
+            // Cloak and Dagger counts its steps afresh.
+            "distract" => self.distract(owner, victim, secs, source),
+            "cloak" => {
+                if self.apply_cc_look(victim, owner, "cloak", secs, e.amount, 0.0, source, e.aura) {
+                    self.cloak_begins(victim, e.amount);
+                }
+            }
             "burn" | "mark" => {
                 self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
             }
@@ -3821,6 +3832,18 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
         let start = self.players[&id].pos;
+        // Shadowstep: behind the enemy under the reticle (Ambush's find), facing its back; with
+        // none there, to the reticle's point as any blink.
+        if let Some((spot, face)) = d.behind_foe.then(|| self.ambush_spot(id, range)).flatten() {
+            self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+            self.set_down(id, spot, face);
+            self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(spot) });
+            if d.cleanse {
+                self.cleanse(id, &["root", "snare"]);
+            }
+            self.shrouded_step(id);
+            return;
+        }
         let (o, dir) = self.reticle(id);
         let t = self.trace(o, dir, range + 3.0, 0.0, id);
         // Short of what it meets, within the range of where they stand, on the ground.

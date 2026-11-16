@@ -298,9 +298,10 @@ impl Survival {
         self.has_cc(id, "veil")
     }
 
-    /// Hidden from this creature: veiled, and it's no boss (a champion sees through a veil).
+    /// Hidden from this creature: veiled (or a Rogue's Shrouded Step), and it's no boss (a
+    /// champion sees through a veil).
     pub(crate) fn unseen_by(&self, mob: Id, hero: Id) -> bool {
-        self.unseen(hero) && !self.mobs.get(&mob).is_some_and(|m| self.content.mobs[m.def].boss) && !self.firing_sees_veil(mob)
+        (self.unseen(hero) || self.shrouded(hero)) && !self.mobs.get(&mob).is_some_and(|m| self.content.mobs[m.def].boss) && !self.firing_sees_veil(mob)
     }
 
     // --- leaps ----------------------------------------------------------------------------------------

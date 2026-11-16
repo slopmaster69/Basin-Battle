@@ -5,7 +5,8 @@ Warrior, the Mage and the Priest were: three trees, every skill one job, its num
 reasons, and a build plan of small pull requests at the end. It lives in Elwynn Survival, where
 the dodge, posture and the beat are. This page is the design the pull requests in the
 [build plan](#build-plan) follow. Built so far: entry 1, the core (two blades, no guard, the
-perfect dodge and the Shadow Cut; see [Decided while building](#decided-while-building)).
+perfect dodge and the Shadow Cut), and entry 2, Shadow (Distract and Sap, Shadowstep to a back,
+Cloak and Dagger, Shrouded Step); see [Decided while building](#decided-while-building).
 
 ## How the Rogue plays
 
@@ -364,6 +365,41 @@ What the design left open, decided in the pull request that built it:
     in sight, there is no step and the cut is spent: the press is the attack out of the dodge.
   - Mid-run, the attack pressed **out of a dodge** is the run's next blow (a light one), not the
     roll's attack, so the run goes on.
+- **Shadow (entry 2)**:
+  - A card's **tree** is its `choice` on the Rogue column (1 Shadow, 2 Venom, 3 Blades): no new
+    field. Fan of Knives and Death Mark are choice 2 now. A new Rogue still knows Fan of Knives (a
+    class's first cards are its whole Q and E rows), and the Dead Drop teaches Distract, Backstab
+    and Fan of Knives, so Fan of Knives stays learnable by other classes until Venom gives it a
+    place. Morgan the Collector teaches Cloak and Dagger beside Death Mark: the Rogue's boss
+    teaches both of its ultimates.
+  - **Shrouded Step is not Vanish's veil.** The veil drops a creature's fight and ends at the first
+    blow; the shroud does neither. For its 1 sec, a creature (not a boss) whose foe is the Rogue
+    stands and starts no blow, keeping its fight, and one at rest doesn't notice the Rogue. It
+    lasts through the Rogue's own blows, which is the point: land one and step out. It is shown
+    with the Stealth look (5215), as the perfect dodge's flicker. A step counts when it lands
+    behind an enemy: Shadowstep and Blinding Step on a back, Ambush, the Shadow Cut and each Cloak
+    and Dagger step. Bosses see through it (#75).
+  - **Shadowstep uses Ambush's find** (the enemy under the reticle, else the one locked on, else
+    the nearest within 20 deg of the reticle's line), not a second, 15 deg cone: one rule for
+    every step to a back.
+  - **Distract**: the creature's own turn is the whole tell; no look is laid on it. One winding up
+    a blow finishes it first, then turns. A distracted creature at rest notices nobody, so a pack
+    can be walked round. A blow "from its front" is any not from its back (its side too), by
+    anyone or anything (a burn's tick from someone in front). The pouch draws no ring and warns no
+    hero: it hurts nobody. Its look is 1.12's Distract (spell 1725), to be checked when first
+    filmed.
+  - **A boss's glance**: "mid-string" is a string begun (`pattern`) or a wind-up. A glance refused
+    mid-string doesn't spend the 15 sec.
+  - **Sap's "already fighting"**: a creature not at rest before the blow (chasing, striking,
+    walking home). A creature notices a hero in its reach whatever way it faces, so Sap needs it
+    not to see you first: out of a veil (Smoke Bomb, Vanish), in Shrouded Step's second, or while
+    it is Distracted. Its look is 1.12's Sap (spell 6770) and the incapacitate's stun stars (853).
+  - **Cloak and Dagger** steps only when the Rogue is free to strike (not in the ultimate's own
+    0.35 sec cast, nor mid-wind-up), as the Shadow Cut. A press with no back in reach is a plain
+    blow and spends no step. In a duel it steps behind heroes too. Its steps are Shrouded Steps
+    only with the trait. Its 10 steps are the effect's `amount`.
+  - **Truly needs a client patch**: nothing. A shadow trail between the two ends of a step would
+    add to it (PR 6).
 
 ## Build plan
 

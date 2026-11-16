@@ -99,6 +99,8 @@ mod tests_weapon_identity;
 #[cfg(test)]
 mod tests_rogue_core;
 #[cfg(test)]
+mod tests_rogue_shadow;
+#[cfg(test)]
 mod tests_old_saves;
 #[cfg(test)]
 mod tests_sweep;

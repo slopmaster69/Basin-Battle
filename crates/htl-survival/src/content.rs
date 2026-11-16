@@ -5017,8 +5017,15 @@ impl Content {
             if a.counter.as_ref().is_some_and(|c| !c.perfect_pass.is_empty() && (c.immune || c.mirror || c.block || c.dodge)) {
                 bail!("{what}: `perfect_pass` lets a blow through clean (no immune, mirror, block or dodge with it)");
             }
-            for e in a.slip_effects.iter().chain(&a.slip_self).chain(a.counter.iter().flat_map(|c| c.perfect_pass.iter())) {
+            for e in a.slip_effects.iter().chain(&a.slip_self).chain(a.counter.iter().flat_map(|c| c.perfect_pass.iter())).chain(&a.behind_effects) {
                 effect_ok(e, &what)?;
+            }
+            // The Rogue's Shadow: a blink to a back, an art whose effects want one.
+            if a.behind_foe && a.kind != "blink" {
+                bail!("{what}: only a blink lands behind a foe (`behind_foe`)");
+            }
+            if (!a.behind_effects.is_empty() || a.calm_only) && a.kind != "art" {
+                bail!("{what}: only a weapon art has effects from behind (`behind_effects`, `calm_only`)");
             }
             if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
                 bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
@@ -5312,6 +5319,18 @@ pub struct RogueDef {
     pub flicker_secs: f32,
     /// The puff of smoke where the blow fell, and at both ends of the Shadow Cut's step.
     pub puff: u32,
+    /// A tree's trait is on while this many of a Rogue's 5 keys hold that tree's cards (a Rogue
+    /// card's tree is its `choice`: 1 Shadow).
+    pub trait_keys: usize,
+    /// Shadow's trait, Shrouded Step: a step that lands behind an enemy hides the Rogue this long
+    /// from every creature but a boss (none starts a blow at them), shown by this look on the body.
+    pub shroud_secs: f32,
+    pub shroud_aura: u32,
+    /// Distract on a boss: it only glances, this long, at most once in this long, never mid-string.
+    pub glance_secs: f32,
+    pub glance_every: f32,
+    /// Cloak and Dagger: each attack steps behind an enemy this near first.
+    pub cloak_reach: f32,
 }
 
 impl Default for RogueDef {
@@ -5327,6 +5346,12 @@ impl Default for RogueDef {
             flicker_aura: 5215,
             flicker_secs: 0.3,
             puff: 1856,
+            trait_keys: 3,
+            shroud_secs: 1.0,
+            shroud_aura: 5215,
+            glance_secs: 0.8,
+            glance_every: 15.0,
+            cloak_reach: 8.0,
         }
     }
 }

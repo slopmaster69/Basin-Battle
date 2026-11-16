@@ -1030,6 +1030,8 @@ pub struct Mob {
     pub backstabs: Vec<f32>,
     /// The hero at its back it means to turn on as soon as it's free to.
     pub turn_on: Option<Id>,
+    /// What a Rogue's Shadow has done to it: where a Distract turned it, a boss's next glance.
+    pub rogue: rogue::OnMob,
     /// The facing the clients were last told while it stood turning in place, and when; and the
     /// facing it wanted on the tick before (`Survival::tell_facing`).
     pub face_sent: Option<(f32, f32)>,

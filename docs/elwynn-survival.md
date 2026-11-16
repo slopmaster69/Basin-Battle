@@ -203,12 +203,19 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   bounce. `[[missile_look]]` in `content/survival.toml` sets a spell's. On a client with patch
   0031, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
   Grapple hauls a foe in on one.
-- **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
-  up close (its EX, Kidney Shot, is a close stab that stuns one foe for 3 s, 1 s longer if Fan of
-  Knives has Marked it, and uses the Mark up); Shadowstep in, and its key again within 3 s steps
-  you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
-  Smoke Bomb, a cloud at your feet that hides you and your friends in it and slows foes, Vanish
-  hides you at once (your next blow counts as from behind); Death Mark. A hero created as a Rogue
+- **Rogue**: in and out before they turn round. Shadow is the first choice on every key
+  (`docs/rogue-roles.md`): Distract, a pouch lobbed up to 25 yd that turns every foe within 6 yd of
+  it to face it for 2.5 s (a boss only glances, 0.8 s, once every 15 s; its EX, Sap, drops a foe not
+  yet fighting for 6 s from behind); Backstab, three times from behind (its EX Ambush); Shadowstep
+  behind the foe under the reticle (else to its point), and its key again within 3 s steps you
+  straight back (its EX blinds everyone where you come out); Smoke Bomb, a cloud at your feet that
+  hides you and your friends in it and slows foes, Vanish hides you at once (your next blow counts
+  as from behind); Cloak and Dagger, 6 s in which every attack first steps behind the nearest foe
+  within 8 yd. A Rogue with 3 of its 5 keys on Shadow's cards has Shrouded Step: a step that lands
+  behind a foe hides it 1 s from every creature but a boss. Venom's cards so far are the second
+  choice: Fan of Knives, three poisoned knives that all land up close (its EX, Kidney Shot, is a
+  close stab that stuns one foe for 3 s, 1 s longer if Fan of Knives has Marked it, and uses the
+  Mark up), and Death Mark. A hero created as a Rogue
   fights with two blades and never blocks or parries (`docs/rogue-roles.md`): it starts with two
   daggers and can't hold a shield, a two-hander, a staff or an axe; the right mouse button swings
   the off hand (an empty off hand jabs for half); a dodge whose blow lands 0.04 to 0.18 s in is a
