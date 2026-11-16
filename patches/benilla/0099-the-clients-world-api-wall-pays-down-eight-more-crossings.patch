@@ -1,0 +1,395 @@
+From 38ac93370767e2b6ce7a7dc503af738938536727 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 02:17:05 -0600
+Subject: [PATCH] The client's world API wall pays down eight more crossings
+
+Patch 0097 made crossings into methods on types already published; this does it for eight of
+the leaks the series' own patches (0003 to 0087) left in the wall's table, with the same values
+and the same arithmetic. No behaviour changes.
+
+- `RigPose::striking_link` and `RigPose::retarget_from` replace `rig_anim::striking_link`,
+  `Bones`, `map_bones` and `retarget`: the swing trail and the donor-clip retarget no longer
+  assemble a skeleton's parents, rest links and key bones themselves.
+- The planted-feet pass reads the ground through `TerrainHeights::under` (published) instead of
+  `terrain_stream::terrain_height_under` with the streamer and tiles it held; both resources
+  stay optional, so an app with no world still misses every column.
+- `WorldPick::ray_posed_mesh` and `ray_mesh_bounds` replace the two free functions the hover
+  pick named.
+- `WorldDecal::spawn_ground_fx` replaces `ground_fx::spawn_ground_fx_decal`.
+
+Kept, with the reason in the test's comment: the rest are ECS types a game system names in its
+own signature or query (components, resources, messages, sets, SystemParams), or items several
+game modules name at once (`mesh_tag`, `finalize_rig_worlds`, the pick-part markers,
+`PickParts` and `cast_pick_ray_inflated`, the fog override).
+
+World API wall: 121 to 113 (the table's rows go with the crossings).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/creature_anim/action/donor.rs         | 22 ++++-------
+ .../src/creature_anim/action/feet.rs          | 12 ++----
+ .../src/creature_anim/action/strike_trail.rs  |  9 +----
+ .../benilla-app/src/entities/spell_fx/mod.rs  |  2 +-
+ crates/benilla-app/src/target/hover.rs        | 12 ++++--
+ crates/benilla-app/tests/world_api_wall.rs    | 22 +++++------
+ crates/benilla-world/src/ground_fx.rs         | 29 ++++++++++++++
+ crates/benilla-world/src/interact/mod.rs      | 24 ++++++++++++
+ crates/benilla-world/src/rig_anim/pose.rs     | 39 +++++++++++++++++++
+ 9 files changed, 123 insertions(+), 48 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action/donor.rs b/crates/benilla-app/src/creature_anim/action/donor.rs
+index 72737521..eb384aba 100644
+--- a/crates/benilla-app/src/creature_anim/action/donor.rs
++++ b/crates/benilla-app/src/creature_anim/action/donor.rs
+@@ -8,7 +8,7 @@
+ //! those along the hierarchy, child to child by the direction each points at rest. The hips'
+ //! travel is scaled to the unit's height; every other bone keeps its own rest length, so the clip
+ //! takes the unit's proportions. The pairing and the retargeting are
+-//! `benilla_world::rig_anim::bones`.
++//! `benilla_world::rig_anim::RigPose::retarget_from`.
+ 
+ use std::collections::HashMap;
+ use std::sync::{Arc, RwLock};
+@@ -113,19 +113,13 @@ impl Donors {
+             .iter()
+             .map(|j| j.local_translation)
+             .collect();
+-        let target = benilla_world::rig_anim::Bones {
+-            parents: &rig.parents,
+-            binds: rig.binds(),
+-            keys: &anims.pose.key_bones,
+-        };
+-        let from = benilla_world::rig_anim::Bones {
+-            parents: &dparents,
+-            binds: &dbinds,
+-            keys: &danims.pose.key_bones,
+-        };
+-        let map = benilla_world::rig_anim::map_bones(&target, &from);
+-        let scale = target.height() / from.height().max(0.1);
+-        let clip = benilla_world::rig_anim::retarget(dclip, &map, &rig.parents, scale);
++        let clip = rig.retarget_from(
++            &anims.pose.key_bones,
++            dclip,
++            &dparents,
++            &dbinds,
++            &danims.pose.key_bones,
++        );
+         // Into the model's borrowed clips: a whole-body node, and an upper-body and a lower-body
+         // one where the model has the masks for them.
+         let mask_of = |node: Option<AnimationNodeIndex>| {
+diff --git a/crates/benilla-app/src/creature_anim/action/feet.rs b/crates/benilla-app/src/creature_anim/action/feet.rs
+index e4608bfb..b7c6c766 100644
+--- a/crates/benilla-app/src/creature_anim/action/feet.rs
++++ b/crates/benilla-app/src/creature_anim/action/feet.rs
+@@ -13,9 +13,9 @@
+ use bevy::math::Affine3A;
+ use bevy::prelude::*;
+ 
+-use benilla_assets::{AdtTile, ModelAnimations};
++use benilla_assets::ModelAnimations;
+ use benilla_world::rig_anim::{PoseInertia, RigPose};
+-use benilla_world::terrain_stream::{terrain_height_under, TerrainStreamer};
++use benilla_world::world_point::TerrainHeights;
+ 
+ use super::{rebase, restore, ActionTilt, TiltKind};
+ 
+@@ -52,8 +52,7 @@ pub(super) fn plant_feet(
+     time: Res<Time>,
+     feet: Option<Res<PlantedFeet>>,
+     inertia: Option<Res<PoseInertia>>,
+-    streamer: Option<Res<TerrainStreamer>>,
+-    tiles: Option<Res<Assets<AdtTile>>>,
++    terrain: TerrainHeights,
+     mut units: Query<(
+         Entity,
+         &ModelAnimations,
+@@ -66,10 +65,7 @@ pub(super) fn plant_feet(
+ ) {
+     let on = feet.is_some_and(|f| f.on) && inertia.is_some_and(|i| i.live);
+     let dt = time.delta_secs();
+-    let ground = |at: Vec3| match (&streamer, &tiles) {
+-        (Some(s), Some(t)) => terrain_height_under(s, t, at),
+-        _ => None,
+-    };
++    let ground = |at: Vec3| terrain.under(at);
+     for (entity, anims, mut rig, t, tilt, plant) in &mut units {
+         let src = &anims.pose;
+         if src.legs.is_empty() {
+diff --git a/crates/benilla-app/src/creature_anim/action/strike_trail.rs b/crates/benilla-app/src/creature_anim/action/strike_trail.rs
+index d06a4ef0..53813212 100644
+--- a/crates/benilla-app/src/creature_anim/action/strike_trail.rs
++++ b/crates/benilla-app/src/creature_anim/action/strike_trail.rs
+@@ -109,14 +109,7 @@ pub(crate) fn fire_strike_trails(
+                 .pose
+                 .node(p.node)
+                 .and_then(|n| a.pose.clips.get(n.clip as usize))?;
+-            benilla_world::rig_anim::striking_link(
+-                clip,
+-                &pose.parents,
+-                pose.binds(),
+-                p.key * STROKE_FROM,
+-                p.key,
+-                SHORTEST_LINK,
+-            )
++            pose.striking_link(clip, p.key * STROKE_FROM, p.key, SHORTEST_LINK)
+         });
+         let Some((parent, bone)) = link else { continue };
+         if let Some(&anchor) = state.anchors.get(&(p.unit, parent)) {
+diff --git a/crates/benilla-app/src/entities/spell_fx/mod.rs b/crates/benilla-app/src/entities/spell_fx/mod.rs
+index 225b6213..339211fc 100644
+--- a/crates/benilla-app/src/entities/spell_fx/mod.rs
++++ b/crates/benilla-app/src/entities/spell_fx/mod.rs
+@@ -347,7 +347,7 @@ pub(crate) fn attach_effect_visuals(
+         let Some(texture) = texture else {
+             continue; // no texture, nothing to draw
+         };
+-        let decal = benilla_world::ground_fx::spawn_ground_fx_decal(
++        let decal = benilla_world::decal::WorldDecal::spawn_ground_fx(
+             commands,
+             texture,
+             part.blend,
+diff --git a/crates/benilla-app/src/target/hover.rs b/crates/benilla-app/src/target/hover.rs
+index 52574194..2a37f8f7 100644
+--- a/crates/benilla-app/src/target/hover.rs
++++ b/crates/benilla-app/src/target/hover.rs
+@@ -18,7 +18,7 @@ use crate::ui_script::PointerOverUi;
+ use benilla_world::billboard::BillboardCard;
+ use benilla_world::collision::PickOccluder;
+ use benilla_world::interact::{
+-    ray_mesh_bounds, ray_posed_mesh, CreaturePickPart, DoodadOccluders, GoPickPart, PickParts,
++    CreaturePickPart, DoodadOccluders, GoPickPart, PickParts, WorldPick,
+ };
+ use benilla_world::view::WorldCamera;
+ 
+@@ -361,7 +361,9 @@ pub(super) fn update_hover(
+     let mut best: Option<(f32, Entity)> = None;
+     for (entity, _, mesh_ids, palette) in &candidates {
+         for id in mesh_ids {
+-            let Some(t) = ray_posed_mesh(&mesh_assets, *id, palette, origin, dir, false) else {
++            let Some(t) =
++                WorldPick::ray_posed_mesh(&mesh_assets, *id, palette, origin, dir, false)
++            else {
+                 continue;
+             };
+             if best.is_none_or(|(bt, _)| t < bt) {
+@@ -393,7 +395,7 @@ pub(super) fn update_hover(
+         if !target_state.is_candidate(parent, parent_net.kind, is_self, store) {
+             continue;
+         }
+-        if let Some(t) = ray_mesh_bounds(origin, dir, aabb, gt) {
++        if let Some(t) = WorldPick::ray_mesh_bounds(origin, dir, aabb, gt) {
+             if best.is_none_or(|(bt, _)| t < bt) {
+                 best = Some((t, parent));
+             }
+@@ -406,7 +408,9 @@ pub(super) fn update_hover(
+         for (entity, priority, mesh_ids, palette) in &candidates {
+             let hit = mesh_ids
+                 .iter()
+-                .filter_map(|id| ray_posed_mesh(&mesh_assets, *id, palette, origin, dir, true))
++                .filter_map(|id| {
++                    WorldPick::ray_posed_mesh(&mesh_assets, *id, palette, origin, dir, true)
++                })
+                 .min_by(f32::total_cmp);
+             let Some(t) = hit else { continue };
+             let prio = if *last_pick == Some(*entity) {
+diff --git a/crates/benilla-app/tests/world_api_wall.rs b/crates/benilla-app/tests/world_api_wall.rs
+index 9e47355b..79e50ace 100644
+--- a/crates/benilla-app/tests/world_api_wall.rs
++++ b/crates/benilla-app/tests/world_api_wall.rs
+@@ -272,8 +272,12 @@ const PUBLISHED: &[(&str, &str)] = &[
+ /// `CLOSE/invert`: the engine publishes the fact instead of the game reaching in;
+ /// `CLOSE/move-engine`: engine code in a game file moves engine-side; `CLOSE/move-game`: gameplay
+ /// moves out of the engine. Closing a leak is deleting its row.
+-/// 32 of the rows are what the series' patches outside the new look (0003 to 0087) reached for
+-/// from game code: the pick, the rig, the fade, the fog override, the slope under a body.
++/// 24 of the rows are what the series' patches outside the new look (0003 to 0087) reached for
++/// from game code: the pick, the rig, the fade, the fog override. Patch 0099 closed eight of them
++/// as methods on published types (`RigPose::striking_link` and `retarget_from`, `TerrainHeights`,
++/// `WorldPick::ray_posed_mesh` and `ray_mesh_bounds`, `WorldDecal::spawn_ground_fx`), same values.
++/// What is left is an ECS type a game system names in its own signature or query (components,
++/// resources, messages, sets, `SystemParam`s), or an item several game modules name at once.
+ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("art_scope::ArtScope", "CLOSE/absorb"),
+     ("art_scope::ArtSlot", "CLOSE/absorb"),
+@@ -293,7 +297,6 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("doodad_anim::wants_rig", "CLOSE/move-engine"),
+     ("entity_shade::GroundShade", "CLOSE/absorb"),
+     ("ffx_glow::FfxDeathFade", "CLOSE/absorb"),
+-    ("ground_fx::spawn_ground_fx_decal", "CLOSE/absorb"),
+     ("instance_tint::IDENTITY", "CLOSE/absorb"),
+     ("instance_tint::pack", "CLOSE/absorb"),
+     ("interact::CreaturePickPart", "CLOSE/absorb"),
+@@ -304,8 +307,6 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("interact::WorldRightClick", "CLOSE/move-game"),
+     ("interact::WorldRightPress", "CLOSE/move-game"),
+     ("interact::cast_pick_ray_inflated", "CLOSE/absorb"),
+-    ("interact::ray_mesh_bounds", "CLOSE/absorb"),
+-    ("interact::ray_posed_mesh", "CLOSE/absorb"),
+     ("interior::BodyBakeCenter", "CLOSE/absorb"),
+     ("interior::ContainmentAttach", "CLOSE/absorb"),
+     ("interior::InteriorLit", "CLOSE/invert"),
+@@ -363,16 +364,12 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ("ribbons::RibbonSeq", "CLOSE/absorb"),
+     ("ribbons::RibbonTrail", "CLOSE/invert"),
+     ("ribbons::spawn_ribbon", "CLOSE/absorb"),
+-    ("rig_anim::Bones", "CLOSE/absorb"),
+     ("rig_anim::ExtraClips", "CLOSE/absorb"),
+     ("rig_anim::PoseCurves", "CLOSE/absorb"),
+     ("rig_anim::PoseEval", "CLOSE/absorb"),
+     ("rig_anim::PoseExtra", "CLOSE/absorb"),
+     ("rig_anim::PoseInertia", "CLOSE/absorb"),
+     ("rig_anim::finalize_rig_worlds", "CLOSE/absorb"),
+-    ("rig_anim::map_bones", "CLOSE/absorb"),
+-    ("rig_anim::retarget", "CLOSE/absorb"),
+-    ("rig_anim::striking_link", "CLOSE/absorb"),
+     ("rig_palette::RigPaletteMirrors", "CLOSE/absorb"),
+     ("rig_palette::RigPart", "CLOSE/absorb"),
+     ("rig_palette::RigStarved", "CLOSE/invert"),
+@@ -400,16 +397,15 @@ const SORTED_LEAKS: &[(&str, &str)] = &[
+     ),
+     ("terrain_stream::point_light", "CLOSE/absorb"),
+     ("terrain_stream::spawn_model_entities", "CLOSE/move-engine"),
+-    ("terrain_stream::terrain_height_under", "CLOSE/absorb"),
+     ("wmo_portal::UnitWmoRoom", "CLOSE/absorb"),
+     ("wmo_portal::WmoPortalInstance", "CLOSE/absorb"),
+     ("wmo_portal::WmoPvsSet", "CLOSE/absorb"),
+     ("world_unit::Bobber", "CLOSE/absorb"),
+ ];
+ 
+-/// The gate on the leak count. Lower it when a leak closes. 121: the 89 the table already filed
+-/// that are still named, and the 32 the series' patches outside the new look added (above).
+-const LEAK_CEILING: usize = 121;
++/// The gate on the leak count. Lower it when a leak closes. 113: the 89 the table already filed
++/// that are still named, and the 24 the series' patches outside the new look still add (above).
++const LEAK_CEILING: usize = 113;
+ 
+ /// How far under [`LEAK_CEILING`] the count may sit before the test asks for the ceiling to be
+ /// lowered: one closure does not fail the gate, a whole stage of work cannot go unrecorded.
+diff --git a/crates/benilla-world/src/ground_fx.rs b/crates/benilla-world/src/ground_fx.rs
+index c694b018..3408b05d 100644
+--- a/crates/benilla-world/src/ground_fx.rs
++++ b/crates/benilla-world/src/ground_fx.rs
+@@ -45,6 +45,35 @@ pub(crate) struct GroundFxDecal {
+     center: Vec3,
+ }
+ 
++impl crate::decal::WorldDecal<'_, '_> {
++    /// Spawns one ground-quad decal ([`spawn_ground_fx_decal`]), which this param then projects;
++    /// the caller inserts the part's `MatAnim`, its push-time alpha.
++    #[allow(clippy::too_many_arguments)]
++    pub fn spawn_ground_fx(
++        commands: &mut Commands,
++        texture: Handle<Image>,
++        blend: benilla_formats::ModelBlend,
++        additive: bool,
++        fog_policy_bits: u32,
++        rgb_anim: Option<(std::sync::Arc<benilla_formats::RgbAnim>, f32)>,
++        quad: &GroundQuad,
++        joint: Entity,
++        ibp: Mat4,
++    ) -> Entity {
++        spawn_ground_fx_decal(
++            commands,
++            texture,
++            blend,
++            additive,
++            fog_policy_bits,
++            rgb_anim,
++            quad,
++            joint,
++            ibp,
++        )
++    }
++}
++
+ /// Spawns one ground-quad decal; the caller inserts the part's `MatAnim`, its push-time alpha.
+ pub fn spawn_ground_fx_decal(
+     commands: &mut Commands,
+diff --git a/crates/benilla-world/src/interact/mod.rs b/crates/benilla-world/src/interact/mod.rs
+index 216efaee..08158f43 100644
+--- a/crates/benilla-world/src/interact/mod.rs
++++ b/crates/benilla-world/src/interact/mod.rs
+@@ -109,6 +109,30 @@ impl WorldPick<'_, '_> {
+         )
+     }
+ 
++    /// The narrow phase for one skinned part ([`ray_posed_mesh`]): the nearest triangle hit's
++    /// distance along `origin + dir * t`, the geometry pushed out along its normals when `inflate`.
++    pub fn ray_posed_mesh(
++        mesh_assets: &Assets<Mesh>,
++        mesh_id: AssetId<Mesh>,
++        palette: &[Mat4],
++        origin: Vec3,
++        dir: Vec3,
++        inflate: bool,
++    ) -> Option<f32> {
++        ray_posed_mesh(mesh_assets, mesh_id, palette, origin, dir, inflate)
++    }
++
++    /// The ray against a part's `Aabb` in world space ([`ray_mesh_bounds`]): the whole test for a
++    /// part with no resident geometry.
++    pub fn ray_mesh_bounds(
++        origin: Vec3,
++        dir: Vec3,
++        aabb: &bevy::camera::primitives::Aabb,
++        gt: &GlobalTransform,
++    ) -> Option<f32> {
++        ray_mesh_bounds(origin, dir, aabb, gt)
++    }
++
+     /// The identified cast through a screen pixel.
+     pub fn at_cursor(
+         &self,
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index b165c530..06c2e430 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -134,6 +134,45 @@ impl RigPose {
+         &self.binds
+     }
+ 
++    /// The bone that strikes over `[t0, t1]` of `clip` on this skeleton: [`super::striking_link`]
++    /// over this rig's parents and rest links.
++    pub fn striking_link(
++        &self,
++        clip: &benilla_assets::PoseClip,
++        t0: f32,
++        t1: f32,
++        shortest: f32,
++    ) -> Option<(u16, u16)> {
++        super::striking_link(clip, &self.parents, &self.binds, t0, t1, shortest)
++    }
++
++    /// A donor model's `clip` carried onto this skeleton: its bones paired with this rig's by
++    /// [`super::map_bones`] and its turns scaled by the ratio of the two skeletons' heights
++    /// ([`super::retarget`]). `keys` is this model's `KeyBoneID` per bone; the donor is its bones'
++    /// parents and rest links and its own `KeyBoneID` list.
++    pub fn retarget_from(
++        &self,
++        keys: &[i16],
++        clip: &benilla_assets::PoseClip,
++        donor_parents: &[i16],
++        donor_binds: &[Vec3],
++        donor_keys: &[i16],
++    ) -> benilla_assets::PoseClip {
++        let target = super::Bones {
++            parents: &self.parents,
++            binds: &self.binds,
++            keys,
++        };
++        let from = super::Bones {
++            parents: donor_parents,
++            binds: donor_binds,
++            keys: donor_keys,
++        };
++        let map = super::map_bones(&target, &from);
++        let scale = target.height() / from.height().max(0.1);
++        super::retarget(clip, &map, &self.parents, scale)
++    }
++
+     /// The anchor entity for `bone`, spawned on first demand at the current composed pose under
+     /// [`Self::joints_root`]; `rig` is the [`RigPose`] holder.
+     pub fn anchor_for(
+-- 
+2.56.0.windows.4
+
