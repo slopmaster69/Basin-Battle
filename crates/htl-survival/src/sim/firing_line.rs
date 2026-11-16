@@ -93,6 +93,21 @@ pub(crate) struct FiringLine {
     spears: BTreeSet<Id>,
 }
 
+impl FiringLine {
+    /// How many of each thing it holds (for the soak's growth checks).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        vec![
+            ("crews", self.crews.len()),
+            ("owners", self.owners.len()),
+            ("aims", self.aims.len()),
+            ("guns", self.guns.len()),
+            ("spears", self.spears.len()),
+            ("crews.gunners", self.crews.values().map(|c| c.gunners.len()).sum()),
+        ]
+    }
+}
+
 struct Crew {
     gunners: Vec<Id>,
     stage: Stage,

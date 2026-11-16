@@ -1230,10 +1230,11 @@ fn the_journal_ends_the_story_with_three_goals_and_every_corner_counts_38_places
         let g = &c.goals[at(t)];
         assert_eq!((g.kind.as_str(), g.what.as_str()), (kind, what));
     }
-    assert_eq!(at("Every corner"), wagon + 4);
-    assert_eq!(crate::save::ELWYNN_GOALS, 15);
-    assert_eq!(c.sites.len(), 38);
-    assert_eq!(c.goals[at("Every corner")].count, 38);
+    // (Round three's goals follow the seal, before Every corner: `tests_story3`.)
+    assert_eq!(at("The seal-cutter"), wagon + 4);
+    assert!(crate::save::ELWYNN_GOALS >= 15);
+    assert!(c.sites.len() >= 38);
+    assert_eq!(c.goals[at("Every corner")].count as usize, c.sites.len());
     // Each is done by what the camp does, in order.
     let mut s = world();
     s.camp.goal = wagon + 1;
@@ -1245,7 +1246,7 @@ fn the_journal_ends_the_story_with_three_goals_and_every_corner_counts_38_places
     assert_eq!(s.content.goals[s.camp.goal].title, "Marzon the Silent Blade", "the seal doesn't count before Marzon");
     s.camp.counts.insert("kill:marzon".into(), 1);
     s.step_goals();
-    assert_eq!(s.content.goals[s.camp.goal].title, "Every corner");
+    assert_eq!(s.content.goals[s.camp.goal].title, "The seal-cutter");
 }
 
 #[test]
@@ -1262,5 +1263,7 @@ fn a_pack_after_must_be_real_and_belong_to_a_chest_or_validate_refuses_it() {
     let err = swap("after = \"chose:remy:arrest\"\n\n[[pack]]\nmob = \"parley_remy\"", "after = \"chose:remy:nope\"\n\n[[pack]]\nmob = \"parley_remy\"").unwrap_err();
     assert!(format!("{err:#}").contains("nope"), "{err:#}");
     let err = swap("key = \"parley_remy\"\nwake = \"parley_price\"\nafter = \"chose:remy:free\"", "key = \"parley_remy\"\nafter = \"chose:remy:free\"").unwrap_err();
-    assert!(format!("{err:#}").contains("only decides whether a pack that wakes"), "{err:#}");
+    // (A pack's `after` may stand on its own now, round three's E7, but the parley table still
+    // names it in its ambush, and an ambush wakes on its chest.)
+    assert!(format!("{err:#}").contains("ambush parley_remy needs a [[pack]]"), "{err:#}");
 }

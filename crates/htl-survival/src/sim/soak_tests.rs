@@ -9,33 +9,52 @@
 //! ```
 //!
 //! - `SOAK_MINUTES` (default 120): simulated minutes in all, at 20 Hz. Elwynn gets 45 %, the
-//!   dungeons together 40 %, the Basin Battle siege 15 %.
+//!   dungeons together 40 %, the Basin Battle siege 15 %. The whole journal takes about 170
+//!   simulated minutes of Elwynn (so a run of at least 400 here); give it more to see what the
+//!   finished camp does over hours (a run of 1500 is 15 minutes of real time).
 //! - `SOAK_SEED` (default 20261115): the seed. It is printed at the start of every phase, so a
 //!   failure reproduces with the same two variables.
 //! - `SOAK_ONLY` (optional): `elwynn`, `dungeons` or `siege`, to run one phase alone.
 //! - `SOAK_SIZES=1` also prints every collection's size at the start, a third in, two thirds in
 //!   and at the end; `SOAK_DEBUG=1` prints each dungeon minute's bosses and heroes;
 //!   `SOAK_DEATHS=1` logs each hero's first death with what was near.
+//! - `SOAK_TRACE=a,b` prints what the journey's scouts see as it happens: `tells` (what the camp
+//!   says to them), `chest` (each chest they open), or a creature's key (its state every second
+//!   of the fight with it).
 //!
 //! It runs about 3 simulated hours of Elwynn a minute in release. The Basin Battle card mode (the
 //! `htl-sim` crate) has its own, `soak_card_mode_run_after_run` in `htl-sim/src/tests.rs`, run
 //! the same way with `-p htl-sim`.
 //!
-//! The drivers: three to five heroes of mixed classes pressing anything at random (every ability
-//! and its EX, attack, guard, dodge, bash, kick), walking at the nearest creature, taking weapons
-//! from the rack, dying, reviving, leaving and rejoining (sometimes all of them at once); at camp,
-//! building every station, raids rung, chests opened, the journal fed; below, each dungeon's
+//! The drivers: in Elwynn, a band of four heroes of mixed classes pressing anything at random
+//! (every ability and its EX, attack, guard, dodge, bash, kick), walking at the nearest creature,
+//! taking weapons from the rack, dying, reviving, leaving and rejoining (sometimes all of them at
+//! once); at camp, building every station, raids rung, chests opened; below, each dungeon's
 //! bosses pulled, wiped on and pulled again, the run reset; in the siege, whole matches of sends
 //! and trainer cards, one after another.
 //!
+//! And in Elwynn two strong scouts PLAY THE JOURNAL (`soak_tests/journey.rs`), goal by goal,
+//! read from `content.goals`: banking, crafting, building, wearing, exploring, finding secrets,
+//! opening chests (guardians first, trials won), learning (shrines, relics, champions), killing
+//! (a creature in Elwynn, or in the dungeon whose pack it is), taking the Horde's camps, raids
+//! met at the heart, dungeons entered by the book, cleared boss by boss, left by a lamp and the
+//! news sent home (`Event::ToCamp`) as the server does it, with the camp's people spoken to and
+//! their links followed. Each dungeon is its own world beside the camp's. The scouts' blows are
+//! `hurt_mob_as` slices (a dev world's abilities do no damage) while they also press buttons at
+//! what they fight, so every boss's phases, adds, holds, doors and deaths run. When the journal
+//! is done they go on: the chests again in order, every place, every camp, every dungeon cleared
+//! again. A goal that stays the journal's for three simulated hours fails the run (`SOAK STUCK
+//! journal`); one the pilot does not know how to play is named (`SOAK JOURNAL UNPLAYED`).
+//!
 //! Every tick: nothing panics and positions and health are finite and in range. Every simulated
 //! minute: the size of each collection of the sim is sampled (a debug-string length stands for
-//! the ones that hold collections inside), the camp and journal are checked for validity, and
-//! creatures are checked for being stuck. At the end of a phase: any collection that only ever
-//! grew, and the tick time's creep, are reported (`SOAK GROWS`, `SOAK CREEP`), and anything
-//! stuck is a failure (`SOAK STUCK`). The run fails (panics) on a broken invariant, a stuck
-//! creature or a boss that did not reset; growth is reported for a human to judge, and fails
-//! only past `GROWTH_FAIL` (a collection that grew without bound is a leak).
+//! the ones that hold collections inside, the structs with no `Debug` report their own with
+//! `sizes()`), the camp and journal are checked for validity, and creatures are checked for being
+//! stuck. At the end of a phase: any collection that only ever grew, and the tick time's creep,
+//! are reported (`SOAK GROWS`, `SOAK CREEP`), and anything stuck is a failure (`SOAK STUCK`). The
+//! run fails (panics) on a broken invariant, a stuck creature or a boss that did not reset; growth
+//! is reported for a human to judge, and fails only past `GROWTH_FAIL` (a collection that grew
+//! without bound is a leak).
 
 use super::*;
 use crate::content::{Content, SCHOOLS, SLOTS};
@@ -43,6 +62,8 @@ use crate::land::FlatLand;
 use super::mobs::Foe;
 use std::collections::BTreeMap as Map;
 use std::time::Instant;
+
+mod journey;
 
 const DT: f32 = 0.05;
 /// What a hero below has to stand the bosses' blows (a dev world's heroes are not tuned to them).
@@ -103,10 +124,25 @@ struct Monitor {
     last_goal: usize,
     last_raids: u32,
     min_ticks: usize,
+    last_hidden: Map<Id, String>,
+    odd: std::collections::BTreeSet<Id>,
 }
 
 fn debug_len<T: std::fmt::Debug>(x: &T) -> f64 {
     format!("{x:?}").len() as f64
+}
+
+/// A name for the size table that lives for the whole run (each is made once).
+fn interned(name: String) -> &'static str {
+    use std::sync::{Mutex, OnceLock};
+    static NAMES: OnceLock<Mutex<std::collections::BTreeMap<String, &'static str>>> = OnceLock::new();
+    let mut names = NAMES.get_or_init(Default::default).lock().unwrap();
+    if let Some(n) = names.get(&name) {
+        return n;
+    }
+    let leaked: &'static str = Box::leak(name.clone().into_boxed_str());
+    names.insert(name, leaked);
+    leaked
 }
 
 /// Every collection of the sim worth watching, with its size now.
@@ -138,14 +174,25 @@ fn sizes(s: &Survival) -> Vec<(&'static str, f64)> {
         "hunt.wires" => s.hunt.wires.len(), "hunt.pounces" => s.hunt.pounces.len(), "hunt.falls" => s.hunt.falls.len(),
         "hunt.recalls" => s.hunt.recalls.len(), "hunt.anchors" => s.hunt.anchors.len(), "hunt.floating" => s.hunt.floating.len(),
         "hunt.hangs" => s.hunt.hangs.len(),
-        "light.deaths" => s.light.deaths.len(), "light.recoiled" => s.light.recoiled.len(), "light.last_bolt" => s.light.last_bolt.len(),
-        "light.empower_shown" => s.light.empower_shown.len(), "light.drawn_marks" => s.light.drawn_marks.len(),
-        "light.penances" => s.light.penances.len(), "light.feathers" => s.light.feathers.len(), "light.rifts" => s.light.rifts.len(),
-        "light.hollows" => s.light.hollows.len(),
         "beta.yanks" => s.beta.yanks.len(), "beta.later" => s.beta.later.len(), "beta.echoes" => s.beta.echoes.len(),
         "beta.tethers" => s.beta.tethers.len(), "beta.pops" => s.beta.pops.len(), "beta.launched" => s.beta.launched.len(),
         "beta.catches" => s.beta.catches.len(),
         "warlord.tackles" => s.warlord.tackles.len(), "warlord.banners" => s.warlord.banners.len(), "warlord.fled" => s.warlord.fled.len(),
+    }
+    // The structs that report their own collections (no `Debug` to take the length of).
+    let reports: [(&str, Vec<(&'static str, usize)>); 7] = [
+        ("light", s.light.sizes()),
+        ("machinery", s.machinery.sizes()),
+        ("vancleef", s.vancleef.sizes()),
+        ("perches", s.perches.sizes()),
+        ("arsenal", s.arsenal.sizes()),
+        ("firing_line", s.firing_line.sizes()),
+        ("kitchen", s.kitchen.sizes()),
+    ];
+    for (owner, list) in reports {
+        for (name, n) in list {
+            v.push((interned(format!("{owner}.{name}")), n as f64));
+        }
     }
     n! {
         "dbg.hunt" => debug_len(&s.hunt), "dbg.beta" => debug_len(&s.beta), "dbg.warlord" => debug_len(&s.warlord),
@@ -197,6 +244,8 @@ impl Monitor {
             last_goal: 0,
             last_raids: 0,
             min_ticks: 0,
+            last_hidden: Map::new(),
+            odd: Default::default(),
         }
     }
 
@@ -223,6 +272,14 @@ impl Monitor {
             // A creature with no health is `Dead` (and goes in a few seconds): never up and fighting.
             assert!(m.health > 0 || matches!(m.state, mobs::MobState::Dead { .. }), "SOAK {ph}: zombie {} ({id}) with no health in {:?} at {:.1}", s.content.mobs[m.def].key, m.state, s.clock);
         }
+        // A creature unseen is waiting (Idle) or about to rise: it never fights, runs or heals while hidden
+        // (but for a boss flung out of its wreck, Sneed, who is out of sight in the air).
+        for (id, m) in &s.mobs {
+            if m.hidden && m.health > 0 && m.rise_at.is_none() && !s.content.mobs[m.def].boss && !matches!(m.state, mobs::MobState::Idle { .. }) && self.odd.insert(*id) {
+                eprintln!("SOAK ODD {ph}: hidden {} ({id}) in {:?}, hp {}/{}, pack {:?}, at {:.1}; a tick before: {:?}", s.content.mobs[m.def].key, m.state, m.health, m.max_health, m.pack.map(|k| s.content.packs[k].key.clone()), s.clock, self.last_hidden.get(id));
+            }
+        }
+        self.last_hidden = s.mobs.iter().filter(|(_, m)| m.hidden || matches!(m.state, mobs::MobState::Return)).map(|(id, m)| (*id, format!("hidden {} {:?} hp {}", m.hidden, m.state, m.health))).collect();
         for (id, m) in &s.mobs {
             if m.hidden && m.health < m.max_health && m.health > 0 && self.dbg.insert(*id) {
                 eprintln!("DBG hidden hurt {} ({id}) {:?} hp {}/{} at {:.1} pack {:?}", s.content.mobs[m.def].key, m.state, m.health, m.max_health, s.clock, m.pack.map(|k| s.content.packs[k].key.clone()));
@@ -291,9 +348,21 @@ impl Monitor {
                 let cc: Vec<String> = s.cc_of(*id).iter().map(|c| format!("{}:{:.0}", c.kind, c.until)).collect();
                 if self.reported.insert(*id) {
                     found.push(format!(
-                        "{} ({id}) in state {:?} for {age:.0}s at {:.0?}, home {:.0?}, hp {}/{}, pack {:?}, raider {}, clock {now:.0}, path {}, hidden {}, cc {cc:?}, thrown_until {:.0}, rise {:?}, wander_to {:?}, nearest hero {:?}",
+                        "{} ({id}) in state {:?} for {age:.0}s at {:.0?}, home {:.0?}, hp {}/{}, pack {:?}, raider {}, clock {now:.0}, path {}, hidden {}, cc {cc:?}, thrown_until {:.0}, rise {:?}, wander_to {:?}, nearest hero {:?}, its foe {:?}, speed {} think {} ready_at {:.0} lost_at {:?} moved_at {:.0} far_at {:.0} stagger_until {:.0} summoned {:?} friendly {}",
                         s.content.mobs[m.def].key, m.state, m.pos, m.home, m.health, m.max_health, m.pack, m.raider, m.path.len(), m.hidden, m.thrown_until, m.rise_at,
-                        m.path.first(), s.players.values().map(|p| dist2d(p.pos, m.pos) as i32).min()
+                        m.path.first(), s.players.values().map(|p| dist2d(p.pos, m.pos) as i32).min(),
+                        m.state.foe().map(|f| match f {
+                            mobs::Foe::Hero(h) => format!("{:?}", s.players.get(&h).map(|p| (p.account.clone(), p.health, p.pos.map(|v| v as i32), dist2d(p.pos, m.pos) as i32))),
+                            mobs::Foe::Obj(o) => format!(
+                                "{:?}; raid {:?}, {} raiders, {} queued",
+                                s.objs.get(&o).map(|ob| (match ob.kind { ObjKind::Station { def, health, damaged, .. } => format!("{} {health}{}", s.content.stations[def].key, if damaged { " wrecked" } else { "" }), _ => "an object".to_string() }, ob.pos.map(|v| v as i32))),
+                                s.raid.phase,
+                                s.raid.raiders.len(),
+                                s.raid.queue.len()
+                            ),
+                            mobs::Foe::Mob(o) => format!("a friendly creature {o:?}"),
+                        }),
+                        m.speed, m.think, m.ready_at, m.lost_at, m.moved_at, m.far_at, m.stagger_until, m.summoned_by, m.friendly
                     ));
                 }
                 *e = (d, now);
@@ -333,7 +402,9 @@ impl Monitor {
             // (`told_immune` is a cache that sheds its expired entries past 256: bounded.)
             let half = &series[series.len() / 2..];
             let mono = half.windows(2).all(|w| w[1] >= w[0] * 0.9);
-            let rising = last > third * 1.5 + 8.0 && mono && last > half[0] && *name != "told_immune";
+            // (The camp's tallies, chest and finds grow with the journey played: bounded by the content.)
+            let bounded = ["told_immune", "camp.counts", "camp.found", "camp.opened", "storage"].contains(name);
+            let rising = last > third * 1.5 + 8.0 && mono && last > half[0] && !bounded;
             if rising {
                 grew.push((name, series[0], third, last, max));
             }
@@ -347,9 +418,10 @@ impl Monitor {
         if std::env::var("SOAK_SIZES").is_ok() {
             for (name, series) in &self.sizes {
                 let last = *series.last().unwrap_or(&0.0);
-                if last > 0.0 {
+                let most = series.iter().cloned().fold(0.0, f64::max);
+                if most > 0.0 {
                     let at = |f: f64| series[((series.len() - 1) as f64 * f) as usize];
-                    eprintln!("SOAK SIZE {} {name}: {:.0} / {:.0} / {:.0} / {:.0} (start, a third, two thirds, end)", self.phase, series[0], at(0.33), at(0.66), last);
+                    eprintln!("SOAK SIZE {} {name}: {:.0} / {:.0} / {:.0} / {:.0}, most {most:.0} (start, a third, two thirds, end)", self.phase, series[0], at(0.33), at(0.66), last);
                 }
             }
         }
@@ -562,20 +634,8 @@ fn mend(s: &mut Survival, band: &Band, dice: &mut Dice) {
 
 // --- Elwynn ------------------------------------------------------------------------------------------
 
-fn world(seed: u64) -> Survival {
-    let mut c = Content::dev();
-    c.pvp = Default::default();
-    c.dev.full_tree = true;
-    // Foes hit back as they do in the game, and the camp builds as it costs.
-    c.combat.foe_health = 1.0;
-    c.combat.foe_damage = 1.0;
-    let mut s = Survival::new(c, Box::new(FlatLand::default()), seed, 1_700_000_000.0);
-    s.free_build = true;
-    s
-}
-
 /// Build whatever the camp can: every station once, the raid's needs first.
-fn build_all(s: &mut Survival, band: &Band, dice: &mut Dice, built: &mut u32) {
+fn build_all(s: &mut Survival, band: &Band, dice: &mut Dice, built: &mut u32, spill: &mut Vec<Event>) {
     let Some(h) = band.live().first().copied() else { return };
     if s.players.get(&h).is_none_or(|p| p.health == 0) {
         return;
@@ -612,7 +672,7 @@ fn build_all(s: &mut Survival, band: &Band, dice: &mut Dice, built: &mut u32) {
             if matches!(s.objs.get(&st).map(|o| &o.kind), Some(ObjKind::Station { damaged: true, .. })) {
                 s.interact(h, Some(st));
                 for _ in 0..60 {
-                    let _ = s.step(DT);
+                    spill.extend(s.step(DT));
                 }
                 continue;
             }
@@ -625,7 +685,7 @@ fn build_all(s: &mut Survival, band: &Band, dice: &mut Dice, built: &mut u32) {
     }
 }
 
-fn open_chests(s: &mut Survival, band: &Band) {
+fn open_chests(s: &mut Survival, band: &Band, spill: &mut Vec<Event>) {
     let Some(h) = band.live().first().copied() else { return };
     let chests: Vec<(Id, Vec3)> = s.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Chest { spent: false, .. })).map(|(id, o)| (*id, o.pos)).collect();
     for (id, at) in chests.into_iter().take(4) {
@@ -634,58 +694,9 @@ fn open_chests(s: &mut Survival, band: &Band) {
         // A chest takes a few seconds, standing still: step them out here (the rest of the
         // world goes on), then back to the fight.
         for _ in 0..80 {
-            let _ = s.step(DT);
+            spill.extend(s.step(DT));
         }
     }
-}
-
-/// The journal's goal: what a hero would do for it, done for them (bank what it asks, craft
-/// what it asks, tally what the soak can't play out: a dungeon's clear, a lesson learned).
-fn feed_journal(s: &mut Survival, band: &Band, done: &mut u32) {
-    let Some(h) = band.live().first().copied() else { return };
-    if s.players.get(&h).is_none_or(|p| p.health == 0) {
-        return;
-    }
-    let Some(g) = s.goal().cloned() else { return };
-    let (have, need) = s.goal_progress(&g);
-    if have >= need {
-        return;
-    }
-    match g.kind.as_str() {
-        "bank" => {
-            let Some(st) = s.objs.get(&s.storage_id()).map(|o| o.pos) else { return };
-            s.move_player(h, [st[0] + 1.0, st[1], st[2]], 0.0, Moving::default());
-            if let Err(e) = s.give_for_testing(h, &g.what, need - have) {
-                eprintln!("SOAK journal: {} not given: {e}", g.what);
-            }
-            s.deposit_all(h);
-        }
-        "craft" => {
-            let Some(r) = s.content.recipes.iter().find(|r| r.key == g.what).cloned() else { return };
-            for (k, n) in &r.inputs {
-                if let Some(i) = s.content.item(k) {
-                    *s.storage.entry(i).or_default() += n * 4;
-                }
-            }
-            let at = s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Station { def, damaged: false, .. } if s.station_does(def, &r.station))).map(|(id, o)| (*id, o.pos));
-            if at.is_none() {
-                eprintln!("SOAK journal: no station for {} ({})", r.key, r.station);
-            }
-            if let Some((st, pos)) = at {
-                s.move_player(h, [pos[0] + 1.0, pos[1], pos[2]], 0.0, Moving::default());
-                if let Err(e) = s.craft(h, st, &r.key) {
-                    eprintln!("SOAK journal: craft {} failed: {e}", r.key);
-                }
-                for _ in 0..80 {
-                    let _ = s.step(DT);
-                }
-            }
-        }
-        // Raids, builds and kills come by themselves; the rest is told.
-        "raid" | "build" | "kill" => {}
-        kind => s.count(kind, &g.what, need - have),
-    }
-    *done += 1;
 }
 
 fn rack_round(s: &mut Survival, band: &Band, dice: &mut Dice, armed: &mut u32) {
@@ -710,123 +721,11 @@ fn rack_round(s: &mut Survival, band: &Band, dice: &mut Dice, armed: &mut u32) {
     }
 }
 
-fn soak_elwynn(minutes: f32, seed: u64) {
-    let mut s = world(seed);
-    let mut dice = Dice(seed ^ 0xE1);
-    let heart = s.content.world.heart;
-    let at = s.ground(heart[0], heart[1]);
-    let mut band = Band::new(&mut s, 4, at, 4_000);
-    let mut mon = Monitor::new("elwynn", seed);
-    let (mut built, mut armed, mut raids_rung, mut raids_started, mut fed) = (0u32, 0u32, 0u32, 0u32, 0u32);
-    let mut raid_since: Option<f32> = None;
-    let ticks = (minutes * TICKS_PER_MIN as f32) as usize;
-    for tick in 0..ticks {
-        hands(&mut s, &band, &mut dice, true);
-        // Everyone back from a long way out, to find creatures to fight: a hero with nothing near
-        // goes to one, or home to the camp.
-        if tick % 100 == 0 {
-            for h in band.live() {
-                if let Some(p) = s.players.get(&h) {
-                    if p.health > 0 && nearest(&s, p.pos, 25.0).is_none() {
-                        let to = match s.mobs.iter().filter(|(_, m)| m.health > 0).map(|(_, m)| m.pos).nth(dice.below(s.mobs.len().max(1))) {
-                            Some(m) if dice.chance(0.7) => [m[0] + 4.0, m[1], m[2]],
-                            _ => at,
-                        };
-                        s.move_player(h, to, 0.0, Moving::default());
-                    }
-                }
-            }
-        }
-        if tick % 20 == 0 {
-            mend(&mut s, &band, &mut dice);
-        }
-        band.churn(&mut s, &mut dice, 4_000);
-        if tick % 3_000 == 1_000 {
-            build_all(&mut s, &band, &mut dice, &mut built);
-        }
-        if tick % 2_400 == 1_200 {
-            open_chests(&mut s, &band);
-        }
-        if tick % 1_200 == 600 {
-            feed_journal(&mut s, &band, &mut fed);
-        }
-        if tick % 2_000 == 500 {
-            rack_round(&mut s, &band, &mut dice, &mut armed);
-        }
-        if tick % 400 == 0 {
-            if let Some(&h) = band.live().first() {
-                if let Some(p) = s.players.get(&h) {
-                    let storage = s.objs.get(&s.storage_id()).map(|o| o.pos);
-                    if let (Some(st), true) = (storage, p.health > 0 && dice.chance(0.3)) {
-                        let back = p.pos;
-                        s.move_player(h, [st[0] + 1.0, st[1], st[2]], 0.0, Moving::default());
-                        s.deposit_all(h);
-                        s.move_player(h, back, 0.0, Moving::default());
-                    }
-                }
-            }
-        }
-        // Raids: ring the bell whenever the camp is ready.
-        if tick % 100 == 50 && s.raid.phase == raid::RaidPhase::Idle && s.camp_ready() {
-            if let Some(&h) = band.live().first() {
-                s.ring_bell(h);
-                raids_rung += 1;
-                if s.raid_start(h).is_ok() {
-                    raids_started += 1;
-                }
-            }
-        }
-        match (s.raid.phase == raid::RaidPhase::Idle, raid_since) {
-            (false, None) => raid_since = Some(s.clock),
-            (true, Some(_)) => raid_since = None,
-            (false, Some(t0)) if s.clock - t0 > 1_800.0 => {
-                eprintln!("SOAK STUCK elwynn: a raid has been {:?} for {:.0} s ({} raiders, {} queued)", s.raid.phase, s.clock - t0, s.raid.raiders.len(), s.raid.queue.len());
-                for r in &s.raid.raiders {
-                    if let Some(m) = s.mobs.get(r) {
-                        let cc: Vec<String> = s.cc_of(*r).iter().map(|c| format!("{}:{:.0}", c.kind, c.until)).collect();
-                        eprintln!("SOAK   raider {} ({r}) {:?} hp {}/{} at {:.0?}, path {} to {:?}, hidden {}, cc {cc:?}", s.content.mobs[m.def].key, m.state, m.health, m.max_health, m.pos, m.path.len(), m.path.last(), m.hidden);
-                    } else {
-                        eprintln!("SOAK   raider {r} is not a creature any more");
-                    }
-                }
-                let stations: Vec<String> = s.objs.values().filter_map(|o| match o.kind { ObjKind::Station { def, health, damaged, .. } => Some(format!("{}{}:{health}@{:.0?}", s.content.stations[def].key, if damaged { "(wrecked)" } else { "" }, o.pos)), _ => None }).collect();
-                eprintln!("SOAK   stations {stations:?}; heroes {:?}", s.players.values().map(|p| (p.health, p.pos.map(|v| v as i32))).collect::<Vec<_>>());
-                mon.stuck_found.push("raid".into());
-                raid_since = Some(s.clock);
-            }
-            _ => {}
-        }
-        let t = Instant::now();
-        let ev = s.step(DT);
-        let ms = t.elapsed().as_secs_f64() * 1000.0;
-        std::hint::black_box(&ev);
-        mon.tick(&s, ms);
-        if tick % TICKS_PER_MIN == TICKS_PER_MIN - 1 {
-            mon.minute(&s);
-        }
-    }
-    eprintln!(
-        "SOAK elwynn done: {:.0} simulated minutes; {fed} journal feeds, {} built, {} armed, {} raids rung, {} started, {} won, journal goal {} of {}, {} chests opened, {} heroes joined, {} found",
-        s.clock / 60.0,
-        built,
-        armed,
-        raids_rung,
-        raids_started,
-        s.camp.raids_won,
-        s.camp.goal,
-        s.content.goals.len(),
-        s.camp.opened.len(),
-        band.joins,
-        s.camp.found.len()
-    );
-    mon.report();
-}
-
 #[test]
 #[ignore]
 fn soak_elwynn_wave_after_wave() {
     if only("elwynn") {
-        soak_elwynn(minutes() * 0.45, seed());
+        journey::soak_elwynn(minutes() * 0.45, seed());
     }
 }
 

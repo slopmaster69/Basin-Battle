@@ -113,8 +113,9 @@ pub struct Columns {
     tris: Vec<[[f32; 3]; 3]>,
 }
 
-/// How far over a spot a building's floor seen from under it still seals the spot in.
-const SEALED_REACH: f32 = 8.0;
+/// How far over a spot a building's floor seen from under it still seals the spot in (Baron
+/// Silverlaine stood 15 yards under Shadowfang Keep's floor, Nov 2026).
+const SEALED_REACH: f32 = 20.0;
 
 impl Columns {
     /// An instance map's terrain and buildings (no props: what's checked is the floor itself).

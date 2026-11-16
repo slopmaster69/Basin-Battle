@@ -913,6 +913,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
 | The Goldshire road, north-west of the crossroads | Stitches (rare), a flesh golem who walks the cobbled road between the bridge and the crossroads |
 | The Parley Stones (the woods past Jasperlode) | the Brotherhood's parley table; Marzon the Silent Blade, who answers every swing, and the Blackrock Envoy; Dughan or Remy helps, as the camp chose; the satchel with the lion's seal |
+| The Stormwind Gate (the north road's end, where the city's bridge begins) | where Aldric Pell is walked from his hiding place by the road, under Lescovar's knives and Crane, the Lion's Knife; Pell stands there once he is through |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; the Stonefield Wagon, a hold against three kobold waves with Fedfennel, with Tommy Joe Stonefield helping; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista; Gruff Swiftbite (rare, three spots in the west) and the Riverpaw Tribute he sits on |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
@@ -969,7 +970,7 @@ hero comes near; spiders drop out of the dark at Jasperlode.
 
 **Rares** wander between spots and come back somewhere else a while after they fall; their fall,
 and their return (and where they've been seen), is told to everyone: Hogger, Garrick Padfoot, Taskmaster Snivvle, Grizzlefin, Mother Fang, Goldtooth,
-Princess, Gruff Swiftbite. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
+Princess, Gruff Swiftbite, Sable. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
 a parry only fills a boss's posture (it never stun-locks one), so Goldtooth's, Morgan's and Paymaster
 Voss's flurries carry `parry_ends = true`, which ends the string at a parry without a reel
 (`tests_boss_rules.rs` checks every such comment against the sim). Every champion and rare leaves a trophy in the chest the first time (Hogger's Cudgel,
@@ -1248,6 +1249,7 @@ so as it does:
 | The Horde Warband beaten | A second tower over the west wall, Marshal Wyle by the fire |
 | The Blackrock Assault beaten | Westbrook's footmen, a second weapon rack |
 | Brannick the Mason killed (in the fifth raid) | A stonemason from Stormwind, who mends the wall he built (`after = "kill:brannick"`) |
+| The letter kept from House Lescovar (Stage 12) | Two Stormwind archers outside the gate, who shoot raiders (`after = "chose:letter:keep"` on their packs) |
 
 **The Brotherhood's hand** (Stage 2 of docs/elwynn-expansion.md). The Brotherhood is selling Elwynn's
 roads to the Horde. The Defias Messenger (not a rare; he respawns after 15 min, and under 35% of
@@ -1372,6 +1374,50 @@ glowing red and blocked by nothing (it is not an enrage). His trophy is **The Si
 mechanic does 75% more damage to an enemy in its recovery. His satchel stays shut until he falls: a letter under a
 lion's seal, signed "G. L." Marshal Wyle then names Lord Gregor Lescovar and links the Deadmines page. Three goals
 follow (the stones, Marzon, the seal), and "Every corner" counts the 38 places.
+
+**The Witness** (Stage 11 of docs/elwynn-expansion.md). Wyle's word on the seal now ends: Stormwind won't hang a lord
+on ink, but Aldric Pell, who cut the seal, hides by the north road. His satchel there (shut until Marzon's satchel is
+read) starts an **escort**: Pell wakes and walks the road to the Stormwind gate, a new landmark (so "Every corner" is
+39). An escort is a chest with `escort` (the key of a pack of one friendly creature that wakes on it) and `route` (the
+points he walks, from his pack's `at`), its waves in `trial`. He walks at his own pace while a hero is within 20 yd of
+him and nothing is fighting him, and waits otherwise. Wave `i` of `n` comes as he sets off from point `i * len / n`
+of his route (here at his start, his fourth point and his seventh of eight), and its creatures come for him, not the
+heroes (`Foe::Mob`: a creature can fight a friendly one; its blows hurt him, and are never a kill for the camp). A
+hero's blow on one draws it off him for good, as a raider is drawn off a station, and one sent after him never gives
+up for its leash. It is passed once he reaches the end and every wave has fallen (the opener gets the satchel's
+silver and bronze and Pell's sworn word, "Pell Is Through"), and lost if he is struck down ("Aldric Pell is struck
+down...") or no hero has been within 60 yd of him for 12 sec: the knives go back unseen and whole, and he waits at
+his start, whole, to try again. It is once a world. The waves are 3 footpads ("Knives in the trees. They want Pell."),
+2 thugs ("More of them on the road ahead. Someone sold them the hour.") and **Crane, the Lion's Knife** ("Crane comes
+for the witness himself."). Remy's choice is paid again: a camp that freed him meets 2 more footpads in the second
+wave (he sold Pell's hour too, and says so after), and one that had him arrested finds a Goldshire watchman of
+Dughan's at Pell's side with a bow (a friendly shooter, who shoots what is on Pell too), and Dughan says so after.
+Crane is a **hunter** (`hunts`): a hero who strikes him turns him for one string (a blow he was winding up at Pell
+turns on that hero), and then he turns his back on that hero and goes for Pell again. His rule: keep hitting him.
+Two quick cuts (parry the first and the second never comes) and a lunge; from half his health ("Hold still, old
+man.") a slow throat-cut, glowing red, that nothing blocks: struck as he winds it up at Pell, it comes at the hero
+instead, so step out of it. Once Pell is through he stands at the gate with words of his own, and Wyle has a new
+line. Two goals follow (the seal-cutter, the Lion's Knife).
+
+**The Lion's Bargain** (Stage 12 of docs/elwynn-expansion.md). Once Pell is through, Steward Venn of House Lescovar
+waits outside the camp's gate (not asked in) with an offer for the letter: the camp's second choice, `.es choose
+letter:sell` or `letter:keep`, made once, by any hero, and he goes with the answer. *Sell the Letter*: the Lion's
+Purse at the gate opens (8 silver, 4 bronze, 2 pearls), Pell leaves the city's gate, and Wyle says what he thinks of
+it. *Keep the Letter*: Pell stays at the gate to swear before the House, and two Stormwind archers stand at the
+camp's gate for good, friendly shooters that shoot a raider on its way to, or at, the camp's buildings, as well as
+what fights a hero. A pack's `after` now works on any pack: one whose condition doesn't hold is unseen (an ambusher
+lying in wait never steps out) until it does, and the camp is looked over as it grows; it stays standing from then,
+across saves. The journal asks for the answer.
+
+**Sable, the Lion's Hound** (Stage 13 of docs/elwynn-expansion.md). Sold or kept, his lordship sends a hunter. Sable,
+a rare, lies unseen on the roads round the camp (the junction below the gate, the Westfall road, the woods by the
+north-west road: `spots`, more than 100 yd from the camp) until a hero comes within 12 yd, and only once the camp has
+answered Venn (her pack's `after`). She steps out ("His lordship sends his regards.") and comes back 30 min after she
+falls. Her temper, `stalker`, strikes only a back, or at an opening (a swing's follow-through, a cast, a meal), and
+works round and gives ground otherwise. Her rule: turn with her and she circles; give her your back and she cuts it.
+Two quick cuts (parry the first and the second never comes) and a lunge at a back. At half her health ("You'll tire
+before I do.") she throws down every hero within 4 yd, once, and goes round them as they rise: get up facing her. Her
+fall is told; Wyle, Marten and (if he stayed) Pell have a last word on her, and the journal asks for her.
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set

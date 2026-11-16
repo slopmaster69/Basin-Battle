@@ -182,6 +182,29 @@ pub(crate) struct Perches {
     workers: BTreeMap<Id, Worker>,
 }
 
+impl Perches {
+    /// How many of each thing it holds (for the soak's growth checks).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        let crews = || self.crews.values();
+        vec![
+            ("crews", self.crews.len()),
+            ("workers", self.workers.len()),
+            ("crews.workers", crews().map(|c| c.workers.len()).sum()),
+            ("crews.props", crews().map(|c| c.props.len()).sum()),
+            ("crews.visuals", crews().map(|c| c.visuals.len()).sum()),
+            ("crews.timed", crews().map(|c| c.timed.len()).sum()),
+            ("crews.later", crews().map(|c| c.later.len()).sum()),
+            ("crews.bands", crews().map(|c| c.bands.len()).sum()),
+            ("crews.sticks", crews().map(|c| c.sticks.len()).sum()),
+            ("crews.legs", crews().map(|c| c.legs.len()).sum()),
+            ("crews.channel", crews().map(|c| c.channel.len()).sum()),
+            ("crews.wisps", crews().map(|c| c.wisps.len()).sum()),
+            ("crews.lines", crews().map(|c| c.lines.len()).sum()),
+        ]
+    }
+}
+
 struct Crew {
     home: Vec3,
     /// In turn order: the first is the one the furnace brings down.

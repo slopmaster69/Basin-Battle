@@ -284,3 +284,57 @@ Built as planned, with these differences, found checking the plan against the co
 - Probed with `elwynn_probe near`: the site centre, the guards (the archers' spot has a trunk or wall within 6 yd, none beside it), the envoy, the table, the satchel and the helpers' spots are open ground, unmoved.
 
 Round two is built.
+
+# Round three: "The Lord's Answer" (stages 11 to 13)
+
+Designed 16 Nov 2026 from origin/main @8905cc8d, built overnight from the plan's defaults. Stages are ticked as they land.
+
+Defaults for Corey's open questions, all reversible:
+- The witness is invented: Aldric Pell, a Stormwind seal-cutter who cut Lescovar's ring. So are Crane (the Lion's Knife), Sable (the Lion's Hound) and Steward Venn.
+- The escort ends at the Stormwind gate, a new landmark on the north road. Nothing of the city is spawned.
+- A lost escort is not a death: Pell is struck down, the knives slip away, and he waits at his start to try again.
+- The second choice (sell or keep the letter) is camp-wide and one-time, like Remy's.
+- Sable hunts whichever way the camp chose, so the journal can always be finished.
+- Stormwind's archers at the camp shoot raiders at its buildings too.
+- No new weapon this round. The Horde column on the Redridge road and a night event are deferred.
+
+Story spine: a letter is ink, so Stormwind needs the man who cut the seal to swear to it. Pell is walked to the city under Lescovar's knives. Lescovar then offers to buy the letter back, and sends his hunter whatever the answer.
+
+Journal: every new goal goes just before "Every corner". `ELWYNN_GOALS` in `save.rs` goes 17, 18, 19. "Every corner" equals the site count (39 from Stage 11). Camps already past "The classes' trials" still skip the new goals: that migration is a call left for Corey. The tests are in `tests_story3.rs`, with `tests_story.rs`'s old-save, goal-order and sites tests extended.
+
+## Stage 11: The Witness [x] (escort; engine change E6)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E6.** `ChestDef.escort` and `ChestDef.route` (`sim/explore.rs`: `escort_walks`, `escort_walker`, `hurt_ward`, `lose_trial`). The escort is a trial: `start_trial` wakes the walker and the chest's `ambush` helpers and calls wave 1 at once; `step_trials` moves him (`go`, at his walk speed, only with a hero within 20 yd and nothing whose foe is him) and calls wave `i` as he sets off from point `i * len / n`. `Foe::Mob` is new (`sim/mobs.rs`): `foe_pos`, the blow landing on him (`hurt_ward`, never `mob_died`), the leash (one sent after a standing walker never gives up for it), `retarget` (it keeps him), and the draw-off on a hero's blow (any creature on him, not only a raider). `Mob.ward` keeps whom it was set on. `validate()` checks the escort's pack is one friendly creature that wakes on the chest, that it has a route and waves and no `hold` or `teaches`, and that only an escort has a route.
+- **`MobDef.hunts`**: drawn off its quarry, it gives that hero one string and goes back (at the string's end, in `Recover`). A blow on it while it winds up at its quarry turns that wind-up on the hero (the plan's "a light blow knocks the throat-cut aside" could not be: a boss's wind-up is never knocked aside by the rules, `boss_knock_aside`).
+- A friendly shooter also shoots a foe on a walker (`allies_shoot`), so Dughan's watchman helps Pell.
+- The waves reuse the Brotherhood's footpads and thugs, all fighters up close: a ranged creature's shot lands where its target stood and only hurts heroes there, so an escort's waves keep to melee.
+- `lose_trial` is the old give-up, shared: a hold or an escort that is lost says its `lost_text`; a shrine's trial still says nothing.
+- Displays (`npcfind` on the real data): Pell 1724 (purple cloth), Crane 3358 (black leathers), the watchman 1984 (Stormwind plate and tabard). Unchecked in the client.
+- Wyle's line at `open:marzon_satchel` now ends with the pointer to Pell (it still starts as round two's test reads it), and Wyle, Remy and Dughan each have a line at `open:pell_satchel`.
+- Two tests elsewhere (`tests_tactics`'s give-ground, `tests_warlord`'s tackle) drew their dice from the world's content, which this stage's packs move; each now seeds its own dice (both pass on 11 of 12 seeds).
+- `ELWYNN_GOALS` is 17 and "Every corner" is 39 for the 39 sites.
+- Probed with `elwynn_probe near`: the satchel, Pell's start, every point of the road, the wave spots and the gate are open ground. The route's fifth point moved from (-9150, 365), which has a wall within 6 yd, to (-9152, 360).
+
+## Stage 12: The Lion's Bargain [x] (a second camp choice; engine change E7)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E7.** `PackDef.after` on any pack: `spawn_mob` keeps one whose condition doesn't hold unseen (`pack_due`), an ambusher lying in wait doesn't step out before it holds, and `grow_camp` (every 5 sec, and as a choice is made) brings into sight the packs whose time has come (`packs_come`). `validate()` dropped its "only for a pack that wakes" rule; round two's test now reads the parley's ambush error instead.
+- `allies_shoot` also shoots a raider (any state but fallen), so the archers help in a raid.
+- Venn, the purse and the archers stand outside the camp's building ground (55 yd from its heart, past the gate's lion statues), so nothing built can stand on them. Pell leaves only if the letter is sold (`until = "chose:letter:sell"`); kept, he stays at the gate with a new line.
+- Displays: Venn 7011 (a black suit, `npcfind`), the archers 1984. Unchecked in the client.
+- `ELWYNN_GOALS` is 18. No site was added.
+- Probed with `elwynn_probe near`: Venn (-9673, 692), the purse (-9675, 688) and the archers (-9678, 674) and (-9678, 702) are open ground; the plan's first spots by the statues had walls beside them.
+
+## Stage 13: Sable, the Lion's Hound [x] (roaming hunter; content on E7)
+
+Built as planned, with these differences, found checking the plan against the code:
+- Content only. Her pack is `hidden = 12`, `rare`, with three `spots` and `after = "chose:letter"` (E7 keeps her from stepping out before the camp answers, whichever answer). The `stalker` temper is the existing `backstab` rule (`sim/mobs.rs`: a backstabber waits unless its hero's back is to it or they are open) with `flank`, `punish`, `retreat 0.5` over 5 yd and `pace 0.9`; tempers apply to a boss.
+- Her 50% turn is a `shove` of 4 yd (every hero beside her thrown down) with her line, not the plan's "unseen for a moment": a `run_to` needs fixed points and she wanders between spots. No adds, no enrage (`speed` and `might` stay 1).
+- Three spots, not four: the Goldshire road east of the camp is Stitches' (his bridge end is at (-9744, 470)), and (-9752, 540) is on the stream's bridge. Her spots are (-9752, 640), (-9764, 790) and (-9705, 760), each more than 100 yd from the camp and 60 from Stitches' road.
+- Display 1297 (a woman in black and red leathers, `npcfind`), two daggers. Unchecked in the client.
+- Lines: Wyle, Marten and Pell (only there if the letter was kept) each have a last word at `kill:sable`.
+- `ELWYNN_GOALS` is 19; no site was added, so "Every corner" stays 39.
+- Probed with `elwynn_probe near`: the three spots are open ground; (-9752, 540) and (-9790, 700) failed (water, a wall) and were dropped.
+
+Round three is built.

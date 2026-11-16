@@ -149,6 +149,30 @@ pub(crate) struct Machinery {
     tilts: BTreeMap<Id, f32>,
 }
 
+impl Machinery {
+    /// How many of each thing it holds (for the soak's growth checks).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        vec![
+            ("pressure", self.pressure.len()),
+            ("steam_at", self.steam_at.len()),
+            ("grinds", self.grinds.len()),
+            ("stalls", self.stalls.len()),
+            ("revs", self.revs.len()),
+            ("wrenches", self.wrenches.len()),
+            ("drivers", self.drivers.len()),
+            ("rebuilt", self.rebuilt.len()),
+            ("logs", self.logs.len()),
+            ("approach", self.approach.len()),
+            ("approached", self.approached.len()),
+            ("lines", self.lines.len()),
+            ("rigs", self.rigs.len()),
+            ("runaways", self.runaways.len()),
+            ("tilts", self.tilts.len()),
+        ]
+    }
+}
+
 #[derive(Clone)]
 struct Grind {
     last: Vec3,

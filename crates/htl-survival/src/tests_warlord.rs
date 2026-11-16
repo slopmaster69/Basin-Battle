@@ -251,6 +251,9 @@ fn tackle_with_nothing_behind_flings_the_enemy_on_ahead() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "brave", [2.0, 0.0, 0.0]);
+    // (The dice are this seed's from here, whatever the world's content drew getting this far: what
+    // the brave does once it lands is drawn, and 1 draw in 12 or so walks it back a little.)
+    s.rng = rand::SeedableRng::seed_from_u64(1);
     let mut ev = cast(&mut s, p, "tackle", false, 0.0, 0.0);
     ev.extend(run(&mut s, 0.35));
     assert!(s.mobs[&k].pos[0] > 8.0, "carried the rest of the 8 yd: {:?}", s.mobs[&k].pos);

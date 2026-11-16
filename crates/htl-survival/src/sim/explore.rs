@@ -14,6 +14,10 @@ pub const NEVER: f64 = 1.0e18;
 const TRIAL_STAY: f32 = 60.0;
 /// ...and given up when none has been for this long.
 const TRIAL_GIVE_UP: f32 = 12.0;
+/// An escort's walker walks on only while a hero is this near him.
+pub const ESCORT_NEAR: f32 = 20.0;
+/// He has reached a point of his route this near it.
+const ESCORT_REACHED: f32 = 1.5;
 
 impl Survival {
     /// Set out the chests: those not opened (or full again), the secret ones kept back until found;
@@ -51,6 +55,33 @@ impl Survival {
         }
         // The camp's own, as far as it has come.
         self.grow_camp(false);
+    }
+
+    /// Whether pack `k`'s condition holds (its `after`; none: always).
+    pub(crate) fn pack_due(&self, k: usize) -> bool {
+        self.content.packs[k].after.as_deref().is_none_or(|a| self.camp_has(a))
+    }
+
+    /// Packs that stand once the camp has come this far (`after`, not woken by a chest nor lying in
+    /// wait): those whose condition holds now come into sight.
+    fn packs_come(&mut self) {
+        let due: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.hidden && m.health > 0)
+            .filter(|(_, m)| m.pack.is_some_and(|k| {
+                let p = &self.content.packs[k];
+                p.after.is_some() && p.wake.is_empty() && p.hidden <= 0.0 && self.pack_due(k)
+            }))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in due {
+            self.mobs.get_mut(&id).unwrap().hidden = false;
+            self.events.push(Event::MobSpawned { id });
+            if self.content.mobs[self.mobs[&id].def].aura != 0 {
+                self.events.push(Event::Auras { id });
+            }
+        }
     }
 
     /// Whether prop `k` has gone: its `until` holds.
@@ -151,6 +182,8 @@ impl Survival {
         if self.is_below() || self.is_siege() {
             return;
         }
+        // Packs whose time has come stand.
+        self.packs_come();
         // What the camp has outgrown goes (a person taken away: `until`), and never stands again.
         let gone: Vec<Id> = self
             .objs
@@ -382,11 +415,28 @@ impl Survival {
             return;
         }
         if self.trials.contains_key(&def) {
-            if c.hold > 0.0 {
+            if let Some(name) = self.trials[&def].walker.and_then(|w| self.mobs.get(&w)).map(|m| self.content.mobs[m.def].name.clone()) {
+                self.tell(id, format!("{name} is already on the road. Stay near him."));
+            } else if c.hold > 0.0 {
                 self.tell(id, format!("{} is under way. Stay near it.", c.name));
             } else {
                 self.tell(id, format!("The trial is under way. Defeat {}'s guardians.", c.name));
             }
+            return;
+        }
+        // An escort: its walker wakes where he waits, and the first wave comes for him.
+        if !c.escort.is_empty() {
+            self.wake_ambush(&c.escort, id);
+            let Some(w) = self.escort_walker(def) else { return };
+            for k in &c.ambush {
+                self.wake_ambush(k, id);
+            }
+            let now = self.clock;
+            self.trials.insert(def, Trial { obj, by: id, near_at: now, started: now, called: 1, walker: Some(w), leg: 0 });
+            self.call_wave(def, 0, id);
+            let name = self.content.mobs[self.mobs[&w].def].name.clone();
+            let title = if c.hold_title.is_empty() { format!("Escort {name}") } else { c.hold_title.clone() };
+            self.events.push(Event::Banner { player: Some(id), title, sub: format!("Stay near {name}") });
             return;
         }
         let waves = self.trial_waves(&c);
@@ -401,7 +451,7 @@ impl Survival {
             }
         }
         let now = self.clock;
-        self.trials.insert(def, Trial { obj, by: id, near_at: now, started: now, called });
+        self.trials.insert(def, Trial { obj, by: id, near_at: now, started: now, called, walker: None, leg: 0 });
         if c.hold > 0.0 {
             let title = if c.hold_title.is_empty() { format!("Hold {}", c.name) } else { c.hold_title.clone() };
             self.events.push(Event::Banner { player: Some(id), title, sub: format!("Stay near it for {} sec", c.hold.round() as u32) });
@@ -433,7 +483,9 @@ impl Survival {
                 self.spawn_mob(mdef, at, Some(k), false);
             }
             let key = pack.key.clone();
-            self.wake_ambush(&key, by);
+            // An escort's waves come for the one walked, not for the heroes.
+            let foe = self.trials.get(&def).and_then(|t| t.walker).map_or(mobs::Foe::Hero(by), mobs::Foe::Mob);
+            self.wake_ambush_on(&key, foe);
         }
         if let Some(text) = c.wave_text.get(i) {
             self.announce(text.clone());
@@ -442,11 +494,19 @@ impl Survival {
 
     /// A hold's helpers (friendly creatures of its `ambush` packs) stand down: unseen again.
     fn stand_down_allies(&mut self, def: usize) {
-        let packs: Vec<usize> = self.content.chests[def].ambush.iter().filter_map(|key| self.content.packs.iter().position(|p| p.key == *key)).collect();
+        let c = &self.content.chests[def];
+        let packs: Vec<usize> = c.ambush.iter().chain(std::iter::once(&c.escort)).filter_map(|key| self.content.packs.iter().position(|p| !key.is_empty() && p.key == *key)).collect();
         let ids: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.friendly && !m.hidden && m.pack.is_some_and(|k| packs.contains(&k))).map(|(id, _)| *id).collect();
         for id in ids {
+            // A walker goes back to where he waits, whole.
+            let start = self.mobs[&id].pack.filter(|k| self.content.packs[*k].key == self.content.chests[def].escort).map(|k| self.content.packs[k].at);
+            let start = start.map(|a| self.ground(a[0], a[1]));
             if let Some(x) = self.mobs.get_mut(&id) {
                 x.hidden = true;
+                if let Some(at) = start {
+                    x.home = at;
+                    x.health = x.max_health;
+                }
                 x.pos = x.home;
                 x.path.clear();
                 x.state = mobs::MobState::Idle { wander_at: f32::MAX };
@@ -470,6 +530,32 @@ impl Survival {
                 continue;
             };
             let waves = self.trial_waves(&c);
+            // An escort: near him is what counts, and he walks; struck down, it is lost.
+            let mut at = at;
+            let mut walked = true;
+            if let Some(w) = t.walker {
+                let Some(wpos) = self.mobs.get(&w).filter(|m| m.health > 0 && !m.hidden).map(|m| m.pos) else {
+                    self.lose_trial(def);
+                    continue;
+                };
+                at = wpos;
+                let leg = self.escort_walks(def, w, t.leg);
+                // Wave `i` of `n` comes as he sets off from point `i * len / n` of his route.
+                let mut called = t.called;
+                let by = if self.players.contains_key(&t.by) { t.by } else { self.players.keys().next().copied().unwrap_or(t.by) };
+                while called < waves.len() && leg * waves.len() >= called * c.route.len() {
+                    if let Some(x) = self.trials.get_mut(&def) {
+                        x.called = called + 1;
+                    }
+                    self.call_wave(def, called, by);
+                    called += 1;
+                }
+                if let Some(x) = self.trials.get_mut(&def) {
+                    x.leg = leg;
+                }
+                walked = leg >= c.route.len();
+            }
+            let Some(t) = self.trials.get(&def).cloned() else { continue };
             // A hold calls its waves over its time: wave `i` of `n` at `i * hold / n` sec.
             let mut called = t.called;
             if c.hold > 0.0 {
@@ -484,7 +570,8 @@ impl Survival {
             }
             let packs: Vec<usize> = waves.iter().flatten().copied().collect();
             let up: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| packs.contains(&k)) && m.health > 0 && !m.hidden).map(|(id, _)| *id).collect();
-            let held = called >= waves.len() && now - t.started >= c.hold;
+            let called = called.max(t.called);
+            let held = called >= waves.len() && now - t.started >= c.hold && walked;
             if up.is_empty() && held {
                 self.trials.remove(&def);
                 let mut heroes: Vec<Id> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= mobs::TEACH_RANGE).map(|(id, _)| *id).collect();
@@ -521,29 +608,96 @@ impl Survival {
                     t.near_at = now;
                 }
             } else if now - t.near_at > TRIAL_GIVE_UP {
-                self.trials.remove(&def);
-                for m in up {
-                    if let Some(x) = self.mobs.get_mut(&m) {
-                        x.hidden = true;
-                        x.health = x.max_health;
-                        x.pos = x.home;
-                        x.path.clear();
-                        x.state = mobs::MobState::Idle { wander_at: f32::MAX };
-                    }
-                    self.events.push(Event::MobGone { id: m });
-                }
-                if c.hold > 0.0 {
-                    self.stand_down_allies(def);
-                    let text = if c.lost_text.is_empty() { format!("{} is lost. Use it again to try again.", c.name) } else { c.lost_text.clone() };
-                    self.announce(text);
-                }
+                self.lose_trial(def);
+            }
+        }
+    }
+
+    /// A trial given up (no hero near a while) or an escort lost (its walker struck down): its
+    /// guardians go back to waiting, whole and unseen; a hold's or an escort's helpers stand down,
+    /// and the camp hears it is lost.
+    fn lose_trial(&mut self, def: usize) {
+        let c = self.content.chests[def].clone();
+        self.trials.remove(&def);
+        let packs: Vec<usize> = self.trial_waves(&c).into_iter().flatten().collect();
+        let up: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| packs.contains(&k)) && m.health > 0 && !m.hidden).map(|(id, _)| *id).collect();
+        for m in up {
+            if let Some(x) = self.mobs.get_mut(&m) {
+                x.hidden = true;
+                x.health = x.max_health;
+                x.pos = x.home;
+                x.path.clear();
+                x.ward = None;
+                x.drawn_off = None;
+                x.pattern = None;
+                x.state = mobs::MobState::Idle { wander_at: f32::MAX };
+            }
+            self.events.push(Event::MobGone { id: m });
+        }
+        if c.hold > 0.0 || !c.escort.is_empty() {
+            self.stand_down_allies(def);
+            let text = if c.lost_text.is_empty() { format!("{} is lost. Use it again to try again.", c.name) } else { c.lost_text.clone() };
+            self.announce(text);
+        }
+    }
+
+    /// The walker of escort `def` (its pack's one creature, standing).
+    fn escort_walker(&self, def: usize) -> Option<Id> {
+        let key = &self.content.chests[def].escort;
+        let k = self.content.packs.iter().position(|p| !key.is_empty() && p.key == *key)?;
+        self.mobs.iter().find(|(_, m)| m.pack == Some(k) && m.health > 0).map(|(id, _)| *id)
+    }
+
+    /// An escort's walker `w` on his way: the point he makes for, after this moment. He walks to it
+    /// at his own pace while a hero is near him and nothing is fighting him, and waits otherwise.
+    fn escort_walks(&mut self, def: usize, w: Id, leg: usize) -> usize {
+        let route = self.content.chests[def].route.clone();
+        let Some(m) = self.mobs.get(&w) else { return leg };
+        let (pos, speed) = (m.pos, self.content.mobs[m.def].walk_speed.max(1.0));
+        let mut leg = leg;
+        while leg < route.len() && dist2d(pos, [route[leg][0], route[leg][1], 0.0]) <= ESCORT_REACHED {
+            leg += 1;
+        }
+        let beset = self.mobs.values().any(|o| o.health > 0 && !o.hidden && o.state.foe() == Some(mobs::Foe::Mob(w)));
+        let near = self.players.values().any(|p| p.health > 0 && dist2d(p.pos, pos) <= ESCORT_NEAR);
+        if leg < route.len() && near && !beset {
+            if self.mobs[&w].path.is_empty() {
+                let to = self.ground_near(route[leg][0], route[leg][1], pos[2]);
+                self.mobs.get_mut(&w).unwrap().home = to;
+                self.go(w, to, speed);
+            }
+        } else if !self.mobs[&w].path.is_empty() {
+            // He stops where he is, and waits.
+            let m = self.mobs.get_mut(&w).unwrap();
+            m.path.clear();
+            m.home = pos;
+            self.events.push(Event::MobStop { id: w, pos, facing: self.mobs[&w].facing });
+        }
+        leg
+    }
+
+    /// A blow on the friendly creature the heroes guard (an escort's walker): it takes it (never a
+    /// kill for the camp), and struck down, its escort is lost.
+    pub(crate) fn hurt_ward(&mut self, w: Id, damage: u32, from: Vec3) {
+        let Some(m) = self.mobs.get_mut(&w) else { return };
+        if m.health == 0 || m.hidden {
+            return;
+        }
+        m.health = m.health.saturating_sub(damage);
+        let (h, max) = (m.health, m.max_health);
+        self.events.push(Event::Health { id: w, health: h, max });
+        self.events.push(Event::React { id: w, anim: combat::WOUND_ANIM, from, lean: 0.15, hold: 0.0, fit: 0.0 });
+        if h == 0 {
+            if let Some(def) = self.trials.iter().find(|(_, t)| t.walker == Some(w)).map(|(d, _)| *d) {
+                self.lose_trial(def);
             }
         }
     }
 
     /// Each friendly shooter (`shoots` on its `[[mob]]`) shoots the nearest foe in reach that is
-    /// fighting a hero, every so often, if it can see it: a hero's helper, as a tower is, and a
-    /// foe it finishes counts for the camp. It never shoots an idle pack, nor a hero.
+    /// fighting a hero (or one the heroes guard), or a raider on its way to or at a station, every
+    /// so often, if it can see it: a hero's helper, as a tower is, and a foe it finishes counts for
+    /// the camp. It never shoots an idle pack, nor a hero.
     pub(crate) fn allies_shoot(&mut self) {
         let now = self.clock;
         let shooters: Vec<(Id, Vec3, crate::content::ShootDef)> = self
@@ -563,7 +717,10 @@ impl Survival {
                 .mobs
                 .iter()
                 .filter(|(id, m)| **id != a && m.health > 0 && !m.hidden && !m.friendly && !self.content.mobs[m.def].inert())
-                .filter(|(_, m)| matches!(m.state, mobs::MobState::Chase { foe: mobs::Foe::Hero(_) } | mobs::MobState::Windup { foe: mobs::Foe::Hero(_), .. }))
+                .filter(|(_, m)| {
+                    matches!(m.state, mobs::MobState::Chase { foe: mobs::Foe::Hero(_) | mobs::Foe::Mob(_) } | mobs::MobState::Windup { foe: mobs::Foe::Hero(_) | mobs::Foe::Mob(_), .. })
+                        || (m.raider && !matches!(m.state, mobs::MobState::Dead { .. }))
+                })
                 .filter(|(_, m)| dist2d(m.pos, at) <= sh.range && crate::land::clear_line(self.land.as_ref(), eye, [m.pos[0], m.pos[1], m.pos[2] + 1.0]))
                 .min_by(|x, y| dist2d(x.1.pos, at).total_cmp(&dist2d(y.1.pos, at)))
                 .map(|(id, _)| *id);
@@ -577,6 +734,11 @@ impl Survival {
 
     /// Wake an ambush lying in wait (a pack by key) on a hero.
     pub(crate) fn wake_ambush(&mut self, key: &str, on: Id) {
+        self.wake_ambush_on(key, mobs::Foe::Hero(on));
+    }
+
+    /// Wake an ambush lying in wait (a pack by key) on a foe: a hero, or the one the heroes guard.
+    pub(crate) fn wake_ambush_on(&mut self, key: &str, on: mobs::Foe) {
         let Some(k) = self.content.packs.iter().position(|p| p.key == key) else { return };
         // A pack with a condition that doesn't hold stays asleep (a helper of one side of a choice).
         if self.content.packs[k].after.as_deref().is_some_and(|a| !self.camp_has(a)) {
@@ -588,7 +750,7 @@ impl Survival {
             self.events.push(Event::MobSpawned { id: *m });
         }
         for m in ids {
-            self.engage(m, mobs::Foe::Hero(on));
+            self.engage(m, on);
         }
     }
 
@@ -637,7 +799,7 @@ impl Survival {
             .filter(|(_, m)| m.hidden && m.health > 0)
             .filter_map(|(id, m)| {
                 let p = &self.content.packs[m.pack?];
-                (p.wake.is_empty() && p.hidden > 0.0).then_some((*id, m.pos, p.hidden))
+                (p.wake.is_empty() && p.hidden > 0.0 && self.pack_due(m.pack?)).then_some((*id, m.pos, p.hidden))
             })
             .collect();
         for (m, pos, r) in waiting {

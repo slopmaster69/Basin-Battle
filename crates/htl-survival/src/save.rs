@@ -103,7 +103,7 @@ const FIRST_JOURNAL: [&str; 17] = [
 /// place) needs the goals past this point carried over the new ones. Raise `ELWYNN_GOALS` by the
 /// goals each stage adds there.
 pub(crate) const ELWYNN_GOALS_AT: usize = 33;
-pub(crate) const ELWYNN_GOALS: usize = 15;
+pub(crate) const ELWYNN_GOALS: usize = 19;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StationSave {
