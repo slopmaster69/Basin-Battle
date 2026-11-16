@@ -48,6 +48,8 @@ mod hidden_tests;
 mod leave_tests;
 #[cfg(test)]
 mod perf_tests;
+#[cfg(test)]
+mod sleep_tests;
 mod bench_support;
 mod flay;
 pub mod priest;
