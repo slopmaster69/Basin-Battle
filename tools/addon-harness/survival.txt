@@ -457,7 +457,7 @@ MK	t1	1	2	3	2	1	0
 !this = ElwynnSurvivalKeys.marks; this:GetScript("OnClick")() assert(ElwynnSurvivalSettings.noMarks == 1 and ElwynnSurvival.MarksOn() == false and this.label:GetText() == "Hidden", "Controls must save 1 to hide floor markers") assert(FLOOR_CLEARED["est1"] and ElwynnSurvival.marksUp.mk["est1"] == nil, "hiding must clear a drawn floor marker immediately") ClearGroundMarker = FLOOR_OLD_CLEAR FLOOR_OLD_CLEAR = nil FLOOR_CLEARED = nil
 MK	t1	1	2	3	2	1	0
 !assert(ElwynnSurvival.marksUp.mk["est1"] == nil, "hidden floor markers must stay suppressed") table.insert(SAID, "floor-marker default, Controls and clearing: passed")
-# The book with its dungeons (through Ledger.lua's dressing, which must pass them on).
+# The book with its dungeons (the book window).
 WR	camp
 BK	0		arena~The Proving Ring~0	siege~The Siege~Camps.	deadmines~The Deadmines~~1~1~3~1~~^stockade~The Stockade~INV_Misc_Key_04~0~1~2~1~A prison~The gate
 !local t = {} for i = 1, 8 do local r = ElwynnSurvival.win.rows[i] if r and r:IsShown() then table.insert(t, tostring(r.name:GetText())) end end table.insert(SAID, "book with dungeons: " .. table.concat(t, " | "))

@@ -18,11 +18,18 @@
 local ES = ElwynnSurvival
 if not ES then return end
 
-local A = "Interface\\AddOns\\ElwynnSurvival\\art\\ledger\\"
-local FONTS = "Interface\\AddOns\\ElwynnSurvival\\fonts\\"
-local TITLE = FONTS .. "IMFellEnglishSC-Regular.ttf"
-local BODY = FONTS .. "CrimsonPro-Regular.ttf"
+local TITLE = "Fonts\\FRIZQT__.TTF"
+local BODY = "Fonts\\FRIZQT__.TTF"
 local DEATH = 10
+-- The slip's colors, on a dark panel: the white of a title, the pale text, the faded (slain) line,
+-- gold for the clock while there's room, red once it's over, green for a win.
+local WHITE = { 1, 1, 1 }
+local TEXT = { 0.86, 0.86, 0.88 }
+local FADED = { 0.55, 0.57, 0.6 }
+local GOLD = { 1, 0.82, 0.3 }
+local AMBER = { 1, 0.62, 0.2 }
+local RED = { 1, 0.35, 0.3 }
+local GREEN = { 0.45, 0.85, 0.4 }
 
 -- A dungeon's tier in words, for the book's list (BK's last field; nil when it's not there).
 local TIERS = { "Tier I, a first dungeon", "Tier II, a harder one", "Tier III, among the hardest" }
@@ -38,51 +45,54 @@ f:SetFrameStrata("MEDIUM")
 f:Hide()
 ES.wagerFrame = f
 
--- The slip: the goal note's parchment card, a nine-slice, so its torn rim keeps its width at any
--- height (the old scrap, a wide 256 x 128, stretched tall with the boss list and its torn top ate
--- the title). The scrap stays for a client without the Ledger.
-local ledger = ES.ledger
-if ledger and ledger.Slice and ledger.CARD_RECTS then
-  f.paper = ledger.Slice(f, "detail_card", "BACKGROUND", 256, 256, ledger.CARD_RECTS, 26, 4)
-  f.paper:SetVertexColor(1, 1, 1, 0.97)
-else
-  f.paper = f:CreateTexture(nil, "BACKGROUND")
-  f.paper:SetTexture(A .. "scrap_note_b")
-  f.paper:SetPoint("TOPLEFT", f, "TOPLEFT", -14, 10)
-  f.paper:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 14, -10)
+-- The slip: a dark, a little see-through panel with a thin edge, at any height.
+f.paper = f:CreateTexture(nil, "BACKGROUND")
+f.paper:SetTexture(0.05, 0.055, 0.07, 0.85)
+f.paper:SetAllPoints(f)
+local function Edge(p1, p2, w, h)
+  local t = f:CreateTexture(nil, "BORDER")
+  t:SetTexture(0.32, 0.34, 0.4, 0.9)
+  t:SetPoint(p1, f, p1, 0, 0)
+  t:SetPoint(p2, f, p2, 0, 0)
+  if w then t:SetWidth(w) end
+  if h then t:SetHeight(h) end
 end
--- The words clear of the rim: in from the sides, the title below the torn top.
+Edge("TOPLEFT", "TOPRIGHT", nil, 1)
+Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
+Edge("TOPLEFT", "BOTTOMLEFT", 1, nil)
+Edge("TOPRIGHT", "BOTTOMRIGHT", 1, nil)
+-- The words in from the sides.
 local PAD = 8
 
-local function Text(face, size, r, g, b)
+local function Text(face, size, c)
   local t = f:CreateFontString(nil, "ARTWORK")
   t:SetFont(face, size, "")
-  t:SetTextColor(r, g, b)
+  t:SetTextColor(c[1], c[2], c[3])
   t:SetShadowOffset(0, 0)
   t:SetJustifyH("CENTER")
   t:SetWidth(250 - 2 * PAD - 4)
   return t
 end
 
-f.title = Text(TITLE, 14, 0.165, 0.13, 0.094)
+f.title = Text(TITLE, 13, WHITE)
 f.title:SetPoint("TOP", f, "TOP", 0, -PAD - 4)
-f.clock = Text(TITLE, 24, 0.55, 0.38, 0.08)
+f.clock = Text(TITLE, 22, GOLD)
 f.clock:SetPoint("TOP", f.title, "BOTTOM", 0, -2)
-f.falls = Text(BODY, 13, 0.353, 0.275, 0.188)
+f.falls = Text(BODY, 11, FADED)
 f.falls:SetPoint("TOP", f.clock, "BOTTOM", 0, -1)
-f.terms = Text(BODY, 12, 0.604, 0.169, 0.125)
+f.terms = Text(BODY, 11, AMBER)
 f.terms:SetPoint("TOP", f.falls, "BOTTOM", 0, -1)
-f.bossHead = Text(TITLE, 13, 0.165, 0.13, 0.094)
+f.bossHead = Text(TITLE, 12, WHITE)
 f.bosses = {}
 local ROW = 16
--- The count of foes: a word and a bar (an ink trough, a gold fill, green once it's enough).
-f.forces = Text(TITLE, 13, 0.165, 0.13, 0.094)
+-- The count of foes: a word and a bar (a dark trough, a gold fill, green once it's enough).
+f.forces = Text(TITLE, 12, WHITE)
 f.forceBar = CreateFrame("Frame", nil, f)
 f.forceBar:SetWidth(180)
 f.forceBar:SetHeight(8)
 f.forceBar.back = f.forceBar:CreateTexture(nil, "BACKGROUND")
 f.forceBar.back:SetAllPoints(f.forceBar)
-f.forceBar.back:SetTexture(0.25, 0.2, 0.14, 0.35)
+f.forceBar.back:SetTexture(0.2, 0.22, 0.27, 0.8)
 f.forceBar.fill = f.forceBar:CreateTexture(nil, "ARTWORK")
 f.forceBar.fill:SetPoint("TOPLEFT", f.forceBar, "TOPLEFT", 0, 0)
 f.forceBar.fill:SetPoint("BOTTOMLEFT", f.forceBar, "BOTTOMLEFT", 0, 0)
@@ -96,14 +106,14 @@ f.ready:SetWidth(110)
 f.ready:SetHeight(22)
 f.ready.back = f.ready:CreateTexture(nil, "BACKGROUND")
 f.ready.back:SetAllPoints(f.ready)
-f.ready.back:SetTexture(A .. "button_normal")
+f.ready.back:SetTexture(0.14, 0.15, 0.19, 0.95)
 f.ready.label = f.ready:CreateFontString(nil, "ARTWORK")
-f.ready.label:SetFont(TITLE, 13, "")
+f.ready.label:SetFont(TITLE, 12, "")
 f.ready.label:SetPoint("CENTER", f.ready, "CENTER", 0, 0)
-f.ready.label:SetTextColor(0.953, 0.902, 0.784)
+f.ready.label:SetTextColor(0.44, 0.78, 1)
 f.ready.label:SetText("Ready")
-f.ready:SetScript("OnEnter", function() this.back:SetTexture(A .. "button_hover") end)
-f.ready:SetScript("OnLeave", function() this.back:SetTexture(A .. "button_normal") end)
+f.ready:SetScript("OnEnter", function() this.back:SetTexture(0.22, 0.25, 0.32, 1) end)
+f.ready:SetScript("OnLeave", function() this.back:SetTexture(0.14, 0.15, 0.19, 0.95) end)
 f.ready:SetScript("OnClick", function()
   if ES.Play then ES.Play("click") end
   if ES.Say then ES.Say(".es ready") end
@@ -127,9 +137,9 @@ local function DrawForces(fc, below)
   if fc.needed > 0 then share = math.min(1, fc.felled / fc.needed) end
   f.forceBar.fill:SetWidth(math.max(1, 180 * share))
   if share >= 1 then
-    f.forceBar.fill:SetVertexColor(0.3, 0.5, 0.18, 0.95)
+    f.forceBar.fill:SetVertexColor(0.4, 0.75, 0.35, 0.95)
   else
-    f.forceBar.fill:SetVertexColor(0.72, 0.537, 0.184, 0.95)
+    f.forceBar.fill:SetVertexColor(1, 0.82, 0.3, 0.95)
   end
   f.forceBar:Show()
   return 34
@@ -150,7 +160,7 @@ local function DrawBosses(list, below)
   for i = 1, math.max(n, table.getn(f.bosses)) do
     local row = f.bosses[i]
     if not row and i <= n then
-      row = Text(BODY, 13, 0.165, 0.13, 0.094)
+      row = Text(BODY, 12, TEXT)
       f.bosses[i] = row
     end
     if row then
@@ -158,25 +168,25 @@ local function DrawBosses(list, below)
         row:ClearAllPoints()
         row:SetPoint("TOP", f.bossHead, "BOTTOM", 0, -2 - (i - 1) * ROW)
         if list[i].down and list[i].split then
-          local text, r, g, b = list[i].name .. "  " .. ES.WagerClock(list[i].split), 0.5, 0.45, 0.38
+          local text, r, g, b = list[i].name .. "  " .. ES.WagerClock(list[i].split), FADED[1], FADED[2], FADED[3]
           if list[i].best then
             local d = list[i].split - list[i].best
             if d <= 0 then
               text = text .. "  (-" .. ES.WagerClock(-d) .. ")"
-              r, g, b = 0.24, 0.42, 0.14
+              r, g, b = GREEN[1], GREEN[2], GREEN[3]
             else
               text = text .. "  (+" .. ES.WagerClock(d) .. ")"
-              r, g, b = 0.62, 0.18, 0.1
+              r, g, b = RED[1], RED[2], RED[3]
             end
           end
           row:SetText(text)
           row:SetTextColor(r, g, b)
         elseif list[i].down then
           row:SetText(list[i].name .. "  - slain")
-          row:SetTextColor(0.5, 0.45, 0.38)
+          row:SetTextColor(FADED[1], FADED[2], FADED[3])
         else
           row:SetText(list[i].name)
-          row:SetTextColor(0.165, 0.13, 0.094)
+          row:SetTextColor(TEXT[1], TEXT[2], TEXT[3])
         end
         row:Show()
       else
@@ -203,13 +213,13 @@ local function Draw()
   if last.state == "run" then elapsed = elapsed + (GetTime() - last.at) end
   f.clock:SetText(Clock(elapsed) .. "  /  " .. Clock(last.limit))
   if last.state == "over" or elapsed > last.limit then
-    f.clock:SetTextColor(0.7, 0.12, 0.08)
+    f.clock:SetTextColor(RED[1], RED[2], RED[3])
   elseif last.state == "won" then
-    f.clock:SetTextColor(0.24, 0.42, 0.14)
+    f.clock:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
   elseif elapsed > last.limit * 0.8 then
-    f.clock:SetTextColor(0.62, 0.3, 0.08)
+    f.clock:SetTextColor(AMBER[1], AMBER[2], AMBER[3])
   else
-    f.clock:SetTextColor(0.55, 0.38, 0.08)
+    f.clock:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
   end
   -- (An older server sends no ready field: its clock starts when someone leaves the lamp.)
   local words = { wait = "The clock starts when you leave the lamp", run = "", won = "Won in time", over = "Over time" }

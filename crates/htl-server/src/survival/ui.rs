@@ -570,7 +570,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 75: the health-bar watch keeps its list of plates and the Ledger's font sweep walks a few frames
 /// a tick, so neither costs a frame spike in a crowd (Corey's laggy Elwynn). No line changes.
 /// 76: the Bookmaker's Wager and board pages are a plain dark panel, no parchment. No line changes.
-pub(crate) const ADDON_NEWEST: u32 = 76;
+/// 77: no parchment anywhere: the Ledger skin (parchment windows, leather, wax seals, brush bars) is gone and every window, the HUD and the dock are the plain dark panels; the wager slip matches the Bookmaker's pages. No line changes.
+pub(crate) const ADDON_NEWEST: u32 = 77;
 /// The first add-on that shows a person's answers (`AN`) as links in chat.
 pub(crate) const SPEECH_ADDON: u32 = 74;
 /// The first add-on that lays a column's third choice on the board.

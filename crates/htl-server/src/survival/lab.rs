@@ -180,8 +180,8 @@ impl SurvivalGame {
                 }
                 // The hero's own bars kept in the film (the interface is hidden otherwise).
                 "hud" => hud = true,
-                // The hero's bars' frame in another look, kept in the film: `barlook dark` (the
-                // add-on's Ledger.lua says which there are).
+                // The hero's bars' frame in another look, kept in the film: `barlook dark` (the add-on has one
+                // look now and ignores it).
                 "barlook" => {
                     hud = true;
                     bar_look = words.get(k + 1).copied().unwrap_or("").to_lowercase();

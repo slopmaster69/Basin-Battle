@@ -5,8 +5,7 @@
 --
 -- The server sends them in the same TR line as the class cards, each with its column `beta` and its
 -- page (the line's last field per card) 2. The class board knows no `beta` column and leaves them
--- be; this file lays them out, in the order they come, on their own page. It loads before
--- Ledger.lua, so the Ledger look dresses these cards as it does the class cards.
+-- be; this file lays them out, in the order they come, on their own page.
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
@@ -165,10 +164,8 @@ function B.Draw()
   end
   if beta then B.head:Show() B.sub:Show() else B.head:Hide() B.sub:Hide() end
   tree.hint:SetText(beta and B.hintBeta or B.hintClasses)
-  -- The Ledger's wood on the tabs, once it's there to put on.
   for n = 1, 2 do
     local t = B.tabs[n]
-    if ES.ledger and ES.ledger.Button and not t.ledger then ES.ledger.Button(t, true) end
     t:SetEnabledLook((n == 2) == beta)
   end
   if beta then
