@@ -67,6 +67,11 @@ A wipe, the leash or a reset takes the crew and their shots away, and he goes ho
 the crew stands at its posts again, whole. A party death retargets the same crew; a solo Vanish
 keeps the fight (the crew sees through it).
 
+The last hero leaving mid-fight puts it all back at once (`firing_abandoned`, called from
+`Survival::leave`): the world takes no steps with nobody in it, so the crew, the shots in flight,
+the harpoon or gun in hand and his wounds would otherwise stand frozen until the next hero came.
+He is whole at his post, the crew posts afresh when someone comes near.
+
 ## What the data couldn't do, and the nearest thing
 
 - **No gun flash or bullet.** The 1.12 data has no muzzle flash, gun smoke or bullet model to
