@@ -10,6 +10,9 @@ mod shared_fixes_tests;
 #[cfg(test)]
 #[path = "boss_fuzz_tests.rs"]
 mod boss_fuzz_tests;
+#[cfg(test)]
+#[path = "scan_tests.rs"]
+mod scan_tests;
 
 /// A creature's missile that splashes at least this wide is a lobbed throw (a pot, a bomb): its
 /// landing is marked from the wind-up's start.
@@ -1677,7 +1680,7 @@ impl Survival {
             return false;
         }
         self.mobs.iter().any(|(oid, o)| {
-            *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h) && !self.attack_now(*oid).ranged
+            *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h) && !self.attack_ranged(*oid)
         })
     }
 
@@ -1746,7 +1749,7 @@ impl Survival {
         }
         self.mobs.iter().any(|(oid, o)| {
             // (Only asked when its state needs it: most of the others are doing neither.)
-            let ranged = || self.attack_now(*oid).ranged;
+            let ranged = || self.attack_ranged(*oid);
             *oid != id
                 && o.health > 0
                 && match o.state {
@@ -1775,12 +1778,12 @@ impl Survival {
             .filter(|(id, m)| {
                 **id != except
                     && m.health > 0
-                    && !self.attack_now(**id).ranged
                     && match m.state {
                         MobState::Windup { foe: Foe::Hero(h), .. } => h == hero,
                         MobState::Recover { foe: Foe::Hero(h), .. } => h == hero && m.pattern.is_some(),
                         _ => false,
                     }
+                    && !self.attack_ranged(**id)
             })
             .count()
     }
@@ -2665,6 +2668,18 @@ impl Survival {
                     }
                 }
             }
+        }
+    }
+
+    /// Whether the blow a creature is set on is a ranged one: `attack_now(id).ranged` without
+    /// building the whole blow (nothing after the first choice of blow changes it).
+    pub(crate) fn attack_ranged(&self, id: Id) -> bool {
+        let Some(m) = self.mobs.get(&id) else { return self.content.mobs[0].attack.ranged };
+        let d = &self.content.mobs[m.def];
+        match (self.pattern_step(id), &d.special, m.special) {
+            (Some(step), _, _) => step.ranged.unwrap_or(d.attack.ranged),
+            (None, Some(s), true) => s.ranged.unwrap_or(d.attack.ranged),
+            _ => d.attack.ranged,
         }
     }
 
