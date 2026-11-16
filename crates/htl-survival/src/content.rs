@@ -1280,7 +1280,38 @@ pub struct WeaponDef {
     /// A blow cows the foe (it deals this much less and winds up slower) for `COW_SECS`.
     #[serde(default)]
     pub cow: f32,
+    /// Its heavy blow knocks the foe back this many yards.
+    #[serde(default)]
+    pub knock: f32,
+    /// A hit tenderizes the foe for `TENDER_SECS`: the next hit on it from any ally does this
+    /// much more.
+    #[serde(default)]
+    pub tender: f32,
+    /// Its heavy blow stuns a mechanical foe (a machine that isn't a champion) this many seconds.
+    #[serde(default)]
+    pub machine_stun: f32,
+    /// Each hit heals the most wounded hero within `MEND_RANGE` (the wielder too) this share of
+    /// their health.
+    #[serde(default)]
+    pub mend_ally: f32,
+    /// A hit curses the foe for `CURSE_SECS`; a cursed foe that dies bursts in shadow for this
+    /// many times the weapon's average blow on foes within `CURSE_RADIUS`.
+    #[serde(default)]
+    pub curse: f32,
+    /// Each hit puts a shield of this much on the hero for `IRON_SKIN_SECS`, stacking to
+    /// `IRON_SKIN_CAP`.
+    #[serde(default)]
+    pub iron_skin: f32,
 }
+
+/// The tenderized foe's window, the mending hand's reach, the curse's length and burst radius, the
+/// iron skin's length and cap.
+pub const TENDER_SECS: f32 = 6.0;
+pub const MEND_RANGE: f32 = 15.0;
+pub const CURSE_SECS: f32 = 12.0;
+pub const CURSE_RADIUS: f32 = 5.0;
+pub const IRON_SKIN_SECS: f32 = 8.0;
+pub const IRON_SKIN_CAP: f32 = 30.0;
 
 /// How long a bloodlust lasts after the latest kill, and how many kills it stacks.
 pub const BLOODLUST_SECS: f32 = 6.0;
@@ -1349,6 +1380,25 @@ impl WeaponDef {
         }
         if self.cow > 0.0 {
             s.push(format!("Cows the enemy for {} sec: it deals {}% less damage and winds up slower.", COW_SECS, (self.cow * 100.0).round()));
+        }
+        if self.knock > 0.0 {
+            s.push(format!("Heavy attacks knock the enemy back {} yd.", self.knock));
+        }
+        if self.tender > 0.0 {
+            s.push(format!("Hits tenderize the enemy for {} sec. The next hit on it from any ally deals {}% more.", TENDER_SECS, (self.tender * 100.0).round()));
+        }
+        if self.machine_stun > 0.0 {
+            s.push(format!("Heavy attacks stun mechanical enemies and machines for {} sec.", self.machine_stun));
+        }
+        if self.mend_ally > 0.0 {
+            s.push(format!("Each hit heals the most wounded ally within {} yd, you included, for {}% of their health.", MEND_RANGE, (self.mend_ally * 100.0).round()));
+        }
+        if self.curse > 0.0 {
+            let burst = ((self.damage[0] + self.damage[1]) as f32 / 2.0 * self.curse).round();
+            s.push(format!("Hits curse the enemy for {} sec. A cursed enemy that dies bursts in shadow for {} damage to enemies within {} yd.", CURSE_SECS, burst, CURSE_RADIUS));
+        }
+        if self.iron_skin > 0.0 {
+            s.push(format!("Each hit gives you a shield that absorbs {} damage for {} sec, stacking up to {}.", self.iron_skin, IRON_SKIN_SECS, IRON_SKIN_CAP));
         }
         if self.blink_behind {
             s.push("The last blow of a light chain carries you behind the enemy.".into());

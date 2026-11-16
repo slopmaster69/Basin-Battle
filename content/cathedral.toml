@@ -1113,6 +1113,8 @@ icon = "INV_Hammer_03"
 kind = "weapon"
 text = "Scarlet Commander Mograine's. The Crusade's hammer, and it falls like judgment."
 
+# The Hand mends: each hit heals the most wounded hero within 15 yd, the wielder too, 3% of their
+# health.
 [[weapon]]
 key = "hand_of_righteousness"
 windup = 0.36
@@ -1125,6 +1127,7 @@ arc = 100.0
 targets = 1
 stagger = 0.85
 subclass = 4
+mend_ally = 0.03
 moveset = "mace_one_hand"
 
 [[item]]
@@ -1133,7 +1136,7 @@ name = "Hand of Righteousness"
 display = 1461
 icon = "INV_Hammer_04"
 kind = "weapon"
-text = "Whitemane's. It mends the hand that holds it."
+text = "{fx} \"Whitemane's. It mends the hand that holds it.\""
 perks = [{ kind = "regen", amount = 0.003 }]
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a

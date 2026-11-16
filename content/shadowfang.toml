@@ -1441,6 +1441,8 @@ key = "shadowfang"
 name = "Shadowfang Regalia"
 bonus = [ { pieces = 2, kind = "might", amount = 0.04 }, { pieces = 4, kind = "regen", amount = 0.004 } ]
 
+# The Baron's curse: a hit curses the foe for 12 sec, and when it dies it bursts in shadow for 1.5
+# times the scepter's blow on everything within 5 yd.
 [[weapon]]
 key = "barons_scepter"
 windup = 0.36
@@ -1453,6 +1455,7 @@ arc = 100.0
 targets = 1
 stagger = 0.95
 subclass = 4
+curse = 1.5
 moveset = "mace_one_hand"
 parry = 0.08
 
@@ -1462,7 +1465,7 @@ name = "Baron's Scepter"
 display = 1774
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "Widens the parry window by 0.08 sec. \"Silverlaine's. A nobleman's mace.\""
+text = "Widens the parry window by 0.08 sec. {fx} \"Silverlaine's. A nobleman's mace.\""
 perks = [{ kind = "ward", amount = 0.02 }]
 
 [[weapon]]

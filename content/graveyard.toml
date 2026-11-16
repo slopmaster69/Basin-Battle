@@ -1074,6 +1074,7 @@ key = "gravewarden"
 name = "The Gravewarden's Shroud"
 bonus = [ { pieces = 2, kind = "regen", amount = 0.003 }, { pieces = 4, kind = "ward", amount = 0.04 } ]
 
+# Ironspine's fist hardens the hand: each hit gives a 5 point shield for 8 sec, stacking to 30.
 [[weapon]]
 key = "ironspine_fist"
 windup = 0.36
@@ -1086,6 +1087,7 @@ arc = 100.0
 targets = 1
 stagger = 1.0
 subclass = 4
+iron_skin = 5.0
 moveset = "mace_one_hand"
 
 [[item]]
@@ -1094,7 +1096,7 @@ name = "Ironspine's Fist"
 display = 2047
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "Breaks guards. \"Ironspine's. Bone grown around iron.\""
+text = "{fx} \"Ironspine's. Bone grown around iron.\""
 
 # The scythe reaps: a 200 degree sweep of up to 5, and 1% of the wielder's health for each foe it
 # strikes (a full sweep of 5 mends 5%).
