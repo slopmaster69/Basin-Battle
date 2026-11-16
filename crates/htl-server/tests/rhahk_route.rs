@@ -943,3 +943,28 @@ fn what_the_wrecking_wave_brings_down_lies_behind_its_line_and_stops_no_one() {
     }
     println!("{} of the works came down with the rock, {} kinds, every one behind its line and none solid", seen.len(), kinds.len());
 }
+
+/// The owner's note (Nov 13): "make sure that the ship is gone by the time you get to the last
+/// stand". The route's own points see no part of the dock; nor does any spot of floor a hero of the
+/// fight could stand on or be thrown to (the whole mouth of the mine, the last stand's ground and
+/// the pockets beside the route), so nobody in the fight is ever shown a ship that is still there
+/// (it goes for them the moment the fight ends, `aftermath_wreck.rs`).
+#[test]
+#[ignore = "requires WOW_DATA pointing to installed WoW 1.12.1 Data"]
+fn no_floor_a_hero_of_the_fight_can_stand_on_sees_the_dry_dock() {
+    let (s, ..) = begun(19);
+    let start = s.collapse_route_point(0.0).unwrap();
+    let floor = flood(&s, start, false);
+    let (_, total) = s.collapse_lines().unwrap();
+    let end = s.collapse_route_point(total).unwrap();
+    assert!(floor.values().any(|p| dist2d(*p, end) < 6.0), "the flood reaches the last stand");
+    let mut looked = 0;
+    for (n, p) in floor.iter().filter(|(n, _)| (n.0 + n.1).rem_euclid(3) == 0) {
+        let eye = [p[0], p[1], p[2] + 1.8];
+        for (x, y, z) in [(-130.0, -860.0, 10.0), (-66.0, -820.0, 25.0), (-66.0, -820.0, 40.0), (-2.0, -780.0, 60.0), (-66.0, -780.0, 30.0), (-130.0, -780.0, 40.0), (-2.0, -860.0, 40.0)] {
+            assert!(!htl_survival::land::clear_line(s.land(), eye, [x, y, z]), "floor at {n:?} {p:?} sees the dock at {x:.0}, {y:.0}, {z:.0}");
+            looked += 1;
+        }
+    }
+    println!("{} floor cells of the fight's side, {looked} lines to the dock, none clear", floor.len());
+}
