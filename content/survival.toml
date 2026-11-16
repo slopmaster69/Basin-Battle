@@ -2726,6 +2726,7 @@ respawn = 200.0
 
 [[mob]]
 key = "cutthroat"
+tags = ["undead"]
 name = "Forsaken Cutthroat"
 subname = "Forsaken"
 display = 2639
@@ -3113,6 +3114,7 @@ respawn = 300.0
 
 [[mob]]
 key = "deathguard"
+tags = ["undead"]
 name = "Forsaken Deathguard"
 subname = "Forsaken"
 display = 1583
@@ -9281,6 +9283,7 @@ respawn = 1200.0
 # A defiler with a blade: long thrusts, two cuts and a thrust, a held overhead.
 [[mob]]
 key = "defiler"
+tags = ["undead"]
 name = "Forsaken Defiler"
 subname = "Forsaken"
 display = 1583
@@ -9325,6 +9328,7 @@ respawn = 260.0
 # A darkcaster: shadow bolts from afar; crowded, a burst of shadow that throws you down.
 [[mob]]
 key = "darkcaster"
+tags = ["undead"]
 name = "Forsaken Darkcaster"
 subname = "Forsaken"
 display = 1565
@@ -9377,6 +9381,7 @@ respawn = 260.0
 # raises two of the dead.
 [[mob]]
 key = "morvane"
+tags = ["undead"]
 name = "Defiler Morvane"
 subname = "Forsaken"
 display = 1579
@@ -9443,6 +9448,7 @@ respawn = 1200.0
 # Raised by the defilers: bones that swing and keep coming.
 [[mob]]
 key = "risen_skeleton"
+tags = ["undead"]
 name = "Risen Footman"
 subname = "Risen"
 display = 158
@@ -9478,6 +9484,7 @@ respawn = 300.0
 # A restless soul of a fallen footman, roused when its grave is disturbed: cold bolts and a wail.
 [[mob]]
 key = "restless_spirit"
+tags = ["undead"]
 name = "Restless Spirit"
 display = 146
 scale = 1.0
@@ -9716,6 +9723,7 @@ respawn = 1200.0
 # A rockling: a pebble of the cairn come alive.
 [[mob]]
 key = "rockling"
+tags = ["stone"]
 name = "Cairn Rockling"
 display = 453
 scale = 0.6
@@ -9754,6 +9762,7 @@ respawn = 260.0
 # the shaman's trial: the camp learns Earthquake when it falls.
 [[mob]]
 key = "rumbler"
+tags = ["stone"]
 name = "Rumbler"
 subname = "Stone Cairn"
 display = 69
@@ -10914,7 +10923,7 @@ name = "Silver-Edged Longsword"
 display = 20075
 icon = "INV_Sword_27"
 kind = "weapon"
-text = "Quick, true, and harder-hitting than it looks. \"Bronze with a silver edge.\""
+text = "Quick. {fx} \"Bronze with a silver edge.\""
 
 # Hogger's club: a one-handed mace that hits like a heavy one.
 [[weapon]]
@@ -10945,6 +10954,9 @@ range = 3.1
 arc = 95.0
 targets = 1
 subclass = 7
+bane = ["undead", "worgen"]
+bane_damage = 0.5
+silver = true
 # The duelist's blade (docs/weapon-identities.md).
 parry = 0.1
 riposte = 2.25

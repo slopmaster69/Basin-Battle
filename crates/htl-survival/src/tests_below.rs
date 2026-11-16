@@ -700,7 +700,7 @@ fn a_boss_leaves_one_of_its_pieces_for_certain_and_the_rest_by_chance() {
     let (mut seen_axe, mut seen_legs, mut total) = (0, 0, 0);
     for _ in 0..60 {
         let before: Vec<Id> = s.objs.keys().copied().collect();
-        s.below_kill(w, [100.0, 0.0, 0.0], [100.0, 0.0, 0.0], Some(k), false, false);
+        s.below_kill(w, [100.0, 0.0, 0.0], [100.0, 0.0, 0.0], Some(k), false, false, false);
         let drops: Vec<usize> = s.objs.iter().filter(|(id, _)| !before.contains(id)).filter_map(|(_, o)| if let ObjKind::Loot { item, .. } = o.kind { Some(item) } else { None }).collect();
         assert!(!drops.is_empty(), "one piece for certain");
         seen_axe += drops.iter().filter(|i| **i == axe).count();
@@ -2561,4 +2561,16 @@ fn collapse_route_samples_the_floor_between_corners_and_rejects_wet_targets() {
     assert!(route.iter().any(|p| p[2] > 3.9));
     assert!(route.iter().all(|p| Hill.footing(*p).is_some()));
     assert!(walking_route(&Hill, &[[0.0, 0.0, 0.0], [50.0, 6.0, 0.0]]).is_none());
+}
+
+#[test]
+fn a_foe_felled_under_silver_is_not_put_back_at_a_rest() {
+    let mut s = below();
+    let w = s.content.mob("grunt").unwrap();
+    let k = s.content.packs.iter().position(|p| p.mob == "grunt").unwrap();
+    let before = s.below.as_ref().unwrap().fallen.len();
+    s.below_kill(w, [30.0, 0.0, 0.0], [30.0, 0.0, 0.0], Some(k), false, false, false);
+    assert_eq!(s.below.as_ref().unwrap().fallen.len(), before + 1, "an ordinary kill is put back at a rest");
+    s.below_kill(w, [30.0, 0.0, 0.0], [30.0, 0.0, 0.0], Some(k), false, false, true);
+    assert_eq!(s.below.as_ref().unwrap().fallen.len(), before + 1, "one laid to rest by silver stays down");
 }

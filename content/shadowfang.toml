@@ -470,6 +470,7 @@ perks = [{ kind = "ward", amount = 0.03 }]
 
 [[mob]]
 key = "sf_wolfguard"
+tags = ["worgen"]
 name = "Shadowfang Wolfguard"
 subname = "Shadowfang Keep"
 display = 202
@@ -504,6 +505,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_darksoul"
+tags = ["undead"]
 name = "Shadowfang Darksoul"
 subname = "Shadowfang Keep"
 display = 657
@@ -538,6 +540,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_moonwalker"
+tags = ["worgen"]
 name = "Shadowfang Moonwalker"
 subname = "Shadowfang Keep"
 display = 729
@@ -577,6 +580,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_worg"
+tags = ["worgen"]
 name = "Bleak Worg"
 subname = "Shadowfang Keep"
 display = 557
@@ -610,6 +614,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_servitor"
+tags = ["undead"]
 name = "Haunted Servitor"
 subname = "Shadowfang Keep"
 display = 5430
@@ -748,6 +753,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_razorclaw"
+tags = ["worgen"]
 name = "Razorclaw the Butcher"
 subname = "Shadowfang Keep"
 display = 104
@@ -822,6 +828,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_silverlaine"
+tags = ["undead"]
 name = "Baron Silverlaine"
 subname = "The Keep's Old Lord"
 display = 146
@@ -897,6 +904,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_springvale"
+tags = ["undead"]
 name = "Commander Springvale"
 subname = "Fallen Paladin"
 display = 1583
@@ -1047,6 +1055,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_fenrus"
+tags = ["worgen"]
 name = "Fenrus the Devourer"
 subname = "Shadowfang Keep"
 # A worg (display 557), not the dire wolf (246): the dire wolf has one bite, its head barely
@@ -1287,6 +1296,7 @@ then_look = 27812
 
 [[mob]]
 key = "sf_arugal_cursed"
+tags = ["worgen"]
 name = "Arugal"
 subname = "Worgen-Cursed"
 display = 523
@@ -1351,6 +1361,7 @@ respawn = 0.0
 
 [[mob]]
 key = "sf_deathsworn"
+tags = ["undead"]
 name = "Deathsworn Captain"
 subname = "Still On Watch"
 display = 158

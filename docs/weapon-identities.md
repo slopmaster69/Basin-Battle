@@ -84,3 +84,19 @@ about as much as it takes longer; `a_family_set_keeps_the_familys_damage_a_secon
 | 2H axe | `axe_two_hand` | Big diagonal cleaves, the widest closing the chain |
 | Maul, hammers | `maul` | A slow overhead slam every blow, the longest coil on the heavy |
 | Sword, dagger, greatsword, polearm, staff | the grip's | Unchanged |
+
+### Each weapon's own mechanic (step 3)
+
+A mechanic, not a number: the thing this weapon does that no other does. The fields are on
+`WeaponDef`, what they do is in `sim/weapon_fx.rs`, and the tooltip's sentence is built from the same
+numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a bane names are a
+`[[mob]]`'s `tags` (`undead`, `worgen`, `stone`, `mechanical`).
+
+| Weapon | Mechanic | Field |
+| --- | --- | --- |
+| Footman's Sword | Parry and riposte (the duelist) | `parry`, `riposte` |
+| Silver Sword | 50% more damage to undead and worgen; they stop mending and stay down once slain | `bane`, `bane_damage`, `silver` |
+| Cruel Barb | Its heavy hooks the foe and pulls it 6 yd to you | `hook` |
+| Pirate Cutlass | Its heavy is a 5 yd boarding leap, a gap closer | `boarding` |
+| Sneed's Machete | No backstab; each light hit chops every foe in a 5 yd line | `no_backstab`, `line` |
+| Cursed Felblade | The last blow of the light chain carries you behind the foe | `blink_behind` |

@@ -398,6 +398,7 @@ impl Survival {
                 enraged: false,
                 phase: 0,
                 rise_at: None,
+                fx: Default::default(),
                 lob: None,
                 posture: 0,
                 posture_from: 0.0,
@@ -1171,11 +1172,14 @@ impl Survival {
         }
         // A pack's creatures come back; one called up for testing doesn't. Below, they come
         // back when a hero rests (and a boss never does).
+        // (One felled under silver doesn't come back: silver lays the dead to rest. A boss's
+        // own forms are the encounter's, not that.)
+        let laid_to_rest = self.silvered(mid) && !d.boss && !raider;
         if self.is_below() {
             let at = self.mobs[&mid].pos;
             let form = self.mobs[&mid].form_of.is_some();
-            self.below_kill(def, home, at, pack, raider, form);
-        } else if !raider && pack.is_some() {
+            self.below_kill(def, home, at, pack, raider, form, laid_to_rest);
+        } else if !raider && !laid_to_rest && pack.is_some() {
             self.respawns.push((def, home, pack, now + d.respawn));
         }
         // What it drops goes straight into the killer's bags. Below, the dungeon's own currency
@@ -2235,7 +2239,10 @@ impl Survival {
                         m.max_health = own;
                     }
                     m.fighters = 1;
-                    m.health = m.max_health;
+                    // (Silvered, it doesn't mend: it comes home as hurt as it left.)
+                    if m.fx.silvered_until <= now {
+                        m.health = m.max_health;
+                    }
                     m.floor_failures = 0;
                     m.floor_recovery = None;
                     // Whole again: its second wind and its posture with it, its voice too.
