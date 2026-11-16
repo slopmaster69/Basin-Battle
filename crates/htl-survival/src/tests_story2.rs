@@ -153,3 +153,179 @@ fn wren_has_a_word_once_gruff_is_dead_and_the_journal_asks_for_him() {
     assert_eq!((g.kind.as_str(), g.what.as_str()), ("kill", "gruff_swiftbite"));
     assert!(g.text.contains("steps out of every heavy attack"), "the journal names his rule");
 }
+
+// --- Stage 7: the Mason's Marks ----------------------------------------------------------------
+
+/// The built-in world on flat ground with only the cairn's ambushers standing.
+fn mason_world() -> Survival {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    let keep: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key.starts_with("mason_"))).map(|(id, _)| *id).collect();
+    s.mobs.retain(|id, _| keep.contains(id));
+    s.respawns.clear();
+    s
+}
+
+fn told(ev: &[Event], what: &str) -> bool {
+    ev.iter().any(|e| matches!(e, Event::Tell { text, .. } if text.contains(what)))
+}
+
+/// E1: a chest's `after` with a colon is a condition the camp meets, and it stays shut, with its
+/// own words, until then.
+#[test]
+fn a_chest_that_waits_on_another_stays_shut_with_its_locked_text_until_that_one_is_opened() {
+    let mut s = mason_world();
+    let h = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    let ev = open_at(&mut s, h, "mason_trowel");
+    assert!(told(&ev, "The trowel's stone won't move. Something was laid before it."), "it says why");
+    assert!(chest(&s, "mason_trowel").is_some(), "still shut");
+    assert!(!s.camp_has("open:mason_trowel"));
+    // The one it waits on opens, and then so does it.
+    let ev = open_at(&mut s, h, "mason_plumb");
+    assert!(told(&ev, "The plumb line hangs true."));
+    assert!(s.camp_has("open:mason_plumb"));
+    let ev = open_at(&mut s, h, "mason_trowel");
+    assert!(told(&ev, "Mortar gives way under the trowel's mark."));
+    assert!(s.camp_has("open:mason_trowel"));
+}
+
+/// A bare key is still a creature: the camp must have killed one.
+#[test]
+fn a_bare_after_still_waits_on_a_kill() {
+    let (mut s, h) = real_world();
+    let ev = open_at(&mut s, h, "westbrook_armory");
+    assert!(told(&ev, "barred while Hogger roams"), "{ev:?}");
+    s.camp.counts.insert("kill:hogger".into(), 1);
+    assert!(s.chest_unlocked("hogger"));
+    assert!(s.chest_unlocked("kill:hogger"));
+    assert!(!s.chest_unlocked("found:mason_cairn"));
+}
+
+#[test]
+fn the_marks_are_opened_in_the_masons_order_and_only_that_order() {
+    let mut s = mason_world();
+    let h = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    let silver = s.content.item("silver").unwrap();
+    let pearl = s.content.item("pearl").unwrap();
+    let stone = s.content.item("stone").unwrap();
+    // The key's stone first: set fast. The trowel first: it won't move.
+    let ev = open_at(&mut s, h, "mason_cache");
+    assert!(told(&ev, "The key's stone is set fast. The trowel comes before it."));
+    open_at(&mut s, h, "mason_trowel");
+    assert!(!s.camp_has("open:mason_trowel"));
+    assert!(!s.camp_has("open:mason_cache"));
+    // The right order.
+    for key in ["mason_plumb", "mason_trowel", "mason_cache"] {
+        open_at(&mut s, h, key);
+        assert!(s.camp_has(&format!("open:{key}")), "{key} opened in its turn");
+    }
+    let bag = &s.players[&h].bag;
+    assert_eq!(bag.get(&silver), Some(&2));
+    assert_eq!(bag.get(&pearl), Some(&1));
+    assert_eq!(bag.get(&stone), Some(&6));
+    // They are once a world: none stands again.
+    assert!(["mason_plumb", "mason_trowel", "mason_cache"].iter().all(|k| s.content.chests.iter().find(|c| c.key == *k).unwrap().respawn == 0.0));
+    s.move_player(h, [3000.0, 3000.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 3000.0);
+    assert!(["mason_plumb", "mason_trowel", "mason_cache"].iter().all(|k| chest(&s, k).is_none()), "never full again");
+    // Opening the cache is the goal.
+    let g = s.content.goals.iter().find(|g| g.title == "The mason's marks").unwrap();
+    assert_eq!((g.kind.as_str(), g.what.as_str()), ("open", "mason_cache"));
+    assert!(g.text.contains("A wrong stone wakes the Brotherhood."));
+}
+
+/// A wrong stone wakes its two hidden footpads on the opener, and they wait again once it fills.
+#[test]
+fn a_decoy_wakes_its_ambush_and_waits_again_once_it_refills() {
+    for key in ["mason_crown", "mason_lion"] {
+        let mut s = mason_world();
+        let h = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+        let ambush = format!("{key}_ambush");
+        let pack = s.content.packs.iter().position(|p| p.key == ambush).unwrap();
+        let of = |s: &Survival| -> Vec<Id> { s.mobs.iter().filter(|(_, m)| m.pack == Some(pack) && m.health > 0).map(|(id, _)| *id).collect() };
+        let foot = of(&s);
+        assert_eq!(foot.len(), 2, "two footpads");
+        assert!(foot.iter().all(|id| s.mobs[id].hidden), "unseen until the stone is touched");
+        let c = s.content.chests.iter().find(|c| c.key == key).unwrap();
+        assert!(c.loot.is_empty() && c.roll.is_empty(), "no loot");
+        assert_eq!(c.respawn, 300.0);
+        let ev = open_at(&mut s, h, key);
+        assert!(told(&ev, "Not Brannick's mark. The Brotherhood was waiting for a wrong guess."));
+        for id in &foot {
+            assert!(!s.mobs[id].hidden, "stepped out");
+            assert_eq!(s.mobs[id].state.foe(), Some(Foe::Hero(h)), "on the opener");
+        }
+        assert!(!s.camp_has("open:mason_cache") && chest(&s, "mason_cache").is_some(), "a decoy opens nothing true");
+        for id in &foot {
+            fell(&mut s, h, *id);
+        }
+        assert!(chest(&s, key).is_none(), "opened");
+        s.move_player(h, [3000.0, 3000.0, 0.0], 0.0, Moving::default());
+        run(&mut s, 600.0);
+        assert!(chest(&s, key).is_some(), "full again");
+        let back = of(&s);
+        assert_eq!(back.len(), 2, "the footpads are back");
+        assert!(back.iter().all(|id| s.mobs[id].hidden), "and waiting again");
+    }
+}
+
+#[test]
+fn a_chests_condition_must_name_something_real_and_one_a_chest_can_meet() {
+    let text = source("survival.toml");
+    let dungeon = source("deadmines.toml");
+    assert!(Content::parse_with(&text, &dungeon).is_ok());
+    let line = "after = \"open:mason_plumb\"";
+    let at = text.find(line).expect("the trowel's condition");
+    for (bad, why) in [
+        ("open:nope", "nope"),
+        ("found:nowhere", "nowhere"),
+        ("kill:nobody_at_all", "nobody_at_all"),
+        ("raids:3", "open:, found: or kill:"),
+        ("bogus:x", "open:, found: or kill:"),
+        ("open:mason_trowel", "wait on itself"),
+    ] {
+        let mut t = text.clone();
+        t.replace_range(at..at + line.len(), &format!("after = \"{bad}\""));
+        let err = Content::parse_with(&t, &dungeon).expect_err(bad);
+        assert!(format!("{err:#}").contains(why), "{bad}: {err:#}");
+    }
+    // The ones that are real still read.
+    for good in ["found:mason_cairn", "kill:hogger", "open:mason_crown"] {
+        let mut t = text.clone();
+        t.replace_range(at..at + line.len(), &format!("after = \"{good}\""));
+        assert!(Content::parse_with(&t, &dungeon).is_ok(), "{good}");
+    }
+}
+
+#[test]
+fn the_stonemasons_words_change_in_order_with_the_cairn() {
+    let mut s = world();
+    s.camp.counts.insert("kill:brannick".into(), 1);
+    run(&mut s, 5.5);
+    let (mason, _) = person(&s, "Stormwind Stonemason");
+    let say = |s: &Survival| s.talk_line(mason).unwrap().text.clone();
+    assert!(say(&s).starts_with("Brannick laid half this wall"));
+    s.camp.found.insert("mason_cairn".into());
+    assert!(say(&s).starts_with("Brannick signed every wall the same. Plumb, then trowel, then key."));
+    // After his fifth-raid line too: the last line that holds wins.
+    s.camp.raids_won = 5;
+    assert!(say(&s).starts_with("Brannick signed"), "the cairn's line follows the raid's");
+    s.camp.counts.insert("open:mason_cache".into(), 1);
+    assert!(say(&s).starts_with("So he kept books too."));
+}
+
+#[test]
+fn the_cairn_is_a_place_and_every_corner_counts_it() {
+    let c = Content::builtin();
+    let site = c.sites.iter().find(|s| s.key == "mason_cairn").unwrap();
+    assert_eq!((site.kind.as_str(), site.radius, site.at), ("landmark", 30.0, [-8890.0, -840.0]));
+    assert_eq!(c.sites.len(), 37);
+    let corner = c.goals.iter().find(|g| g.title == "Every corner").unwrap();
+    assert_eq!(corner.count as usize, c.sites.len());
+    // The stones stand inside it.
+    for k in ["mason_plumb", "mason_trowel", "mason_cache", "mason_crown", "mason_lion"] {
+        let ch = c.chests.iter().find(|ch| ch.key == k).unwrap();
+        assert!(dist2d([ch.at[0], ch.at[1], 0.0], [site.at[0], site.at[1], 0.0]) < site.radius, "{k} is at the cairn");
+    }
+}

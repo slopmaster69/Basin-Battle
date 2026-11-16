@@ -3247,7 +3247,8 @@ fn site_radius() -> f32 {
 /// A chest out in the land (or a cache, a relic, a shrine): opened with the use key, its `loot`
 /// into the opener's bags (and `roll`'s random extras), the cards it `teaches` learned by the
 /// whole camp. A `secret` one is unseen until a hero comes that near; `after` keeps it shut until
-/// the camp has killed that creature; `ambush` wakes those packs (by key) as it's opened; `keep`
+/// the camp has killed that creature (a key), or meets a condition (`open:<chest>`, `found:<site>`,
+/// `kill:<mob>`); `ambush` wakes those packs (by key) as it's opened; `keep`
 /// leaves it standing (a shrine), spent; `respawn` fills it again after that many seconds of real
 /// time (0: once a world).
 #[derive(Debug, Clone, Deserialize)]
@@ -4236,7 +4237,19 @@ impl Content {
             for k in &c.teaches {
                 card(k, &format!("chest {}", c.key))?;
             }
-            if !c.after.is_empty() && self.mob(&c.after).is_none() {
+            // A bare key is a creature (shut until the camp has killed one); with a colon it is a
+            // condition the camp meets (`open:<chest>`, `found:<site>`, `kill:<mob>`).
+            if c.after.contains(':') {
+                let what = format!("chest {}", c.key);
+                let kind = c.after.split(':').next().unwrap_or("").trim();
+                if !["open", "found", "kill"].contains(&kind) {
+                    bail!("{what}: after {:?}: a chest waits on open:, found: or kill:", c.after);
+                }
+                if c.after.trim() == format!("open:{}", c.key) {
+                    bail!("{what}: after {:?}: it would wait on itself", c.after);
+                }
+                self.check_camp_condition(&c.after, &what)?;
+            } else if !c.after.is_empty() && self.mob(&c.after).is_none() {
                 bail!("chest {}: after {}, no such mob", c.key, c.after);
             }
             for k in c.ambush.iter().chain(&c.trial) {
