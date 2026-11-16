@@ -667,6 +667,25 @@ What the design left open, decided in the pull request that built it:
     "one-handed". Why: the owner kept every other class as it is, and a Warrior's dual wield with
     any two one-handers is already how they play two weapons.
 
+- **Cloak and Dagger steps only into a fight, Garrote after a Shadowstep (Corey's review, Nov 17)**:
+  - **"In the fight" means a creature that has a foe**: coming at one, winding up or getting its
+    breath back (`state.foe()`). An idle one never is a step, whatever its distance, so a blow
+    can't pull a neighbouring pack; a creature walking home isn't either. Why: the state is the
+    one the server already trusts for "aggroed", and a packmate that hasn't woken is still idle.
+    The dev practice targets (`.es target ... still`) and training dummies count too: they are no
+    pack. If every creature in reach is idle, the press is a plain blow, and no step is spent.
+  - **Garrote did nothing in the refilm because of the scenario's key path, not the skill.** An
+    ability press turns the hero along the reticle's line when that line is fresh (0.6 sec). The
+    Shadowstep click's line was sent while she faced the kobold; she was then put behind it, and
+    the Garrote pressed 0.2 sec later swung along that old line, away from the back: a miss that
+    still spent the 14 sec cooldown, so the next two presses were refused. A real client sends a
+    new line with every key and its camera decides, as with every art; the scripted press sent none.
+    Fixed in the server: a teleport (`put_at`: Shadowstep, the Cloak's step, the Shadow Cut) drops
+    the stored line and point, so the next press faces where she was put until a new line comes.
+    The reach, the facing from behind, the cast, the effects and the targeting were checked in a
+    sim test that plays the scenario's steps (`garrote_pressed_just_after_a_shadowstep_lands_in_the_back_it_was_put_behind`).
+    The scenario's comment says so, and its second and third presses are spares.
+
 ## Build plan
 
 Six pull requests, in order. Each is handed to one subagent with only this page to go on, so each

@@ -2073,6 +2073,10 @@ impl Survival {
         p.facing = facing;
         p.moved_at = now;
         p.last_safe = pos;
+        // The reticle's line was laid from where they stood and faced: an art pressed on the next
+        // beat must not turn them back along it, away from the back they were just put behind.
+        p.aim_line = None;
+        p.aim_at = None;
         self.events.push(Event::Teleport { player: id, pos, facing });
     }
 

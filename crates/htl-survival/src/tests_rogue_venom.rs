@@ -717,3 +717,62 @@ fn venom_cards_words_say_what_the_data_does() {
     said("fan_of_knives", &[format!("With {} Venom abilities on your keys, each knife also lays {} Venom", s.content.rogue.trait_keys, d.coats)]);
 }
 
+
+// --- Garrote after a Shadowstep, as the visual check plays it -----------------------------------------
+
+/// The visual check's steps through the same inputs the server's key path sends: a Kobold
+/// Geomancer 12 yd ahead that comes at her (`.es target`), Shadowstep on the utility key aimed at
+/// it (the click carries the reticle's line), the key put back to Garrote 0.1 sec later, and the key
+/// pressed with no new line (`in ab 2 0`) 0.2 sec after the landing, then twice more. The line the
+/// click left looks the way she faced before the step, away from the back she was put behind: it
+/// used to turn the blow away from the kobold (a miss that spent the 14 sec), the next two presses
+/// finding Garrote cooling.
+#[test]
+fn garrote_pressed_just_after_a_shadowstep_lands_in_the_back_it_was_put_behind() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    s.slot_ability(p, "utility", "shadowstep").unwrap();
+    s.spawn_target(p, "kobold_geomancer", 12.0, false, false, 1.0).unwrap();
+    let m = *s.mobs.keys().next().unwrap();
+    run(&mut s, 1.2);
+    assert!(casting(&s, m), "it casts at her");
+    s.set_valor(p, 100.0);
+    s.input(p, Input::Ability(2, false));
+    run(&mut s, 0.2);
+    let f = facing(s.players[&p].pos, s.mobs[&m].pos);
+    s.set_aim_line(p, f, -0.15);
+    s.input(p, Input::Attack);
+    run(&mut s, 0.1);
+    s.input(p, Input::AttackUp);
+    assert!(dist2d(s.players[&p].pos, [13.3, 0.0, 0.0]) < 0.6, "behind it: {:?}", s.players[&p].pos);
+    assert!(s.from_behind(m, s.players[&p].pos), "in its back");
+    s.slot_ability(p, "utility", "garrote").unwrap();
+    let hp = s.mobs[&m].health;
+    let mut ev = Vec::new();
+    for wait in [0.1f32, 0.4, 0.4] {
+        ev.extend(run(&mut s, wait));
+        s.set_valor(p, 100.0);
+        s.players.get_mut(&p).unwrap().stamina = 100.0;
+        s.input(p, Input::Ability(2, false));
+        ev.extend(run(&mut s, 0.02));
+    }
+    ev.extend(run(&mut s, 0.5));
+    assert!(s.mobs[&m].health < hp, "the cut lands");
+    assert!(s.has_cc(m, "silence") && s.garroted(m), "silenced");
+    assert!(s.has_cc(m, "burn"), "bleeding");
+    assert_eq!(s.venom_on(m), 2, "2 Venom");
+    // (Its cast was already loosed by the time she landed: only the blow's own effects are asked.)
+    assert!(ev.iter().any(|e| matches!(e, Event::Swing { attacker, outcome: Outcome::Hit, .. } if *attacker == p)), "a hit");
+}
+
+/// A teleport drops the reticle's old line (and its point): till a new one comes, she faces where
+/// she was put. (A key sent with a fresh line still aims where that line goes, as every art does.)
+#[test]
+fn a_teleport_drops_the_reticles_old_line() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.put_at(p, [5.0, 0.0, 0.0], PI);
+    assert!(s.players[&p].aim_line.is_none() && s.players[&p].aim_at.is_none());
+    assert!((s.aim_of(p).0 - PI).abs() < 1e-3, "her facing, till a new line comes");
+}
