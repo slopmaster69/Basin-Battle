@@ -1022,7 +1022,7 @@ impl Survival {
         candidates.sort_by(|a, b| dist2d(*b, hero).total_cmp(&dist2d(*a, hero)));
         candidates
             .into_iter()
-            .find_map(|at| self.land.footing(at).filter(|p| (p[2] - origin[2]).abs() <= 1.5))
+            .find_map(|at| self.land.dry_footing(at).filter(|p| (p[2] - origin[2]).abs() <= 1.5))
             .unwrap_or_else(|| self.slide_end(origin, facing(hero, origin), 3.0))
     }
 
@@ -1068,7 +1068,7 @@ impl Survival {
                     self.abandon_repair(id, Some(LINE_STOPPED));
                 } else if now >= until {
                     self.abandon_repair(id, Some(LINE_NO_WAY));
-                } else if dist2d(pos, at) <= WORK_ARRIVAL && (pos[2] - at[2]).abs() < 0.5 && self.land.footing(pos).is_some() {
+                } else if dist2d(pos, at) <= WORK_ARRIVAL && (pos[2] - at[2]).abs() < 0.5 && self.land.dry_footing(pos).is_some() {
                     self.halt(id);
                     let face = facing(pos, wreck);
                     self.mobs.get_mut(&id).unwrap().facing = face;
@@ -1084,7 +1084,7 @@ impl Survival {
             }
             RepairStage::Working { at, until, spark_at, beat } => {
                 let done = (1.0 - (until - now) / REPAIR).clamp(0.0, 1.0);
-                if !free || dist2d(pos, at) > WORK_DRIFT || (pos[2] - at[2]).abs() >= 0.5 || self.land.footing(pos).is_none() {
+                if !free || dist2d(pos, at) > WORK_DRIFT || (pos[2] - at[2]).abs() >= 0.5 || self.land.dry_footing(pos).is_none() {
                     self.abandon_repair(id, Some(LINE_STOPPED));
                 } else if now >= until {
                     self.shredder_note("the machine stands again");
@@ -1179,13 +1179,13 @@ impl Survival {
         let mut candidates = self.wreck_edges(origin, face, scale, clearance);
         candidates.sort_by(|a, b| dist2d(*b, hero).total_cmp(&dist2d(*a, hero)));
         candidates.into_iter().find_map(|at| {
-            let at = self.land.footing(at)?;
+            let at = self.land.dry_footing(at)?;
             // The driver and an approaching hero must stay on the wreck's own floor.
             if (at[2] - origin[2]).abs() > 1.5 { return None; }
             // A dry work point pressed against a wall is still unreadable to melee.
             // Keep one ordinary swing's standing room outside this same edge.
             let outward = facing(origin, at);
-            let approach = self.land.footing([at[0] + outward.cos() * 1.2,
+            let approach = self.land.dry_footing([at[0] + outward.cos() * 1.2,
                 at[1] + outward.sin() * 1.2, at[2]])?;
             if (approach[2] - at[2]).abs() > 0.5 || !self.land.walk_clear(approach, at) { return None; }
             let route = crate::land::walking_route(self.land.as_ref(), &[from, at])?;

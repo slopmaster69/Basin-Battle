@@ -952,7 +952,7 @@ impl Survival {
         let Some(m) = self.mobs.get(&boss) else { return };
         if !c.done {
             // Its leash runs from wherever it is while the place comes down round it.
-            if let Some(pos) = self.land.footing(m.pos) {
+            if let Some(pos) = self.land.dry_footing(m.pos) {
                 self.mobs.get_mut(&boss).unwrap().home = pos;
             }
             self.collapse_stage(&mut c, dt);
@@ -1141,7 +1141,7 @@ impl Survival {
         let behind: Vec<(Id, Vec3, f32, u32)> =
             self.players.iter().filter(|(_, p)| p.health > 0 && c.behind(p.pos, 0.0)).map(|(h, p)| (*h, p.pos, p.facing, p.max_health)).collect();
         let (clear, yaw) = route_pose(&c.route, &c.along, (line + c.throw).min(total));
-        let clear = self.land.footing(clear).unwrap_or(clear);
+        let clear = self.land.dry_footing(clear).unwrap_or(clear);
         let now = self.clock;
         for (h, was, facing, max) in behind {
             // (Thrown and in the air: on their way clear.)
@@ -1151,7 +1151,7 @@ impl Survival {
             // (Side by side, not on a spot somebody stands on.)
             let to = [0.0, 1.4, -1.4, 2.8, -2.8]
                 .iter()
-                .filter_map(|off| self.land.footing([clear[0] - yaw.sin() * off, clear[1] + yaw.cos() * off, clear[2]]))
+                .filter_map(|off| self.land.dry_footing([clear[0] - yaw.sin() * off, clear[1] + yaw.cos() * off, clear[2]]))
                 .find(|p| !c.behind(*p, 0.0) && !self.players.iter().any(|(o, q)| *o != h && q.health > 0 && dist2d(q.pos, *p) < 1.0))
                 .unwrap_or(clear);
             if !c.caught.insert(h) {
@@ -1360,7 +1360,7 @@ impl Survival {
                 if d > back + 0.3 {
                     let k = (d - back) / d;
                     let p = [at[0] + (stop[0] - at[0]) * k, at[1] + (stop[1] - at[1]) * k, at[2]];
-                    path.push(self.land.footing(p).unwrap_or(p));
+                    path.push(self.land.dry_footing(p).unwrap_or(p));
                 }
                 break;
             }
@@ -1748,7 +1748,7 @@ impl Survival {
         let c = self.bosses.collapse.as_mut().unwrap();
         c.boss_leg = leg;
         c.holding = true;
-        if let Some(to) = self.land.footing(to).filter(|_| boss_at < want || !on_route) {
+        if let Some(to) = self.land.dry_footing(to).filter(|_| boss_at < want || !on_route) {
             let run = self.content.mobs[def].run_speed;
             let end = self.mobs[&id].path.last().copied();
             if end.is_none_or(|end| dist3(end, to) > 0.5) {
@@ -2170,17 +2170,17 @@ impl Survival {
     /// wall (no floor on, or none a walker could step to) and how far off it is. `None` with no
     /// wall within `most`, or where the floor only drops away (a ledge is no wall).
     fn slam_march(&self, from: Vec3, dir: [f32; 2], most: f32) -> Option<(Vec3, f32)> {
-        let mut last = self.land.footing(from)?;
+        let mut last = self.land.dry_footing(from)?;
         let mut d = SLAM_STEP;
         while d <= most {
             let p = [from[0] + dir[0] * d, from[1] + dir[1] * d, last[2]];
-            match self.land.footing(p) {
+            match self.land.dry_footing(p) {
                 Some(g) if self.land.walk_clear(last, g) => last = g,
                 // (Floor there, but nothing walks onto it: a rock face, a pillar.)
                 Some(_) => return Some((last, d - SLAM_STEP)),
                 None => {
                     // (Floor a little below it: a drop, not a wall.)
-                    let drop = (1..=4).any(|k| self.land.footing([p[0], p[1], last[2] - 1.5 * k as f32]).is_some());
+                    let drop = (1..=4).any(|k| self.land.dry_footing([p[0], p[1], last[2] - 1.5 * k as f32]).is_some());
                     return (!drop).then_some((last, d - SLAM_STEP));
                 }
             }
@@ -2194,7 +2194,7 @@ impl Survival {
     fn slam_spot(&self, from: Vec3, dir: [f32; 2], last: Vec3, d: f32, stand: f32) -> (Vec3, Vec3) {
         let sd = (d + SLAM_STEP * 0.5 - stand).max(0.0);
         let xy = [from[0] + dir[0] * sd, from[1] + dir[1] * sd];
-        let at = self.land.footing([xy[0], xy[1], last[2]]).or_else(|| self.land.footing([xy[0], xy[1], from[2]])).unwrap_or(last);
+        let at = self.land.dry_footing([xy[0], xy[1], last[2]]).or_else(|| self.land.dry_footing([xy[0], xy[1], from[2]])).unwrap_or(last);
         ([last[0] + dir[0] * SLAM_STEP, last[1] + dir[1] * SLAM_STEP, last[2] + SLAM_HIGH], at)
     }
 
@@ -2202,7 +2202,7 @@ impl Survival {
     /// the route's start or to either side of it, whichever the boss at `pos` is nearest, if it
     /// can be there in the slam's `door_secs` at its own run.
     fn slam_door(&self, pos: Vec3, a: Vec3, b: Vec3, def: &SlamDef, run: f32) -> Option<(Vec3, Vec3, Struck)> {
-        let a = self.land.footing(a)?;
+        let a = self.land.dry_footing(a)?;
         let v = [b[0] - a[0], b[1] - a[1]];
         let len = (v[0] * v[0] + v[1] * v[1]).sqrt();
         if len < 1.0e-3 {
@@ -2426,7 +2426,7 @@ impl Survival {
                 tries += 1;
                 // (The biggest fall first, the small ones last.)
                 let kind = (LOOSE.len() - 1).saturating_sub(got * LOOSE.len() / want.max(1));
-                let Some(at) = self.land.footing([pos[0] + angle.cos() * out, pos[1] + angle.sin() * out, pos[2]]) else { continue };
+                let Some(at) = self.land.dry_footing([pos[0] + angle.cos() * out, pos[1] + angle.sin() * out, pos[2]]) else { continue };
                 if !self.land.walk_clear(pos, at) || !clear(at, kind) {
                     continue;
                 }
@@ -2436,13 +2436,13 @@ impl Survival {
             }
             loose += got;
             // At the door, to either side of the way in: the collapse starts there.
-            if let Some(door) = band.as_ref().and_then(|b| b.2).and_then(|d| self.land.footing(d)) {
+            if let Some(door) = band.as_ref().and_then(|b| b.2).and_then(|d| self.land.dry_footing(d)) {
                 let (want, mut got, mut tries) = (s.def.door_rocks, 0, 0);
                 while got < want && tries < want * 4 {
                     let (angle, out) = (tries as f32 * 2.399 + 1.9, 2.0 + (tries * 3 % 5) as f32);
                     tries += 1;
                     let kind = got % LOOSE.len();
-                    let Some(at) = self.land.footing([door[0] + angle.cos() * out, door[1] + angle.sin() * out, door[2]]) else { continue };
+                    let Some(at) = self.land.dry_footing([door[0] + angle.cos() * out, door[1] + angle.sin() * out, door[2]]) else { continue };
                     if !self.land.walk_clear(door, at) || !clear(at, kind) {
                         continue;
                     }
@@ -2730,7 +2730,7 @@ impl Survival {
                     break;
                 }
                 let xy = [p[0] + side[0] * off, p[1] + side[1] * off];
-                match self.land.footing([xy[0], xy[1], z]) {
+                match self.land.dry_footing([xy[0], xy[1], z]) {
                     Some(g) => {
                         z = g[2];
                         missed = 0;
@@ -2951,7 +2951,7 @@ impl Survival {
             let mut off = -wide;
             while off <= wide {
                 let xy = [p[0] + side[0] * off, p[1] + side[1] * off];
-                if off.abs() < 0.1 || self.land.footing([xy[0], xy[1], p[2]]).is_some() {
+                if off.abs() < 0.1 || self.land.dry_footing([xy[0], xy[1], p[2]]).is_some() {
                     let at = self.floor_beside(p, xy);
                     self.point_look(boss, at, DUST_ROLL);
                 }

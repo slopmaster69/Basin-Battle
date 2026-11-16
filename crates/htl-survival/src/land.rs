@@ -21,8 +21,11 @@ pub trait Land: Send + Sync {
     fn wet_near(&self, x: f32, y: f32, z: f32) -> bool {
         self.water_near(x, y, z)
     }
-    /// Dry, open footing on the requested floor. Never silently choose a roof or the floor
-    /// under a missing deck. The tolerance allows authored heights and sloping grid cells.
+    /// Open footing on the requested floor: dry, or in water shallow enough to wade (heroes stand
+    /// and fight in the Wailing Caverns' streams, and the dungeons' searched walks wade them; a
+    /// foe that couldn't stopped at the bank until Nov 2026). Never deep water. Never silently
+    /// choose a roof or the floor under a missing deck. The tolerance allows authored heights and
+    /// sloping grid cells.
     fn footing(&self, at: Vec3) -> Option<Vec3> {
         if at.iter().any(|v| !v.is_finite()) {
             return None;
@@ -30,8 +33,13 @@ pub trait Land: Send + Sync {
         let z = self.height_near(at[0], at[1], at[2]);
         (z.is_finite() && (z - at[2]).abs() <= 1.5
             && !self.blocked_near(at[0], at[1], at[2])
-            && !self.wet_near(at[0], at[1], at[2]))
+            && !self.water_near(at[0], at[1], at[2]))
             .then_some([at[0], at[1], z])
+    }
+    /// [`Land::footing`] out of the water altogether: dry ground (an authored route, kept out of
+    /// even shallow water).
+    fn dry_footing(&self, at: Vec3) -> Option<Vec3> {
+        self.footing(at).filter(|p| !self.wet_near(p[0], p[1], p[2]))
     }
     /// A floor (a deck, a ceiling) lies between heights `a` and `b` over (x, y).
     fn slab_between(&self, _x: f32, _y: f32, _a: f32, _b: f32) -> bool {
@@ -90,16 +98,16 @@ pub trait Land: Send + Sync {
     }
 }
 
-/// Resolve an authored itinerary into walking corners on its own floors. Every leg must be
-/// walkable, including the exact ends of a searched path. No chord across a bend is invented.
+/// Resolve an authored itinerary into walking corners on its own floors, dry ones. Every leg must
+/// be walkable, including the exact ends of a searched path. No chord across a bend is invented.
 pub fn walking_route(land: &dyn Land, authored: &[Vec3]) -> Option<Vec<Vec3>> {
-    let mut route = vec![land.footing(*authored.first()?)?];
+    let mut route = vec![land.dry_footing(*authored.first()?)?];
     for &at in &authored[1..] {
-        let to = land.footing(at)?;
+        let to = land.dry_footing(at)?;
         let from = *route.last()?;
         let path = if land.walk_clear(from, to) { vec![to] } else { land.path(from, to)? };
         for corner in path.into_iter().chain(std::iter::once(to)) {
-            let corner = land.footing(corner)?;
+            let corner = land.dry_footing(corner)?;
             let last = *route.last()?;
             if dist2d(last, corner) < 0.001 && (last[2] - corner[2]).abs() < 0.001 { continue; }
             if !land.walk_clear(last, corner) { return None; }
@@ -109,7 +117,7 @@ pub fn walking_route(land: &dyn Land, authored: &[Vec3]) -> Option<Vec<Vec3>> {
             let mut z = last[2];
             for i in 1..=steps {
                 let t = i as f32 / steps as f32;
-                let p = land.footing([last[0] + (corner[0]-last[0])*t, last[1] + (corner[1]-last[1])*t, z])?;
+                let p = land.dry_footing([last[0] + (corner[0]-last[0])*t, last[1] + (corner[1]-last[1])*t, z])?;
                 z = p[2];
                 route.push(p);
             }

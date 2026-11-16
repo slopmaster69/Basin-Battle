@@ -260,7 +260,7 @@ impl Survival {
     /// Dry footing at a spot on the post's own floor (within a step and a half of it).
     fn rig_floor(&self, home: Vec3, p: Vec3) -> Option<Vec3> {
         let g = self.ground_near(p[0], p[1], home[2]);
-        self.land.footing(g).filter(|f| (f[2] - home[2]).abs() <= 1.5)
+        self.land.dry_footing(g).filter(|f| (f[2] - home[2]).abs() <= 1.5)
     }
 
     /// The post's rig, made the first time its machine is seen there (and again after a lamp

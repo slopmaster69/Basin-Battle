@@ -551,6 +551,35 @@ mod tests {
         assert!(land.path([-4.0, -4.0, -3.0], [4.0, 4.0, 3.0]).is_some(), "and a walk up the slope past it");
     }
 
+    /// Level ground with a shallow stream across it (x 3 to 7, half a yard deep) and a deep pool
+    /// beyond (x 12 to 16, two yards deep), as in the Wailing Caverns.
+    fn stream_and_pool() -> DeadminesLand {
+        use htl_map::layers::{Layers, Sources};
+        let terrain = |_x: f32, _y: f32| Some(0.0);
+        let sheet = |x0: f32, x1: f32, z: f32| [[[x0, -10.0, z], [x1, -10.0, z], [x1, 10.0, z]], [[x0, -10.0, z], [x1, 10.0, z], [x0, 10.0, z]]];
+        let mut liquid = Vec::new();
+        liquid.extend(sheet(2.5, 7.5, 0.5));
+        liquid.extend(sheet(11.5, 16.5, 2.0));
+        DeadminesLand::from_layers(Layers::build([-10.0, -10.0], [20.0, 10.0], 1.0, &Sources { terrain: &terrain, solid: &[], liquid: &liquid }))
+    }
+
+    #[test]
+    fn a_walker_wades_a_shallow_stream_as_its_search_does_but_not_a_deep_pool() {
+        let land = stream_and_pool();
+        let (dry, stream, pool) = ([0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [14.0, 0.0, 0.0]);
+        assert!(land.wet_near(5.0, 0.0, 0.0) && !land.water_near(5.0, 0.0, 0.0), "the stream is shallow");
+        assert!(land.water_near(14.0, 0.0, 0.0), "the pool is deep");
+        // Standing in the stream is standing (heroes do; a foe chasing one there did not, Nov 2026:
+        // it halted at the bank, or was put back as if fallen through the floor).
+        assert_eq!(land.footing(stream), Some(stream));
+        assert!(land.footing(pool).is_none(), "nobody stands in the deep pool");
+        // The grid's search wades the stream: the planned walk goes too, there and across.
+        assert!(land.walk_clear(dry, stream));
+        assert!(land.path(dry, stream).is_some_and(|p| !p.is_empty()));
+        assert!(land.path(dry, [10.0, 0.0, 0.0]).is_some_and(|p| !p.is_empty()), "across it");
+        assert!(land.path(dry, pool).is_none(), "but not into the pool");
+    }
+
     /// A small land: level ground, a cliff 20 yards high from x = 40 on, and a tree at (20, 0).
     fn land() -> ElwynnLand {
         let grid = HeightGrid::sample([0.0, -40.0], [80.0, 40.0], 1.0, |x, _| Some(if x >= 40.0 { 20.0 } else { 0.0 }));
