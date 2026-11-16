@@ -201,9 +201,9 @@ fn lined(lines: &[f32], len: f32, speed: f32, rest: f32) -> Vec<EnrageDef> {
 /// A blow that brings on its phase.
 fn strike(s: &mut Survival, boss: Id, h: Id) {
     let max = s.mobs[&boss].max_health;
-    // (Never less than 380, the blow these tests were written with at 1900 health: a smaller one at his
-    // 1300 does not bring the phase on the same way.)
-    s.hurt_mob(boss, h, (max / 5).max(380));
+    // 30% of his health (390 at 1300, as 380 was at 1900): a fifth, 260 at 1300, did not bring the phase on in these
+    // tests (cause not chased). All of them are Rhahk'Zor's.
+    s.hurt_mob(boss, h, max * 3 / 10);
 }
 
 /// Into the phase, as a blow brings it (once what the boss was doing is done), the hero at `at`.

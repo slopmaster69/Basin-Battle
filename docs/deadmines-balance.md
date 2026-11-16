@@ -217,7 +217,7 @@ fight is for. They are first guesses to rerun the table on, not settled numbers.
 
 | Boss | Line | From | To | Why |
 | --- | --- | --- | --- | --- |
-| Rhahk'Zor | 2087 `health` | 1900 | 1300 | **Done in `claude/tune-rhahkzor`** (rows above are the rerun). Was priest 221 s, 3/10 falls; mage 133 s. Now warrior 105 s, priest 159 s, falls 0, 0, 1, 2 of 10. The collapse (not measured) adds to the real fight |
+| Rhahk'Zor | 2090 `health` | 1900 | 1300 | **Done in `claude/tune-rhahkzor`** (rows above are the rerun). Was priest 221 s, 3/10 falls; mage 133 s. Now warrior 105 s, priest 152 s (159 s for the wins), falls 0, 0, 1, 2 of 10. The collapse (not measured) adds to the real fight |
 | VanCleef | 807 `health` | 1500 | 2600 | Final boss, 66 to 88 s: shorter than the boss before it by half (target: nothing longer than him). Warrior to about 115 s, mage to about 153 s |
 | Smite | 606 `health` | 1100 | 1700 | 59 to 74 s: below 90 s for all four classes. Warrior to about 91 s |
 | Greenskin | 706 `health` | 1200 | 2000 | 49 to 65 s. Warrior to about 90 s. The gunners (85 health, line 774) die first and stay as they are |
