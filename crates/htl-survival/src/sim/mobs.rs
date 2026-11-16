@@ -2608,6 +2608,11 @@ impl Survival {
                         }
                     }
                 }
+                // The counter may have killed it (a leap's net and arrows): a fallen creature is left as
+                // `mob_died` left it, not put back in its wind-up with no health.
+                if self.mobs.get(&id).is_none_or(|m| m.health == 0) {
+                    return;
+                }
                 let mut shown = shown;
                 if !a.ranged && !shown && t2 >= a.windup - ANIM_LEAD {
                     shown = true;
@@ -2624,6 +2629,10 @@ impl Survival {
                     // A hit can mercy-cancel the pattern; retain the step that actually released.
                     let lodge = self.pattern_step(id).map_or(0.0, |s| s.lodge);
                     self.release(id, foe);
+                    // (Its own blow may have cost it its life, to a guard's answer: no recovery then.)
+                    if self.mobs.get(&id).is_none_or(|m| m.health == 0) {
+                        return;
+                    }
                     self.kitchen_blow_released(id, released);
                     self.halt(id);
                     let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));

@@ -1623,6 +1623,25 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     assert!(s.planted_of(p).len() <= 5, "no more arrows scattered");
 }
 
+/// Found by the soak (Nov 16): an attacker the leap counter killed as its blow committed was left
+/// at no health in `Windup`, a zombie that kept acting, was never removed and kept its raid going.
+#[test]
+fn an_attacker_that_the_leap_counter_kills_stays_dead() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [1.5, 0.0, 0.0]);
+    s.mobs.get_mut(&k).unwrap().health = 1;
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "ensnaring_retreat", true);
+    s.engage(k, crate::sim::mobs::Foe::Hero(p));
+    for _ in 0..80 {
+        s.step(DT);
+        if let Some(m) = s.mobs.get(&k) {
+            assert!(m.health > 0 || matches!(m.state, crate::sim::mobs::MobState::Dead { .. }), "no hp but {:?} at {:.2}", m.state, s.clock);
+        }
+    }
+}
+
 #[test]
 fn skyfall_leaps_up_and_its_volley_rains_where_the_reticle_points_planting_its_arrows() {
     let mut s = world();
