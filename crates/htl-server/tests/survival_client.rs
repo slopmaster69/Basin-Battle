@@ -1092,12 +1092,8 @@ fn a_champion_called_up_shows_its_bar() {
     let c = htl_survival::Content::builtin();
     let hp = (c.mobs[c.mob("warlord").unwrap()].health as f32 * c.combat.foe_health).round() as u32;
     assert!(bs.starts_with(&format!("BS\tWarlord Gorzak\t{hp}\t{hp}\t0")), "{bs}");
-    // The whole journal came too: every goal, the first the one it's on.
-    let gj = addon_lines(&a, "ES").into_iter().rfind(|l| l.starts_with("GJ\t")).expect("the journal line");
-    let goals: Vec<&str> = gj[3..].split('^').collect();
-    assert_eq!(goals.len(), htl_survival::Content::builtin().goals.len());
-    assert_eq!(goals[0].split('~').nth(1), Some("1"), "{}", goals[0]);
-    assert_eq!(goals[1].split('~').nth(1), Some("2"));
+    // No journal: no goal line, no list of them.
+    assert!(!addon_lines(&a, "ES").iter().any(|l| l.starts_with("GL\t") || l.starts_with("GJ\t")), "no journal lines");
 }
 
 #[test]
@@ -1134,11 +1130,6 @@ fn the_book_takes_a_hero_down_to_the_deadmines_and_a_lamp_brings_them_home() {
     let _ = enter(&mut a);
     a.chat(".es hello 5 ac4");
     a.drain(0.6);
-    // The first goal done at camp (the timber banked): the journal's on its second.
-    a.chat(".es bank");
-    a.drain(1.0);
-    let goal_no = |a: &Client| addon_lines(a, "ES").into_iter().rev().find(|l| l.starts_with("GL\t")).map(|l| l.split('\t').nth(1).unwrap_or("").to_string());
-    assert_eq!(goal_no(&a).as_deref(), Some("2"), "on the second goal at camp");
     let d = htl_survival::Content::builtin().dungeon.unwrap();
     stand(&mut a, [d.book[0], d.book[1], 0.0], 0.0);
     // Shut until the camp holds a raid (debug opens it).
@@ -1179,8 +1170,6 @@ fn the_book_takes_a_hero_down_to_the_deadmines_and_a_lamp_brings_them_home() {
         addon_lines(&a, "ES").iter().any(|l| l == "WR\tbelow"),
         "the add-on knows it's below"
     );
-    // Below, the same journal: the camp's goal, not the first.
-    assert_eq!(goal_no(&a).as_deref(), Some("2"), "the camp's goal below too");
     // The lamp where they stand: lit, and its window.
     let lamp = d.lamps[0].at;
     stand(&mut a, lamp, 0.0);

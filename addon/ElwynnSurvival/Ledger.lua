@@ -1,6 +1,6 @@
 -- Elwynn Survival: the Hearthside Ledger look. Ink on parchment for the camp's windows, a leather
 -- binding round them, wax seals, wood buttons; over the world, brush-stroke bars in torn parchment
--- troughs, scraps of paper for the foe and the journal's goal, an ink reticle.
+-- troughs, scraps of paper for the foe, an ink reticle.
 --
 -- It loads after ElwynnSurvival.lua and dresses what that file built, by the frames' names and
 -- fields, so neither file has to know much of the other: take this file out of the .toc and the
@@ -1113,58 +1113,6 @@ local function SkinHud()
     Cream(info.bags, SERIF, 14)
     Cream(info.mode, SERIF, 13)
     if info.cache then Cream(info.cache.text, SERIF, 14) end
-    -- The journal's goal on a parchment card that grows with its words (any length), a red wax
-    -- seal with its ribbon pinned to the card's corner.
-    local note = CreateFrame("Frame", nil, info)
-    note:SetWidth(300)
-    note:SetPoint("TOPRIGHT", info.goal, "TOPRIGHT", 16, 9)
-    -- The goal a little further under the line above it, so the card clears that line.
-    info.goal:ClearAllPoints()
-    info.goal:SetPoint("TOPRIGHT", info.mode, "BOTTOMRIGHT", 0, -16)
-    note:SetFrameLevel(math.max(0, info:GetFrameLevel() - 1))
-    note.card = Slice(note, "detail_card", "BACKGROUND", 256, 256, CARD_RECTS, 26, 0)
-    note.card:SetVertexColor(1, 1, 1, 0.97)
-    note.seal = Tex(note, "ARTWORK", "seal_ribbon")
-    note.seal:SetWidth(76)
-    note.seal:SetHeight(38)
-    note.seal:SetPoint("CENTER", note, "TOPLEFT", 12, -8)
-    info.note = note
-    Ink(info.goal)
-    Face(info.goal, SERIF, 15)
-    Ink(info.goalText)
-    Face(info.goalText, BODY, 13)
-    info.goalText:SetWidth(262)
-    -- As tall as the title and the words under it, plus the card's margins.
-    local function Fit()
-      local h1 = info.goal:GetHeight() or 16
-      local text = info.goalText:GetText()
-      local h2 = (text and text ~= "") and ((info.goalText:GetHeight() or 0) + 3) or 0
-      note:SetHeight(math.max(46, h1 + h2 + 22))
-      -- The kill feed under whichever ends lower: the corner's block or the card.
-      local feed = ElwynnSurvivalFeed
-      if feed then
-        local nb, ib = note:IsShown() and note:GetBottom(), info:GetBottom()
-        feed:ClearAllPoints()
-        if nb and ib and nb < ib then
-          feed:SetPoint("TOPRIGHT", note, "BOTTOMRIGHT", -16, -8)
-        else
-          feed:SetPoint("TOPRIGHT", info, "BOTTOMRIGHT", 0, -6)
-        end
-      end
-    end
-    note.Fit = Fit
-    local setText = info.goal.SetText
-    info.goal.SetText = function(self, t)
-      setText(self, t)
-      if t and t ~= "" then note:Show() else note:Hide() end
-      Fit()
-    end
-    local setWords = info.goalText.SetText
-    info.goalText.SetText = function(self, t)
-      setWords(self, t)
-      Fit()
-    end
-    info.goal:SetText(info.goal:GetText())
   end
 
   local feed = ElwynnSurvivalFeed
@@ -1747,7 +1695,6 @@ Wrap("Chest", DressWindow)
 Wrap("Station", DressWindow)
 Wrap("BuildMenu", DressWindow)
 Wrap("Rack", DressWindow)
-Wrap("DrawJournal", DressWindow)
 Wrap("Book", DressWindow)
 Wrap("Lamp", DressWindow)
 Wrap("Muster", DressWindow)

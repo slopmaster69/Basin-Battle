@@ -99,9 +99,6 @@ pub struct Content {
     /// roads), each becoming a pack where it stands.
     #[serde(rename = "roam", default)]
     pub roams: Vec<RoamDef>,
-    /// The camp's journal: goals in order, each rewarded into the chest.
-    #[serde(rename = "goal", default)]
-    pub goals: Vec<GoalDef>,
     /// The Horde's camps, which heroes can take for a while by killing everyone in them.
     #[serde(rename = "camp", default)]
     pub camps: Vec<CampDef>,
@@ -3161,25 +3158,6 @@ pub struct BurnDef {
     pub aura: u32,
 }
 
-/// One of the journal's goals: done when the camp has `kind` (`bank`, `build`, `craft`, `kill`,
-/// `gather`, `raid`, `wear`) of `what` `count` times over (a raid by its place in the list, from 0;
-/// `wear`, an armor slot someone wears).
-#[derive(Debug, Clone, Deserialize)]
-pub struct GoalDef {
-    pub title: String,
-    pub text: String,
-    pub kind: String,
-    pub what: String,
-    #[serde(default = "one")]
-    pub count: u32,
-    #[serde(default)]
-    pub reward: BTreeMap<String, u32>,
-}
-
-impl GoalDef {
-    pub const KINDS: [&'static str; 15] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn", "cleared", "chose"];
-}
-
 /// A string of blows a creature commits to: each a step (its clip, wind-up, reach, damage...)
 /// over the creature's usual attack, the next coming after the last's recovery.
 #[derive(Debug, Clone, Deserialize)]
@@ -3390,8 +3368,8 @@ pub struct ChestDef {
 /// the camp's own people (`npc`), standing at their post.
 ///
 /// The camp's own props grow with it: one with `after` stands only once the camp has got that
-/// far (`raids:1` one raid beaten, `built:smithy` a smithy built once, `goal:6` the journal at
-/// its seventh step, `found:<site>` a place found), and stays from then on.
+/// far (`raids:1` one raid beaten, `built:smithy` a smithy built once, `found:<site>` a place
+/// found), and stays from then on.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PropDef {
     /// Its look: a game object's (`GameObjectDisplayInfo`), or for an `npc` a creature's
@@ -3438,7 +3416,7 @@ pub struct PropDef {
 #[derive(Debug, Clone, Deserialize)]
 pub struct TalkDef {
     /// How far the camp must have come (as a prop's `after`: `raids:N`, `built:<station>`,
-    /// `goal:N`, `found:<site>`, `kill:<mob>`, `open:<chest>`); none: always.
+    /// `found:<site>`, `kill:<mob>`, `open:<chest>`, `chose:<group>`); none: always.
     #[serde(default)]
     pub after: Option<String>,
     pub text: String,
@@ -3448,7 +3426,7 @@ pub struct TalkDef {
 }
 
 /// The conditions a prop's or a line's `after` may name, each with what follows its colon.
-pub const CAMP_CONDITIONS: [&str; 8] = ["start", "raids", "goal", "built", "found", "kill", "open", "chose"];
+pub const CAMP_CONDITIONS: [&str; 7] = ["start", "raids", "built", "found", "kill", "open", "chose"];
 
 fn chest_display() -> u32 {
     259
@@ -3925,7 +3903,6 @@ impl Content {
         c.sites.clear();
         c.chests.clear();
         c.props.clear();
-        c.goals.clear();
         c.arena = None;
         c.dungeon = None;
         c.pvp.friendly_fire = true;
@@ -4110,7 +4087,6 @@ impl Content {
         let real = match kind {
             "start" => true,
             "raids" => arg.parse::<u32>().is_ok(),
-            "goal" => arg.parse::<usize>().is_ok(),
             "built" => self.station(arg).is_some(),
             "found" => self.sites.iter().any(|s| s.key == arg),
             "kill" => self.mob(arg).is_some(),
@@ -4571,43 +4547,6 @@ impl Content {
                 if !EffectDef::KINDS.contains(&e.kind.as_str()) {
                     bail!("item {}: no effect {:?} (one of {:?})", i.key, e.kind, EffectDef::KINDS);
                 }
-            }
-        }
-        for g in &self.goals {
-            if !GoalDef::KINDS.contains(&g.kind.as_str()) {
-                bail!("goal {}: no kind {:?} (one of {:?})", g.title, g.kind, GoalDef::KINDS);
-            }
-            for k in g.reward.keys() {
-                item(k, &format!("goal {}", g.title))?;
-            }
-            let known = match g.kind.as_str() {
-                "bank" | "gather" => self.item(&g.what).is_some(),
-                "build" => self.station(&g.what).is_some(),
-                "craft" => self.recipes.iter().any(|r| r.key == g.what),
-                "kill" => self.mob(&g.what).is_some(),
-                "raid" => g.what.parse::<usize>().is_ok_and(|t| t < self.raid.count()),
-                "clear" => self.camps.iter().any(|c| c.key == g.what),
-                // Places found (any, of a kind, or one by key), chests opened (any, or one), secrets
-                // come upon and cards learned (any).
-                "explore" => g.what == "any" || self.sites.iter().any(|x| x.key == g.what || x.kind == g.what),
-                "open" => g.what == "any" || self.chests.iter().any(|c| c.key == g.what),
-                "secret" | "learn" => g.what == "any",
-                // A dungeon cleared (every boss down in one run), by its key.
-                "cleared" => self.dungeons().any(|d| d.key == g.what),
-                // A choice made (a group a person's `.es choose` link offers).
-                "chose" => self.choices().iter().any(|(grp, _)| *grp == g.what),
-                // Below: the book read, a lamp lit (by its key), out of any dungeon's way out
-                // (`end`) or one's (`end:<dungeon>`).
-                "delve" => {
-                    g.what == "book"
-                        || g.what == "end"
-                        || g.what.strip_prefix("end:").is_some_and(|k| self.dungeons().any(|d| d.key == k))
-                        || self.dungeons().any(|d| d.lamps.iter().any(|l| l.key == g.what))
-                }
-                _ => ARMOR_SLOTS.contains(&g.what.as_str()),
-            };
-            if !known {
-                bail!("goal {}: no {} {:?}", g.title, g.kind, g.what);
             }
         }
         let mut lamp_keys = std::collections::BTreeSet::new();

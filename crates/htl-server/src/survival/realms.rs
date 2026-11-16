@@ -3,7 +3,7 @@
 //! [`SurvivalGame`] of its own. A connection is in
 //! one of them at a time; the book at camp, the lamps below and Siege's banner move a hero (and
 //! their connection) from one to another with the client's far teleport. What's done below that
-//! the camp counts (its journal, trophies) is passed up, and the camp's book learns which lamps
+//! the camp counts (what was done, trophies) is passed up, and the camp's book learns which lamps
 //! are lit. A hero in Siege plays a fresh hero there: their own save stays with the camp,
 //! untouched, until they're back.
 
@@ -382,9 +382,9 @@ impl Realms {
                 }
             }
         }
-        // The journal below is the camp's.
+        // What the camp has done reads the same below.
         for b in &mut self.below {
-            b.sim.mirror_journal(self.camp.sim.camp.goal, &self.camp.sim.camp.counts);
+            b.sim.mirror_counts(&self.camp.sim.camp.counts);
         }
         let lit: Vec<String> = self.below.iter().flat_map(|b| b.sim.lit_lamps().into_iter().map(|(k, _)| k)).collect();
         if lit != self.pages {

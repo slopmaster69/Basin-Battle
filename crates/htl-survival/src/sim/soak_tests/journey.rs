@@ -1,15 +1,16 @@
-//! The Elwynn soak's JOURNEY: the camp's journal played out for real, goal after goal, from the
-//! first timber to the last "every corner", by two scouts of the band's own world. Nothing is
-//! tallied for them: a goal that asks for a dungeon's clear sends the scouts down by the book, to
+//! The Elwynn soak's JOURNEY: the world played out for real, deed after deed along [`ROUTE`], from
+//! the first timber to every corner and the book's last dungeon, by two scouts of the band's own
+//! world. The camp keeps no list of what to do (it has no journal); the route is only the order
+//! the scouts take the world in, each deed done when the camp's own counts say so. Nothing is
+//! tallied for them: a deed that asks for a dungeon's clear sends the scouts down by the book, to
 //! the dungeon's own world (one for each, as the server keeps them), where they pull every boss
-//! and bring the news home the way the server does (`Event::ToCamp`, `from_below_at`); a goal that
+//! and bring the news home the way the server does (`Event::ToCamp`, `from_below_at`); a deed that
 //! asks for a lesson has them open the shrine and win its trial.
 //!
-//! The pilot is DATA-DRIVEN from `content.goals`: it reads each goal's `kind` and `what` and does
-//! what a hero would (bank, craft, build, explore, kill, clear, raid, delve, open, learn, wear,
-//! secret, cleared). A goal added to the content is played with no change here, as long as it
-//! uses those kinds; a kind this file doesn't know is reported (`SOAK JOURNAL UNPLAYED`) and fails
-//! the run once it has stood in the way for [`STALL_SECS`].
+//! Each deed is a `kind` and a `what`, done as a hero would (bank, craft, build, explore, kill,
+//! clear, raid, delve, open, learn, wear, secret, cleared, chose). A kind this file doesn't know is
+//! reported (`SOAK ROUTE UNPLAYED`) and fails the run once it has stood in the way for
+//! [`STALL_SECS`].
 //!
 //! The scouts are strong (a dev world's heroes are not tuned to the bosses) and the damage is
 //! dealt by `hurt_mob_as` in slices, as the dungeon phase does: the foes' own code (phases,
@@ -17,20 +18,121 @@
 //! dev world, so their hits are stood in for. The scouts also press random buttons at what they
 //! fight, as the band does.
 //!
-//! What the journal doesn't ask for, played too once it is done (and while it is stuck): every
+//! What the route doesn't ask for, played too once it is done (and while it is stuck): every
 //! person in the camp spoken to and every link they offer followed, every chest opened in order
 //! (their guardians first), every place found, every Horde camp taken, every dungeon cleared again.
 
 use super::*;
-use crate::content::{DungeonDef, GoalDef};
+use crate::content::DungeonDef;
 
-/// A goal that stays the journal's this long (simulated seconds) with the pilot trying is a failure
-/// to find out about: either a bug in the sim, or something the pilot can't play yet.
+/// One deed on the scouts' route: what a hero does (`kind`), to what, how many times over (0 for
+/// `explore any`: every place there is), and a name for the log.
+pub(super) struct Deed {
+    pub kind: &'static str,
+    pub what: &'static str,
+    pub count: u32,
+    pub name: &'static str,
+}
+
+const fn d(kind: &'static str, what: &'static str, count: u32, name: &'static str) -> Deed {
+    Deed { kind, what, count, name }
+}
+
+/// The scouts' way through the world, in order: the camp built up, Elwynn's people, places, chests
+/// and camps, the raids, the Brotherhood's story, then every dungeon of the book.
+pub(super) const ROUTE: &[Deed] = &[
+    d("bank", "wood", 10, "Timber for the camp"),
+    d("build", "cooking", 1, "A fire to cook on"),
+    d("craft", "roast", 3, "Provisions"),
+    d("explore", "any", 4, "Scout Elwynn"),
+    d("bank", "ore", 6, "Copper from Fargodeep"),
+    d("build", "smithy", 1, "An anvil"),
+    d("kill", "grunt", 3, "Thin the Warsong"),
+    d("learn", "any", 2, "A shrine's lesson"),
+    d("raid", "0", 1, "Hold the camp"),
+    d("craft", "grilled_fish", 3, "Snapper for supper"),
+    d("delve", "book", 1, "The Smuggler's Logbook"),
+    d("kill", "dm_cookie", 1, "Cookie's stew pot"),
+    d("build", "tanning", 1, "A rack for hides"),
+    d("wear", "chest", 1, "Armor of hide"),
+    d("build", "cauldron", 1, "A herbalist's cauldron"),
+    d("craft", "salve", 4, "Salves for the road"),
+    d("secret", "any", 2, "Elwynn's secrets"),
+    d("raid", "1", 1, "Drive off the Darkspear"),
+    d("clear", "darkspear", 1, "The Darkspear camp"),
+    d("kill", "overseer", 1, "The Overseer"),
+    d("bank", "silver", 4, "Silver"),
+    d("clear", "mine", 1, "Take the mine yard"),
+    d("kill", "hogger", 1, "Hogger"),
+    d("craft", "bronze", 4, "Bronze"),
+    d("build", "palisade", 1, "A wall"),
+    d("build", "workbench", 1, "A workbench"),
+    d("explore", "any", 18, "The far reaches"),
+    d("craft", "explorer_pack", 1, "An explorer's pack"),
+    d("build", "watchtower", 1, "Archers on the wall"),
+    d("learn", "any", 16, "The classes' trials"),
+    d("raid", "2", 1, "Break the warband"),
+    d("kill", "rakgash", 1, "Ridgepoint"),
+    d("raid", "3", 1, "The Blackrock Assault"),
+    d("kill", "bh_messenger", 1, "The messenger"),
+    d("open", "bh_drop", 1, "The drop at the dock"),
+    d("explore", "smugglers_ford", 1, "The Smugglers' Ford"),
+    d("kill", "bh_paymaster", 1, "The Paymaster"),
+    d("clear", "nightbane", 1, "The Nightbane Crossing"),
+    d("kill", "fenros_risen", 1, "Fenros"),
+    d("kill", "stitches", 1, "Stitches"),
+    d("raid", "4", 1, "The Brotherhood's Price"),
+    d("kill", "gruff_swiftbite", 1, "Gruff Swiftbite"),
+    d("open", "mason_cache", 1, "The mason's marks"),
+    d("chose", "remy", 1, "Remy Two Times"),
+    d("open", "sf_wagon", 1, "The Stonefield wagon"),
+    d("explore", "parley_stones", 1, "The Parley Stones"),
+    d("kill", "marzon", 1, "Marzon the Silent Blade"),
+    d("open", "marzon_satchel", 1, "The seal on the letter"),
+    d("open", "pell_satchel", 1, "The seal-cutter"),
+    d("kill", "crane", 1, "The Lion's Knife"),
+    d("chose", "letter", 1, "The Lion's Bargain"),
+    d("kill", "sable", 1, "The Lion's Hound"),
+    d("explore", "any", 0, "Every corner"),
+    d("kill", "dm_cookie", 1, "Cookie's stew"),
+    d("kill", "dm_smite", 1, "The first mate"),
+    d("kill", "dm_gilnid", 1, "The Smelter"),
+    d("kill", "dm_sneed", 1, "The Lumbermaster"),
+    d("kill", "dm_rhahkzor", 1, "The foreman"),
+    d("delve", "end:deadmines", 1, "Out into Moonbrook"),
+    d("cleared", "ragefire", 1, "Into the fire"),
+    d("cleared", "wailing", 1, "Naralex's nightmare"),
+    d("cleared", "stockade", 1, "The Stockade"),
+    d("cleared", "shadowfang", 1, "Arugal's keep"),
+    d("cleared", "razorfen", 1, "The warren of thorns"),
+    d("cleared", "graveyard", 1, "The Crusade's dead"),
+    d("cleared", "library", 1, "The Crusade's books"),
+    d("cleared", "cathedral", 1, "The Crusade's heart"),
+];
+
+/// How far the camp is towards a deed: what it has, what it needs (from the camp's counts, or the
+/// armor a scout wears).
+pub(super) fn progress(s: &Survival, d: &Deed) -> (u32, u32) {
+    let need = if d.count == 0 { s.content.sites.len() as u32 } else { d.count };
+    let have = match d.kind {
+        "wear" => u32::from(s.players.values().any(|p| p.armor.contains_key(d.what))),
+        _ => s.camp.counts.get(&format!("{}:{}", d.kind, d.what)).copied().unwrap_or(0),
+    };
+    (have.min(need), need)
+}
+
+fn done(s: &Survival, d: &Deed) -> bool {
+    let (have, need) = progress(s, d);
+    have >= need
+}
+
+/// A deed that stays the route's next this long (simulated seconds) with the pilot trying is a
+/// failure to find out about: either a bug in the sim, or something the pilot can't play yet.
 pub(super) const STALL_SECS: f32 = 3.0 * 3600.0;
-/// How long one boss gets before the pilot gives up on that pull (and the goal's stall clock
+/// How long one boss gets before the pilot gives up on that pull (and the deed's stall clock
 /// goes on).
 const BOSS_SECS: f32 = 480.0;
-/// The raids the band rings in a run, the journal's own and after (each comes with more raiders).
+/// The raids the band rings in a run, the route's own and after (each comes with more raiders).
 const MAX_RAIDS: u32 = 16;
 const SCOUTS: usize = 2;
 const ACCOUNTS: [&str; SCOUTS] = ["scout0", "scout1"];
@@ -240,7 +342,7 @@ impl Ctx {
                 }
             }
             // Raids: ring the bell whenever the camp is ready.
-            // (A raid more each time comes with a raider more of each kind: past the journal's own the
+            // (A raid more each time comes with a raider more of each kind: past the route's own the
             // band rings it a dozen times over, not for ever, or the raid is a hundred strong.)
             if tick % 100 == 50 && s.raid.phase == raid::RaidPhase::Idle && s.camp_ready() && *raids_started < MAX_RAIDS {
                 if let Some(&h) = band.live().first() {
@@ -370,9 +472,9 @@ impl Ctx {
             for id in home {
                 self.ascend(k, id);
             }
-            // The journal below is the camp's.
-            let (goal, counts) = (self.s.camp.goal, &self.s.camp.counts);
-            self.dungeons[k].s.mirror_journal(goal, counts);
+            // What the camp has done reads the same below.
+            let counts = &self.s.camp.counts;
+            self.dungeons[k].s.mirror_counts(counts);
         }
         let lit: Vec<String> = self.dungeons.iter().flat_map(|d| d.s.lit_lamps().into_iter().map(|(k, _)| k)).collect();
         if lit != self.pages {
@@ -383,7 +485,7 @@ impl Ctx {
 
     fn descend(&mut self, player: Id, lamp: &str) {
         let Some(k) = self.dungeons.iter().position(|d| d.s.content.dungeon.as_ref().is_some_and(|dd| dd.lamps.iter().any(|l| l.key == lamp))) else {
-            eprintln!("SOAK JOURNAL: no dungeon has the lamp {lamp}");
+            eprintln!("SOAK ROUTE: no dungeon has the lamp {lamp}");
             return;
         };
         let Some(p) = self.s.players.get(&player) else { return };
@@ -534,15 +636,15 @@ enum Target {
     End,
 }
 
-/// The goal pilot, and what it has seen.
+/// The route's pilot, and what it has seen.
 #[derive(Default)]
 pub(super) struct Pilot {
-    /// The journal's goal and the clock it became current.
+    /// The route's next deed and the clock it became next.
     last: (usize, f32),
     began: bool,
     pub stalled: Vec<String>,
     pub unplayed: Vec<String>,
-    /// Goal title, when it was done (simulated minutes).
+    /// A deed's name, when it was done (simulated minutes).
     pub done: Vec<(String, f32)>,
     told: std::collections::BTreeSet<String>,
     extras: usize,
@@ -563,25 +665,27 @@ pub(super) struct Pilot {
 impl Pilot {
     fn note(&mut self, key: &str, msg: String) {
         if self.told.insert(key.to_string()) {
-            eprintln!("SOAK JOURNAL: {msg}");
+            eprintln!("SOAK ROUTE: {msg}");
         }
     }
 
-    /// One step of the pilot: a unit of work towards the journal's goal (or, with the journal
+    /// One step of the pilot: a unit of work towards the route's next deed (or, with the route
     /// done or stuck, an extra), and always at least one tick.
     pub fn step(&mut self, c: &mut Ctx) {
         let before = c.tick;
         let now = c.s.clock;
-        let goal = c.s.camp.goal;
         if !self.began {
             self.began = true;
-            self.last = (goal, now);
+            self.last = (0, now);
         }
-        if goal != self.last.0 {
-            let title = c.s.content.goals.get(self.last.0).map_or(String::new(), |g| g.title.clone());
-            self.done.push((title.clone(), now / 60.0));
-            eprintln!("SOAK JOURNAL: goal {} of {} done at {:.0} min: {title}", self.last.0 + 1, c.s.content.goals.len(), now / 60.0);
-            self.last = (goal, now);
+        let mut moved = false;
+        while let Some(d) = ROUTE.get(self.last.0).filter(|d| done(&c.s, d)) {
+            self.done.push((d.name.to_string(), now / 60.0));
+            eprintln!("SOAK ROUTE: deed {} of {} done at {:.0} min: {}", self.last.0 + 1, ROUTE.len(), now / 60.0, d.name);
+            self.last = (self.last.0 + 1, now);
+            moved = true;
+        }
+        if moved {
             self.talk_round(c);
         }
         let (here, ids) = c.scouts();
@@ -590,7 +694,7 @@ impl Pilot {
             return;
         }
         // A raid on the camp: the scouts meet it where it comes, at the heart, whatever else the
-        // journal asks (the raiders follow the heroes wherever they go, so the heroes go home).
+        // route asks (the raiders follow the heroes wherever they go, so the heroes go home).
         if here.is_none() && c.s.raid.active() && now - self.raid_since < 1500.0 {
             self.defend(c);
             return;
@@ -598,18 +702,18 @@ impl Pilot {
         if !c.s.raid.active() {
             self.raid_since = now;
         }
-        // Scouts are home to play the camp's goals (a dungeon's are played from the book).
+        // Scouts are home to play the route (a dungeon's deeds are played from the book).
         if here.is_some() {
             self.home(c);
-        } else if let Some(g) = c.s.goal().cloned() {
+        } else if let Some(g) = ROUTE.get(self.last.0) {
             let stalled_for = now - self.last.1;
             if stalled_for > STALL_SECS {
-                let msg = format!("goal {} of {} ({} {} x{}: {}) has been the journal's for {:.0} simulated minutes", goal + 1, c.s.content.goals.len(), g.kind, g.what, g.count, g.title, stalled_for / 60.0);
-                eprintln!("SOAK STUCK journal: {msg}");
+                let msg = format!("deed {} of {} ({} {} x{}: {}) has been the route's next for {:.0} simulated minutes", self.last.0 + 1, ROUTE.len(), g.kind, g.what, g.count, g.name, stalled_for / 60.0);
+                eprintln!("SOAK STUCK route: {msg}");
                 self.stalled.push(msg);
                 self.last.1 = now;
             }
-            self.play(c, &g);
+            self.play(c, g);
             // A long stand: the rest of the world gets played too (it may be what unlocks it).
             if stalled_for > 1800.0 {
                 self.extra(c);
@@ -644,53 +748,53 @@ impl Pilot {
         }
     }
 
-    // --- goals ------------------------------------------------------------------------------------
+    // --- the route's deeds -------------------------------------------------------------------------
 
-    fn play(&mut self, c: &mut Ctx, g: &GoalDef) {
-        let (have, need) = c.s.goal_progress(g);
+    fn play(&mut self, c: &mut Ctx, g: &Deed) {
+        let (have, need) = progress(&c.s, g);
         let missing = need.saturating_sub(have);
         let key = format!("{}:{}", g.kind, g.what);
-        match g.kind.as_str() {
-            "bank" => self.bank(c, &g.what, missing),
-            "craft" => self.craft(c, &g.what),
+        match g.kind {
+            "bank" => self.bank(c, g.what, missing),
+            "craft" => self.craft(c, g.what),
             "build" => {
-                if !self.build(c, &g.what) {
+                if !self.build(c, g.what) {
                     c.wait(10.0);
                 }
             }
-            "gather" => self.gather(c, &g.what),
-            "wear" => self.wear(c, &g.what),
+            "gather" => self.gather(c, g.what),
+            "wear" => self.wear(c, g.what),
             // A choice a person offers (once it is theirs to offer): they are spoken to, and the choice made.
             "chose" => {
                 self.talk_round(c);
                 c.wait(5.0);
             }
-            "kill" => self.kill(c, &g.what),
-            "clear" => self.clear_camp(c, &g.what),
-            "raid" => self.raid(c, &g.what),
-            "explore" => self.explore(c, &g.what),
+            "kill" => self.kill(c, g.what),
+            "clear" => self.clear_camp(c, g.what),
+            "raid" => self.raid(c, g.what),
+            "explore" => self.explore(c, g.what),
             "secret" => self.secrets(c),
-            "open" => self.open_goal(c, &g.what),
+            "open" => self.open_deed(c, g.what),
             "learn" => self.learn(c),
-            "delve" => self.delve(c, &g.what),
+            "delve" => self.delve(c, g.what),
             "cleared" => {
                 let d = c.s.content.ladder().find(|d| d.key == g.what).cloned();
                 match d {
                     Some(d) => {
                         self.dungeon(c, &d, Target::Clear);
                     }
-                    None => self.note(&key, format!("no dungeon {} for the goal {}", g.what, g.title)),
+                    None => self.note(&key, format!("no dungeon {} for the deed {}", g.what, g.name)),
                 }
             }
             kind => {
-                self.note(&key, format!("UNPLAYED goal kind {kind} ({}: {})", g.what, g.title));
-                self.unplayed.push(format!("{kind} {} ({})", g.what, g.title));
+                self.note(&key, format!("UNPLAYED deed kind {kind} ({}: {})", g.what, g.name));
+                self.unplayed.push(format!("{kind} {} ({})", g.what, g.name));
                 c.wait(30.0);
             }
         }
     }
 
-    /// Scouts in a dungeon with the camp's goal in front of them: home by a lamp.
+    /// Scouts in a dungeon with the route's next deed at camp: home by a lamp.
     fn home(&mut self, c: &mut Ctx) {
         let (here, _) = c.scouts();
         let Some(k) = here else { return };
@@ -994,12 +1098,12 @@ impl Pilot {
                 self.build(c, arg);
             }
             "chose" => self.talk_round(c),
-            // (The raids and goals come by themselves, in their order.)
+            // (The raids come by themselves, in their order.)
             _ => c.wait(20.0),
         }
     }
 
-    fn open_goal(&mut self, c: &mut Ctx, what: &str) {
+    fn open_deed(&mut self, c: &mut Ctx, what: &str) {
         if what == "any" {
             // The next chest not yet opened, easiest first.
             let key = c.s.content.chests.iter().filter(|ch| !c.s.camp.opened.contains_key(&ch.key)).map(|ch| ch.key.clone()).next();
@@ -1335,7 +1439,7 @@ impl Pilot {
             }
             c.wait(3.0);
         }
-        eprintln!("SOAK JOURNAL: the scouts could not leave {} by its lamp", d.key);
+        eprintln!("SOAK ROUTE: the scouts could not leave {} by its lamp", d.key);
         // (Out some other way would still be the server's: the soak does not mask it.)
         self.stalled.push(format!("the scouts could not go home from {}", d.key));
         for id in c.scouts_at(Some(k)) {
@@ -1401,7 +1505,7 @@ impl Pilot {
         }
     }
 
-    /// With the journal done, or stuck: one more round of what a thorough hero would play.
+    /// With the route done, or stuck: one more round of what a thorough hero would play.
     fn extra(&mut self, c: &mut Ctx) {
         let n = self.extras;
         self.extras += 1;
@@ -1458,12 +1562,12 @@ pub(super) fn soak_elwynn(minutes: f32, seed: u64) {
     while c.live() {
         pilot.step(&mut c);
     }
-    let goals = c.s.content.goals.len();
+    let deeds = ROUTE.len();
     eprintln!(
-        "SOAK elwynn done: {:.0} simulated minutes; journal goal {} of {}, {} built, {} armed, {} raids rung, {} started, {} won, {} chests opened ({} by scouts, {} trials), {} heroes joined, {} found",
+        "SOAK elwynn done: {:.0} simulated minutes; route deed {} of {}, {} built, {} armed, {} raids rung, {} started, {} won, {} chests opened ({} by scouts, {} trials), {} heroes joined, {} found",
         c.s.clock / 60.0,
-        c.s.camp.goal,
-        goals,
+        pilot.last.0,
+        deeds,
         c.built,
         c.armed,
         c.raids_rung,
@@ -1480,14 +1584,13 @@ pub(super) fn soak_elwynn(minutes: f32, seed: u64) {
         "SOAK journey: {} dungeon trips, {} boss pulls, {} clears, {} camps taken, {} places visited, {} people spoken to, {} links followed, {} crossings, {} news items sent up",
         pilot.trips, pilot.boss_kills, pilot.clears, camps_taken, pilot.explored, pilot.talked, pilot.links, c.crossings, c.news
     );
-    if c.s.camp.goal < goals {
-        let g = &c.s.content.goals[c.s.camp.goal];
-        eprintln!("SOAK JOURNAL: the journal stands at goal {} of {}: {} ({} {})", c.s.camp.goal + 1, goals, g.title, g.kind, g.what);
+    if let Some(g) = ROUTE.get(pilot.last.0) {
+        eprintln!("SOAK ROUTE: the route stands at deed {} of {deeds}: {} ({} {})", pilot.last.0 + 1, g.name, g.kind, g.what);
     } else {
-        eprintln!("SOAK JOURNAL: the whole journal played, all {goals} goals");
+        eprintln!("SOAK ROUTE: the whole route played, all {deeds} deeds");
     }
     for (title, min) in &pilot.done {
-        eprintln!("SOAK JOURNAL   {min:6.0} min  {title}");
+        eprintln!("SOAK ROUTE   {min:6.0} min  {title}");
     }
     for d in c.dungeons.iter_mut() {
         if d.mon.min_ticks >= 1 {
@@ -1496,8 +1599,8 @@ pub(super) fn soak_elwynn(minutes: f32, seed: u64) {
         }
     }
     for u in &pilot.unplayed {
-        eprintln!("SOAK JOURNAL UNPLAYED {u}");
+        eprintln!("SOAK ROUTE UNPLAYED {u}");
     }
     c.mon.report();
-    assert!(pilot.stalled.is_empty(), "SOAK elwynn: the journal stalled: {:#?}", pilot.stalled);
+    assert!(pilot.stalled.is_empty(), "SOAK elwynn: the route stalled: {:#?}", pilot.stalled);
 }

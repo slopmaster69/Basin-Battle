@@ -68,11 +68,10 @@ fn what_the_camp_has_reads_its_progress() {
     assert!(!s.camp_has("built:smithy"));
     assert!(!s.camp_has("nonsense"));
     s.camp.raids_won = 1;
-    s.camp.goal = 6;
     s.camp.found.insert("goldshire".into());
     s.camp.counts.insert("build:smithy".into(), 1);
     assert!(s.camp_has("raids:1") && !s.camp_has("raids:2"));
-    assert!(s.camp_has("goal:6") && !s.camp_has("goal:7"));
+    assert!(!s.camp_has("goal:0"), "no journal: a goal is no condition");
     assert!(s.camp_has("found:goldshire") && !s.camp_has("found:azora"));
     assert!(s.camp_has("built:smithy"));
 }

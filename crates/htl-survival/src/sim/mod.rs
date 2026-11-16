@@ -27,7 +27,6 @@ pub use building::StationActions;
 pub(crate) mod combat;
 pub mod dungeon;
 pub mod duel;
-mod journal;
 pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
@@ -313,8 +312,6 @@ pub enum Event {
     Lock { player: Id, target: Option<Id> },
     /// A hero's lasting effects changed (one began or ran out).
     Effects { player: Id },
-    /// The journal moved on: a goal done.
-    Goal,
     /// The camp's places found or chests opened changed: the world map's marks again.
     Sites,
     /// The dodge's dash (`roll`: a dodge, which tumbles), or a blow throwing a hero back.
@@ -390,7 +387,7 @@ pub enum Event {
         player: Id,
         to: Option<String>,
     },
-    /// Done below and counted at camp too: the journal's counts, and trophies for the chest.
+    /// Done below and counted at camp too: the camp's counts, and trophies for the chest.
     ToCamp {
         counts: Vec<(String, u32)>,
         items: BTreeMap<usize, u32>,
@@ -929,12 +926,12 @@ impl HeroLook {
     }
 }
 
-/// How far the camp has come, kept in the save: raids beaten, the journal's goal and what's been
-/// done towards goals (`bank:wood`, `craft:roast`, `kill:kobold`, `build:smithy`...).
+/// How far the camp has come, kept in the save: raids beaten and what's been done
+/// (`bank:wood`, `craft:roast`, `kill:kobold`, `build:smithy`...), which the world's `after`
+/// conditions read.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Camp {
     pub raids_won: u32,
-    pub goal: usize,
     pub counts: BTreeMap<String, u32>,
     /// Places found (`[[site]]` keys) and chests opened (each with when it's full again, unix
     /// seconds; never for one that's once a world).
@@ -1277,7 +1274,7 @@ pub struct Survival {
     pub raid: raid::Raid,
     /// The Proving Ring's run, if one's on.
     pub arena: arena::Arena,
-    /// How far the camp has come: raids beaten, the journal, what's been done.
+    /// How far the camp has come: raids beaten, what's been done.
     pub camp: Camp,
     /// Packs: who's in each, and when each dead member comes back.
     pub(crate) respawns: Vec<(usize, Vec3, Option<usize>, f32)>,
@@ -1524,7 +1521,6 @@ impl Survival {
             self.step_arena(dt);
             self.step_explore();
             self.step_mills();
-            self.step_goals();
             self.step_weekly_chest();
         }
         self.record_trails();

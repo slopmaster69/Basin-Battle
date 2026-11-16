@@ -56,9 +56,6 @@
   <Binding name="ES_TREE">
     ElwynnSurvival.Tree()
   </Binding>
-  <Binding name="ES_JOURNAL">
-    ElwynnSurvival.Journal()
-  </Binding>
   <Binding name="ES_BUILD">
     ElwynnSurvival.Build()
   </Binding>

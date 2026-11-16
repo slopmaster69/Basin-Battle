@@ -927,19 +927,15 @@ fn a_hero_come_down_from_the_camp_starts_whole_with_their_draughts_as_they_were(
 }
 
 #[test]
-fn below_the_journal_is_the_camps() {
+fn below_what_the_camp_has_done_reads_as_at_camp() {
     let mut s = below();
     let _id = s.join("ayla", "Ayla", None);
-    let counts = BTreeMap::from([("delve:book".to_string(), 1)]);
-    s.mirror_journal(5, &counts);
-    let ev = run(&mut s, 0.5);
-    assert!(ev.iter().any(|e| matches!(e, Event::Goal)), "shown again");
-    assert_eq!(s.camp.goal, 5, "the camp's goal, not the first");
-    // Done or not, the journal moves on at camp only.
-    let g = s.content.goals[5].clone();
-    s.camp.counts.insert(format!("{}:{}", g.kind, g.what), g.count);
+    assert!(!s.camp_has("kill:hogger"));
+    let counts = BTreeMap::from([("kill:hogger".to_string(), 1), ("chose:remy:free".to_string(), 1)]);
+    s.mirror_counts(&counts);
     run(&mut s, 0.5);
-    assert_eq!(s.camp.goal, 5);
+    assert!(s.camp_has("kill:hogger") && s.camp_has("chose:remy:free"));
+    assert_eq!(s.camp.counts, counts);
 }
 
 #[test]
@@ -2203,22 +2199,6 @@ fn a_harder_tier_opens_once_two_of_the_tier_below_are_cleared() {
     // A dungeon the camp has been in already stays open (an old camp isn't locked out).
     camp.camp.counts.insert("kill:gy_vishas".into(), 1);
     assert!(open(&camp, "graveyard").0);
-}
-
-#[test]
-fn the_journal_walks_the_camp_through_every_dungeon_by_their_clears() {
-    let c = Content::builtin();
-    let keys: Vec<String> = c.dungeons().map(|d| d.key.clone()).collect();
-    for k in keys.iter().filter(|k| *k != "deadmines") {
-        assert!(c.goals.iter().any(|g| g.kind == "cleared" && &g.what == k), "a journal step for {k}");
-    }
-    // In the book's order: no step for a harder tier before every one of an easier tier's.
-    let tier = |k: &str| c.dungeons().find(|d| d.key == k).unwrap().tier;
-    let steps: Vec<u32> = c.goals.iter().filter(|g| g.kind == "cleared").map(|g| tier(&g.what)).collect();
-    assert!(steps.windows(2).all(|w| w[0] <= w[1]), "{steps:?}");
-    let camp = Survival::new(c.clone(), Box::new(FlatLand::default()), 1, 0.0);
-    let g = c.goals.iter().find(|g| g.kind == "cleared" && g.what == "ragefire").unwrap();
-    assert_eq!(camp.goal_progress(g), (0, 1));
 }
 
 #[test]

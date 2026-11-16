@@ -99,7 +99,6 @@ effect.
 | B | The bags: the backpack and all four satchels |
 | H | Build: the menu, then the station stands in front of you with the mouse free, see-through and light blue, a ring on the ground where it goes (green: it can; red: it can't, and the banner says why); only you see it until it's built, and it's never solid, so it never stands in your way or a friend's (client patch 0017; an older client draws it solid and fading). F puts it down, R or T turns it, H cancels |
 | N | The **board** of abilities |
-| J | The camp's journal |
 | Tab | **Lock on** to the foe in front of you (the one you've been trading blows with first, then a hero to fight, then a creature fighting someone; a creature minding its business last); Tab again lets go (middle mouse too, if the card says so) |
 | Ctrl + Tab | The next foe in view, each in turn (locks on if you weren't) |
 | Z | Free the mouse to click things in the world (Z again to fight) |
@@ -830,9 +829,9 @@ The warband never brings more than one of him, however often it comes back.
 **Taking their camps.** Kill every Horde fighter in the Fargodeep mine yard (the yard and the
 grunts on the hill above it) or at the Darkspear camp and it's taken: a banner, none come back there
 for ten minutes, and the first time the camp's chest gets their stores (tin, bronze and linen from
-the mine; leather and herbs from the Darkspear). The journal asks for both.
+the mine; leather and herbs from the Darkspear).
 
-**Resources over the whole forest.** Beyond the handful by the camp (the first goal's fallen
+**Resources over the whole forest.** Beyond the handful by the camp (the fallen
 timber, a few herbs, the mine yard's veins), timber and silverleaf stand beside trees and
 peacebloom, mageroyal, earthroot, briarthorn and boulders lie in the open all over Elwynn
 (`spread` on a `[[nodes]]`: the zone cut into squares that many yards a side, a spot tried in
@@ -928,7 +927,7 @@ The world is the whole zone now (`htl-map`'s `elwynn.rs` reads every tile of it:
 explored from the start, and marks every place worth going to: a found place in full colour with a
 tick, one not yet found greyed; its tooltip says what's there. Along the top, the camp's tally:
 places found, chests opened, secrets come upon. The first hero to walk into a place finds it for
-the camp (a banner, and a little into the chest); the journal counts them. With no supplies of
+the camp (a banner, and a little into the chest). With no supplies of
 yours to point to, the corner's arrow points the way to the nearest place not yet found (within
 600 yards), and says how far.
 
@@ -963,7 +962,7 @@ the classes it had in 1.12 (a human can't be a hunter, druid or shaman: those ne
 night elf, a night elf or tauren, an orc, tauren or troll). Every race is a camp survivor (the
 same faction); the camera and the swing clips were tuned on a human man, so the other models may
 sit a little off. Each character is its own hero, kept apart in the save under `account/name`: its
-gear, bags, Valor, look and cards. The camp's chest, stations, journal, raids, the places found
+gear, bags, Valor, look and cards. The camp's chest, stations, raids, the places found
 and the chests opened are the camp's, shared by everyone. A save from before characters keeps
 each account's first footman (a human warrior) on the list as it was. A character can be deleted
 from the select screen when it isn't in the world.
@@ -992,7 +991,7 @@ card be taken off the board.
 **Starting over (testing).** With `.es debug` on: `.es reset me` sets your hero back to their first
 day (at the camp, their class's Q and E, the axe, buckler, bow and a roast; still the same name,
 class and look). `.es reset camp` starts the camp's whole world over (the chest emptied, stations
-gone, the journal at its first goal, no raid beaten, no place found nor chest opened, every
+gone, nothing done, no raid beaten, no place found nor chest opened, every
 creature and resource back): the save is first written and copied beside itself as
 `elwynn-survival.toml.before-reset-<time>`, so copying that back over the save (with the server
 stopped) undoes it. The heroes keep what they carry; `.es reset me` each for a true blank slate.
@@ -1031,10 +1030,6 @@ warning signs, the murlocs' altars, the gnolls' cages, the cult's candles, the B
 | Brackwell Pumpkin | the Brackwell patch | Brackwell Pumpkin Pie, the Feast |
 | Shimmering Pearl | murlocs, fishing, hoards | the Silver-Inlaid Helm |
 
-The journal gains steps for all of it: scout four places, learn at a shrine, fish for supper, two
-secrets, silver, Hogger, the far reaches (eighteen places), an explorer's pack, the classes' trials
-(sixteen cards), Ridgepoint, and every corner.
-
 Far from every hero a creature at rest sleeps (it doesn't think or wander), so the wide land costs
 little: a tick with a hero at any of the places takes about a quarter of a millisecond.
 
@@ -1071,9 +1066,8 @@ strongboxes fill: the Deadmines can be farmed. The lamps lit, the gates and the 
 they are. `.es reset camp` starts the Deadmines over with the camp (no lamp lit, no door open,
 whoever's below set down at the first lamp; their save is kept aside as well).
 
-**The journal below** is the camp's: the goal shown there, and its count, are the camp's
-(mirrored every tick; the journal moves on only at camp). After the Logbook, the next goal is to
-kill Cookie once.
+**What the camp has done** reads the same below: its counts (a creature killed, a chest opened, a
+choice made) are mirrored from the camp every tick, so a condition below holds as it does at camp.
 
 ## The book's ladder
 
@@ -1082,9 +1076,8 @@ Wailing Caverns) is open from the start. A tier past the first opens once the ca
 two dungeons of the tier below (every boss down in one run; `LADDER_CLEARS`): the Stockade,
 Shadowfang Keep and Razorfen Kraul after two of the first, the Scarlet Monastery's three after
 two of those. A locked dungeon's page says what opens it. A dungeon the camp has already been in
-(a lamp lit past the first, a boss felled) stays open. The journal walks the camp through them in
-that order after the Deadmines' own steps (`kind = "cleared"`), each paying into the chest on top
-of the dungeon's first-clear gift.
+(a lamp lit past the first, a boss felled) stays open. Each pays its first-clear gift into the
+chest.
 
 ## Secrets and notes
 
@@ -1296,8 +1289,7 @@ stays shut while he lives, and its map points to the Smugglers' Ford. There the 
 wakes Paymaster Voss and 2 hirelings on whoever opens it, and they lie in wait again when it fills. His
 rule: while his hirelings fight he circles off (a commander), so kill them or go in after him. At 35% health
 he says "Hold them. You're paid till sundown.", calls 2 more thugs and runs to his boat at the water,
-and fights again once a hero comes within 10 yd. Four journal goals follow it (the messenger, the drop,
-the ford, the Paymaster), and once the Paymaster is dead Marshal Wyle names the Deadmines.
+and fights again once a hero comes within 10 yd. Once the Paymaster is dead Marshal Wyle names the Deadmines.
 
 **Nightbane Crossing** (Stage 3 of docs/elwynn-expansion.md). A worgen pack holds the river's south
 bank (`[[camp]]` "the Nightbane Crossing", taken by killing all 6, and back after 10 min). Watcher Dodds
@@ -1308,7 +1300,6 @@ Risen ("Not... yet."), who can't be parried, only blocked, and is slower and hea
 sweep all round when crowded, a slow leap). The hero's rule is taken away: parry the first form, dodge
 the second. His fall is told once, when the second form is dead, and it is the first form that
 comes back after 30 min. Dodds then says where the wolves came from and links the Shadowfang Keep page.
-Two goals follow: the crossing and Fenros.
 
 **Stitches** (Stage 4 of docs/elwynn-expansion.md). A rare flesh golem walks the cobbled road north-west
 of Goldshire (`route`, never nearer than 200 yd to the camp) and comes back 40 min after he falls.
@@ -1316,8 +1307,8 @@ He is too big to parry (`unparryable`: a guard only blocks him), with a posture 
 cleaver chop, a swing all round him when crowded that nothing blocks (dodge it), a lurching charge
 from 6 yd or more, and a cleaver thrown from afar. At 50% health his stitches split, and every heavy
 blow he lands leaves bile where it falls (8 damage a tick for 8 sec in 3 yd, shown as flames: the
-fire look stands in for a green one, for Corey to say). The rule: keep him walking. The journal asks
-for his fall, and it is told to everyone.
+fire look stands in for a green one, for Corey to say). The rule: keep him walking. His fall is told
+to everyone.
 
 **The Brotherhood's Price** (Stage 5 of docs/elwynn-expansion.md). The fifth raid (`[[raid.tier]]`, once
 the camp has a barracks and an infirmary) is 5 Defias thugs, 3 footpads, 2 lookouts, 2 conjurers and
@@ -1327,18 +1318,17 @@ his back for a backstab, but not too close: within 3.5 yd he stomps all round hi
 At arm's length he swings his maul (an overhead, glowing, or a wide sweep). At 50% health he says "Pitch on
 the stones, lads." and every heavy blow leaves burning pitch where it lands (Fire's look: the flames are
 the pitch, for Corey to say). When he falls a stonemason from Stormwind comes to the camp. What comes
-back after the raid is the next one, a raider more of each kind. The goal is the raid's place in the list (4).
+back after the raid is the next one, a raider more of each kind.
 
 **Gruff Swiftbite** (Stage 6 of docs/elwynn-expansion.md). A rare gnoll runner of the Riverpaw runs between three
 spots in Forest's Edge, clear of Hogger's (`spots`), and comes back 25 min after he falls. He is not a `boss`,
 so a parry makes him reel. The rule: he steps out of every heavy attack wound up at him from the front
 (`evade = 0.95`), and his backstep is the tell. Parry him, and the heavy lands while he reels. He bites in
 quick strings (parry the first and he reels) and lunges from 5 to 12 yd. The Riverpaw Tribute (Brotherhood
-silver and a mason's tally stick) stays shut while he lives. The journal asks for his fall, and Wren says a
-word once he is gone.
+silver and a mason's tally stick) stays shut while he lives. Wren says a word once he is gone.
 
 **The Mason's Marks** (Stage 7 of docs/elwynn-expansion.md). The Mason's Cairn is a landmark above Stone
-Cairn Lake (a place to find, so "Every corner" is 37). Brannick cut five stones with a mason's mark. A chest's
+Cairn Lake (a place to find). Brannick cut five stones with a mason's mark. A chest's
 `after` that holds a colon is a condition the camp meets, read as `camp_has` (`open:<chest>`, `found:<site>`,
 `kill:<mob>`); a bare key stays a creature the camp must have killed, as ever. The true stones open in his
 order, each shut with its own words until the one before it is open: the plumb, then the trowel, then the key,
@@ -1357,7 +1347,7 @@ condition a prop's `after` takes) and a `text`, and optionally `links = ["comman
 say the last line whose `after` holds, so each person's words follow the camp: Hale after the
 first raid, Wyle after the Blackrock. The page is a `talk` letter (the blue seal) in the add-on's
 `Letter.lua`; there are no choices yet. A person with no line that holds isn't usable. The
-conditions are `start`, `raids:N`, `goal:N`, `built:<station>`, `found:<site>`, `kill:<mob>`
+conditions are `start`, `raids:N`, `built:<station>`, `found:<site>`, `kill:<mob>`
 (once the camp has killed one), `open:<chest>` (once one has been opened) and `chose:<group>` or
 `chose:<group>:<option>` (once the camp has made that choice). `Content::validate`
 refuses any other word, and a name that isn't a real station, site, creature or chest.
@@ -1368,15 +1358,14 @@ the command, and the choice is the camp's, made once per group (a second try say
 decided."). It counts `chose:<group>` and `chose:<group>:<option>` in the camp's counts, which the save
 already keeps. A `[[prop]]` with `until = "<condition>"` goes once its condition holds and never stands
 again, so a person can be taken away. `Content::validate` refuses a link that isn't a group and an option,
-a condition or goal that names a choice nobody offers, and an option nothing waits on. A goal of kind
-`chose` is done by any option of its group.
+a condition that names a choice nobody offers, and an option nothing waits on.
 
 **Remy "Two Times"** (Stage 8 of docs/elwynn-expansion.md). Once the mason's road book is open, Remy stands
 outside the Lion's Pride in Goldshire, and says he sold the watch rosters to a man in black. His page offers
 two choices. *Arrest Him*: he is taken away, Marshal Dughan stands in his place (and names the Stockade's page),
 and the Stormwind Bounty opens (3 silver, 2 bronze). *Free Him*: he stays, tells where the man in black meets
 his buyers (past Jasperlode), and his stash at the Maclure well opens (2 silver, 2 pearls). The chest of the
-option not taken stays shut, with its own words. The journal asks for the choice.
+option not taken stays shut, with its own words.
 
 **Hold the Stonefield Wagon** (Stage 9 of docs/elwynn-expansion.md). The Stonefield Wagon at the farm is a hold.
 Using it begins a 90 sec defense (`hold`, with waves in `trial`): kobolds from Fargodeep come in three waves, at 0,
@@ -1410,13 +1399,11 @@ after a string. So let him strike first: parry his three stabs (a parry ends the
 and hit him as he recovers. At half his health he says "Enough talk." and throws a fan of knives all round him once,
 glowing red and blocked by nothing (it is not an enrage). His trophy is **The Silent Blade**, a dagger whose punish
 mechanic does 75% more damage to an enemy in its recovery. His satchel stays shut until he falls: a letter under a
-lion's seal, signed "G. L." Marshal Wyle then names Lord Gregor Lescovar and links the Deadmines page. Three goals
-follow (the stones, Marzon, the seal), and "Every corner" counts the 38 places.
+lion's seal, signed "G. L." Marshal Wyle then names Lord Gregor Lescovar and links the Deadmines page.
 
 **The Witness** (Stage 11 of docs/elwynn-expansion.md). Wyle's word on the seal now ends: Stormwind won't hang a lord
 on ink, but Aldric Pell, who cut the seal, hides by the north road. His satchel there (shut until Marzon's satchel is
-read) starts an **escort**: Pell wakes and walks the road to the Stormwind gate, a new landmark (so "Every corner" is
-39). An escort is a chest with `escort` (the key of a pack of one friendly creature that wakes on it) and `route` (the
+read) starts an **escort**: Pell wakes and walks the road to the Stormwind gate, a new landmark. An escort is a chest with `escort` (the key of a pack of one friendly creature that wakes on it) and `route` (the
 points he walks, from his pack's `at`), its waves in `trial`. He walks at his own pace while a hero is within 20 yd of
 him and nothing is fighting him, and waits otherwise. Wave `i` of `n` comes as he sets off from point `i * len / n`
 of his route (here at his start, his fourth point and his seventh of eight), and its creatures come for him, not the
@@ -1435,7 +1422,7 @@ turns on that hero), and then he turns his back on that hero and goes for Pell a
 Two quick cuts (parry the first and the second never comes) and a lunge; from half his health ("Hold still, old
 man.") a slow throat-cut, glowing red, that nothing blocks: struck as he winds it up at Pell, it comes at the hero
 instead, so step out of it. Once Pell is through he stands at the gate with words of his own, and Wyle has a new
-line. Two goals follow (the seal-cutter, the Lion's Knife).
+line.
 
 **The Lion's Bargain** (Stage 12 of docs/elwynn-expansion.md). Once Pell is through, Steward Venn of House Lescovar
 waits outside the camp's gate (not asked in) with an offer for the letter: the camp's second choice, `.es choose
@@ -1445,7 +1432,7 @@ it. *Keep the Letter*: Pell stays at the gate to swear before the House, and two
 camp's gate for good, friendly shooters that shoot a raider on its way to, or at, the camp's buildings, as well as
 what fights a hero. A pack's `after` now works on any pack: one whose condition doesn't hold is unseen (an ambusher
 lying in wait never steps out) until it does, and the camp is looked over as it grows; it stays standing from then,
-across saves. The journal asks for the answer.
+across saves.
 
 **Sable, the Lion's Hound** (Stage 13 of docs/elwynn-expansion.md). Sold or kept, his lordship sends a hunter. Sable,
 a rare, lies unseen on the roads round the camp (the junction below the gate, the Westfall road, the woods by the
@@ -1455,7 +1442,7 @@ falls. Her temper, `stalker`, strikes only a back, or at an opening (a swing's f
 works round and gives ground otherwise. Her rule: turn with her and she circles; give her your back and she cuts it.
 Two quick cuts (parry the first and the second never comes) and a lunge at a back. At half her health ("You'll tire
 before I do.") she throws down every hero within 4 yd, once, and goes round them as they rise: get up facing her. Her
-fall is told; Wyle, Marten and (if he stayed) Pell have a last word on her, and the journal asks for her.
+fall is told; Wyle, Marten and (if he stayed) Pell have a last word on her.
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set
@@ -1558,10 +1545,10 @@ Salve, Tonic, Honed) shows under the stamina bar with its time left.
 
 ## The loop
 
-The camp's **journal** (top right; **J** opens the whole of it) gives the next step and pays into the chest when the camp
-(everyone together) has done it: timber banked, a cooking fire, roasts, copper from the mine, an
-anvil, Warsong grunts felled, the first raid held, a tanning rack, armor worn, a cauldron, salves,
-the second raid, the Darkspear camp, the Overseer, the mine yard, bronze, a palisade, a workbench, a watchtower, the warband and its Warlord. The steps:
+There is no journal or quest list: the world changes as the camp plays it. What the camp has done
+(timber banked, a station built, a creature felled, a chest opened, a place found, a raid held, a
+choice made) is counted in the save, and the camp's people, packs and chests follow those counts
+through their `after` conditions. A camp usually grows like this:
 
 1. You start inside the camp's gate at Westbrook with an axe, a buckler, a hunting bow and one
    roast. The weapon rack in the muster yard by the gate has everything else to try.
@@ -1645,8 +1632,8 @@ check for overlaps and spacing, not the game's drawing.
 the brief lists, the chains, cancels, bash, kick, lock-on, the lag allowances, poise, knockdowns,
 ripostes, creatures' patterns, lunges, shields, crowds and backsteps, the casters' blasts, the
 Warlord's two phases, trophies and a two-minute soak of his fight, posture, backstabs, danger
-warnings, patrols, taking the Horde's camps, the watchtower, the journal kept by title in saves,
-armor, packs, the quick item, the journal, raid tiers, the server carrying a runner on, and
+warnings, patrols, taking the Horde's camps, the watchtower, older saves loading,
+armor, packs, the quick item, raid tiers, the server carrying a runner on, and
 tuning) and `crates/htl-server/tests/survival_client.rs`, where benilla's own protocol
 code logs in to the survival realm and every packet the server sends must parse:
 
