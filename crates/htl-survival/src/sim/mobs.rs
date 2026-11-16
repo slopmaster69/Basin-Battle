@@ -11,6 +11,9 @@ mod shared_fixes_tests;
 #[path = "boss_fuzz_tests.rs"]
 mod boss_fuzz_tests;
 #[cfg(test)]
+#[path = "balance_tests.rs"]
+mod balance_tests;
+#[cfg(test)]
 #[path = "scan_tests.rs"]
 mod scan_tests;
 
