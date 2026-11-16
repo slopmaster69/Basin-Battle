@@ -2578,7 +2578,8 @@ impl Survival {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ability_on_mob(&mut self, owner: Id, mid: Id, ability: usize, share: f32, base: f32, from: Vec3, how: HitKind, spell: u32) {
         let now = self.clock;
-        if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) || self.own_totem(mid, owner) {
+        // (One lying unseen, a trial's guardian or a strongbox's keeper, is not there to be hit.)
+        if !self.mobs.get(&mid).is_some_and(|m| m.health > 0 && !m.hidden) || self.own_totem(mid, owner) {
             return;
         }
         // Gone home past its leash: the blow finds nothing, and it's seen to slip it.

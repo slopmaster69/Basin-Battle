@@ -51,3 +51,38 @@ fn burning_ground_does_not_find_a_hidden_creature() {
     }
     untouched(&s, grunt);
 }
+
+/// (Found by the soak a second time, Nov 16: a Warlord's "Summon Infernal" landing near a trial
+/// shrine hurt its guardians the same way, and an ability's blow reaches a creature by
+/// `ability_on_mob`, whatever chose it: the swing, the ground, the infernal, a bolt.)
+#[test]
+fn an_ability_that_lands_does_not_find_a_hidden_creature() {
+    let (mut s, h, grunt) = world();
+    for ability in 0..s.content.abilities.len() {
+        s.ability_on_mob(h, grunt, ability, 1.0, 60.0, [0.0, 0.0, 0.0], abilities::HitKind::Area, 0);
+        s.ability_on_mob(h, grunt, ability, 1.0, 60.0, [0.0, 0.0, 0.0], abilities::HitKind::Projectile, 0);
+        untouched(&s, grunt);
+    }
+}
+
+/// ...and whatever else deals a creature damage (an orb, a channel, a meteor, a curse) goes
+/// through `hurt_mob_as`, which is not there to be hurt either.
+#[test]
+fn nothing_hurts_a_hidden_creature() {
+    let (mut s, h, grunt) = world();
+    s.hurt_mob_as(grunt, h, 40, "Meteor");
+    s.hurt_mob_as(grunt, h, 40, "Melee");
+    untouched(&s, grunt);
+}
+
+/// ...and none of what a blow sets off on the way to the health: a freeze it would end, a shield
+/// it would soak.
+#[test]
+fn a_blow_on_a_hidden_creature_ends_none_of_its_holds() {
+    let (mut s, h, grunt) = world();
+    assert!(s.apply_cc(grunt, h, "petrify", 30.0, 1.0, 0.0, "Ice"));
+    s.hurt_mob_as(grunt, h, 40, "Meteor");
+    s.ability_on_mob(h, grunt, 0, 1.0, 40.0, [0.0, 0.0, 0.0], abilities::HitKind::Area, 0);
+    assert!(s.has_cc(grunt, "petrify"), "the freeze was not touched");
+    untouched(&s, grunt);
+}

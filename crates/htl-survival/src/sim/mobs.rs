@@ -650,6 +650,13 @@ impl Survival {
         if self.own_totem(mid, by) {
             return;
         }
+        // One lying unseen (a trial's guardian, a strongbox's keeper) is not there to be hurt: it
+        // would turn on its hero and go home, and a hidden creature never thinks, so it would
+        // stay in `Return` at its post, hurt, for good. (Before anything the damage would set
+        // off: a runaway, a freeze ended, a perch dropped.)
+        if self.mobs.get(&mid).is_some_and(|m| m.hidden) {
+            return;
+        }
         // Sneed in the air, thrown out of his wreck, isn't there to strike yet (`sim::machinery`).
         if self.machinery_shielded(mid) {
             return;
