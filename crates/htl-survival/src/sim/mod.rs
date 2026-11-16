@@ -43,6 +43,8 @@ mod raid;
 pub mod siege;
 mod bomb;
 #[cfg(test)]
+mod cleave_tests;
+#[cfg(test)]
 mod hidden_tests;
 #[cfg(test)]
 mod leave_tests;

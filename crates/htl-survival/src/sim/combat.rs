@@ -1611,6 +1611,11 @@ impl Survival {
         let room = most.saturating_sub(struck.len());
         let lean = if strike.heavy() { self.content.combat.lean_heavy } else { self.content.combat.lean_light };
         for (_, mid) in hits.into_iter().take(room) {
+            // (An earlier blow of this swing may have taken it away: a summoner's fall dismisses
+            // what it called up, so the add farther along the swing is gone.)
+            if !self.players.contains_key(&mid) && !self.mobs.contains_key(&mid) {
+                continue;
+            }
             struck.push(mid);
             if self.players.contains_key(&mid) {
                 if strike.shove() {
