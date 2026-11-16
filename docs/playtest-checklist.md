@@ -157,7 +157,7 @@ Hold an ability's key a quarter second (or Ctrl with it) to cast its EX for Valo
 
 ### Warlock
 
-- [ ] Seed of Corruption's EX, Soul Swap: put two or more of your rots on a foe, aim at it, and each other foe within 10 yd of it gets them with the time they had left. With no rot or nobody near, nothing is spent ([#378](https://github.com/slopmaster69/Basin-Battle/pull/378)).
+- [ ] Seed of Corruption's EX, Soul Swap: put one or more of your rots on a foe, aim at it, and each other foe within 10 yd of it gets them with the time they had left. With no rot or nobody near, nothing is spent ([#378](https://github.com/slopmaster69/Basin-Battle/pull/378)).
 - [ ] Shadowfury's EX, Howl of Terror: every foe within 10 yd flees 4 sec (heroes 1.5). Damage frees them early, but not in the first 1 sec ([#378](https://github.com/slopmaster69/Basin-Battle/pull/378)).
 
 ### Warrior and Rogue

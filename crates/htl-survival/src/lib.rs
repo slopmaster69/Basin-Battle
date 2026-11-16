@@ -77,6 +77,8 @@ mod tests_class_rogue_priest_shaman;
 #[cfg(test)]
 mod tests_class_mage_warlock_druid;
 #[cfg(test)]
+mod tests_playtest_classes;
+#[cfg(test)]
 mod tests_beta_mechanics;
 #[cfg(test)]
 mod tests_beta;
