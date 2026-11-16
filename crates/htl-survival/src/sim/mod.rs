@@ -32,6 +32,7 @@ pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
 pub(crate) mod warlord;
+pub(crate) mod weapon_fx;
 pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
@@ -967,6 +968,8 @@ pub struct Mob {
     /// A secret form lying in wait where the last one fell, unseen and untouchable until then
     /// (its `then_after`): when, the hero it rises on, and the form it steps out of.
     pub rise_at: Option<(f32, Id, usize)>,
+    /// What hero weapons have done to it (`weapon_fx`).
+    pub fx: weapon_fx::MobFx,
     /// A lobbed throw being wound up: where it will come down, and the ring marked there from the
     /// wind-up's start until it lands.
     pub lob: Option<(Vec3, Id)>,

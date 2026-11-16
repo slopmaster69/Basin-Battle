@@ -675,7 +675,8 @@ impl Survival {
             stagger: if heavy { w.stagger.max(h.stagger) } else { w.stagger },
             clip: m.clip,
             take: m.take,
-            lunge: m.lunge,
+            // (A boarding blade's heavy is a leap across the gap.)
+            lunge: if heavy && w.boarding > 0.0 { w.boarding } else { m.lunge },
             stamina: w.stamina * m.stamina * if heavy { h.stamina } else { 1.0 },
             art: None,
             from: m.from.clone(),
@@ -1544,6 +1545,7 @@ impl Survival {
             }
         }
         let mut hits: Vec<(f32, Id)> = Vec::new();
+        let line = w.line > 0.0 && !strike.heavy() && !strike.shove();
         for (&mid, m) in &self.mobs {
             if m.health == 0 || struck.contains(&mid) || self.own_totem(mid, id) {
                 continue;
@@ -1551,12 +1553,17 @@ impl Survival {
             let at = self.pos_at(mid, seen_at).unwrap_or(m.pos);
             let size = self.content.mobs[m.def].body();
             let d = dist2d(pos, at);
-            if d > strike.range + size {
+            if d > strike.range.max(if line { w.line } else { 0.0 }) + size {
                 continue;
             }
             let off = angle_between(f, facing(pos, at));
+            // A line blow (a machete clearing brush) takes everything in a strip ahead.
+            if line {
+                if off >= 90.0 || d * off.to_radians().sin() > crate::content::LINE_HALF_WIDTH + size || d > w.line + size {
+                    continue;
+                }
             // Right on top of you still has to be in front of you.
-            if off > strike.arc / 2.0 && !(d < size + 0.4 && off < 90.0) {
+            } else if off > strike.arc / 2.0 && !(d < size + 0.4 && off < 90.0) {
                 continue;
             }
             if !clear_line(self.land.as_ref(), pos, at) {
@@ -1685,7 +1692,7 @@ impl Survival {
                 (self.roll(w.damage) as f32 * strike.damage * might * self.blow_share(id)).round() as u32
             };
             // From behind (a backstab): harder, unless it's a riposte already.
-            let behind = !reeling && self.from_behind(mid, pos);
+            let behind = !reeling && !w.no_backstab && self.from_behind(mid, pos);
             let stab = if w.backstab > 0.0 { w.backstab } else { self.content.combat.backstab };
             // Stabbed in the back again and again, it's ready for it: each backstab lately (more
             // so with more heroes on it) takes from the next one's bonus.
@@ -1701,7 +1708,7 @@ impl Survival {
             // An executioner's blow on a foe near its end.
             let low = self.mobs.get(&mid).is_some_and(|m| (m.health as f32) < m.max_health as f32 / 3.0);
             let damage = if w.execute > 0.0 && low && !strike.shove() { (damage as f32 * w.execute).round() as u32 } else { damage };
-            let damage = (damage as f32 * self.taken_share(mid)).round() as u32;
+            let damage = (damage as f32 * self.taken_share(mid) * self.weapon_share(mid, w, strike)).round() as u32;
             // The first blow out of Prowl: its bonus damage, and its stun.
             let damage = if damage > 0 && !strike.shove() { damage + self.prowl_strike(id, mid) } else { damage };
             if behind {
@@ -1733,6 +1740,8 @@ impl Survival {
                     let bleed = crate::content_abilities::AbilityEffect { kind: "burn".into(), secs: [BLEED_SECS, BLEED_SECS], amount: w.bleed, ..Default::default() };
                     self.apply_effects(id, mid, &[bleed], 1.0, "Bleed");
                 }
+                // What the weapon's own mechanic sets off (silver, the hook, the fel step...).
+                self.weapon_hit(id, mid, w, strike, damage);
             }
             if damage > 0 && !self.content.mobs[self.mobs[&mid].def].totem {
                 let v = if strike.heavy() { self.content.valor.heavy } else { self.content.valor.light };

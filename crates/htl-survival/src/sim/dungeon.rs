@@ -1630,6 +1630,8 @@ impl Survival {
         pack: Option<usize>,
         raider: bool,
         form: bool,
+        // Laid to rest under silver: it stays down at the next rest.
+        stays: bool,
     ) {
         if raider || pack.is_none() {
             return;
@@ -1646,7 +1648,9 @@ impl Survival {
         let lasting = self.lasting_pack(k);
         // (A second form, a druid's serpent or a split ooze, comes back as its first: that one is
         // counted already.)
-        if !lasting && !form {
+        if !lasting && !form && stays {
+            // (Not put back at a rest, and not a pack's end either while others stand.)
+        } else if !lasting && !form {
             self.below.as_mut().unwrap().fallen.push((def, home, pack));
         } else {
             let standing = self

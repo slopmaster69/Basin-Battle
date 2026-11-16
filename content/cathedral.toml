@@ -894,6 +894,7 @@ then_look = 24171
 
 [[mob]]
 key = "sc_mograine_risen"
+tags = ["undead"]
 name = "Scarlet Commander Mograine"
 subname = "Raised"
 display = 2042
@@ -927,6 +928,7 @@ respawn = 0.0
 # The Ashbringer's shadow: Mograine, burning, a last time.
 [[mob]]
 key = "sc_ashen"
+tags = ["undead"]
 name = "Mograine"
 subname = "The Ashbringer's Shadow"
 display = 2461

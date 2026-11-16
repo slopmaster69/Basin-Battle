@@ -1237,9 +1237,84 @@ pub struct WeaponDef {
     /// parry, no ward.
     #[serde(default)]
     pub alt: String,
+    // --- the weapon identity pass: one mechanic each (docs/weapon-identities.md) -------------
+    /// Foes of these kinds (`[[mob]] tags`: undead, worgen, stone, mechanical...) take
+    /// `bane_damage` more from its blows.
+    #[serde(default)]
+    pub bane: Vec<String>,
+    /// The extra a bane foe takes (0.5: half as much again).
+    #[serde(default)]
+    pub bane_damage: f32,
+    /// A bane foe it strikes is silvered for `SILVER_SECS`: it doesn't mend on its way home and
+    /// stays down once slain (no respawn, no return at a rest).
+    #[serde(default)]
+    pub silver: bool,
+    /// Its heavy blow hooks the foe and pulls it this many yards toward the hero.
+    #[serde(default)]
+    pub hook: f32,
+    /// Its heavy blow is a leap: the hero crosses this many yards into it.
+    #[serde(default)]
+    pub boarding: f32,
+    /// Each light blow strikes every foe in a line this long in front, not an arc.
+    #[serde(default)]
+    pub line: f32,
+    /// A blow from behind is nothing special (a blade that doesn't stab).
+    #[serde(default)]
+    pub no_backstab: bool,
+    /// The last blow of its light chain carries the hero behind the foe it strikes.
+    #[serde(default)]
+    pub blink_behind: bool,
 }
 
+/// "undead and worgen", "stone, mechanical and undead": a list of kinds as words.
+fn join_kinds(kinds: &[String]) -> String {
+    match kinds {
+        [] => String::new(),
+        [one] => one.clone(),
+        [init @ .., last] => format!("{} and {last}", init.join(", ")),
+    }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map_or(String::new(), |f| f.to_uppercase().collect::<String>() + c.as_str())
+}
+
+/// How long a silvered foe stays silvered (a bane foe struck by a silver weapon).
+pub const SILVER_SECS: f32 = 10.0;
+/// The width, either side, of a line blow (a machete clearing brush).
+pub const LINE_HALF_WIDTH: f32 = 0.9;
+
 impl WeaponDef {
+    /// The sentences of its own mechanic (the pass of docs/weapon-identities.md), built from its
+    /// numbers so the tooltip never drifts from the rules. An item's `text` has `{fx}` where they
+    /// go. Empty for a weapon with none of its own.
+    pub fn effect_text(&self) -> String {
+        let mut s: Vec<String> = Vec::new();
+        if self.bane_damage > 0.0 && !self.bane.is_empty() {
+            s.push(format!("Deals {}% more damage to {}.", (self.bane_damage * 100.0).round(), join_kinds(&self.bane)));
+        }
+        if self.silver {
+            s.push(format!("{} it harms are silvered for {} sec. They stop mending and stay down once slain.", capitalize(&join_kinds(&self.bane)), SILVER_SECS));
+        }
+        if self.hook > 0.0 {
+            s.push(format!("Heavy attacks hook the enemy and pull it up to {} yd toward you.", self.hook));
+        }
+        if self.boarding > 0.0 {
+            s.push(format!("Heavy attacks leap {} yd to board the enemy.", self.boarding));
+        }
+        if self.line > 0.0 {
+            s.push(format!("Light attacks strike every enemy in a line {} yd long.", self.line));
+        }
+        if self.no_backstab {
+            s.push("Does no extra damage from behind.".into());
+        }
+        if self.blink_behind {
+            s.push("The last blow of a light chain carries you behind the enemy.".into());
+        }
+        s.join(" ")
+    }
+
     /// The weapon casts its light attack.
     pub fn casts(&self) -> bool {
         !self.bolt.is_empty()
@@ -2308,6 +2383,10 @@ pub struct MobDef {
     pub then_kit: u32,
     #[serde(default)]
     pub then_look: u32,
+    /// What it is, for the weapons that single out a kind: `undead`, `worgen`, `stone`,
+    /// `mechanical`.
+    #[serde(default)]
+    pub tags: Vec<String>,
     /// A totem a hero sets down, or a training dummy: no mind of its own, it only stands there and
     /// is struck.
     #[serde(default)]
@@ -3532,6 +3611,14 @@ impl Content {
                 8 => w.swing_poise = true,
                 1 => w.execute = 2.0,
                 _ => {}
+            }
+        }
+        // A weapon's tooltip says its own mechanic, built from its numbers: `{fx}` in the item's
+        // text is where it goes (a text without the mark has none to say).
+        let texts: Vec<(String, String)> = self.weapons.iter().map(|w| (w.key.clone(), w.effect_text())).collect();
+        for (key, fx) in texts {
+            if let Some(i) = self.items.iter_mut().find(|i| i.key == key) {
+                i.text = i.text.replace("{fx}", &fx).replace("  ", " ");
             }
         }
         let grow = self.combat.boss_scale.max(0.1);

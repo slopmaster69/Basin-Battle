@@ -465,6 +465,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_zombie"
+tags = ["undead"]
 name = "Unburied Crusader"
 subname = "The Graveyard"
 display = 1200
@@ -499,6 +500,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_ghoul"
+tags = ["undead"]
 name = "Graveyard Ghoul"
 subname = "The Graveyard"
 display = 519
@@ -532,6 +534,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_phantasm"
+tags = ["undead"]
 name = "Haunting Phantasm"
 subname = "The Graveyard"
 display = 10700
@@ -564,6 +567,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_spirit"
+tags = ["undead"]
 name = "Anguished Dead"
 subname = "The Graveyard"
 display = 915
@@ -681,6 +685,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_ironspine"
+tags = ["undead"]
 name = "Ironspine"
 subname = "The Graveyard"
 display = 158
@@ -850,6 +855,7 @@ then_look = 10604
 # The Headless Rider: what sleeps under the pumpkin, abroad on Hallow's End.
 [[mob]]
 key = "gy_rider"
+tags = ["undead"]
 name = "The Headless Rider"
 subname = "Hallow's End"
 display = 6353
@@ -917,6 +923,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_champion"
+tags = ["undead"]
 name = "Fallen Champion"
 subname = "The Graveyard"
 display = 1576
@@ -989,6 +996,7 @@ respawn = 0.0
 
 [[mob]]
 key = "gy_azshir"
+tags = ["undead"]
 name = "Azshir the Sleepless"
 subname = "The Graveyard"
 display = 8783

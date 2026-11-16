@@ -607,6 +607,7 @@ respawn = 0.0
 # Earthborers: out of the walls when you pass, a bite and a burrowing lunge.
 [[mob]]
 key = "rf_earthborer"
+tags = ["stone"]
 name = "Earthborer"
 subname = "Ragefire Chasm"
 display = 7549
@@ -1296,6 +1297,7 @@ range = 3.1
 arc = 95.0
 targets = 1
 subclass = 7
+blink_behind = true
 
 [[item]]
 key = "cursed_felblade"
@@ -1303,7 +1305,7 @@ name = "Cursed Felblade"
 display = 5158
 icon = "INV_Sword_19"
 kind = "weapon"
-text = "Taragaman's. A demon's blade, and it wants blood."
+text = "Taragaman's. {fx} \"A demon's blade, and it wants blood.\""
 perks = [{ kind = "might", amount = 0.05 }]
 
 [[weapon]]

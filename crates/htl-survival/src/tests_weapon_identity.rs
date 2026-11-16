@@ -271,3 +271,160 @@ fn a_family_set_keeps_the_familys_damage_a_second() {
         }
     }
 }
+
+// --- swords: the pass's first batch ----------------------------------------------------------------
+
+fn first_hit(ev: &[Event], m: Id) -> u32 {
+    hits_on(ev, m).into_iter().find(|(d, o)| *d > 0 && *o == Outcome::Hit).map_or(0, |(d, _)| d)
+}
+
+#[test]
+fn silver_hits_undead_and_worgen_half_again_as_hard_and_nothing_else() {
+    for (foe_key, bane) in [("risen_skeleton", true), ("sf_worg", true), ("dm_woodcutter", false)] {
+        let (mut s, p) = world();
+        wield(&mut s, p, "silver_sword");
+        let m = foe(&mut s, foe_key);
+        s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+        s.mobs.get_mut(&m).unwrap().max_health = 1_000_000;
+        let d = first_hit(&swing(&mut s, p), m);
+        let (lo, hi) = if bane { (28, 38) } else { (19, 25) };
+        assert!((lo..=hi).contains(&d), "{foe_key}: {d}");
+    }
+}
+
+#[test]
+fn silver_leaves_a_foe_that_doesnt_mend_and_a_kill_that_stays_down() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "silver_sword");
+    let m = foe(&mut s, "risen_skeleton");
+    s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+    s.mobs.get_mut(&m).unwrap().max_health = 2_000_000;
+    assert!(!s.silvered(m));
+    swing(&mut s, p);
+    assert!(s.silvered(m), "silvered by the blow");
+    // Sent home hurt: a silvered foe comes home as it left.
+    let hurt = s.mobs[&m].health;
+    {
+        let x = s.mobs.get_mut(&m).unwrap();
+        x.state = MobState::Return;
+        x.pos = x.home;
+    }
+    for _ in 0..5 {
+        s.step(0.05);
+    }
+    assert_eq!(s.mobs[&m].health, hurt, "it doesn't mend");
+    // The same on a foe a plain sword struck: whole again.
+    let (mut s, p) = world();
+    wield(&mut s, p, "sword");
+    let m = foe(&mut s, "risen_skeleton");
+    s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+    s.mobs.get_mut(&m).unwrap().max_health = 2_000_000;
+    swing(&mut s, p);
+    assert!(!s.silvered(m));
+    {
+        let x = s.mobs.get_mut(&m).unwrap();
+        x.state = MobState::Return;
+        x.pos = x.home;
+    }
+    for _ in 0..5 {
+        s.step(0.05);
+    }
+    assert_eq!(s.mobs[&m].health, 2_000_000, "an ordinary foe mends");
+}
+
+#[test]
+fn the_barbs_heavy_hooks_the_foe_in_and_a_light_blow_does_not() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "cruel_barb");
+    let m = foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+    s.mobs.get_mut(&m).unwrap().max_health = 1_000_000;
+    s.mobs.get_mut(&m).unwrap().pos = [3.0, 0.0, 0.0];
+    swing(&mut s, p);
+    assert!(s.mobs[&m].pos[0] > 2.5, "a light blow doesn't pull: {:?}", s.mobs[&m].pos);
+    s.input(p, Input::Heavy);
+    for _ in 0..60 {
+        s.step(0.02);
+    }
+    assert!(s.mobs[&m].pos[0] < 2.2, "the heavy hooked it in: {:?}", s.mobs[&m].pos);
+}
+
+#[test]
+fn the_cutlass_heavy_leaps_the_gap_and_the_swords_doesnt() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "pirate_cutlass");
+    let cutlass = s.strike_at(p, StrikeKind::Heavy, 0).lunge;
+    wield(&mut s, p, "sword");
+    let sword = s.strike_at(p, StrikeKind::Heavy, 0).lunge;
+    assert_eq!(cutlass, s.content.weapon("pirate_cutlass").unwrap().boarding);
+    assert!(cutlass >= 4.0 * sword, "{cutlass} against {sword}");
+}
+
+#[test]
+fn the_machete_chops_every_foe_in_a_line_and_stabs_nobody_in_the_back() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "sneed_machete");
+    let near = foe(&mut s, "dm_woodcutter");
+    let far = foe(&mut s, "dm_woodcutter");
+    let aside = foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&far).unwrap().pos = [4.6, 0.0, 0.0];
+    s.mobs.get_mut(&aside).unwrap().pos = [2.0, 3.5, 0.0];
+    for m in [near, far, aside] {
+        s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+        s.mobs.get_mut(&m).unwrap().max_health = 1_000_000;
+    }
+    let ev = swing(&mut s, p);
+    assert!(first_hit(&ev, near) > 0 && first_hit(&ev, far) > 0, "the whole line is chopped");
+    assert_eq!(first_hit(&ev, aside), 0, "what's off to the side isn't");
+    // From behind: no more than the front (the sword's 2.5 on a stabbing blade).
+    let w = s.content.weapon("sneed_machete").unwrap();
+    assert!(w.no_backstab && w.backstab == 0.0);
+    let (mut s, p) = world();
+    wield(&mut s, p, "sneed_machete");
+    let m = foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&m).unwrap().facing = 0.0; // looking away
+    let d = first_hit(&swing(&mut s, p), m);
+    assert!((18..=25).contains(&d), "from behind it's an ordinary blow: {d}");
+}
+
+#[test]
+fn the_felblades_last_blow_carries_the_hero_behind_the_foe() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "cursed_felblade");
+    let m = foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&m).unwrap().health = 1_000_000;
+    s.mobs.get_mut(&m).unwrap().max_health = 1_000_000;
+    // Two blows of the chain stay where they stand; the third steps round.
+    for step in 0..3 {
+        let late = {
+            let k = s.strike_at(p, StrikeKind::Light, step);
+            k.windup + k.active + k.recovery * 0.5
+        };
+        s.input(p, Input::Attack);
+        for _ in 0..((late / 0.02) as usize + 1) {
+            s.step(0.02);
+        }
+        let x = s.players[&p].pos[0];
+        if step < 2 {
+            assert!(x < 1.5, "blow {step}: still in front ({x})");
+        }
+    }
+    let x = s.players[&p].pos[0];
+    assert!(x > s.mobs[&m].pos[0], "the third carried the hero past the foe: hero {x}, foe {:?}", s.mobs[&m].pos);
+}
+
+#[test]
+fn a_swords_tooltip_says_its_mechanic_from_its_numbers() {
+    let c = Content::dev();
+    let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
+    let silver = c.weapon("silver_sword").unwrap();
+    assert!(text("silver_sword").contains(&format!("Deals {}% more damage to undead and worgen.", (silver.bane_damage * 100.0).round())), "{}", text("silver_sword"));
+    assert!(text("silver_sword").contains(&format!("silvered for {} sec", crate::content::SILVER_SECS)));
+    assert!(text("cruel_barb").contains(&format!("pull it up to {} yd", c.weapon("cruel_barb").unwrap().hook)));
+    assert!(text("pirate_cutlass").contains(&format!("leap {} yd", c.weapon("pirate_cutlass").unwrap().boarding)));
+    assert!(text("sneed_machete").contains(&format!("a line {} yd long", c.weapon("sneed_machete").unwrap().line)));
+    assert!(text("cursed_felblade").contains("carries you behind the enemy"));
+    for k in ["silver_sword", "cruel_barb", "pirate_cutlass", "sneed_machete", "cursed_felblade"] {
+        assert!(!text(k).contains("{fx}"), "{k}: the mark is filled");
+    }
+}

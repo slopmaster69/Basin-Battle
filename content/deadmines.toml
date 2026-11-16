@@ -234,6 +234,7 @@ range = 3.4
 arc = 100.0
 targets = 1
 subclass = 7
+boarding = 5.0
 
 [[item]]
 key = "pirate_cutlass"
@@ -241,7 +242,7 @@ name = "Pirate's Cutlass"
 display = 1853
 icon = "INV_Sword_13"
 kind = "weapon"
-text = "Quick, with a long reach for a one-handed blade. \"A Defias pirate's cutlass.\""
+text = "Quick, with a long reach for a one-handed blade. {fx} \"A Defias pirate's cutlass.\""
 
 [[item]]
 key = "red_bandana"
@@ -337,6 +338,7 @@ range = 3.1
 arc = 95.0
 targets = 1
 subclass = 7
+hook = 6.0
 parry = 0.12
 
 [[item]]
@@ -345,7 +347,7 @@ name = "Cruel Barb"
 display = 1928
 icon = "INV_Sword_27"
 kind = "weapon"
-text = "Quick. Widens the parry window by 0.12 sec. \"Edwin VanCleef's sword.\""
+text = "Quick. Widens the parry window by 0.12 sec. {fx} \"Edwin VanCleef's sword.\""
 perks = [{ kind = "might", amount = 0.04 }]
 
 [[item]]
@@ -1249,9 +1251,10 @@ stamina = 11.0
 damage = [18, 25]
 range = 3.0
 arc = 95.0
-targets = 1
+targets = 6
 subclass = 7
-backstab = 3.0
+no_backstab = true
+line = 5.0
 
 [[item]]
 key = "sneed_machete"
@@ -1259,7 +1262,7 @@ name = "Sneed's Machete"
 display = 1552
 icon = "INV_Sword_04"
 kind = "weapon"
-text = "Quick. Blows from behind deal 300% damage. \"Sneed's own.\""
+text = "Quick. {fx} \"Sneed's own.\""
 
 # --- the Foundry's goblins --------------------------------------------------------------------------
 
@@ -1497,6 +1500,7 @@ respawn = 0.0
 # health. Its lines are said there, 2 sec apart.
 [[mob]]
 key = "dm_shredder"
+tags = ["mechanical"]
 name = "Sneed's Shredder"
 temper = "bruiser"
 subname = "Lumbermaster"
