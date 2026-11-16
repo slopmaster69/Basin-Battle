@@ -1,0 +1,132 @@
+From b007c14d590cf11c7ae07528be9471432c7a1aad Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 04:59:51 -0600
+Subject: [PATCH 2/2] The light packer drops far lights before it asks their
+ rooms
+
+`build_light_data` walks every authored point light twice a frame: once for the reference's point
+table, once for the new look's ranked pools. Both asked each light's rooms first (a portal lookup
+per light, and for the look's pass a second one for the interior test, then `torch_light`'s
+arithmetic) and only then threw the far ones away by distance. With the look's reach most loaded
+lights are far. Both passes now test the distance first.
+
+The point table's two tests are pure, so swapping them changes nothing. For the look's pass the
+cut is `TORCH_REACH`, the packer's own reach past the widest pool `torch_light` can give, so no
+light it drops was one the packer would have kept; a test pins that bound for every reach and host
+size, NaN included.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/lighting/global_light.rs              | 27 ++++++++++------
+ crates/benilla-world/src/look/lights.rs       | 32 +++++++++++++++++++
+ 2 files changed, 50 insertions(+), 9 deletions(-)
+
+diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
+index 610d7b12..faf5f467 100644
+--- a/crates/benilla-world/src/lighting/global_light.rs
++++ b/crates/benilla-world/src/lighting/global_light.rs
+@@ -267,8 +267,15 @@ fn build_light_data(
+     // by 4π undoes the spawn's premultiply, so the colour is the authored `colour × intensity`,
+     // committed raw. Entries past the count stay stale; the count row guards every reader.
+     let cam_pos = cam.single().map(|t| t.translation()).unwrap_or(Vec3::ZERO);
++    // The distance first: it is a subtraction, where a room's test is a lookup, and most of the
++    // world's lights are far (the look's reach keeps thousands loaded).
+     let mut pts: Vec<(f32, Vec3, f32, [f32; 3])> = lights_q
+         .iter()
++        .filter_map(|(_, pl, gt, rooms)| {
++            let p = gt.translation();
++            let d2 = p.distance_squared(cam_pos);
++            (d2 < POINT_PACK_RADIUS * POINT_PACK_RADIUS).then_some((pl, p, d2, rooms))
++        })
+         .filter(|(_, _, _, rooms)| {
+             // A culled room's light registers nothing in the reference ([`LightRooms`]); a light
+             // that names no rooms always passes.
+@@ -277,15 +284,11 @@ fn build_light_data(
+                 rooms.and_then(|r| portals.get(r.0.instance).ok()),
+             )
+         })
+-        .filter_map(|(_, pl, gt, _)| {
+-            let p = gt.translation();
+-            let d2 = p.distance_squared(cam_pos);
+-            (d2 < POINT_PACK_RADIUS * POINT_PACK_RADIUS).then(|| {
+-                let c = pl.color;
+-                let s = pl.intensity / (4.0 * std::f32::consts::PI);
+-                let rgb = commit_raw([c[0] * s, c[1] * s, c[2] * s]);
+-                (d2, p, pl.range, rgb)
+-            })
++        .map(|(pl, p, d2, _)| {
++            let c = pl.color;
++            let s = pl.intensity / (4.0 * std::f32::consts::PI);
++            let rgb = commit_raw([c[0] * s, c[1] * s, c[2] * s]);
++            (d2, p, pl.range, rgb)
+         })
+         .collect();
+     pts.sort_by(|a, b| a.0.total_cmp(&b.0));
+@@ -298,8 +301,14 @@ fn build_light_data(
+     // The new look's table: the same authored lights, admitted by the same rooms, as warm pools,
+     // and every spell's light, ranked about the camera; count 0 under the classic look. Entries
+     // past the count stay stale, as the point table's do.
++    // A light past every pool's reach is never ranked: it is dropped before its rooms are asked.
+     let torches = lights_q
+         .iter()
++        .filter(|(_, _, gt, _)| {
++            // A light at no position (NaN) stays, as the packer's own test keeps it.
++            let d = gt.translation().distance(cam_pos);
++            d <= crate::look::lights::TORCH_REACH || d.is_nan()
++        })
+         .filter(|(_, _, _, rooms)| {
+             crate::wmo_portal::room_admits(
+                 rooms.map(|r| &r.0),
+diff --git a/crates/benilla-world/src/look/lights.rs b/crates/benilla-world/src/look/lights.rs
+index 20ee9691..2499ccc2 100644
+--- a/crates/benilla-world/src/look/lights.rs
++++ b/crates/benilla-world/src/look/lights.rs
+@@ -432,6 +432,16 @@ pub fn score(peak: f32, radius: f32, distance: f32) -> f32 {
+     peak * r2 / (distance * distance + r2).max(1e-6)
+ }
+ 
++/// The farthest from the camera an authored light can be and still be ranked: [`tune::REACH`]
++/// past the widest pool [`torch_light`] gives (a torch's, or a glow's at its longest; a
++/// miniature's is smaller). The packer's caller drops a light past it before asking its rooms.
++pub(crate) const TORCH_REACH: f32 = tune::REACH
++    + if tune::TORCH_RADIUS > tune::GLOW_MAX_RANGE * tune::GLOW_RANGE_SCALE {
++        tune::TORCH_RADIUS
++    } else {
++        tune::GLOW_MAX_RANGE * tune::GLOW_RANGE_SCALE
++    };
++
+ /// The look's light for an authored point light at night (`night` from [`night_weight`]): its
+ /// hue, at a strength set by its authored peak, out to [`tune::TORCH_RADIUS`]; a flame flickers.
+ /// A light authored with a reach of [`tune::GLOW_MAX_RANGE`] or less is Basin Battle's glowing
+@@ -1031,6 +1041,28 @@ mod tests {
+         assert_eq!(big.intensity, full.intensity);
+     }
+ 
++    /// No authored light's pool reaches past [`TORCH_REACH`], whatever its reach or its host's
++    /// size, so dropping a light past it before ranking drops none the packer would have kept.
++    #[test]
++    fn no_pool_reaches_past_the_torch_reach() {
++        for range in [-1.0, 0.0, 2.0, 4.0, 6.0, 6.01, 12.0, 48.0, 1.0e6, f32::NAN] {
++            for host in [0.0, 0.42, 1.0, 2.5, f32::INFINITY, f32::NAN] {
++                let pl = WorldPointLight {
++                    range,
++                    ..crate::terrain_stream::point_light([1.0, 0.8, 0.5], 1.0)
++                };
++                let Some(l) = torch_light(&pl, host) else {
++                    continue;
++                };
++                assert!(
++                    tune::REACH + l.radius <= TORCH_REACH,
++                    "reach {range}, host {host}: radius {}",
++                    l.radius
++                );
++            }
++        }
++    }
++
+     /// `looklights`: a scale from 0 to 10, nothing or `tuned` for 1, anything else refused.
+     #[test]
+     fn the_console_scale_parses() {
+-- 
+2.56.0.windows.4
+

@@ -1,0 +1,180 @@
+From 846332a3c0074436657c8dc838519faa12a8151b Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 04:59:50 -0600
+Subject: [PATCH 1/2] The sun shadows' caster pass builds its stats lines only
+ when they are asked for
+
+`extract_casters` runs in the extract every frame the look's shadows are on, once for every
+model mesh in the world (hidden ones too). For each it built the line `WOW_SHADOW_STATS` prints,
+whether the list was armed or not: a `format!` with float formatting for every caster, a second
+`format!` for every mesh that doesn't cast, and a material lookup for every hidden or out-of-range
+mesh, all thrown away. The extract runs with the main world stopped, so it lands straight on the
+frame. The lines are now built only while the list is armed (once a second, with the variable set).
+
+A caster whose material is still parked (`model_render::lazy`: a mesh the camera hasn't looked at
+yet) had its whole material cloned every frame (a `StandardMaterial` and its extension, every
+handle's reference count up and down) to read three fields. Its verdict is now read in place under
+the table's lock, and the value is copied only for the stats list.
+
+What casts and how is unchanged: the same verdicts, from the same fields, in the same order.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ crates/benilla-world/src/look/shadow_pass.rs | 94 ++++++++++++--------
+ 1 file changed, 59 insertions(+), 35 deletions(-)
+
+diff --git a/crates/benilla-world/src/look/shadow_pass.rs b/crates/benilla-world/src/look/shadow_pass.rs
+index a17bdc0f..d15f9a63 100644
+--- a/crates/benilla-world/src/look/shadow_pass.rs
++++ b/crates/benilla-world/src/look/shadow_pass.rs
+@@ -134,6 +134,11 @@ pub fn caster_kind(mat: &WowModelMaterial) -> Option<Option<AssetId<Image>>> {
+     )
+ }
+ 
++/// A material the shadows count as blended: drawn blended, and no doodad fade's (`model_flags.y`).
++fn blends(m: &WowModelMaterial) -> bool {
++    matches!(m.base.alpha_mode, AlphaMode::Blend) && m.extension.model_flags.y <= 0.5
++}
++
+ /// [`caster_kind`] on the material's lanes alone.
+ fn caster_law(
+     alpha_mode: AlphaMode,
+@@ -320,6 +325,10 @@ fn extract_casters(
+     let frame = **frame;
+     // `WOW_SHADOW_STATS`: once a second, every model mesh near the camera and its verdict.
+     let mut near = near_due().then(Vec::<(f32, String)>::new);
++    // Every verdict's line (its `format!`, its material looked up) is built only while the list
++    // is armed: built for every caster every frame and thrown away, they were the extract's
++    // largest allocation.
++    let noting = near.is_some();
+     let admits = |c: Vec3, r: f32| {
+         frame.slices[..frame.cascades]
+             .iter()
+@@ -366,7 +375,9 @@ fn extract_casters(
+             || layers.is_some_and(|l| !l.intersects(&world_layer))
+         {
+             out.1[0] += 1;
+-            note("left out: hidden", materials.get(&mat.0));
++            if noting {
++                note("left out: hidden", materials.get(&mat.0));
++            }
+             continue;
+         }
+         let rig = tag.map_or(0, |t| (t.0 >> 19) & 0x7ff);
+@@ -376,44 +387,53 @@ fn extract_casters(
+             .flatten();
+         let Some((center, radius)) = caster_bound(gt, aabb, origin) else {
+             out.1[1] += 1;
+-            note("left out: unbounded", materials.get(&mat.0));
++            if noting {
++                note("left out: unbounded", materials.get(&mat.0));
++            }
+             continue;
+         };
+         if !admits(center, radius) {
+             out.1[2] += 1;
+-            note("left out: outside every slice", materials.get(&mat.0));
++            if noting {
++                note("left out: outside every slice", materials.get(&mat.0));
++            }
+             continue;
+         }
+         // A material waits outside the store (`model_render::lazy`, parked) until a mesh bound to
+         // it has been on screen, so a mesh the camera has not looked at yet (behind it, round a
+         // corner, in a barn) had no material here and cast nothing: take #280 listed game objects
+         // 8 yd off as "no material yet". Its parked value says how it casts; the batch's mesh and
+-        // texture are loaded whether it has been seen or not.
+-        let parked = if materials.contains(mat.0.id()) {
+-            None
+-        } else {
+-            crate::model_render::lazy::with_material(&materials, mat.0.id(), Clone::clone)
++        // texture are loaded whether it has been seen or not. The verdict is read in place under
++        // the table's lock; the value itself is copied out only for the stats list (a whole
++        // material, every handle's count, for every unseen caster every frame, it was not cheap).
++        let stored = materials.get(&mat.0);
++        let (kind, blended, was_parked, parked) = match stored {
++            Some(m) => (caster_kind(m), blends(m), false, None),
++            None => crate::model_render::lazy::with_material(&materials, mat.0.id(), |m| {
++                (caster_kind(m), blends(m), true, noting.then(|| m.clone()))
++            })
++            .unwrap_or((None, false, false, None)),
+         };
+-        let material = materials.get(&mat.0).or(parked.as_ref());
+-        let Some(cut) = material.and_then(caster_kind) else {
++        // The stats list's material: the stored one, or the parked one's copy while it is armed.
++        let material = stored.or(parked.as_ref());
++        let Some(cut) = kind else {
+             out.1[3] += 1;
+-            let why = material.map_or("no material yet", |m| {
+-                let e = &m.extension;
+-                no_cast_reason(
+-                    m.base.alpha_mode,
+-                    m.base.base_color_texture.as_ref().map(|h| h.id()),
+-                    e.clutter_fade,
+-                    e.model_flags,
+-                    e.sun_scale,
+-                )
+-                .unwrap_or("?")
+-            });
+-            note(&format!("left out: not casting ({why})"), material);
++            if noting {
++                let why = material.map_or("no material yet", |m| {
++                    let e = &m.extension;
++                    no_cast_reason(
++                        m.base.alpha_mode,
++                        m.base.base_color_texture.as_ref().map(|h| h.id()),
++                        e.clutter_fade,
++                        e.model_flags,
++                        e.sun_scale,
++                    )
++                    .unwrap_or("?")
++                });
++                note(&format!("left out: not casting ({why})"), material);
++            }
+             continue;
+         };
+-        let blended = material.is_some_and(|m| {
+-            matches!(m.base.alpha_mode, AlphaMode::Blend) && m.extension.model_flags.y <= 0.5
+-        });
+         // A blended sheet of water in a model (a basin's or a fountain's `water.blp`, a fall)
+         // is no solid prop: take 291 saw Goldshire's water basin cast a blended shadow of its
+         // water. Its texture's name is the only thing that tells it from a solid prop drawn
+@@ -429,21 +449,25 @@ fn extract_casters(
+             })
+         {
+             out.1[3] += 1;
+-            note("left out: not casting (water)", material);
++            if noting {
++                note("left out: not casting (water)", material);
++            }
+             continue;
+         }
+         if blended {
+             out.2 += 1;
+         }
+-        note(
+-            &format!(
+-                "casts {}{}{}, r {radius:.2}",
+-                if blended { "blended, " } else { "" },
+-                if cut.is_some() { "cut" } else { "solid" },
+-                if parked.is_some() { ", not yet seen" } else { "" }
+-            ),
+-            material,
+-        );
++        if noting {
++            note(
++                &format!(
++                    "casts {}{}{}, r {radius:.2}",
++                    if blended { "blended, " } else { "" },
++                    if cut.is_some() { "cut" } else { "solid" },
++                    if was_parked { ", not yet seen" } else { "" }
++                ),
++                material,
++            );
++        }
+         out.0.push(Caster {
+             mesh: mesh.id(),
+             inst: inst_rows(gt, rig),
+-- 
+2.56.0.windows.4
+
