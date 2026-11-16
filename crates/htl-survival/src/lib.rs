@@ -97,6 +97,8 @@ mod tests_release;
 #[cfg(test)]
 mod tests_weapon_identity;
 #[cfg(test)]
+mod tests_old_saves;
+#[cfg(test)]
 mod tests_sweep;
 #[cfg(test)]
 mod tests_orb;

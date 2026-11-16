@@ -16,11 +16,16 @@ pub struct WorldSave {
     pub version: u32,
     pub next_uid: u64,
     /// The chest, by item key.
+    #[serde(default)]
     pub storage: BTreeMap<String, u32>,
+    #[serde(default)]
     pub stations: Vec<StationSave>,
+    #[serde(default)]
     pub nodes: Vec<NodeSave>,
+    #[serde(default)]
     pub caches: Vec<CacheSave>,
     pub raid: Option<RaidSave>,
+    #[serde(default)]
     pub players: BTreeMap<String, PlayerSave>,
     /// How far the camp has come: raids beaten, the journal's goal, what's been done.
     #[serde(default)]
