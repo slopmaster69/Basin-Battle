@@ -814,3 +814,89 @@ fn a_torch_burns_by_the_stake_while_sneed_mends_and_goes_out_with_the_rope() {
     cut(&mut s, band[0]);
     assert_eq!(props(&s, LAMP), 0, "it goes out with the rope");
 }
+
+/// What the encounter must look like with nobody in it and nothing stepped: one whole machine at
+/// its post, the log hung again over a clean floor, no Sneed, no wreck, no smoke.
+fn put_back(s: &Survival, home: Vec3, what: &str) {
+    let g = rig(s);
+    assert_eq!(g.state, "hung", "{what}: the log hung again");
+    assert!(g.lumber.is_empty(), "{what}: no lumber");
+    assert_eq!((props(s, LOG), props(s, STAKE), props(s, LUMBER), props(s, PLANK)), (LOG_BUNDLE.len(), 1, 0, 0), "{what}: the pieces");
+    assert!(!s.mobs.values().any(|m| s.content.mobs[m.def].key == DRIVER), "{what}: no Sneed");
+    let machines: Vec<&Mob> = s.mobs.values().filter(|m| s.content.mobs[m.def].key == MACHINE).collect();
+    assert_eq!(machines.len(), 1, "{what}: one machine, no wreck");
+    assert!(machines[0].health == machines[0].max_health && dist2d(machines[0].pos, home) < 1.0, "{what}: whole, at its post");
+    assert!(machines[0].state.foe().is_none(), "{what}: at rest");
+    let m = &s.machinery;
+    assert!(m.drivers.is_empty() && m.rebuilt.is_empty() && m.runaways.is_empty() && m.stalls.is_empty(), "{what}: no state left");
+    assert!(m.grinds.is_empty() && m.revs.is_empty() && m.wrenches.is_empty() && m.lines.is_empty(), "{what}: no wind-up or line left");
+    assert_eq!(props(s, LAMP), 0, "{what}: the torch by the stake out");
+}
+
+#[test]
+fn the_last_hero_leaving_at_any_stage_puts_the_whole_encounter_back_at_once() {
+    for stage in 0..=9 {
+        let (mut s, band, machine) = fight(1, 40 + stage);
+        let h = band[0];
+        run(&mut s, 0.5);
+        let home = rig(&s).home;
+        match stage {
+            0 => { cut(&mut s, h); landed(&mut s); }
+            1 => { s.hurt_mob(machine, h, u32::MAX); run(&mut s, 0.3); }
+            2 => { broken(&mut s, machine, h); }
+            3 => { broken(&mut s, machine, h); run(&mut s, COLLAPSE + 0.3); }
+            4 => { let d = broken(&mut s, machine, h); emerged(&mut s, d); }
+            5 => { let d = broken(&mut s, machine, h); working(&mut s, d); }
+            6 => { let d = broken(&mut s, machine, h); working(&mut s, d); cut(&mut s, h); }
+            7 => { let d = broken(&mut s, machine, h); working(&mut s, d); cut(&mut s, h); landed(&mut s); run(&mut s, 1.0); }
+            8 => { let d = broken(&mut s, machine, h); working(&mut s, d); run(&mut s, REPAIR + 0.3); }
+            // A stall of the machine's own, smoke pouring.
+            _ => { run(&mut s, 12.0); }
+        }
+        s.leave(h);
+        put_back(&s, home, &format!("stage {stage}, at once"));
+        run(&mut s, 3.0);
+        put_back(&s, home, &format!("stage {stage}, after"));
+        // The next hero finds it as at the first pull.
+        let n = s.join("next", "Next", None);
+        s.move_player(n, off(home, rig(&s).face, -30.0), 0.0, Moving::default());
+        let ev = run(&mut s, 1.0);
+        put_back(&s, home, &format!("stage {stage}, a new hero"));
+        assert!(!ev.iter().any(|e| matches!(e, Event::GroundWarn { .. } | Event::CastEnd { .. })), "stage {stage}: nothing plays out in front of them");
+    }
+}
+
+#[test]
+fn one_hero_leaving_mid_repair_leaves_the_fight_to_the_other_and_the_last_to_leave_puts_it_back() {
+    let (mut s, band, machine) = fight(2, 50);
+    run(&mut s, 0.5);
+    let home = rig(&s).home;
+    let driver = broken(&mut s, machine, band[0]);
+    working(&mut s, driver);
+    s.leave(band[0]);
+    run(&mut s, 0.3);
+    assert!(live(&s, DRIVER) == Some(driver), "Sneed still at it for the one who stays");
+    assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Working { .. }), "the repair is not reset");
+    assert_eq!(props(&s, LAMP), 1, "the torch still burns: the moment to cut is theirs");
+    cut(&mut s, band[1]);
+    landed(&mut s);
+    assert!(matches!(s.machinery.drivers[&driver].stage, RepairStage::Spent), "the log lands on him for the one who stays");
+    s.leave(band[1]);
+    put_back(&s, home, "the last one out");
+}
+
+#[test]
+fn a_dead_hero_at_one_end_and_a_live_one_at_the_other_who_then_leaves_puts_it_back_with_the_dead_one_still_there() {
+    let (mut s, band, machine) = mortal(2, 51, 0);
+    run(&mut s, 0.5);
+    let home = rig(&s).home;
+    s.move_player(band[0], off(home, rig(&s).face, 30.0), 0.0, Moving::default());
+    s.move_player(band[1], off(home, rig(&s).face, -30.0), 0.0, Moving::default());
+    lost(&mut s, band[0], machine);
+    run(&mut s, 1.0);
+    assert!(s.players[&band[0]].health == 0 && s.players[&band[1]].health > 0, "one down, one up");
+    s.leave(band[1]);
+    // The one lying dead is still in the world, so it steps; the machine finds nobody to fight.
+    run(&mut s, 8.0);
+    put_back(&s, home, "the dead one still here");
+}

@@ -512,6 +512,36 @@ impl Survival {
         self.rigs_gone(old.rigs);
     }
 
+    /// The last hero has left (or been taken out of the world) in the middle of the fight. The
+    /// world takes no steps with nobody in it, so the lost fight's own end (the machine back whole
+    /// at its post, Sneed and the wreck gone, the log hung again over a clean floor, the torch out)
+    /// would wait for the next hero and play out in front of them. It is put back now, as a lamp
+    /// rest puts it back. An encounter at rest, or a won one, is left alone.
+    pub(crate) fn machinery_abandoned(&mut self) {
+        if !self.players.is_empty() || self.slain("sneed") {
+            return;
+        }
+        let ours: Vec<Id> = self.mobs.keys().copied().filter(|id| self.is_machinery(*id)).collect();
+        let Some(first) = ours.iter().copied().find(|id| self.mobs[id].health > 0 || self.machinery.drivers.contains_key(id)) else { return };
+        let dirty = !self.machinery.drivers.is_empty()
+            || !self.machinery.runaways.is_empty()
+            || ours.iter().any(|id| { let m = &self.mobs[id]; m.state.foe().is_some() || m.health < m.max_health || dist2d(m.pos, m.home) > 1.0 || !matches!(m.state, MobState::Idle { .. }) })
+            || self.machinery.rigs.values().any(|g| g.is_dirty());
+        if !dirty {
+            return;
+        }
+        let (home, pack, raider, def) = {
+            let m = &self.mobs[&first];
+            (m.home, m.pack, m.raider, self.content.mobs.iter().position(|d| d.key == MACHINE).unwrap())
+        };
+        self.reset_machinery();
+        for id in ours {
+            self.dismiss(id);
+        }
+        let machine = self.spawn_mob(def, home, pack, raider);
+        self.rig_ensure(machine);
+    }
+
     pub(crate) fn clean_machinery(&mut self) {
         let now = self.clock;
         let stale: Vec<Id> = self.machinery.drivers.keys().copied().filter(|id| !self.mobs.get(id).is_some_and(|m| m.health > 0)).collect();
