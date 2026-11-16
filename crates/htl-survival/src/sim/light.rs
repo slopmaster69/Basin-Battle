@@ -38,6 +38,26 @@ pub(crate) struct Light {
     pub drawn_marks: std::collections::BTreeSet<Id>,
 }
 
+impl Light {
+    /// How many of each thing it holds (for the soak's growth checks: none of them should only grow).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        vec![
+            ("sigils", self.sigils.len()),
+            ("aloft", self.aloft.len()),
+            ("penances", self.penances.len()),
+            ("feathers", self.feathers.len()),
+            ("rifts", self.rifts.len()),
+            ("hollows", self.hollows.len()),
+            ("deaths", self.deaths.len()),
+            ("recoiled", self.recoiled.len()),
+            ("last_bolt", self.last_bolt.len()),
+            ("empower_shown", self.empower_shown.len()),
+            ("drawn_marks", self.drawn_marks.len()),
+        ]
+    }
+}
+
 impl Survival {
     /// A floor mark a client with ground rings draws itself (Salvation's circle and rim, `SV`).
     pub fn drawn_by_addon(&self, mark: Id) -> bool {

@@ -30,6 +30,14 @@ pub(crate) struct Arsenal {
     racks: BTreeMap<Id, Rack>,
 }
 
+impl Arsenal {
+    /// How many of each thing it holds (for the soak's growth checks).
+    #[cfg(test)]
+    pub(crate) fn sizes(&self) -> Vec<(&'static str, usize)> {
+        vec![("racks", self.racks.len()), ("racks.lying", self.racks.values().map(|r| r.lying.len()).sum())]
+    }
+}
+
 struct Rack {
     prop: Id,
     /// What lies at its foot: the hammer until he takes it, the sword once he has put it down.
