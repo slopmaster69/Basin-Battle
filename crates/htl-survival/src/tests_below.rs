@@ -591,6 +591,16 @@ fn a_hero_who_falls_through_the_world_is_put_back_and_unstuck_goes_to_the_lamp()
     let ev = s.step(DT);
     assert!((s.players[&id].pos[2] - safe[2]).abs() < 1.0, "caught on arrival: {:?}", s.players[&id].pos);
     assert!(ev.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == id)));
+    // And the host's log keeps it: who, where their client said they were, how soon after
+    // arriving, and where they were put back (the one record of a fall a client keeps no log of).
+    let logged = ev.iter().find_map(|e| match e {
+        Event::Log(t) if t.starts_with("Ayla fell through the world at") => Some(t.clone()),
+        _ => None,
+    });
+    let logged = logged.unwrap_or_else(|| panic!("the fall is in the host's log: {ev:?}"));
+    assert!(logged.contains(&format!("{:.1})", safe[2] - 15.0)), "where the client said: {logged}");
+    assert!(logged.contains("s after arriving"), "how soon after arriving: {logged}");
+    assert!(logged.contains("put back at"), "{logged}");
     assert!((s.players[&id].last_safe[2] - safe[2]).abs() < 0.01, "the firm ground stays the floor's");
     s.move_player(id, safe, 0.0, Moving::default());
     for _ in 0..(9.0 / DT) as usize {
@@ -604,6 +614,11 @@ fn a_hero_who_falls_through_the_world_is_put_back_and_unstuck_goes_to_the_lamp()
     let ev = s.step(DT);
     assert!((s.players[&id].pos[2] - safe[2]).abs() < 1.0, "back on firm ground");
     assert!(ev.iter().any(|e| matches!(e, Event::Teleport { player, .. } if *player == id)));
+    // Long after arriving, the log says where, and not how soon.
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Log(t) if t.starts_with("Ayla fell through the world at") && !t.contains("after arriving"))),
+        "{ev:?}"
+    );
     s.move_player(id, [30.0, 20.0, 0.0], 0.0, Moving::default());
     s.unstuck(id).unwrap();
     let p = &s.players[&id];
