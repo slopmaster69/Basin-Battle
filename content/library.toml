@@ -654,6 +654,7 @@ kind = "weapon"
 text = "Doan's. The light in it moves when you aren't looking."
 perks = [{ kind = "focus", amount = 0.06 }]
 
+# The boar spear pins its quarry: each thrust slows the foe 40% for 2.5 sec.
 [[weapon]]
 key = "loksey_boar_spear"
 windup = 0.42

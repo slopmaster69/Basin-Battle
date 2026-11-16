@@ -1308,6 +1308,8 @@ kind = "weapon"
 text = "Taragaman's. {fx} \"A demon's blade, and it wants blood.\""
 perks = [{ kind = "might", amount = 0.05 }]
 
+# Bazzalan's lust: each kill speeds the swing 8%, up to 4 kills (32%), fading 6 sec after the last;
+# a pack cleared in one go ends with the wielder twice as quick as he began, never more.
 [[weapon]]
 key = "bloodlust_edge"
 windup = 0.32

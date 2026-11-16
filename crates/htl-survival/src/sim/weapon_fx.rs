@@ -41,18 +41,23 @@ impl Survival {
         k
     }
 
+    /// What a blow does as it lands, before its damage: silver marks the foe, so the blow that
+    /// fells it lays it to rest too.
+    pub(crate) fn weapon_before(&mut self, mid: Id, w: &WeaponDef, strike: &Strike) {
+        if w.silver && !strike.shove() && w.bane.iter().any(|t| self.has_tag(mid, t)) {
+            let until = self.clock + SILVER_SECS;
+            if let Some(m) = self.mobs.get_mut(&mid) {
+                m.fx.silvered_until = until;
+            }
+        }
+    }
+
     /// What a blow that landed sets off besides its damage.
     pub(crate) fn weapon_hit(&mut self, id: Id, mid: Id, w: &WeaponDef, strike: &Strike, damage: u32) {
         if strike.shove() || damage == 0 {
             return;
         }
         let now = self.clock;
-        // Silver: a bane foe it strikes neither mends nor rises.
-        if w.silver && w.bane.iter().any(|t| self.has_tag(mid, t)) {
-            if let Some(m) = self.mobs.get_mut(&mid) {
-                m.fx.silvered_until = now + SILVER_SECS;
-            }
-        }
         // The hook: a heavy blow drags the foe in.
         if w.hook > 0.0 && strike.heavy() && self.alive(mid) {
             let pull = crate::content::AbilityEffect { kind: "pull".into(), amount: w.hook, from_caster: true, ..Default::default() };

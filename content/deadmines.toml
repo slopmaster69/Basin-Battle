@@ -223,6 +223,8 @@ loot = { draught_flask = 1, plunder = 10 }
 # --- weapons and gear found below ---------------------------------------------------------------
 
 # The Defias Pirate's cutlass: quick, with a long reach for its kind.
+# The cutlass boards: its heavy crosses 5 yd (the leap attack's 3.6 and a little more), so it opens a
+# gap the other swords can't. (docs/weapon-identities.md)
 [[weapon]]
 key = "pirate_cutlass"
 windup = 0.27
@@ -327,6 +329,8 @@ kind = "weapon"
 text = "Breaks stances 50% faster. \"Mr. Smite's own. The heaviest swing there is.\""
 
 # VanCleef's own: the timed guard comes easier with it in hand.
+# The barb: its heavy hooks the foe 6 yd in, which is VanCleef's own reach (a duelist closing a gap
+# the other way round); a light blow doesn't. (docs/weapon-identities.md)
 [[weapon]]
 key = "cruel_barb"
 windup = 0.25
@@ -1242,6 +1246,8 @@ kind = "weapon"
 text = "One-handed. Breaks stances 60% faster, more than most two-handers. \"Gilnid's own.\""
 
 # Sneed's: quick, and cruel from behind.
+# The machete clears brush: no backstab (it never stabbed), and each light hit chops the 5 yd line ahead,
+# up to 6 foes (a corridor's worth). (docs/weapon-identities.md)
 [[weapon]]
 key = "sneed_machete"
 windup = 0.24
@@ -1737,6 +1743,8 @@ count = 1
 # --- gear from the galleries ------------------------------------------------------------------------
 
 # A miner's pick: it chips at a stance.
+# The pick: a posture breaker (3 times towards a stance, the maces' 2) and 50% more to stone,
+# golems and machines, what a miner's tool is for.
 [[weapon]]
 key = "miner_pick"
 windup = 0.34

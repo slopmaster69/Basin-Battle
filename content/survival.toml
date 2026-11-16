@@ -990,6 +990,8 @@ subclass = 0
 moveset = "axe_one_hand"
 # Identity: the bleeder; each hit bleeds 4 a second for 3 sec (docs/weapon-identities.md).
 bleed = 4.0
+# The beard hooks: its heavy drags a shield aside, so the shield-bearer can't block for 4 sec (a
+# light blow was always blocked, a heavy never; this is what the heavy buys the next lights).
 [[weapon]]
 key = "bearded_axe"
 windup = 0.42
@@ -10944,6 +10946,8 @@ moveset = "mace_one_hand"
 # A silver-edged sword: the sword's quickness, the axe's bite.
 # The stance breaker (docs/weapon-identities.md).
 posture = 2.0
+# Silver: undead and worgen take 50% more (the Keep's dead and its hounds), and a foe it strikes
+# neither mends nor comes back once slain: what silver does in the stories. (docs/weapon-identities.md)
 [[weapon]]
 key = "silver_sword"
 windup = 0.26

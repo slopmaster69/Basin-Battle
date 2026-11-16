@@ -560,3 +560,15 @@ fn an_axes_and_polearms_tooltips_say_their_mechanics_from_their_numbers() {
     assert!(text("horsemans_scythe").contains(&format!("Restores {}% of your health for each enemy", (w("horsemans_scythe").reap_heal * 100.0).round())));
     assert!(text("loksey_boar_spear").contains(&format!("Slows the enemy by {}% for {} sec", (w("loksey_boar_spear").snare * 100.0).round(), crate::content::SNARE_SECS)));
 }
+
+#[test]
+fn the_blow_that_fells_a_foe_under_silver_lays_it_to_rest_too() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "silver_sword");
+    let m = foe(&mut s, "risen_skeleton");
+    s.mobs.get_mut(&m).unwrap().health = 1;
+    assert!(!s.silvered(m));
+    let ev = swing(&mut s, p);
+    assert!(hits_on(&ev, m).iter().any(|(d, _)| *d > 0), "the blow lands");
+    assert!(s.mobs[&m].health == 0 && s.silvered(m), "felled by the first blow, and silvered by it");
+}

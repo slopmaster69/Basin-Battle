@@ -1735,6 +1735,7 @@ impl Survival {
                     StrikeKind::Kick => "Kick",
                     _ => "Melee",
                 };
+                self.weapon_before(mid, w, strike);
                 self.hurt_mob_as(mid, id, damage, label);
                 // An axe's hit bleeds.
                 if w.bleed > 0.0 && !strike.shove() && self.alive(mid) {
