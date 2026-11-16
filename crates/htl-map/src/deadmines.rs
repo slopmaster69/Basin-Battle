@@ -111,7 +111,13 @@ pub fn tiles_of(chain: &mut Chain, map_dir: &str) -> Result<Vec<TileMesh>> {
 pub struct Columns {
     chunks: Vec<ChunkMesh>,
     tris: Vec<[[f32; 3]; 3]>,
+    /// The triangles over each `BUCKET`-yard square (by its corner's index), so a look up and
+    /// down reads only those near it.
+    near: std::collections::HashMap<(i32, i32), Vec<u32>>,
 }
+
+/// The side of [`Columns`]' squares of triangles, in yards.
+const BUCKET: f32 = 4.0;
 
 /// How far over a spot a building's floor seen from under it still seals the spot in (Baron
 /// Silverlaine stood 15 yards under Shadowfang Keep's floor, Nov 2026).
@@ -135,12 +141,22 @@ impl Columns {
             tris.extend(mesh.indices.chunks_exact(3).map(|c| [p[c[0] as usize], p[c[1] as usize], p[c[2] as usize]]));
         }
         let chunks = tiles.into_iter().flat_map(|t| t.chunks).collect();
-        Ok(Self { chunks, tris })
+        Ok(Self::from_parts(chunks, tris))
     }
 
     /// Made of these pieces (for tests).
     pub fn from_parts(chunks: Vec<ChunkMesh>, tris: Vec<[[f32; 3]; 3]>) -> Self {
-        Self { chunks, tris }
+        let mut near: std::collections::HashMap<(i32, i32), Vec<u32>> = Default::default();
+        for (k, t) in tris.iter().enumerate() {
+            let lo = |a: usize| (t.iter().map(|p| p[a]).fold(f32::MAX, f32::min) / BUCKET).floor() as i32;
+            let hi = |a: usize| (t.iter().map(|p| p[a]).fold(f32::MIN, f32::max) / BUCKET).floor() as i32;
+            for i in lo(0)..=hi(0) {
+                for j in lo(1)..=hi(1) {
+                    near.entry((i, j)).or_default().push(k as u32);
+                }
+            }
+        }
+        Self { chunks, tris, near }
     }
 
     /// The terrain's height at (x, y), if there is terrain there (not a hole).
@@ -152,7 +168,9 @@ impl Columns {
     /// (a floor) or down (a ceiling). Walls are left out.
     pub fn faces(&self, x: f32, y: f32) -> Vec<(f32, bool)> {
         let mut out = Vec::new();
-        for t in &self.tris {
+        let key = ((x / BUCKET).floor() as i32, (y / BUCKET).floor() as i32);
+        for &k in self.near.get(&key).map_or(&[][..], |v| v.as_slice()) {
+            let t = &self.tris[k as usize];
             let (a, b, c) = (t[0], t[1], t[2]);
             let det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
             if det.abs() < 1e-9 {
@@ -192,6 +210,51 @@ impl Columns {
     pub fn sealed_over(&self, at: [f32; 3]) -> Option<f32> {
         let over = self.faces(at[0], at[1]).into_iter().find(|&(z, _)| z > at[2] + 0.6 && z < at[2] + SEALED_REACH)?;
         over.1.then_some(over.0)
+    }
+
+    /// Whether a floor at `at` is the terrain itself, not a building's floor on or just over it.
+    pub fn on_terrain(&self, at: [f32; 3]) -> bool {
+        self.terrain(at[0], at[1]).is_some_and(|t| (t - at[2]).abs() < 0.05)
+            && !self.faces(at[0], at[1]).iter().any(|&(z, up)| up && (z - at[2]).abs() < 0.4)
+    }
+
+    /// Whether a floor at `at` is the terrain in the hollow under a building's floor
+    /// ([`Self::sealed_over`]): no hero gets there in the game, as the floor over it is all they
+    /// walk on.
+    pub fn in_hollow(&self, at: [f32; 3]) -> bool {
+        self.on_terrain(at) && self.sealed_over(at).is_some()
+    }
+
+    /// Whether a floor at `at` is the terrain out from under every building: nothing of theirs
+    /// over it or under it (a hillside outside a keep's walls).
+    pub fn outdoors(&self, at: [f32; 3]) -> bool {
+        self.on_terrain(at) && self.faces(at[0], at[1]).is_empty()
+    }
+
+    /// Each of `ground`'s floors (by floor index) that a walk inside the dungeon's buildings keeps
+    /// off: the terrain in a hollow under their floors ([`Self::in_hollow`]), which the server's
+    /// ground has as a floor of its own, and with `indoors` the terrain outside them too
+    /// ([`Self::outdoors`]). Shadowfang Keep's walks to Fenrus and Wolf Master Nandos ran under the
+    /// courtyard's floor, or out of the kitchen and round the hillside outside the walls, until
+    /// Nov 2026.
+    pub fn off_limits(&self, ground: &Layers, indoors: bool) -> Vec<bool> {
+        let mut out = vec![false; ground.floor_count()];
+        let (w, h) = ground.size();
+        for j in 0..h {
+            for i in 0..w {
+                let r = ground.floor_range(i, j);
+                if r.is_empty() {
+                    continue;
+                }
+                let [x, y] = ground.cell_xy(i, j);
+                let Some(t) = self.terrain(x, y) else { continue };
+                for f in r {
+                    let at = [x, y, ground.floor(f).z];
+                    out[f] = (t - at[2]).abs() < 0.05 && (self.in_hollow(at) || (indoors && self.outdoors(at)));
+                }
+            }
+        }
+        out
     }
 }
 
