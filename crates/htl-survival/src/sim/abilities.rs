@@ -813,6 +813,12 @@ impl Survival {
             self.events.push(Event::Flash { player: id, text });
             return true;
         }
+        // A Quickstep goes from a blow at any point and from a dodge (a chain of evasions), and
+        // not while held to the spot.
+        if d.quickstep && self.held_still(id) {
+            self.refuse(id, "Can't move", cues::Vocal::CantDo);
+            return true;
+        }
         // Berserker Rage goes off the ground (a knockdown is a stun); nothing else does.
         let breaking_free = d.breaks_free && !self.has_cc(id, "silence") && !self.cc_of(id).iter().any(|c| c.until > self.clock && matches!(c.kind.as_str(), "incapacitate" | "petrify" | "panic" | "disorient"));
         if (self.silenced(id) && !breaking_free) || self.immune(id) {
@@ -828,7 +834,8 @@ impl Survival {
             || self.is_flaying(id);
         // A recast goes from the air too (the Stoop out of the Uppercut, Skyfall's volley).
         let airborne_recast = recast.is_some() && matches!(p.action, Action::Dash { .. });
-        if !free && !self.cancelable_now(id) && !airborne_recast {
+        let quickstep = d.quickstep && matches!(p.action, Action::Swing { .. } | Action::Dodge { .. });
+        if !free && !self.cancelable_now(id) && !airborne_recast && !quickstep {
             return false;
         }
         if recast.is_none() && !self.ready(id, ability) {
@@ -863,6 +870,10 @@ impl Survival {
                 self.refuse(id, "No enemy in reach to step behind. Aim at one or lock on", cues::Vocal::NoTarget);
                 return true;
             }
+        }
+        // A Quickstep from a blow: the blow called off first (its stamina back in the wind-up).
+        if quickstep && matches!(self.players[&id].action, Action::Swing { .. }) {
+            self.quick_cut(id);
         }
         // Mind Blast on a taut Mind Flay: at once on its foe (judged before the cord is let go).
         let snap = if d.on_taut > 0.0 && recast.is_none() { self.taut_flay(id) } else { None };
@@ -1441,7 +1452,10 @@ impl Survival {
                 self.start_art(id, ability);
             }
             "buff" => {
-                self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+                // (A Quickstep has none: the dash is its look.)
+                if d.spell != 0 {
+                    self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+                }
                 // Lay on Hands: what's on them ends.
                 if d.cleanse {
                     self.cleanse(id, &crate::content::HARMFUL);
@@ -1456,6 +1470,12 @@ impl Survival {
                 }
                 self.apply_effects(id, id, &d.effects, 1.0, &d.name);
                 self.set_action(id, next);
+                // The Rogue's Blades: Blade Flurry's string of cuts; a Quickstep's dodge.
+                if d.cuts > 0 {
+                    self.flurry_begins(id, d.cuts);
+                } else if d.quickstep {
+                    self.quickstep(id, ability);
+                }
             }
             // A War Banner planted (or its recast's, moved).
             "place" if self.content.plants_banner(ability) => {
@@ -2737,6 +2757,10 @@ impl Survival {
         if !inert {
             let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
             self.gain_valor(owner, v * valor);
+            // A Darting Knife that strikes is a hand in the thrower's two-blade run.
+            if d.hand {
+                self.knife_hand(owner);
+            }
         }
         if killed && d.refund_kill && d.valor > 0 {
             self.gain_valor(owner, d.valor as f32);

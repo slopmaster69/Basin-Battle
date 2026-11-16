@@ -39,6 +39,16 @@
 //! It reads with no floor marker: the poison's look on the body (a deeper one once ripe), a drip
 //! and its number at every tick. It is apart from a Bazil's Shiv's own `poison`: a dagger's
 //! poison and the Rogue's Venom stack side by side, and Eviscerate spends only Venom.
+//!
+//! **Blades** (docs/rogue-roles.md, "Blades: the dance"): the third tree, the column's third
+//! choice. Its trait, **Flourish**, builds with every perfect dodge (up to `[rogue] flourish_most`,
+//! each blow harder and quicker) and breaks on a blow that lands. **Darting Knife** counts as a
+//! hand in the two-blade run, **Pinning Knife** keeps a creature from turning, **Blade Flurry** is
+//! the whole run at once (a dodge cuts it off), **Hemorrhage** keeps every backstab whole,
+//! **Quickstep** is a free dodge that cuts the Rogue's own blow, **Afterimage** leaves a shade the
+//! enemies turn to, **Evasion** widens the perfect window, **Adrenaline Rush** makes blows and
+//! dodges free and **Blade Dance** makes every evading dodge perfect and cuts the striker. It reads
+//! with no floor marker: the body's looks, the count beside the reticle (`SK flourish`), the beat.
 
 use super::*;
 use crate::land::clear_line;
@@ -57,6 +67,17 @@ pub struct Rogue {
     /// Cloak and Dagger: the steps it has left, and the enemies struck from them so far.
     pub cloak_steps: u32,
     pub cloak_struck: Vec<Id>,
+    /// Blades' Flurry: how many, until then (none after).
+    pub flourish: u32,
+    pub flourish_until: f32,
+    /// The dodge under way is a Quickstep's (its own pace along the ground).
+    pub quick: bool,
+    /// Blade Flurry: the cuts it has left, the next at this time, and how many it began with.
+    pub flurry_left: u32,
+    pub flurry_next: f32,
+    pub flurry_cuts: u32,
+    /// A Darting Knife struck: the next blow of either hand carries the two-blade run on.
+    pub any_hand: bool,
 }
 
 /// What a Rogue's Shadow keeps on a creature.
@@ -140,9 +161,18 @@ impl Survival {
     }
 
     /// A Rogue's dodge took this blow in its perfect moment.
+    /// Evasion widens the window (to its `amount`); in Blade Dance every dodge that evades is
+    /// perfect.
     pub(crate) fn dodged_perfectly(&self, victim: Id, doing: &Action) -> bool {
         let d = &self.content.dodge;
-        d.perfect_to > 0.0 && self.players.get(&victim).is_some_and(|p| self.is_rogue(p)) && matches!(doing, Action::Dodge { t, .. } if *t >= d.evade_from && *t <= d.perfect_to)
+        let to = if self.has_cc(victim, "blade_dance") { d.evade_to } else { d.perfect_to.max(self.effect_amount(victim, "evasion")) };
+        d.perfect_to > 0.0 && self.players.get(&victim).is_some_and(|p| self.is_rogue(p)) && matches!(doing, Action::Dodge { t, .. } if *t >= d.evade_from && *t <= to)
+    }
+
+    /// The largest `amount` of an effect on a unit now (0: none).
+    fn effect_amount(&self, id: Id, kind: &str) -> f32 {
+        let now = self.clock;
+        self.cc_of(id).iter().filter(|c| c.kind == kind && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max)
     }
 
     /// What a perfect dodge pays besides the breath and Valor (`strike_player`): a share of the
@@ -175,6 +205,11 @@ impl Survival {
             self.events.push(Event::Missile { caster: victim, spell: r.puff, target: Target::Point(at) });
         }
         self.cue(Some(victim), victim, 0, cues::SOUND_PERFECT_DODGE, cues::BEAT_PERFECT_DODGE);
+        // Blades: a Flourish, and in Blade Dance a cut at whoever swung.
+        self.gain_flourish(victim);
+        if alive && self.has_cc(victim, "blade_dance") {
+            self.dance_cut(victim, attacker);
+        }
     }
 
     /// The perfect dodge's flicker on the body, and Shrouded Step's veil, while they last (for
@@ -187,6 +222,9 @@ impl Survival {
         }
         if r.shroud_aura != 0 && p.rogue.shroud_until > self.clock {
             out.push(r.shroud_aura);
+        }
+        if r.flourish_aura != 0 && self.flourish_of(p) > 0 {
+            out.push(r.flourish_aura);
         }
         out
     }
@@ -204,9 +242,16 @@ impl Survival {
             p.rogue.shroud_until = 0.0;
             gone = true;
         }
+        // Flourish run out: its look goes, and the count on their screen.
+        if p.rogue.flourish > 0 && now >= p.rogue.flourish_until {
+            p.rogue.flourish = 0;
+            gone = true;
+            self.events.push(Event::Stacks { player: id, kind: "flourish", n: 0, on: None });
+        }
         if gone {
             self.events.push(Event::Auras { id });
         }
+        self.step_flurry(id);
     }
 
     /// The Shadow Cut: an attack while it's open steps the Rogue behind the one who swung (a puff
@@ -398,7 +443,7 @@ impl Survival {
     /// A creature that doesn't think this tick for a Rogue's Shadow (true): distracted, it stands
     /// facing where the pouch landed; its foe shrouded (and it no boss), it stands where it is.
     /// Either way it keeps its foe, and a blow it is winding up still lands first.
-    pub(crate) fn step_shadowed(&mut self, id: Id) -> bool {
+    pub(crate) fn step_shadowed(&mut self, id: Id, dt: f32) -> bool {
         let Some(m) = self.mobs.get(&id) else { return false };
         if matches!(m.state, mobs::MobState::Windup { .. }) {
             return false;
@@ -406,6 +451,10 @@ impl Survival {
         // Feinted mid-blow: the blow done, it looks away (Venom's Feint).
         if m.rogue.feint_from.is_some() {
             self.feint_after_blow(id);
+        }
+        // Pinned (Blades' Pinning Knife), a creature stands as it faces.
+        if self.step_pinned(id, dt) {
+            return true;
         }
         let Some(m) = self.mobs.get(&id) else { return false };
         if self.has_cc(id, "distract") {
@@ -698,5 +747,296 @@ impl Survival {
         } else if let Some(m) = self.mobs.get_mut(&mid) {
             m.rogue.feint_from = None;
         }
+    }
+}
+
+// --- Blades -----------------------------------------------------------------------------------------
+
+/// The Rogue column's third choice: Blades' cards.
+pub const BLADES: u32 = 3;
+
+impl Survival {
+    /// A Rogue's Flourish now (0: none, or run out).
+    pub fn flourish_of(&self, p: &Player) -> u32 {
+        if p.rogue.flourish_until > self.clock { p.rogue.flourish } else { 0 }
+    }
+
+    /// Blades' trait: a perfect dodge gives one more Flourish (up to the most), its time from now.
+    /// It shows on the body while it holds, and its count on the Rogue's own screen (`SK`).
+    pub(crate) fn gain_flourish(&mut self, id: Id) {
+        let Some(p) = self.players.get(&id) else { return };
+        if !self.rogue_trait(p, BLADES) {
+            return;
+        }
+        let r = &self.content.rogue;
+        let (most, until) = (r.flourish_most, self.clock + r.flourish_secs);
+        let had = self.flourish_of(p);
+        let n = (had + 1).min(most);
+        let p = self.players.get_mut(&id).unwrap();
+        p.rogue.flourish = n;
+        p.rogue.flourish_until = until;
+        if had == 0 {
+            self.events.push(Event::Auras { id });
+        }
+        self.events.push(Event::Stacks { player: id, kind: "flourish", n, on: None });
+    }
+
+    /// A blow landed on the Rogue: every Flourish gone at once.
+    pub(crate) fn lose_flourish(&mut self, id: Id) {
+        let Some(p) = self.players.get(&id) else { return };
+        if self.flourish_of(p) == 0 {
+            return;
+        }
+        let p = self.players.get_mut(&id).unwrap();
+        p.rogue.flourish = 0;
+        p.rogue.flourish_until = 0.0;
+        self.events.push(Event::Auras { id });
+        self.events.push(Event::Stacks { player: id, kind: "flourish", n: 0, on: None });
+    }
+
+    /// How much harder a hero's blows land, and how much quicker they come, for their Flourish.
+    pub(crate) fn flourish_boost(&self, id: Id) -> (f32, f32) {
+        let Some(p) = self.players.get(&id) else { return (1.0, 0.0) };
+        let (n, r) = (self.flourish_of(p) as f32, &self.content.rogue);
+        (1.0 + r.flourish_damage * n, r.flourish_haste * n)
+    }
+
+    /// What a dodge costs this hero now: nothing under Adrenaline Rush or in Blade Dance, less
+    /// under Evasion, else the dodge's own.
+    pub(crate) fn dodge_cost(&self, id: Id) -> f32 {
+        if self.has_cc(id, "adrenaline") || self.has_cc(id, "blade_dance") {
+            0.0
+        } else if self.has_cc(id, "evasion") {
+            self.content.rogue.evasion_cost.min(self.content.dodge.stamina)
+        } else {
+            self.content.dodge.stamina
+        }
+    }
+
+    /// What a dodge needs in hand to start: its cost when that's less than a dodge's own, else the
+    /// dodge's least.
+    pub(crate) fn dodge_needs(&self, id: Id) -> f32 {
+        let cost = self.dodge_cost(id);
+        if cost < self.content.dodge.stamina { cost } else { self.content.dodge.needs() }
+    }
+
+    /// A dodge's dash: a Quickstep's pace, else the dodge's.
+    pub(crate) fn dodge_speed(&self, p: &Player) -> f32 {
+        if p.rogue.quick { self.content.rogue.quick_speed } else { self.content.dodge.speed }
+    }
+
+    /// Blade Dance: a cut at whoever swung, its share of the weapon, from behind (a backstab by
+    /// the rule, with its blood burst and its sound).
+    fn dance_cut(&mut self, id: Id, on: Id) {
+        let share = self.effect_amount(id, "blade_dance");
+        let Some(p) = self.players.get(&id) else { return };
+        if share <= 0.0 || p.health == 0 {
+            return;
+        }
+        let w = self.weapon_of(p).clone();
+        let rolled = self.roll(w.damage) as f32 * share;
+        if self.mobs.get(&on).is_some_and(|m| m.health > 0) {
+            let stab = if w.backstab > 0.0 { w.backstab } else { self.content.combat.backstab };
+            let stab = self.backstab_bonus(on, stab);
+            let damage = (rolled * stab * self.taken_share(on)).round() as u32;
+            self.backstabbed(on, id);
+            self.cue(Some(id), on, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+            self.backstab_look(on, Some(id));
+            self.events.push(Event::Swing { attacker: id, victim: Some(on), damage, outcome: Outcome::Hit, anim: false, style: Blow::Light });
+            self.hurt_mob_as(on, id, damage, "Blade Dance");
+        } else if self.players.get(&on).is_some_and(|h| h.health > 0) && on != id {
+            let damage = rolled.round() as u32;
+            self.events.push(Event::Swing { attacker: id, victim: Some(on), damage, outcome: Outcome::Hit, anim: false, style: Blow::Light });
+            self.hurt_player_by(on, damage, id, "Blade Dance");
+        }
+    }
+
+    /// A Darting Knife struck: it counts as a hand in the thrower's two-blade run (never its
+    /// finisher), and holds the run `[rogue] knife_window` for the next blow, of either hand.
+    pub(crate) fn knife_hand(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(p) = self.players.get(&id) else { return };
+        if !self.two_hands(p) || p.health == 0 {
+            return;
+        }
+        let window = self.content.rogue.knife_window;
+        let swinging = matches!(p.action, Action::Swing { .. });
+        let p = self.players.get_mut(&id).unwrap();
+        let going = p.dual_run > 0 && (swinging || now <= p.combo_until + DUAL_WINDOW);
+        p.dual_run = if going { p.dual_run + 1 } else { 1 }.min(DUAL_FINISH_AT - 1);
+        p.rogue.any_hand = true;
+        if !swinging {
+            p.combo_until = p.combo_until.max(now + window - DUAL_WINDOW);
+            if !going {
+                p.combo_until = now + window - DUAL_WINDOW;
+            }
+        }
+    }
+
+    /// Blade Flurry begins: its cuts, the first at once.
+    pub(crate) fn flurry_begins(&mut self, id: Id, cuts: u32) {
+        let now = self.clock;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        p.rogue.flurry_left = cuts;
+        p.rogue.flurry_cuts = cuts;
+        p.rogue.flurry_next = now;
+        self.flurry_cut(id);
+    }
+
+    /// Blade Flurry's next cut: the hands alternate, main hand first, each lunging in, and the
+    /// last is the two-blade run's finisher. It costs nothing (the ability paid).
+    fn flurry_cut(&mut self, id: Id) {
+        let now = self.clock;
+        let (gap, step) = (self.content.rogue.flurry_gap, self.content.rogue.flurry_step);
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let (left, cuts) = (p.rogue.flurry_left, p.rogue.flurry_cuts);
+        if left == 0 {
+            return;
+        }
+        let off = (cuts - left) % 2 == 1;
+        // The run as it would stand before this cut, so the last is the finisher.
+        p.dual_run = DUAL_FINISH_AT.saturating_sub(left.min(DUAL_FINISH_AT as u32) as u8);
+        p.dual_last_off = !off;
+        p.combo_until = f32::INFINITY;
+        p.rogue.any_hand = false;
+        p.rogue.flurry_left = left - 1;
+        p.rogue.flurry_next = now + gap;
+        p.dodge_attack = false;
+        self.set_action(id, Action::Ready);
+        self.start_swing_with(id, if off { StrikeKind::Off } else { StrikeKind::Light }, false);
+        if let Some(Action::Swing { strike, .. }) = self.players.get_mut(&id).map(|p| &mut p.action) {
+            strike.lunge = step;
+            // (Unpaid: a dodge in its wind-up gives nothing back.)
+            strike.stamina = 0.0;
+        }
+    }
+
+    /// Each tick: Blade Flurry's next cut when it's due; a dodge (or anything that takes the
+    /// hero out of the string) ends it.
+    fn step_flurry(&mut self, id: Id) {
+        let Some(p) = self.players.get(&id) else { return };
+        if p.rogue.flurry_left == 0 {
+            return;
+        }
+        let going = p.health > 0 && matches!(p.action, Action::Swing { .. } | Action::Ready);
+        if !going {
+            self.players.get_mut(&id).unwrap().rogue.flurry_left = 0;
+            return;
+        }
+        if self.clock + 1.0e-4 >= p.rogue.flurry_next {
+            self.flurry_cut(id);
+        }
+    }
+
+    /// Pinning Knife: the share of its turn a creature keeps (1: not pinned; a boss
+    /// `[rogue] pinned_boss_turn`; any other none).
+    pub(crate) fn pinned_turn(&self, mid: Id) -> f32 {
+        if !self.has_cc(mid, "pinned") {
+            1.0
+        } else if self.boss_of(mid) {
+            self.content.rogue.pinned_boss_turn
+        } else {
+            0.0
+        }
+    }
+
+    /// A pinned creature (not a boss, not winding up) can't turn: it stands where it is, facing
+    /// as it was. While its foe is in front of it and in reach it thinks (so strikes), still where
+    /// it stands and as it faces. True: it has had its turn.
+    fn step_pinned(&mut self, mid: Id, dt: f32) -> bool {
+        if self.pinned_turn(mid) > 0.0 {
+            return false;
+        }
+        let Some(m) = self.mobs.get(&mid) else { return false };
+        let a = self.attack_now(mid);
+        let face = m.facing;
+        let in_front = match m.state.foe().and_then(|f| self.foe_pos(f)) {
+            Some(at) => dist2d(m.pos, at) <= a.range + 0.5 && angle_between(face, facing(m.pos, at)) <= (a.arc.to_radians() / 2.0).max(0.35),
+            None => false,
+        };
+        if in_front {
+            self.think(mid, dt);
+        }
+        // Not a step, not a turn (a creature circling its foe turns as it goes).
+        let now = self.clock;
+        let Some(m) = self.mobs.get_mut(&mid) else { return true };
+        m.sidle = None;
+        let turned = angle_between(m.facing, face) > 1.0e-4;
+        m.facing = face;
+        if !m.path.is_empty() {
+            self.halt(mid);
+        } else if turned {
+            // (Its thinking told the clients a turn: they're told it stands as it was.)
+            let pos = m.pos;
+            m.face_sent = Some((face, now));
+            self.events.push(Event::MobStop { id: mid, pos, facing: face });
+        }
+        true
+    }
+
+    /// In Blade Flurry, between cuts: a cut that has struck may be cut short by a dodge.
+    pub(crate) fn flurrying(&self, p: &Player) -> bool {
+        p.rogue.flurry_left > 0
+    }
+
+    /// Quickstep: the hero's own blow called off where it stands (in its wind-up, its stamina
+    /// back, and the run it was part of ends), so the step can go at once.
+    pub(crate) fn quick_cut(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(p) = self.players.get(&id) else { return };
+        let Action::Swing { t, strike, .. } = &p.action else { return };
+        let refund = if *t < strike.windup && strike.art.is_none() { strike.stamina } else { 0.0 };
+        let most = self.content.player.stamina;
+        let p = self.players.get_mut(&id).unwrap();
+        p.stamina = (p.stamina + refund).min(most);
+        if refund > 0.0 {
+            p.combo_next = 0;
+            p.off_next = 0;
+            p.combo_until = now;
+            p.dual_run = 0;
+        }
+        p.rogue.flurry_left = 0;
+        self.events.push(Event::Stamina { player: id });
+        self.events.push(Event::ClipStop { id });
+        self.set_action(id, Action::Ready);
+    }
+
+    /// Quickstep: a dodge that costs nothing, at its own pace. Afterimage leaves a shade where the
+    /// hero stood, and every enemy on them turns to it.
+    pub(crate) fn quickstep(&mut self, id: Id, ability: usize) {
+        let d = self.content.abilities[ability].clone();
+        let Some(at) = self.players.get(&id).map(|p| p.pos) else { return };
+        if self.held_still(id) {
+            return;
+        }
+        self.set_action(id, Action::Ready);
+        self.start_dodge_as(id, 0.0, true);
+        if d.shade > 0.0 {
+            self.leave_shade(id, ability, at, d.shade, d.shade_turn);
+        }
+    }
+
+    /// Afterimage's shade: a body left where the hero stood (`[rogue] shade`, see-through) for
+    /// `secs`, and every creature on the hero turns to it for `turn` (a boss only glances).
+    fn leave_shade(&mut self, id: Id, ability: usize, at: Vec3, secs: f32, turn: f32) {
+        let now = self.clock;
+        let Some(def) = self.content.mob(&self.content.rogue.shade) else { return };
+        let old: Vec<Id> = self.totems.iter().filter(|x| x.owner == id && x.ability == ability).map(|x| x.mob).collect();
+        for m in old {
+            self.remove_totem(m);
+        }
+        let face = self.players.get(&id).map_or(0.0, |p| p.facing);
+        let mid = self.spawn_mob(def, at, None, false);
+        if let Some(m) = self.mobs.get_mut(&mid) {
+            m.facing = face;
+        }
+        // It stands (a totem that never pulses) until its time is out.
+        self.totems.push(super::abilities::Totem { mob: mid, owner: id, ability, until: now + secs, next: f32::INFINITY });
+        let on: Vec<Id> = self.mobs.iter().filter(|(k, m)| **k != mid && m.health > 0 && !m.friendly && m.state.target() == Some(id)).map(|(k, _)| *k).collect();
+        let was = self.fx_from.replace(at);
+        for m in on {
+            self.distract(id, m, turn, "Afterimage");
+        }
+        self.fx_from = was;
     }
 }

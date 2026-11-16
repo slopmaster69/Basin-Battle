@@ -529,6 +529,8 @@ impl SurvivalGame {
                     let most = match kind {
                         "weave" => k.priest.weave_most,
                         "sear" => 1,
+                        // A Rogue's Flourish (Blades' trait), for the count beside the reticle.
+                        "flourish" => k.rogue.flourish_most,
                         _ => k.staffs.most,
                     };
                     let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);

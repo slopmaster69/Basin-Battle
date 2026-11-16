@@ -1,0 +1,65 @@
+# The Rogue's Blades tree (docs/rogue-roles.md, build plan 4), floor markers off. All five keys on
+# Blades' cards, so the trait (Flourish) is on. A grunt 4 yd ahead swings at the Rogue; the small
+# player in the interface (RB, as in rogue-perfect-dodge) reads each wind-up (AN, the time to the
+# blow) and dodges 0.12 sec before it lands, alternating the dodge (Mouse 4) and Quickstep (the 1
+# key), five times. Look for, with no floor marker and no word: each perfect dodge's flicker, puff
+# and stop; Slice and Dice's look (5171) on the body from the first; five violet diamonds under the
+# reticle lighting one by one with a chime, breathing once all five are lit; Quickstep's dash a step
+# longer than the dodge's. Then Blade Flurry (E): four cuts, the hands visibly alternating (clips 87
+# and 17), each lunging a step in, the 4th with both blades and the grunt staggering. Then a hit
+# taken on purpose (no dodge): the diamonds burst and fade with a crack, and the body's look goes.
+# Then Darting Knife twice at a still grunt 3 yd off (the rig has no walk), and two blows: the 4th
+# is the both-blades finisher. Last, Blade Dance (3) against two grunts: the body see-through the
+# whole 8 sec, and on every dodge a backstab's blood burst on the striker and a stab sound.
+# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>` (the `setup`
+# scenario makes only the hunter, the warrior and the cameraman). Not run yet: the knife and
+# Blade Dance times are a first guess, tune them on the first run.
+hero rogue
+cam 90 -12 8
+include _setup
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot q darting_knife
+4.4 .es slot e blade_flurry
+4.4 .es slot 1 quickstep
+4.4 .es slot 2 blade_evasion
+4.4 .es slot 3 blade_dance
+4.5 lua RB = { q = {}, on = false, n = 0, most = 5 }
+4.5 lua function RB.say(t) SendChatMessage(t, "SAY") end
+4.5 lua function RB.after(d, f) table.insert(RB.q, { GetTime() + d, f }) end
+4.5 lua function RB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+4.5 lua function RB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+4.5 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= RB.most then return end RB.n = RB.n + 1 RB.log("wind-up " .. w) local quick = math.mod(RB.n, 2) == 0 RB.after(math.max(0, w - 0.12), function() if quick then RB.say(".es in ab 2 0") else RB.say(".es in d") end end) end
+4.5 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) end end
+4.5 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) RB.line(l) return old(l) end
+4.5 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end end)
+4.6 .es target grunt 4
+5.0 lua RB.on = true
+5.0 video
+5.2 shots flourish 80 0.1
+14.0 .es in ab 1 0                      # E: Blade Flurry, the 4 cuts
+14.0 shots flurry 20 0.1
+15.6 lua RB.on = false
+16.0 shots lost 30 0.1                  # the grunt's next blow lands: the diamonds burst
+19.5 .es target clear
+19.6 .es target grunt 3 still
+20.0 .es in ab 0 0                      # Q: Darting Knife
+20.1 .es in a {facing} 0
+20.2 .es in au
+20.7 .es in ab 0 0                      # Q again: the run at 2
+20.8 .es in a {facing} 0
+20.9 .es in au
+21.4 .es in a                           # the 3rd blow
+21.5 .es in au
+21.9 .es in g                           # the 4th: both blades
+22.0 .es in gu
+20.0 shots knives 40 0.1
+25.0 .es target clear
+25.2 .es target grunt 3
+25.3 .es target grunt 4
+25.6 .es valor full
+26.0 .es in ab 4 0                      # 3: Blade Dance
+26.0 lua RB.n = 0 RB.most = 8 RB.on = true
+26.0 shots dance 90 0.1
+35 lua RB.on = false
+36 end

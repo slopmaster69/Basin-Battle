@@ -1809,6 +1809,39 @@ venom_drip = 805
 # Feint: a creature on the Rogue turns on another hero within 10 yd of it (a creature's reach and a
 # step or two: the friend it can see beside you), else stands and takes no notice of the Rogue.
 feint_turn = 10.0
+# Blades' trait, Flourish (docs/rogue-roles.md, Blades): on while 3 of the 5 keys hold Blades' cards
+# (the same `trait_keys`). Each perfect dodge gives 1, up to 5, for 6 sec from the latest. Five
+# perfect dodges in a fight is the top of the skill; 6 sec is about three dagger runs, so a Rogue
+# who stops dodging loses them, and a blow that lands on the Rogue takes them all at once: the risk
+# that makes them worth having.
+flourish_most = 5
+flourish_secs = 6.0
+# Each makes every blow 6% harder and 4% quicker: 30% and 20% at 5. A dagger run of 4 at 5 Flourish
+# is about a blow and a half more damage and a third of a blow sooner, a reward you feel without
+# doubling the Rogue's damage (Bloodlust Edge's 4 stacks are 10% quicker each, from kills).
+flourish_damage = 0.06
+flourish_haste = 0.04
+# How it reads with no floor marker: Slice and Dice's look (5171) on the body while any holds, and
+# the count on the Rogue's own screen beside the reticle (the `SK flourish` line, add-on 71), a
+# chime as each comes and a crack as they break. The look is to be checked when first filmed.
+flourish_aura = 5171
+# Quickstep's dash: 20 yd a second for the dodge's 0.25 sec dash, 5 yd (the dodge's own is 16, 4 yd).
+quick_speed = 20.0
+# Under Evasion a dodge costs 8 stamina, not 15: about two dodges for one, so the wider window can be
+# used, and a perfect one (20 back) leaves the Rogue 12 up.
+evasion_cost = 8.0
+# Blade Flurry: its cuts 0.3 sec apart (a whole run of 4 in about 1.2 sec, against about 2.4 by
+# hand), each lunging 1 yd in so the string carries the Rogue onto a foe that steps back.
+flurry_gap = 0.3
+flurry_step = 1.0
+# A Darting Knife that strikes holds the two-blade run for 1.5 sec, not the run's 0.8: time to close
+# about 10 yd at a run between the knife and the next blow (two knives, step in, two blows).
+knife_window = 1.5
+# Pinning Knife on a boss: it turns at half its speed in a wind-up (a creature not at all), so a boss
+# is never held, only slowed to bring round.
+pinned_boss_turn = 0.5
+# Afterimage's shade: a Defias Footpad's body (a rogue's look), see-through.
+shade = "rogue_shade"
 
 # --- stations -------------------------------------------------------------------------------------
 
@@ -5149,6 +5182,31 @@ respawn = 0.0
   lock = 0.0
 
 [[mob]]
+# Afterimage's shade (a Rogue's Blades): a Defias Footpad's body (a rogue's look, 2338) left where
+# the Rogue stood, see-through under the Stealth look (5215), for the 2 sec the enemies look at it.
+# A totem that never pulses: it stands, takes no notice and is gone when its time is out.
+key = "rogue_shade"
+name = "Shade"
+display = 2338
+aura = 5215
+health = 10
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 1.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
 key = "earthbind_totem"
 name = "Earthbind Totem"
 display = 4588
@@ -6587,6 +6645,185 @@ linger = 4.0
 spell = 25810
 linger_spell = 28158
 effects = [{ kind = "choked", secs = [1.5, 1.5], amount = 0.4 }, { kind = "venom", amount = 1.0 }]
+
+# Blades (docs/rogue-roles.md, "Blades: the dance"): the Rogue column's third choice on every key.
+# Every clean evasion feeds the blades. Keep the rhythm from range: a thrown knife that strikes counts
+# as a hand in the two-blade run, so two knives, a step in and two blows bring the finisher. 9 per 5
+# sec is well under the poke budget (9.5 a second); its worth is the rhythm, not the damage.
+[[ability]]
+key = "darting_knife"
+name = "Darting Knife"
+text = "Throws a knife at the reticle for 9 damage, up to 22 yd. A knife that hits counts as a strike in your two-weapon chain, so the strike with both blades comes sooner. With 3 Blades abilities on your keys, each perfect dodge grants 1 Flourish for 6 sec, up to 5. Each Flourish makes your attacks deal 6% more damage and swing 4% faster. A hit on you removes them all. Holds 3 charges."
+icon = "INV_ThrowingKnife_02"
+school = "rogue"
+slot = "ranged"
+choice = 3
+kind = "projectile"
+damage = [9.0, 9.0]
+range = [22.0, 22.0]
+radius = [0.3, 0.3]
+speed = 30.0
+# 3 charges of 5 sec: two knives to open a run and one held for the next.
+cooldown = 5.0
+charges = 3
+# 1.12's Throw: a spinning dagger and its glint where it lands (to be checked when first filmed).
+spell = 2764
+clip = 107
+hand = true
+
+# Darting Knife's EX, Pinning Knife: keep its back open. For 3 sec the enemy can't turn: it still
+# strikes whatever is in front of it, so the Rogue walks round to its back and lands two blows. A
+# boss turns at half its speed instead ([rogue] pinned_boss_turn). A hero's facing is their own
+# client's, so on a hero it is only the knife. Crippling Poison's look (3409) on the body while it
+# holds, to be checked when first filmed; the body staying put as you circle it is the tell.
+[[ability]]
+key = "pinning_knife"
+name = "Pinning Knife"
+ex_of = "darting_knife"
+text = "Throws a knife at the reticle for 9 damage, up to 22 yd. For 3 sec, the enemy can't turn and only attacks what is in front of it. Bosses turn at half speed instead. Heroes ignore it."
+icon = "INV_ThrowingKnife_03"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [9.0, 9.0]
+range = [22.0, 22.0]
+radius = [0.3, 0.3]
+speed = 30.0
+spell = 2764
+clip = 107
+hand = true
+effects = [{ kind = "pinned", secs = [3.0, 3.0], aura = 3409 }]
+
+# Blades: the whole two-blade run at once. 4 cuts 0.3 sec apart ([rogue] flurry_gap), the hands
+# alternating, main hand first, each lunging 1 yd in; the 4th is the run's finisher (x2.2, both
+# blades, 0.8 sec stagger). A dodge cuts it off between any two cuts, so you still have to see the
+# blow coming. 1.2 sec for a run that takes about 2.4 by hand; 8 sec, about three runs by hand
+# between. 20 stamina: a run's worth of blows (5 each), paid at once.
+[[ability]]
+key = "blade_flurry"
+name = "Blade Flurry"
+text = "Strikes 4 times, 0.3 sec apart, alternating weapons and stepping 1 yd forward with each. The 4th strike is with both blades. A dodge between strikes ends it. Requires a weapon in each hand. With 3 Blades abilities on your keys, each perfect dodge grants 1 Flourish for 6 sec, up to 5. Each Flourish makes your attacks deal 6% more damage and swing 4% faster. A hit on you removes them all."
+icon = "Ability_Warrior_PunishingBlow"
+school = "rogue"
+slot = "close"
+choice = 3
+kind = "buff"
+cuts = 4
+needs_two_blades = true
+stamina = 20.0
+cooldown = 8.0
+# 1.12's Blade Flurry as it begins (to be checked when first filmed); the cuts are the hands' own
+# clips (87 the off hand, 17 both blades).
+spell = 13877
+
+# Blade Flurry's EX, Hemorrhage: open it for the team. A cut, 60% weapon; for 8 sec the enemy
+# remembers none of its backstabs (`backstab_bonus`): every backstab on it, anyone's, keeps the
+# whole bonus. It may still wheel on whoever is at its back: that is a boss's answer. 8 sec lets a
+# band take turns at one back. It bleeds while it lasts (Rend's blood burst, kit 220, every 1.5 sec).
+[[ability]]
+key = "hemorrhage"
+name = "Hemorrhage"
+ex_of = "blade_flurry"
+text = "After a 0.3 sec windup, cuts one enemy in melee reach for 60% weapon damage. For 8 sec, attacks from behind on it by any hero keep their full bonus."
+icon = "Spell_Shadow_LifeDrain"
+slot = "close"
+kind = "art"
+valor = 25
+windup = 0.3
+weapon = 0.6
+one_target = true
+stamina = 14.0
+clip = 85
+spell = 16511
+effects = [{ kind = "hemorrhage", secs = [8.0, 8.0], mark = 220, mark_every = 1.5 }]
+
+# Blades: more dodges than stamina allows. A dodge that costs nothing, 5 yd the way the movement
+# keys point ([rogue] quick_speed), or the dodge's hop back with none. It evades as a dodge does,
+# so a perfect one pays (and gives Flourish). It cancels your own blow at any point, wind-up
+# included (its stamina back): the dodge-cancel string. Two charges with the dodge make a chain of
+# three evasions; 10 sec keeps it a utility.
+[[ability]]
+key = "quickstep"
+name = "Quickstep"
+text = "Dashes 5 yd the way you are moving, or hops back. Evades attacks as a dodge does and costs no stamina. Usable during your own attack or dodge. Cancels your attack and gives back its stamina during its windup. Holds 2 charges."
+icon = "Ability_Rogue_Sprint"
+school = "rogue"
+slot = "utility"
+choice = 3
+kind = "buff"
+quickstep = true
+cooldown = 10.0
+charges = 2
+
+# Quickstep's EX, Afterimage: leave a decoy. A Quickstep that leaves a shade where you stood for 2
+# sec ([rogue] shade: a Defias Footpad's body, see-through); every enemy on you turns to it for 1.5
+# sec (a Distract; a boss glances for 0.8, once every 15 sec). The shade is where they last saw you;
+# their backs are to wherever you went. Vanish's puff where you leave.
+[[ability]]
+key = "afterimage"
+name = "Afterimage"
+ex_of = "quickstep"
+text = "Quickstep that leaves a shade where you stood for 2 sec. Every enemy attacking you turns to face the shade for 1.5 sec. A boss only glances at it."
+icon = "Ability_Vanish"
+slot = "utility"
+kind = "buff"
+valor = 25
+quickstep = true
+shade = 2.0
+shade_turn = 1.5
+spell = 1856
+
+# Blades: make the perfect dodge easier, for a while. For 5 sec a dodge is perfect up to 0.28 sec
+# into it, not 0.18 (still inside the 0.32 sec it evades, so it widens the reward, never the dodge),
+# and costs 8 stamina ([rogue] evasion_cost). Not the old stance: you keep moving and striking.
+# 20 sec: a defense's pace.
+[[ability]]
+key = "blade_evasion"
+name = "Evasion"
+text = "For 5 sec, a dodge is perfect up to 0.28 sec after you press it, not 0.18 sec. Dodging costs 8 stamina."
+icon = "Spell_Shadow_ShadowWard"
+school = "rogue"
+slot = "defense"
+choice = 3
+kind = "buff"
+cooldown = 20.0
+# 1.12's Evasion as it begins and on the body while it lasts (to be checked when first filmed).
+spell = 5277
+effects = [{ kind = "evasion", secs = [5.0, 5.0], amount = 0.28, aura = 5277 }]
+
+# Evasion's EX, Adrenaline Rush: the all-in. For 6 sec blows, weapon abilities and dodges cost no
+# stamina. 50 Valor: the strongest moment of the tree that isn't the ultimate.
+[[ability]]
+key = "adrenaline_rush"
+name = "Adrenaline Rush"
+ex_of = "blade_evasion"
+text = "For 6 sec, attacks and dodges cost no stamina."
+icon = "Spell_Shadow_ShadowWordDominate"
+slot = "defense"
+kind = "buff"
+valor = 50
+# 1.12's Adrenaline Rush: its burst as it begins, its glow while it lasts (to be checked when filmed).
+spell = 13750
+effects = [{ kind = "adrenaline", secs = [6.0, 6.0], aura = 13750 }]
+
+# Blades: every dodge a perfect one. For 8 sec every dodge that evades a blow counts as perfect (its
+# Shadow Cut, stamina, Valor and Flourish), dodges cost nothing, and each throws a free cut at
+# whoever swung, 60% weapon from behind (a backstab by the rule). The tree's whole idea at full
+# strength; it hurts only what attacks you. The body flickers see-through the whole 8 sec (the
+# Stealth look, 5215), with a backstab's blood burst on every striker.
+[[ability]]
+key = "blade_dance"
+name = "Blade Dance"
+text = "For 8 sec, every dodge that evades an attack is a perfect dodge and costs no stamina. Each one also cuts the attacker from behind for 60% weapon damage."
+icon = "Ability_DualWield"
+school = "rogue"
+slot = "ultimate"
+choice = 3
+kind = "buff"
+valor = 100
+cooldown = 40.0
+spell = 1856
+effects = [{ kind = "blade_dance", secs = [8.0, 8.0], amount = 0.6, aura = 5215 }]
 
 # Shadow: make them look away. A pouch lobbed at a spot; the enemies near where it lands turn to
 # it, and their backs are the Rogue's. No damage.
@@ -11442,7 +11679,7 @@ boss = true
 posture = 140
 drops = { wool = [2, 4], bronze = [1, 1] }
 trophy = { defias_jerkin = 1, silver = 2 }
-teaches = ["death_mark", "cloak_and_dagger"]
+teaches = ["death_mark", "cloak_and_dagger", "blade_dance"]
 respawn = 1200.0
   [mob.attack]
   windup = 0.4
@@ -14587,7 +14824,7 @@ name = "The Brotherhood's Dead Drop"
 at = [-9782.0, -888.0]
 display = 18
 scale = 1.0
-teaches = ["distract", "backstab", "fan_of_knives", "eviscerate"]
+teaches = ["distract", "backstab", "fan_of_knives", "eviscerate", "darting_knife", "blade_flurry"]
 keep = true
 secs = 3.0
 text = "Under the crate, a Defias training ledger. How to turn a head, how to throw a knife, where to put a blade, and how to finish it."
@@ -14695,7 +14932,7 @@ trial = ["trial_relic_warlock_0"]
 key = "relic_rogue"
 name = "Morgan's Stash"
 at = [-9968.0, -150.0]
-teaches = ["shadowstep", "smoke_bomb", "garrote", "leeching_venom"]
+teaches = ["shadowstep", "smoke_bomb", "garrote", "leeching_venom", "quickstep", "blade_evasion"]
 loot = { wool = 3, bronze = 1 }
 display = 259
 secret = 7.0

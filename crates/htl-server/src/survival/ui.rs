@@ -540,7 +540,12 @@ pub(crate) const VERSION: u32 = 2;
 /// their words as the default page.
 /// 70: the `CU` beat `perfect_dodge` (a Rogue's perfect dodge: a short stop on the hero alone and a
 /// shadow-coloured edge). An older add-on knows none of it and shows nothing for it.
-pub(crate) const ADDON_NEWEST: u32 = 70;
+/// 71: the board's third choice in the Rogue's column (`TR`'s `choice` 3, Blades) and the Rogue's
+/// Flourish count beside the reticle (`SK flourish`). An older add-on is sent no third choice (it
+/// would lay those cards over the first), and ignores the count.
+pub(crate) const ADDON_NEWEST: u32 = 71;
+/// The first add-on that lays a column's third choice on the board.
+pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1481,6 +1486,7 @@ impl SurvivalGame {
             "hello" => {
                 if let Some(w) = self.world_mut(conn) {
                     w.addon = true;
+                    w.addon_v = arg.parse().unwrap_or(0);
                     w.sent.clear();
                 }
                 // `.es hello <version> ac`: the action-combat client, aiming over the shoulder;
@@ -2277,17 +2283,19 @@ impl SurvivalGame {
             self.say_to(conn, &format!("Your abilities: {}. Keys: {:?}. .es slot <q|e|r|f> <ability> puts one on a key.", owned.join(", "), p.loadout));
             return;
         }
-        if let Some(line) = self.tree_line(id) {
+        let third = self.world_of(conn).is_some_and(|w| w.addon_v >= THIRD_CHOICE_ADDON);
+        if let Some(line) = self.tree_line(id, third) {
             self.ui_line(conn, &line);
         }
     }
 
     /// The board (N): `TR\t<dev>\t<what the count says>\t<card>^...`, each card
     /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts~where learned~page~choice`
-    /// (`choice` 2: the class's second card in that row, shown under its first).
+    /// (`choice` 2: the class's second card in that row, shown under its first; 3, the Rogue's
+    /// third, under its second, sent only to an add-on that lays it: `third`).
     /// `page` is 1 for a class's card (`column` its class) and 2 for the beta page's (`column`
     /// `beta`): an add-on from before the beta page knows no `beta` column and leaves those out.
-    fn tree_line(&self, id: Id) -> Option<String> {
+    fn tree_line(&self, id: Id, third: bool) -> Option<String> {
         let p = self.sim.players.get(&id)?;
         let c = &self.sim.content;
         let dev = c.dev.full_tree;
@@ -2295,7 +2303,7 @@ impl SurvivalGame {
             .abilities
             .iter()
             .enumerate()
-            .filter(|(_, a)| a.on_board())
+            .filter(|(_, a)| a.on_board() && (third || a.choice <= 2))
             .map(|(k, a)| {
                 let owned = p.owned.contains(&a.key);
                 let can = !owned && self.sim.reachable(&p.owned, &a.key);
@@ -2740,5 +2748,26 @@ mod aim_point_tests {
         assert_eq!(held_words("h0.5", vec![]), (Some(0.5), "", vec![]));
         // An older add-on: none.
         assert_eq!(held_words("1.5", vec!["0.2"]), (None, "1.5", vec!["0.2"]));
+    }
+}
+
+#[cfg(test)]
+mod board_tests {
+    #[test]
+    fn an_older_addon_is_sent_no_third_choice_and_a_newer_one_the_rogues_blades() {
+        use htl_survival::{content::Content, land::FlatLand};
+        let mut game = super::super::SurvivalGame::new(Content::builtin(), Box::new(FlatLand::default()), None, 7);
+        let hero = game.sim.join("ayla", "Ayla", None);
+        let cards = |line: String| line.split('\t').nth(3).unwrap_or("").split('^').map(|c| c.split('~').map(String::from).collect::<Vec<_>>()).collect::<Vec<_>>();
+        // An add-on from before 71 lays any choice but 2 as the first: Blades would cover Shadow.
+        let old = cards(game.tree_line(hero, false).unwrap());
+        assert!(old.iter().all(|c| c[22] != "3"), "no third choice for an older add-on");
+        assert!(old.iter().any(|c| c[0] == "distract") && !old.iter().any(|c| c[0] == "darting_knife"));
+        let new = cards(game.tree_line(hero, true).unwrap());
+        for k in ["darting_knife", "blade_flurry", "quickstep", "blade_evasion", "blade_dance"] {
+            let c = new.iter().find(|c| c[0] == k).unwrap_or_else(|| panic!("{k} on the board"));
+            assert_eq!((c[3].as_str(), c[22].as_str()), ("rogue", "3"), "{k}: the Rogue's third choice");
+        }
+        assert!(super::THIRD_CHOICE_ADDON <= super::ADDON_NEWEST);
     }
 }

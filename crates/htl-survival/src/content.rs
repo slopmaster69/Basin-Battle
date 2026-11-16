@@ -4740,6 +4740,9 @@ impl Content {
             if !e.pop.is_empty() && e.kind != "shield" {
                 bail!("{what}: only a shield bursts as it ends (`pop`)");
             }
+            if e.kind == "evasion" && !(self.dodge.evade_from..=self.dodge.evade_to).contains(&e.amount) {
+                bail!("{what}: evasion widens the perfect dodge to `amount` sec, inside the dodge's evade window");
+            }
             if e.kind == "venom" && e.amount < 1.0 {
                 bail!("{what}: venom lays a whole number of stacks (`amount`, 1 or more)");
             }
@@ -4858,8 +4861,10 @@ impl Content {
             if !a.hunt.is_empty() && !crate::content_abilities::HUNTS.contains(&a.hunt.as_str()) {
                 bail!("{what}: hunt {:?} (one of {:?})", a.hunt, crate::content_abilities::HUNTS);
             }
-            if !(1..=2).contains(&a.choice) {
-                bail!("{what}: choice {} (1 or 2: a class has two a row)", a.choice);
+            // The Rogue's column has a third: its three trees (docs/rogue-roles.md).
+            let most = if a.school == "rogue" { 3 } else { 2 };
+            if !(1..=most).contains(&a.choice) {
+                bail!("{what}: choice {} (1 or 2: a class has two a row; the Rogue three)", a.choice);
             }
             // The Warlord's mechanics.
             if a.crash.is_some() && a.kind != "dash" {
@@ -5034,6 +5039,19 @@ impl Content {
             if (a.per_venom > 0.0 || a.breaks_cast > 0.0) && a.kind != "art" {
                 bail!("{what}: only a weapon art spends Venom or breaks a cast (`per_venom`, `breaks_cast`)");
             }
+            // The Rogue's Blades.
+            if (a.quickstep || a.cuts > 0) && a.kind != "buff" {
+                bail!("{what}: only a buff is a Quickstep or a Blade Flurry (`quickstep`, `cuts`)");
+            }
+            if a.shade > 0.0 && !a.quickstep {
+                bail!("{what}: only a Quickstep leaves a shade (`shade`)");
+            }
+            if a.hand && a.kind != "projectile" {
+                bail!("{what}: only a projectile counts as a hand in the two-blade run (`hand`)");
+            }
+            if a.shade > 0.0 && self.mob(&self.rogue.shade).is_none() {
+                bail!("{what}: [rogue] shade {:?} is no creature", self.rogue.shade);
+            }
             if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
                 bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
             }
@@ -5126,14 +5144,15 @@ impl Content {
         // The board: a card a column at most in each row; the beta page, four a row.
         for row in SLOTS {
             let (beta, cards): (Vec<&AbilityDef>, Vec<&AbilityDef>) = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).partition(|a| a.is_beta());
-            if cards.len() > SCHOOLS.len() * 2 {
-                bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len() * 2);
+            // Two a class, and the Rogue's third.
+            if cards.len() > SCHOOLS.len() * 2 + 1 {
+                bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len() * 2 + 1);
             }
             if beta.len() > BETA_ROW {
                 bail!("the beta page's {row} row: {} cards, at most {BETA_ROW}", beta.len());
             }
             for col in SCHOOLS {
-                for choice in [1, 2] {
+                for choice in [1, 2, 3] {
                     if cards.iter().filter(|a| a.school == col && a.choice == choice).count() > 1 {
                         bail!("the board's {row} row: two {col} cards as its choice {choice}");
                     }
@@ -5349,6 +5368,27 @@ pub struct RogueDef {
     pub venom_drip: u32,
     /// Feint: a creature on the Rogue turns to another hero this near it, else loses interest.
     pub feint_turn: f32,
+    /// Blades' trait, Flourish (`sim::rogue`): each perfect dodge gives one, up to this many, for
+    /// this long from the latest. Each makes the Rogue's blows this much harder and this much
+    /// quicker; a blow landing on the Rogue takes them all. Its look on the body while it holds.
+    pub flourish_most: u32,
+    pub flourish_secs: f32,
+    pub flourish_damage: f32,
+    pub flourish_haste: f32,
+    pub flourish_aura: u32,
+    /// Quickstep's dash: this fast along the ground for the dodge's `dash_secs`.
+    pub quick_speed: f32,
+    /// A dodge's stamina under Evasion.
+    pub evasion_cost: f32,
+    /// Blade Flurry: its cuts this far apart, each lunging this far in.
+    pub flurry_gap: f32,
+    pub flurry_step: f32,
+    /// A Darting Knife that strikes holds the two-blade run this long for the next blow.
+    pub knife_window: f32,
+    /// Pinning Knife on a boss: it turns at this share of its speed (a creature not at all).
+    pub pinned_boss_turn: f32,
+    /// Afterimage's shade: the creature (`[[mob]]` key) left where the Rogue stood.
+    pub shade: String,
 }
 
 impl Default for RogueDef {
@@ -5377,6 +5417,18 @@ impl Default for RogueDef {
             ripe_aura: 3815,
             venom_drip: 805,
             feint_turn: 10.0,
+            flourish_most: 5,
+            flourish_secs: 6.0,
+            flourish_damage: 0.06,
+            flourish_haste: 0.04,
+            flourish_aura: 0,
+            quick_speed: 20.0,
+            evasion_cost: 8.0,
+            flurry_gap: 0.3,
+            flurry_step: 1.0,
+            knife_window: 1.5,
+            pinned_boss_turn: 0.5,
+            shade: "rogue_shade".into(),
         }
     }
 }

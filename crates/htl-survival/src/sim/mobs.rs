@@ -1431,7 +1431,7 @@ impl Survival {
                 continue;
             }
             // A Rogue's Shadow: distracted, or its foe shrouded, it stands (`sim::rogue`).
-            if self.step_shadowed(id) {
+            if self.step_shadowed(id, dt) {
                 continue;
             }
             // A boss on its run (`sim::bosses`): its run is its thinking.
@@ -2849,6 +2849,8 @@ impl Survival {
         if choke > 0.0 {
             a.windup *= 1.0 + choke;
         }
+        // Pinning Knife (a Rogue's Blades): no turn in its wind-up, a boss's only slower.
+        a.turn_rate *= self.pinned_turn(id);
         // A string's first blow up close (or a lone one) never comes quicker than a hero can
         // answer from inside their own swing.
         let first = m.pattern.is_none_or(|(_, s)| s == 0);

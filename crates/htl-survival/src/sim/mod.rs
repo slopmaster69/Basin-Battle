@@ -2364,7 +2364,7 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return 0.0 };
         let c = &self.content.player;
         let base = match p.action {
-            Action::Dodge { t, dash: true, .. } if t < self.content.dodge.dash_secs => return self.content.dodge.speed,
+            Action::Dodge { t, dash: true, .. } if t < self.content.dodge.dash_secs => return self.dodge_speed(p),
             Action::Dash { .. } => return DASH_SPEED,
             Action::Swing { .. } => c.attack_speed,
             Action::Guard => c.guard_speed,
@@ -2433,7 +2433,7 @@ impl Survival {
     /// The run-back speed: 1.12's own, but the dodge's while it dashes backwards.
     pub(crate) fn back_speed_for(&self, p: &Player) -> f32 {
         match p.action {
-            Action::Dodge { t, dash: true, .. } if t < self.content.dodge.dash_secs => self.content.dodge.speed,
+            Action::Dodge { t, dash: true, .. } if t < self.content.dodge.dash_secs => self.dodge_speed(p),
             _ => BACK_SPEED,
         }
     }

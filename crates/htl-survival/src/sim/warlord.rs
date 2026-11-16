@@ -469,8 +469,9 @@ impl Survival {
     }
 
     /// Their attacks cost no stamina: Blood Fury, or the Warrior's own Rallying Cry.
+    /// (A Rogue's Adrenaline Rush too: `sim::rogue`.)
     pub(crate) fn tireless(&self, id: Id) -> bool {
-        self.has_cc(id, "fury")
+        self.has_cc(id, "fury") || self.has_cc(id, "adrenaline")
     }
 
     /// How much more a hero's attacks deal under `fury` (0 without it).

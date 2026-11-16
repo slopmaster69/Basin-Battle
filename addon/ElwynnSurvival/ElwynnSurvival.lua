@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 70
+local VERSION = 71
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -5801,7 +5801,8 @@ local BOARD_COLS = { "warrior", "paladin", "hunter", "rogue", "priest", "shaman"
 local BOARD_N = 9
 local BOARD_ROWS = { "ranged", "close", "utility", "defense", "ultimate" }
 -- Each row holds a class's two choices, the second under the first: a row is two cards high
--- (`CARD_H * 2 + 4`; no local of its own, the main chunk is near Lua's 200).
+-- (`CARD_H * 2 + 4`; no local of its own, the main chunk is near Lua's 200). The Rogue's column
+-- has a third (its three trees): its cards are drawn shorter, three in the same height (`FitCard`).
 local CARD_W, CARD_H, CARD_GAP = 112, 44, 5
 local BOARD_LABEL = 100
 local BOARD_W = 24 + BOARD_LABEL + BOARD_N * CARD_W + (BOARD_N - 1) * CARD_GAP + 24
@@ -5986,6 +5987,29 @@ local function BoardCard(i)
   return b
 end
 
+-- A card at its full height, or short (`small`: three to a row's height, the Rogue's column): the
+-- name on one line, the EX's under it, the icon smaller. Its height back.
+function ES.FitCard(b, small)
+  local h = small and math.floor((CARD_H * 2 + 4 - 8) / 3) or CARD_H
+  if b.small == small then return h end
+  b.small = small
+  b:SetHeight(h)
+  local w = small and 22 or 32
+  b.well:SetWidth(w)
+  b.well:SetHeight(w)
+  b.icon:SetWidth(w - 4)
+  b.icon:SetHeight(w - 4)
+  local x = small and 30 or 42
+  b.name:ClearAllPoints()
+  b.name:SetPoint("TOPLEFT", b, "TOPLEFT", x, small and -3 or -6)
+  b.name:SetHeight(small and 11 or 22)
+  b.ex:ClearAllPoints()
+  b.ex:SetPoint("TOPLEFT", b, "TOPLEFT", x, small and -15 or -29)
+  b.ex:SetWidth(CARD_W - x - (small and 30 or 4))
+  b.name:SetWidth(CARD_W - x - 4)
+  return h
+end
+
 function ES.DrawCard(b)
   local d = b.d
   if not d then return end
@@ -6098,6 +6122,16 @@ function ES.TreeLine(f)
   tree.points:SetText(f[3] or "")
   local parts = Split(f[4] or "", "^")
   local used = {}
+  -- The columns that hold a third choice (the Rogue's): three short cards to a row there.
+  local three = {}
+  for i = 1, table.getn(parts) do
+    local e = Split(parts[i], "~")
+    if e[23] == "3" then
+      for k = 1, BOARD_N do
+        if BOARD_COLS[k] == e[4] then three[k] = true end
+      end
+    end
+  end
   for r = 1, AB_N do
     tree.rowKeys[r]:SetText(ShortKey("ES_AB" .. r))
   end
@@ -6116,13 +6150,18 @@ function ES.TreeLine(f)
         exKey = e[15] or "", exName = e[16] or "", exIcon = e[17] or "", exValor = tonumber(e[18] or "") or 0,
         exText = e[19] or "", exFacts = e[20] or "", where = e[21] or "",
       }
-      -- A class's second choice in the row sits under its first (older servers send none: 1).
-      local choice = (e[23] == "2") and 2 or 1
+      -- A class's second choice in the row sits under its first (older servers send none: 1), and
+      -- the Rogue's third under its second. (The third's slots are below 0: the beta page's
+      -- start at 100.)
+      local choice = tonumber(e[23] or "") or 1
+      if choice < 1 or choice > 3 then choice = 1 end
       local slot = (r - 1) * BOARD_N * 2 + (choice - 1) * BOARD_N + c
+      if choice == 3 then slot = -((r - 1) * BOARD_N + c) end
       used[slot] = true
       local b = BoardCard(slot)
+      local h = ES.FitCard(b, three[c])
       b:ClearAllPoints()
-      b:SetPoint("TOPLEFT", tree, "TOPLEFT", ColX(c), -RowY(r) - (choice - 1) * (CARD_H + 4))
+      b:SetPoint("TOPLEFT", tree, "TOPLEFT", ColX(c), -RowY(r) - (choice - 1) * (h + 4))
       b.d = d
       b.icon:SetTexture(ICONS .. d.icon)
       if d.owned then
@@ -6874,6 +6913,7 @@ function ES.Line(line)
   elseif verb == "SK" then
     if ES.StacksLine then ES.StacksLine(f) end
     if ES.PriestStacksLine then ES.PriestStacksLine(f) end
+    if ES.RogueStacksLine then ES.RogueStacksLine(f) end
   elseif verb == "SH" then
     if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
   elseif verb == "SV" then

@@ -221,7 +221,17 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   hero's melee blow lay 1 for 8 s); Garrote from behind breaks a cast, silences 3 s (no new cast;
   not a boss), bleeds and lays 2 (its EX, Feint, hops back and the foes on you look away for 2 s
   or turn on a friend); Leeching Venom heals you by your Venom's ticks for 6 s (its EX, Choking
-  Cloud, slows wind-ups 40% and lays 1 a second); Death Mark. A hero created as a Rogue
+  Cloud, slows wind-ups 40% and lays 1 a second); Death Mark. Blades is the third choice: with 3
+  of its 5 keys on Blades' cards (Flourish), each perfect dodge gives a Flourish, up to 5 for 6 s,
+  each making blows 6% harder and 4% quicker, all lost to a blow that lands. Darting Knife, 3
+  charges of a 9-damage knife that counts as a hand in the two-blade run (its EX, Pinning Knife,
+  keeps a foe from turning for 3 s; a boss turns at half speed); Blade Flurry, 4 cuts 0.3 s apart,
+  hands alternating, the 4th the finisher, a dodge cutting it off (its EX, Hemorrhage, keeps every
+  backstab on a foe whole for 8 s); Quickstep, 2 charges of a free 5 yd dodge that cuts your own
+  blow at any point (its EX, Afterimage, leaves a shade the foes on you turn to for 1.5 s);
+  Evasion, a perfect dodge up to 0.28 s in and dodges for 8 stamina for 5 s (its EX, Adrenaline
+  Rush, makes blows and dodges free for 6 s); Blade Dance, 8 s in which every dodge that evades is
+  perfect, free, and cuts the striker from behind for 60%. A hero created as a Rogue
   fights with two blades and never blocks or parries (`docs/rogue-roles.md`): it starts with two
   daggers and can't hold a shield, a two-hander, a staff or an axe; the right mouse button swings
   the off hand (an empty off hand jabs for half); a dodge whose blow lands 0.04 to 0.18 s in is a

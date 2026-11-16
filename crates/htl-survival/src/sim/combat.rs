@@ -467,7 +467,9 @@ impl Survival {
                     return true;
                 }
                 // A Rogue's dodge-feint: pressed in their own wind-up, the blow is called off.
-                if fresh && self.players[&id].stamina >= self.content.dodge.needs() {
+                // (A dodge's cost is less under Evasion, nothing under Adrenaline Rush.)
+                let needs = self.dodge_needs(id);
+                if fresh && self.players[&id].stamina >= needs {
                     self.dodge_feint(id);
                 }
                 let p = &self.players[&id];
@@ -475,7 +477,7 @@ impl Survival {
                 if !(free || busy_soft || self.cancelable(p) || matches!(p.action, Action::Cast { .. })) {
                     return false;
                 }
-                if !fresh || self.players[&id].stamina < self.content.dodge.needs() {
+                if !fresh || self.players[&id].stamina < needs {
                     self.winded(id);
                     return true;
                 }
@@ -644,7 +646,8 @@ impl Survival {
                 // A Rogue's off hand never commits them: a dodge cuts it short as soon as it lands.
                 let share = if strike.heavy() {
                     c.heavy_cancel_after
-                } else if strike.kind == StrikeKind::Off && self.is_rogue(p) {
+                } else if (strike.kind == StrikeKind::Off && self.is_rogue(p)) || self.flurrying(p) {
+                    // (Blade Flurry: any cut that has struck, between it and the next.)
                     self.content.rogue.off_cancel_after
                 } else {
                     c.cancel_after
@@ -690,7 +693,9 @@ impl Survival {
         };
         let heavy = kind == StrikeKind::Heavy;
         // Rallying Cry: every blow comes that much quicker. Cowed, it winds up slower.
-        let quick = 1.0 / (1.0 + self.rallied_haste(id) + self.bloodlust_haste(id));
+        // A Rogue's Flourish: harder and quicker for each.
+        let (flourish, flourish_haste) = self.flourish_boost(id);
+        let quick = 1.0 / (1.0 + self.rallied_haste(id) + self.bloodlust_haste(id) + flourish_haste);
         let cowed = 1.0 + self.cowed_slow(id);
         Strike {
             kind,
@@ -698,7 +703,7 @@ impl Survival {
             windup: windup * m.windup * quick * cowed,
             active: w.active,
             recovery: recovery * m.recovery * quick,
-            damage: m.damage * if heavy { h.damage } else { 1.0 } * share,
+            damage: m.damage * if heavy { h.damage } else { 1.0 } * share * flourish,
             range: w.range * m.range,
             arc: w.arc,
             stagger: if heavy { w.stagger.max(h.stagger) } else { w.stagger },
@@ -759,7 +764,7 @@ impl Survival {
         }
     }
 
-    fn start_swing_with(&mut self, id: Id, kind: StrikeKind, pay: bool) {
+    pub(crate) fn start_swing_with(&mut self, id: Id, kind: StrikeKind, pay: bool) {
         // Avenging Wrath: every heavy attack sends a wave of light toward the reticle.
         if kind == StrikeKind::Heavy && self.has_cc(id, "wrath") {
             self.avenging_wave(id);
@@ -782,7 +787,8 @@ impl Survival {
         let dual = self.players.get(&id).is_some_and(|p| self.two_hands(p));
         if dual && matches!(kind, StrikeKind::Light | StrikeKind::Off) {
             let p = &self.players[&id];
-            let alternate = p.dual_run > 0 && p.dual_last_off != off && self.clock <= p.combo_until + DUAL_WINDOW;
+            // (After a Darting Knife, either hand carries the run on.)
+            let alternate = p.dual_run > 0 && (p.dual_last_off != off || p.rogue.any_hand) && self.clock <= p.combo_until + DUAL_WINDOW;
             let run = if alternate { p.dual_run + 1 } else { 1 };
             let finish = run >= DUAL_FINISH_AT;
             if finish {
@@ -796,6 +802,7 @@ impl Survival {
             let p = self.players.get_mut(&id).unwrap();
             p.dual_run = if finish { 0 } else { run };
             p.dual_last_off = off;
+            p.rogue.any_hand = false;
         }
         if pay {
             self.spend_attack(id, strike.stamina);
@@ -1042,8 +1049,15 @@ impl Survival {
     }
 
     fn start_dodge(&mut self, id: Id) {
+        let cost = self.dodge_cost(id);
+        self.start_dodge_as(id, cost, false);
+    }
+
+    /// A dodge for this much stamina; `quick`, a Quickstep's (its own pace along the ground).
+    pub(crate) fn start_dodge_as(&mut self, id: Id, cost: f32, quick: bool) {
         if let Some(p) = self.players.get_mut(&id) {
             p.dodge_attack = false;
+            p.rogue.quick = quick;
         }
         self.run_through_dodge(id);
         let c = self.content.dodge.clone();
@@ -1070,7 +1084,7 @@ impl Survival {
         let dash = fx.abs() + fy.abs() >= 0.01;
         let rel = if dash { fy.atan2(fx) } else { PI };
         let dir = (p.facing + rel).rem_euclid(std::f32::consts::TAU);
-        self.spend(id, c.stamina);
+        self.spend(id, cost);
         // With a direction held, the dash is the hero's own run, sped up (set_action sends the
         // speed); with none, a hop back.
         self.set_action(id, Action::Dodge { t: 0.0, dir, dash });
@@ -2429,6 +2443,8 @@ impl Survival {
             let caught = recap::caught_word(&doing, outcome, blockable);
             self.set_cause(victim, recap::Cause::blow(attacker, recap::blow_word(style, heavy), caught));
             let before = p_health(self, victim);
+            // A Rogue's Flourish: every one gone to a blow that lands.
+            self.lose_flourish(victim);
             self.hurt_player(victim, landed);
             // Shadowguard: what the shell stopped of it, stored.
             if p_health(self, victim) <= before {
@@ -3289,11 +3305,16 @@ impl Survival {
     }
 
     /// A backstab's bonus on a creature, less for each one it took lately.
-    fn backstab_bonus(&mut self, mid: Id, stab: f32) -> f32 {
+    /// (Under a Rogue's Hemorrhage it remembers none: the whole bonus, every time.)
+    pub(crate) fn backstab_bonus(&mut self, mid: Id, stab: f32) -> f32 {
         let now = self.clock;
         let heroes = self.heroes_on(mid).max(1);
+        let open = self.has_cc(mid, "hemorrhage");
         let Some(m) = self.mobs.get_mut(&mid) else { return stab };
         m.backstabs.retain(|t| now - *t <= BACKSTAB_MEMORY);
+        if open {
+            return stab;
+        }
         let n = m.backstabs.len() as i32;
         // Each lately takes a quarter of the bonus, a third with three heroes or more.
         let keep = if heroes >= 3 { 0.66f32 } else { 0.75 };
@@ -3303,11 +3324,15 @@ impl Survival {
     /// Stabbed from behind: remembered; and a champion with more than one hero on it may turn on
     /// the one at its back (the more heroes, the likelier), so no one strikes it from behind for
     /// long while another holds it.
-    fn backstabbed(&mut self, mid: Id, by: Id) {
+    /// (Under a Rogue's Hemorrhage, not remembered; it may still wheel.)
+    pub(crate) fn backstabbed(&mut self, mid: Id, by: Id) {
         let now = self.clock;
         let heroes = self.heroes_on(mid);
+        let open = self.has_cc(mid, "hemorrhage");
         let Some(m) = self.mobs.get_mut(&mid) else { return };
-        m.backstabs.push(now);
+        if !open {
+            m.backstabs.push(now);
+        }
         let boss = self.content.mobs[m.def].boss || self.content.mobs[m.def].posture > 0;
         let on_other = m.state.target().is_some_and(|t| t != by);
         if !boss || !on_other || heroes < 2 || m.health == 0 {
