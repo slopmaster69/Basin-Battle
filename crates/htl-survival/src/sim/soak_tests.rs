@@ -20,7 +20,7 @@
 //!   `SOAK_DEATHS=1` logs each hero's first death with what was near.
 //! - `SOAK_TRACE=a,b` prints what the journey's scouts see as it happens: `tells` (what the camp
 //!   says to them), `chest` (each chest they open), or a creature's key (its state every second
-//!   of the fight with it).
+//!   of the fight with it), or `escort` (the seal-cutter's road: where Pell is, and which leg).
 //!
 //! It runs about 3 simulated hours of Elwynn a minute in release. The Basin Battle card mode (the
 //! `htl-sim` crate) has its own, `soak_card_mode_run_after_run` in `htl-sim/src/tests.rs`, run
@@ -39,7 +39,7 @@
 //! champions), killing (a creature in Elwynn, or in the dungeon whose pack it is), taking the
 //! Horde's camps, raids met at the heart, dungeons entered by the book, cleared boss by boss, left by a lamp and the
 //! news sent home (`Event::ToCamp`) as the server does it, with the camp's people spoken to and
-//! their links followed. Each dungeon is its own world beside the camp's. The scouts' blows are
+//! their links followed, and the seal-cutter's escort walked beside him to the gate. Each dungeon is its own world beside the camp's. The scouts' blows are
 //! `hurt_mob_as` slices (a dev world's abilities do no damage) while they also press buttons at
 //! what they fight, so every boss's phases, adds, holds, doors and deaths run. When the route
 //! is done they go on: the chests again in order, every place, every camp, every dungeon cleared

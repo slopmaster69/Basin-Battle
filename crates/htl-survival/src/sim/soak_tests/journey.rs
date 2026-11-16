@@ -1063,6 +1063,12 @@ impl Pilot {
         if trace("chest") {
             eprintln!("TRACE chest {key}: before {acted:?}, after use {started:?}, now {:?}, hero at {:.0?} chest at {:.0?}, trial {}, opened {}", c.s.players.get(&h).map(|p| format!("{:?}", p.action)), c.s.players.get(&h).map(|p| p.pos), pos, c.s.trials.contains_key(&def), c.s.camp.opened.contains_key(key));
         }
+        // An escort: the party walks with him (see `escort`); lost, it is tried again at the next step.
+        if !ch.escort.is_empty() && c.s.trials.contains_key(&def) {
+            self.trials += 1;
+            self.escort(c, def);
+            return true;
+        }
         // A trial: its guardians on the party, and the trial passed when the last falls. A hold
         // (the wagon) is that and its time, kept near the chest while its waves come to the party
         // (a wave is one pack or several joined with `+`).
@@ -1081,6 +1087,48 @@ impl Pilot {
             }
         }
         true
+    }
+
+    /// An escort under way (its satchel opened): the party stays beside the walker as he goes
+    /// along his road (he walks only while a hero is near him and nothing is on him), fells what
+    /// comes for him (a wave's knives, Crane), and sees him to the gate. Lost (he is struck down, or
+    /// no hero was near for long), it ends here: the satchel is opened again at the next step.
+    fn escort(&mut self, c: &mut Ctx, def: usize) {
+        let t0 = c.s.clock;
+        let mut ticks = 0usize;
+        while c.live() && c.s.clock - t0 < 1800.0 {
+            let Some(w) = c.s.trials.get(&def).map(|t| t.walker) else { break };
+            let Some(w) = w else { break };
+            let Some(wpos) = c.s.mobs.get(&w).filter(|m| m.health > 0 && !m.hidden).map(|m| m.pos) else { break };
+            let (_, ids) = c.scouts();
+            if ids.is_empty() {
+                break;
+            }
+            // What is on him, or on the road to him: the nearest to him first.
+            let s = &c.s;
+            let foe = s.mobs.iter().filter(|(_, m)| m.health > 0 && !m.hidden && !m.friendly && (m.state.foe() == Some(Foe::Mob(w)) || dist2d(m.pos, wpos) < 25.0 && m.pack.is_some_and(|k| s.content.packs[k].key.starts_with("pell_"))))
+                .map(|(id, m)| (*id, dist2d(m.pos, wpos))).min_by(|a, b| a.1.total_cmp(&b.1));
+            match foe {
+                Some((mid, _)) => self.pull(c, None, mid),
+                None => {
+                    // Beside him (he walks on while they are within 20 yd), a step behind.
+                    for (k, id) in ids.iter().enumerate() {
+                        if c.s.players.get(id).is_some_and(|p| dist2d(p.pos, wpos) > 6.0) {
+                            let to = c.s.ground_near(wpos[0] - 2.0 - k as f32, wpos[1], wpos[2]);
+                            tele(&mut c.s, *id, to);
+                        }
+                    }
+                    c.wait(0.5);
+                }
+            }
+            ticks += 1;
+            if trace("escort") && ticks % 20 == 0 {
+                eprintln!("TRACE escort: t {:.0} Pell at {:.0?} leg {:?}", c.s.clock - t0, wpos, c.s.trials.get(&def).map(|t| (t.leg, t.called)));
+            }
+        }
+        if !c.s.trials.contains_key(&def) && !c.s.camp.opened.contains_key("pell_satchel") && trace("escort") {
+            eprintln!("TRACE escort: lost at {:.0} s", c.s.clock - t0);
+        }
     }
 
     /// Do what a condition asks (a chest's `after`, a person's): a creature felled, a chest opened,
