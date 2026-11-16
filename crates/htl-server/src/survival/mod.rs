@@ -34,6 +34,9 @@ mod watch;
 #[cfg(test)]
 #[path = "rail_tests.rs"]
 mod rail_tests;
+#[cfg(test)]
+#[path = "perf_tests.rs"]
+mod perf_tests;
 
 pub(crate) const TICK: Duration = Duration::from_millis(50);
 /// Saves at most this often (and when a hero leaves).

@@ -93,6 +93,16 @@ fn frame(p: &Packet, encrypt: impl FnOnce(&mut [u8])) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// A batch of queued packets is cut off at about this many bytes.
+const BATCH_MOST: usize = 32 * 1024;
+
+/// `frame`, appended to `out` (nothing for a packet too big for any header).
+fn frame_into(out: &mut Vec<u8>, p: &Packet, encrypt: impl FnOnce(&mut [u8])) {
+    if let Some(bytes) = frame(p, encrypt) {
+        out.extend_from_slice(&bytes);
+    }
+}
+
 fn write_plain(s: &mut TcpStream, p: &Packet) -> std::io::Result<()> {
     match frame(p, |_| {}) {
         Some(out) => s.write_all(&out),
@@ -147,8 +157,19 @@ fn serve(mut s: TcpStream, keys: &SessionKeys, game: &Sender<Inbound>) -> Result
     std::thread::Builder::new()
         .name(format!("world-write-{conn}"))
         .spawn(move || {
-            for p in out_rx {
-                if write_encrypted(&mut ws, &mut enc, &p).is_err() {
+            // Whatever the game thread has queued goes out in one write (a tick queues dozens of
+            // small packets: one write and one segment each cost far more than the bytes do).
+            let mut batch: Vec<u8> = Vec::with_capacity(BATCH_MOST);
+            for p in out_rx.iter() {
+                batch.clear();
+                frame_into(&mut batch, &p, |h| enc.encrypt(h));
+                while batch.len() < BATCH_MOST {
+                    match out_rx.try_recv() {
+                        Ok(p) => frame_into(&mut batch, &p, |h| enc.encrypt(h)),
+                        Err(_) => break,
+                    }
+                }
+                if ws.write_all(&batch).is_err() {
                     break;
                 }
             }
@@ -222,6 +243,34 @@ mod tests {
         // The largest two-byte size stays two bytes; one more takes three.
         assert_eq!(server_header(&packet(0x7ffd)).unwrap()[..2], [0x7f, 0xff]);
         assert_eq!(server_header(&packet(0x7ffe)).unwrap()[..3], [0x80, 0x80, 0x00]);
+    }
+
+    /// A batch is the packets' frames end to end, each header run through the cipher in order (a
+    /// stream cipher: the order is the only thing that matters to the client).
+    #[test]
+    fn a_batch_is_the_frames_end_to_end_with_the_cipher_run_in_order() {
+        let packets = [packet(3), packet(0), packet(300), packet(LONG_SIZE_MAX - 1), packet(7)];
+        let run = |batched: bool| {
+            let mut n = 0u8;
+            let mut cipher = move |h: &mut [u8]| {
+                for b in h {
+                    n = n.wrapping_add(31);
+                    *b ^= n;
+                }
+            };
+            let mut out = Vec::new();
+            for p in &packets {
+                if batched {
+                    frame_into(&mut out, p, &mut cipher);
+                } else if let Some(f) = frame(p, &mut cipher) {
+                    out.extend_from_slice(&f);
+                }
+            }
+            out
+        };
+        assert_eq!(run(true), run(false));
+        // The oversized one is dropped, the rest stay.
+        assert_eq!(run(true).len(), [3, 0, 300, 7].iter().map(|b| b + 2 + 2).sum::<usize>());
     }
 
     #[test]
