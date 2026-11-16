@@ -172,3 +172,43 @@ fn run_to(s: &mut Survival, secs: f32) {
         s.step(DT);
     }
 }
+
+/// With the floor markers off a small lobbed splash is told by the thrown thing: it is let go at
+/// the spot marked in the wind-up (where the hero stood), spends at least `LOB_MIN_FLY` in the air
+/// even point blank, a hero who reacts in 0.3 sec still has time to dash out of its ring, one who
+/// stands still is hit, and the only ring ever drawn for it is the optional `GroundWarn`.
+#[test]
+fn a_small_lobbed_splash_reads_by_the_thrown_thing_in_the_air_with_the_markers_off() {
+    for stand in [1.0f32, 8.0] {
+        let (mut s, h) = world();
+        s.players.get_mut(&h).unwrap().health = 100_000;
+        s.players.get_mut(&h).unwrap().max_health = 100_000;
+        s.move_player(h, [stand, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+        let def = s.content.mob("dm_smite").unwrap();
+        s.content.mobs[def].patterns.clear();
+        s.content.mobs[def].special = Some(special("chance = 1.0\nranged = true\nradius = 3.0\nspeed = 12.0\nspell = 7978\nwindup = 1.0"));
+        let id = s.spawn_mob(def, [0.0, 0.0, 0.0], None, false);
+        s.events.clear();
+        s.windup(id, mobs::Foe::Hero(h), s.players[&h].pos);
+        let mut events: Vec<Event> = s.events.drain(..).collect();
+        let (mut released, mut air) = (None, 0.0);
+        for _ in 0..400 {
+            events.extend(s.step(DT));
+            if released.is_none() && !s.missiles.is_empty() {
+                released = Some(s.clock);
+                air = s.missiles[0].land_at - s.clock;
+            }
+            if released.is_some() && s.missiles.is_empty() { break; }
+        }
+        assert!(released.is_some(), "the thrown thing was let go");
+        assert!(air >= mobs::LOB_MIN_FLY - 0.05, "{air:.2} sec in the air at {stand} yd");
+        assert!(0.3 + s.content.dodge.dash_secs <= air, "a 0.3 sec reaction and the dash fit in the flight");
+        assert!(s.content.dodge.speed * s.content.dodge.dash_secs >= 3.0, "the dash clears the 3 yd ring");
+        let spot = events.iter().find_map(|e| match e { Event::Missile { caster, target: Target::Point(p), .. } if *caster == id => Some(*p), _ => None })
+            .expect("the throw is shown");
+        assert!(dist2d(spot, [stand, 0.0, 0.0]) < 0.5, "it comes down where the hero stood at the wind-up");
+        assert!(events.iter().any(|e| matches!(e, Event::GroundWarn { shape: "ring", .. })), "the ring is the optional extra");
+        assert!(!events.iter().any(|e| matches!(e, Event::GroundBurst { shape: "ring", .. })), "never drawn whatever the setting");
+        assert!(s.players[&h].health < 100_000, "a hero who stood still was hit");
+    }
+}
