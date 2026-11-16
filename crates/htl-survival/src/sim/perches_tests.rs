@@ -1299,5 +1299,5 @@ fn the_pole_struck_just_as_the_spill_lands_drops_the_man_once() {
     assert!(matches!(s.perches.workers[&crew[0]].state, Place::Ground));
     assert!(s.perches.crews[&boss].demo.is_none());
     assert!(perched(&s, crew[1]), "the second is not taken down with him");
-    assert_eq!(s.perches.crews[&boss].props.iter().filter(|id| display(&s, **id) == Some(PLANK)).count() >= 1, true);
+    assert!(s.perches.crews[&boss].props.iter().any(|id| display(&s, *id) == Some(PLANK)), "the second's plank still stands");
 }
