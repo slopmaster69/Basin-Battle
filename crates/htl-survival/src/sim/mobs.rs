@@ -2080,6 +2080,8 @@ impl Survival {
                 continue;
             }
             let raider = self.mobs[&mid].raider;
+            // (A blow it was winding up never lands: its mark goes with it.)
+            if let MobState::Windup { mark: Some(mk), .. } = self.mobs[&mid].state { self.unmark(mk); }
             self.mobs.get_mut(&mid).unwrap().state = MobState::Return;
             if raider {
                 self.raider_next(mid);

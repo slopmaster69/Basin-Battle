@@ -107,6 +107,12 @@ A lost fight puts it back whole (the duel and its guards are removed with the wi
 again on the next pull: 8 guards, nobody held, the cry unspent). With two heroes each is held
 and shoved on their own.
 
+The last hero leaving mid-fight (the world takes no steps with nobody in it) puts it back at that
+moment, in `Survival::leave`: the duel and the guards gone, the open pose and raised blades let go,
+any wind-up mark down, him home and whole (Unbowed whole where he rose). The next hero finds a fresh
+pull. One of two leaving hands him to the other; with one down and one up, the fight is only
+abandoned once both have gone.
+
 ## How it reads
 
 The Nov 9 filming (sword hero) found "hunched means hit" back to front on screen: the hunch was
