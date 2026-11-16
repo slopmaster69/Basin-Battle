@@ -574,12 +574,11 @@ impl SurvivalGame {
         // (A retired weapon in hand shows as its family's basic one, as it comes in.)
         let weapon = c.item(&s.weapon).or_else(|| c.item(htl_survival::save::retired_weapon(&s.weapon)));
         let two = weapon.and_then(|i| c.weapon(&c.items[i].key)).is_some_and(|w| w.two_handed);
-        // The off hand as `worn` has it: a second blade (a Rogue's), nothing, or the shield (never
-        // a Rogue's: an old Rogue save's shield goes to the bags as it comes in).
+        // A Rogue's off hand as `worn` has it: the second blade or nothing, never a shield (an old
+        // Rogue save's shield goes to the bags as it comes in). Everyone else: the shield, as ever.
         let off = match s.off_hand.as_str() {
-            "" if s.class == htl_survival::sim::rogue::ROGUE => None,
-            "" => c.item(&s.shield),
-            "none" => None,
+            _ if s.class != htl_survival::sim::rogue::ROGUE => c.item(&s.shield),
+            "" | "none" => None,
             k => c.item(k).filter(|i| c.items[*i].kind == htl_survival::ItemKind::Weapon),
         };
         let shield = off.filter(|_| !two);

@@ -351,8 +351,8 @@ What the design left open, decided in the pull request that built it:
     Rogue always has a blade to fight with. The off hand is left empty (it jabs), as the table says.
   - A shield, a two-hander or an axe a Rogue **forges** at a station goes to Camp Storage with
     "Rogues can't use shields." (or the weapon's words), never into the hands.
-  - The **character screen** shows the off hand's blade (or nothing), as the world does, and never
-    an old Rogue save's shield.
+  - The **character screen** shows a Rogue's off-hand blade (or nothing), as the world does, and
+    never an old Rogue save's shield. Other classes' look there is left as it was.
   - The perfect dodge's **sound** is Vanish's (`SOUND_PERFECT_DODGE`, 3324 in `sim/cues.rs`); the
     id is to be checked when it is first filmed.
   - The **`perfect_dodge` beat** is in the add-on (`Cues.lua`, add-on 70): a 90 ms stop on the
