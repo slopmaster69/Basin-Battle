@@ -128,3 +128,5 @@ mod tests_content_rules;
 mod tests_hero_fuzz;
 #[cfg(test)]
 mod tests_story;
+#[cfg(test)]
+mod tests_boss_rules;

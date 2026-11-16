@@ -3139,6 +3139,11 @@ pub struct PatternDef {
     /// keeps it for the enrage alone.
     #[serde(default = "one_f")]
     pub below: f32,
+    /// A parry of any blow of the string ends it, for a boss too (whose parries only fill its
+    /// posture: `[parry] posture`). "Parry the first and the rest never come": the creature
+    /// doesn't reel (so a group can't parry it into reeling forever), it just loses the string.
+    #[serde(default)]
+    pub parry_ends: bool,
     pub steps: Vec<SpecialDef>,
 }
 

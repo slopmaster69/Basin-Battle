@@ -2444,6 +2444,9 @@ impl Survival {
             if limit > 0 && self.content.mobs[def].boss && c.parry.posture > 0.0 {
                 let fill = self.posture_limit(attacker) as f32 * c.parry.posture;
                 self.build_posture(attacker, victim, fill.round() as u32);
+                // A string whose rule is "parry the first and the rest never come" (a pattern's
+                // `parry_ends`) still stops for a boss: no reel, the string simply is over.
+                self.end_string_parried(attacker);
             } else {
                 self.stagger_mob(attacker, c.parry.stagger, true);
             }

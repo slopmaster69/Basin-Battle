@@ -8648,6 +8648,7 @@ respawn = 1200.0
   [[mob.pattern]]
   name = "flurry"
   weight = 2.5
+  parry_ends = true
   steps = [ { clip = 16, take = 0, windup = 0.45, damage = 9, recovery = 0.1 }, { clip = 16, take = 1, windup = 0.25, damage = 9, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.3, damage = 12, recovery = 1.0 } ]
   # A dive in from afar.
   [[mob.pattern]]
@@ -9326,6 +9327,7 @@ death_text = "Tell them... the price was fair."
   [[mob.pattern]]
   name = "stabs"
   weight = 1.5
+  parry_ends = true
   steps = [ { from = "TrollFemale", clip = 17, take = 0, windup = 0.45, damage = 7, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.25, damage = 7, recovery = 0.08 }, { from = "GnomeMale", clip = 17, take = 0, windup = 0.28, damage = 9, recovery = 1.1 } ]
   # A lunge to close the gap when he's tired of waiting.
   [[mob.pattern]]
@@ -10005,6 +10007,7 @@ respawn = 1200.0
   [[mob.pattern]]
   name = "flurry"
   weight = 2.5
+  parry_ends = true
   steps = [ { from = "GnomeMale", clip = 17, take = 0, windup = 0.4, damage = 10, recovery = 0.08 }, { from = "GnomeFemale", clip = 17, take = 1, windup = 0.22, damage = 10, recovery = 0.08 }, { from = "TrollMale", clip = 17, take = 0, windup = 0.22, damage = 10, recovery = 0.08 }, { from = "HumanFemale", clip = 17, take = 1, windup = 0.25, damage = 13, recovery = 1.0 } ]
   # A poisoned stab through the guard (the red ! warns of it).
   [[mob.pattern]]

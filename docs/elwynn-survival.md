@@ -967,7 +967,10 @@ hero comes near; spiders drop out of the dark at Jasperlode.
 
 **Rares** wander between spots and come back somewhere else a while after they fall; their fall,
 and their return (and where they've been seen), is told to everyone: Hogger, Garrick Padfoot, Taskmaster Snivvle, Grizzlefin, Mother Fang, Goldtooth,
-Princess. Every champion and rare leaves a trophy in the chest the first time (Hogger's Cudgel,
+Princess. "Parry the first and the rest never come" holds for every string that says so, a boss's too:
+a parry only fills a boss's posture (it never stun-locks one), so Goldtooth's, Morgan's and Paymaster
+Voss's flurries carry `parry_ends = true`, which ends the string at a parry without a reel
+(`tests_boss_rules.rs` checks every such comment against the sim). Every champion and rare leaves a trophy in the chest the first time (Hogger's Cudgel,
 Rak'gash's pauldrons, Morgan's vest, silver, pearls...). Patrols walk the roads; rabbits, deer,
 squirrels and the farms' beasts never fight back and run from a blow (some give meat or wool).
 The camps look lived in (`[[prop]]`): the Brotherhood's fires and wagons, the kobolds' carts and
