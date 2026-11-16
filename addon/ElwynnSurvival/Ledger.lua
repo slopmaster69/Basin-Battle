@@ -1654,9 +1654,12 @@ end)
 -- Every frame the add-on made, by its name: each font in the Ledger's faces. Rows and marks made
 -- after load are caught on the next sweep.
 
+-- A region dressed already, or one that is no font, is passed by its mark, without asking the
+-- client its type again.
 local function RefontTree(f)
   Walk(f, function(r)
-    if IsFont(r) then Refont(r) end
+    if r.ledgerFont or r.ledgerNotFont then return end
+    if IsFont(r) then Refont(r) else r.ledgerNotFont = true end
   end)
 end
 
@@ -1707,11 +1710,25 @@ end)
 
 L.Apply()
 
+-- A sweep every 1.5 s, three of the named frames a tick: the whole walk at once was a hitch.
 local sweeper = CreateFrame("Frame", "ElwynnSurvivalLedgerSweep", UIParent)
 sweeper.t = 0
 sweeper:SetScript("OnUpdate", function()
   this.t = this.t + (arg1 or 0)
-  if this.t < 1.5 then return end
-  this.t = 0
-  if ES.awake then L.Sweep() end
+  if not this.at then
+    if this.t < 1.5 then return end
+    this.t = 0
+    if not ES.awake then return end
+    if not named then L.FindFrames() end
+    this.at = 1
+  end
+  for _ = 1, 3 do
+    local f = named and named[this.at]
+    if not f then
+      this.at = nil
+      return
+    end
+    this.at = this.at + 1
+    RefontTree(f)
+  end
 end)

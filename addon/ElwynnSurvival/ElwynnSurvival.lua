@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 74
+local VERSION = 75
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1965,13 +1965,28 @@ function ES.SkinPlate(plate)
   plate:SetAlpha(hurt and 1 or 0)
 end
 
+-- The plates among the WorldFrame's children, looked for again only when it gains or loses a
+-- child, or each second (the client makes its plates once and reuses them): asking every child
+-- every frame whether it was a plate was most of this watch's cost in a crowd.
+ES.plateList = { kids = -1 }
 ES.plateWatch = CreateFrame("Frame")
 ES.plateWatch:SetScript("OnUpdate", function()
   if not ES.awake or not WorldFrame or not WorldFrame.GetChildren then return end
-  local kids = { WorldFrame:GetChildren() }
-  for i = 1, table.getn(kids) do
-    local k = kids[i]
-    if k:IsShown() and ES.IsPlate(k) then ES.SkinPlate(k) end
+  this.t = (this.t or 0) + (arg1 or 0)
+  local list = ES.plateList
+  local kidCount = WorldFrame.GetNumChildren and WorldFrame:GetNumChildren() or -2
+  if kidCount ~= list.kids or kidCount == -2 or this.t >= 1 then
+    this.t = 0
+    list = { kids = kidCount }
+    local kids = { WorldFrame:GetChildren() }
+    for i = 1, table.getn(kids) do
+      if ES.IsPlate(kids[i]) then table.insert(list, kids[i]) end
+    end
+    ES.plateList = list
+  end
+  for i = 1, table.getn(list) do
+    local k = list[i]
+    if k:IsShown() then ES.SkinPlate(k) end
   end
 end)
 
