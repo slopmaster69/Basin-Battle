@@ -1,10 +1,9 @@
--- Elwynn Survival: the letter. A page to read at leisure: a note found below, a secret come upon,
--- the book's record of a dungeon (what's found, the rumours of the rest, every note to read
--- again). Parchment that stays up till it's closed (Escape, the ink cross, or Close), and a
--- clue in red ink under a note while what it points to is still hidden.
+-- Elwynn Survival: the letter. The Bookmaker's pages: a wager's terms and the board's records,
+-- parchment that stays up till it's closed (Escape, the ink cross, or Close), each wager or
+-- record a button. (Words to read, a note, a secret, the book's record, a run's tally, and what
+-- the camp's people say, are told in chat: `Words.lua`.)
 --
--- The server sends `NT kind title place text clue links`: kind is note, secret, lore, wager, board,
--- run (a run's tally as you leave it) or talk (what a person in the camp says); `{n}`
+-- The server sends `NT kind title place text clue links`: kind is wager or board here; `{n}`
 -- breaks a line in the text; links are `command~label` with `^` between.
 --
 -- It loads after Ledger.lua and wears its art and fonts (a plain dark page without it).
@@ -30,22 +29,17 @@ local WIDTHS = { 460, 600, 740 }
 local LINK_H = 28
 local LINK_W = 280
 
--- The inks: the page's, a faded one, the clue's red, the links' blue.
+-- The inks: the page's, a faded one, a red for the hover, the links' blue.
 local INK = { 0.165, 0.13, 0.094 }
 local SEPIA = { 0.353, 0.275, 0.188 }
 local WAX = { 0.604, 0.169, 0.125 }
 local FROST = { 0.184, 0.373, 0.47 }
 -- The seal on each kind of page.
-local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue", wager = "seal_grey", board = "seal_grey", run = "seal_check", talk = "seal_blue" }
+local SEALS = { wager = "seal_grey", board = "seal_grey" }
 -- And the line at its foot.
 local FOOT = {
-  note = "Kept in the logbook, under Secrets and Notes.",
-  secret = "Written into the logbook, under Secrets and Notes.",
-  lore = "Click a note to read it again.",
   wager = "Click a wager to take it. The dungeon starts fresh.",
   board = "Every server's runs, through the board's keeper.",
-  run = "The run's tally, as you leave it. The book at camp keeps the dungeon's page.",
-  talk = "Talk to them again as the camp grows.",
 }
 
 local ledger = ES.ledger
@@ -109,10 +103,6 @@ f.rule = Art("ARTWORK", "divider_vine", 300, 18)
 f.rule:SetVertexColor(1, 1, 1, 0.8)
 f.body = Text(SERIF, 15, INK, "LEFT")
 if f.body.SetSpacing then f.body:SetSpacing(3) end
-f.clueRule = Art("ARTWORK", "divider_small", 48, 24)
-f.clueHead = Text(TITLE, 13, WAX, "CENTER")
-f.clueHead:SetText("A Clue")
-f.clue = Text(SERIF, 14, WAX, "CENTER")
 f.foot = Text(TITLE, 12, SEPIA, "CENTER")
 
 -- The ink cross, top right; Close, at the foot.
@@ -173,13 +163,13 @@ local function Tall(fs, size, text)
 end
 
 -- The page, laid out top to bottom at `w` wide and sized to what's on it.
-local function Lay(kind, title, place, text, clue, links, w)
+local function Lay(kind, title, place, text, links, w)
   w = w or W
   inner = w - 2 * PAD
   f:SetWidth(w)
-  local words = { f.title, f.place, f.body, f.clueHead, f.clue, f.foot }
+  local words = { f.title, f.place, f.body, f.foot }
   for i = 1, table.getn(words) do words[i]:SetWidth(inner) end
-  f.seal:SetTexture(A .. (SEALS[kind] or "seal_red"))
+  f.seal:SetTexture(A .. (SEALS[kind] or "seal_grey"))
   local y = 34
   local function put(region, h, gap)
     region:ClearAllPoints()
@@ -198,20 +188,6 @@ local function Lay(kind, title, place, text, clue, links, w)
   put(f.rule, 18, 10)
   f.body:SetText(text)
   put(f.body, Tall(f.body, 15, text), 14)
-  if clue ~= "" then
-    f.clueRule:Show()
-    f.clueHead:Show()
-    f.clue:Show()
-    put(f.clueRule, 20, 0)
-    f.clueHead:SetText(kind == "secret" and "Left Here" or "A Clue")
-    put(f.clueHead, 16, 2)
-    f.clue:SetText(clue)
-    put(f.clue, Tall(f.clue, 14, clue), 12)
-  else
-    f.clueRule:Hide()
-    f.clueHead:Hide()
-    f.clue:Hide()
-  end
   local n = 0
   for i = 1, MAX_LINKS do
     if links[i] then n = n + 1 end
@@ -243,20 +219,20 @@ local function Lay(kind, title, place, text, clue, links, w)
     end
   end
   if n > 0 then y = top + math.ceil(n / cols) * (bh + gap) + 8 end
-  f.foot:SetText(FOOT[kind] or FOOT.note)
+  f.foot:SetText(FOOT[kind] or FOOT.wager)
   put(f.foot, 14, 0)
   f:SetHeight(math.max(180, y + 30))
   if f.paper.Fit then f.paper.Fit() end
 end
 
 -- Laid out at the narrowest width that fits the screen's height; past the widest, scaled down.
-local function Fit(kind, title, place, text, clue, links)
+local function Fit(kind, title, place, text, links)
   local room = (UIParent and UIParent:GetHeight() or 768) - 60
   local roomW = (UIParent and UIParent:GetWidth() or 1024) - 40
   for i = 1, table.getn(WIDTHS) do
     local w = WIDTHS[i]
     if i == 1 or w <= roomW then
-      Lay(kind, title, place, text, clue, links, w)
+      Lay(kind, title, place, text, links, w)
       if (f:GetHeight() or 0) <= room then break end
     end
   end
@@ -266,9 +242,8 @@ end
 
 -- A page from the server.
 function ES.Letter(fields)
-  local kind = fields[2] or "note"
+  local kind = fields[2] or "wager"
   local text = string.gsub(fields[5] or "", "{n}", "\n")
-  local clue = string.gsub(fields[6] or "", "{n}", "\n")
   local links = {}
   if fields[7] and fields[7] ~= "" and ES.Split then
     local items = ES.Split(fields[7], "^")
@@ -277,14 +252,14 @@ function ES.Letter(fields)
       if l[1] and l[1] ~= "" then table.insert(links, { l[1], l[2] or l[1] }) end
     end
   end
-  Fit(kind, fields[3] or "", fields[4] or "", text, clue, links)
+  Fit(kind, fields[3] or "", fields[4] or "", text, links)
   if not f:IsShown() then
     PlaySound("igQuestListOpen")
     f.switched = ES.mode ~= "cursor"
     f:Show()
     if ES.WindowMode then ES.WindowMode() end
   end
-  ES.letterShown = { kind = kind, title = fields[3] or "", clue = clue, links = table.getn(links), height = f:GetHeight() }
+  ES.letterShown = { kind = kind, title = fields[3] or "", links = table.getn(links), height = f:GetHeight() }
 end
 
 f:SetScript("OnHide", function()

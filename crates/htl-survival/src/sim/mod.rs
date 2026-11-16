@@ -357,12 +357,16 @@ pub enum Event {
     Announce { text: String },
     /// A big banner for everyone (or one hero).
     Banner { player: Option<Id>, title: String, sub: String },
-    /// A page for one hero to read at leisure (a note, a secret found, the book's record of a
-    /// dungeon): stays up till closed. `kind` is note, secret or lore; `text`'s paragraphs are
-    /// split by blank lines; `links` are (command, label) to read on.
     /// A wager won (in time or not), for the camp and the Bookmaker's Board.
     WagerDone(wager::WagerRun),
+    /// Words for one hero to read where they stand, told in chat (no page): a note, a secret
+    /// found, the book's record of a dungeon, a run's tally. `kind` is note, secret, lore or run;
+    /// `text`'s lines are split by newlines; `links` are (command, label) to read on.
     Letter { player: Id, kind: String, title: String, place: String, text: String, clue: String, links: Vec<(String, String)> },
+    /// One of the camp's people (`speaker`, their prop) speaks to `player`: `text` said aloud
+    /// where they stand, and `links`, (command, label), the answers the hero can give (a choice,
+    /// a page of the book to read).
+    Talk { player: Id, speaker: Id, text: String, links: Vec<(String, String)> },
     /// A blow coming at a hero that no guard stops (dodge it): warned for its wind-up.
     /// A blow no guard stops on its way to `player` for `secs`; `from` the creature winding it up
     /// (its weapon goes red), none for a hazard or a spell's ground.

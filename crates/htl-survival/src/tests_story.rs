@@ -41,9 +41,10 @@ pub(crate) fn beside(s: &mut Survival, id: Id) -> Id {
     hero
 }
 
-pub(crate) fn letters(ev: &[Event]) -> Vec<(String, String, String, Vec<(String, String)>)> {
+/// What the camp's people said: who (their prop's object), their words and the answers offered.
+pub(crate) fn talks(ev: &[Event]) -> Vec<(Id, String, Vec<(String, String)>)> {
     ev.iter().filter_map(|e| match e {
-        Event::Letter { kind, title, text, links, .. } => Some((kind.clone(), title.clone(), text.clone(), links.clone())),
+        Event::Talk { speaker, text, links, .. } => Some((*speaker, text.clone(), links.clone())),
         _ => None,
     }).collect()
 }
@@ -59,11 +60,12 @@ fn a_person_with_lines_is_usable_and_prompts_talk_to_and_one_without_isnt() {
     let hero = beside(&mut s, id);
     assert_eq!(s.use_prompt(hero).map(|(o, n, v)| (o, n, v)), Some((id, "Quartermaster Hale".to_string(), "Talk to")));
     s.interact(hero, None);
-    let said = letters(&s.step(0.0));
-    assert_eq!(said.len(), 1, "one page");
-    assert_eq!(said[0].0, "talk");
-    assert_eq!(said[0].1, "Quartermaster Hale");
-    assert!(said[0].2.contains("Keep the storage stocked"));
+    let ev = s.step(0.0);
+    let said = talks(&ev);
+    assert_eq!(said.len(), 1, "one line said");
+    assert_eq!(said[0].0, id, "by Hale, where he stands");
+    assert!(said[0].1.contains("Keep the storage stocked"));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Letter { .. })), "no page");
     // The same person with nothing to say isn't usable, and the key finds nothing.
     s.content.props[def].talk.clear();
     assert!(!s.object(id).unwrap().usable);

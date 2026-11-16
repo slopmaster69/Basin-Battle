@@ -28,7 +28,7 @@ Defaults for Corey's open questions, all reversible:
   - Second form: then / then_after / then_text.
   - Other fields: unparryable, posture, temper (commander, coward, bruiser...), aggro_text, death_text.
 - **NPCs.** Camp NPCs are `[[prop]]` with `npc = true`: Hale 1299, Tobin 1357, Garrick Stone 1500, Wren 1439, Maren 1295, Marten 1364, Wyle 1276, sentries 1499. They grow with `after`. No gossip exists in Survival.
-- **Dialogue window.** `Event::Letter` (parchment: title, text, command links) is shown by the add-on's `Letter.lua` as the `NT` line.
+- **Dialogue window.** `Event::Letter` (parchment: title, text, command links) is shown by the add-on's `Letter.lua` as the `NT` line. (16 Nov 2026: replaced for talk by `Event::Talk`, the person's own say in the world with the answers as chat links, `AN`; notes, secrets, the book's record and a run's tally are told in chat, `Words.lua`. Only the Bookmaker's pages stay parchment.)
 - **Dungeons.** They hook in only through the camp's book. The Smuggler's Logbook opens the Deadmines; the book's ladder opens SFK after two first-tier clears.
 - **Models.**
   - Defias: thug 2323, footpad 2338, conjurer 2345, lookout 2357.

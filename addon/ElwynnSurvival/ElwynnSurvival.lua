@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 73
+local VERSION = 74
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6957,7 +6957,10 @@ function ES.Line(line)
   elseif verb == "T" then
     ES.Message(f[2] or "")
   elseif verb == "NT" then
-    if ES.Letter then ES.Letter(f) end
+    -- Words to read go to chat (Words.lua); a wager's page and the board stay pages.
+    if not (ES.Words and ES.Words(f)) and ES.Letter then ES.Letter(f) end
+  elseif verb == "AN" then
+    if ES.Answers then ES.Answers(f) end
   elseif verb == "WT" then
     if ES.WagerLine then ES.WagerLine(f) end
   elseif verb == "DP" then

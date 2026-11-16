@@ -354,13 +354,14 @@ fn remy_waits_for_the_mason_book_and_offers_two_choices_on_his_page() {
     let (_, id) = person(&s, REMY);
     let h = beside(&mut s, id);
     s.interact(h, None);
-    let said = letters(&s.step(0.0));
+    let said = talks(&s.step(0.0));
     assert_eq!(said.len(), 1);
-    assert!(said[0].2.starts_with("Rosters. Who walks which road, and when."));
-    let links: Vec<&str> = said[0].3.iter().map(|(c, _)| c.as_str()).collect();
+    assert_eq!(said[0].0, id);
+    assert!(said[0].1.starts_with("Rosters. Who walks which road, and when."));
+    let links: Vec<&str> = said[0].2.iter().map(|(c, _)| c.as_str()).collect();
     assert_eq!(links, [".es choose remy:arrest", ".es choose remy:free"]);
-    assert_eq!(said[0].3[0].1, "Arrest Him");
-    assert_eq!(said[0].3[1].1, "Free Him");
+    assert_eq!(said[0].2[0].1, "Arrest Him");
+    assert_eq!(said[0].2[1].1, "Free Him");
 }
 
 #[test]
