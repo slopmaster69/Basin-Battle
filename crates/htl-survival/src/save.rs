@@ -344,10 +344,12 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
     p.off_weapon = (!s.off_hand.is_empty() && !p.off_empty).then(|| saved_item(c, &s.off_hand)).flatten().filter(|i| c.items[*i].kind == crate::ItemKind::Weapon);
     p.bow = item(&s.bow, p.bow);
     p.bag = saved_items(c, &s.bag);
-    // A Rogue saved holding a shield, a two-hander or an axe: it's in the bags now.
+    // (The pack before the hands: a Rogue's hands put right count the room in the bags.)
+    p.pack = s.pack.as_deref().and_then(|k| c.item(k)).filter(|i| c.items[*i].kind == crate::ItemKind::Pack);
+    // A Rogue saved holding a shield, a two-hander or an axe: it's in the bags now. One saved
+    // with a fist in one hand holds it in both.
     crate::sim::rogue::rogue_hands(c, p);
     p.armor = s.armor.iter().filter_map(|(slot, k)| Some((slot.clone(), saved_item(c, k).filter(|i| c.items[*i].kind == crate::ItemKind::Armor)?))).collect();
-    p.pack = s.pack.as_deref().and_then(|k| c.item(k)).filter(|i| c.items[*i].kind == crate::ItemKind::Pack);
     p.quick = s.quick.as_deref().and_then(|k| saved_item(c, k));
     p.last_safe = p.pos;
     // The tree as they left it (a dev build owns it all whatever was saved), and their keys where

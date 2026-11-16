@@ -149,7 +149,10 @@ Gorzak's Cleaver, Goldshire Halberd and Zanjin's Spear, and the six staffs.
 A new family (Nov 16) for the Rogue's Iron Knuckles ([rogue-roles.md](rogue-roles.md), "Weapon
 paths"), on the rack for anyone. Identity: the brawler, whose job is making backs: the quickest
 blows, short reach, twice the damage from behind (`backstab = 2.0`, between the rules' 1.5 and a
-dagger's 2.5).
+dagger's 2.5). For a Rogue each is one item, a pair of knuckles, that fills both hands and always
+plays as Iron Knuckles, its mechanic in both hands; anyone else holds it as a one-hander. The
+claw's off hand shows its own left-hand model (`off_display`, 26594); 1.12 has none for the
+knuckles.
 
 | Weapon | Key | Mechanic | Fields |
 | --- | --- | --- | --- |

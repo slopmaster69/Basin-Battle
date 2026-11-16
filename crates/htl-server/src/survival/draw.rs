@@ -20,6 +20,9 @@ pub(crate) const RESIDENT_ENTRY: u32 = 65_000;
 const UNIT_FLAG_NON_ATTACKABLE: u32 = 0x02;
 pub(crate) const ITEM_ENTRY: u32 = 300_000;
 const OUTFIT_ENTRY: u32 = 300_900;
+/// A weapon in the off hand with a left-hand look of its own (`off_display`): its own template,
+/// by item, with that display.
+const LEFT_ENTRY: u32 = 302_000;
 /// The satchels every hero carries beside the backpack.
 const BAG_ENTRY: u32 = 300_950;
 const BAG_DISPLAY: u32 = 1244;
@@ -159,8 +162,9 @@ pub(crate) fn armor_slot(slot: &str) -> (u32, u8) {
 }
 
 /// What's worn, slot by slot (item entries): the plain outfit, with the armor in its place, then
-/// the weapon, the shield and the bow, the ones there are.
-fn worn_of(armor: &[(&str, usize)], weapon: Option<usize>, shield: Option<usize>, bow: Option<usize>) -> Vec<(u8, u32)> {
+/// the weapon, the shield (or the off hand's weapon, by its entry: [`SurvivalGame::off_entry`])
+/// and the bow, the ones there are.
+fn worn_of(armor: &[(&str, usize)], weapon: Option<usize>, shield: Option<u32>, bow: Option<usize>) -> Vec<(u8, u32)> {
     let mut v: Vec<(u8, u32)> = OUTFIT
         .iter()
         .enumerate()
@@ -170,8 +174,8 @@ fn worn_of(armor: &[(&str, usize)], weapon: Option<usize>, shield: Option<usize>
     for (slot, item) in armor {
         v.push((armor_slot(slot).1, ITEM_ENTRY + *item as u32));
     }
-    let hands = [(SLOT_MAIN_HAND, weapon), (SLOT_OFF_HAND, shield), (SLOT_RANGED, bow)];
-    v.extend(hands.into_iter().filter_map(|(slot, i)| i.map(|i| (slot, ITEM_ENTRY + i as u32))));
+    let hands = [(SLOT_MAIN_HAND, weapon.map(|i| ITEM_ENTRY + i as u32)), (SLOT_OFF_HAND, shield), (SLOT_RANGED, bow.map(|i| ITEM_ENTRY + i as u32))];
+    v.extend(hands.into_iter().filter_map(|(slot, e)| e.map(|e| (slot, e))));
     v
 }
 
@@ -355,6 +359,11 @@ impl SurvivalGame {
         for k in 0..OUTFIT.len() {
             self.item_query(conn, OUTFIT_ENTRY + k as u32);
         }
+        for (i, d) in self.sim.content.items.iter().enumerate() {
+            if d.off_display != 0 {
+                self.item_query(conn, LEFT_ENTRY + i as u32);
+            }
+        }
         self.item_query(conn, BAG_ENTRY);
         if let Some(w) = self.world_mut(conn) {
             w.fresh_items.clear();
@@ -445,6 +454,13 @@ impl SurvivalGame {
             t.material = 8;
             t.description = "Plain and sturdy.".into();
             return Some((t, 1));
+        }
+        // A weapon's left-hand look: its template, with that display.
+        if let Some(i) = entry.checked_sub(LEFT_ENTRY).map(|i| i as usize).filter(|i| self.sim.content.items.get(*i).is_some_and(|d| d.off_display != 0)) {
+            let (mut t, stack) = self.item_template(ITEM_ENTRY + i as u32)?;
+            t.entry = entry;
+            t.display_id = self.sim.content.items[i].off_display;
+            return Some((t, stack));
         }
         if entry == BAG_ENTRY {
             let mut t = blank(entry, "Survivor's Satchel", BAG_DISPLAY);
@@ -558,9 +574,9 @@ impl SurvivalGame {
         let shield = if self.sim.weapon_of(p).two_handed || p.off_empty {
             None
         } else if self.sim.off_weapon_of(p).is_some() {
-            p.off_weapon
+            p.off_weapon.map(|i| if self.sim.is_rogue(p) { self.off_entry(i) } else { ITEM_ENTRY + i as u32 })
         } else {
-            Some(p.shield)
+            Some(ITEM_ENTRY + p.shield as u32)
         };
         // (A bow ability's bow in hand: the one it draws.)
         worn_of(&armor, Some(p.weapon), shield, Some(self.sim.ranged_shown(p)))
@@ -581,8 +597,22 @@ impl SurvivalGame {
             "" | "none" => None,
             k => c.item(k).filter(|i| c.items[*i].kind == htl_survival::ItemKind::Weapon),
         };
-        let shield = off.filter(|_| !two);
+        // (A Rogue's off-hand weapon by its left-hand look, where it has one.)
+        let rogue = s.class == htl_survival::sim::rogue::ROGUE;
+        let shield = off.filter(|_| !two).map(|i| if rogue { self.off_entry(i) } else { ITEM_ENTRY + i as u32 });
         worn_of(&armor, weapon, shield, c.item(&s.bow))
+    }
+
+    /// The entry a weapon in a Rogue's off hand shows as: its left-hand look where it has one (a
+    /// claw's own left-hand model, `off_display`), else the item itself. Anyone else's off hand
+    /// shows the item as it always has.
+    pub(crate) fn off_entry(&self, item: usize) -> u32 {
+        let d = &self.sim.content.items[item];
+        if d.off_display != 0 && d.kind == htl_survival::ItemKind::Weapon {
+            LEFT_ENTRY + item as u32
+        } else {
+            ITEM_ENTRY + item as u32
+        }
     }
 
     /// The character screen's look of what's worn: each slot's display and inventory type.
@@ -1650,5 +1680,47 @@ mod saved_look_tests {
             save.weapon = gone.into();
             assert_eq!(game.worn_saved(&save), want, "{gone} looks like {now}");
         }
+    }
+
+    /// A Rogue's fist weapon fills both hands: the off hand shows it too, by its left-hand look
+    /// where it has one (the claw's), else by itself (the knuckles'); in the world and on the
+    /// character screen alike.
+    #[test]
+    fn a_rogues_fist_weapon_shows_in_both_hands_the_claw_by_its_left_hand_model() {
+        use htl_survival::{content::Content, land::FlatLand};
+        let mut c = Content::builtin();
+        c.world.armory = true;
+        let mut game = super::SurvivalGame::new(c, Box::new(FlatLand::default()), None, 7);
+        let save = game.sim.fresh_save("ayla", "Ayla", "rogue", Default::default());
+        let mut hero = game.sim.join("ayla", "Ayla", Some(&save));
+        let rack = game.sim.objs[&game.sim.rack_id()].pos;
+        game.sim.players.get_mut(&hero).unwrap().pos = rack;
+        for (key, left) in [("cutpurse_claw", true), ("footpad_knuckles", false)] {
+            game.sim.arm(hero, key).unwrap();
+            let i = game.sim.content.item(key).unwrap() as u32;
+            let worn = game.worn(hero);
+            let hand = |slot: u8| worn.iter().find(|(s, _)| *s == slot).map(|(_, e)| *e);
+            assert_eq!(hand(super::SLOT_MAIN_HAND), Some(super::ITEM_ENTRY + i), "{key}");
+            let off = if left { super::LEFT_ENTRY + i } else { super::ITEM_ENTRY + i };
+            assert_eq!(hand(super::SLOT_OFF_HAND), Some(off), "{key}");
+            let (t, _) = game.item_template(off).unwrap();
+            let d = &game.sim.content.items[i as usize];
+            assert_eq!(t.display_id, if left { d.off_display } else { d.display }, "{key}");
+            assert!(!left || (d.off_display != 0 && d.off_display != d.display), "{key}");
+            assert_eq!((t.name.as_str(), t.subclass), (d.name.as_str(), 13), "{key}: the same weapon");
+            // Out of the world, on the character screen.
+            let saved = game.sim.leave(hero).unwrap();
+            assert_eq!(game.worn_saved(&saved), worn, "{key}");
+            hero = game.sim.join("ayla", "Ayla", Some(&saved));
+            assert_eq!(game.worn(hero), worn, "{key}: back in the world");
+            game.sim.players.get_mut(&hero).unwrap().pos = rack;
+        }
+        // A Warrior's off-hand claw shows as it always has.
+        let w = game.sim.join("bren", "Bren", None);
+        game.sim.players.get_mut(&w).unwrap().pos = rack;
+        game.sim.arm(w, "dagger").unwrap();
+        game.sim.arm_off(w, "cutpurse_claw").unwrap();
+        let claw = game.sim.content.item("cutpurse_claw").unwrap() as u32;
+        assert!(game.worn(w).contains(&(super::SLOT_OFF_HAND, super::ITEM_ENTRY + claw)));
     }
 }

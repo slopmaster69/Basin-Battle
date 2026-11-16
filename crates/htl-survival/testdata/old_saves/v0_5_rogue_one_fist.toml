@@ -1,0 +1,92 @@
+# Hand-built: Rogues as saves held them while a fist weapon was a one-hander (#470, before a fist
+# weapon filled both hands): a fist beside a dagger, a sword beside a claw, two different fists,
+# a fist beside an empty hand, and a Warrior with a fist and a dagger. Made by hand; not a real
+# save.
+version = 1
+next_uid = 2
+
+[players.kip]
+pos = [0.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "footpad_knuckles"
+shield = "buckler"
+off_hand = "dagger"
+bow = "bow"
+dead = false
+class = "rogue"
+name = "Kip"
+valor = 0.0
+owned = []
+[players.kip.bag]
+ore = 2
+[players.kip.loadout]
+
+[players.lark]
+pos = [1.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "sword"
+shield = "buckler"
+off_hand = "cutpurse_claw"
+bow = "bow"
+dead = false
+class = "rogue"
+name = "Lark"
+valor = 0.0
+owned = []
+[players.lark.bag]
+[players.lark.loadout]
+
+[players.moss]
+pos = [2.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "footpad_knuckles"
+shield = "buckler"
+off_hand = "cutpurse_claw"
+bow = "bow"
+dead = false
+class = "rogue"
+name = "Moss"
+valor = 0.0
+owned = []
+[players.moss.bag]
+[players.moss.loadout]
+
+[players.nell]
+pos = [3.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "cutpurse_claw"
+shield = "buckler"
+off_hand = "none"
+bow = "bow"
+dead = false
+class = "rogue"
+name = "Nell"
+valor = 0.0
+owned = []
+[players.nell.bag]
+[players.nell.loadout]
+
+[players.bren]
+pos = [4.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "footpad_knuckles"
+shield = "buckler"
+off_hand = "dagger"
+bow = "bow"
+dead = false
+class = "warrior"
+name = "Bren"
+valor = 0.0
+owned = []
+[players.bren.bag]
+[players.bren.loadout]

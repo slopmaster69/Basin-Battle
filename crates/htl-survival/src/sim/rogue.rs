@@ -131,6 +131,29 @@ pub(crate) fn rogue_hands(c: &crate::content::Content, p: &mut Player) {
         *p.bag.entry(p.shield).or_default() += 1;
         p.off_empty = true;
     }
+    // A fist in one hand (a save from before a fist weapon filled both hands): it's the pair now,
+    // the main hand's fist first. What the other hand held goes to the bags; with no room there,
+    // the hands stay as they were.
+    let fist = [Some(p.weapon), p.off_weapon].into_iter().flatten().find(|i| is_fist(c, *i));
+    if let Some(f) = fist.filter(|f| !(p.weapon == *f && p.off_weapon == Some(*f))) {
+        let other = if p.weapon == f { p.off_weapon } else { Some(p.weapon) };
+        if let Some(o) = other {
+            let mut bag = p.bag.clone();
+            *bag.entry(o).or_default() += 1;
+            if c.bag_slots_with(&bag, p.pack) > c.player.bag_slots {
+                return;
+            }
+            p.bag = bag;
+        }
+        p.weapon = f;
+        p.off_weapon = Some(f);
+        p.off_empty = false;
+    }
+}
+
+/// A fist weapon (`[[weapon]] subclass` 13): for a Rogue, one item that fills both hands.
+pub fn is_fist(c: &crate::content::Content, item: usize) -> bool {
+    c.items.get(item).and_then(|d| c.weapon(&d.key)).is_some_and(|w| w.subclass == FIST)
 }
 
 impl Survival {
@@ -1074,7 +1097,8 @@ pub const FIST: u32 = 13;
 /// A Rogue's two hands as a pair (docs/rogue-roles.md, "Weapon paths: the dual-wield pairs"). Each
 /// weapon keeps its own mechanic in its own hand; the pair adds one rule to the two-blade run, the
 /// finisher's (a Twin Fangs Shadow Cut's too). A pair is judged on both hands' families, so an
-/// empty off hand (it jabs) is none, and only a hero created as a Rogue has one.
+/// empty off hand (it jabs) is none, and only a hero created as a Rogue has one. A fist weapon is
+/// one item that fills both hands ([`Survival::rogue_grip`]), so a fist is only ever with itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pair {
     /// Dagger and dagger: a Shadow Cut's backstab is whole and isn't remembered.
@@ -1083,22 +1107,24 @@ pub enum Pair {
     BladeAndShiv,
     /// Sword and sword: the finisher is a cross-cut, every enemy in `[rogue] cross_arc`.
     CrossedSwords,
-    /// A mace and any other: the finisher counts `[rogue] breaker_heft` times toward posture.
+    /// A mace with a dagger, a sword or a mace: the finisher counts `[rogue] breaker_heft` times
+    /// toward posture.
     BreakersPair,
-    /// Fist and fist: a run of `[rogue] knuckle_run`; the finisher wheels a creature round, and
-    /// counts `knuckle_boss_heft` times toward a boss's posture.
+    /// A fist weapon, in both hands: a run of `[rogue] knuckle_run`; the finisher wheels a creature
+    /// round, and counts `knuckle_boss_heft` times toward a boss's posture.
     IronKnuckles,
 }
 
 impl Pair {
-    /// The pair two weapon families make, in either hand. None: a fist with a dagger or a sword
-    /// (each hand keeps its own, and the run is the plain one).
+    /// The pair two weapon families make, in either hand. None: a fist with anything but a fist
+    /// (an old save the bags had no room to put right: each hand keeps its own, and the run is the
+    /// plain one).
     pub fn of(a: u32, b: u32) -> Option<Pair> {
         match (a.min(b), a.max(b)) {
             (DAGGER, DAGGER) => Some(Pair::TwinFangs),
             (SWORD, DAGGER) => Some(Pair::BladeAndShiv),
             (SWORD, SWORD) => Some(Pair::CrossedSwords),
-            (MACE, MACE | SWORD | FIST | DAGGER) => Some(Pair::BreakersPair),
+            (MACE, MACE | SWORD | DAGGER) => Some(Pair::BreakersPair),
             (FIST, FIST) => Some(Pair::IronKnuckles),
             _ => None,
         }
@@ -1127,6 +1153,38 @@ impl Survival {
         Pair::of(self.weapon_of(p).subclass, off.subclass)
     }
 
+    /// A Rogue whose fist weapon fills both hands (Iron Knuckles).
+    pub fn fists_of(&self, p: &Player) -> bool {
+        self.is_rogue(p) && is_fist(&self.content, p.weapon) && p.off_weapon == Some(p.weapon)
+    }
+
+    /// A Rogue's hands with weapon `item` equipped in the main hand, or the off hand on `off`: a
+    /// fist weapon fills both. Any other over a fist takes it off: equipped in the main hand, the
+    /// off hand is left empty (it jabs); in the off hand, the main hand takes the Rogue's start
+    /// blade (it's never empty). The hands as (main, off), and the off hand's weapon taken off
+    /// besides what the main hand held (a second blade, as fists go on). None for anyone but a
+    /// Rogue, or for anything but a weapon: their hands go as ever.
+    pub(crate) fn rogue_grip(&self, id: Id, item: usize, off: bool) -> Option<(usize, Option<usize>, Option<usize>)> {
+        let c = &self.content;
+        let p = self.players.get(&id).filter(|p| self.is_rogue(p))?;
+        if c.items.get(item)?.kind != ItemKind::Weapon {
+            return None;
+        }
+        let fist = |i: usize| is_fist(c, i);
+        let pair_on = fist(p.weapon) && p.off_weapon == Some(p.weapon);
+        if fist(item) {
+            return Some((item, Some(item), if pair_on { None } else { p.off_weapon }));
+        }
+        if !off {
+            // The off hand's fist comes off with the main hand's.
+            let other = p.off_weapon.filter(|o| fist(*o));
+            let off_now = if other.is_some() { None } else { p.off_weapon };
+            return Some((item, off_now, other.filter(|_| !pair_on)));
+        }
+        let main = if fist(p.weapon) { c.item(&c.rogue.weapon).unwrap_or(p.weapon) } else { p.weapon };
+        Some((main, Some(item), None))
+    }
+
     /// What a Rogue's pair does, in the words the rack says it as a hand is equipped (built from
     /// the numbers, so it never drifts from the rules). None: no pair.
     pub fn pair_words(&self, p: &Player) -> Option<String> {
@@ -1145,7 +1203,7 @@ impl Survival {
             Pair::CrossedSwords => format!("Your strike with both blades hits every enemy within {} degrees in front of you.", r.cross_arc),
             Pair::BreakersPair => format!("Your strike with both weapons breaks stances {}% faster.", ((r.breaker_heft - 1.0) * 100.0).round()),
             Pair::IronKnuckles => format!(
-                "Alternating weapons, your {}th strike is with both fists. It turns an enemy's back to you for {} sec. On a boss it breaks stances {}% faster instead.",
+                "Your strikes alternate fists, and the {}th is with both. It turns an enemy's back to you for {} sec. On a boss it breaks stances {}% faster instead.",
                 r.knuckle_run,
                 r.wheel_secs,
                 ((r.knuckle_boss_heft - 1.0) * 100.0).round()

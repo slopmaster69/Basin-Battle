@@ -1079,6 +1079,9 @@ backstab = 2.5
 # The fists (docs/rogue-roles.md, "Weapon paths"): the quickest blows on the rack, a 0.15 sec
 # wind-up, short reach and light hits, about a dagger's damage a second. Identity: the brawler,
 # whose job is making backs; twice the damage from behind (the rules' 1.5, a dagger's 2.5).
+# For a Rogue each fist weapon is one item, a pair of knuckles, that fills both hands and always
+# plays as Iron Knuckles (Corey, Nov 16): its own mechanic is in both hands. Anyone else holds it
+# as a one-hander, as before.
 [[weapon]]
 key = "footpad_knuckles"
 windup = 0.15
@@ -1471,6 +1474,10 @@ text = "{fx} \"Brass, worn bright where it meets a jaw.\""
 key = "cutpurse_claw"
 name = "Cutpurse's Claw"
 display = 4687
+# In the off hand, the claw's own left-hand model (hand_1h_claw_a_01left, the same silver skin):
+# 1.12 keeps one for the claw. The knuckles have none (no hand_1h_knuckle_a_01left in the data), so
+# they show the same model in both hands. Checked in tests/rogue_fist_displays.rs against WOW_DATA.
+off_display = 26594
 icon = "INV_Gauntlets_04"
 kind = "weapon"
 text = "{fx} \"Three hooked blades, filed in a Moonbrook cellar.\""
@@ -1917,14 +1924,14 @@ shade = "rogue_shade"
 # sword's 90 opened out to the two blades' sweep. #60 found the Rogue falls to a big pack; this is
 # its answer, and it still has to be earned with 3 blows first.
 cross_arc = 150.0
-# Breaker's Pair (a mace and any other): the finisher counts 3 times toward a champion's posture (a
-# mace's own blows count 2). With no parry, the Rogue needs a stance-breaker for bosses: about one
-# run in three of a parry's 25% fill.
+# Breaker's Pair (a mace with a dagger, a sword or a mace): the finisher counts 3 times toward a
+# champion's posture (a mace's own blows count 2). With no parry, the Rogue needs a stance-breaker
+# for bosses: about one run in three of a parry's 25% fill.
 breaker_heft = 3.0
-# Iron Knuckles (two fists): a run of 6 (the others' 4), each blow a fist's 0.15 sec wind-up, so the
-# whole run takes about as long as a dagger's 4. The finisher wheels a creature (not a boss) round
-# so its back is to the Rogue for 1 sec (a Distract away from the Rogue: about two fist blows in
-# its back), then it turns back. On a boss it counts 2 times toward posture instead: a boss is
+# Iron Knuckles (a fist weapon, one item in both hands): a run of 6 (the others' 4), each blow a
+# fist's 0.15 sec wind-up, so the whole run takes about as long as a dagger's 4. The finisher
+# wheels a creature (not a boss) round so its back is to the Rogue for 1 sec (a Distract away from
+# the Rogue: about two fist blows in its back), then it turns back. On a boss it counts 2 times toward posture instead: a boss is
 # never turned.
 knuckle_run = 6
 wheel_secs = 1.0

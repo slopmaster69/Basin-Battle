@@ -1,7 +1,8 @@
 //! The Rogue's dual-wield pairs and the fist weapons (docs/rogue-roles.md, build plan entry 5):
 //! Twin Fangs, Blade and Shiv, Crossed Swords, Breaker's Pair and Iron Knuckles, each one rule on
 //! the two-blade finisher, judged on both hands' families. Each weapon keeps its own mechanic in
-//! its own hand; the fists' own are in `tests_weapon_identity.rs`.
+//! its own hand; the fists' own are in `tests_weapon_identity.rs`. A Rogue's fist weapon is one
+//! item that fills both hands, always Iron Knuckles (Corey, Nov 16).
 
 use crate::content::Content;
 use crate::land::FlatLand;
@@ -152,10 +153,9 @@ fn a_pairs_rule_needs_both_hands() {
         ("mace", "dagger", Some(Pair::BreakersPair)),
         ("bazil_shiv", "mace", Some(Pair::BreakersPair)),
         ("mace", "hogger_club", Some(Pair::BreakersPair)),
-        ("footpad_knuckles", "cutpurse_claw", Some(Pair::IronKnuckles)),
-        // A fist with a blade: each hand its own, no pair.
-        ("footpad_knuckles", "dagger", None),
-        ("sword", "cutpurse_claw", None),
+        ("mace", "sword", Some(Pair::BreakersPair)),
+        ("footpad_knuckles", "footpad_knuckles", Some(Pair::IronKnuckles)),
+        ("cutpurse_claw", "cutpurse_claw", Some(Pair::IronKnuckles)),
     ] {
         hands(&mut s, p, main, off);
         assert_eq!(s.pair_of(&s.players[&p]), want, "{main} and {off}");
@@ -390,7 +390,7 @@ fn a_warriors_two_hands_count_toward_posture_as_before() {
 #[test]
 fn iron_knuckles_run_is_6_and_its_finisher_turns_a_non_boss_away() {
     let mut s = world();
-    let p = rogue_with(&mut s, "footpad_knuckles", "cutpurse_claw");
+    let p = rogue_with(&mut s, "cutpurse_claw", "cutpurse_claw");
     assert_eq!(s.run_length(&s.players[&p]), 6);
     let m = mob(&mut s, "dm_woodcutter", [2.0, 0.0, 0.0], PI);
     let wind = s.content.weapon("footpad_knuckles").unwrap().windup;
@@ -483,21 +483,6 @@ fn each_weapons_own_mechanic_still_works_in_either_hand() {
         let one = s.content.weapon("bazil_shiv").unwrap().poison;
         assert!((stacks - one).abs() < 1e-3, "the knife's hand lays none: {stacks}");
     }
-    // The knuckles' breath back, from the off hand.
-    let mut s = world();
-    let p = rogue_with(&mut s, "cutpurse_claw", "footpad_knuckles");
-    let m = mob(&mut s, "dm_woodcutter", [2.0, 0.0, 0.0], PI);
-    let _ = hand(&mut s, p, false, &mut |s| hold(s, m, PI));
-    s.players.get_mut(&p).unwrap().stamina = 50.0;
-    s.input(p, Input::Guard);
-    let cost = strike(&s, p).unwrap().stamina;
-    for _ in 0..20 {
-        hold(&mut s, m, PI);
-        let _ = s.step(DT);
-    }
-    let wind = s.content.weapon("footpad_knuckles").unwrap().wind;
-    let have = s.players[&p].stamina;
-    assert!(have > 50.0 - cost + wind - 1.0, "{wind} back after the {cost} the jab cost: {have}");
     // A Silver-Edged Longsword's bane from the off hand of Crossed Swords.
     let mut s = world();
     let p = rogue_with(&mut s, "sword", "silver_sword");
@@ -524,32 +509,196 @@ fn each_pairs_words_say_what_its_data_does() {
     assert!(says(&s).contains(&format!("within {} degrees", r.cross_arc)), "{}", says(&s));
     hands(&mut s, p, "mace", "sword");
     assert!(says(&s).contains(&format!("breaks stances {}% faster", ((r.breaker_heft - 1.0) * 100.0).round())), "{}", says(&s));
-    hands(&mut s, p, "footpad_knuckles", "cutpurse_claw");
+    hands(&mut s, p, "footpad_knuckles", "footpad_knuckles");
     let w = says(&s);
-    assert!(w.contains(&format!("your {}th strike is with both fists", r.knuckle_run)) && w.contains(&format!("for {} sec", r.wheel_secs)), "{w}");
+    assert!(w.starts_with("Your pair is Iron Knuckles.") && w.contains(&format!("the {}th is with both", r.knuckle_run)) && w.contains(&format!("for {} sec", r.wheel_secs)), "{w}");
     assert!(w.contains(&format!("{}% faster", ((r.knuckle_boss_heft - 1.0) * 100.0).round())), "{w}");
-    // No pair, no words; nor for a Warrior.
-    hands(&mut s, p, "footpad_knuckles", "dagger");
+    // No pair (an empty off hand), no words; nor for a Warrior.
+    let h = s.players.get_mut(&p).unwrap();
+    h.off_weapon = None;
+    h.off_empty = true;
     assert_eq!(s.pair_words(&s.players[&p]), None);
     let b = hero_of(&mut s, "Bren", "warrior");
     hands(&mut s, b, "dagger", "dagger");
     assert_eq!(s.pair_words(&s.players[&b]), None);
 }
 
-#[test]
-fn a_rogue_takes_up_the_fists_from_the_rack() {
-    let mut s = world();
+// --- a fist weapon is one item in both hands (Corey, Nov 16) ----------------------------------------
+
+/// A hero of this class at the weapon rack, the armory open.
+fn at_rack(s: &mut Survival, name: &str, class: &str) -> Id {
     s.content.world.armory = true;
-    let p = hero_of(&mut s, "Ayla", "rogue");
+    let p = hero_of(s, name, class);
     let rack = s.objs[&s.rack_id()].pos;
     s.players.get_mut(&p).unwrap().pos = rack;
-    let offered: Vec<String> = s.rack_view(p).into_iter().map(|r| r.0).collect();
+    p
+}
+
+/// What a hero's hands hold: (main hand, off hand's weapon, off hand left empty).
+fn held(s: &Survival, p: Id) -> (String, Option<String>, bool) {
+    let h = &s.players[&p];
+    (s.content.items[h.weapon].key.clone(), h.off_weapon.map(|o| s.content.items[o].key.clone()), h.off_empty)
+}
+
+/// One fist weapon in both hands.
+fn both(k: &str) -> (String, Option<String>, bool) {
+    (k.to_string(), Some(k.to_string()), false)
+}
+
+fn bag_keys(s: &Survival, p: Id) -> std::collections::BTreeMap<String, u32> {
+    s.players[&p].bag.iter().map(|(i, n)| (s.content.items[*i].key.clone(), *n)).collect()
+}
+
+#[test]
+fn a_rogues_fist_weapon_fills_both_hands_from_the_rack() {
+    let mut s = world();
+    let p = at_rack(&mut s, "Ayla", "rogue");
+    // The rack says so, in the row's kind and first in its words.
+    let view = s.rack_view(p);
     for k in ["footpad_knuckles", "cutpurse_claw"] {
-        assert!(offered.contains(&k.to_string()), "the rack offers {k}");
+        let row = view.iter().find(|r| r.0 == k).unwrap_or_else(|| panic!("the rack offers {k}"));
+        assert_eq!(row.2, "both hands", "{k}");
+        assert!(row.4.starts_with("Equipped in both hands. "), "{}", row.4);
         let w = s.content.weapon(k).unwrap();
         assert!(w.subclass == crate::sim::rogue::FIST && !w.two_handed && w.moveset_key() == "fist", "{k} is a fist weapon");
     }
+    // Either button: both hands, Iron Knuckles.
     s.arm(p, "footpad_knuckles").unwrap();
-    s.arm_off(p, "cutpurse_claw").unwrap();
+    assert_eq!(held(&s, p), both("footpad_knuckles"));
     assert_eq!(s.pair_of(&s.players[&p]), Some(Pair::IronKnuckles));
+    assert!(s.fists_of(&s.players[&p]));
+    assert!(s.rack_view(p).iter().any(|r| r.0 == "footpad_knuckles" && r.3), "shown as equipped");
+    s.arm_off(p, "cutpurse_claw").unwrap();
+    assert_eq!(held(&s, p), both("cutpurse_claw"));
+    assert_eq!(s.run_length(&s.players[&p]), s.content.rogue.knuckle_run);
+    // The off hand can't be emptied alone.
+    assert_eq!(s.stow_off(p), Err("Fist weapons take both hands already.".to_string()));
+    assert_eq!(held(&s, p), both("cutpurse_claw"));
+}
+
+#[test]
+fn a_blade_in_either_hand_takes_the_fists_off() {
+    let mut s = world();
+    let p = at_rack(&mut s, "Ayla", "rogue");
+    // In the main hand: the off hand is left empty (it jabs).
+    s.arm(p, "footpad_knuckles").unwrap();
+    s.arm(p, "sword").unwrap();
+    assert_eq!(held(&s, p), ("sword".to_string(), None, true));
+    assert_eq!(s.pair_of(&s.players[&p]), None);
+    // In the off hand: the main hand takes the Rogue's start blade (it's never empty).
+    s.arm(p, "cutpurse_claw").unwrap();
+    s.arm_off(p, "mace").unwrap();
+    let knife = s.content.rogue.weapon.clone();
+    assert_eq!(held(&s, p), (knife, Some("mace".to_string()), false));
+    assert_eq!(s.pair_of(&s.players[&p]), Some(Pair::BreakersPair));
+    // Fists over two blades take both hands.
+    s.arm(p, "sword").unwrap();
+    assert_eq!(held(&s, p), ("sword".to_string(), Some("mace".to_string()), false));
+    s.arm_off(p, "footpad_knuckles").unwrap();
+    assert_eq!(held(&s, p), both("footpad_knuckles"));
+}
+
+#[test]
+fn fists_from_the_bags_or_storage_take_both_hands_and_put_both_blades_away() {
+    let mut s = world();
+    let p = hero_of(&mut s, "Ayla", "rogue");
+    let (fist, dagger) = (s.content.item("footpad_knuckles").unwrap(), s.content.item("dagger").unwrap());
+    // From the bags: the sword and the dagger both go to the bags.
+    hands(&mut s, p, "sword", "dagger");
+    s.players.get_mut(&p).unwrap().bag = [(fist, 1)].into();
+    let said = s.wear_from_bag(p, fist).unwrap();
+    assert_eq!(held(&s, p), both("footpad_knuckles"));
+    assert!(said.contains("in both hands") && said.contains(" and "), "{said}");
+    assert_eq!(bag_keys(&s, p), [("sword".to_string(), 1), ("dagger".to_string(), 1)].into());
+    // A blade from the bags over them: the fists go to the bags once, the off hand is empty.
+    s.wear_from_bag(p, dagger).unwrap();
+    assert_eq!(held(&s, p), ("dagger".to_string(), None, true));
+    assert_eq!(bag_keys(&s, p), [("sword".to_string(), 1), ("footpad_knuckles".to_string(), 1)].into());
+    // Bags with room for one but not two: refused, the hands as they were.
+    hands(&mut s, p, "sword", "dagger");
+    let ore = s.content.item("ore").unwrap();
+    let room = s.content.player.bag_slots as u32 - 1;
+    s.players.get_mut(&p).unwrap().bag = [(fist, 1), (ore, room * s.stack_for(ore, None))].into();
+    assert!(s.wear_from_bag(p, fist).is_err());
+    assert_eq!(held(&s, p), ("sword".to_string(), Some("dagger".to_string()), false));
+    // From storage: both blades go to storage.
+    s.players.get_mut(&p).unwrap().bag.clear();
+    s.storage.insert(fist, 1);
+    let chest = s.objs[&s.storage_id()].pos;
+    s.players.get_mut(&p).unwrap().pos = chest;
+    s.equip_from_chest(p, "footpad_knuckles").unwrap();
+    assert_eq!(held(&s, p), both("footpad_knuckles"));
+    let (sword, fist_left) = (s.storage.get(&s.content.item("sword").unwrap()).copied(), s.storage.get(&fist).copied().unwrap_or(0));
+    assert_eq!((sword, s.storage.get(&dagger).copied(), fist_left), (Some(1), Some(1), 0));
+}
+
+#[test]
+fn a_fist_weapons_own_mechanic_is_in_both_hands() {
+    for off in [false, true] {
+        // The knuckles' breath back.
+        let mut s = world();
+        let p = rogue_with(&mut s, "footpad_knuckles", "footpad_knuckles");
+        let m = mob(&mut s, "dm_woodcutter", [2.0, 0.0, 0.0], PI);
+        if off {
+            let _ = hand(&mut s, p, false, &mut |s| hold(s, m, PI));
+        }
+        s.players.get_mut(&p).unwrap().stamina = 50.0;
+        s.input(p, if off { Input::Guard } else { Input::Attack });
+        let cost = strike(&s, p).unwrap().stamina;
+        for _ in 0..20 {
+            hold(&mut s, m, PI);
+            let _ = s.step(DT);
+        }
+        let wind = s.content.weapon("footpad_knuckles").unwrap().wind;
+        let have = s.players[&p].stamina;
+        assert!(wind > 0.0 && have > 50.0 - cost + wind - 1.0, "{} hand: {wind} back after the {cost} the blow cost: {have}", if off { "off" } else { "main" });
+        // The claw's counter, just after a dodge slipped a blow.
+        let blow = |slipped: bool| -> u32 {
+            let mut s = world();
+            let p = rogue_with(&mut s, "cutpurse_claw", "cutpurse_claw");
+            let m = mob(&mut s, "dm_woodcutter", [2.0, 0.0, 0.0], PI);
+            if off {
+                let _ = hand(&mut s, p, false, &mut |s| hold(s, m, PI));
+            }
+            let now = s.clock;
+            s.players.get_mut(&p).unwrap().fx.slipped_at = slipped.then_some(now);
+            let (st, ev) = hand(&mut s, p, off, &mut |s| hold(s, m, PI));
+            assert!(!st.finish && st.pair == Some(Pair::IronKnuckles));
+            hits_on(&ev, m).into_iter().max().unwrap_or(0)
+        };
+        let (plain, slipped) = (blow(false), blow(true));
+        let slip = s.content.weapon("cutpurse_claw").unwrap().slip;
+        let ratio = slipped as f32 / plain.max(1) as f32;
+        assert!(plain > 0 && (ratio - (1.0 + slip)).abs() < 0.08, "{} hand: {slip} more: {slipped} / {plain}", if off { "off" } else { "main" });
+    }
+}
+
+#[test]
+fn anyone_but_a_rogue_holds_a_fist_weapon_as_a_one_hander_as_before() {
+    let mut s = world();
+    let w = at_rack(&mut s, "Bren", "warrior");
+    let row = s.rack_view(w).into_iter().find(|r| r.0 == "footpad_knuckles").unwrap();
+    assert_eq!(row.2, "one-handed");
+    assert!(!row.4.contains("both hands"), "{}", row.4);
+    // The main hand, the shield kept.
+    let shield = s.players[&w].shield;
+    s.arm(w, "footpad_knuckles").unwrap();
+    let h = &s.players[&w];
+    assert_eq!(s.content.items[h.weapon].key, "footpad_knuckles");
+    assert!(h.off_weapon.is_none() && !h.off_empty && h.shield == shield, "the shield stays");
+    // A fist in the off hand, and a blade beside it: one hand each, no pair.
+    s.arm_off(w, "cutpurse_claw").unwrap();
+    assert_eq!(held(&s, w), ("footpad_knuckles".to_string(), Some("cutpurse_claw".to_string()), false));
+    s.arm(w, "dagger").unwrap();
+    assert_eq!(held(&s, w), ("dagger".to_string(), Some("cutpurse_claw".to_string()), false));
+    assert_eq!(s.pair_of(&s.players[&w]), None);
+    assert!(!s.fists_of(&s.players[&w]));
+    assert!(s.stow_off(w).is_ok());
+    // From the bags, the main hand only.
+    hands(&mut s, w, "sword", "dagger");
+    let fist = s.content.item("footpad_knuckles").unwrap();
+    s.players.get_mut(&w).unwrap().bag = [(fist, 1)].into();
+    s.wear_from_bag(w, fist).unwrap();
+    assert_eq!(held(&s, w), ("footpad_knuckles".to_string(), Some("dagger".to_string()), false));
+    assert_eq!(bag_keys(&s, w), [("sword".to_string(), 1)].into());
 }

@@ -14,6 +14,7 @@ const V01: &str = include_str!("../testdata/old_saves/v0_1_footman.toml");
 const V04: &str = include_str!("../testdata/old_saves/v0_4_warrior_retired_gear.toml");
 const PRIEST: &str = include_str!("../testdata/old_saves/v0_4_priest_old_cards.toml");
 const ROGUE: &str = include_str!("../testdata/old_saves/v0_4_rogue_shield_old_cards.toml");
+const ONE_FIST: &str = include_str!("../testdata/old_saves/v0_5_rogue_one_fist.toml");
 
 /// Today's rules with the tree not handed out whole, so what a save owned is what a hero owns.
 fn rules() -> Content {
@@ -182,6 +183,51 @@ fn a_rogue_saved_with_a_shield_a_two_hander_and_old_cards_loads_with_two_hands_a
     let a = s.join("ayla", "Ayla", Some(&again));
     let bag = bag_of(&s, a);
     assert_eq!((bag["greatsword"], bag["buckler"]), (1, 1), "{bag:?}");
+}
+
+#[test]
+fn a_rogue_saved_with_a_fist_in_one_hand_loads_holding_the_fist_weapon_in_both() {
+    use crate::sim::rogue::Pair;
+    let (mut s, save) = load(ONE_FIST);
+    // (hero, the fist both hands hold, what goes to the bags)
+    for (who, fist, bagged) in [
+        ("kip", "footpad_knuckles", Some("dagger")),
+        ("lark", "cutpurse_claw", Some("sword")),
+        // Two different fists: the main hand's is the pair.
+        ("moss", "footpad_knuckles", Some("cutpurse_claw")),
+        // A fist beside an empty hand: nothing to put away.
+        ("nell", "cutpurse_claw", None),
+    ] {
+        let id = s.join(who, who, save.players.get(who));
+        let h = &s.players[&id];
+        assert_eq!((key(&s, h.weapon), h.off_weapon.map(|o| key(&s, o)), h.off_empty), (fist.to_string(), Some(fist.to_string()), false), "{who}");
+        assert_eq!(s.pair_of(h), Some(Pair::IronKnuckles), "{who}");
+        let bag = bag_of(&s, id);
+        if let Some(b) = bagged {
+            assert_eq!(bag.get(b), Some(&1), "{who}: the {b} in the bags: {bag:?}");
+        }
+        if who == "kip" {
+            assert_eq!(bag.get("ore"), Some(&2), "what the bags held stays");
+        }
+        // Saved again and loaded again: nothing more turns up.
+        let again = s.leave(id).unwrap();
+        let id = s.join(who, who, Some(&again));
+        assert_eq!(bag_of(&s, id), bag, "{who}");
+        assert!(s.fists_of(&s.players[&id]), "{who}");
+    }
+    // Bags with no room: the hands stay as they were.
+    let mut full = save.players["kip"].clone();
+    let stack = s.content.items[s.content.item("ore").unwrap()].stack.max(1);
+    full.bag = BTreeMap::from([("ore".to_string(), stack * s.content.player.bag_slots as u32)]);
+    let id = s.join("kip2", "Kip", Some(&full));
+    let h = &s.players[&id];
+    assert_eq!((key(&s, h.weapon), h.off_weapon.map(|o| key(&s, o))), ("footpad_knuckles".to_string(), Some("dagger".to_string())), "no room: as it was");
+    assert!(!bag_of(&s, id).contains_key("dagger"));
+    // Anyone but a Rogue: a fist and a dagger, as saved.
+    let id = s.join("bren", "Bren", save.players.get("bren"));
+    let h = &s.players[&id];
+    assert_eq!((key(&s, h.weapon), h.off_weapon.map(|o| key(&s, o))), ("footpad_knuckles".to_string(), Some("dagger".to_string())));
+    assert!(bag_of(&s, id).is_empty());
 }
 
 #[test]

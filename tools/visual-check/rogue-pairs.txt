@@ -4,11 +4,13 @@
 # word: Twin Fangs (two Poacher's Knives), the plain finisher, both blades (clip 17); Crossed Swords
 # (two swords) on three grunts side by side, the finisher's cross-cut striking all three; Breaker's
 # Pair (the Militia Mace and a knife) on a Defias Overseer, its stance bar jumping on the finisher;
-# Iron Knuckles (Footpad's Knuckles and Cutpurse's Claw): six quick punches (AttackUnarmed, clip
+# Iron Knuckles (Cutpurse's Claw, one item in both hands): six quick punches (AttackUnarmed, clip
 # 16), the 6th with both fists, and the grunt wheeling round to show the Rogue its back for 1 sec,
 # then a stab in its back (the blood burst) before it turns back. Each pair's words say in chat as
-# it's equipped ("Your pair is ..."). Both fists show in the hands: the off-hand fist is the same
-# model as the main hand's (no left-hand model is set), to be checked here.
+# it's equipped ("Your pair is ..."). Footpad's Knuckles goes on first and then the claw over it:
+# each fills both hands ("You equipped the ... in both hands."). Both fists show in the hands: the
+# claw's off hand is its own left-hand model (display 26594), the knuckles' the same model as the
+# main hand's (1.12 has no left-hand knuckles), to be checked here.
 # Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>`. Not run yet: the
 # blow times are a first guess (a dagger's swing is about 0.5 sec, a fist's 0.42), tune them on the
 # first run.
@@ -61,7 +63,7 @@ include _setup
 17.9 .es in gu
 20.0 .es target clear
 20.2 .es arm footpad_knuckles
-20.3 .es arm cutpurse_claw off
+20.3 .es arm cutpurse_claw
 20.5 .es target grunt 3 still
 21.0 shots knuckles 60 0.1
 21.1 .es in a                           # Iron Knuckles: six punches, the 6th both fists
