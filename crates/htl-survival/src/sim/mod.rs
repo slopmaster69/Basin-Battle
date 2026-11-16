@@ -28,6 +28,7 @@ pub(crate) mod combat;
 pub mod dungeon;
 pub mod duel;
 pub mod meter;
+pub mod melee;
 pub mod mobs;
 pub(crate) mod moves;
 pub(crate) mod warlord;
@@ -844,6 +845,8 @@ pub struct Player {
     /// The light chain: the next blow's place, if an attack comes by then.
     pub combo_next: u8,
     pub combo_until: f32,
+    /// Their melee this fight, for the host log (`sim::melee`).
+    pub melee: melee::MeleeTally,
     /// What the weapon in hand has built up in them (`weapon_fx`).
     pub fx: weapon_fx::HeroFx,
     /// Their round trip to the server (seconds), for the allowances for lag.
@@ -1721,6 +1724,7 @@ impl Survival {
             sent_back: BACK_SPEED,
             combo_next: 0,
             combo_until: -100.0,
+            melee: Default::default(),
             fx: Default::default(),
             rtt: 0.0,
             local_moves: false,
@@ -1778,6 +1782,7 @@ impl Survival {
     /// eaten, a gather not finished); where they stand and what they carry is kept.
     pub fn leave(&mut self, id: Id) -> Option<crate::save::PlayerSave> {
         self.cancel_preview(id);
+        self.melee_flush(id);
         // Their heat and chill on foes go with them (only their own bolts ever cleared them).
         self.staff_marks.retain(|m| m.owner != id);
         let p = self.players.get_mut(&id)?;

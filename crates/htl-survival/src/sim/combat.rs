@@ -413,6 +413,7 @@ impl Survival {
                             p.combo_next = 0;
                             p.combo_until = self.clock;
                         }
+                        self.melee_switched(id);
                         self.events.push(Event::Stamina { player: id });
                         self.events.push(Event::ClipStop { id });
                         self.unsheathe(id);
@@ -547,6 +548,9 @@ impl Survival {
         };
         if let Some(item) = bite {
             self.eaten(id, item);
+        }
+        if matches!(action, Action::Stagger { .. }) {
+            self.melee_staggered(id);
         }
         let Some(p) = self.players.get_mut(&id) else { return };
         let was_eating = matches!(p.action, Action::Eat { .. });
@@ -812,6 +816,7 @@ impl Survival {
         if pay {
             self.spend_attack(id, strike.stamina);
         }
+        self.melee_swing(id, kind, strike.step, set_len);
         {
             let p = self.players.get_mut(&id).unwrap();
             match kind {
@@ -889,6 +894,7 @@ impl Survival {
             p.combo_next = 0;
             p.combo_until = -100.0;
         }
+        self.melee_switched(id);
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
         self.players.get_mut(&id).unwrap().combat_at = self.clock;
         self.events.push(Event::Swing { attacker: id, victim: None, damage: 0, outcome: Outcome::Miss, anim: true, style: Blow::Light });
@@ -1095,6 +1101,7 @@ impl Survival {
         // With a direction held, the dash is the hero's own run, sped up (set_action sends the
         // speed); with none, a hop back.
         self.set_action(id, Action::Dodge { t: 0.0, dir, dash });
+        self.melee_dodged(id);
         // A client that runs its own dodge gets no throw; others hop back with no keys held.
         let local = self.players[&id].local_moves;
         let (speed, lift) = if dash || local { (0.0, 0.0) } else { (c.back_step[0], c.back_step[1]) };
@@ -1130,6 +1137,7 @@ impl Survival {
             self.check_lock(id);
             self.step_player(id, dt);
             self.step_rogue(id);
+            self.melee_check(id);
         }
     }
 
@@ -1348,7 +1356,14 @@ impl Survival {
                 if t2 >= strike.windup && t < strike.windup + strike.active {
                     // (Its first moment: what's struck once a swing, a War Banner, is struck then.)
                     let first = t < strike.windup;
+                    let before = struck.len();
                     self.connect(id, &w, &strike, &mut struck, first);
+                    if before == 0 && !struck.is_empty() && strike.art.is_none() && !strike.shove() {
+                        self.melee_struck(id, true);
+                    }
+                }
+                if strike.art.is_none() && !strike.shove() && struck.is_empty() && t < strike.windup + strike.active && t2 >= strike.windup + strike.active {
+                    self.melee_struck(id, false);
                 }
                 // Parried mid-swing: the stagger stands.
                 if !matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { .. })) {
@@ -2460,6 +2475,7 @@ impl Survival {
                 }
             }
         }
+        self.melee_defended(victim, outcome);
         self.events.push(Event::Swing { attacker, victim: Some(victim), damage: landed, outcome, anim: false, style });
         self.trade_blows(attacker, victim);
         if let Some(p) = self.players.get_mut(&victim) {
@@ -2761,6 +2777,7 @@ impl Survival {
     // --- falling and getting up -----------------------------------------------------------------
 
     fn die(&mut self, id: Id) {
+        self.melee_flush(id);
         let now = self.clock;
         let pvp = self.content.pvp.clone();
         // A barracks at the camp gets the fallen up sooner.
@@ -2968,6 +2985,7 @@ impl Survival {
             p.combo_until = -100.0;
             p.combat_at = self.clock;
         }
+        self.melee_switched(id);
         let windup = strike.windup;
         let (range, arc) = (strike.range, strike.arc);
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
