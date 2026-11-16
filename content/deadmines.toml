@@ -2633,12 +2633,18 @@ radius = 0.0
 count = 1
 link = 12.0
 
+# One wizard, not two: with the evoker that is two casters, as the Evoker pair is (right play 4 to 24 s,
+# 0 to 14% of health). Three casters with no guard in front took a right-playing warrior and hunter
+# down 1 to 13 times in 30 and a third to 95% of their health (Wizard x2 + Evoker, Nov 16 2026, in
+# docs/deadmines-packs.md): every caster casts on its own clock and no blade stands between them,
+# so a roll's stamina is spent before the third bolt (the guards the survey's note above promises
+# stand in front of the casters in the Blackguard pack; here there were none).
 [[dungeon.pack]]
 mob = "dm_wizard"
 at = [-132.4, -786.1]
 z = 17.5
 radius = 3.0
-count = 2
+count = 1
 link = 12.0
 
 [[dungeon.pack]]
