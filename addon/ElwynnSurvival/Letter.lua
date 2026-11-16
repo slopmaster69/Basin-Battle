@@ -3,7 +3,7 @@
 -- again). Parchment that stays up till it's closed (Escape, the ink cross, or Close), and a
 -- clue in red ink under a note while what it points to is still hidden.
 --
--- The server sends `NT kind title place text clue links`: kind is note, secret, lore, wager, board
+-- The server sends `NT kind title place text clue links`: kind is note, secret, lore, wager, board,
 -- run (a run's tally as you leave it) or talk (what a person in the camp says); `{n}`
 -- breaks a line in the text; links are `command~label` with `^` between.
 --
