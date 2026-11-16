@@ -1442,3 +1442,162 @@ fn coming_back_aboard_over_the_rail_is_never_held() {
     assert_eq!(s.players[&h].pos, [-62.0, -838.0, 0.0]);
     assert!(!s.events.iter().any(|e| matches!(e, Event::Teleport { .. })));
 }
+
+// --- the last hero leaves, and two events at once --------------------------------------------------
+
+/// Everything the fight left in the world: crew, shots, held poses, the harpoon and gun in hand.
+fn leftovers(s: &Survival, boss: Id, crew: &[Id]) -> Vec<String> {
+    let mut v = Vec::new();
+    if s.firing_line.crews.contains_key(&boss) { v.push("crew".into()); }
+    if crew.iter().any(|g| s.mobs.contains_key(g)) { v.push("gunners".into()); }
+    if !s.firing_line.aims.is_empty() { v.push("aims".into()); }
+    if !s.firing_line.spears.is_empty() { v.push("harpoon in hand".into()); }
+    if !s.firing_line.guns.is_empty() { v.push("gun".into()); }
+    if !s.firing_line.owners.is_empty() { v.push("owners".into()); }
+    if !s.line_shots.is_empty() { v.push("shots in flight".into()); }
+    if s.pending.iter().any(|p| p.attacker == boss || crew.contains(&p.attacker)) { v.push("pending".into()); }
+    v
+}
+
+fn assert_put_back(s: &Survival, boss: Id, crew: &[Id]) {
+    let m = &s.mobs[&boss];
+    assert_eq!(leftovers(s, boss, crew), Vec::<String>::new());
+    assert_eq!(m.health, m.max_health, "whole");
+    assert!(matches!(m.state, MobState::Idle { .. }), "at ease, not on his way home: {:?}", m.state);
+    assert!(m.pattern.is_none() && m.phase == 0 && m.stagger_until <= s.clock);
+    assert!(dist2d(m.pos, m.home) < 0.1, "at his post");
+}
+
+/// Once abandoned the world takes no steps, so the put-back must already be done on leaving; the
+/// next hero then finds the crew posted afresh, the captain whole, nothing frozen mid-event.
+fn assert_next_hero_finds_it_fresh(s: &mut Survival, boss: Id, crew: &[Id]) {
+    let h = s.join("late", "Late", None);
+    let p = s.players.get_mut(&h).unwrap();
+    p.pos = [-24.0, 0.0, 0.0];
+    p.health = 100_000;
+    p.max_health = 100_000;
+    run(s, 0.5);
+    let c = &s.firing_line.crews[&boss];
+    assert_eq!(c.stage, Stage::Posted);
+    assert_eq!(c.gunners.len(), 2);
+    assert!(c.gunners.iter().all(|g| !crew.contains(g) && s.mobs[g].health == s.mobs[g].max_health));
+    assert_eq!(s.mobs[&boss].health, s.mobs[&boss].max_health);
+    assert!(s.line_shots.is_empty());
+}
+
+#[test]
+fn the_last_hero_leaving_mid_volley_puts_the_whole_fight_back_at_once() {
+    for secs in [1.5, 5.0, 9.0, 20.0] {
+        let (mut s, band, boss, crew) = fight(1);
+        let h = band[0];
+        s.mobs.get_mut(&boss).unwrap().health -= 300;
+        run(&mut s, secs);
+        s.hurt_mob(boss, h, 100);
+        let _ = s.leave(h);
+        assert!(s.players.is_empty());
+        assert_put_back(&s, boss, &crew);
+        assert_next_hero_finds_it_fresh(&mut s, boss, &crew);
+    }
+}
+
+#[test]
+fn leaving_with_a_gunner_down_or_the_captain_alone_with_his_gun_out_puts_it_back() {
+    let (mut s, band, boss, crew) = fight(1);
+    run(&mut s, 2.5);
+    s.hurt_mob(crew[0], band[0], u32::MAX);
+    run(&mut s, 5.0);
+    let _ = s.leave(band[0]);
+    assert_put_back(&s, boss, &crew);
+    assert_next_hero_finds_it_fresh(&mut s, boss, &crew);
+    let (mut s, h, boss) = alone();
+    let crew: Vec<Id> = Vec::new();
+    run(&mut s, 3.0);
+    let _ = s.leave(h);
+    assert_put_back(&s, boss, &crew);
+    assert!(s.mobs[&boss].phase == 0, "his gun is for the next fight's end");
+}
+
+#[test]
+fn leaving_while_the_harpoon_is_held_in_flight_or_hauling_puts_it_back() {
+    // Held back, then in flight, then the haul and the cut waiting, one leave at each.
+    for after in [0.5, 1.75, 2.4, 3.2] {
+        let (mut s, h, boss) = harpoon(11.0);
+        let start = s.clock;
+        while s.clock - start < after {
+            s.step(DT);
+            s.move_player(h, s.players[&h].pos, 0.0, Moving::default());
+        }
+        let _ = s.leave(h);
+        assert_put_back(&s, boss, &[]);
+        assert_next_hero_finds_it_fresh(&mut s, boss, &[]);
+    }
+}
+
+#[test]
+fn one_hero_leaving_hands_the_crew_to_the_other_and_the_last_to_go_puts_it_back() {
+    let (mut s, band, boss, crew) = fight(2);
+    run(&mut s, 3.0);
+    let _ = s.leave(band[0]);
+    assert_eq!(s.mobs[&boss].state.target(), Some(band[1]));
+    assert!(crew.iter().all(|g| s.mobs[g].state.target() == Some(band[1])));
+    run(&mut s, 10.0);
+    assert_eq!(s.firing_line.crews[&boss].gunners, crew);
+    assert!(s.mobs[&boss].state.target().is_some());
+    // The second goes: now it is put back.
+    let _ = s.leave(band[1]);
+    assert_put_back(&s, boss, &crew);
+}
+
+#[test]
+fn one_hero_down_one_up_at_the_far_ends_and_the_up_one_leaves_puts_it_back() {
+    let (mut s, band, boss, crew) = fight(2);
+    run(&mut s, 1.3);
+    s.players.get_mut(&band[0]).unwrap().health = 0;
+    s.foe_gone(band[0]);
+    s.players.get_mut(&band[1]).unwrap().pos = [-14.0, 12.0, 0.0];
+    run(&mut s, 6.0);
+    let _ = s.leave(band[1]);
+    // The fallen one is still in the world: the fight is not abandoned until they too go.
+    let _ = s.leave(band[0]);
+    assert_put_back(&s, boss, &crew);
+}
+
+/// A harpoon's haul is helpless for about 1.7 sec; a gunner's shot must not land on a hero in it.
+#[test]
+fn no_gunner_shot_lands_on_a_hero_hauled_by_the_harpoon() {
+    let mut hauls = 0;
+    for seed in [31, 7, 12, 3, 5, 9, 21, 42] {
+        let (mut s, band, boss, crew) = fight_with(1, seed);
+        let h = band[0];
+        for g in &crew {
+            s.mobs.get_mut(g).unwrap().health = 1_000_000;
+        }
+        s.mobs.get_mut(&boss).unwrap().health = 1_000_000_000;
+        s.mobs.get_mut(&boss).unwrap().max_health = 1_000_000_000;
+        let start = s.clock;
+        let mut air_until = 0.0f32;
+        let mut seen_hop = false;
+        while s.clock - start < 70.0 {
+            let before = s.players[&h].health;
+            for e in s.step(DT) {
+                if let Event::Hop { player, .. } = e {
+                    if player == h {
+                        seen_hop = true;
+                        hauls += 1;
+                        air_until = match s.players[&h].action { Action::Stagger { until } => until, _ => s.clock + 1.7 };
+                    }
+                }
+            }
+            let hit = before.saturating_sub(s.players[&h].health);
+            let shot_hit = hit > 0 && s.firing_line.crews.get(&boss).is_some() && s.clock < air_until
+                && s.line_shots.iter().any(|l| crew.contains(&l.owner)) ;
+            assert!(!shot_hit || !seen_hop, "seed {seed}: a gunner's shot struck a hauled hero at {}", s.clock);
+            // The hero stands (and is set down where the haul put them).
+            let p = s.mobs[&boss].pos;
+            if s.clock >= air_until {
+                s.move_player(h, [p[0] - 6.0, p[1], p[2]], 0.0, Moving::default());
+            }
+        }
+    }
+    assert!(hauls >= 2, "the sweep hauled a hero {hauls} times");
+}
