@@ -254,30 +254,6 @@ reduce = 0.04
 text = "Reduces damage taken by 4%. Does not slow stamina regeneration. \"The Brotherhood's red mask.\""
 set = "brotherhood"
 
-# The Squallshaper's staff: two-handed, a long reach, guards with the haft.
-[[weapon]]
-key = "squall_staff"
-windup = 0.40
-active = 0.12
-recovery = 0.52
-stamina = 18.0
-damage = [28, 35]
-range = 4.6
-arc = 70.0
-targets = 2
-two_handed = true
-guard = "haft_guard"
-emote = 38
-subclass = 6
-
-[[item]]
-key = "squall_staff"
-name = "Squallshaper's Staff"
-display = 5415
-icon = "INV_Staff_08"
-kind = "weapon"
-text = "Two-handed, with a long reach. Quick for its length. Guards with the haft."
-
 [[ranged]]
 key = "defias_crossbow"
 draw_secs = 0.0
@@ -454,7 +430,6 @@ weapon = 5415
 grip = "staff"
 keep_away = 13.0
 drops = { plunder = [2, 5] }
-gear = ["squall_staff"]
 respawn = 0.0
   [mob.attack]
   ranged = true
@@ -1238,49 +1213,6 @@ count = 1
 
 # --- gear from the Foundry and the Mast Room --------------------------------------------------------
 
-# The goblins' felling axe: a wide chop that takes two.
-[[weapon]]
-key = "goblin_axe"
-windup = 0.30
-active = 0.11
-recovery = 0.40
-stamina = 13.0
-damage = [20, 27]
-range = 3.1
-arc = 115.0
-targets = 2
-subclass = 0
-
-[[item]]
-key = "goblin_axe"
-name = "Goblin Woodcutter's Axe"
-display = 453
-icon = "INV_Axe_04"
-kind = "weapon"
-text = "One-handed. Its wide chop hits up to 2 enemies. \"A felling axe.\""
-
-# An engineer's wrench: a knock that jars a wind-up.
-[[weapon]]
-key = "goblin_wrench"
-windup = 0.32
-active = 0.12
-recovery = 0.40
-stamina = 13.0
-damage = [19, 26]
-range = 2.9
-arc = 100.0
-targets = 1
-stagger = 0.6
-subclass = 4
-
-[[item]]
-key = "goblin_wrench"
-name = "Engineer's Wrench"
-display = 1610
-icon = "INV_Misc_Wrench_01"
-kind = "weapon"
-text = "Light and heavy blows that land during an enemy's wind-up knock it aside and stagger the enemy for 0.6 sec. Does not work on bosses, on an enemy staggered a moment ago, or on a heavy enemy's braced wind-up. \"A goblin engineer's wrench.\""
-
 # Gilnid's: one hand, and it breaks a stance like a two-hander.
 [[weapon]]
 key = "gilnid_wrench"
@@ -1345,7 +1277,6 @@ weapon = 1610
 grip = "1h"
 keep_away = 12.0
 drops = { plunder = [2, 4] }
-gear = ["goblin_wrench"]
 respawn = 0.0
   [mob.attack]
   ranged = true
@@ -1395,7 +1326,6 @@ weapon = 453
 grip = "1h"
 evade = 0.1
 drops = { plunder = [2, 4] }
-gear = ["goblin_axe"]
 respawn = 0.0
   [mob.attack]
   windup = 0.6
@@ -3230,7 +3160,6 @@ weapon = 1610
 grip = "1h"
 keep_away = 7.0
 drops = { plunder = [3, 5] }
-gear = ["goblin_wrench"]
 respawn = 0.0
   [mob.attack]
   windup = 0.5

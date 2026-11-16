@@ -44,12 +44,12 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
     out
 }
 
-/// A hero with the Apprentice's Staff in hand, standing where they were.
+/// A hero with the Ember Staff in hand, standing where they were.
 fn staff_hero(s: &mut Survival, name: &str, pos: Vec3) -> Id {
     let p = hero(s, name, pos, 0.0);
     let rack = s.objs[&s.rack_id()].pos;
     s.players.get_mut(&p).unwrap().pos = rack;
-    s.arm(p, "apprentice_staff").unwrap();
+    s.arm(p, "ember_staff").unwrap();
     s.players.get_mut(&p).unwrap().pos = pos;
     p
 }

@@ -284,10 +284,31 @@ fn renamed_on<'a>(slot: &str, k: &'a str) -> &'a str {
     RENAMED_ON.iter().find(|(s, old, _)| *s == slot && *old == k).map_or_else(|| renamed(k), |(_, _, new)| new)
 }
 
+/// Weapons taken off the rack and out of the dungeons (the weapon identity pass), old key to the
+/// basic weapon of their family: a save that holds one (in hand, off hand, bag, chest or cache,
+/// honed copies too) gets the family's plain weapon instead, so it still loads.
+const RETIRED_WEAPONS: &[(&str, &str)] = &[
+    ("apprentice_staff", "ember_staff"),
+    ("squall_staff", "halberd"),
+    ("goblin_axe", "axe"),
+    ("goblin_wrench", "mace"),
+];
+
+/// A saved item key as it is now: a retired weapon (or its honed copy) is its family's basic one.
+pub fn retired_weapon(k: &str) -> &str {
+    let base = k.rsplit_once("_honed").map_or(k, |(b, tier)| if tier.chars().all(|c| c.is_ascii_digit()) { b } else { k });
+    RETIRED_WEAPONS.iter().find(|(old, _)| *old == base).map_or(k, |(_, new)| new)
+}
+
+/// The item a saved key names, a retired weapon as its successor.
+fn saved_item(c: &Content, k: &str) -> Option<usize> {
+    c.item(k).or_else(|| c.item(retired_weapon(k)))
+}
+
 /// A returning hero is where they left, as hurt as they were: no heal and no trip home for
 /// logging out (only a fall sends them to the camp).
 pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl Fn(f32, f32) -> f32) {
-    let item = |k: &str, fallback: usize| c.item(k).unwrap_or(fallback);
+    let item = |k: &str, fallback: usize| saved_item(c, k).unwrap_or(fallback);
     p.pos = [s.pos[0], s.pos[1], height(s.pos[0], s.pos[1]).max(s.pos[2])];
     p.facing = s.facing;
     p.health = if s.dead { 0 } else { s.health.min(p.max_health) };
@@ -295,12 +316,12 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
     p.weapon = item(&s.weapon, p.weapon);
     p.shield = item(&s.shield, p.shield);
     p.off_empty = s.off_hand == "none";
-    p.off_weapon = (!s.off_hand.is_empty() && !p.off_empty).then(|| c.item(&s.off_hand)).flatten().filter(|i| c.items[*i].kind == crate::ItemKind::Weapon);
+    p.off_weapon = (!s.off_hand.is_empty() && !p.off_empty).then(|| saved_item(c, &s.off_hand)).flatten().filter(|i| c.items[*i].kind == crate::ItemKind::Weapon);
     p.bow = item(&s.bow, p.bow);
-    p.bag = s.bag.iter().filter_map(|(k, n)| Some((c.item(k)?, *n))).collect();
-    p.armor = s.armor.iter().filter_map(|(slot, k)| Some((slot.clone(), c.item(k).filter(|i| c.items[*i].kind == crate::ItemKind::Armor)?))).collect();
+    p.bag = s.bag.iter().filter_map(|(k, n)| Some((saved_item(c, k)?, *n))).collect();
+    p.armor = s.armor.iter().filter_map(|(slot, k)| Some((slot.clone(), saved_item(c, k).filter(|i| c.items[*i].kind == crate::ItemKind::Armor)?))).collect();
     p.pack = s.pack.as_deref().and_then(|k| c.item(k)).filter(|i| c.items[*i].kind == crate::ItemKind::Pack);
-    p.quick = s.quick.as_deref().and_then(|k| c.item(k));
+    p.quick = s.quick.as_deref().and_then(|k| saved_item(c, k));
     p.last_safe = p.pos;
     // The tree as they left it (a dev build owns it all whatever was saved), and their keys where
     // the abilities still exist and are theirs.
@@ -481,11 +502,11 @@ impl Survival {
             }
         }
         for c in &save.caches {
-            let items: BTreeMap<usize, u32> = c.items.iter().filter_map(|(k, n)| Some((s.content.item(k)?, *n))).collect();
+            let items: BTreeMap<usize, u32> = c.items.iter().filter_map(|(k, n)| Some((saved_item(&s.content, k)?, *n))).collect();
             let id = s.alloc();
             s.objs.insert(id, Obj { kind: ObjKind::Cache { uid: c.uid, owner: c.owner.clone(), items }, pos: c.pos, facing: 0.0 });
         }
-        s.storage = save.storage.iter().filter_map(|(k, n)| Some((s.content.item(k)?, *n))).collect();
+        s.storage = save.storage.iter().filter_map(|(k, n)| Some((saved_item(&s.content, k)?, *n))).collect();
         s.next_uid = s.next_uid.max(save.next_uid).max(
             save.stations.iter().map(|x| x.uid + 1).chain(save.caches.iter().map(|x| x.uid + 1)).max().unwrap_or(1),
         );
@@ -572,7 +593,7 @@ impl Survival {
             let items: BTreeMap<usize, u32> = c
                 .items
                 .iter()
-                .filter_map(|(k, n)| Some((s.content.item(k)?, *n)))
+                .filter_map(|(k, n)| Some((saved_item(&s.content, k)?, *n)))
                 .collect();
             let id = s.alloc();
             s.objs.insert(

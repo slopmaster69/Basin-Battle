@@ -199,3 +199,24 @@ fn a_save_keeps_the_off_hand() {
     let q = t.join("bren", "Bren", Some(&saved));
     assert_eq!(t.players[&q].off_weapon, t.content.item("axe"), "the axe is back in the off hand");
 }
+
+#[test]
+fn a_save_holding_a_retired_weapon_loads_the_familys_basic_one() {
+    let c = Content::dev();
+    for gone in ["apprentice_staff", "squall_staff", "goblin_axe", "goblin_wrench"] {
+        assert!(c.item(gone).is_none() && c.weapon(gone).is_none(), "{gone} is gone");
+    }
+    let (mut s, p) = world();
+    let mut save = s.leave(p).unwrap();
+    save.weapon = "goblin_axe".into();
+    save.off_hand = "goblin_wrench".into();
+    save.bag.insert("squall_staff".into(), 1);
+    save.bag.insert("apprentice_staff_honed2".into(), 1);
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let h = &s.players[&q];
+    let key = |i: usize| s.content.items[i].key.clone();
+    assert_eq!(key(h.weapon), "axe");
+    assert_eq!(h.off_weapon.map(key).as_deref(), Some("mace"));
+    let bag: Vec<String> = h.bag.keys().map(|i| key(*i)).collect();
+    assert!(bag.contains(&"halberd".to_string()) && bag.contains(&"ember_staff".to_string()), "{bag:?}");
+}
