@@ -3,8 +3,9 @@
 The Rogue, the fourth class of the design (Warrior, Priest, Mage, Rogue), rebuilt the way the
 Warrior, the Mage and the Priest were: three trees, every skill one job, its numbers with their
 reasons, and a build plan of small pull requests at the end. It lives in Elwynn Survival, where
-the dodge, posture and the beat are. Nothing here is built yet: this page is the design the
-pull requests in the [build plan](#build-plan) follow.
+the dodge, posture and the beat are. This page is the design the pull requests in the
+[build plan](#build-plan) follow. Built so far: entry 1, the core (two blades, no guard, the
+perfect dodge and the Shadow Cut; see [Decided while building](#decided-while-building)).
 
 ## How the Rogue plays
 
@@ -339,6 +340,30 @@ weapons are, with a 1.12 fist weapon's display id checked in an ignored test aga
 - **Looks that need the client**: a ribbon trail on each blade, and a true copy of the hero's own
   body for Afterimage and the Shadow Cut. The server's looks carry everything until a client patch
   is allowed (the last pull request below).
+
+## Decided while building
+
+What the design left open, decided in the pull request that built it:
+
+- **The core (entry 1)**:
+  - An old Rogue save whose **main hand** holds what a Rogue can't (a two-hander, an axe, a staff)
+    loads with that weapon in the bags and the Rogue's start blade (a dagger) in the hand, so the
+    Rogue always has a blade to fight with. The off hand is left empty (it jabs), as the table says.
+  - A shield, a two-hander or an axe a Rogue **forges** at a station goes to Camp Storage with
+    "Rogues can't use shields." (or the weapon's words), never into the hands.
+  - The **character screen** shows the off hand's blade (or nothing), as the world does, and never
+    an old Rogue save's shield.
+  - The perfect dodge's **sound** is Vanish's (`SOUND_PERFECT_DODGE`, 3324 in `sim/cues.rs`); the
+    id is to be checked when it is first filmed.
+  - The **`perfect_dodge` beat** is in the add-on (`Cues.lua`, add-on 70): a 90 ms stop on the
+    hero alone (a parry's is 150: a slip, not a clash), no shake, and the screen's corners
+    flashed violet for 0.6 sec, the Shadow Cut's time. An older add-on ignores a beat it doesn't
+    know, so it shows only the server's looks.
+  - A **Shadow Cut** steps squarely behind the one who swung, or half a radian to either side of
+    that (still in its back, never round its flank). If none of those is clear, within 6 yd and
+    in sight, there is no step and the cut is spent: the press is the attack out of the dodge.
+  - Mid-run, the attack pressed **out of a dodge** is the run's next blow (a light one), not the
+    roll's attack, so the run goes on.
 
 ## Build plan
 

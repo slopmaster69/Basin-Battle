@@ -710,10 +710,19 @@ impl Survival {
             }
             ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor | ItemKind::Pack => {
                 self.count("craft", &recipe.key, recipe.count);
-                let old = self.put_on(id, out);
-                self.events.push(Event::Gear { player: id });
                 let what = c.items[out].text.clone();
                 let verb = if matches!(kind, ItemKind::Armor | ItemKind::Pack) { "made the" } else { "forged the" };
+                // A Rogue's hands: a shield, a two-hander or an axe they made waits in storage.
+                if let Err(why) = self.can_hold(id, out) {
+                    *self.storage.entry(out).or_default() += 1;
+                    self.events.push(Event::Storage);
+                    self.tell(id, format!("You {verb} {name}. {why} It went to storage."));
+                    self.events.push(Event::Missile { caster: id, spell: CRAFT_SPELL, target: Target::Unit(id) });
+                    self.events.push(Event::Dirty);
+                    return Ok(());
+                }
+                let old = self.put_on(id, out);
+                self.events.push(Event::Gear { player: id });
                 match old {
                     Some(old) => {
                         self.tell(id, format!("You {verb} {name} and equipped it. {what} Your {} went to storage.", c.items[old].name));

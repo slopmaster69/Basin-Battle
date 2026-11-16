@@ -1,0 +1,43 @@
+# The Rogue's perfect dodge (docs/rogue-roles.md, build plan 1): a grunt 4 yd ahead swings at a
+# Rogue; a small player in the interface (RB) reads its wind-up (AN, the time to the blow) and
+# rolls 0.12 s before the blow lands (inside the perfect window, 0.04 to 0.18 s into the dodge),
+# then presses the left button 0.2 s after the blow (inside the Shadow Cut's 0.6 s). Floor markers
+# off. Look for, with no floor marker and no word: the grunt's own wind-up; the Rogue's body
+# flickering see-through (the Stealth look) for 0.3 s; Vanish's puff of smoke and its sound where
+# the blow fell; the short stop and violet corners on the Rogue's own screen; the step behind the
+# grunt (a puff at both ends); the stab in its back (the blood burst, the backstab's sound and
+# stop). Then a few blows with both hands: the off hand (right button) swings AttackOff (clip 87),
+# the 4th blow both blades (clip 17), and a roll in the middle of the run doesn't end it.
+# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>` (the `setup`
+# scenario makes only the hunter, the warrior and the cameraman). Not run yet.
+hero rogue
+cam 90 -12 8
+include _setup
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 lua RB = { q = {}, on = false, n = 0 }
+4.4 lua function RB.say(t) SendChatMessage(t, "SAY") end
+4.4 lua function RB.after(d, f) table.insert(RB.q, { GetTime() + d, f }) end
+4.4 lua function RB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+4.4 lua function RB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+4.4 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= 3 then return end RB.n = RB.n + 1 RB.log("wind-up " .. w) RB.after(math.max(0, w - 0.12), function() RB.say(".es in d") end) RB.after(w + 0.2, function() RB.say(".es in a") end) RB.after(w + 0.28, function() RB.say(".es in au") end) end
+4.4 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) end end
+4.4 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) RB.line(l) return old(l) end
+4.4 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end end)
+4.6 .es target grunt 4
+5.0 lua RB.on = true
+5.0 video
+5.2 shots dodges 60 0.1
+# Three perfect dodges and their cuts, then the bot stops and the run is played by hand.
+16 lua RB.on = false
+16.5 .es target clear
+16.6 .es target grunt 3 still
+17.0 .es in a
+17.1 .es in au
+17.5 .es in g
+17.9 .es in d
+18.6 .es in a
+18.7 .es in au
+19.1 .es in g
+17.0 shots run 30 0.1
+22 end

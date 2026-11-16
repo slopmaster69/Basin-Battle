@@ -58,6 +58,9 @@ fn pin(s: &mut Survival, m: Id, hero: Id) {
     m.pos = [2.0, 0.0, 0.0];
     m.facing = std::f32::consts::PI;
     m.ready_at = 1e9;
+    // (Nor stepping round the hero: a creature circling turns to its foe as it goes.)
+    m.path.clear();
+    m.sidle = None;
 }
 
 fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
@@ -166,6 +169,33 @@ fn a_rogue_cant_equip_a_shield_a_two_hander_or_an_axe() {
     s.players.get_mut(&w).unwrap().pos = rack;
     s.arm(w, "greatsword").unwrap();
     s.arm(w, "buckler").unwrap();
+}
+
+#[test]
+fn a_shield_a_rogue_forges_goes_to_storage_and_the_blades_stay_in_hand() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let (at, f) = crate::tests::build_spot(&s);
+    s.move_player(p, at, f, Moving::default());
+    let _ = s.step(0.0);
+    for (k, n) in [("wood", 20), ("ore", 12)] {
+        let i = s.content.item(k).unwrap();
+        s.players.get_mut(&p).unwrap().bag.insert(i, n);
+    }
+    s.build_start(p, "smithy").unwrap();
+    let _ = s.step(DT);
+    s.build_confirm(p).unwrap();
+    let anvil = *s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Station { .. })).unwrap().0;
+    s.events.clear();
+    s.craft(p, anvil, "reinforced_shield").unwrap();
+    let ev = run(&mut s, 0.5);
+    let shield = s.content.item("reinforced_shield").unwrap();
+    assert_eq!(s.storage.get(&shield), Some(&1), "in storage");
+    let h = &s.players[&p];
+    assert_eq!((key(&s, h.weapon).as_str(), h.off_weapon.map(|i| key(&s, i))), ("dagger", Some("dagger".to_string())));
+    assert_ne!(h.shield, shield, "never put on");
+    let told = ev.iter().chain(s.events.iter()).any(|e| matches!(e, Event::Tell { text, .. } | Event::Flash { text, .. } if text.contains("Rogues can't use shields.")));
+    assert!(told, "the hero is told why");
 }
 
 #[test]

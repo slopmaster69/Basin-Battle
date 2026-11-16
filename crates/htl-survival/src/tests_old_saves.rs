@@ -13,6 +13,7 @@ use crate::FlatLand;
 const V01: &str = include_str!("../testdata/old_saves/v0_1_footman.toml");
 const V04: &str = include_str!("../testdata/old_saves/v0_4_warrior_retired_gear.toml");
 const PRIEST: &str = include_str!("../testdata/old_saves/v0_4_priest_old_cards.toml");
+const ROGUE: &str = include_str!("../testdata/old_saves/v0_4_rogue_shield_old_cards.toml");
 
 /// Today's rules with the tree not handed out whole, so what a save owned is what a hero owns.
 fn rules() -> Content {
@@ -143,6 +144,44 @@ fn a_priest_from_the_early_drafts_comes_back_with_the_cards_that_took_their_plac
     assert_eq!(h.valor, 10.0);
     // And they play: a step and a cast do not panic.
     let _ = s.step(0.05);
+}
+
+#[test]
+fn a_rogue_saved_with_a_shield_a_two_hander_and_old_cards_loads_with_two_hands_and_its_cards() {
+    let (mut s, save) = load(ROGUE);
+    // A two-hander and the buckler in hand: the Rogue's blade in the main hand, the off hand empty
+    // (it jabs), and both in the bags with what was there.
+    let a = s.join("ayla", "Ayla", save.players.get("ayla"));
+    let h = &s.players[&a];
+    assert_eq!(h.class, "rogue");
+    assert_eq!(key(&s, h.weapon), "dagger");
+    assert!(h.off_weapon.is_none() && h.off_empty, "the off hand empty");
+    let bag = bag_of(&s, a);
+    assert_eq!((bag["greatsword"], bag["buckler"], bag["ore"]), (1, 1, 2), "{bag:?}");
+    // The old cards come back as their successors, on their keys.
+    for (gone, new) in [("deadly_throw", "fan_of_knives"), ("evasion", "smoke_bomb")] {
+        assert!(!h.owned.contains(gone) && h.owned.contains(new), "{gone} became {new}: {:?}", h.owned);
+    }
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("fan_of_knives"));
+    assert_eq!(h.loadout.get("defense").map(String::as_str), Some("smoke_bomb"));
+    assert_eq!(h.valor, 20.0);
+    // A sword and an axe in the off hand: the sword stays, the axe goes to the bags.
+    let v = s.join("vex", "Vex", save.players.get("vex"));
+    let h = &s.players[&v];
+    assert_eq!(key(&s, h.weapon), "sword");
+    assert!(h.off_weapon.is_none() && h.off_empty);
+    let bag = bag_of(&s, v);
+    assert_eq!(bag.get("axe"), Some(&1), "{bag:?}");
+    assert!(!bag.contains_key("buckler"), "the buckler wasn't in hand: it isn't doubled");
+    // And they play: the right click swings the off hand, never a guard.
+    s.input(a, Input::Guard);
+    assert!(matches!(&s.players[&a].action, Action::Swing { strike, .. } if strike.kind == StrikeKind::Off), "{:?}", s.players[&a].action);
+    let _ = s.step(0.05);
+    // Saved again and loaded again: nothing more turns up.
+    let again = s.leave(a).unwrap();
+    let a = s.join("ayla", "Ayla", Some(&again));
+    let bag = bag_of(&s, a);
+    assert_eq!((bag["greatsword"], bag["buckler"]), (1, 1), "{bag:?}");
 }
 
 #[test]

@@ -1,0 +1,44 @@
+# Hand-built: two Rogues as saves held them before the Rogue's core (docs/rogue-roles.md): one with
+# a two-hander and the buckler in hand and the Rogue's old cards (Deadly Throw, Evasion), one with
+# a sword and an axe in the off hand. Made by hand; not a real save.
+version = 1
+next_uid = 2
+
+[players.ayla]
+pos = [0.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "greatsword"
+shield = "buckler"
+bow = "bow"
+dead = false
+class = "rogue"
+name = "Ayla"
+valor = 20.0
+owned = ["deadly_throw", "backstab", "shadowstep", "evasion"]
+[players.ayla.bag]
+ore = 2
+[players.ayla.loadout]
+ranged = "deadly_throw"
+close = "backstab"
+utility = "shadowstep"
+defense = "evasion"
+
+[players.vex]
+pos = [3.0, 0.0, 0.0]
+facing = 0.0
+health = 50
+stamina = 50.0
+weapon = "sword"
+shield = "buckler"
+off_hand = "axe"
+bow = "bow"
+dead = false
+class = "rogue"
+name = "Vex"
+valor = 0.0
+owned = ["backstab"]
+[players.vex.bag]
+[players.vex.loadout]
+close = "backstab"

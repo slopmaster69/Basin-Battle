@@ -538,7 +538,9 @@ pub(crate) const VERSION: u32 = 2;
 /// shows the raw `disorient` key.
 /// 69: the camp's people can be talked to (a `talk` page, `Letter.lua`): an older add-on shows
 /// their words as the default page.
-pub(crate) const ADDON_NEWEST: u32 = 69;
+/// 70: the `CU` beat `perfect_dodge` (a Rogue's perfect dodge: a short stop on the hero alone and a
+/// shadow-coloured edge). An older add-on knows none of it and shows nothing for it.
+pub(crate) const ADDON_NEWEST: u32 = 70;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
