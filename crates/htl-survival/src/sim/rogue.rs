@@ -211,6 +211,10 @@ impl Survival {
             p.rogue.flicker_until = now + r.flicker_secs;
             self.events.push(Event::Auras { id: victim });
         }
+        // And, on a client that draws it, the hero's own body left behind for the flicker's time.
+        if r.flicker_secs > 0.0 {
+            self.events.push(Event::Afterimage { id: victim, secs: r.flicker_secs, at: None, stand_in: None });
+        }
         if r.puff != 0 {
             self.events.push(Event::Missile { caster: victim, spell: r.puff, target: Target::Point(at) });
         }
@@ -1046,8 +1050,10 @@ impl Survival {
         if let Some(m) = self.mobs.get_mut(&mid) {
             m.facing = face;
         }
-        // It stands (a totem that never pulses) until its time is out.
+        // It stands (a totem that never pulses) until its time is out. On a client that draws it,
+        // its look is a copy of the hero's own body there, the creature's hidden.
         self.totems.push(super::abilities::Totem { mob: mid, owner: id, ability, until: now + secs, next: f32::INFINITY });
+        self.events.push(Event::Afterimage { id, secs, at: Some(at), stand_in: Some(mid) });
         let on: Vec<Id> = self.mobs.iter().filter(|(k, m)| **k != mid && m.health > 0 && !m.friendly && m.state.target() == Some(id)).map(|(k, _)| *k).collect();
         let was = self.fx_from.replace(at);
         for m in on {

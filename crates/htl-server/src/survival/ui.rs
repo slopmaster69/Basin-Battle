@@ -189,6 +189,17 @@
 //!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
 //! - `BT\t<beat>\t<guid>`: a beat on the hero's own screen alone: `kill_shot` as Kill Shot goes
 //!   (its speed lines), `kill_shot_kill` as it kills (`guid` the foe: a hit-stop and shake).
+//!
+//! A Rogue's looks, to a client of the thirty-second round (patch 0103, [`ROGUE_LOOKS_LEVEL`]):
+//! - An `AN` for a Rogue's blow carries its trail a hand each, `<main AARRGGBB>/<off AARRGGBB>`,
+//!   `-` for a hand that trails nothing ([`rogue_trail`]): the main hand's blow its own blade in
+//!   the blow's own colour, the off hand's its blade in a deeper steel, the two-blade finisher
+//!   both, stronger. An older client is sent the one colour as before (both blades).
+//! - `AI\t<guid>\t<secs>\t<alpha>\t<RRGGBB>[\t<x>\t<y>\t<z>\t<stand-in guid>]`: a see-through
+//!   copy of that hero's own body and gear left for `secs` ([`afterimage_line`]): where the body
+//!   is (a perfect dodge, for the flicker's 0.3 sec), or at that spot hiding the stand-in creature
+//!   (Afterimage's shade, 2 sec; its own body is what an older client sees). `AI\t<guid>\t0`
+//!   takes the hero's copies away (the shade gone early). An older add-on ignores it.
 
 use std::fmt::Write as _;
 
@@ -543,7 +554,10 @@ pub(crate) const VERSION: u32 = 2;
 /// 71: the board's third choice in the Rogue's column (`TR`'s `choice` 3, Blades) and the Rogue's
 /// Flourish count beside the reticle (`SK flourish`). An older add-on is sent no third choice (it
 /// would lay those cards over the first), and ignores the count.
-pub(crate) const ADDON_NEWEST: u32 = 71;
+/// 72: a Rogue's afterimage (`AI`, on a client of the thirty-second round: patch 0103), and its
+/// own blows' trails a hand each. An older add-on ignores the line and draws both blades on the
+/// blows it guesses.
+pub(crate) const ADDON_NEWEST: u32 = 72;
 /// The first add-on that lays a column's third choice on the board.
 pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
@@ -576,7 +590,56 @@ pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// over and crooked copies only to this round (`aftermath_doodads.rs`).
 /// 31: the Deadmines' route lanterns put out on the server's say-so, one game object each, as
 /// Rhahk'Zor's collapse comes down (0096; `aftermath_wreck.rs`).
-pub(crate) const CLIENT_NEWEST: u8 = 31;
+/// 32: a Rogue's two blades and its afterimage (0103; [`ROGUE_LOOKS_LEVEL`]).
+pub(crate) const CLIENT_NEWEST: u8 = 32;
+
+/// 32: a Rogue's two blades trail a hand each (`PlayUnitAnimation`'s trail `main/off`), and a copy
+/// of the hero's own body is left behind (`PlayUnitAfterimage`, 0103): [`ROGUE_LOOKS_LEVEL`].
+pub(crate) const ROGUE_LOOKS_LEVEL: u8 = 32;
+
+/// A Rogue's off-hand blade trails a deeper steel than the main hand's pale streak (the blow's own
+/// colour, `play.rs`'s light trail), so the two hands read apart in the rhythm; the two-blade
+/// finisher draws both blades at once, a stronger alpha on each (0x78, a heavy blow's).
+const OFF_TRAIL: &str = "5A7C86B4";
+const FINISH_MAIN_TRAIL: &str = "78F2EEE4";
+const FINISH_OFF_TRAIL: &str = "787C86B4";
+
+/// The perfect dodge's copy: pale, the body's own colours under a cool light, 0.55 so it reads as a
+/// ghost beside the hero who left it, for the flicker's 0.3 sec.
+const DODGE_IMAGE_ALPHA: f32 = 0.55;
+const DODGE_IMAGE_TINT: &str = "C8C8FF";
+/// Afterimage's shade: the hero's own body in Shadow's violet, 0.6 and standing most of its 2 sec,
+/// so the enemies turning to it read as turning to the Rogue.
+const SHADE_IMAGE_ALPHA: f32 = 0.6;
+const SHADE_IMAGE_TINT: &str = "A08CDC";
+
+/// A Rogue's blow's trail a hand each (`main/off`, `-` for none): the main hand's blow trails its
+/// own blade in the blow's own colour (`own`), the off hand's its own blade, the two-blade finisher
+/// both.
+pub(crate) fn rogue_trail(own: &str, off_hand: bool, finish: bool) -> String {
+    if finish {
+        format!("{FINISH_MAIN_TRAIL}/{FINISH_OFF_TRAIL}")
+    } else if off_hand {
+        format!("-/{OFF_TRAIL}")
+    } else {
+        format!("{own}/-")
+    }
+}
+
+/// The `AI` line: a copy of the hero's body for `secs` where it stands, or at `at` hiding the
+/// stand-in (Afterimage's shade); `secs` 0 takes the hero's copies away.
+pub(crate) fn afterimage_line(guid: u64, secs: f32, at: Option<htl_survival::Vec3>, stand_in: Option<u64>) -> String {
+    if secs <= 0.0 {
+        return format!("AI\t{guid:#X}\t0");
+    }
+    let (alpha, tint) = if stand_in.is_some() { (SHADE_IMAGE_ALPHA, SHADE_IMAGE_TINT) } else { (DODGE_IMAGE_ALPHA, DODGE_IMAGE_TINT) };
+    let mut line = format!("AI\t{guid:#X}\t{secs:.2}\t{alpha:.2}\t{tint}");
+    if let Some(p) = at {
+        let who = stand_in.map_or_else(|| "-".to_string(), |g| format!("{g:#X}"));
+        let _ = write!(line, "\t{:.2}\t{:.2}\t{:.2}\t{who}", p[0], p[1], p[2]);
+    }
+    line
+}
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -2625,6 +2688,39 @@ mod version_tests {
         assert_eq!(level, CLIENT_NEWEST, "the newest client the add-on asks for");
     }
 
+}
+
+#[cfg(test)]
+mod rogue_looks_tests {
+    use super::*;
+
+    #[test]
+    fn a_rogues_blow_trails_the_hand_that_struck_and_the_finisher_both() {
+        assert_eq!(rogue_trail("50F2EEE4", false, false), "50F2EEE4/-", "the main hand's blade alone, in the blow's own colour");
+        assert_eq!(rogue_trail("50F2EEE4", true, false), "-/5A7C86B4", "the off hand's blade alone, a deeper steel");
+        assert_eq!(rogue_trail("50F2EEE4", true, true), "78F2EEE4/787C86B4", "both blades on the finisher, whichever hand pressed it");
+        assert_eq!(rogue_trail("78FF9A3C", false, true), "78F2EEE4/787C86B4");
+        // Each side is a colour the client reads, or none.
+        for t in [rogue_trail("50F2EEE4", false, false), rogue_trail("", true, false), rogue_trail("", false, true)] {
+            let (m, o) = t.split_once('/').unwrap();
+            for h in [m, o] {
+                assert!(h == "-" || (h.len() == 8 && u32::from_str_radix(h, 16).is_ok()), "{t}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_afterimage_line_is_a_copy_where_the_body_is_or_at_the_shade_or_none() {
+        assert_eq!(afterimage_line(0x2A, 0.3, None, None), "AI\t0x2A\t0.30\t0.55\tC8C8FF");
+        assert_eq!(
+            afterimage_line(0x2A, 2.0, Some([-9001.25, 120.5, 82.0]), Some(0xF130_0001_2300_0042)),
+            "AI\t0x2A\t2.00\t0.60\tA08CDC\t-9001.25\t120.50\t82.00\t0xF130000123000042"
+        );
+        assert_eq!(afterimage_line(0x2A, 0.0, None, None), "AI\t0x2A\t0");
+        let f: Vec<String> = afterimage_line(0x2A, 2.0, Some([1.0, 2.0, 3.0]), Some(7)).split('\t').map(String::from).collect();
+        assert_eq!(f.len(), 9, "the add-on's fields: verb, guid, secs, alpha, colour, x, y, z, stand-in");
+        assert_eq!(ROGUE_LOOKS_LEVEL, CLIENT_NEWEST, "the newest round is the Rogue's looks");
+    }
 }
 
 #[cfg(test)]

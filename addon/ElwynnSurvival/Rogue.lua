@@ -45,6 +45,25 @@ local function Lay()
   end
 end
 
+-- `AI <guid> <secs> <alpha> <RRGGBB> [<x> <y> <z> <stand-in>]`: a see-through copy of a Rogue's
+-- own body left behind (patch 0103's PlayUnitAfterimage): for a moment where a perfect dodge
+-- slipped a blow, or standing as Afterimage's shade at its spot while the shade's own body is
+-- hidden. `AI <guid> 0` takes the copies away. Without the patch, nothing: the server's flicker and
+-- the shade's own body are the look.
+function ES.RogueImageLine(f)
+  if not PlayUnitAfterimage or not f[2] then return end
+  local guid = f[2]
+  local secs = tonumber(f[3]) or 0
+  if secs <= 0 then
+    PlayUnitAfterimage(guid, 0)
+    return
+  end
+  local x, y, z = tonumber(f[6]), tonumber(f[7]), tonumber(f[8])
+  local standIn = f[9]
+  if standIn == "-" then standIn = nil end
+  PlayUnitAfterimage(guid, secs, tonumber(f[4]) or 0.6, f[5], x, y, z, standIn)
+end
+
 -- `SK flourish <n> <most>`: the Rogue's Flourish now (other kinds are the staffs' and the Priest's).
 function ES.RogueStacksLine(f)
   if f[2] ~= "flourish" then return end

@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 71
+local VERSION = 72
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -618,10 +618,17 @@ function ES.SwingBody(kind)
 end
 
 -- Play a blow of ours: the clip (its impact and recovery the server's), the trail, the lunge, the
--- whoosh.
+-- whoosh. A trail a hand each (ac32, a Rogue's: "main/off") is the server's when it sent one; a
+-- blow we guess, the main hand's blade alone while the server's blows have come a hand each.
 local function PlayMine(kind, step, move)
   local heavy = kind == "heavy" or kind == "bash" or kind == "kick" or kind == "leap"
   local trail = heavy and HEAVY_TRAIL or LIGHT_TRAIL
+  if move.trail then
+    trail = move.trail
+  elseif ES.handTrails then
+    trail = trail .. "/-"
+  end
+  ES.predictedTrail = trail
   PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery, ES.SwingBody(kind), move.from)
   local mv = ES.moves
   if move.lunge > 0 and ActionDash and mv then
@@ -791,12 +798,19 @@ function ES.SwingLine(f)
     return
   end
   if mine then
+    -- A trail a hand each (ac32, a Rogue's two blades): our guesses trail the main hand alone from
+    -- now on; one colour, both hands as before.
+    local hands = trail and string.find(trail, "/", 1, true) and trail or nil
+    ES.handTrails = hands and true or nil
     local same = ES.predicted and GetTime() - ES.predicted < PREDICT_WINDOW and ES.predictedClip == clip and (ES.predictedTake or 0) == take
+    -- (The two-blade finisher on the same clip as the blow we guessed: played again, both blades.
+    -- A main hand's blow, "<colour>/-", stands as we guessed it.)
+    if same and hands and ES.predictedTrail ~= hands and not string.find(hands, "/-", 1, true) then same = nil end
     ES.predicted = nil
     if same then return end
     -- The server's blow, not the one we guessed: it plays now.
     if ActionLayer() and ES.moves then
-      PlayMine(kind, step, { clip = clip, take = take, impact = impact, recovery = recovery, lunge = lunge, stamina = 0, from = from })
+      PlayMine(kind, step, { clip = clip, take = take, impact = impact, recovery = recovery, lunge = lunge, stamina = 0, from = from, trail = hands })
       ES.predicted = nil
       return
     end
@@ -7064,6 +7078,9 @@ function ES.Line(line)
     ES.SwingLine(f)
   elseif verb == "FU" then
     ES.FlurryLine(f)
+  elseif verb == "AI" then
+    -- A Rogue's afterimage, on a client with patch 0103 (Rogue.lua).
+    if ES.RogueImageLine then ES.RogueImageLine(f) end
   elseif verb == "GB" then
     -- A shape flashed on the ground as an ability lands (Shockwave's cone), on a client with
     -- patch 0026: an effect, drawn whatever the floor markers are set to.
@@ -7187,7 +7204,10 @@ events:SetScript("OnEvent", function()
     -- ac29: the legs walk under a swing (a cast's body "auto", ActionDash's "legs").
     -- ac30: the collapsed Deadmines' own doodads hidden for the server's knocked-over copies.
     -- ac31: the collapse route's lanterns put out as each section comes down (patch 0096).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 31 then
+    -- ac32: a Rogue's blades trail a hand each, and its afterimage (PlayUnitAfterimage, 0103).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 32 then
+      Say(".es hello " .. VERSION .. " ac32")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 31 then
       Say(".es hello " .. VERSION .. " ac31")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 30 then
       Say(".es hello " .. VERSION .. " ac30")

@@ -257,6 +257,11 @@ pub enum Event {
     /// A staff's stacks changed (`[staffs]`): `kind` heat or chill on `on`, charge on the caster;
     /// `n` how many now (the most: it just ignited, froze, or gathered its last).
     Stacks { player: Id, kind: &'static str, n: u32, on: Option<Id> },
+    /// A Rogue's afterimage (docs/rogue-roles.md, "Looks the server can't make"): a see-through
+    /// copy of the hero's own body left for `secs` where it stands, or at `at` hiding `stand_in`
+    /// (Afterimage's shade, whose own body is the look for a client without the copy); `secs` 0
+    /// takes the hero's copies away. A look only, for the clients that draw it (`AI`).
+    Afterimage { id: Id, secs: f32, at: Option<Vec3>, stand_in: Option<Id> },
     /// A pose held on a unit (the ward's arm held out): `clip` looped for `secs` (0: let go), for
     /// the clients that hold one (`WP`).
     HoldPose { id: Id, clip: u16, secs: f32, from: Option<String> },

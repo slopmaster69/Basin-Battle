@@ -345,7 +345,8 @@ weapons are, with a 1.12 fist weapon's display id checked in an ignored test aga
   Rogue only. A Basin Battle Rogue would be its own page.
 - **Looks that need the client**: a ribbon trail on each blade, and a true copy of the hero's own
   body for Afterimage and the Shadow Cut. The server's looks carry everything until a client patch
-  is allowed (the last pull request below).
+  is allowed (the last pull request below). Built in entry 6 (client patch 0103); the server's
+  looks stay for a client without it.
 
 ## Decided while building
 
@@ -563,6 +564,54 @@ What the design left open, decided in the pull request that built it:
     change: the server's chat line carries it.
   - **Truly needs a client patch**: nothing. A ribbon on both blades during the finisher, and a
     left-hand fist model in the off hand, would add to it (PR 6).
+
+- **Looks the server can't make (entry 6, client patch 0103)**:
+  - **One patch, the thirty-second round**: `HasActionCombat()` 32, the add-on's hello `ac32` and
+    the server's `CLIENT_NEWEST` 32 (`ROGUE_LOOKS_LEVEL`); add-on `VERSION` and `ADDON_NEWEST` 72.
+    0103 was the next free number (0100 to 0102 on `main`, no open pull request claiming it).
+  - **The blade's ribbon is 1.12's own weapon trail, not a second ribbon.** The page named patch
+    0030's missile ribbons as the model, but a blade already has its ribbon: the swing trail the
+    client draws from each weapon's own tip and base (`weapon_trail`, one a hand), which
+    `PlayUnitAnimation` armed on both hands in one colour. The patch lets that trail name a colour
+    a hand, `"<main AARRGGBB>/<off AARRGGBB>"`, `-` for a hand that trails nothing. Why: a second
+    ribbon on a blade would draw twice, and the trail already follows the blade's own shape.
+  - **The trail rides the blow's own `AN` line**, in its trail field, not a line of its own: the
+    trail must start with the clip, and a second line could arrive after it. Only an `ac32` client
+    is sent the two-colour field; an older one gets the one colour as before (both blades). The
+    main hand's blow trails the right blade alone in the blow's own colour (the light blow's pale
+    `50F2EEE4`, a heavy's ember); the off hand's the left blade alone in a deeper steel
+    (`5A7C86B4`, half the pale's brightness, so the hands read apart in the rhythm); the two-blade
+    finisher both, each its own colour at a heavy blow's alpha (`78F2EEE4` / `787C86B4`), whichever
+    button pressed it. Only a hero created as a Rogue: a Warrior's two blades trail as before.
+  - **The one new line is `AI`, the afterimage's start and stop** (`ui.rs`'s `afterimage_line`):
+    `AI <guid> <secs> <alpha> <RRGGBB> [<x> <y> <z> <stand-in>]`, and `AI <guid> 0` to take the
+    hero's copies away. It starts on the server's own triggers, a sim event
+    (`Event::Afterimage`): a perfect dodge, for the flicker's time (`[rogue] flicker_secs`, 0.3: no
+    new number), and Afterimage's shade, for its `shade` (2 sec). It stops as the shade goes for
+    any reason (its time out, struck down, a second Afterimage, its Rogue gone).
+  - **The copy is patch 0027's afterimage** (the frozen copy of a unit's own body and what it
+    holds that Bladestorm's cuts leave), which the add-on can now ask for: `PlayUnitAfterimage`.
+    The perfect dodge's is left where the body is as the line arrives (a moment into the dodge:
+    the blow fell then), pale (`C8C8FF`) at 0.55, fading the whole way. The shade's stands at the
+    shade's spot (its rig moved along the ground, the body's own height kept), Shadow's violet
+    (`A08CDC`) at 0.6, keeping most of its alpha until near its end (the appear ramp's cubic, run
+    downwards), and the server's Defias body there is hidden on that client while it stands (its
+    stand-in). The enemies still turn to the server's shade, at the same spot, so what the player
+    sees and what the enemies turn to agree. A copy whose stand-in goes first goes with it, even
+    if the stop line is lost.
+  - **The copy's pose is the body's as the line arrives**: for the shade, the Rogue at the start
+    of the Quickstep's dash; for a perfect dodge, mid-dodge. To be checked when filmed.
+  - **The flicker and the shade's body stay** for every client: the flicker plays on the body as
+    before (the copy is left behind it), and a client without the patch sees the Defias shade.
+  - **Our own blows that the add-on plays before the server's line** (a left click): once the
+    server's own blows have come a hand each, a guessed blow trails the main hand alone, and a
+    finisher the guess got wrong (the same clip, both blades) is played again with both. An older
+    add-on on the new client trails both blades on its guesses, as before.
+  - **Not done here**: the Shadow Cut's step leaves no copy of its own (the perfect dodge's copy is
+    left the same moment); the off-hand fist's model is as it was (nothing in the patch sends a
+    left-hand display).
+  - **The client's own guards**: `PlayUnitAfterimage` is on the list of globals past 1.12
+    (`reference_surface.rs`) and in the VM surface golden, both in the patch.
 
 ## Build plan
 
@@ -796,10 +845,11 @@ otherwise skip it. Builds the [Not decided here](#not-decided-here) looks.
   darker shade on the off hand, both on the finisher), and an afterimage: a see-through copy of
   the hero's own model and gear left for 0.3 sec on a perfect dodge and for 2 sec as Afterimage's
   shade. Patch 0030's missile ribbons are the model for the trail.
-- **Files**: one new patch with the next free number in `patches/benilla/` (0101 as of this page;
-  never edit another), a server line to start and stop it (`ui.rs`'s line formats), and the
+- **Files**: one new patch with the next free number in `patches/benilla/` (0103, built; never
+  edit another), a server line to start and stop it (`ui.rs`'s line formats), and the
   server's fallback kept for a client without the patch.
 - **Tests**: the server line's format test; the whole patch series applied on a clean benilla
   checkout and the client built (`scripts/play.sh` does it). Ready only once the whole series has
   built (`AGENTS.md`): a patch that doesn't build stops the owner's game from starting.
-- **Shown with the server's looks**: n/a; this is the part that needs the client.
+- **Shown with the server's looks**: n/a; this is the part that needs the client. Scenario
+  `rogue-trails.txt` films it (and, on an older client, the fallback beside it).

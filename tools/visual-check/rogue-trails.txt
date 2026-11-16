@@ -1,0 +1,63 @@
+# The Rogue's looks the server can't make (docs/rogue-roles.md, build plan 6: client patch 0103),
+# floor markers off. Needs the client built with the whole patch series (HasActionCombat 32) and
+# the add-on at 72 or later; on an older client the same run shows the server's own looks (both
+# blades trailing pale on every blow, the flicker, the Defias shade), which is the fallback to
+# compare against.
+# Look for, with no floor marker and no word:
+# - A run of both hands on a still grunt 3 yd ahead: the main hand's blow trails a pale streak on
+#   the right-hand blade alone, the off hand's a deeper steel on the left-hand blade alone, and the
+#   4th (the finisher) both blades, each its own colour, stronger. Watch the off-hand blade on a
+#   main-hand blow: it must leave no ribbon.
+# - Five perfect dodges of a grunt's blows (the small player from rogue-blades reads each wind-up
+#   and dodges 0.12 sec before it lands): on each, a pale see-through copy of the Rogue's own body
+#   and both blades, frozen in the dodge's pose, left where the blow fell for 0.3 sec and fading.
+# - Afterimage (Quickstep's EX, the 1 key with Valor): a violet copy of the Rogue's own body and
+#   gear standing where the Rogue was for 2 sec, keeping its look until near the end, and the
+#   Defias body the server places there hidden the whole time; the grunt turns to the copy.
+# - A second Afterimage inside the 2 sec: the first copy goes as the second appears.
+# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>`. Not run yet: the
+# blow times are a first guess (a dagger's swing is about 0.5 sec), tune them on the first run.
+hero rogue
+cam 90 -12 8
+include _setup
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot q darting_knife
+4.4 .es slot e blade_flurry
+4.4 .es slot 1 quickstep
+4.4 .es slot 2 blade_evasion
+4.4 .es slot 3 blade_dance
+4.5 lua RB = { q = {}, on = false, n = 0, most = 5 }
+4.5 lua function RB.say(t) SendChatMessage(t, "SAY") end
+4.5 lua function RB.after(d, f) table.insert(RB.q, { GetTime() + d, f }) end
+4.5 lua function RB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
+4.5 lua function RB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
+4.5 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= RB.most then return end RB.n = RB.n + 1 RB.log("wind-up " .. w) RB.after(math.max(0, w - 0.12), function() RB.say(".es in d") end) end
+4.5 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) end end
+4.5 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) RB.line(l) return old(l) end
+4.5 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end end)
+4.6 .es target grunt 3 still
+5.0 video
+5.0 shots trails 60 0.1
+5.2 .es in a                            # main hand: the right blade alone, pale
+5.3 .es in au
+5.8 .es in g                            # off hand: the left blade alone, deeper steel
+5.9 .es in gu
+6.4 .es in a
+6.5 .es in au
+7.0 .es in g                            # the finisher: both blades, each its own colour
+7.1 .es in gu
+9.0 .es target clear
+9.2 .es target grunt 4
+9.5 lua RB.on = true
+9.5 shots dodges 80 0.1                 # five perfect dodges: a pale copy left at each
+17.5 lua RB.on = false
+18.0 .es target clear
+18.2 .es target grunt 4
+18.5 .es valor full
+19.0 .es in ab 2 1                      # 1's EX: Afterimage, the violet copy where the Rogue was
+19.0 shots shade 40 0.1
+20.0 .es valor full
+20.2 .es in ab 2 1                      # again inside its 2 sec: the first copy goes
+20.2 shots second 30 0.1
+24 end
