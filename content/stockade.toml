@@ -474,6 +474,8 @@ kind = "weapon"
 text = "Two-handed. Its wide chop hits up to 3 enemies. Breaks stances 30% faster. \"Targorr the Dread's.\""
 
 # Bazil's: a shiv, quick and cruel from behind.
+# Bazil's shiv is poisoned: each hit adds a stack of 3 a second (to 5 stacks, 15 a second), for 6 sec
+# from the latest, so a long fight is worth more than a quick stab.
 [[weapon]]
 key = "bazil_shiv"
 windup = 0.2
@@ -485,6 +487,7 @@ range = 2.6
 arc = 80.0
 targets = 1
 subclass = 15
+poison = 3.0
 backstab = 3.5
 
 [[item]]
@@ -493,7 +496,7 @@ name = "Bazil's Shiv"
 display = 2699
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Quick. Blows from behind deal 350% damage. \"Bazil Thredd's.\""
+text = "Quick. Blows from behind deal 350% damage. {fx} \"Bazil Thredd's.\""
 perks = [{ kind = "might", amount = 0.03 }]
 
 [[item]]

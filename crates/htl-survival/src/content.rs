@@ -1302,7 +1302,35 @@ pub struct WeaponDef {
     /// `IRON_SKIN_CAP`.
     #[serde(default)]
     pub iron_skin: f32,
+    /// A hit makes a foe lose interest in the hero (it drops them, and takes no notice for
+    /// `LULL_SECS`). Not a champion.
+    #[serde(default)]
+    pub lull: bool,
+    /// A blow from behind is a shatter trigger: it breaks a frozen foe's ice for `SHATTER` times
+    /// the damage (the one shatter, `sim::abilities`).
+    #[serde(default)]
+    pub shatter: bool,
+    /// A blow from behind bursts in fire on the foes round the target for this share of it,
+    /// within `BURST_RADIUS`.
+    #[serde(default)]
+    pub burst: f32,
+    /// A hit poisons the foe this much a second, a stack each, up to `POISON_STACKS`, for
+    /// `POISON_SECS` from the latest.
+    #[serde(default)]
+    pub poison: f32,
+    /// A hit on a foe casting interrupts it and staggers it this many seconds.
+    #[serde(default)]
+    pub interrupt: f32,
+    /// A blow from behind puts the foe to sleep this many seconds (any damage wakes it).
+    #[serde(default)]
+    pub sleep: f32,
 }
+
+/// How long a lulled foe takes no notice, the fire burst's radius, the poison's stacks and length.
+pub const LULL_SECS: f32 = 4.0;
+pub const BURST_RADIUS: f32 = 4.0;
+pub const POISON_STACKS: u32 = 5;
+pub const POISON_SECS: f32 = 6.0;
 
 /// The tenderized foe's window, the mending hand's reach, the curse's length and burst radius, the
 /// iron skin's length and cap.
@@ -1399,6 +1427,24 @@ impl WeaponDef {
         }
         if self.iron_skin > 0.0 {
             s.push(format!("Each hit gives you a shield that absorbs {} damage for {} sec, stacking up to {}.", self.iron_skin, IRON_SKIN_SECS, IRON_SKIN_CAP));
+        }
+        if self.lull {
+            s.push(format!("Hits make the enemy lose interest in you for {} sec.", LULL_SECS));
+        }
+        if self.shatter {
+            s.push("Blows from behind shatter a frozen enemy's ice for extra damage.".into());
+        }
+        if self.burst > 0.0 {
+            s.push(format!("Blows from behind burst in fire for {}% of their damage on enemies within {} yd.", (self.burst * 100.0).round(), BURST_RADIUS));
+        }
+        if self.poison > 0.0 {
+            s.push(format!("Hits poison the enemy for {} damage a sec, stacking up to {} times, for {} sec.", self.poison, POISON_STACKS, POISON_SECS));
+        }
+        if self.interrupt > 0.0 {
+            s.push(format!("Hits interrupt an enemy that is casting and stagger it for {} sec.", self.interrupt));
+        }
+        if self.sleep > 0.0 {
+            s.push(format!("Blows from behind put the enemy to sleep for {} sec. Damage wakes it.", self.sleep));
         }
         if self.blink_behind {
             s.push("The last blow of a light chain carries you behind the enemy.".into());

@@ -1493,6 +1493,8 @@ icon = "INV_Axe_17"
 kind = "weapon"
 text = "The Deathsworn Captain's. It has taken heads, and it remembers each one."
 
+# The shard: a blow from behind bursts in fire for half its damage on the foes within 4 yd of the
+# target, and shatters a frozen foe's ice like any other shatter (SHATTER, `sim::abilities`).
 [[weapon]]
 key = "meteor_shard"
 windup = 0.18
@@ -1504,6 +1506,8 @@ range = 2.5
 arc = 75.0
 targets = 1
 subclass = 15
+shatter = true
+burst = 0.5
 backstab = 4.0
 
 [[item]]
@@ -1512,7 +1516,7 @@ name = "Meteor Shard"
 display = 2707
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Torn from cursed Arugal, still warm from wherever it fell."
+text = "Quick. Blows from behind deal 400% damage. {fx} \"Torn from cursed Arugal, still warm from wherever it fell.\""
 perks = [{ kind = "focus", amount = 0.08 }]
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a

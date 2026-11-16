@@ -1711,6 +1711,12 @@ impl Survival {
             let damage = if w.execute > 0.0 && low && !strike.shove() { (damage as f32 * w.execute).round() as u32 } else { damage };
             let tender = if strike.shove() { 0.0 } else { self.take_tender(mid) };
             let damage = (damage as f32 * self.taken_share(mid) * self.weapon_share(mid, w, strike) * (1.0 + tender)).round() as u32;
+            // A shard in the back of a frozen foe: the ice shatters (the one shatter, an ability's too).
+            let shattered = w.shatter && behind && !strike.shove() && self.has_cc(mid, "petrify");
+            let damage = if shattered { (damage as f32 * super::abilities::SHATTER).round() as u32 } else { damage };
+            if shattered {
+                self.shatter_ice(id, mid);
+            }
             // The first blow out of Prowl: its bonus damage, and its stun.
             let damage = if damage > 0 && !strike.shove() { damage + self.prowl_strike(id, mid) } else { damage };
             if behind {
@@ -1744,7 +1750,7 @@ impl Survival {
                     self.apply_effects(id, mid, &[bleed], 1.0, "Bleed");
                 }
                 // What the weapon's own mechanic sets off (silver, the hook, the fel step...).
-                self.weapon_hit(id, mid, w, strike, damage);
+                self.weapon_hit(id, mid, w, strike, damage, behind);
             }
             if damage > 0 && !self.content.mobs[self.mobs[&mid].def].totem {
                 let v = if strike.heavy() { self.content.valor.heavy } else { self.content.valor.light };

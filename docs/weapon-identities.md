@@ -112,3 +112,9 @@ numbers (`effect_text`, filled into the item's `{fx}`). The creature kinds a ban
 | Hand of Righteousness | Each hit heals the most wounded ally within 15 yd (you too) 3% | `mend_ally` |
 | Baron's Scepter | A hit curses the foe; a cursed foe that dies bursts in shadow on those within 5 yd | `curse` |
 | Ironspine's Fist | Each hit gives a 5 point shield, stacking to 30 | `iron_skin` |
+| Poacher's Knife | Backstab (2.5 times from behind) | `backstab` |
+| Hypnotic Blade | Hits make the foe lose interest in you for 4 sec | `lull` |
+| Meteor Shard | A backstab bursts in fire (50%) on foes within 4 yd and is a shatter trigger | `shatter`, `burst` |
+| Bazil's Shiv | Hits poison 3 a sec a stack, up to 5 stacks, for 6 sec | `poison` |
+| Thornspike | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
+| Cobrahn's Fang | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |

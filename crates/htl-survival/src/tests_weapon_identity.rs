@@ -728,3 +728,157 @@ fn the_maces_tooltips_say_their_mechanics_from_their_numbers() {
     assert!(text("barons_scepter").contains(&format!("dies bursts in shadow for 44 damage to enemies within {} yd", crate::content::CURSE_RADIUS)), "{}", text("barons_scepter"));
     assert!(text("ironspine_fist").contains(&format!("absorbs {} damage for {} sec, stacking up to {}", w("ironspine_fist").iron_skin, crate::content::IRON_SKIN_SECS, crate::content::IRON_SKIN_CAP)));
 }
+
+// --- daggers: the pass's fourth batch -------------------------------------------------------------------
+
+/// A foe with its back to the hero at the origin, and nothing to make it turn (it stands in its
+/// recovery, as a foe between blows does).
+fn turn_away(s: &mut Survival, m: Id) {
+    let hero = *s.players.keys().next().unwrap();
+    let x = s.mobs.get_mut(&m).unwrap();
+    x.facing = 0.0;
+    x.state = MobState::Recover { foe: Foe::Hero(hero), until: 1.0e9 };
+}
+
+#[test]
+fn the_hypnotic_blade_makes_a_foe_lose_interest_and_look_elsewhere() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "hypnotic_blade");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    swing(&mut s, p);
+    assert!(matches!(s.mobs[&m].state, MobState::Idle { .. }), "it dropped the hero: {:?}", s.mobs[&m].state.foe());
+    assert!(s.lulled(m, p), "and takes no notice of them for a while");
+    // A plain dagger leaves it on the hero.
+    let (mut s, p) = world();
+    wield(&mut s, p, "dagger");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    swing(&mut s, p);
+    assert!(!matches!(s.mobs[&m].state, MobState::Idle { .. }), "engaged");
+    assert!(!s.lulled(m, p));
+}
+
+#[test]
+fn a_shard_in_the_back_bursts_in_fire_round_the_target_and_shatters_ice() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "meteor_shard");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let near = sturdy_foe(&mut s, "dm_woodcutter");
+    let far = sturdy_foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&near).unwrap().pos = [3.0, 2.5, 0.0];
+    s.mobs.get_mut(&far).unwrap().pos = [3.0, 9.0, 0.0];
+    turn_away(&mut s, m);
+    let (n0, f0) = (s.mobs[&near].health, s.mobs[&far].health);
+    let ev = swing(&mut s, p);
+    let hit = first_hit(&ev, m);
+    assert!(hit >= 60, "from behind: {hit}");
+    let burst = (hit as f32 * s.content.weapon("meteor_shard").unwrap().burst).round() as u32;
+    assert_eq!(n0 - s.mobs[&near].health, burst, "the neighbour burns");
+    assert_eq!(s.mobs[&far].health, f0, "the far one doesn't");
+    // From the front: no burst.
+    let (mut s, p) = world();
+    wield(&mut s, p, "meteor_shard");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let near = sturdy_foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&near).unwrap().pos = [3.0, 2.5, 0.0];
+    let n0 = s.mobs[&near].health;
+    swing(&mut s, p);
+    assert!(s.mobs[&m].health < 1_000_000);
+    assert_eq!(s.mobs[&near].health, n0, "no burst from the front");
+    // A frozen foe struck in the back: the ice shatters for SHATTER times the blow.
+    let blow = |frozen: bool| {
+        let (mut s, p) = world();
+        wield(&mut s, p, "meteor_shard");
+        let m = sturdy_foe(&mut s, "dm_woodcutter");
+        turn_away(&mut s, m);
+        if frozen {
+            s.apply_cc(m, p, "petrify", 5.0, 0.0, 0.0, "Test freeze");
+        }
+        let ev = swing(&mut s, p);
+        (first_hit(&ev, m), s.has_cc(m, "petrify"))
+    };
+    let (plain, _) = blow(false);
+    let (shattered, still_frozen) = blow(true);
+    assert!(!still_frozen, "the ice is gone");
+    assert!(shattered as f32 >= plain as f32 * 1.2, "{shattered} against {plain}");
+}
+
+#[test]
+fn the_shivs_poison_stacks_with_each_hit_up_to_a_cap() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "bazil_shiv");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    let per = s.content.weapon("bazil_shiv").unwrap().poison;
+    let poison = |s: &Survival| s.cc_of(m).iter().find(|c| c.kind == "burn" && c.until > s.clock).map_or(0.0, |c| c.amount);
+    assert_eq!(poison(&s), 0.0);
+    swing(&mut s, p);
+    assert_eq!(poison(&s), per);
+    reset_foe(&mut s, m);
+    swing(&mut s, p);
+    assert_eq!(poison(&s), 2.0 * per, "a second stack");
+    for _ in 0..8 {
+        reset_foe(&mut s, m);
+        swing(&mut s, p);
+    }
+    assert_eq!(poison(&s), crate::content::POISON_STACKS as f32 * per, "up to the cap");
+}
+
+#[test]
+fn the_thorn_breaks_a_cast_and_a_plain_dagger_doesnt() {
+    for (weapon, broken) in [("thornspike", true), ("dagger", false)] {
+        let (mut s, p) = world();
+        wield(&mut s, p, weapon);
+        let m = sturdy_foe(&mut s, "dm_woodcutter");
+        // Mid-cast: winding up a ranged attack at the hero.
+        let def = s.mobs[&m].def;
+        s.content.mobs[def].attack.ranged = true;
+        s.mobs.get_mut(&m).unwrap().ready_at = 0.0;
+        s.engage(m, Foe::Hero(p));
+        for _ in 0..80 {
+            s.step(0.02);
+            if matches!(s.mobs[&m].state, MobState::Windup { .. }) {
+                break;
+            }
+        }
+        assert!(matches!(s.mobs[&m].state, MobState::Windup { .. }), "casting");
+        s.input(p, Input::Attack);
+        for _ in 0..16 {
+            s.step(0.02);
+        }
+        let staggered = s.mobs[&m].stagger_until > s.clock;
+        assert_eq!(staggered, broken, "{weapon}");
+    }
+}
+
+#[test]
+fn the_fangs_blow_from_behind_puts_a_foe_to_sleep_and_damage_wakes_it() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "cobrahn_fang");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    turn_away(&mut s, m);
+    swing(&mut s, p);
+    // (Its own damage first, then the sleep: the second blow wakes it.)
+    assert!(s.has_cc(m, "incapacitate"), "asleep");
+    s.hurt_mob(m, p, 5);
+    assert!(!s.has_cc(m, "incapacitate"), "damage wakes it");
+    // From the front it doesn't sleep.
+    let (mut s, p) = world();
+    wield(&mut s, p, "cobrahn_fang");
+    let m = sturdy_foe(&mut s, "dm_woodcutter");
+    swing(&mut s, p);
+    assert!(!s.has_cc(m, "incapacitate"));
+}
+
+#[test]
+fn the_daggers_tooltips_say_their_mechanics_from_their_numbers() {
+    let c = Content::dev();
+    let text = |k: &str| c.items[c.item(k).unwrap()].text.clone();
+    let w = |k: &str| c.weapon(k).unwrap();
+    assert!(text("hypnotic_blade").contains(&format!("lose interest in you for {} sec", crate::content::LULL_SECS)), "{}", text("hypnotic_blade"));
+    let m = w("meteor_shard");
+    assert!(text("meteor_shard").contains(&format!("burst in fire for {}% of their damage on enemies within {} yd", (m.burst * 100.0).round(), crate::content::BURST_RADIUS)), "{}", text("meteor_shard"));
+    assert!(text("meteor_shard").contains("shatter a frozen enemy's ice"));
+    let b = w("bazil_shiv");
+    assert!(text("bazil_shiv").contains(&format!("poison the enemy for {} damage a sec, stacking up to {} times, for {} sec", b.poison, crate::content::POISON_STACKS, crate::content::POISON_SECS)), "{}", text("bazil_shiv"));
+    assert!(text("thornspike").contains(&format!("stagger it for {} sec", w("thornspike").interrupt)));
+    assert!(text("cobrahn_fang").contains(&format!("to sleep for {} sec", w("cobrahn_fang").sleep)));
+}
