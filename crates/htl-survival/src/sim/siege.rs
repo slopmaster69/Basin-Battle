@@ -181,7 +181,7 @@ impl Survival {
         s.siege = Some(Siege { queues: vec![Vec::new(); modes], ..Siege::default() });
         s.place_hall();
         s.place_nodes(None);
-        let gates: Vec<Vec3> = s.siege_def().cloned().map(|d| d.bases.iter().map(|b| s.gate_of(s.clear_spot_near(s.ground_near(b.at[0], b.at[1], b.at[2]), HEARTH_CLEAR), d.middle, d.gate_walk)).collect()).unwrap_or_default();
+        let gates: Vec<Vec3> = s.siege_arc().map(|d| d.bases.iter().map(|b| s.gate_of(s.clear_spot_near(s.ground_near(b.at[0], b.at[1], b.at[2]), HEARTH_CLEAR), d.middle, d.gate_walk)).collect()).unwrap_or_default();
         s.siege.as_mut().unwrap().gates = gates;
         s.events.clear();
         s
@@ -192,7 +192,12 @@ impl Survival {
     }
 
     pub(crate) fn siege_def(&self) -> Option<&SiegeDef> {
-        self.content.siege.as_ref()
+        self.content.siege.as_deref()
+    }
+
+    /// The Siege rules, shared: a handle, not a copy of its rosters and sends.
+    pub(crate) fn siege_arc(&self) -> Option<std::sync::Arc<SiegeDef>> {
+        self.content.siege.clone()
     }
 
     /// The book's page at camp for Siege: its key, name and what it is.
@@ -202,7 +207,7 @@ impl Survival {
     }
 
     fn place_hall(&mut self) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let back = d.lobby_facing + std::f32::consts::PI;
         let at = self.ground_near(d.lobby[0] + d.lobby_facing.cos() * BANNER_BACK, d.lobby[1] + d.lobby_facing.sin() * BANNER_BACK, d.lobby[2]);
         let id = self.alloc();
@@ -398,7 +403,7 @@ impl Survival {
 
     /// Join the heroes waiting for a way to play (`key`), leaving any other.
     pub fn siege_join(&mut self, id: Id, key: &str) -> Result<String, String> {
-        let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
+        let d = self.siege_arc().ok_or("There's no Siege here.")?;
         let m = d.modes.iter().position(|m| m.key == key || m.name.eq_ignore_ascii_case(key)).ok_or_else(|| {
             let keys: Vec<&str> = d.modes.iter().map(|m| m.key.as_str()).collect();
             format!("No way to play called {key}. Try {}.", keys.join(", "))
@@ -469,7 +474,7 @@ impl Survival {
     }
 
     fn siege_countdown(&mut self, m: usize) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let s = self.siege.as_mut().unwrap();
         s.phase = SiegePhase::Countdown { left: d.countdown };
         s.mode = Some(m);
@@ -491,7 +496,7 @@ impl Survival {
     // --- the match ---------------------------------------------------------------------------------
 
     pub(crate) fn step_siege(&mut self, dt: f32) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let Some(phase) = self.siege.as_ref().map(|s| s.phase) else { return };
         // Who's gone (left the world).
         let gone: Vec<Id> = {
@@ -558,7 +563,7 @@ impl Survival {
     /// The countdown's done: the camps go up, the heroes to them, fresh, and the first wave's
     /// timer starts.
     fn begin_match(&mut self) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let s = self.siege.as_ref().unwrap();
         let Some(m) = s.mode else { return };
         let mode = d.modes[m].clone();
@@ -718,7 +723,7 @@ impl Survival {
 
     /// Put a hero by their camp's Hearth (getting up, or at the start).
     fn to_camp(&mut self, id: Id, camp: usize) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let Some(c) = self.siege.as_ref().and_then(|s| s.camps.get(camp)).cloned() else { return };
         let at = self.objs.get(&c.hearth).map_or(d.bases[c.def].at, |o| o.pos);
         let f = d.bases[c.def].facing;
@@ -807,7 +812,7 @@ impl Survival {
     /// A wave comes in at every camp standing: the base wave, and what was bought for it. Every
     /// hero in the match is paid their income first.
     fn next_wave(&mut self) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let s = self.siege.as_mut().unwrap();
         // The last wave's time is up: the healthiest Hearth wins.
         if s.wave >= d.waves {
@@ -897,7 +902,7 @@ impl Survival {
     /// One of a wave's creatures comes in at camp `k`'s gate (the `j`th of `n`, spread across the
     /// way in, a few deep).
     fn wave_foe_in(&mut self, k: usize, def: usize, j: usize, n: usize, tough: f32) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let Some(c) = self.siege.as_ref().and_then(|s| s.camps.get(k)).cloned() else { return };
         if c.out {
             return;
@@ -920,7 +925,7 @@ impl Survival {
     /// The groups of a wave due now come in.
     fn step_trickle(&mut self) {
         let now = self.clock;
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let Some(s) = self.siege.as_mut() else { return };
         if s.trickle.is_empty() {
             return;
@@ -936,7 +941,7 @@ impl Survival {
 
     /// Who a camp's base wave brings in wave `wave`, for `heroes` heroes in it.
     pub fn base_wave(&mut self, wave: u32, heroes: usize) -> Vec<usize> {
-        let Some(d) = self.siege_def().cloned() else { return Vec::new() };
+        let Some(d) = self.siege_arc() else { return Vec::new() };
         let mut worth = (d.budget + d.growth * wave.saturating_sub(1) as f32) * (1.0 + d.per_hero * heroes.saturating_sub(1) as f32);
         let open: Vec<(usize, f32)> = d.roster.iter().filter(|f| f.from <= wave).filter_map(|f| Some((self.content.mob(&f.mob)?, f.cost))).collect();
         let cheapest = open.iter().map(|o| o.1).fold(f32::MAX, f32::min);
@@ -960,7 +965,7 @@ impl Survival {
 
     /// `warn_secs` before a wave: each camp's heroes hear what's been bought for them.
     fn warn_camps(&mut self) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let s = self.siege.as_mut().unwrap();
         s.warned = true;
         let camps = s.camps.clone();
@@ -1038,7 +1043,7 @@ impl Survival {
 
     /// A creature of the match felled: gold for the hero who did it.
     pub(crate) fn siege_kill(&mut self, mid: Id, killer: Id) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let Some(m) = self.mobs.get(&mid) else { return };
         let gold = (self.content.mobs[m.def].health as f32 * d.kill_gold).round() as u32;
         if let Some(s) = self.siege.as_mut() {
@@ -1053,7 +1058,7 @@ impl Survival {
 
     /// A hero felled in the match: a rival who did it takes a share of their gold.
     pub(crate) fn siege_fell(&mut self, id: Id, by: Option<Id>) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let Some(k) = by.filter(|k| self.siege_foes(*k, id)) else { return };
         let take = (self.gold_of(id) as f32 * d.steal).floor() as u32;
         if take == 0 {
@@ -1087,7 +1092,7 @@ impl Survival {
 
     /// A camp whose Hearth has fallen is out; one camp left standing wins.
     fn check_hearths(&mut self) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let camps = self.siege.as_ref().unwrap().camps.clone();
         for (k, c) in camps.iter().enumerate() {
             if c.out {
@@ -1152,7 +1157,7 @@ impl Survival {
     }
 
     fn end_match(&mut self, winner: Option<usize>) {
-        let Some(d) = self.siege_def().cloned() else { return };
+        let Some(d) = self.siege_arc() else { return };
         let s = self.siege.as_mut().unwrap();
         if !matches!(s.phase, SiegePhase::Running) {
             return;
@@ -1233,7 +1238,7 @@ impl Survival {
     /// Buy a send at the ledger: it comes at the hero's target with its next wave, and the
     /// hero's income goes up.
     pub fn siege_send(&mut self, id: Id, key: &str) -> Result<String, String> {
-        let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
+        let d = self.siege_arc().ok_or("There's no Siege here.")?;
         let k = d.sends.iter().position(|s| s.key == key).ok_or_else(|| {
             let keys: Vec<&str> = d.sends.iter().map(|s| s.key.as_str()).collect();
             format!("No send called {key}. Try {}.", keys.join(", "))
@@ -1299,7 +1304,7 @@ impl Survival {
 
     /// Send at the next rival camp round (or a named one).
     pub fn siege_target(&mut self, id: Id, to: Option<&str>) -> Result<String, String> {
-        let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
+        let d = self.siege_arc().ok_or("There's no Siege here.")?;
         let mine = self.camp_of(id).ok_or("Only during a match.")?;
         let s = self.siege.as_ref().unwrap();
         let n = s.camps.len();
@@ -1396,7 +1401,7 @@ impl Survival {
     /// Ready (or not) for the next wave: once every hero still in it is, it comes in
     /// `ready_secs`.
     pub fn siege_ready(&mut self, id: Id) -> Result<String, String> {
-        let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
+        let d = self.siege_arc().ok_or("There's no Siege here.")?;
         let mine = self.camp_of(id).ok_or("Only during a match.")?;
         let s = self.siege.as_mut().ok_or("There's no Siege here.")?;
         if s.phase != SiegePhase::Running {

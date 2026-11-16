@@ -1673,7 +1673,7 @@ impl Survival {
             return false;
         }
         self.mobs.iter().any(|(oid, o)| {
-            *oid != id && o.health > 0 && !self.attack_now(*oid).ranged && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h)
+            *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h) && !self.attack_now(*oid).ranged
         })
     }
 
@@ -1741,19 +1741,20 @@ impl Survival {
             return true;
         }
         self.mobs.iter().any(|(oid, o)| {
-            let ranged = self.attack_now(*oid).ranged;
+            // (Only asked when its state needs it: most of the others are doing neither.)
+            let ranged = || self.attack_now(*oid).ranged;
             *oid != id
                 && o.health > 0
                 && match o.state {
                     // A caster gathering a bolt at them counts as a turn too, up to its loosing.
                     MobState::Windup { foe: Foe::Hero(x), .. } => x == h,
-                    MobState::Recover { foe: Foe::Hero(x), .. } => x == h && !ranged,
+                    MobState::Recover { foe: Foe::Hero(x), .. } => x == h && !ranged(),
                     // Just done (a breath after a string), or one near and ready that has waited
                     // longer since its last: it goes first (else the one already in reach took every
                     // turn and the other only circled).
                     MobState::Chase { foe: Foe::Hero(x) } => {
                         x == h
-                            && !ranged
+                            && !ranged()
                             && (now - o.string_done_at < ai.turn_beat
                                 || (o.string_done_at < me.string_done_at && o.ready_at <= now && hp.is_some_and(|hp| dist2d(o.pos, hp) <= PRESS_RANGE)))
                     }

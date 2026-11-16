@@ -134,7 +134,7 @@ pub struct Content {
     pub arena: Option<ArenaDef>,
     /// Siege: camps against camps in Arathi Basin, a page of the same book.
     #[serde(default)]
-    pub siege: Option<SiegeDef>,
+    pub siege: Option<std::sync::Arc<SiegeDef>>,
     /// The abilities on the ring tree, their EX versions and the counters.
     #[serde(rename = "ability", default)]
     pub abilities: Vec<AbilityDef>,
