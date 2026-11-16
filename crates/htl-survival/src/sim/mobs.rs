@@ -665,7 +665,10 @@ impl Survival {
         // there (`sim::machinery`).
         let damage = self.machinery_hold(mid, by, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
-        if m.health == 0 {
+        // One lying unseen (a trial's guardian, a strongbox's keeper) is not there to be hurt: it
+        // would turn on its hero and go home, and a hidden creature never thinks, so it would
+        // stay in `Return` at its post, hurt, for good.
+        if m.health == 0 || m.hidden {
             return;
         }
         let before = m.health;
