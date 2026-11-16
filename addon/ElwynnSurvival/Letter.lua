@@ -4,7 +4,7 @@
 -- clue in red ink under a note while what it points to is still hidden.
 --
 -- The server sends `NT kind title place text clue links`: kind is note, secret, lore, wager, board
--- or run (a run's tally as you leave it); `{n}`
+-- run (a run's tally as you leave it) or talk (what a person in the camp says); `{n}`
 -- breaks a line in the text; links are `command~label` with `^` between.
 --
 -- It loads after Ledger.lua and wears its art and fonts (a plain dark page without it).
