@@ -984,7 +984,7 @@ impl Survival {
             let k = self.content.checks.clone();
             let (lo, _) = self.charge_of(id, ability);
             let fixed = (hi - lo).abs() < 1.0e-3;
-            // A fixed charge (Pyroblast) can't go before its least, so its window opens no sooner.
+            // A fixed charge can't go before its least, so its window opens no sooner.
             let (from, to) = if fixed { (hi + k.window, hi + k.flare_late.max(2.0 * k.window)) } else { ((hi * k.flare_from).max(lo + k.window), hi) };
             let flare = from + (to - from) * rand::Rng::gen::<f32>(&mut self.rng);
             const CURVES: [&str; 4] = ["steady", "ease", "surge", "stutter"];
@@ -1029,7 +1029,7 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         let all = d.perfect && d.stakes == "all";
         if held + 1.0e-4 < lo {
-            // A fixed charge (Pyroblast) let go early is dropped; one with a range goes at its
+            // A fixed charge let go early is dropped; one with a range goes at its
             // least, as soon as it's reached.
             if all {
                 self.fizzle(id, ability);
@@ -2487,7 +2487,7 @@ impl Survival {
             self.cue(Some(owner), victim, combat::KIT_HEAVY, cues::SOUND_CRIT, cues::BEAT_CRIT);
         }
         // Fire, or a sundering blow, on a frozen foe: the ice shatters. The one shatter for every
-        // class and ability (a Hunter's Multi-Shot, a Mage's Pyroblast): this is its only path,
+        // class and ability (a Hunter's Multi-Shot, a Mage's Fireball): this is its only path,
         // and nothing here reads the class. (The ability's own impact, if it has one, lands
         // besides: that's the ability's, not the shatter's.)
         if shatter && self.has_cc(victim, "petrify") {
@@ -3369,7 +3369,7 @@ impl Survival {
         self.light.boost = boost;
         self.area(id, ability, at, radius, share, damage * boost, None);
         self.light.boost = 0.0;
-        // Body and Soul: everyone it reaches (the caster too) freed of slows and roots.
+        // A cleansing nova: everyone it reaches (the caster too) freed of slows and roots.
         if d.cleanse {
             let friends: Vec<Id> = self.players.iter().filter(|(h, p)| p.health > 0 && (**h == id || self.helpable(id, **h)) && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
             for f in friends {

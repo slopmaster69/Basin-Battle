@@ -853,7 +853,7 @@ trail = "FF9A3C"
 width = 0.35
 secs = 0.45
 
-# Split Arrow (Arcane Shot's arrow; Kill Shot's too until #157 moves it to Fire Shot's bolt): a hot
+# Arcane Shot's arrow (Kill Shot's too until #157 moves it to Fire Shot's bolt): a hot
 # gold-red line.
 [[missile_look]]
 spell = 3044
@@ -5957,7 +5957,7 @@ clip = 53
 # ------------------------------------------------------------------------- Warrior, the Warlord --
 # The Warrior's second choice on every key (`choice = 2`): the Warlord, the commander who holds the
 # line. It plants the ground the group fights from (War Banner), breaks a pack's nerve (Intimidating
-# Roar), cashes in what's opened (Cleave) and opens it (Rising Cut), body-slams with Tackle and
+# Roar), cashes in what's opened (Cleave), slows a whole pack (Piercing Howl), body-slams with Tackle and
 # covers a friend with Intervene, keeps the Juggernaut's old guard (Retaliation, Shield Wall), and
 # rallies everyone near (Rallying Cry). An opened enemy is staggered, knocked down, stunned,
 # Exposed, or a boss stance-broken. An EX shares its key's cooldown. Its ultimate's old place
@@ -6078,7 +6078,7 @@ valor_hit = 6.0
 
 # Cleave's EX, Piercing Howl: no blow at all, a shout. Every foe within 10 yd is slowed hard for
 # 6 sec (a hero for 3), and nothing is dealt. 60% is under Gravity Lance's 70% (2 sec) and over
-# Crippling Throw's 50% (3 sec): the longest hard slow there is, for a kite or a peel. A boss holds
+# the old Rogue slow's 50% (3 sec): the longest hard slow there is, for a kite or a peel. A boss holds
 # its ground against it as against control (`control`).
 [[ability]]
 key = "piercing_howl"

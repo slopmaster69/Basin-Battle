@@ -247,7 +247,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   a way out at your feet and the key again steps back to it (its EX screams where you left); Drain
   Life outlasts them, every point it drains healing you, and Death Coil sends a foe fleeing as it
   heals you; Summon Infernal crashes down and stands burning.
-- **Druid**: grow and pounce. Living Seed's two seeds strike a foe or settle on a friend and mend
+- **Druid**: grow and prowl. Living Seed's two seeds strike a foe or settle on a friend and mend
   them for 4 s (its EX roots); Swipe, and Typhoon throws a cone of foes back; Feral Leap bounds
   onto them (its EX, Prowl, hides you for up to 10 s, and your next attack from hiding stuns its
   target for 2 s and deals 20 more damage; damage on you ends it); Barkskin, and Ironbark gives it away, to the friend under your reticle
