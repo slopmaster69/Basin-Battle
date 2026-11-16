@@ -49,6 +49,8 @@ mod leave_tests;
 #[cfg(test)]
 mod perf_tests;
 #[cfg(test)]
+mod soak_tests;
+#[cfg(test)]
 mod sleep_tests;
 mod bench_support;
 mod flay;
