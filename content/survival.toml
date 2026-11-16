@@ -3777,6 +3777,13 @@ what = "remy"
 reward = { silver = 2, bronze = 2 }
 
 [[goal]]
+title = "The Stonefield wagon"
+text = "Load the wagon at the Stonefield farm and hold the farm for 90 sec. Kobolds come from Fargodeep. Fedfennel's shield stops light attacks from the front."
+kind = "open"
+what = "sf_wagon"
+reward = { silver = 2, linen = 3 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
@@ -10171,6 +10178,161 @@ loot = { silver = 2, pearl = 2 }
 text = "Two silver a road, saved. Remy never spent a coin he could hide."
 
 # === end of Stage 8's block ============================================================================
+
+# === Elwynn expansion, round two, Stage 9: Hold the Stonefield Wagon (docs/elwynn-expansion.md) =======
+# Load the Stonefield wagon and hold the farm for 90 sec while the kobolds of Fargodeep come in three
+# waves (a hold: `hold`, with `trial` waves called over its time). Tommy Joe Stonefield takes up his bow
+# for the hold (a friendly creature that `shoots`), and Fedfennel, who comes last, carries a shield that
+# turns light blows from the front. The Defias note under the grain names the parley.
+
+# Tommy Joe Stonefield: the farmer's son, with a bow. He never fights a hero and no enemy is made to
+# fight him; he shoots the kobolds that are fighting a hero.
+[[mob]]
+key = "tommy_joe_stonefield"
+name = "Tommy Joe Stonefield"
+subname = "Stonefield Farm"
+display = 1408
+scale = 1.0
+health = 150
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+grip = "bow"
+bow = 2826
+friendly = true
+shoots = { damage = 9, range = 25.0, every = 2.0 }
+respawn = 600.0
+  [mob.attack]
+  windup = 0.6
+  damage = 1
+  range = 2.6
+  arc = 90.0
+  recovery = 0.8
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+
+# Fedfennel: a kobold foreman with a pick and a shield. His shield takes light blows from the front
+# while he is between blows (it does not take a heavy blow, a shove or a thrust through the guard,
+# and not a blow struck as he winds up, or from the side): hit him as he winds up, from the side, or
+# heavy. A chop, and a pick held high, glowing amber.
+[[mob]]
+key = "fedfennel"
+name = "Fedfennel"
+subname = "Fargodeep Foreman"
+display = 2152
+scale = 1.3
+health = 520
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 22.0
+leash = 40.0
+grip = "1h"
+shield = 18399
+block = 0.9
+boss = true
+posture = 160
+drops = { ore = [2, 3], tin = [1, 2], silver = [1, 2] }
+trophy = { silver = 2, bronze = 2 }
+respawn = 1500.0
+  [mob.attack]
+  windup = 0.7
+  damage = 22
+  range = 3.0
+  arc = 100.0
+  recovery = 1.1
+  cooldown = 1.4
+  turn_rate = 200.0
+  lock = 0.25
+  blockable = true
+  # A pick chop.
+  [[mob.pattern]]
+  name = "pick chop"
+  weight = 3.0
+  steps = [ { clip = 17, take = 1, windup = 0.7, damage = 22, recovery = 1.1 } ]
+  # The pick held high, glowing amber: block it or step out of it.
+  [[mob.pattern]]
+  name = "overhead"
+  weight = 2.0
+  steps = [ { clip = 16, take = 1, windup = 1.3, damage = 34, recovery = 1.5, kit = 379 } ]
+
+# The wagon, and what the hold brings: three waves (a wave is a pack, or packs joined with `+`), all
+# unseen until the wagon is used, and the farmer's son at his post.
+[[chest]]
+key = "sf_wagon"
+name = "The Stonefield Wagon"
+at = [-9895.0, 370.0]
+display = 3678
+respawn = 1800.0
+secs = 2.0
+hold = 90.0
+trial = ["sf_wave1", "sf_wave2_tunnelers+sf_wave2_geomancer", "sf_wave3_fedfennel+sf_wave3_laborers"]
+ambush = ["sf_tommy"]
+wave_text = ["Kobolds pour out of the Fargodeep road.", "Tunnelers come up under the fence.", "Fedfennel comes for the grain himself."]
+hold_title = "Hold the Wagon"
+held_title = "Wagon Held"
+lost_text = "The wagon is lost. Use it again to load it."
+loot = { silver = 2, meat = 6, linen = 4 }
+text = "Grain for Westbrook, and under it a Defias note. 'The parley is at the standing stones past Jasperlode. Bring the rest of the price.'"
+
+[[pack]]
+mob = "kobold_laborer"
+at = [-9855.0, 325.0]
+radius = 3.0
+count = 3
+link = 10.0
+key = "sf_wave1"
+wake = "sf_wagon"
+
+[[pack]]
+mob = "kobold_tunneler"
+at = [-9855.0, 325.0]
+radius = 2.0
+count = 2
+link = 10.0
+key = "sf_wave2_tunnelers"
+wake = "sf_wagon"
+
+[[pack]]
+mob = "kobold_geomancer"
+at = [-9860.0, 320.0]
+radius = 0.0
+count = 1
+link = 10.0
+key = "sf_wave2_geomancer"
+wake = "sf_wagon"
+
+[[pack]]
+mob = "fedfennel"
+at = [-9858.0, 327.0]
+radius = 0.0
+count = 1
+link = 10.0
+key = "sf_wave3_fedfennel"
+wake = "sf_wagon"
+
+[[pack]]
+mob = "kobold_laborer"
+at = [-9852.0, 323.0]
+radius = 2.0
+count = 2
+link = 10.0
+key = "sf_wave3_laborers"
+wake = "sf_wagon"
+
+# Tommy Joe stands at his post by the wagon for the hold, and stands down after it.
+[[pack]]
+mob = "tommy_joe_stonefield"
+at = [-9905.0, 385.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "sf_tommy"
+wake = "sf_wagon"
+
+# === end of Stage 9's block ============================================================================
 
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.

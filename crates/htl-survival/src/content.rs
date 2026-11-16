@@ -2309,13 +2309,16 @@ fn quarter() -> f32 {
     0.25
 }
 
-/// A tower's shot (`shoots` on a `[[station]]`).
+/// A shot: a tower's (`shoots` on a `[[station]]`), or a friendly creature's (`shoots` on a `[[mob]]`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct ShootDef {
     pub damage: u32,
     pub range: f32,
     /// Seconds between shots.
     pub every: f32,
+    /// The look of the shot in flight (a spell with a missile; 0: the ranged weapon's).
+    #[serde(default)]
+    pub spell: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2683,6 +2686,10 @@ pub struct MobDef {
     /// rules yet; `.es ally` sets one down to try.
     #[serde(default)]
     pub friendly: bool,
+    /// A friendly creature that shoots: the nearest foe within `range` that is fighting a hero,
+    /// every `every` sec for `damage` (`sim::explore`, as a tower does). Only for a `friendly` one.
+    #[serde(default)]
+    pub shoots: Option<ShootDef>,
     /// Set down by a hero (a `totem`) yet a heal can reach it: help aimed at a friend lands on
     /// it as on an ally (a Priest's orb). A totem without it never takes a heal.
     #[serde(default)]
@@ -3279,11 +3286,27 @@ pub struct ChestDef {
     pub locked: String,
     #[serde(default)]
     pub ambush: Vec<String>,
-    /// A shrine's or a relic's trial: its guardians (packs by key that wake on it), called up
+    /// A trial: a shrine's or a relic's (or a hold's, below) guardians (packs by key that wake on it), called up
     /// each time a hero who has something to learn uses it; it teaches everyone near (and its
     /// first finder what's in it) only once they've all fallen.
     #[serde(default)]
     pub trial: Vec<String>,
+    /// A trial that is a hold: seconds a hero must stay near, its waves (`trial` entries, each a
+    /// pack or several joined with `+`) called up one after another over that time, the chest
+    /// opened for whoever opened it once the time has run and the last wave has fallen. Left
+    /// at 0, every wave is called at once. `wave_text` is said as each wave comes; `hold_title`,
+    /// `held_title` and `lost_text` are the banners and the news as it begins, is held, or is
+    /// lost (a default from the chest's name when empty).
+    #[serde(default)]
+    pub hold: f32,
+    #[serde(default)]
+    pub wave_text: Vec<String>,
+    #[serde(default)]
+    pub hold_title: String,
+    #[serde(default)]
+    pub held_title: String,
+    #[serde(default)]
+    pub lost_text: String,
     #[serde(default)]
     pub keep: bool,
     #[serde(default)]
@@ -4160,6 +4183,14 @@ impl Content {
             }
         }
         for m in &self.mobs {
+            if let Some(s) = &m.shoots {
+                if !m.friendly {
+                    bail!("mob {}: only a friendly creature shoots", m.key);
+                }
+                if s.damage == 0 || s.range <= 0.0 || s.every <= 0.0 {
+                    bail!("mob {}: a shot needs damage, range and every", m.key);
+                }
+            }
             if let Some(a) = &m.arsenal {
                 if a.loadouts.len() != m.phases.len() + 1 || a.display == 0 || a.rack.iter().any(|x| !x.is_finite()) {
                     bail!("mob {}: arsenal needs a rack and one loadout per stage", m.key);
@@ -4272,10 +4303,17 @@ impl Content {
             } else if !c.after.is_empty() && self.mob(&c.after).is_none() {
                 bail!("chest {}: after {}, no such mob", c.key, c.after);
             }
-            for k in c.ambush.iter().chain(&c.trial) {
-                if !self.packs.iter().any(|p| &p.key == k && p.wake == c.key) {
+            // A trial's entry is a wave: one pack, or several joined with `+`.
+            for k in c.ambush.iter().map(String::as_str).chain(c.trial.iter().flat_map(|w| w.split('+')).map(str::trim)) {
+                if !self.packs.iter().any(|p| p.key == k && p.wake == c.key) {
                     bail!("chest {}: ambush {k} needs a [[pack]] of that key that wakes on it", c.key);
                 }
+            }
+            if c.hold < 0.0 || (c.hold > 0.0 && c.trial.is_empty()) {
+                bail!("chest {}: a hold of {} sec needs waves (`trial`)", c.key, c.hold);
+            }
+            if c.wave_text.len() > c.trial.len() {
+                bail!("chest {}: {} wave texts for {} waves", c.key, c.wave_text.len(), c.trial.len());
             }
         }
         for m in &self.mobs {

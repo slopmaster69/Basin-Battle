@@ -2282,7 +2282,8 @@ impl Survival {
                         return;
                     }
                 }
-                if now >= wander_at {
+                // (A friendly creature set by a pack stands where it was put.)
+                if now >= wander_at && !self.mobs[&id].friendly {
                     let ang = self.rng.gen::<f32>() * std::f32::consts::TAU;
                     let r = self.rng.gen::<f32>() * 4.0;
                     let to = self.ground_near(home[0] + ang.cos() * r, home[1] + ang.sin() * r, home[2]);

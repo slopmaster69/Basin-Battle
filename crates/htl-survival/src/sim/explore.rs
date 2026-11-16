@@ -241,8 +241,8 @@ impl Survival {
         if !matches!(self.objs.get(&obj).map(|o| &o.kind), Some(ObjKind::Chest { spent: false, .. })) {
             return;
         }
-        // One with a trial: its guardians first.
-        if !c.teaches.is_empty() && !c.trial.is_empty() {
+        // One with a trial: its guardians first (a hold's waves too, which teach nothing).
+        if !c.trial.is_empty() {
             self.start_trial(id, def, obj);
             return;
         }
@@ -269,6 +269,14 @@ impl Survival {
             self.events.push(Event::Dirty);
             return;
         }
+        self.finish_open(id, def, obj, true);
+    }
+
+    /// An ordinary chest opened by `id`: spent (full again in its time), what's in it theirs, and
+    /// (with `wake`) its ambush awake. A hold's chest is opened this way once it is held, its
+    /// guardians having come already.
+    fn finish_open(&mut self, id: Id, def: usize, obj: Id, wake: bool) {
+        let c = self.content.chests[def].clone();
         let back = if c.respawn > 0.0 { self.wall() + c.respawn as f64 } else { NEVER };
         self.camp.opened.insert(c.key.clone(), back);
         if c.keep {
@@ -285,8 +293,10 @@ impl Survival {
         self.give_chest(id, &c);
         self.count("open", &c.key, 1);
         self.count("open", "any", 1);
-        for k in &c.ambush {
-            self.wake_ambush(k, id);
+        if wake {
+            for k in &c.ambush {
+                self.wake_ambush(k, id);
+            }
         }
         self.events.push(Event::Sites);
         self.events.push(Event::Dirty);
@@ -356,21 +366,57 @@ impl Survival {
         all
     }
 
-    /// A hero calls up a shrine's or a relic's trial: its guardians (those fallen since come again
-    /// at once), on them. Nothing to learn, or one already under way: only words.
+    /// The packs of each wave of a chest's trial: an entry names one pack, or several joined with `+`.
+    fn trial_waves(&self, c: &crate::content::ChestDef) -> Vec<Vec<usize>> {
+        c.trial.iter().map(|w| w.split('+').filter_map(|key| self.content.packs.iter().position(|p| p.key == key.trim())).collect()).collect()
+    }
+
+    /// A hero calls up a trial: a shrine's or a relic's guardians (those fallen since come again at
+    /// once), on them. A hold calls its first wave, and the rest as its time runs (`step_trials`).
+    /// Nothing to learn, or one already under way: only words.
     fn start_trial(&mut self, id: Id, def: usize, obj: Id) {
         let c = self.content.chests[def].clone();
-        let knows = self.players.get(&id).is_some_and(|p| c.teaches.iter().all(|k| p.owned.contains(k)));
+        let knows = !c.teaches.is_empty() && self.players.get(&id).is_some_and(|p| c.teaches.iter().all(|k| p.owned.contains(k)));
         if knows {
             self.tell(id, format!("You know all {} has to teach.", c.name));
             return;
         }
         if self.trials.contains_key(&def) {
-            self.tell(id, format!("The trial is under way. Defeat {}'s guardians.", c.name));
+            if c.hold > 0.0 {
+                self.tell(id, format!("{} is under way. Stay near it.", c.name));
+            } else {
+                self.tell(id, format!("The trial is under way. Defeat {}'s guardians.", c.name));
+            }
             return;
         }
-        for key in &c.trial {
-            let Some(k) = self.content.packs.iter().position(|p| p.key == *key) else { continue };
+        let waves = self.trial_waves(&c);
+        let called = if c.hold > 0.0 { 1.min(waves.len()) } else { waves.len() };
+        for i in 0..called {
+            self.call_wave(def, i, id);
+        }
+        // A hold's helpers (a friendly shooter in an `ambush` pack) come with it.
+        if c.hold > 0.0 {
+            for k in &c.ambush {
+                self.wake_ambush(k, id);
+            }
+        }
+        let now = self.clock;
+        self.trials.insert(def, Trial { obj, by: id, near_at: now, started: now, called });
+        if c.hold > 0.0 {
+            let title = if c.hold_title.is_empty() { format!("Hold {}", c.name) } else { c.hold_title.clone() };
+            self.events.push(Event::Banner { player: Some(id), title, sub: format!("Stay near it for {} sec", c.hold.round() as u32) });
+        } else {
+            self.events.push(Event::Banner { player: Some(id), title: format!("The Trial of {}", c.name), sub: "Defeat its guardians to learn what it teaches".into() });
+            self.tell(id, format!("{} wakes and its guardians attack. Defeat them and everyone nearby learns its abilities.", c.name));
+        }
+    }
+
+    /// Wave `i` of a trial comes: its packs' guardians (those fallen since stand again now, not
+    /// later) awake and on `by`, and its words said to the camp.
+    fn call_wave(&mut self, def: usize, i: usize, by: Id) {
+        let c = self.content.chests[def].clone();
+        let Some(wave) = self.trial_waves(&c).get(i).cloned() else { return };
+        for k in wave {
             let pack = self.content.packs[k].clone();
             let Some(mdef) = self.content.mob(&pack.mob) else { continue };
             // Those fallen in an earlier trial stand again now, not later.
@@ -386,17 +432,34 @@ impl Survival {
                 }
                 self.spawn_mob(mdef, at, Some(k), false);
             }
-            self.wake_ambush(key, id);
+            let key = pack.key.clone();
+            self.wake_ambush(&key, by);
         }
-        let now = self.clock;
-        self.trials.insert(def, Trial { obj, by: id, near_at: now });
-        self.events.push(Event::Banner { player: Some(id), title: format!("The Trial of {}", c.name), sub: "Defeat its guardians to learn what it teaches".into() });
-        self.tell(id, format!("{} wakes and its guardians attack. Defeat them and everyone nearby learns its abilities.", c.name));
+        if let Some(text) = c.wave_text.get(i) {
+            self.announce(text.clone());
+        }
     }
 
-    /// Trials under way: passed when the last guardian falls (everyone near learns, the first
-    /// finder gets what's in it), given up when no hero has been near a while (the guardians go
-    /// back to waiting, whole).
+    /// A hold's helpers (friendly creatures of its `ambush` packs) stand down: unseen again.
+    fn stand_down_allies(&mut self, def: usize) {
+        let packs: Vec<usize> = self.content.chests[def].ambush.iter().filter_map(|key| self.content.packs.iter().position(|p| p.key == *key)).collect();
+        let ids: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.friendly && !m.hidden && m.pack.is_some_and(|k| packs.contains(&k))).map(|(id, _)| *id).collect();
+        for id in ids {
+            if let Some(x) = self.mobs.get_mut(&id) {
+                x.hidden = true;
+                x.pos = x.home;
+                x.path.clear();
+                x.state = mobs::MobState::Idle { wander_at: f32::MAX };
+            }
+            self.ally_at.remove(&id);
+            self.events.push(Event::MobGone { id });
+        }
+    }
+
+    /// Trials under way: a hold calls its next wave when its time comes; one is passed when the last
+    /// guardian falls (and, for a hold, its time has run: everyone near learns what a shrine
+    /// teaches, the first finder gets what's in it, a hold's opener gets it and the chest is spent),
+    /// and given up when no hero has been near a while (the guardians go back to waiting, whole).
     pub(crate) fn step_trials(&mut self) {
         let now = self.clock;
         for def in self.trials.keys().copied().collect::<Vec<_>>() {
@@ -406,16 +469,40 @@ impl Survival {
                 self.trials.remove(&def);
                 continue;
             };
-            let packs: Vec<usize> = c.trial.iter().filter_map(|key| self.content.packs.iter().position(|p| p.key == *key)).collect();
+            let waves = self.trial_waves(&c);
+            // A hold calls its waves over its time: wave `i` of `n` at `i * hold / n` sec.
+            let mut called = t.called;
+            if c.hold > 0.0 {
+                let on = if self.players.contains_key(&t.by) { Some(t.by) } else { self.players.iter().find(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= TRIAL_STAY).map(|(id, _)| *id) };
+                while let Some(h) = on.filter(|_| called < waves.len() && now - t.started >= called as f32 * c.hold / waves.len() as f32) {
+                    self.call_wave(def, called, h);
+                    called += 1;
+                }
+                if let Some(x) = self.trials.get_mut(&def) {
+                    x.called = called;
+                }
+            }
+            let packs: Vec<usize> = waves.iter().flatten().copied().collect();
             let up: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| packs.contains(&k)) && m.health > 0 && !m.hidden).map(|(id, _)| *id).collect();
-            if up.is_empty() {
+            let held = called >= waves.len() && now - t.started >= c.hold;
+            if up.is_empty() && held {
                 self.trials.remove(&def);
                 let mut heroes: Vec<Id> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= mobs::TEACH_RANGE).map(|(id, _)| *id).collect();
                 if self.players.contains_key(&t.by) && !heroes.contains(&t.by) {
                     heroes.push(t.by);
                 }
                 for h in &heroes {
-                    self.events.push(Event::Banner { player: Some(*h), title: "Trial Passed".into(), sub: c.name.clone() });
+                    let title = if c.held_title.is_empty() { "Trial Passed".to_string() } else { c.held_title.clone() };
+                    self.events.push(Event::Banner { player: Some(*h), title, sub: c.name.clone() });
+                }
+                if c.teaches.is_empty() {
+                    // A hold: whoever opened it is paid, and it is a chest like any other from here.
+                    self.stand_down_allies(def);
+                    let by = if self.players.contains_key(&t.by) { Some(t.by) } else { heroes.first().copied() };
+                    if let Some(by) = by {
+                        self.finish_open(by, def, t.obj, false);
+                    }
+                    continue;
                 }
                 if !self.camp.opened.contains_key(&c.key) && self.players.contains_key(&t.by) {
                     self.camp.opened.insert(c.key.clone(), NEVER);
@@ -445,7 +532,46 @@ impl Survival {
                     }
                     self.events.push(Event::MobGone { id: m });
                 }
+                if c.hold > 0.0 {
+                    self.stand_down_allies(def);
+                    let text = if c.lost_text.is_empty() { format!("{} is lost. Use it again to try again.", c.name) } else { c.lost_text.clone() };
+                    self.announce(text);
+                }
             }
+        }
+    }
+
+    /// Each friendly shooter (`shoots` on its `[[mob]]`) shoots the nearest foe in reach that is
+    /// fighting a hero, every so often, if it can see it: a hero's helper, as a tower is, and a
+    /// foe it finishes counts for the camp. It never shoots an idle pack, nor a hero.
+    pub(crate) fn allies_shoot(&mut self) {
+        let now = self.clock;
+        let shooters: Vec<(Id, Vec3, crate::content::ShootDef)> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.friendly && m.health > 0 && !m.hidden)
+            .filter_map(|(id, m)| self.content.mobs[m.def].shoots.clone().map(|sh| (*id, m.pos, sh)))
+            .collect();
+        self.ally_at.retain(|id, _| shooters.iter().any(|(s, _, _)| s == id));
+        let spell = self.content.ranged.first().map_or(0, |r| r.spell);
+        for (a, at, sh) in shooters {
+            if self.ally_at.get(&a).is_some_and(|n| now < *n) {
+                continue;
+            }
+            let eye = [at[0], at[1], at[2] + 1.4];
+            let target = self
+                .mobs
+                .iter()
+                .filter(|(id, m)| **id != a && m.health > 0 && !m.hidden && !m.friendly && !self.content.mobs[m.def].inert())
+                .filter(|(_, m)| matches!(m.state, mobs::MobState::Chase { foe: mobs::Foe::Hero(_) } | mobs::MobState::Windup { foe: mobs::Foe::Hero(_), .. }))
+                .filter(|(_, m)| dist2d(m.pos, at) <= sh.range && crate::land::clear_line(self.land.as_ref(), eye, [m.pos[0], m.pos[1], m.pos[2] + 1.0]))
+                .min_by(|x, y| dist2d(x.1.pos, at).total_cmp(&dist2d(y.1.pos, at)))
+                .map(|(id, _)| *id);
+            let Some(r) = target else { continue };
+            self.ally_at.insert(a, now + sh.every);
+            self.events.push(Event::Missile { caster: a, spell: if sh.spell != 0 { sh.spell } else { spell }, target: Target::Unit(r) });
+            self.events.push(Event::React { id: r, anim: combat::WOUND_ANIM, from: at, lean: 0.15, hold: 0.0, fit: 0.0 });
+            self.hurt_mob(r, 0, sh.damage);
         }
     }
 
@@ -474,6 +600,8 @@ impl Survival {
         if heroes.is_empty() {
             return;
         }
+        // A friendly shooter helps the heroes in their fights.
+        self.allies_shoot();
         // Places found.
         for k in 0..self.content.sites.len() {
             let site = &self.content.sites[k];

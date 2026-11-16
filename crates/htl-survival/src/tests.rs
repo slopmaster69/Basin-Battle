@@ -3589,6 +3589,8 @@ fn keen_gear_gives_back_breath_on_a_parry_and_peerless_gear_throws_a_dodged_foe_
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    // (Not a blow of its own in the way: only the ones the test strikes.)
+    s.mobs.get_mut(&k).unwrap().ready_at = 1e9;
     let piece = |s: &Survival, tier: u8| s.content.items.iter().position(|i| i.hone == tier && i.kind == ItemKind::Armor).unwrap();
     // A Keen piece worn: a parry gives back breath.
     let keen = piece(&s, 2);
