@@ -188,6 +188,9 @@ pub(crate) struct InWorld {
     pub porting: bool,
     /// Ignore inspection movement already in flight until the original position is acknowledged.
     pub aftermath_return: Option<u32>,
+    /// When this hero came in, and whether the host's log has already said they have no add-on.
+    pub entered_at: Instant,
+    pub no_addon_logged: bool,
 }
 
 impl InWorld {
@@ -213,6 +216,8 @@ impl InWorld {
             ground_z: z,
             porting: false,
             aftermath_return: None,
+            entered_at: Instant::now(),
+            no_addon_logged: false,
         }
     }
 }
