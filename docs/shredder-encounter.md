@@ -70,7 +70,7 @@ is about 12 to 15 sec. The code is `crates/htl-survival/src/sim/machinery.rs` (t
 
 A wipe at any point (the machine on its run, Sneed inside, on foot, mid-repair, the log up, cut
 or down) puts back one whole machine at its post and hangs the log again over a clean floor; a
-lamp rest does too. Only Sneed's death awards plunder and gear and clears the pack; the wreck,
+lamp rest does too. So does the last hero leaving (or being taken out of the world) mid-fight: the world takes no steps with nobody in it, so `machinery_abandoned` (called from `Survival::leave`) puts it back at once, torch stake and all, rather than playing it out in front of the next hero. Only Sneed's death awards plunder and gear and clears the pack; the wreck,
 the lumber and the fallen log go with his body.
 
 ## Three wind-ups, three tells

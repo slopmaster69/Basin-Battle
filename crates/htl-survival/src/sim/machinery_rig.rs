@@ -174,6 +174,13 @@ enum Dash {
     Lunge,
 }
 
+impl Rig {
+    /// Not as hung at the pull: the log down or falling, lumber lying, the torch lit.
+    pub(super) fn is_dirty(&self) -> bool {
+        self.state != RigState::Hung || !self.lumber.is_empty() || self.lamp.is_some()
+    }
+}
+
 impl Survival {
     /// The rig of the post `id` (the machine or Sneed) belongs to.
     pub(super) fn rig_of(&self, id: Id) -> Option<usize> {
@@ -383,7 +390,7 @@ impl Survival {
     /// A lamp rest: every rig goes with the encounter, and is hung again when its machine is back.
     pub(super) fn rigs_gone(&mut self, rigs: BTreeMap<usize, Rig>) {
         for (_, g) in rigs {
-            for id in g.log.into_iter().chain(g.bundle).chain(g.stake).chain(g.lumber) {
+            for id in g.log.into_iter().chain(g.bundle).chain(g.stake).chain(g.lamp).chain(g.lumber) {
                 if self.objs.remove(&id).is_some() {
                     self.events.push(Event::ObjGone { id });
                 }
