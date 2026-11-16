@@ -1931,8 +1931,8 @@ breaker_heft = 3.0
 # Iron Knuckles (a fist weapon, one item in both hands): a run of 6 (the others' 4), each blow a
 # fist's 0.15 sec wind-up, so the whole run takes about as long as a dagger's 4. The finisher
 # wheels a creature (not a boss) round so its back is to the Rogue for 1 sec (a Distract away from
-# the Rogue: about two fist blows in its back), then it turns back. On a boss it counts 2 times toward posture instead: a boss is
-# never turned.
+# the Rogue: about two fist blows in its back), then it turns back. On a boss it counts 2 times
+# toward posture instead: a boss is never turned.
 knuckle_run = 6
 wheel_secs = 1.0
 knuckle_boss_heft = 2.0
