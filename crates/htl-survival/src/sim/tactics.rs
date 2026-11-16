@@ -97,7 +97,7 @@ impl Survival {
         self.mobs.get_mut(&id).unwrap().retarget_at = now + ai.retarget_secs.max(0.2);
         let current = match foe {
             Foe::Hero(h) => Some(h),
-            Foe::Obj(_) => None,
+            Foe::Obj(_) | Foe::Mob(_) => None,
         };
         // A raider at a station: only a hero coming near draws it off.
         let look = if current.is_none() {

@@ -71,6 +71,8 @@ const PHASE_SHOVE_WARN: f32 = 0.7;
 pub enum Foe {
     Hero(Id),
     Obj(Id),
+    /// A friendly creature the heroes guard (an escort's walker).
+    Mob(Id),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -448,6 +450,7 @@ impl Survival {
                 threat: Vec::new(),
                 retarget_at: 0.0,
                 drawn_off: None,
+                ward: None,
                 summoned_by: None,
                 friendly: self.content.mobs[def].friendly,
                 thrall: None,
@@ -599,6 +602,10 @@ impl Survival {
                 }
                 mob.state = MobState::Chase { foe };
                 mob.think = 0.0;
+                // Set on a walker: its quarry, to go back to (a hunter).
+                if let Foe::Mob(w) = foe {
+                    mob.ward = Some(w);
+                }
                 // Its voice and its words as it turns on them (once until it's home again).
                 let sound = self.content.mobs[mob.def].aggro_sound;
                 let line = &self.content.mobs[mob.def].aggro_text;
@@ -725,9 +732,12 @@ impl Survival {
         // Struck by a hero (not a tower or the spikes): it turns on them.
         let m = &self.mobs[&mid];
         let hero = self.players.contains_key(&by);
-        if hero && (matches!(m.state, MobState::Idle { .. } | MobState::Return) || (m.raider && matches!(m.state.foe(), Some(Foe::Obj(_))))) {
-            // Mid-blow at a station (a Hearth, a wall): the blow lands, and then it's theirs.
-            if matches!(m.state, MobState::Windup { .. } | MobState::Recover { .. }) {
+        if hero && (matches!(m.state, MobState::Idle { .. } | MobState::Return) || (m.raider && matches!(m.state.foe(), Some(Foe::Obj(_)))) || matches!(m.state.foe(), Some(Foe::Mob(_)))) {
+            // A hunter winding up at its quarry turns the blow on the hero who struck it.
+            if let (MobState::Windup { foe: Foe::Mob(_), t, mark, shown }, true) = (m.state.clone(), self.content.mobs[m.def].hunts) {
+                self.mobs.get_mut(&mid).unwrap().state = MobState::Windup { foe: Foe::Hero(by), t, mark, shown };
+            } else if matches!(m.state, MobState::Windup { .. } | MobState::Recover { .. }) {
+                // Mid-blow at a station (a Hearth, a wall): the blow lands, and then it's theirs.
                 self.mobs.get_mut(&mid).unwrap().drawn_off = Some(by);
             }
             self.engage(mid, Foe::Hero(by));
@@ -2064,6 +2074,7 @@ impl Survival {
         match foe {
             Foe::Hero(h) => self.players.get(&h).filter(|p| p.health > 0).map(|p| p.pos),
             Foe::Obj(o) => self.objs.get(&o).filter(|o| matches!(o.kind, ObjKind::Station { damaged: false, .. })).map(|o| o.pos),
+            Foe::Mob(m) => self.mobs.get(&m).filter(|m| m.health > 0 && !m.hidden).map(|m| m.pos),
         }
     }
 
@@ -2393,12 +2404,14 @@ impl Survival {
                 // walk to: a dock, the far side of the pot. They wait for the hero to come down.
                 // Gilnid waits the same for a hero out on a plank: `sim::perches`.)
                 let lost = lost && !self.kitchen_holds_on(id, foe) && !self.perch_holds_on(id, foe);
-                if !raider && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
+                // (One sent after an escort's walker follows the road, as a raider does.)
+                let sent = self.mobs[&id].ward.is_some_and(|w| self.foe_pos(Foe::Mob(w)).is_some());
+                if !raider && !sent && !self.boss_unleashed(id) && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     // Its foe ran past its leash (or out of reach), but others are still in its
                     // fight: it turns on one of them, not home to heal.
                     let gone = match foe {
                         Foe::Hero(h) => Some(h),
-                        Foe::Obj(_) => None,
+                        Foe::Obj(_) | Foe::Mob(_) => None,
                     };
                     if let Some(h) = self.next_in_fight(id).filter(|h| Some(*h) != gone) {
                         let m = self.mobs.get_mut(&id).unwrap();
@@ -2411,7 +2424,7 @@ impl Survival {
                     return;
                 }
                 let size = match foe {
-                    Foe::Hero(_) => 0.4,
+                    Foe::Hero(_) | Foe::Mob(_) => 0.4,
                     Foe::Obj(o) => self.objs.get(&o).and_then(|o| match o.kind {
                         ObjKind::Station { def, .. } => Some(self.content.stations[def].footprint),
                         _ => None,
@@ -2713,8 +2726,9 @@ impl Survival {
             }
             MobState::Recover { foe, until } => {
                 if now >= until {
-                    // Drawn off a station by a hero who struck it: no more of the string there.
-                    if let (Foe::Obj(_), Some(h)) = (foe, self.mobs[&id].drawn_off) {
+                    // Drawn off a station (or a walker) by a hero who struck it: no more of the
+                    // string there.
+                    if let (Foe::Obj(_) | Foe::Mob(_), Some(h)) = (foe, self.mobs[&id].drawn_off) {
                         let m = self.mobs.get_mut(&id).unwrap();
                         m.drawn_off = None;
                         if self.players.get(&h).is_some_and(|p| p.health > 0) {
@@ -2736,10 +2750,19 @@ impl Survival {
                         // Mid-string: the next blow, turned on the foe wherever they've got to.
                         (Some(_), Some(to)) => self.windup(id, foe, to),
                         _ => {
+                            // A hunter drawn off its quarry: one string on the hero, then back.
+                            let back = match (foe, self.mobs[&id].ward) {
+                                (Foe::Hero(_), Some(w)) if self.content.mobs[self.mobs[&id].def].hunts && self.foe_pos(Foe::Mob(w)).is_some() => Some(Foe::Mob(w)),
+                                _ => None,
+                            };
                             let m = self.mobs.get_mut(&id).unwrap();
                             let strung = m.pattern.take().is_some();
-                            m.state = MobState::Chase { foe };
+                            m.state = MobState::Chase { foe: back.unwrap_or(foe) };
                             m.string_done_at = now;
+                            if back.is_some() {
+                                m.think = 0.0;
+                                return;
+                            }
                             // A string done: now and then it gives ground (a boss: it makes
                             // space for a blow from afar, or goes straight into another string).
                             if let (false, Foe::Hero(h)) = (strung, foe) {
@@ -3150,6 +3173,13 @@ impl Survival {
                     self.events.push(Event::Swing { attacker: id, victim: None, damage: 0, outcome: Outcome::Miss, anim: false, style: Blow::Light });
                     self.hurt_station(o, a.damage);
                 }
+            }
+        }
+        // On the friendly creature the heroes guard (an escort's walker): it takes the blow.
+        if let Foe::Mob(w) = foe {
+            if self.foe_pos(foe).is_some_and(|wp| dist2d(pos, wp) <= a.range + 0.4) {
+                any = true;
+                self.hurt_ward(w, a.damage, pos);
             }
         }
         if !any {

@@ -284,3 +284,34 @@ Built as planned, with these differences, found checking the plan against the co
 - Probed with `elwynn_probe near`: the site centre, the guards (the archers' spot has a trunk or wall within 6 yd, none beside it), the envoy, the table, the satchel and the helpers' spots are open ground, unmoved.
 
 Round two is built.
+
+# Round three: "The Lord's Answer" (stages 11 to 13)
+
+Designed 16 Nov 2026 from origin/main @8905cc8d, built overnight from the plan's defaults. Stages are ticked as they land.
+
+Defaults for Corey's open questions, all reversible:
+- The witness is invented: Aldric Pell, a Stormwind seal-cutter who cut Lescovar's ring. So are Crane (the Lion's Knife), Sable (the Lion's Hound) and Steward Venn.
+- The escort ends at the Stormwind gate, a new landmark on the north road. Nothing of the city is spawned.
+- A lost escort is not a death: Pell is struck down, the knives slip away, and he waits at his start to try again.
+- The second choice (sell or keep the letter) is camp-wide and one-time, like Remy's.
+- Sable hunts whichever way the camp chose, so the journal can always be finished.
+- Stormwind's archers at the camp shoot raiders at its buildings too.
+- No new weapon this round. The Horde column on the Redridge road and a night event are deferred.
+
+Story spine: a letter is ink, so Stormwind needs the man who cut the seal to swear to it. Pell is walked to the city under Lescovar's knives. Lescovar then offers to buy the letter back, and sends his hunter whatever the answer.
+
+Journal: every new goal goes just before "Every corner". `ELWYNN_GOALS` in `save.rs` goes 17, 18, 19. "Every corner" equals the site count (39 from Stage 11). Camps already past "The classes' trials" still skip the new goals: that migration is a call left for Corey. The tests are in `tests_story3.rs`, with `tests_story.rs`'s old-save, goal-order and sites tests extended.
+
+## Stage 11: The Witness [x] (escort; engine change E6)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E6.** `ChestDef.escort` and `ChestDef.route` (`sim/explore.rs`: `escort_walks`, `escort_walker`, `hurt_ward`, `lose_trial`). The escort is a trial: `start_trial` wakes the walker and the chest's `ambush` helpers and calls wave 1 at once; `step_trials` moves him (`go`, at his walk speed, only with a hero within 20 yd and nothing whose foe is him) and calls wave `i` as he sets off from point `i * len / n`. `Foe::Mob` is new (`sim/mobs.rs`): `foe_pos`, the blow landing on him (`hurt_ward`, never `mob_died`), the leash (one sent after a standing walker never gives up for it), `retarget` (it keeps him), and the draw-off on a hero's blow (any creature on him, not only a raider). `Mob.ward` keeps whom it was set on. `validate()` checks the escort's pack is one friendly creature that wakes on the chest, that it has a route and waves and no `hold` or `teaches`, and that only an escort has a route.
+- **`MobDef.hunts`**: drawn off its quarry, it gives that hero one string and goes back (at the string's end, in `Recover`). A blow on it while it winds up at its quarry turns that wind-up on the hero (the plan's "a light blow knocks the throat-cut aside" could not be: a boss's wind-up is never knocked aside by the rules, `boss_knock_aside`).
+- A friendly shooter also shoots a foe on a walker (`allies_shoot`), so Dughan's watchman helps Pell.
+- The waves reuse the Brotherhood's footpads and thugs, all fighters up close: a ranged creature's shot lands where its target stood and only hurts heroes there, so an escort's waves keep to melee.
+- `lose_trial` is the old give-up, shared: a hold or an escort that is lost says its `lost_text`; a shrine's trial still says nothing.
+- Displays (`npcfind` on the real data): Pell 1724 (purple cloth), Crane 3358 (black leathers), the watchman 1984 (Stormwind plate and tabard). Unchecked in the client.
+- Wyle's line at `open:marzon_satchel` now ends with the pointer to Pell (it still starts as round two's test reads it), and Wyle, Remy and Dughan each have a line at `open:pell_satchel`.
+- Two tests elsewhere (`tests_tactics`'s give-ground, `tests_warlord`'s tackle) drew their dice from the world's content, which this stage's packs move; each now seeds its own dice (both pass on 11 of 12 seeds).
+- `ELWYNN_GOALS` is 17 and "Every corner" is 39 for the 39 sites.
+- Probed with `elwynn_probe near`: the satchel, Pell's start, every point of the road, the wave spots and the gate are open ground. The route's fifth point moved from (-9150, 365), which has a wall within 6 yd, to (-9152, 360).

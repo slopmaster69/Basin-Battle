@@ -2674,6 +2674,11 @@ pub struct MobDef {
     pub then_kit: u32,
     #[serde(default)]
     pub then_look: u32,
+    /// A hunter: set on the one the heroes guard (an escort's walker), a hero's blow turns it on
+    /// that hero for one string only, and then it goes back for its quarry. Without it, a creature
+    /// drawn off is the hero's for good.
+    #[serde(default)]
+    pub hunts: bool,
     /// What it is, for the weapons that single out a kind: `undead`, `worgen`, `stone`,
     /// `mechanical`.
     #[serde(default)]
@@ -3324,6 +3329,15 @@ pub struct ChestDef {
     pub held_title: String,
     #[serde(default)]
     pub lost_text: String,
+    /// An escort (a hold that walks): the key of a pack of one friendly creature that wakes on the
+    /// chest and walks `route` (from its pack's `at`) while a hero is near it and nothing is fighting
+    /// it. Wave `i` of `n` comes as it sets off from point `i * len / n` of the route, and comes for
+    /// it, not for the heroes; it is passed once it reaches the end and every wave has fallen, and
+    /// lost if it is struck down. Empty: no escort.
+    #[serde(default)]
+    pub escort: String,
+    #[serde(default)]
+    pub route: Vec<[f32; 2]>,
     #[serde(default)]
     pub keep: bool,
     #[serde(default)]
@@ -4337,6 +4351,22 @@ impl Content {
             }
             if c.wave_text.len() > c.trial.len() {
                 bail!("chest {}: {} wave texts for {} waves", c.key, c.wave_text.len(), c.trial.len());
+            }
+            // An escort: one friendly walker that wakes on it, a way to walk, waves, and no clock.
+            if !c.escort.is_empty() {
+                let what = format!("chest {}: escort {}", c.key, c.escort);
+                let Some(p) = self.packs.iter().find(|p| p.key == c.escort) else { bail!("{what}: no [[pack]] of that key") };
+                if p.wake != c.key || p.count != 1 {
+                    bail!("{what}: its pack must be one creature that wakes on the chest");
+                }
+                if !self.mob(&p.mob).is_some_and(|m| self.mobs[m].friendly) {
+                    bail!("{what}: the one walked is a friendly creature");
+                }
+                if c.route.is_empty() || c.trial.is_empty() || c.hold > 0.0 || !c.teaches.is_empty() {
+                    bail!("{what}: an escort has a route and waves (`trial`), and no `hold` or `teaches`");
+                }
+            } else if !c.route.is_empty() {
+                bail!("chest {}: a route is for an escort", c.key);
             }
         }
         for m in &self.mobs {
