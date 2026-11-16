@@ -2110,6 +2110,8 @@ impl Survival {
         let on: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.state.target() == Some(hero)).map(|(m, _)| *m).collect();
         for mid in on {
             if let Some(h) = self.next_in_fight(mid).filter(|h| *h != hero) {
+                // (The blow it was winding up on the leaver never lands: its mark goes too.)
+                if let MobState::Windup { mark: Some(mk), .. } = self.mobs[&mid].state { self.unmark(mk); }
                 let now = self.clock;
                 let m = self.mobs.get_mut(&mid).unwrap();
                 m.state = MobState::Chase { foe: Foe::Hero(h) };

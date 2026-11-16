@@ -1085,3 +1085,182 @@ fn a_cook_who_dies_in_the_reel_leaves_the_pot_steaming() {
     assert_eq!(p.stew.len(), 1 + HELPINGS as usize, "the pot and its steam stay");
     assert!(p.stew.iter().all(|prop| s.objs.contains_key(prop)));
 }
+
+// --- the last hero leaving ----------------------------------------------------------------------
+
+/// Once abandoned the world takes no steps, so the put-back must already be done on leaving.
+fn kitchen_put_back(s: &Survival, id: Id, own_hand: bool) {
+    assert!(s.players.is_empty());
+    assert!(s.marks.is_empty(), "no wind-up mark left on the floor");
+    assert!(!s.kitchen.cooks.contains_key(&id), "no cook state");
+    let own: usize = s.kitchen.pots.values().map(|p| p.stew.len()).sum();
+    let props = s.objs.values().filter(|o| matches!(o.kind, ObjKind::Prop { display, .. } if display == STEAM || display == BUBBLES)).count();
+    assert_eq!(props, own, "no puffs of a puddle or a breath outside the pot's own steam");
+    let m = &s.mobs[&id];
+    assert_eq!(m.health, m.max_health, "whole");
+    assert!(matches!(m.state, MobState::Idle { .. }), "at ease, not on his way home: {:?}", m.state);
+    assert!(m.pattern.is_none() && m.posture == 0 && m.posed_until <= s.clock && m.stagger_until <= s.clock);
+    assert!(dist2d(m.pos, m.home) < 0.1, "at his post");
+    if own_hand { assert!(s.kitchen_hand(id).is_none() || s.kitchen_hand(id) == Some(0)); }
+}
+
+/// The next hero finds a fresh pull: nothing spent, nothing half done, the pot as it should be.
+fn next_hero_finds_dinner_fresh(s: &mut Survival, id: Id) {
+    let h = s.join("late", "Late", None);
+    let p = s.players.get_mut(&h).unwrap();
+    p.health = 100_000;
+    p.max_health = 100_000;
+    p.loadout.clear();
+    s.move_player(h, [2.5, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+    run(s, 0.3);
+    let c = &s.kitchen.cooks[&id];
+    assert!(c.patch.is_none() && c.warn.is_empty() && c.puffs.is_empty());
+    assert_eq!((c.turn, c.healed, c.scoops), (0, 0, 0));
+    assert_eq!(s.mobs[&id].health, s.mobs[&id].max_health);
+}
+
+fn stew_whole(s: &Survival, helpings: u8) {
+    assert_eq!(s.kitchen.pots.len(), 1, "one pot, never two");
+    let p = s.kitchen.pots.values().next().unwrap();
+    assert_eq!((p.helpings, p.down_until.is_none()), (helpings, true));
+    assert_eq!(p.stew.len(), if helpings == 0 { 0 } else { 1 + helpings as usize });
+    assert!(p.stew.iter().all(|x| s.objs.contains_key(x)));
+}
+
+#[test]
+fn cookie_the_last_hero_leaving_in_any_beat_puts_the_kitchen_back_at_once() {
+    // 0 pull, 1 pour wind-up, 2 puddle burning, 3 walking to the pot, 4 scooping, 5 pot knocked and
+    // reeling, 6 gulped and the steam breath drawn, 7 mid cleaver pair.
+    for beat in 0..8 {
+        let (mut s, band, id) = if beat == 0 { fresh(COOKIE, 1) } else { fight(COOKIE, 1) };
+        match beat {
+            0 => { run(&mut s, 0.6); }
+            1 => { s.kitchen.cooks.get_mut(&id).unwrap().turn = 2; until(&mut s, id, 10.0, |s, id| s.kitchen_winding(id, "serve it hot")); }
+            2 => {
+                s.kitchen.cooks.get_mut(&id).unwrap().turn = 2;
+                until(&mut s, id, 22.0, |s, id| s.kitchen.cooks[&id].patch.as_ref().is_some_and(|p| p.landed && !p.props.is_empty()));
+            }
+            3 => { until(&mut s, id, 60.0, |s, id| matches!(s.kitchen.cooks[&id].stage, Some(Stage::Seeking { .. }))); }
+            4 => { scoop(&mut s, id); run(&mut s, 1.5); }
+            5 => {
+                scoop(&mut s, id);
+                let at = s.mobs[&id].pos;
+                s.move_player(band[0], [at[0] - 1.2, at[1], at[2]], 0.0, Moving::default());
+                while s.kitchen_scooping(id) { s.input(band[0], Input::Attack); s.step(DT); }
+                run(&mut s, 1.0);
+            }
+            6 => { scoop(&mut s, id); until(&mut s, id, 8.0, |s, id| s.kitchen_winding(id, "steam")); run(&mut s, 0.5); }
+            _ => { until(&mut s, id, 10.0, |s, id| s.mobs[&id].pattern.is_some()); }
+        }
+        s.mobs.get_mut(&id).unwrap().health = s.mobs[&id].max_health / 2;
+        let pot = s.kitchen.cooks.get(&id).and_then(|c| c.pot);
+        let _ = s.leave(band[0]);
+        kitchen_put_back(&s, id, true);
+        if beat > 0 { assert!(pot.is_some()); stew_whole(&s, HELPINGS); }
+        if beat == 0 { run(&mut s, 0.0); }
+        next_hero_finds_dinner_fresh(&mut s, id);
+        if beat > 0 { stew_whole(&s, HELPINGS); }
+        assert!(s.kitchen.cooks[&id].pot == pot || beat == 0, "the same pot");
+    }
+}
+
+#[test]
+fn gorged_the_last_hero_leaving_in_any_beat_puts_him_back_whole_full_size_and_the_pot_empty() {
+    // 0 getting up and walking, 1 gulping, 2 swelling, 3 waiting to swing, 4 slaps, 5 belch wind-up.
+    for beat in 0..6 {
+        let (mut s, band, id) = fight(COOKIE, 1);
+        let item = s.content.item("secret_ingredient").unwrap();
+        s.give(band[0], item, 1);
+        s.move_player(band[0], [-3.0, -2.0, 0.0], 0.0, Moving::default());
+        s.hurt_mob(id, band[0], u32::MAX);
+        let next = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == GORGED).unwrap().0;
+        until(&mut s, next, 3.0, |s, n| !s.mobs[&n].hidden && s.kitchen.cooks.contains_key(&n));
+        let want = |s: &Survival, n: Id, f: fn(&Rise) -> bool| matches!(s.kitchen.cooks.get(&n).and_then(|c| c.stage), Some(Stage::Rising(ref r)) if f(r));
+        match beat {
+            0 => { run(&mut s, 1.0); }
+            1 => { until(&mut s, next, 9.0, |s, n| want(s, n, |r| matches!(r, Rise::Gulping { .. }))); }
+            2 => { until(&mut s, next, 12.0, |s, n| want(s, n, |r| matches!(r, Rise::Swelling { .. }))); run(&mut s, 0.5); }
+            3 => { until(&mut s, next, 14.0, |s, n| want(s, n, |r| matches!(r, Rise::Waiting { .. }))); }
+            4 => { until(&mut s, next, 30.0, |s, n| s.kitchen.cooks[&n].stage.is_none() && s.mobs[&n].pattern.is_some()); }
+            _ => {
+                until(&mut s, next, 14.0, |s, n| want(s, n, |r| matches!(r, Rise::Waiting { .. })));
+                until(&mut s, next, 40.0, |s, n| s.kitchen_winding(n, "belch"));
+                run(&mut s, 0.8);
+            }
+        }
+        s.move_player(band[0], [1.5, 2.0, 0.0], 0.0, Moving::default());
+        s.mobs.get_mut(&next).unwrap().health /= 3;
+        s.mobs.get_mut(&next).unwrap().pos = [3.0, 3.0, 0.0];
+        s.events.clear();
+        let _ = s.leave(band[0]);
+        kitchen_put_back(&s, next, true);
+        let end = s.content.mobs[s.mobs[&next].def].scale;
+        if beat <= 3 {
+            assert!(s.events.iter().any(|e| matches!(e, Event::Grow { id: who, scale } if *who == next && (*scale - end).abs() < 1e-4)), "beat {beat}: drawn at his full size");
+        }
+        stew_whole(&s, 0);
+        // The next hero finds him standing, not rising out of a body again, and no second Gorged.
+        let h = s.join("late", "Late", None);
+        s.players.get_mut(&h).unwrap().health = 100_000;
+        s.players.get_mut(&h).unwrap().max_health = 100_000;
+        s.move_player(h, [2.5, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+        run(&mut s, 3.0);
+        assert!(!s.mobs[&next].hidden);
+        assert_eq!(s.mobs.values().filter(|m| m.health > 0 && s.content.mobs[m.def].key == GORGED).count(), 1);
+        assert_eq!(s.mobs[&next].health, s.mobs[&next].max_health);
+        stew_whole(&s, 0);
+    }
+}
+
+#[test]
+fn the_killer_leaving_before_gorged_rises_lets_him_rise_for_the_next_hero() {
+    let (mut s, band, id) = fight(COOKIE, 1);
+    let item = s.content.item("secret_ingredient").unwrap();
+    s.give(band[0], item, 1);
+    s.hurt_mob(id, band[0], u32::MAX);
+    run(&mut s, 0.5);
+    let _ = s.leave(band[0]);
+    let next = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == GORGED).unwrap().0;
+    assert!(s.mobs[&next].hidden, "waiting to rise; nothing steps without a hero");
+    let h = s.join("late", "Late", None);
+    s.players.get_mut(&h).unwrap().health = 100_000;
+    s.players.get_mut(&h).unwrap().max_health = 100_000;
+    s.move_player(h, [-3.0, -2.0, 0.0], 0.0, Moving::default());
+    until(&mut s, next, 5.0, |s, n| !s.mobs[&n].hidden);
+    run(&mut s, 12.0);
+    assert!(s.mobs[&next].state.foe() == Some(Foe::Hero(h)) || s.kitchen.cooks.contains_key(&next), "he is up and in the fight");
+}
+
+#[test]
+fn two_heroes_one_down_one_up_at_the_far_ends_dinner_is_put_back_once_both_have_gone() {
+    let (mut s, band, id) = fight(COOKIE, 2);
+    s.move_player(band[0], [6.0, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+    s.move_player(band[1], [-6.0, 0.0, 0.0], 0.0, Moving::default());
+    s.kitchen.cooks.get_mut(&id).unwrap().turn = 2;
+    s.players.get_mut(&band[0]).unwrap().health = 0;
+    s.foe_gone(band[0]);
+    until(&mut s, id, 22.0, |s, id| s.kitchen.cooks[&id].patch.as_ref().is_some_and(|p| p.landed && !p.props.is_empty()));
+    s.mobs.get_mut(&id).unwrap().health /= 2;
+    let _ = s.leave(band[1]);
+    assert!(!s.players.is_empty(), "the fallen one is still in the world");
+    assert!(s.kitchen.cooks.contains_key(&id), "not yet abandoned");
+    let _ = s.leave(band[0]);
+    kitchen_put_back(&s, id, true);
+    stew_whole(&s, HELPINGS);
+    next_hero_finds_dinner_fresh(&mut s, id);
+}
+
+#[test]
+fn one_hero_leaving_mid_pour_hands_him_to_the_other_and_takes_the_mark_and_steam_down() {
+    let (mut s, band, id) = fight(COOKIE, 2);
+    s.move_player(band[1], [-5.0, 3.0, 0.0], 0.0, Moving::default());
+    s.kitchen.cooks.get_mut(&id).unwrap().turn = 2;
+    until(&mut s, id, 10.0, |s, id| s.kitchen_winding(id, "serve it hot"));
+    assert!(!s.marks.is_empty());
+    let _ = s.leave(band[0]);
+    assert!(s.marks.is_empty(), "the leaver's mark went with the wind-up");
+    run(&mut s, 0.3);
+    assert!(s.kitchen.cooks[&id].warn.is_empty(), "no steam gathering for a pour that is not coming");
+    assert_eq!(s.mobs[&id].state.foe(), Some(Foe::Hero(band[1])));
+    assert!(s.kitchen.cooks[&id].patch.as_ref().is_none_or(|p| p.props.is_empty() && !p.landed) );
+}
