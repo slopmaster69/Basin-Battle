@@ -102,6 +102,11 @@ impl MobState {
 /// The swing's animation starts this long before the blow lands, so the strike in the animation
 /// meets the moment it counts.
 const ANIM_LEAD: f32 = 0.3;
+/// A creature turning in place to follow a hero tells the clients its facing only after turning
+/// this many degrees since the last it told (the client snaps a stopped creature to the angle)...
+pub const TURN_TELL: f32 = 6.0;
+/// ...or this many seconds after it, while it keeps turning.
+pub const TURN_TELL_EVERY: f32 = 0.25;
 /// The reel of a staggered creature or hero (`Emotes.dbc` 64, Stun).
 pub const STUN_EMOTE: u32 = 64;
 /// A roar (EMOTE_ONESHOT_ROAR).
@@ -420,6 +425,8 @@ impl Survival {
                 voiced: false,
                 backstabs: Vec::new(),
                 turn_on: None,
+                face_sent: None,
+                face_seen: 0.0,
                 fighters: 1,
                 wary_until: 0.0,
                 fled: false,
@@ -1553,7 +1560,11 @@ impl Survival {
     pub(crate) fn go(&mut self, id: Id, to: Vec3, speed: f32) {
         // Snared: slower, as everyone sees it.
         let speed = speed * self.speed_share(id);
-        let Some(m) = self.mobs.get(&id) else { return };
+        match self.mobs.get_mut(&id) {
+            Some(m) => m.face_sent = None,
+            None => return,
+        }
+        let m = &self.mobs[&id];
         let from = m.pos;
         if self.is_below() && self.land.footing(to).is_none() {
             self.mobs.get_mut(&id).unwrap().lost_at.get_or_insert(self.clock);
@@ -1668,11 +1679,15 @@ impl Survival {
         let pos = m.pos;
         let face = facing(pos, to);
         let turned = (face - m.facing + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+        // (Turned first, so the stop that ends its walk carries the new facing: one packet, not two.)
+        let turn = moving || turned.abs() > 0.35;
+        if turn {
+            self.mobs.get_mut(&id).unwrap().facing = face;
+        }
         if moving {
             self.halt(id);
-        }
-        if moving || turned.abs() > 0.35 {
-            self.mobs.get_mut(&id).unwrap().facing = face;
+        } else if turn {
+            self.mobs.get_mut(&id).unwrap().face_sent = Some((face, now));
             self.events.push(Event::MobStop { id, pos, facing: face });
         }
     }
@@ -1989,7 +2004,31 @@ impl Survival {
         m.speed = 0.0;
         if was_moving {
             let (pos, facing) = (m.pos, m.facing);
+            m.face_sent = Some((facing, now));
             self.events.push(Event::MobStop { id, pos, facing });
+        }
+    }
+
+    /// A creature standing turned to its foe while it waits (the foe walking round it): the
+    /// clients hear of a new facing only once it has moved more than `TURN_TELL` since the last
+    /// one told, or `TURN_TELL_EVERY` seconds have passed while it keeps turning, and always the
+    /// exact facing once it stops turning (the same on two ticks). A wind-up, a swing or a walk
+    /// tells its own, exact (`windup`, `halt`).
+    pub(crate) fn tell_facing(&mut self, id: Id, pos: Vec3, face: f32) {
+        let now = self.clock;
+        let Some(m) = self.mobs.get_mut(&id) else { return };
+        let steady = angle_between(face, m.face_seen) < 0.01;
+        m.face_seen = face;
+        let due = match m.face_sent {
+            None => true,
+            Some((sent, at)) => {
+                let off = angle_between(face, sent);
+                off > 0.01 && (steady || off > TURN_TELL || now - at >= TURN_TELL_EVERY)
+            }
+        };
+        if due {
+            m.face_sent = Some((face, now));
+            self.events.push(Event::MobStop { id, pos, facing: face });
         }
     }
 
@@ -2513,7 +2552,7 @@ impl Survival {
                     self.halt(id);
                     if dist <= reach {
                         // In reach but waiting on the cooldown: face them.
-                        self.events.push(Event::MobStop { id, pos, facing: face });
+                        self.tell_facing(id, pos, face);
                     }
                 } else {
                     let goal = self.free_spot(id, to, pos, stop * 0.8);
@@ -2850,7 +2889,10 @@ impl Survival {
         let a = &a;
         let pos = m.pos;
         let face = facing(pos, to);
-        self.mobs.get_mut(&id).unwrap().facing = face;
+        let now = self.clock;
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.facing = face;
+        m.face_sent = Some((face, now));
         self.events.push(Event::MobStop { id, pos, facing: face });
         // The telegraph: where the blow will land, on the ground, until it does (and on the
         // clients that draw it, the blow itself: its true reach and arc, and when it comes).
