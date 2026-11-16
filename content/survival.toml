@@ -3650,396 +3650,6 @@ roster = [
 ]
 reward = { linen = 2, leather = 2, ore = 2 }
 
-# --- the camp's journal ---------------------------------------------------------------------------
-# Goals in order, shown at the top right: each is done when the camp (everyone together) has done
-# it, and its reward goes into the chest. `kind` is bank, build, craft, kill, gather, raid (by its
-# place: 0 the first raid) or wear (an armor slot); `count` how many.
-
-[[goal]]
-title = "Timber for the camp"
-text = "Gather fallen timber under the trees around the camp. Right-click Camp Storage to bank it. Only banked timber counts."
-kind = "bank"
-what = "wood"
-count = 10
-reward = { roast = 2 }
-
-[[goal]]
-title = "A fire to cook on"
-text = "Build a Cooking Fire in camp (H)."
-kind = "build"
-what = "cooking"
-reward = { meat = 4 }
-
-[[goal]]
-title = "Provisions"
-text = "Hunt boars for meat and cook 3 Roast Meat at the Cooking Fire."
-kind = "craft"
-what = "roast"
-count = 3
-reward = { peacebloom = 3 }
-
-[[goal]]
-title = "Scout Elwynn"
-text = "Find 4 of Elwynn's places. Every mark on the world map (M) is one worth going to."
-kind = "explore"
-what = "any"
-count = 4
-reward = { linen = 2, wood = 4 }
-
-[[goal]]
-title = "Copper from Fargodeep"
-text = "Bank copper from the Fargodeep mine yard, south-east down the Goldshire road. The Warsong hold it. Only banked copper counts."
-kind = "bank"
-what = "ore"
-count = 6
-reward = { wood = 6 }
-
-[[goal]]
-title = "An anvil"
-text = "Build a Smithing Anvil."
-kind = "build"
-what = "smithy"
-reward = { ore = 4 }
-
-[[goal]]
-title = "Thin the Warsong"
-text = "Kill 3 Warsong Grunts. Read their attack strings, parry, then punish the recovery."
-kind = "kill"
-what = "grunt"
-count = 3
-reward = { stone = 4, linen = 2 }
-
-[[goal]]
-title = "A shrine's lesson"
-text = "Use one of Elwynn's class shrines, the marked sanctums on the map, and beat the guardians it wakes. Each hero there learns 2 of its abilities. Open the board (N) to slot them."
-kind = "learn"
-what = "any"
-count = 2
-reward = { silverleaf = 2, peacebloom = 2 }
-
-[[goal]]
-title = "Hold the camp"
-text = "Ring the alarm bell and beat the Warsong Raid."
-kind = "raid"
-what = "0"
-reward = { hide = 4, linen = 4 }
-
-[[goal]]
-title = "Snapper for supper"
-text = "Take Mud Snappers from the murlocs at Crystal Lake, Mirror Lake or Stone Cairn, and grill 3 at the Cooking Fire."
-kind = "craft"
-what = "grilled_fish"
-count = 3
-reward = { pumpkin = 2 }
-
-[[goal]]
-title = "The Smuggler's Logbook"
-text = "Read the Smuggler's Logbook by Camp Storage and go down to the Deadmines once. The scouts say its first page leads there."
-kind = "delve"
-what = "book"
-reward = { linen = 3 }
-
-[[goal]]
-title = "Cookie's stew pot"
-text = "Kill Cookie once, by his stew pot at the pier in the cove below. He lifts a mug of stew and throws it where you stand, so step away before it lands."
-kind = "kill"
-what = "dm_cookie"
-reward = { whetstone = 2, linen = 2 }
-
-[[goal]]
-title = "A rack for hides"
-text = "Build a Tanning Rack and cure some hides."
-kind = "build"
-what = "tanning"
-reward = { leather = 2 }
-
-[[goal]]
-title = "Armor of hide"
-text = "Make a Hide Jerkin at the Tanning Rack and equip it."
-kind = "wear"
-what = "chest"
-reward = { linen = 4 }
-
-[[goal]]
-title = "A herbalist's cauldron"
-text = "Build a Herbalist's Cauldron. Boulders along the mine road give stone."
-kind = "build"
-what = "cauldron"
-reward = { peacebloom = 4 }
-
-[[goal]]
-title = "Salves for the road"
-text = "Brew 4 Healing Salves."
-kind = "craft"
-what = "salve"
-count = 4
-reward = { silverleaf = 2 }
-
-[[goal]]
-title = "Elwynn's secrets"
-text = "Find 2 of Elwynn's hidden places. They show only up close. Look in a den, behind a farm, under a dock and behind a waterfall."
-kind = "secret"
-what = "any"
-count = 2
-reward = { silver = 2 }
-
-[[goal]]
-title = "Drive off the Darkspear"
-text = "Ring the bell and beat the Darkspear. They come from their camp to the west."
-kind = "raid"
-what = "1"
-reward = { tin = 4 }
-
-[[goal]]
-title = "The Darkspear camp"
-text = "Kill every Darkspear at their camp to the west. Take the fight to them."
-kind = "clear"
-what = "darkspear"
-reward = { hide = 4 }
-
-[[goal]]
-title = "The Overseer"
-text = "Kill the Warsong Overseer in the mine yard. Dodge the slam, kick the windup."
-kind = "kill"
-what = "overseer"
-reward = { bronze = 2 }
-
-[[goal]]
-title = "Silver"
-text = "Bank 4 Silver Ore. Jasperlode, Echo Ridge and Ridgepoint have silver in their deeper veins, and their kobolds carry some."
-kind = "bank"
-what = "silver"
-count = 4
-reward = { bronze = 2 }
-
-[[goal]]
-title = "Take the mine yard"
-text = "Kill every Warsong fighter in the Fargodeep mine yard. They stay away for 10 min."
-kind = "clear"
-what = "mine"
-reward = { ore = 4 }
-
-[[goal]]
-title = "Hogger"
-text = "Bring down Hogger. He roams the Riverpaw camps of Forest's Edge, west past the orchard. The Westbrook armory opens when he falls."
-kind = "kill"
-what = "hogger"
-reward = { leather = 3, silver = 1 }
-
-[[goal]]
-title = "Bronze"
-text = "Smelt 4 Bronze Bars at the Smithing Anvil. Copper and tin come from the back of the mine yard."
-kind = "craft"
-what = "bronze"
-count = 4
-reward = { stone = 4 }
-
-[[goal]]
-title = "A wall"
-text = "Build a Crate Bulwark. Raiders must break it to reach what it guards."
-kind = "build"
-what = "palisade"
-reward = { wood = 10 }
-
-[[goal]]
-title = "A workbench"
-text = "Build a Workbench."
-kind = "build"
-what = "workbench"
-reward = { whetstone = 4 }
-
-[[goal]]
-title = "The far reaches"
-text = "Find 18 of Elwynn's places, from Northshire and the lakes to the Tower of Azora, Eastvale and Ridgepoint."
-kind = "explore"
-what = "any"
-count = 18
-reward = { silk = 4, wool = 4 }
-
-[[goal]]
-title = "An explorer's pack"
-text = "Make an Explorer's Pack at the Tanning Rack, with spider silk from Jasperlode and wool from the Brotherhood. Resources stack 150% higher."
-kind = "craft"
-what = "explorer_pack"
-reward = { fish = 4, meat = 4 }
-
-[[goal]]
-title = "Archers on the wall"
-text = "Build a Watchtower by the bulwark with timber, stone and bronze. Its archers shoot raiders in range."
-kind = "build"
-what = "watchtower"
-reward = { stone = 4, wood = 6 }
-
-[[goal]]
-title = "The classes' trials"
-text = "Learn 16 abilities between you, from shrines, hidden relics and champions. Everyone who fights a champion learns its ability. The champions are Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang and Moonfeather."
-kind = "learn"
-what = "any"
-count = 16
-reward = { silver = 3, pearl = 2 }
-
-[[goal]]
-title = "Break the warband"
-text = "Ring the bell and hold against the whole Horde camp, with Warlord Gorzak at its back. He leaves his axe and helm in storage."
-kind = "raid"
-what = "2"
-reward = { bronze = 6, leather = 4 }
-
-[[goal]]
-title = "Ridgepoint"
-text = "Kill Rak'gash the Herald and open the tower's armory. The Blackrock hold Ridgepoint Tower at Elwynn's eastern edge."
-kind = "kill"
-what = "rakgash"
-reward = { bronze = 4, silver = 2 }
-
-[[goal]]
-title = "The Blackrock Assault"
-text = "Ring the bell and hold against the Blackrock Assault. With the warband broken, they come along the Goldshire road with Rak'gash at their back."
-kind = "raid"
-what = "3"
-reward = { silver = 3, bronze = 4 }
-
-[[goal]]
-title = "The messenger"
-text = "Kill the Defias messenger on the Goldshire road. He walks it to Jerod's Landing and back."
-kind = "kill"
-what = "bh_messenger"
-reward = { linen = 3 }
-
-[[goal]]
-title = "The drop at the dock"
-text = "Open the messenger's drop at Jerod's Landing. It stays shut while he lives."
-kind = "open"
-what = "bh_drop"
-reward = { silver = 1 }
-
-[[goal]]
-title = "The Smugglers' Ford"
-text = "Find the Smugglers' Ford on the river's south bank. The map in the drop points to it."
-kind = "explore"
-what = "smugglers_ford"
-reward = { wool = 3 }
-
-[[goal]]
-title = "The Paymaster"
-text = "Open the strongbox at the ford and kill Paymaster Voss. Kill his hirelings or him, and don't wait."
-kind = "kill"
-what = "bh_paymaster"
-reward = { silver = 2, bronze = 2 }
-
-[[goal]]
-title = "The Nightbane Crossing"
-text = "Kill every worgen at the Nightbane Crossing, on the river's south bank. They stay away for 10 min."
-kind = "clear"
-what = "nightbane"
-reward = { hide = 3, silver = 1 }
-
-[[goal]]
-title = "Fenros"
-text = "Kill Fenros, who wanders between the crossing and the woods west of Eastvale. He gets up again."
-kind = "kill"
-what = "fenros_risen"
-reward = { silver = 2, bronze = 2 }
-
-[[goal]]
-title = "Stitches"
-text = "Kill Stitches, who walks the Goldshire road. He is too big to parry. After half his health every heavy blow leaves bile, so keep moving."
-kind = "kill"
-what = "stitches"
-reward = { silver = 2, leather = 3 }
-
-[[goal]]
-title = "The Brotherhood's Price"
-text = "Ring the bell and hold against the Brotherhood's Price, once the camp has a barracks and an infirmary. Brannick the Mason leads them. He turns slowly, so work round him, and don't hug him."
-kind = "raid"
-what = "4"
-reward = { silver = 3, bronze = 4 }
-
-[[goal]]
-title = "Gruff Swiftbite"
-text = "Kill Gruff Swiftbite, who runs with the Riverpaw at Forest's Edge. He steps out of every heavy attack, so parry him first."
-kind = "kill"
-what = "gruff_swiftbite"
-reward = { silver = 2, hide = 3 }
-
-[[goal]]
-title = "The mason's marks"
-text = "Open Brannick's marked stones at the Mason's Cairn, above Stone Cairn Lake, in his order. The Stormwind stonemason knows it. A wrong stone wakes the Brotherhood."
-kind = "open"
-what = "mason_cache"
-reward = { silver = 2, stone = 4 }
-
-[[goal]]
-title = "Remy Two Times"
-text = "Talk to Remy Two Times at the Lion's Pride in Goldshire, and decide what's done with him."
-kind = "chose"
-what = "remy"
-reward = { silver = 2, bronze = 2 }
-
-[[goal]]
-title = "The Stonefield wagon"
-text = "Load the wagon at the Stonefield farm and hold the farm for 90 sec. Kobolds come from Fargodeep. Fedfennel's shield stops light attacks from the front."
-kind = "open"
-what = "sf_wagon"
-reward = { silver = 2, linen = 3 }
-
-[[goal]]
-title = "The Parley Stones"
-text = "Find the Parley Stones in the woods past Jasperlode. The note in the wagon names them."
-kind = "explore"
-what = "parley_stones"
-reward = { silver = 2, stone = 3 }
-
-[[goal]]
-title = "Marzon the Silent Blade"
-text = "Open the price on the parley table and kill Marzon the Silent Blade. He answers every swing, so let him strike first."
-kind = "kill"
-what = "marzon"
-reward = { silver = 3, bronze = 3 }
-
-[[goal]]
-title = "The seal on the letter"
-text = "Open Marzon's satchel and read whose seal is on it."
-kind = "open"
-what = "marzon_satchel"
-reward = { silver = 3, pearl = 2 }
-
-[[goal]]
-title = "The seal-cutter"
-text = "Walk Aldric Pell from his hiding place on the north road to the Stormwind gate. Lescovar's knives come for him, not you: strike them to draw them off."
-kind = "open"
-what = "pell_satchel"
-reward = { silver = 3, bronze = 2 }
-
-[[goal]]
-title = "The Lion's Knife"
-text = "Kill Crane, the Lion's Knife. Strike him and he answers you, but only once before he turns back for Pell."
-kind = "kill"
-what = "crane"
-reward = { silver = 2, pearl = 1 }
-
-[[goal]]
-title = "The Lion's Bargain"
-text = "Hear Steward Venn of House Lescovar at the camp's gate, and answer him: sell the lord his letter, or keep it."
-kind = "chose"
-what = "letter"
-reward = { silver = 2 }
-
-[[goal]]
-title = "The Lion's Hound"
-text = "Kill Sable, the Lion's Hound, who waits unseen on the roads round the camp. She only strikes your back, so turn with her."
-kind = "kill"
-what = "sable"
-reward = { silver = 3, pearl = 1 }
-
-[[goal]]
-title = "Every corner"
-text = "Find every place in Elwynn."
-kind = "explore"
-what = "any"
-count = 39
-reward = { silver = 4, pearl = 2, silk = 4 }
-
 # --- abilities ------------------------------------------------------------------------------------
 # Past the sword and shield, four keys, each a row of four cards to choose from (the board, N):
 #
@@ -10679,8 +10289,6 @@ respawn = 1800.0
 loot = { silver = 2, hide = 3 }
 text = "Brotherhood silver, paid by the head, and a mason's tally stick. It reads 'Rest at the cairn above the lake. B.'"
 
-# (Its goal, "Gruff Swiftbite", sits with the journal's other goals, just before "Every corner".)
-
 # === end of Stage 6's block ============================================================================
 
 # === Elwynn expansion, round two, Stage 7: The Mason's Marks (docs/elwynn-expansion.md) ===============
@@ -11526,8 +11134,7 @@ text = "The Guard keeps me at the gate until the House sits. You kept the letter
 after = "kill:sable"
 text = "The hound's dead? Then I'll sleep tonight. The House sits within the week, and I'll be standing in it."
 
-# (Its goals, "The seal-cutter" and "The Lion's Knife", sit with the journal's other goals, just
-# before "Every corner". Wyle's, Remy's and Dughan's lines for it stand with their people.)
+# (Wyle's, Remy's and Dughan's lines for it stand with their people.)
 
 # === end of Stage 11's block ===========================================================================
 
@@ -11615,8 +11222,7 @@ link = 0.0
 key = "letter_archer_west"
 after = "chose:letter:keep"
 
-# (Its goal, "The Lion's Bargain", sits with the journal's other goals, just before "Every corner".
-# Wyle's and Pell's lines for it stand with them.)
+# (Wyle's and Pell's lines for it stand with them.)
 
 # === end of Stage 12's block ===========================================================================
 
@@ -11700,8 +11306,7 @@ spots = [[-9752.0, 640.0], [-9764.0, 790.0], [-9705.0, 760.0]]
 rare = true
 after = "chose:letter"
 
-# (Its goal, "The Lion's Hound", sits with the journal's other goals, just before "Every corner". The
-# camp's words on her stand with its people.)
+# (The camp's words on her stand with its people.)
 
 # === end of Stage 13's block ===========================================================================
 
@@ -15327,7 +14932,7 @@ text = "Bones, and a fisherman's things."
 
 # --- Elwynn's places ------------------------------------------------------------------------------
 # Marked on the world map from the start; found by the first hero to walk there, worth a little
-# into the chest, and counted for the journal. `kind` picks the mark (`icon` overrides it).
+# into the chest. `kind` picks the mark (`icon` overrides it).
 
 [[site]]
 key = "camp"

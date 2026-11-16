@@ -695,7 +695,7 @@ impl SurvivalGame {
                 }
             }
             // The add-on's effects line follows on the next flush.
-            Event::Effects { .. } | Event::Goal | Event::Sites => {}
+            Event::Effects { .. } | Event::Sites => {}
             Event::Guard { player, up } => {
                 // The guard's pose, held while the hero stands with it up. Down, a pose the rules
                 // hold of their own (Arrow Recall's arm out) comes back rather than nothing.
@@ -1070,6 +1070,7 @@ impl SurvivalGame {
                     self.letter(c, &kind, &title, &place, &text, &clue, &links);
                 }
             }
+            Event::Talk { player, speaker, text, links } => self.talk(player, speaker, &text, &links),
             Event::StationOpen { player, station } => {
                 if let Some(c) = self.conn_of(player) {
                     if let Some(w) = self.world_mut(c) {
@@ -1376,6 +1377,53 @@ impl SurvivalGame {
             if !links.is_empty() {
                 let more: Vec<String> = links.iter().map(|(cmd, label)| format!("{cmd} ({label})")).collect();
                 self.say_to(c, &format!("Read on: {}", more.join(", ")));
+            }
+        }
+    }
+}
+
+/// How far a camp person's say carries: every hero this near hears it (the one who asked, always).
+const SAY_RANGE: f32 = 25.0;
+
+impl SurvivalGame {
+    /// One of the camp's people speaks to a hero: their line said aloud where they stand (a
+    /// creature's say, "<name> says:", with its speech bubble), heard by every hero within
+    /// [`SAY_RANGE`]; then the answers the hero can give. With an add-on that knows them
+    /// ([`super::ui::SPEECH_ADDON`]) they come as `AN`, links in its chat to click; else a command to type
+    /// for each.
+    pub(crate) fn talk(&self, player: Id, speaker: Id, text: &str, links: &[(String, String)]) {
+        let Some(o) = self.sim.objs.get(&speaker) else { return };
+        let htl_survival::ObjKind::Piece { def } = o.kind else { return };
+        let name = self.sim.content.props[def].name.clone();
+        let at = o.pos;
+        let me = self.conn_of(player);
+        match self.guid_of(speaker) {
+            Some(g) => {
+                let say = packets::monster_say(g, &name, text);
+                for (c, s, w) in self.in_world() {
+                    let near = self.sim.players.get(&w.id).is_some_and(|p| htl_survival::dist2d(p.pos, at) <= SAY_RANGE);
+                    if near || Some(*c) == me {
+                        s.send(say.clone());
+                    }
+                }
+            }
+            // (Not drawn yet: the words in chat all the same.)
+            None => {
+                if let Some(c) = me {
+                    self.say_to(c, &format!("{name} says: {text}"));
+                }
+            }
+        }
+        let Some(c) = me else { return };
+        if links.is_empty() {
+            return;
+        }
+        if self.world_of(c).is_some_and(|w| w.addon && w.addon_v >= super::ui::SPEECH_ADDON) {
+            let list: Vec<String> = links.iter().map(|(cmd, label)| format!("{}~{}", clean(cmd), clean(label))).collect();
+            self.ui_line(c, &format!("AN\t{}\t{}", clean(&name), list.join("^")));
+        } else {
+            for (cmd, label) in links {
+                self.say_to(c, &format!("Type {cmd} for {label}."));
             }
         }
     }

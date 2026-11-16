@@ -152,9 +152,6 @@ fn wren_has_a_word_once_gruff_is_dead_and_the_journal_asks_for_him() {
     assert!(!s.talk_line(wren).unwrap().text.contains("Swiftbite"));
     s.camp.counts.insert("kill:gruff_swiftbite".into(), 1);
     assert!(s.talk_line(wren).unwrap().text.starts_with("Swiftbite's gone."));
-    let g = s.content.goals.iter().find(|g| g.title == "Gruff Swiftbite").unwrap();
-    assert_eq!((g.kind.as_str(), g.what.as_str()), ("kill", "gruff_swiftbite"));
-    assert!(g.text.contains("steps out of every heavy attack"), "the journal names his rule");
 }
 
 // --- Stage 7: the Mason's Marks ----------------------------------------------------------------
@@ -232,10 +229,7 @@ fn the_marks_are_opened_in_the_masons_order_and_only_that_order() {
     s.move_player(h, [3000.0, 3000.0, 0.0], 0.0, Moving::default());
     run(&mut s, 3000.0);
     assert!(["mason_plumb", "mason_trowel", "mason_cache"].iter().all(|k| chest(&s, k).is_none()), "never full again");
-    // Opening the cache is the goal.
-    let g = s.content.goals.iter().find(|g| g.title == "The mason's marks").unwrap();
-    assert_eq!((g.kind.as_str(), g.what.as_str()), ("open", "mason_cache"));
-    assert!(g.text.contains("A wrong stone wakes the Brotherhood."));
+    assert!(s.camp_has("open:mason_cache"));
 }
 
 /// A wrong stone wakes its two hidden footpads on the opener, and they wait again once it fills.
@@ -319,13 +313,11 @@ fn the_stonemasons_words_change_in_order_with_the_cairn() {
 }
 
 #[test]
-fn the_cairn_is_a_place_and_every_corner_counts_it() {
+fn the_cairn_is_a_place() {
     let c = Content::builtin();
     let site = c.sites.iter().find(|s| s.key == "mason_cairn").unwrap();
     assert_eq!((site.kind.as_str(), site.radius, site.at), ("landmark", 30.0, [-8890.0, -840.0]));
     assert!(c.sites.len() >= 37, "the cairn is one of the places");
-    let corner = c.goals.iter().find(|g| g.title == "Every corner").unwrap();
-    assert_eq!(corner.count as usize, c.sites.len());
     // The stones stand inside it.
     for k in ["mason_plumb", "mason_trowel", "mason_cache", "mason_crown", "mason_lion"] {
         let ch = c.chests.iter().find(|ch| ch.key == k).unwrap();
@@ -362,13 +354,14 @@ fn remy_waits_for_the_mason_book_and_offers_two_choices_on_his_page() {
     let (_, id) = person(&s, REMY);
     let h = beside(&mut s, id);
     s.interact(h, None);
-    let said = letters(&s.step(0.0));
+    let said = talks(&s.step(0.0));
     assert_eq!(said.len(), 1);
-    assert!(said[0].2.starts_with("Rosters. Who walks which road, and when."));
-    let links: Vec<&str> = said[0].3.iter().map(|(c, _)| c.as_str()).collect();
+    assert_eq!(said[0].0, id);
+    assert!(said[0].1.starts_with("Rosters. Who walks which road, and when."));
+    let links: Vec<&str> = said[0].2.iter().map(|(c, _)| c.as_str()).collect();
     assert_eq!(links, [".es choose remy:arrest", ".es choose remy:free"]);
-    assert_eq!(said[0].3[0].1, "Arrest Him");
-    assert_eq!(said[0].3[1].1, "Free Him");
+    assert_eq!(said[0].2[0].1, "Arrest Him");
+    assert_eq!(said[0].2[1].1, "Free Him");
 }
 
 #[test]
@@ -473,18 +466,11 @@ fn freed_remy_stays_with_his_word_and_his_stash_opens() {
 }
 
 #[test]
-fn the_choice_counts_for_the_journal_and_a_save_keeps_it() {
+fn the_choice_is_the_camps_and_a_save_keeps_it() {
     let (mut s, h, _) = remy_world();
-    let g = s.content.goals.iter().position(|g| g.title == "Remy Two Times").unwrap();
-    let corner = s.content.goals.iter().position(|g| g.title == "Every corner").unwrap();
-    assert!(g < corner, "ahead of Every corner");
-    assert_eq!((s.content.goals[g].kind.as_str(), s.content.goals[g].what.as_str()), ("chose", "remy"));
-    s.camp.goal = g;
-    s.step_goals();
-    assert_eq!(s.camp.goal, g, "not before the choice");
+    assert!(!s.camp_has("chose:remy"), "not before the choice");
     s.choose(h, "remy:arrest").unwrap();
-    s.step_goals();
-    assert_eq!(s.camp.goal, g + 1, "the choice is the goal");
+    assert!(s.camp_has("chose:remy") && s.camp_has("chose:remy:arrest"));
     // A save keeps the choice: Remy is still gone, the Marshal still stands, the bounty still opens.
     let save = s.save(&BTreeMap::new());
     let mut back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
@@ -530,9 +516,6 @@ fn a_choice_nothing_offers_or_nothing_waits_on_is_refused_by_validate() {
     assert!(format!("{err:#}").contains("not `.es choose <group>:<option>`"), "{err:#}");
     let err = swap(two, "\".es choose remy:free~Free Him\", \".es choose remy:pardon~Pardon\"]").unwrap_err();
     assert!(format!("{err:#}").contains("nothing waits on it"), "{err:#}");
-    // A goal for a group nobody offers.
-    let err = swap("kind = \"chose\"\nwhat = \"remy\"", "kind = \"chose\"\nwhat = \"nobody\"").unwrap_err();
-    assert!(format!("{err:#}").contains("nobody"), "{err:#}");
     // And a prop that goes for a condition that names nothing.
     let err = swap("until = \"chose:remy:arrest\"", "until = \"chose:remy:bogus\"").unwrap_err();
     assert!(format!("{err:#}").contains("bogus"), "{err:#}");
@@ -968,17 +951,6 @@ fn a_hold_and_a_shooter_must_be_made_right_or_validate_refuses_them() {
     assert!(format!("{err:#}").contains("only a friendly creature shoots"), "{err:#}");
 }
 
-#[test]
-fn the_wagon_is_a_goal_and_the_journal_keeps_its_place() {
-    let c = Content::builtin();
-    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
-    assert!(at("The Stonefield wagon") < at("Every corner"), "ahead of Every corner");
-    let g = &c.goals[at("The Stonefield wagon")];
-    assert_eq!((g.kind.as_str(), g.what.as_str()), ("open", "sf_wagon"));
-    assert!(crate::save::ELWYNN_GOALS >= 12, "the wagon is one of the goals the expansion put in");
-    assert_eq!(c.goals[at("Every corner")].count as usize, c.sites.len());
-}
-
 // --- Stage 10: The Parley Stones ---------------------------------------------------------------
 
 /// The world with only the parley table's packs standing (Marzon and the two helpers).
@@ -1218,35 +1190,6 @@ fn the_parley_stones_are_a_place_with_guards_an_envoy_and_a_table() {
     }
     assert_eq!(c.chests.iter().find(|ch| ch.key == "parley_price").unwrap().ambush, ["marzon", "parley_dughan", "parley_remy"]);
     assert_eq!(c.chests.iter().find(|ch| ch.key == "marzon_satchel").unwrap().after, "marzon");
-}
-
-#[test]
-fn the_journal_ends_the_story_with_three_goals_and_every_corner_counts_38_places() {
-    let c = Content::builtin();
-    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
-    let wagon = at("The Stonefield wagon");
-    for (k, (t, kind, what)) in [("The Parley Stones", "explore", "parley_stones"), ("Marzon the Silent Blade", "kill", "marzon"), ("The seal on the letter", "open", "marzon_satchel")].into_iter().enumerate() {
-        assert_eq!(at(t), wagon + 1 + k, "{t} in its place");
-        let g = &c.goals[at(t)];
-        assert_eq!((g.kind.as_str(), g.what.as_str()), (kind, what));
-    }
-    // (Round three's goals follow the seal, before Every corner: `tests_story3`.)
-    assert_eq!(at("The seal-cutter"), wagon + 4);
-    assert!(crate::save::ELWYNN_GOALS >= 15);
-    assert!(c.sites.len() >= 38);
-    assert_eq!(c.goals[at("Every corner")].count as usize, c.sites.len());
-    // Each is done by what the camp does, in order.
-    let mut s = world();
-    s.camp.goal = wagon + 1;
-    s.step_goals();
-    assert_eq!(s.camp.goal, wagon + 1);
-    s.camp.counts.insert("explore:parley_stones".into(), 1);
-    s.camp.counts.insert("open:marzon_satchel".into(), 1);
-    s.step_goals();
-    assert_eq!(s.content.goals[s.camp.goal].title, "Marzon the Silent Blade", "the seal doesn't count before Marzon");
-    s.camp.counts.insert("kill:marzon".into(), 1);
-    s.step_goals();
-    assert_eq!(s.content.goals[s.camp.goal].title, "The seal-cutter");
 }
 
 #[test]

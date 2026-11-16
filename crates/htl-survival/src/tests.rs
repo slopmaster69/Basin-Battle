@@ -2225,32 +2225,21 @@ fn a_shield_bearer_takes_light_blows_on_its_shield_but_not_a_kick() {
 }
 
 #[test]
-fn the_journal_moves_on_as_the_camp_does_each_goal_and_pays_into_the_chest() {
+fn what_the_camp_does_is_counted_and_kept_across_a_save_with_nothing_paid_for_it() {
     let mut s = world();
     let heart = s.content.world.heart;
     let p = hero(&mut s, "Ayla", [heart[0] + 1.0, heart[1], 0.0], 0.0);
-    assert_eq!(s.goal().unwrap().title, "Timber for the camp");
     give(&mut s, p, "wood", 10);
     s.deposit_all(p);
     let ev = run(&mut s, 0.1);
-    assert_eq!(s.camp.goal, 1);
-    assert!(ev.iter().any(|e| matches!(e, Event::Goal)));
+    assert_eq!(s.camp.counts.get("bank:wood"), Some(&10));
+    // No journal: no goal done, no reward, no announcement of one.
     let roast = s.content.item("roast").unwrap();
-    assert_eq!(s.storage.get(&roast), Some(&2), "the reward");
-    assert_eq!(s.goal().unwrap().title, "A fire to cook on");
+    assert_eq!(s.storage.get(&roast), None, "nothing paid for banking");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.starts_with("Done: "))));
     // Kept across a save.
     let save = s.save(&Default::default());
-    assert_eq!(save.goal, 1);
     assert_eq!(save.counts.get("bank:wood"), Some(&10));
-    // Armor worn counts once seen.
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let i = s.content.goals.iter().position(|g| g.kind == "wear").unwrap();
-    s.camp.goal = i;
-    let jerkin = s.content.item("hide_jerkin").unwrap();
-    s.players.get_mut(&p).unwrap().armor.insert("chest".into(), jerkin);
-    run(&mut s, 0.1);
-    assert_eq!(s.camp.goal, i + 1);
 }
 
 
@@ -3082,37 +3071,20 @@ fn killing_every_fighter_of_a_horde_camp_takes_it_for_a_while() {
 }
 
 #[test]
-fn a_save_keeps_its_journal_goal_by_title_and_an_older_one_is_read_through_the_first_journal() {
+fn a_save_from_the_journals_days_loads_with_its_goal_dropped_and_its_progress_kept() {
     let mut s = world();
-    let overseer = s.content.goals.iter().position(|g| g.title == "The Overseer").unwrap();
-    s.camp.goal = overseer;
-    let mut save = s.save(&BTreeMap::new());
-    assert_eq!(save.goal_title.as_deref(), Some("The Overseer"));
-    let back = Survival::load(Content::dev(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-    assert_eq!(back.camp.goal, overseer);
-    // An older save: only the place, 12 in the first journal.
-    save.goal_title = None;
-    save.goal = 12;
-    let back = Survival::load(Content::dev(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-    assert_eq!(back.content.goals[back.camp.goal].title, "The Overseer");
-}
-
-#[test]
-fn a_camp_done_with_its_journal_goes_on_to_steps_added_since() {
-    let mut s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    // Done with the journal as it was before the book's ladder: its steps end where the ladder's begin.
-    let ladder = s.content.goals.iter().position(|g| g.kind == "cleared").expect("the ladder's steps");
-    s.camp.goal = ladder;
-    let mut save = s.save(&BTreeMap::new());
-    save.goal_title = None;
-    // (Read by its place in the journal as it was before the expansion's goals went in ahead of the ladder.)
-    save.goal = ladder - crate::save::ELWYNN_GOALS;
-    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-    assert_eq!(back.camp.goal, ladder, "on to the ladder's first step");
-    // Done with this one: still done.
-    save.goal = s.content.goals.len();
-    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-    assert_eq!(back.camp.goal, back.content.goals.len());
+    s.camp.raids_won = 3;
+    s.count("kill", "overseer", 1);
+    let save = s.save(&BTreeMap::new());
+    // The journal's goal, as saves kept it (by place and by title), put back into the file.
+    let text = crate::save::to_toml(&save).unwrap().replacen("raids_won = 3", "raids_won = 3\ngoal = 20\ngoal_title = \"The Overseer\"", 1);
+    assert!(text.contains("goal_title"), "{text}");
+    let old = crate::save::from_toml(&text).expect("an old save with a goal parses");
+    let back = Survival::load(Content::dev(), Box::new(FlatLand::default()), 1, 1_000_000.0, &old);
+    assert_eq!(back.camp.raids_won, 3);
+    assert!(back.camp_has("kill:overseer"));
+    // Written again, it has no goal.
+    assert!(!crate::save::to_toml(&back.save(&BTreeMap::new())).unwrap().contains("goal"));
 }
 
 #[test]

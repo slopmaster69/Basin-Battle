@@ -87,7 +87,7 @@ impl Survival {
     }
 
     /// Testing: the camp's world started over, as on a new world's first day: the chest emptied,
-    /// the stations gone, the journal at its start, no raid beaten, no place found nor chest
+    /// the stations gone, nothing done, no raid beaten, no place found nor chest
     /// opened, every creature and resource back where it begins. The heroes stay who they are
     /// (each can start over with `reset_hero`), set down at the camp. (The server starts the
     /// Deadmines over with it: [`Survival::reset_below`].)
@@ -123,7 +123,6 @@ impl Survival {
             self.land_from_far(p);
         }
         self.events.push(Event::Storage);
-        self.events.push(Event::Goal);
         self.events.push(Event::Sites);
         self.events.push(Event::Dirty);
         self.announce("The camp started over on a new world's first day.");

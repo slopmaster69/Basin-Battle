@@ -9,7 +9,7 @@
 -- aimed one comes up on its key (the camera over the shoulder, the reticle in the middle), left
 -- mouse casts it (held: charges it), right mouse or its key again calls it off. F uses what's in
 -- front of you, Space jumps, R sheathes, T uses the quick item (G the next), X walks, B the bags, H
--- builds, N the board of abilities, J the journal, V the health bars over heads, Tab locks on (Tab
+-- builds, N the board of abilities, V the health bars over heads, Tab locks on (Tab
 -- again lets go, Ctrl+Tab the next foe), Z frees the mouse. Every key can be changed on the
 -- Controls card (K), mouse buttons and modifiers too, and the mouse speed set there.
 --
@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 72
+local VERSION = 74
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -73,7 +73,6 @@ BINDING_NAME_ES_CYCLE = "Next quick item"
 BINDING_NAME_ES_SHEATHE = "Sheathe / draw weapon"
 BINDING_NAME_ES_BAG = "Open bags"
 BINDING_NAME_ES_TREE = "Open ability board"
-BINDING_NAME_ES_JOURNAL = "Open journal"
 BINDING_NAME_ES_BUILD = "Build"
 BINDING_NAME_ES_ROTATE = "Rotate station while placing"
 BINDING_NAME_ES_MODE = "Free mouse / return to action"
@@ -1118,7 +1117,6 @@ local KEYS = {
   { "B", "ES_BAG" },
   { "H", "ES_BUILD" },
   { "N", "ES_TREE" },
-  { "J", "ES_JOURNAL" },
   -- Tab locks on and, locked, lets go; Ctrl+Tab goes to the next foe.
   { "TAB", "ES_LOCK" },
   { "CTRL-TAB", "ES_NEXT" },
@@ -1147,7 +1145,7 @@ ES.KEYS = KEYS
 
 -- Each key above is bound with Shift too (sprinting), where a Shift binding would take the key
 -- otherwise, and each Ctrl one with Ctrl+Shift; these aren't.
-local NO_SHIFT = { ES_KEYS = 1, ES_MODE = 1, TOGGLECHARACTER0 = 1, TOGGLEWORLDMAP = 1, ES_BAG = 1, ES_TREE = 1, ES_JOURNAL = 1, ES_BUILD = 1, ES_BARS = 1 }
+local NO_SHIFT = { ES_KEYS = 1, ES_MODE = 1, TOGGLECHARACTER0 = 1, TOGGLEWORLDMAP = 1, ES_BAG = 1, ES_TREE = 1, ES_BUILD = 1, ES_BARS = 1 }
 -- Bound with Ctrl too (and Ctrl+Shift), where Ctrl is held for an EX version: the jump, the use
 -- key, the quick item, the walk; the stock client's Ctrl chords there (the sound, the frame rate)
 -- would take the key otherwise.
@@ -3630,30 +3628,6 @@ function ES.infoCacheText() return info.cache:IsShown() and info.cache.text:GetT
 info.mode = Text(info, FONT_BODY, 11, "OUTLINE")
 info.mode:SetPoint("TOPRIGHT", info.cache, "BOTTOMRIGHT", 0, -6)
 info.mode:SetTextColor(0.75, 0.75, 0.75)
--- The camp's journal: the goal it's on, how far along, and what to do.
-info.goal = Text(info, FONT_BODY, 12, "OUTLINE")
-info.goal:SetPoint("TOPRIGHT", info.mode, "BOTTOMRIGHT", 0, -6)
-info.goal:SetJustifyH("RIGHT")
-info.goal:SetTextColor(1, 0.86, 0.5)
-info.goalText = Text(info, FONT_BODY, 10, "OUTLINE")
-info.goalText:SetPoint("TOPRIGHT", info.goal, "BOTTOMRIGHT", 0, -3)
-info.goalText:SetWidth(270)
-info.goalText:SetJustifyH("RIGHT")
-info.goalText:SetTextColor(0.85, 0.85, 0.8)
-
--- GL: the journal's goal: its place, how many, its title, what to do, how far along.
-function ES.GoalLine(f)
-  local n, total, title, text, have, need = tonumber(f[2]) or 0, tonumber(f[3]) or 0, f[4] or "", f[5] or "", tonumber(f[6]) or 0, tonumber(f[7]) or 0
-  if title == "" then
-    info.goal:SetText(total > 0 and "Journal complete" or "")
-    info.goalText:SetText("")
-    return
-  end
-  local progress = need > 1 and string.format(" (%d/%d)", have, need) or ""
-  info.goal:SetText(string.format("Goal %d/%d: %s%s", n, total, title, progress))
-  info.goalText:SetText(ES.Keyed(text))
-end
-
 -- --- a champion's bar, across the top ---------------------------------------------------------
 
 local boss = CreateFrame("Frame", "ElwynnSurvivalBoss", ES.topBars)
@@ -4288,24 +4262,16 @@ function ES.ExploreSound()
 end
 
 function ES.Banner(title, sub)
-  -- A place found or a journal goal done is quiet news, told the way the game tells it: a yellow
-  -- line at the top in its own font, like a quest's progress. No banner, no horn (those are for
-  -- what's coming at you). The server's titles start "Discovered: " and "Done: " (explore.rs,
-  -- journal.rs).
+  -- A place found is quiet news, told the way the game tells it: a yellow line at the top in its
+  -- own font. No banner, no horn (those are for what's coming at you). The server's title starts
+  -- "Discovered: " (explore.rs).
   local t = title or ""
-  if string.find(t, "^Discovered") or string.find(t, "^Done: ") then
-    local line
-    if string.find(t, "^Done: ") then
-      line = string.sub(t, 7) .. " completed."
-    else
-      -- Just the place: how many are found is for the journal, not the moment.
-      line = t
-      ES.ExploreSound()
-    end
+  if string.find(t, "^Discovered") then
+    ES.ExploreSound()
     if UIErrorsFrame then
-      UIErrorsFrame:AddMessage(line, 1.0, 0.82, 0.0)
+      UIErrorsFrame:AddMessage(t, 1.0, 0.82, 0.0)
     else
-      ES.Message(line)
+      ES.Message(t)
     end
     return
   end
@@ -4323,7 +4289,7 @@ end
 
 -- A text's key hints, "(H)", as the keys really are: the server writes the Elwynn keys, and a
 -- key moved on the Controls card is shown where it went.
-ES.HINT_KEYS = { H = "ES_BUILD", B = "ES_BAG", N = "ES_TREE", J = "ES_JOURNAL", F = "ES_USE", T = "ES_EAT",
+ES.HINT_KEYS = { H = "ES_BUILD", B = "ES_BAG", N = "ES_TREE", F = "ES_USE", T = "ES_EAT",
   G = "ES_CYCLE", R = "ES_SHEATHE", K = "ES_KEYS", Z = "ES_MODE", Tab = "ES_LOCK", V = "ES_BARS", X = "TOGGLERUN", Space = "JUMP" }
 function ES.Keyed(text)
   if not text or text == "" or not string.find(text, "(", 1, true) then return text end
@@ -4370,7 +4336,7 @@ function ES.DrawDeath()
   death.sub:SetText(string.format("Respawn in %d sec", math.max(0, math.ceil(left))))
 end
 
--- --- windows: the chest, a station's work, the build menu, the weapon rack, the journal -------------
+-- --- windows: the chest, a station's work, the build menu, the weapon rack ------------------------
 -- One window, in two shapes: a slot grid (the chest) and a list of rows with icons (everything
 -- else). Below either, a detail strip says what the hovered thing is and does; pages when there's
 -- more than fits.
@@ -4672,7 +4638,6 @@ end
 
 local WINDOW_ICONS = {
   chest = "INV_Misc_Bag_08",
-  journal = "INV_Misc_Book_09",
   station = "INV_Hammer_15",
   rack = "INV_Sword_04",
   build = "INV_Misc_Note_01",
@@ -4899,63 +4864,6 @@ function ES.DrawPins()
     end
   end
 end
-
--- --- the journal (GJ: title~state~what to do~reward, state 0 done, 1 now, 2 ahead; J opens it) ---
-
-function ES.JournalLine(f)
-  ES.journal = Items(f[2])
-  if win:IsShown() and win.kind == "journal" then
-    ES.DrawJournal()
-  end
-end
-
-function ES.Journal()
-  if not ES.awake then return end
-  if win:IsShown() and win.kind == "journal" then
-    ES.CloseWindows()
-    ES.SetMode("action")
-    return
-  end
-  -- It opens on the page of the goal it's on.
-  ES.pages.journal = nil
-  local items = ES.journal or {}
-  for i = 1, table.getn(items) do
-    if Split(items[i], "~")[2] == "1" then
-      ES.pages.journal = math.ceil(i / LIST_ROWS)
-    end
-  end
-  ES.DrawJournal()
-end
-
-function ES.DrawJournal()
-  OpenWindow("journal", "The Camp's Journal", "What the camp has done and what comes next. Every goal pays into storage.")
-  local items = ES.journal or {}
-  local first = PageOf("journal", table.getn(items), LIST_ROWS)
-  Rest("Nothing written yet.", "", "")
-  for i = 1, math.min(LIST_ROWS, table.getn(items) - first) do
-    local f = Split(items[first + i], "~")
-    local title, state, text, reward = f[1] or "?", f[2], f[3] or "", f[4] or ""
-    local n = first + i
-    local o = { icon = "INV_Misc_Note_01", plainName = n .. ". " .. title, detail = text }
-    o.sub = reward ~= "" and ("Sent to storage: " .. reward) or ""
-    if state == "0" then
-      o.name = "|cff8fbf7f" .. n .. ". " .. title .. "|r"
-      o.tag = "|cff8fbf7fDone|r"
-      o.lit = false
-    elseif state == "1" then
-      o.name = "|cffffd27f" .. n .. ". " .. title .. "|r"
-      o.tag = "|cffffd27fNow|r"
-      o.icon = "INV_Misc_Book_09"
-      o.chosen = true
-      Rest(o.plainName, text, "")
-    else
-      o.name = "|cffb0aaa0" .. n .. ". " .. title .. "|r"
-      o.lit = false
-    end
-    Row(i, o)
-  end
-end
-ES.redraw.journal = function() ES.DrawJournal() end
 
 -- --- the chest (S: item~name~count~gear~text~icon, gear 1 held, 2 worn) -----------------------------
 
@@ -6273,7 +6181,6 @@ local CONTROLS = {
   { "Autorun", "TOGGLEAUTORUN" },
   { "Open bags", "ES_BAG" },
   { "Open ability board", "ES_TREE" },
-  { "Open journal", "ES_JOURNAL" },
   { "Build", "ES_BUILD" },
   { "Character", "TOGGLECHARACTER0" },
   { "Map", "TOGGLEWORLDMAP" },
@@ -6864,8 +6771,6 @@ function ES.Line(line)
     ES.DrawEffects()
   elseif verb == "EF" then
     ES.EffectsLine(f)
-  elseif verb == "GL" then
-    ES.GoalLine(f)
   elseif verb == "BS" then
     ES.BossLine(f)
   elseif verb == "WN" then
@@ -6875,8 +6780,6 @@ function ES.Line(line)
     if not ES.WeaponGlow(f[3], secs) then ES.Danger(secs) end
   elseif verb == "WG" then
     ES.WeaponGlow(f[2], tonumber(f[3] or ""))
-  elseif verb == "GJ" then
-    ES.JournalLine(f)
   elseif verb == "PM" then
     ES.PinsLine(f)
   elseif verb == "A" then
@@ -7054,7 +6957,10 @@ function ES.Line(line)
   elseif verb == "T" then
     ES.Message(f[2] or "")
   elseif verb == "NT" then
-    if ES.Letter then ES.Letter(f) end
+    -- Words to read go to chat (Words.lua); a wager's page and the board stay pages.
+    if not (ES.Words and ES.Words(f)) and ES.Letter then ES.Letter(f) end
+  elseif verb == "AN" then
+    if ES.Answers then ES.Answers(f) end
   elseif verb == "WT" then
     if ES.WagerLine then ES.WagerLine(f) end
   elseif verb == "DP" then

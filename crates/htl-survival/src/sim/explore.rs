@@ -104,14 +104,13 @@ impl Survival {
     }
 
     /// Whether the camp has come as far as `after` says (`raids:N`, `built:<station>`,
-    /// `goal:N`, `found:<site>`, `kill:<mob>` once the camp has killed one, `open:<chest>` once
-    /// one has been opened); an unknown condition never holds.
+    /// `found:<site>`, `kill:<mob>` once the camp has killed one, `open:<chest>` once one has been
+    /// opened, `chose:<group>`); an unknown condition never holds.
     pub fn camp_has(&self, after: &str) -> bool {
         let (what, arg) = after.split_once(':').unwrap_or((after, ""));
         match what.trim() {
             "start" => true,
             "raids" => arg.trim().parse::<u32>().is_ok_and(|n| self.camp.raids_won >= n),
-            "goal" => arg.trim().parse::<usize>().is_ok_and(|n| self.camp.goal >= n),
             "built" => {
                 let key = arg.trim();
                 self.has_station(key) || self.camp.counts.get(&format!("build:{key}")).is_some_and(|n| *n > 0)
@@ -168,12 +167,12 @@ impl Survival {
         d.talk.iter().rev().find(|t| t.after.as_deref().is_none_or(|a| self.camp_has(a)))
     }
 
-    /// A hero uses one of the camp's people: their words, as a page (talk, no choices).
-    pub(crate) fn talk_to(&mut self, id: Id, def: usize) {
+    /// A hero uses one of the camp's people (`speaker`, of prop `def`): they say their line aloud,
+    /// and the hero is offered its links to answer with.
+    pub(crate) fn talk_to(&mut self, id: Id, def: usize, speaker: Id) {
         let Some(t) = self.talk_line(def).cloned() else { return };
-        let d = &self.content.props[def];
         let links: Vec<(String, String)> = t.links.iter().filter_map(|l| l.split_once('~')).map(|(c, n)| (c.trim().to_string(), n.trim().to_string())).collect();
-        self.events.push(Event::Letter { player: id, kind: "talk".into(), title: d.name.clone(), place: d.subname.clone(), text: t.text, clue: String::new(), links });
+        self.events.push(Event::Talk { player: id, speaker, text: t.text, links });
     }
 
     /// Set out every camp prop the camp has earned and doesn't have yet; with `tell`, the camp

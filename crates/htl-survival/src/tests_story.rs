@@ -41,9 +41,10 @@ pub(crate) fn beside(s: &mut Survival, id: Id) -> Id {
     hero
 }
 
-pub(crate) fn letters(ev: &[Event]) -> Vec<(String, String, String, Vec<(String, String)>)> {
+/// What the camp's people said: who (their prop's object), their words and the answers offered.
+pub(crate) fn talks(ev: &[Event]) -> Vec<(Id, String, Vec<(String, String)>)> {
     ev.iter().filter_map(|e| match e {
-        Event::Letter { kind, title, text, links, .. } => Some((kind.clone(), title.clone(), text.clone(), links.clone())),
+        Event::Talk { speaker, text, links, .. } => Some((*speaker, text.clone(), links.clone())),
         _ => None,
     }).collect()
 }
@@ -59,11 +60,12 @@ fn a_person_with_lines_is_usable_and_prompts_talk_to_and_one_without_isnt() {
     let hero = beside(&mut s, id);
     assert_eq!(s.use_prompt(hero).map(|(o, n, v)| (o, n, v)), Some((id, "Quartermaster Hale".to_string(), "Talk to")));
     s.interact(hero, None);
-    let said = letters(&s.step(0.0));
-    assert_eq!(said.len(), 1, "one page");
-    assert_eq!(said[0].0, "talk");
-    assert_eq!(said[0].1, "Quartermaster Hale");
-    assert!(said[0].2.contains("Keep the storage stocked"));
+    let ev = s.step(0.0);
+    let said = talks(&ev);
+    assert_eq!(said.len(), 1, "one line said");
+    assert_eq!(said[0].0, id, "by Hale, where he stands");
+    assert!(said[0].1.contains("Keep the storage stocked"));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Letter { .. })), "no page");
     // The same person with nothing to say isn't usable, and the key finds nothing.
     s.content.props[def].talk.clear();
     assert!(!s.object(id).unwrap().usable);
@@ -146,7 +148,7 @@ fn every_name_the_story_points_at_is_real() {
         let (kind, arg) = cond.split_once(':').unwrap_or((cond, ""));
         let ok = match kind {
             "start" => true,
-            "raids" | "goal" => arg.parse::<u32>().is_ok(),
+            "raids" => arg.parse::<u32>().is_ok(),
             "built" => station(arg),
             "found" => c.sites.iter().any(|s| s.key == arg),
             "kill" => c.mob(arg).is_some(),
@@ -195,19 +197,6 @@ fn every_name_the_story_points_at_is_real() {
         if !p.camp.is_empty() {
             assert!(c.camps.iter().any(|x| x.key == p.camp), "pack {} camp {}", p.key, p.camp);
         }
-    }
-    for g in &c.goals {
-        let ok = match g.kind.as_str() {
-            "kill" => c.mob(&g.what).is_some(),
-            "open" => g.what == "any" || c.chests.iter().any(|x| x.key == g.what),
-            "explore" => g.what == "any" || c.sites.iter().any(|s| s.key == g.what),
-            "build" => station(&g.what),
-            "clear" => c.camps.iter().any(|x| x.key == g.what),
-            "raid" => g.what.parse::<u32>().is_ok(),
-            "chose" => c.choices().iter().any(|(grp, _)| *grp == g.what),
-            _ => true,
-        };
-        assert!(ok, "goal {}: {} {}", g.title, g.kind, g.what);
     }
 }
 
@@ -412,65 +401,6 @@ fn at_35_percent_the_paymaster_runs_to_his_boat_and_fights_again_once_a_hero_is_
     assert!(said.iter().any(|t| t.contains("boat leaves without me")), "{said:?}");
     assert_eq!(s.mobs[&voss].home, last, "the boat is his post now");
     assert_eq!(s.mobs[&voss].state.foe(), Some(Foe::Hero(h)));
-}
-
-#[test]
-fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner() {
-    let mut s = bh_world();
-    let at = |s: &Survival, t: &str| s.content.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
-    let first = at(&s, "The messenger");
-    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "The mason's marks", "Remy Two Times", "The Stonefield wagon", "The Parley Stones", "Marzon the Silent Blade", "The seal on the letter", "The seal-cutter", "The Lion's Knife", "The Lion's Bargain", "The Lion's Hound", "Every corner"];
-    for (k, t) in titles.iter().enumerate() {
-        assert_eq!(at(&s, t), first + k, "{t} in its place");
-    }
-    // Every corner asks for every place there is.
-    let corner = &s.content.goals[at(&s, "Every corner")];
-    assert_eq!(corner.count as usize, s.content.sites.len(), "Every corner counts the sites");
-    // Each is done in turn, by what the camp does.
-    s.camp.goal = first;
-    s.step_goals();
-    assert_eq!(s.camp.goal, first, "nothing yet");
-    s.camp.counts.insert("open:bh_drop".into(), 1);
-    s.camp.counts.insert("kill:bh_paymaster".into(), 1);
-    s.step_goals();
-    assert_eq!(s.camp.goal, first, "the later ones don't count before the first");
-    s.camp.counts.insert("kill:bh_messenger".into(), 1);
-    s.step_goals();
-    assert_eq!(s.camp.goal, first + 2, "the messenger and the drop are done, the ford not");
-    s.camp.counts.insert("explore:smugglers_ford".into(), 1);
-    s.step_goals();
-    assert_eq!(s.content.goals[s.camp.goal].title, "The Nightbane Crossing", "then the paymaster, and on");
-}
-
-/// An old save's goal still points at the goal it did before, or is carried over the new ones.
-#[test]
-fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_every_corner() {
-    let s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "The mason's marks", "Remy Two Times", "The Stonefield wagon", "The Parley Stones", "Marzon the Silent Blade", "The seal on the letter", "The seal-cutter", "The Lion's Knife", "The Lion's Bargain", "The Lion's Hound"].into_iter().collect();
-    assert_eq!(new.len(), crate::save::ELWYNN_GOALS, "the goals the expansion has put in, counted");
-    let goals = &s.content.goals;
-    // The journal as it was before: the same goals without the new ones.
-    let before: Vec<&str> = goals.iter().map(|g| g.title.as_str()).filter(|t| !new.contains(t)).collect();
-    assert_eq!(before[crate::save::ELWYNN_GOALS_AT], "Every corner", "it was the goal at the place the new ones went in");
-    for (old_index, title) in before.iter().enumerate() {
-        let mut save = s.save(&BTreeMap::new());
-        save.goal = old_index;
-        save.goal_title = Some((*title).to_string());
-        let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-        assert_eq!(back.content.goals[back.camp.goal].title, *title, "goal {old_index} still the same goal");
-    }
-    // A save from before titles were kept, done with the journal as it stood then: still done.
-    let mut save = s.save(&BTreeMap::new());
-    save.goal_title = None;
-    save.goal = before.len();
-    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-    assert_eq!(back.camp.goal, goals.len(), "done stays done, no goal done again");
-    // One done up to where the dungeons' steps were added: on at the first of them, as before.
-    let ladder_before = before.iter().position(|t| goals.iter().find(|g| g.title == *t).is_some_and(|g| g.kind == "cleared")).unwrap();
-    save.goal = ladder_before;
-    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
-    assert_eq!(back.content.goals[back.camp.goal].kind, "cleared");
-    assert_eq!(back.content.goals[back.camp.goal].title, before[ladder_before]);
 }
 
 // --- Stage 3: Nightbane Crossing ---------------------------------------------------------------
@@ -767,9 +697,6 @@ fn the_fifth_raid_is_the_brotherhoods_price_and_the_sixth_comes_back_harder() {
     assert_eq!(again.title, "The Brotherhood's Price (2)");
     let more: BTreeMap<String, usize> = want.iter().map(|(k, n)| (k.clone(), n + 1)).collect();
     assert_eq!(counts(&again), more);
-    // The journal asks for it by its place in the list.
-    let g = c.goals.iter().find(|g| g.title == "The Brotherhood's Price").unwrap();
-    assert_eq!((g.kind.as_str(), g.what.as_str()), ("raid", "4"));
 }
 
 fn brannick_bare() -> (Survival, Id, Id) {

@@ -1092,12 +1092,8 @@ fn a_champion_called_up_shows_its_bar() {
     let c = htl_survival::Content::builtin();
     let hp = (c.mobs[c.mob("warlord").unwrap()].health as f32 * c.combat.foe_health).round() as u32;
     assert!(bs.starts_with(&format!("BS\tWarlord Gorzak\t{hp}\t{hp}\t0")), "{bs}");
-    // The whole journal came too: every goal, the first the one it's on.
-    let gj = addon_lines(&a, "ES").into_iter().rfind(|l| l.starts_with("GJ\t")).expect("the journal line");
-    let goals: Vec<&str> = gj[3..].split('^').collect();
-    assert_eq!(goals.len(), htl_survival::Content::builtin().goals.len());
-    assert_eq!(goals[0].split('~').nth(1), Some("1"), "{}", goals[0]);
-    assert_eq!(goals[1].split('~').nth(1), Some("2"));
+    // No journal: no goal line, no list of them.
+    assert!(!addon_lines(&a, "ES").iter().any(|l| l.starts_with("GL\t") || l.starts_with("GJ\t")), "no journal lines");
 }
 
 #[test]
@@ -1134,11 +1130,6 @@ fn the_book_takes_a_hero_down_to_the_deadmines_and_a_lamp_brings_them_home() {
     let _ = enter(&mut a);
     a.chat(".es hello 5 ac4");
     a.drain(0.6);
-    // The first goal done at camp (the timber banked): the journal's on its second.
-    a.chat(".es bank");
-    a.drain(1.0);
-    let goal_no = |a: &Client| addon_lines(a, "ES").into_iter().rev().find(|l| l.starts_with("GL\t")).map(|l| l.split('\t').nth(1).unwrap_or("").to_string());
-    assert_eq!(goal_no(&a).as_deref(), Some("2"), "on the second goal at camp");
     let d = htl_survival::Content::builtin().dungeon.unwrap();
     stand(&mut a, [d.book[0], d.book[1], 0.0], 0.0);
     // Shut until the camp holds a raid (debug opens it).
@@ -1179,8 +1170,6 @@ fn the_book_takes_a_hero_down_to_the_deadmines_and_a_lamp_brings_them_home() {
         addon_lines(&a, "ES").iter().any(|l| l == "WR\tbelow"),
         "the add-on knows it's below"
     );
-    // Below, the same journal: the camp's goal, not the first.
-    assert_eq!(goal_no(&a).as_deref(), Some("2"), "the camp's goal below too");
     // The lamp where they stand: lit, and its window.
     let lamp = d.lamps[0].at;
     stand(&mut a, lamp, 0.0);
@@ -2096,4 +2085,43 @@ fn the_weather_reaches_every_hero_and_holds_for_filming() {
     assert!(b.until(3.0, |c| weathers(c).last().is_some_and(|w| *w == (1, 0.25, 0, false))), "{:?}", weathers(&b));
     a.chat(".es weather auto");
     assert!(b.until(3.0, |c| weathers(c).last().is_some_and(|w| w.0 == 0)), "{:?}", weathers(&b));
+}
+
+#[test]
+fn a_camp_person_speaks_in_the_world_and_their_answers_come_as_links() {
+    let mut c = content();
+    // Quartermaster Hale beside where a hero comes in, standing from the start, with a link to offer.
+    let spawn = c.world.spawn;
+    let hale = c.props.iter().position(|p| p.npc && p.name == "Quartermaster Hale").expect("Hale");
+    c.props[hale].after = None;
+    c.props[hale].at = [spawn[0] + 4.0, spawn[1]];
+    c.props[hale].z = None;
+    c.props[hale].talk.truncate(1);
+    c.props[hale].talk[0].after = None;
+    c.props[hale].talk[0].text = "Keep the storage stocked.".into();
+    c.props[hale].talk[0].links = vec![".es lore deadmines~The Deadmines".into()];
+    let server = start_content(None, false, c);
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut a);
+    a.chat(".es hello 74 ac4");
+    a.drain(0.6);
+    stand(&mut a, [spawn[0] + 3.0, spawn[1], 0.0], 0.0);
+    a.drain(0.3);
+    a.seen.clear();
+    a.chat(".es e");
+    // His words: his own say (a creature's, with his name), not a page.
+    let said = a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.chat_type == 0x0B && m.text == "Keep the storage stocked."));
+    let Some(ServerPacket::MessageChat(m)) = said else { panic!("Hale says his line: {:?}", addon_lines(&a, "ES")) };
+    assert_eq!(m.sender_name.as_deref(), Some("Quartermaster Hale"));
+    assert_ne!(m.sender_guid, 0, "from where he stands");
+    a.drain(0.3);
+    let lines = addon_lines(&a, "ES");
+    assert!(lines.iter().any(|l| l == "AN\tQuartermaster Hale\t.es lore deadmines~The Deadmines"), "{lines:?}");
+    assert!(!lines.iter().any(|l| l.starts_with("NT\t")), "no page: {lines:?}");
+    // An older add-on is told the answer as a command to type.
+    a.chat(".es hello 73 ac4");
+    a.drain(0.6);
+    a.seen.clear();
+    a.chat(".es e");
+    assert!(a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "Type .es lore deadmines for The Deadmines.")).is_some(), "typed");
 }

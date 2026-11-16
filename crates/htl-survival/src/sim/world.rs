@@ -490,7 +490,7 @@ impl Survival {
             ObjKind::Chest { def, spent: false } => self.use_chest(id, def, t),
             ObjKind::Chest { .. } => {}
             ObjKind::Loot { item, n } => self.take_loot(id, item, n, t),
-            ObjKind::Piece { def } => self.talk_to(id, def),
+            ObjKind::Piece { def } => self.talk_to(id, def, t),
             ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } => {}
         }
     }
@@ -1497,7 +1497,7 @@ impl Survival {
         self.objs.values().any(|o| matches!(o.kind, ObjKind::Station { def, damaged: false, .. } if self.station_does(def, key)))
     }
 
-    /// One more towards a goal's count (`bank:wood`, `craft:roast`, `kill:kobold`...).
+    /// One more of what the camp has done (`bank:wood`, `craft:roast`, `kill:kobold`...).
     pub(crate) fn count(&mut self, what: &str, key: &str, n: u32) {
         *self.camp.counts.entry(format!("{what}:{key}")).or_default() += n;
     }

@@ -27,14 +27,10 @@ pub struct WorldSave {
     pub raid: Option<RaidSave>,
     #[serde(default)]
     pub players: BTreeMap<String, PlayerSave>,
-    /// How far the camp has come: raids beaten, the journal's goal, what's been done.
+    /// How far the camp has come: raids beaten, what's been done. (A save from before the
+    /// journal was taken out also has `goal` and `goal_title`: they are read past and dropped.)
     #[serde(default)]
     pub raids_won: u32,
-    #[serde(default)]
-    pub goal: usize,
-    /// The goal by its title (so goals added to the journal later don't move it).
-    #[serde(default)]
-    pub goal_title: Option<String>,
     #[serde(default)]
     pub counts: BTreeMap<String, u32>,
     /// The world below: what the group has done there.
@@ -74,36 +70,6 @@ pub struct BelowHeroSave {
     #[serde(default)]
     pub flasks: u32,
 }
-
-/// The journal as it was when saves held only the goal's place in it: an older save's place is
-/// read through this.
-const FIRST_JOURNAL: [&str; 17] = [
-    "Timber for the camp",
-    "A fire to cook on",
-    "Provisions",
-    "Copper from Fargodeep",
-    "An anvil",
-    "Thin the Warsong",
-    "Hold the camp",
-    "A rack for hides",
-    "Armor of hide",
-    "A herbalist's cauldron",
-    "Salves for the road",
-    "Drive off the Darkspear",
-    "The Overseer",
-    "Bronze",
-    "A wall",
-    "A workbench",
-    "Break the warband",
-];
-
-/// Where the Elwynn expansion's goals (docs/elwynn-expansion.md) were put into the journal: just
-/// before "Every corner", which was the 34th goal (index 33). A save keeps its goal's title, so it
-/// finds its goal wherever it moved; only a save with no title (a finished journal, read by its
-/// place) needs the goals past this point carried over the new ones. Raise `ELWYNN_GOALS` by the
-/// goals each stage adds there.
-pub(crate) const ELWYNN_GOALS_AT: usize = 33;
-pub(crate) const ELWYNN_GOALS: usize = 19;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StationSave {
@@ -419,8 +385,6 @@ impl Survival {
             storage: self.storage.iter().map(|(i, n)| (key(i), *n)).collect(),
             players,
             raids_won: self.camp.raids_won,
-            goal: self.camp.goal,
-            goal_title: self.content.goals.get(self.camp.goal).map(|g| g.title.clone()),
             counts: self.camp.counts.clone(),
             found: self.camp.found.iter().cloned().collect(),
             opened: self.camp.opened.clone(),
@@ -548,25 +512,8 @@ impl Survival {
             s.raid.suspended = true;
             s.raid.won_before = r.won_before;
         }
-        // The goal it was on, by title (an older save: by its place in the first journal).
-        let title = save.goal_title.clone().or_else(|| FIRST_JOURNAL.get(save.goal).map(|t| t.to_string()));
-        let goal = match title {
-            Some(t) => s.content.goals.iter().position(|g| g.title == t).unwrap_or(save.goal),
-            // Done with a journal that's grown since (steps added at its end, as the book's ladder
-            // was): on at the first of the new ones. (Past the first journal, a save has a title
-            // unless it was done, so its place is that journal's end.)
-            // (A place past where the expansion's goals went has moved down by their number.)
-            None if save.goal > FIRST_JOURNAL.len() && save.goal < s.content.goals.len() => {
-                let moved = if save.goal >= ELWYNN_GOALS_AT { ELWYNN_GOALS } else { 0 };
-                (save.goal + moved).min(s.content.goals.len())
-            }
-            // Past the end of the first journal: done with it, so at the end of this one.
-            None if save.goal >= FIRST_JOURNAL.len() => s.content.goals.len(),
-            None => save.goal,
-        };
         s.camp = Camp {
             raids_won: save.raids_won,
-            goal,
             counts: save.counts.clone(),
             found: save.found.iter().cloned().collect(),
             opened: save.opened.clone(),
@@ -644,7 +591,6 @@ impl Survival {
             .max(save.caches.iter().map(|x| x.uid + 1).max().unwrap_or(1));
         s.camp = Camp {
             raids_won: 0,
-            goal: 0,
             counts: save.counts.clone(),
             ..Camp::default()
         };

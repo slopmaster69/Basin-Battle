@@ -27,8 +27,8 @@ pub use building::StationActions;
 pub(crate) mod combat;
 pub mod dungeon;
 pub mod duel;
-mod journal;
 pub mod meter;
+pub mod melee;
 pub mod mobs;
 pub(crate) mod moves;
 pub(crate) mod warlord;
@@ -313,8 +313,6 @@ pub enum Event {
     Lock { player: Id, target: Option<Id> },
     /// A hero's lasting effects changed (one began or ran out).
     Effects { player: Id },
-    /// The journal moved on: a goal done.
-    Goal,
     /// The camp's places found or chests opened changed: the world map's marks again.
     Sites,
     /// The dodge's dash (`roll`: a dodge, which tumbles), or a blow throwing a hero back.
@@ -360,12 +358,16 @@ pub enum Event {
     Announce { text: String },
     /// A big banner for everyone (or one hero).
     Banner { player: Option<Id>, title: String, sub: String },
-    /// A page for one hero to read at leisure (a note, a secret found, the book's record of a
-    /// dungeon): stays up till closed. `kind` is note, secret or lore; `text`'s paragraphs are
-    /// split by blank lines; `links` are (command, label) to read on.
     /// A wager won (in time or not), for the camp and the Bookmaker's Board.
     WagerDone(wager::WagerRun),
+    /// Words for one hero to read where they stand, told in chat (no page): a note, a secret
+    /// found, the book's record of a dungeon, a run's tally. `kind` is note, secret, lore or run;
+    /// `text`'s lines are split by newlines; `links` are (command, label) to read on.
     Letter { player: Id, kind: String, title: String, place: String, text: String, clue: String, links: Vec<(String, String)> },
+    /// One of the camp's people (`speaker`, their prop) speaks to `player`: `text` said aloud
+    /// where they stand, and `links`, (command, label), the answers the hero can give (a choice,
+    /// a page of the book to read).
+    Talk { player: Id, speaker: Id, text: String, links: Vec<(String, String)> },
     /// A blow coming at a hero that no guard stops (dodge it): warned for its wind-up.
     /// A blow no guard stops on its way to `player` for `secs`; `from` the creature winding it up
     /// (its weapon goes red), none for a hazard or a spell's ground.
@@ -390,7 +392,7 @@ pub enum Event {
         player: Id,
         to: Option<String>,
     },
-    /// Done below and counted at camp too: the journal's counts, and trophies for the chest.
+    /// Done below and counted at camp too: the camp's counts, and trophies for the chest.
     ToCamp {
         counts: Vec<(String, u32)>,
         items: BTreeMap<usize, u32>,
@@ -847,6 +849,8 @@ pub struct Player {
     /// The light chain: the next blow's place, if an attack comes by then.
     pub combo_next: u8,
     pub combo_until: f32,
+    /// Their melee this fight, for the host log (`sim::melee`).
+    pub melee: melee::MeleeTally,
     /// What the weapon in hand has built up in them (`weapon_fx`).
     pub fx: weapon_fx::HeroFx,
     /// Their round trip to the server (seconds), for the allowances for lag.
@@ -929,12 +933,12 @@ impl HeroLook {
     }
 }
 
-/// How far the camp has come, kept in the save: raids beaten, the journal's goal and what's been
-/// done towards goals (`bank:wood`, `craft:roast`, `kill:kobold`, `build:smithy`...).
+/// How far the camp has come, kept in the save: raids beaten and what's been done
+/// (`bank:wood`, `craft:roast`, `kill:kobold`, `build:smithy`...), which the world's `after`
+/// conditions read.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Camp {
     pub raids_won: u32,
-    pub goal: usize,
     pub counts: BTreeMap<String, u32>,
     /// Places found (`[[site]]` keys) and chests opened (each with when it's full again, unix
     /// seconds; never for one that's once a world).
@@ -1277,7 +1281,7 @@ pub struct Survival {
     pub raid: raid::Raid,
     /// The Proving Ring's run, if one's on.
     pub arena: arena::Arena,
-    /// How far the camp has come: raids beaten, the journal, what's been done.
+    /// How far the camp has come: raids beaten, what's been done.
     pub camp: Camp,
     /// Packs: who's in each, and when each dead member comes back.
     pub(crate) respawns: Vec<(usize, Vec3, Option<usize>, f32)>,
@@ -1524,7 +1528,6 @@ impl Survival {
             self.step_arena(dt);
             self.step_explore();
             self.step_mills();
-            self.step_goals();
             self.step_weekly_chest();
         }
         self.record_trails();
@@ -1725,6 +1728,7 @@ impl Survival {
             sent_back: BACK_SPEED,
             combo_next: 0,
             combo_until: -100.0,
+            melee: Default::default(),
             fx: Default::default(),
             rtt: 0.0,
             local_moves: false,
@@ -1782,6 +1786,7 @@ impl Survival {
     /// eaten, a gather not finished); where they stand and what they carry is kept.
     pub fn leave(&mut self, id: Id) -> Option<crate::save::PlayerSave> {
         self.cancel_preview(id);
+        self.melee_flush(id);
         // Their heat and chill on foes go with them (only their own bolts ever cleared them).
         self.staff_marks.retain(|m| m.owner != id);
         let p = self.players.get_mut(&id)?;

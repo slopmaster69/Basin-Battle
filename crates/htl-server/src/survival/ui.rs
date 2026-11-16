@@ -4,7 +4,6 @@
 //! Lines to the add-on:
 //! - `V\t<version>`: the server answers the add-on's hello (the add-on wakes only then).
 //! - `EF\t<name~seconds left~kind>^...`: what used items are still doing for the hero.
-//! - `GL\t<place>\t<goals>\t<title>\t<what to do>\t<have>\t<need>`: the camp journal's goal.
 //! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>\t<place unfound>\t<its yd>\t<its bearing>\t<north>\t<shield>\t<overhealth>\t<heal ahead>` (what the hero's shields have left to soak, and their health over the most: the health bar's white and pale-red ends; the healing still to come from meals, salves and mending, a ghost of the health past it)
 //! - `A\t<action>\t<seconds in>\t<seconds long>`: what the hero is doing, for the action bar.
 //! - `S\t<item~name~count~gear>^...`: the camp chest, while its window is open.
@@ -61,10 +60,13 @@
 //!   the other lit lamps, the quartermaster's wares (a flask among them while there's room for
 //!   one), the dungeon's currency the hero carries and its name, and the pieces of the dungeon's
 //!   gear the quartermaster can hone a tier further (to `tier`).
-//! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: a page to read and keep
-//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board, a
-//!   run's tally as a hero leaves it: kind `run`); `{n}`
-//!   breaks a line.
+//! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: words to read. A
+//!   note, a secret found, the book's record of a dungeon and a run's tally as a hero leaves it
+//!   (kinds `note`, `secret`, `lore`, `run`) are told in chat, the links clickable there (add-on
+//!   74 on; an older one opens a page); a wager's page and the board (`wager`, `board`) are a page
+//!   kept up. `{n}` breaks a line.
+//! - `AN\t<who>\t<command~label^...>`: the answers to what one of the camp's people just said
+//!   (their words come as their own say, `CHAT_MSG_MONSTER_SAY`): links in chat to click.
 //! - `WT\t<dungeon>\t<level>\t<elapsed>\t<limit>\t<falls>\t<state>\t<terms>\t<name~down^...>\t<felled~needed~total>`:
 //!   a wager's clock below (state `wait`, `run`, `won` or `over`; the bosses it must beat, and its
 //!   count of foes), then `\t<ready~heroes~count secs>` before the clock (empty after), then
@@ -559,7 +561,15 @@ pub(crate) const VERSION: u32 = 2;
 /// 72: a Rogue's afterimage (`AI`, on a client of the thirty-second round: patch 0103), and its
 /// own blows' trails a hand each. An older add-on ignores the line and draws both blades on the
 /// blows it guesses.
-pub(crate) const ADDON_NEWEST: u32 = 72;
+/// 73: no journal: the goal card at the top right, the journal window and its key (J) are gone,
+/// and the server sends no `GL` or `GJ`. An older add-on just never fills its goal card.
+/// 74: no parchment pages for words: a person's line is their own say in the world and their
+/// answers come as `AN`, links in chat; a note, a secret, the book's record and a run's tally
+/// (`NT` of those kinds) are told in chat. An older add-on is told the answers as commands to
+/// type, and still opens those pages.
+pub(crate) const ADDON_NEWEST: u32 = 74;
+/// The first add-on that shows a person's answers (`AN`) as links in chat.
+pub(crate) const SPEECH_ADDON: u32 = 74;
 /// The first add-on that lays a column's third choice on the board.
 pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
@@ -878,47 +888,6 @@ impl SurvivalGame {
         ))
     }
 
-    /// The journal's goal: `GL\t<place>\t<goals>\t<title>\t<what to do>\t<have>\t<need>`
-    /// (the title empty once they're all done).
-    fn goal_line(&self) -> String {
-        let total = self.sim.content.goals.len();
-        match self.sim.goal() {
-            Some(g) => {
-                let (mut have, mut need) = self.sim.goal_progress(g);
-                // A camp to take: how many of its fighters are down, of all of them, as it goes.
-                if g.kind == "clear" && have < need {
-                    if let Some((left, all)) = self.sim.camp_fighters(&g.what) {
-                        (have, need) = (all - left, all);
-                    }
-                }
-                format!("GL\t{}\t{total}\t{}\t{}\t{have}\t{need}", self.sim.camp.goal + 1, clean(&g.title), clean(&g.text))
-            }
-            None => format!("GL\t{}\t{total}\t\t\t0\t0", total + 1),
-        }
-    }
-
-    /// The whole journal: `GJ\t<title~state~what to do~reward>^...`, state 0 done, 1 the one
-    /// it's on, 2 still ahead.
-    fn journal_line(&self) -> String {
-        let at = self.sim.camp.goal;
-        let list: Vec<String> = self
-            .sim
-            .content
-            .goals
-            .iter()
-            .enumerate()
-            .map(|(k, g)| {
-                let state = match k.cmp(&at) {
-                    std::cmp::Ordering::Less => 0,
-                    std::cmp::Ordering::Equal => 1,
-                    std::cmp::Ordering::Greater => 2,
-                };
-                format!("{}~{state}~{}~{}", clean(&g.title), clean(&g.text), clean(&self.sim.cost_text(&g.reward)))
-            })
-            .collect();
-        format!("GJ\t{}", list.join("^"))
-    }
-
     /// Elwynn's places for the world map: `PM\t<found>~<places>~<chests opened>~<chests>~<secrets
     /// found>~<secrets>\t<key~x~y~kind~found~name~what's there~icon>^...`.
     fn pins_line(&self) -> String {
@@ -1043,8 +1012,6 @@ impl SurvivalGame {
     pub(crate) fn ui_flush(&mut self) {
         /// The HUD lines that don't depend on the hero.
         struct SharedLines {
-            goal: String,
-            journal: String,
             wager: Option<String>,
             pins: Option<String>,
         }
@@ -1066,13 +1033,11 @@ impl SurvivalGame {
                 }
             }
         }
-        // The lines that are the same for every hero (the goal, the journal, the map's places, the
-        // wager) are built once a flush, not once a hero.
+        // The lines that are the same for every hero (the map's places, the wager) are built once
+        // a flush, not once a hero.
         let shared = if hud_due && !conns.is_empty() {
             let (below, siege) = (self.realm.below, self.realm.siege);
             Some(SharedLines {
-                goal: self.goal_line(),
-                journal: self.journal_line(),
                 wager: below.then(|| self.wager_line()),
                 pins: (!below && !siege).then(|| self.pins_line()),
             })
@@ -1105,8 +1070,6 @@ impl SurvivalGame {
                     self.ui_line_changed(conn, "EF", ef);
                 }
                 let shared = shared.as_ref().expect("built when the HUD is due");
-                self.ui_line_changed_shared(conn, "GL", &shared.goal);
-                self.ui_line_changed_shared(conn, "GJ", &shared.journal);
                 if let Some(wt) = &shared.wager {
                     self.ui_line_changed_shared(conn, "WT", wt);
                 }
@@ -2881,6 +2844,7 @@ mod board_tests {
             assert_eq!((c[3].as_str(), c[22].as_str()), ("rogue", "3"), "{k}: the Rogue's third choice");
         }
         assert!(super::THIRD_CHOICE_ADDON <= super::ADDON_NEWEST);
+        assert!(super::SPEECH_ADDON <= super::ADDON_NEWEST);
     }
 }
 

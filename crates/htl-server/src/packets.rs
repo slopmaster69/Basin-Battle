@@ -638,14 +638,25 @@ pub fn chat(kind: u8, language: u32, sender: u64, text: &str) -> Packet {
     Packet::new(op::SMSG_MESSAGECHAT, b)
 }
 
+pub const CHAT_MONSTER_SAY: u8 = 0x0B;
 pub const CHAT_MONSTER_YELL: u8 = 0x0C;
 
 /// A creature's yell (`CHAT_MSG_MONSTER_YELL`): the client prints "<name> yells: <text>" in the
 /// yell colour and raises a speech bubble over `sender`. The shape is `BuildChatPacket`'s monster
 /// branch: the sender's guid, its name, the addressee's guid (0: everyone), then the text.
 pub fn monster_yell(sender: u64, name: &str, text: &str) -> Packet {
+    monster_chat(CHAT_MONSTER_YELL, sender, name, text)
+}
+
+/// A creature's say (`CHAT_MSG_MONSTER_SAY`): "<name> says: <text>" in the say colour, with a
+/// speech bubble over `sender`; the same shape as the yell.
+pub fn monster_say(sender: u64, name: &str, text: &str) -> Packet {
+    monster_chat(CHAT_MONSTER_SAY, sender, name, text)
+}
+
+fn monster_chat(kind: u8, sender: u64, name: &str, text: &str) -> Packet {
     let mut b = Body::new();
-    b.u8(CHAT_MONSTER_YELL)
+    b.u8(kind)
         .u32(LANG_UNIVERSAL)
         .u64(sender)
         .len_str(name)
@@ -1153,6 +1164,10 @@ mod clock_tests {
         let text_len = u32::from_le_bytes(b[at + 8..at + 12].try_into().unwrap()) as usize;
         assert_eq!(&b[at + 12..at + 12 + text_len], b"Mine now.\0");
         assert_eq!(b.len(), at + 12 + text_len + 1, "then the chat tag");
+        // A say is the same shape, its own type.
+        let s = monster_say(0xF130_0000_0000_0042, "Rhahk'Zor", "Mine now.");
+        assert_eq!(s.body[0], CHAT_MONSTER_SAY);
+        assert_eq!(s.body[1..], b[1..]);
     }
 
     #[test]

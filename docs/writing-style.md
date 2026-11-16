@@ -1,7 +1,7 @@
 # Writing for Elwynn Survival
 
 How the words in the game read: window notes, buttons, hints, tooltips, chat messages,
-announcements, the journal, the map and every `text` in `content/`. Follow it for anything a
+announcements, the map and every `text` in `content/`. Follow it for anything a
 player reads. Docs, comments and commit messages keep their own style (AGENTS.md).
 
 The game sits on World of Warcraft 1.12 and fights like a soulslike, so it borrows from both:
@@ -15,7 +15,7 @@ anything with a story**. Every line has one job, and its job decides how it's wr
 | **Interface** | Window titles and notes, buttons, click hints, prompts, errors | Imperative, verb first, plain. Short. No story. |
 | **Stats** | What an item, ability, station or building does | WoW tooltip lines: one effect per sentence, numbers as numerals. |
 | **Flavor** | The story under a name: a chest's find, an item's past, a place | One line, at most two. Concrete, a little grim, never a mechanic. |
-| **News** | Announcements, chat from the camp, the journal, banners | Who did what, or what to do next, in one plain sentence. |
+| **News** | Announcements, chat from the camp, banners | Who did what, or what to do next, in one plain sentence. |
 
 A single `text` that needs both stats and flavor puts the stats first, then the flavor in quotes:
 
@@ -57,8 +57,6 @@ A single `text` that needs both stats and flavor puts the stats first, then the 
 
 - **Who did what, past tense:** "Ayla built a Cooking Fire." "Bren tore down the Thorn Hedge."
   "The Warsong Raid is beaten. Spoils sent to storage: 6 copper, 6 timber."
-- **The journal is quest objectives**: an imperative, then a short reason or where. "Build a
-  Cooking Fire in camp (H)." "Bank copper from the Fargodeep mine yard."
 - **The camp growing** speaks like a narrator, one sentence: "A quartermaster arrives from
   Goldshire with a wagon of supplies."
 - **Banners**: a title of two to four words, and a short line under it.
@@ -109,6 +107,6 @@ The words are free to change; these are not:
 - **Keys and protocol:** item, station, ability and site `key`s, command words (`.es bank`),
   line verbs and their fields (`ui.rs` lists them). Never put `~`, `^` or a tab in text.
 - **Names** of items, places and characters, unless one reads wrong. A save keeps keys, not
-  names, but the journal and tests often match names.
+  names, but tests often match names.
 - **Key brackets** like "(H)", which the add-on rewrites.
 - **Tests** that match a message: change the test with the message, in the same commit.
