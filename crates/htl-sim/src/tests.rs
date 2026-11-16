@@ -4066,3 +4066,105 @@ fn a_new_run_despawns_a_hunters_pet_once() {
     assert_eq!(gone, 1, "the pet is despawned once: {ev:?}");
     l.see(&s, &ev);
 }
+
+/// A long SOAK of the card mode (`#[ignore]`d), run after run: four to five bots of every class
+/// in turn pick cards, shop, fight the waves, fall, and start over; now and then one leaves and
+/// comes back as another class, and the ledger checks the event stream stays coherent. Every
+/// simulated minute the number of live entities and the tick time are sampled; the run fails on a
+/// panic, a broken ledger, a position gone non-finite, an entity count that only ever grows over
+/// the whole soak, or a tick time that creeps up 3x. Run it in release:
+///
+/// ```text
+/// SOAK_MINUTES=120 SOAK_SEED=20261115 cargo test --release -p htl-sim soak_ -- --ignored --nocapture --test-threads 1
+/// ```
+#[test]
+#[ignore]
+fn soak_card_mode_run_after_run() {
+    let minutes: f32 = std::env::var("SOAK_MINUTES").ok().and_then(|v| v.parse().ok()).unwrap_or(120.0);
+    let seed: u64 = std::env::var("SOAK_SEED").ok().and_then(|v| v.parse().ok()).unwrap_or(20261115);
+    eprintln!("SOAK card mode: seed {seed}, {minutes} simulated minutes");
+    let mut s = Sim::new(test_content(), bridged_arena(), Box::new(Flat(0.0)), seed);
+    let classes: Vec<String> = s.content().classes.iter().map(|c| c.key.clone()).collect();
+    let mut dice = seed ^ 0x5eed;
+    let mut next = move |n: usize| {
+        dice = dice.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((dice >> 33) as usize) % n.max(1)
+    };
+    let mut bots: Vec<Bot> = (0..5).map(|i| Bot::new(s.add_player(&format!("Bot{i}"), &classes[i % classes.len()], Luck::default()), Policy::Defend)).collect();
+    let _ = s.step(0.0);
+    let mut l = Ledger::new(&s);
+    s.start_now();
+    let dt = 0.05;
+    let per_min = 1200;
+    let (mut ent, mut ms_min, mut tick_ms): (Vec<usize>, Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut runs, mut deepest, mut last_phase_wave) = (0u32, 0u32, 0u32);
+    let started = std::time::Instant::now();
+    for tick in 0..(minutes * per_min as f32) as usize {
+        for b in bots.iter_mut() {
+            bot_turn(&mut s, b, dt);
+        }
+        let t = std::time::Instant::now();
+        let ev = s.step(dt);
+        tick_ms.push(t.elapsed().as_secs_f64() * 1000.0);
+        l.see(&s, &ev);
+        let st = s.status();
+        deepest = deepest.max(s.depth());
+        if st.phase == PhaseName::Defeat && last_phase_wave != u32::MAX {
+            runs += 1;
+            last_phase_wave = u32::MAX;
+        } else if st.phase != PhaseName::Defeat {
+            last_phase_wave = 0;
+        }
+        if st.phase == PhaseName::Intermission {
+            for b in bots.iter() {
+                shop_defences(&mut s, b.id);
+            }
+            if bots.iter().all(|b| b.base.is_none()) && st.seconds_left > 3 {
+                s.start_now();
+            }
+        }
+        if st.phase == PhaseName::Countdown && st.seconds_left > 3 {
+            s.start_now();
+        }
+        // A bot leaves now and then and comes back, as another class.
+        if tick % 600 == 599 && next(8) == 0 {
+            let k = next(bots.len());
+            let name = format!("Bot{k}");
+            if std::env::var_os("SOAK_DEBUG").is_some() {
+                eprintln!("SOAK leave {name} id {} at tick {tick}", bots[k].id);
+            }
+            s.remove_player(bots[k].id);
+            let id = s.add_player(&name, &classes[next(classes.len())], Luck::default());
+            if std::env::var_os("SOAK_DEBUG").is_some() {
+                eprintln!("SOAK rejoin {name} id {id}");
+            }
+            l.learn(id);
+            bots[k] = Bot::new(id, Policy::Defend);
+        }
+        for e in s.entities() {
+            assert!(e.pos.iter().all(|v| v.is_finite()), "SOAK: entity {} {:?} at {:?}", e.id, e.what, e.pos);
+        }
+        if tick % per_min == per_min - 1 {
+            let mut m = tick_ms[tick + 1 - per_min..].to_vec();
+            m.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            ms_min.push(m[m.len() / 2]);
+            ent.push(s.entities().len());
+            if ent.len() % 10 == 0 {
+                eprintln!("SOAK card mode minute {}: real {:.0}s, {} entities, wave {}, run {runs}, tick median {:.3} ms", ent.len(), started.elapsed().as_secs_f32(), ent.last().unwrap(), st.wave, ms_min.last().unwrap());
+            }
+        }
+    }
+    eprintln!("SOAK card mode done: {runs} runs fell, deepest wave {deepest}, {} hits, {} spell hits, {} deaths, {} menus", l.hits, l.spell_hits, l.deaths, l.menus);
+    let n = ms_min.len();
+    if n >= 10 {
+        let q = (n / 5).max(1);
+        let avg = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+        let (a, b) = (avg(&ms_min[..q]), avg(&ms_min[n - q..]));
+        eprintln!("SOAK CREEP card mode: tick median first fifth {a:.3} ms, last fifth {b:.3} ms ({:.2}x); entities max {}", b / a.max(1e-9), ent.iter().max().unwrap());
+        assert!(b < a * 3.0 + 0.05, "the tick time crept up from {a:.3} to {b:.3} ms");
+        let third = ent[n / 3];
+        let last = *ent.last().unwrap();
+        let mono = ent[n / 2..].windows(2).all(|w| w[1] >= w[0]);
+        assert!(!(mono && last > third * 4 + 500), "live entities only ever grew: {third} a third in, {last} at the end");
+    }
+}
