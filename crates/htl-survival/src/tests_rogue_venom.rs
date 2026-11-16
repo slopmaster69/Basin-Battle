@@ -369,6 +369,18 @@ fn eviscerate_deals_80_percent_and_35_per_venom_and_uses_it_up() {
     let r = &s.content.rogue;
     assert!(!s.auras_of(m).contains(&r.ripe_aura) && !s.auras_of(m).contains(&r.venom_aura), "its look gone");
     assert!(ticks_on(&run(&mut s, 2.0), m, p).is_empty(), "no more ticks");
+    // A blow that finds nothing (a creature gone home past its leash slips it) spends none.
+    pin(&mut s, m);
+    s.set_cooldowns(p, true);
+    s.lay_venom(p, m, 3);
+    let x = s.mobs.get_mut(&m).unwrap();
+    x.state = MobState::Return;
+    x.home = [-200.0, 0.0, 0.0];
+    assert!(s.evading(m, p));
+    let mut ev = press(&mut s, p, "close", false);
+    ev.extend(run(&mut s, 0.4));
+    assert!(hits_on(&ev, m).is_empty(), "it found nothing");
+    assert_eq!(s.venom_on(m), 3, "a missed Eviscerate spends nothing");
 }
 
 #[test]

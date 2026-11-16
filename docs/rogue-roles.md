@@ -420,6 +420,8 @@ What the design left open, decided in the pull request that built it:
     `poison` is its own effect, stacks by its own rule (3 a sec a stack, 5, 6 sec) and shows as it
     did. A Shiv in the off hand lays both, side by side; Eviscerate spends only Venom and leaves the
     Shiv's poison be. Nothing in `weapon_fx.rs` changed.
+  - **Eviscerate spends the Venom only when its blow lands**: one that finds nothing (slipped by a
+    creature gone home, dodged by a dummy) leaves the coat on.
   - **Rupture** counts melee blows, any hero's (weapon blows and weapon arts), not missiles. Its own
     cut lays none. It shows as Rend's blood burst (kit 220) every 1.5 sec on the body, no aura.
   - **Garrote** breaks a cast from behind with 0.5 sec of reeling (the cast cut, not a stun), a

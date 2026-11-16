@@ -3051,8 +3051,8 @@ impl Survival {
             let behind = d.ambush > 0.0 || from_veil || angle_between(vf, facing(at, pos)) >= BACKSTAB_ARC;
             // Sap's: at rest before this blow draws it into a fight, and no boss (a hero: always).
             let calm = self.mobs.get(&v).is_none_or(|m| matches!(m.state, mobs::MobState::Idle { .. }) && !self.content.mobs[m.def].boss);
-            // Eviscerate: the Venom on it spent, each for its share more.
-            let venom = if d.per_venom > 0.0 && self.mobs.contains_key(&v) { self.take_venom(v) } else { 0 };
+            // Eviscerate: each Venom on it for its share more (spent once the blow lands, below).
+            let venom = if d.per_venom > 0.0 && self.mobs.contains_key(&v) { self.venom_on(v) } else { 0 };
             let mut base = self.roll(w.damage) as f32 * (d.weapon + d.per_venom * venom as f32) * might;
             if behind && d.behind > 0.0 {
                 base *= d.behind;
@@ -3072,7 +3072,13 @@ impl Survival {
                 if d.per_venom <= 0.0 {
                     self.blow_coats(id, v, false);
                 }
+                let seen = self.events.len();
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
+                // A blow that found nothing (dodged, slipped, a leashed creature) spends none.
+                let landed = self.events[seen..].iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(x), outcome: Outcome::Hit, .. } if *attacker == id && *x == v));
+                if venom > 0 && landed {
+                    self.take_venom(v);
+                }
             }
             // Garrote: from behind, the cast it's winding up breaks.
             if behind && d.breaks_cast > 0.0 && self.alive(v) {
