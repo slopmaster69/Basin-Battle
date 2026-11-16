@@ -910,6 +910,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Jerod's Landing | Defias smugglers and their crate (guarded); murlocs; fish; the rogue's relic under the dock |
 | Smugglers' Ford (the river's south bank) | the Brotherhood's paymaster, Paymaster Voss, and his strongbox (guarded), with thugs, lookouts and a conjurer. The Defias Messenger who walks the Goldshire road to Jerod's Landing carries the key to the Messenger's Drop at the dock |
 | Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
+| The Goldshire road, north-west of the crossroads | Stitches (rare), a flesh golem who walks the cobbled road between the bridge and the crossroads |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
@@ -1262,6 +1263,15 @@ sweep all round when crowded, a slow leap). The hero's rule is taken away: parry
 the second. His fall is told once, when the second form is dead, and it is the first form that
 comes back after 30 min. Dodds then says where the wolves came from and links the Shadowfang Keep page.
 Two goals follow: the crossing and Fenros.
+
+**Stitches** (Stage 4 of docs/elwynn-expansion.md). A rare flesh golem walks the cobbled road north-west
+of Goldshire (`route`, never nearer than 200 yd to the camp) and comes back 40 min after he falls.
+He is too big to parry (`unparryable`: a guard only blocks him), with a posture of 320: a blockable
+cleaver chop, a swing all round him when crowded that nothing blocks (dodge it), a lurching charge
+from 6 yd or more, and a cleaver thrown from afar. At 50% health his stitches split, and every heavy
+blow he lands leaves bile where it falls (8 damage a tick for 8 sec in 3 yd, shown as flames: the
+fire look stands in for a green one, for Corey to say). The rule: keep him walking. The journal asks
+for his fall, and it is told to everyone.
 
 The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
 A camp from before the move keeps its stations: each standing outside the new building ground is

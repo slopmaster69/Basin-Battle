@@ -410,7 +410,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
     let mut s = bh_world();
     let at = |s: &Survival, t: &str| s.content.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
     let first = at(&s, "The messenger");
-    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Every corner"];
+    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "Every corner"];
     for (k, t) in titles.iter().enumerate() {
         assert_eq!(at(&s, t), first + k, "{t} in its place");
     }
@@ -437,7 +437,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
 #[test]
 fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_every_corner() {
     let s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros"].into_iter().collect();
+    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches"].into_iter().collect();
     assert_eq!(new.len(), crate::save::ELWYNN_GOALS, "the goals the expansion has put in, counted");
     let goals = &s.content.goals;
     // The journal as it was before: the same goals without the new ones.
@@ -609,4 +609,126 @@ fn fenros_wanders_between_the_crossing_and_the_woods_by_eastvale() {
     assert!(pack.spots.iter().any(|p| dist2d([p[0], p[1], 0.0], [site.at[0], site.at[1], 0.0]) < 60.0), "one of his spots is at the crossing");
     assert!(pack.spots.iter().any(|p| dist2d([p[0], p[1], 0.0], [-9660.0, -1200.0, 0.0]) < 30.0), "and one in the woods by Eastvale");
     let _ = pack_of;
+}
+
+// --- Stage 4: Stitches on the Goldshire road ---------------------------------------------------
+
+fn stitches_bare() -> (Survival, Id, Id) {
+    let (mut s, _) = real_world();
+    s.mobs.clear();
+    let p = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    let def = s.content.mob("stitches").unwrap();
+    let id = s.spawn_mob(def, [3.0, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&id).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    (s, p, id)
+}
+
+fn flames_near(s: &Survival, at: Vec3, within: f32) -> usize {
+    s.objs.values().filter(|o| matches!(o.kind, ObjKind::Fire { .. }) && dist2d(o.pos, at) <= within).count()
+}
+
+#[test]
+fn stitches_walks_the_goldshire_road_with_a_hero_near_and_keeps_clear_of_the_camp() {
+    let c = Content::builtin();
+    let k = c.packs.iter().position(|p| p.mob == "stitches").unwrap();
+    let pack = &c.packs[k];
+    assert!(pack.rare && !pack.route.is_empty());
+    let camp = [c.world.build_center[0], c.world.build_center[1], 0.0];
+    for p in std::iter::once(&pack.at).chain(pack.route.iter()) {
+        let far = dist2d([p[0], p[1], 0.0], camp);
+        assert!(far > 110.0, "{p:?} is {far:.0} yd from the camp");
+    }
+    let (mut s, _) = real_world();
+    let id = mob_of(&s, "stitches")[0];
+    let start = s.mobs[&id].pos;
+    // A hero within sight keeps the road awake, well off his aggro.
+    let h = bh_hero(&mut s, [start[0] + 50.0, start[1], 0.0]);
+    let mut went = 0.0f32;
+    for _ in 0..(240.0 / 0.05) as usize {
+        let _ = s.step(0.05);
+        let _ = s.players.get_mut(&h).map(|p| p.health = 1_000_000);
+        went = went.max(dist2d(s.mobs[&id].pos, start));
+    }
+    assert!(went > 40.0, "he walks the road: {went:.0} yd from where he stood");
+}
+
+#[test]
+fn the_fall_of_stitches_is_announced_as_a_rares() {
+    let (mut s, h) = real_world();
+    let id = mob_of(&s, "stitches")[0];
+    let max = s.mobs[&id].max_health;
+    s.hurt_mob(id, h, max);
+    let ev = s.step(0.0);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "Stitches Falls")), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.starts_with("Stitches fell"))));
+    assert!(s.camp_has("kill:stitches"));
+}
+
+/// Stitches's rule: too big to parry, and from half his health every heavy blow leaves bile.
+#[test]
+fn a_parry_fails_on_stitches_and_his_blows_leave_bile_only_from_half_his_health() {
+    // A guard only blocks him, and he doesn't reel.
+    let (mut s, p, w) = stitches_bare();
+    s.input(p, Input::Guard);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Blocked);
+    assert!(s.mobs[&w].stagger_until <= s.clock, "no reel");
+    // Above half: his blows leave nothing.
+    let (mut s, p, w) = stitches_bare();
+    let mut blows = 0;
+    for _ in 0..(14.0 / 0.05) as usize {
+        for e in s.step(0.05) {
+            blows += usize::from(matches!(e, Event::Swing { attacker, .. } if attacker == w));
+        }
+        s.players.get_mut(&p).unwrap().health = 1_000_000;
+    }
+    assert!(blows > 0, "he struck");
+    assert_eq!(flames_near(&s, [0.0, 0.0, 0.0], 30.0), 0, "no bile before half his health");
+    // Below half: each heavy blow that lands leaves bile near the hero, and it bites.
+    let max = s.mobs[&w].max_health;
+    s.mobs.get_mut(&w).unwrap().health = (max as f32 * 0.45) as u32;
+    let mut said = Vec::new();
+    for _ in 0..(14.0 / 0.05) as usize {
+        for e in s.step(0.05) {
+            if let Event::Yell { text, .. } = e {
+                said.push(text);
+            }
+        }
+        s.players.get_mut(&p).unwrap().health = 1_000_000;
+    }
+    assert!(said.iter().any(|t| t.contains("tears at his own seams")), "{said:?}");
+    let at = s.players[&p].pos;
+    assert!(flames_near(&s, at, 8.0) > 0, "bile where his blows land, round the hero");
+    // Standing in it costs health; stepping out of it doesn't.
+    s.mobs.get_mut(&w).unwrap().state = MobState::Idle { wander_at: 1.0e9 };
+    s.mobs.get_mut(&w).unwrap().ready_at = 1.0e9;
+    s.mobs.get_mut(&w).unwrap().pos = [60.0, 0.0, 0.0];
+    s.boss_blow_lands(w, at, 0.0, 3.0, 360.0, true);
+    s.players.get_mut(&p).unwrap().health = 100_000;
+    run(&mut s, 3.0);
+    let standing = 100_000 - s.players[&p].health;
+    assert!(standing > 0, "standing in bile costs health");
+    s.move_player(p, [at[0] - 20.0, at[1], at[2]], 0.0, Moving::default());
+    s.players.get_mut(&p).unwrap().health = 100_000;
+    run(&mut s, 3.0);
+    assert_eq!(100_000 - s.players[&p].health, 0, "walking away from it doesn't");
+}
+
+#[test]
+fn stitches_is_a_blockable_chop_a_swing_that_nothing_blocks_a_lurch_and_a_throw() {
+    let c = Content::builtin();
+    let m = &c.mobs[c.mob("stitches").unwrap()];
+    assert!(m.boss && m.unparryable && m.posture >= 300 && m.respawn >= 2400.0);
+    let pat = |n: &str| m.patterns.iter().find(|p| p.name == n).unwrap_or_else(|| panic!("no {n}"));
+    assert_ne!(pat("cleaver chop").steps[0].blockable, Some(false), "the chop is blocked");
+    let swing = &pat("gut swing").steps[0];
+    assert_eq!((swing.blockable, swing.arc), (Some(false), Some(360.0)), "all round, nothing blocks it");
+    assert!(pat("gut swing").max_range > 0.0 && pat("gut swing").max_range < 5.0, "when crowded");
+    assert!(pat("lurch").steps[0].lunge >= 5.0 && pat("lurch").min_range >= 5.0, "a charge from range");
+    let throw = &pat("thrown cleaver").steps[0];
+    assert!(throw.ranged == Some(true) && throw.spell.is_some() && pat("thrown cleaver").min_range >= 5.0, "a throw");
+    assert!(m.attack.heavy, "every blow is heavy, so every blow leaves bile once he burns");
+    let phase = &m.phases[0];
+    assert_eq!(phase.at, 0.5);
+    assert!(phase.burn.is_some());
 }

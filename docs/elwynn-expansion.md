@@ -156,7 +156,15 @@ Built as planned, with these differences, found checking the plan against the co
 - A parry against the risen form fails.
 - The lore link names a real dungeon key.
 
-## Stage 4: Stitches on the Goldshire road (world boss, content only) [ ]
+## Stage 4: Stitches on the Goldshire road (world boss, content only) [x]
+
+Built as planned, with these differences, found checking the plan against the code:
+- `boss`, `respawn` and `unparryable` are creature fields (the pack only takes `rare` and the `route`). `burn` is a field of a `[[mob.phase]]`, as is the line he says at 50%.
+- The display is 1693, the big Flesh Golem (`mobfind`), which is the Duskwood abomination's model. No creature template was available to check it is the one creature 412 wears.
+- The route is read off the real road (the probe's drawing of it), from the bridge at (-9744, 470) to (-9474, 120) north of Goldshire's crossroads. Every point is 209 yd or more from the camp, and open ground by `elwynn_probe`.
+- The bile is Fire's look (the flames are the bile). No green ground look could be seen from here, so this is flagged for Corey. Every blow of his is `heavy`, so every one leaves bile once he burns.
+- The thrown cleaver uses the Hurled Axe's missile look (spell 16075).
+- `ELWYNN_GOALS` is 7. No site was added: "Every corner" stays 36.
 
 **Location.** A pack with a `route` along the cobbled road from the south bridge toward Goldshire's crossroads, kept more than 110 yd from the camp. Settings: `rare`, `boss`, `respawn = 2400`. Use Stitches' own display (creature 412).
 
