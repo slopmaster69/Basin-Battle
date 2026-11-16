@@ -909,6 +909,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Ridgepoint Tower and Blackfang's den | the Blackrock: outrunners, shadowcasters, Rak'gash the Herald and the tower's armory; Old Blackfang (the hunter's champion) |
 | Jerod's Landing | Defias smugglers and their crate (guarded); murlocs; fish; the rogue's relic under the dock |
 | Smugglers' Ford (the river's south bank) | the Brotherhood's paymaster, Paymaster Voss, and his strongbox (guarded), with thugs, lookouts and a conjurer. The Defias Messenger who walks the Goldshire road to Jerod's Landing carries the key to the Messenger's Drop at the dock |
+| Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
@@ -1250,6 +1251,17 @@ rule: while his hirelings fight he circles off (a commander), so kill them or go
 he says "Hold them. You're paid till sundown.", calls 2 more thugs and runs to his boat at the water,
 and fights again once a hero comes within 10 yd. Four journal goals follow it (the messenger, the drop,
 the ford, the Paymaster), and once the Paymaster is dead Marshal Wyle names the Deadmines.
+
+**Nightbane Crossing** (Stage 3 of docs/elwynn-expansion.md). A worgen pack holds the river's south
+bank (`[[camp]]` "the Nightbane Crossing", taken by killing all 6, and back after 10 min). Watcher Dodds
+of the Night Watch stands on its north side once a hero has found it. Fenros, a rare, wanders between
+the crossing and the woods west of Eastvale (`spots`): quick claw strings (parry the first and the rest
+never come) and a leap from range. When he falls he lies still, and 4 sec later he rises as Fenros,
+Risen ("Not... yet."), who can't be parried, only blocked, and is slower and heavier (a rending blow, a
+sweep all round when crowded, a slow leap). The hero's rule is taken away: parry the first form, dodge
+the second. His fall is told once, when the second form is dead, and it is the first form that
+comes back after 30 min. Dodds then says where the wolves came from and links the Shadowfang Keep page.
+Two goals follow: the crossing and Fenros.
 
 The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
 A camp from before the move keeps its stations: each standing outside the new building ground is

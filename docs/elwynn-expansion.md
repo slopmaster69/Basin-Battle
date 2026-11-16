@@ -119,7 +119,14 @@ Built as planned, with these differences, found checking the plan against the co
 
 **Risk.** The ford's coordinates are unchecked. Run `elwynn_probe` if the WoW data is present; otherwise say so in the report.
 
-## Stage 3: Nightbane Crossing (new region, mini-boss, SFK hook) [ ]
+## Stage 3: Nightbane Crossing (new region, mini-boss, SFK hook) [x]
+
+Built as planned, with these differences, found checking the plan against the code:
+- A rare pack with a second form announced the first form's fall, and put the second form back as a creature of its own. In `mobs.rs` the fall is now told only when no form rises, and what comes back is the first form (`form_of`), after its own respawn time, once the last form is dead.
+- Fenros's `then` form is `fenros_risen`, which holds the trophy and the goal's kill. Only the risen form is a `boss` (with the health bar): a parry makes a boss fill its posture instead of reeling, so the first form is not one, and a parry on him cuts his string short as the plan says.
+- Watcher Dodds uses the Westbrook sentry's display (1499). No creature viewer was available to pick a better one.
+- The crossing's site is of kind `foes`. `ELWYNN_GOALS` in `save.rs` is 6. "Every corner" is 36 for the 36 sites.
+- Placement is at the plan's (-10060, -1100) and (-9660, -1200), the third spot (-9830, -1175), all open ground by `elwynn_probe`.
 
 **Locations.**
 - New site **Nightbane Crossing**, about (-10060, -1100).

@@ -163,6 +163,12 @@ fn every_name_the_story_points_at_is_real() {
             if let Some(a) = &t.after {
                 check(a, &format!("talk of {}", p.name));
             }
+            // A page of the book a person points to is a dungeon there is.
+            for l in &t.links {
+                if let Some(key) = l.split('~').next().and_then(|c| c.strip_prefix(".es lore ")) {
+                    assert!(c.dungeons().any(|d| d.key == key.trim()), "talk of {}: no dungeon {key}", p.name);
+                }
+            }
         }
     }
     for x in &c.chests {
@@ -404,7 +410,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
     let mut s = bh_world();
     let at = |s: &Survival, t: &str| s.content.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
     let first = at(&s, "The messenger");
-    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "Every corner"];
+    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Every corner"];
     for (k, t) in titles.iter().enumerate() {
         assert_eq!(at(&s, t), first + k, "{t} in its place");
     }
@@ -424,14 +430,15 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
     assert_eq!(s.camp.goal, first + 2, "the messenger and the drop are done, the ford not");
     s.camp.counts.insert("explore:smugglers_ford".into(), 1);
     s.step_goals();
-    assert_eq!(s.content.goals[s.camp.goal].title, "Every corner", "then the paymaster, and on");
+    assert_eq!(s.content.goals[s.camp.goal].title, "The Nightbane Crossing", "then the paymaster, and on");
 }
 
 /// An old save's goal still points at the goal it did before, or is carried over the new ones.
 #[test]
 fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_every_corner() {
     let s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster"].into_iter().collect();
+    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros"].into_iter().collect();
+    assert_eq!(new.len(), crate::save::ELWYNN_GOALS, "the goals the expansion has put in, counted");
     let goals = &s.content.goals;
     // The journal as it was before: the same goals without the new ones.
     let before: Vec<&str> = goals.iter().map(|g| g.title.as_str()).filter(|t| !new.contains(t)).collect();
@@ -455,4 +462,151 @@ fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_eve
     let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
     assert_eq!(back.content.goals[back.camp.goal].kind, "cleared");
     assert_eq!(back.content.goals[back.camp.goal].title, before[ladder_before]);
+}
+
+// --- Stage 3: Nightbane Crossing ---------------------------------------------------------------
+
+/// The built-in world on flat ground, the hero far from everything.
+fn real_world() -> (Survival, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    s.respawns.clear();
+    let h = bh_hero(&mut s, [3000.0, 3000.0, 0.0]);
+    (s, h)
+}
+
+fn pack_of(s: &Survival, mob: &str) -> usize {
+    s.content.packs.iter().position(|p| p.mob == mob).unwrap_or_else(|| panic!("no pack of {mob}"))
+}
+
+#[test]
+fn the_nightbane_crossing_is_taken_when_every_worgen_there_is_dead() {
+    let (mut s, h) = real_world();
+    let packs: Vec<usize> = s.content.packs.iter().enumerate().filter(|(_, p)| p.camp == "nightbane").map(|(k, _)| k).collect();
+    assert_eq!(packs.len(), 3, "prowlers, weavers and worgs");
+    let all: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| packs.contains(&k))).map(|(id, _)| *id).collect();
+    assert_eq!(all.len(), 6);
+    let mut banners = Vec::new();
+    for (i, id) in all.iter().enumerate() {
+        let max = s.mobs[id].max_health;
+        s.hurt_mob(*id, h, max);
+        for e in s.step(0.0) {
+            if let Event::Banner { title, .. } = e {
+                banners.push((i, title));
+            }
+        }
+        assert_eq!(s.camp.counts.get("clear:nightbane").copied().unwrap_or(0), u32::from(i + 1 == all.len()), "taken with the last of them only");
+    }
+    assert!(banners.iter().any(|(i, t)| *i == all.len() - 1 && t.contains("Nightbane Crossing Taken")), "{banners:?}");
+}
+
+#[test]
+fn fenros_rises_after_4_seconds_with_his_yell_and_falls_for_good_with_the_news_once() {
+    let (mut s, h) = real_world();
+    let first = mob_of(&s, "fenros");
+    assert_eq!(first.len(), 1);
+    let fenros = s.content.mob("fenros").unwrap();
+    assert_eq!(s.content.mobs[fenros].then, "fenros_risen");
+    assert_eq!(s.content.mobs[fenros].then_after, 4.0);
+    // He falls: not told as news yet, and the second form lies unseen.
+    let max = s.mobs[&first[0]].max_health;
+    s.hurt_mob(first[0], h, max);
+    let mut said = Vec::new();
+    let mut banners = Vec::new();
+    let mut take = |ev: Vec<Event>, said: &mut Vec<String>, banners: &mut Vec<String>| {
+        for e in ev {
+            match e {
+                Event::Yell { text, .. } => said.push(text),
+                Event::Banner { title, .. } => banners.push(title),
+                _ => {}
+            }
+        }
+    };
+    let ev = s.step(0.0);
+    take(ev, &mut said, &mut banners);
+    assert!(mob_of(&s, "fenros_risen").iter().all(|id| s.mobs[id].hidden), "not there to be seen yet");
+    let ev = run(&mut s, 3.5);
+    take(ev, &mut said, &mut banners);
+    assert!(!said.iter().any(|t| t.contains("Not... yet")), "not before 4 sec: {said:?}");
+    assert!(mob_of(&s, "fenros_risen").iter().all(|id| s.mobs[id].hidden));
+    let ev = run(&mut s, 1.0);
+    take(ev, &mut said, &mut banners);
+    assert!(said.iter().any(|t| t.contains("Not... yet")), "his yell as he rises: {said:?}");
+    let risen = mob_of(&s, "fenros_risen");
+    assert_eq!(risen.len(), 1);
+    assert!(!s.mobs[&risen[0]].hidden, "risen");
+    assert!(!banners.iter().any(|t| t.contains("Falls")), "no fall announced for the first form: {banners:?}");
+    // No fall for the first form comes back on its own; the risen form's fall is the news.
+    assert!(s.respawns.is_empty(), "nothing is put back while the second form is up");
+    let max = s.mobs[&risen[0]].max_health;
+    s.hurt_mob(risen[0], h, max);
+    let ev = s.step(0.0);
+    take(ev, &mut said, &mut banners);
+    assert!(banners.iter().any(|t| t == "Fenros, Risen Falls"), "the news: {banners:?}");
+    assert!(!banners.iter().any(|t| t == "Fenros Falls"), "never the first form's: {banners:?}");
+    assert!(s.camp_has("kill:fenros_risen"));
+    // What comes back is the first form, at one of his spots.
+    assert_eq!(s.respawns.len(), 1);
+    assert_eq!(s.respawns[0].0, fenros, "the first form, not the risen one");
+}
+
+/// Fenros's rule: parry the first form, and the second can't be parried (a guard only blocks).
+#[test]
+fn a_parry_works_on_fenros_and_fails_on_fenros_risen() {
+    for (key, want, reels) in [("fenros", Outcome::Parried, true), ("fenros_risen", Outcome::Blocked, false)] {
+        let (mut s, _) = real_world();
+        s.mobs.clear();
+        let p = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+        let def = s.content.mob(key).unwrap();
+        let w = s.spawn_mob(def, [2.0, 0.0, 0.0], None, false);
+        s.input(p, Input::Guard);
+        run(&mut s, 0.1);
+        assert_eq!(s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), want, "{key}");
+        assert_eq!(s.mobs[&w].stagger_until > s.clock + 1.0, reels, "{key} reels only when parried");
+    }
+}
+
+#[test]
+fn fenros_leaps_from_range_and_strikes_in_quick_strings_and_the_risen_form_is_slower_and_heavier() {
+    let c = Content::builtin();
+    let (a, b) = (&c.mobs[c.mob("fenros").unwrap()], &c.mobs[c.mob("fenros_risen").unwrap()]);
+    let strings = a.patterns.iter().find(|p| p.name == "claw string").unwrap();
+    assert!(strings.steps.len() >= 4 && strings.steps[1..].iter().all(|st| st.windup.is_some_and(|w| w < 0.3)), "quick claws after the first");
+    assert!(a.patterns.iter().any(|p| p.name == "leap" && p.min_range >= 5.0), "a leap from range");
+    assert!(!a.unparryable && b.unparryable);
+    assert!(b.attack.cooldown > a.attack.cooldown && b.run_speed < a.run_speed, "slower");
+    let heaviest = |m: &crate::content::MobDef| m.patterns.iter().flat_map(|p| p.steps.iter()).filter_map(|st| st.damage).max().unwrap();
+    assert!(heaviest(b) > heaviest(a), "heavier");
+}
+
+#[test]
+fn watcher_dodds_comes_with_the_crossing_found_and_names_the_keep_once_fenros_has_fallen() {
+    let mut s = Survival::new({ let mut c = Content::builtin(); c.pvp = Default::default(); c }, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    s.mobs.clear();
+    let def = s.content.props.iter().position(|p| p.npc && p.name == "Watcher Dodds").expect("Watcher Dodds");
+    let standing = |s: &Survival| s.objs.values().any(|o| matches!(o.kind, ObjKind::Piece { def: d } if d == def));
+    assert!(!standing(&s), "not before the crossing is found");
+    s.camp.found.insert("nightbane_crossing".into());
+    run(&mut s, 5.5);
+    assert!(standing(&s), "there once it's found");
+    assert!(s.talk_line(def).unwrap().text.contains("Fenros leads them"));
+    s.camp.counts.insert("kill:fenros_risen".into(), 1);
+    let line = s.talk_line(def).unwrap();
+    assert!(line.text.contains("from a keep your book should name"));
+    assert_eq!(line.links, vec![".es lore shadowfang~Shadowfang Keep".to_string()]);
+    let key = line.links[0].split('~').next().unwrap().strip_prefix(".es lore ").unwrap().to_string();
+    assert!(s.content.dungeons().any(|d| d.key == key && d.name == "Shadowfang Keep"), "the link names the Shadowfang Keep's own key");
+}
+
+#[test]
+fn fenros_wanders_between_the_crossing_and_the_woods_by_eastvale() {
+    let c = Content::builtin();
+    let k = c.packs.iter().position(|p| p.mob == "fenros").unwrap();
+    let pack = &c.packs[k];
+    assert!(pack.rare);
+    let site = c.sites.iter().find(|x| x.key == "nightbane_crossing").unwrap();
+    assert!(pack.spots.iter().any(|p| dist2d([p[0], p[1], 0.0], [site.at[0], site.at[1], 0.0]) < 60.0), "one of his spots is at the crossing");
+    assert!(pack.spots.iter().any(|p| dist2d([p[0], p[1], 0.0], [-9660.0, -1200.0, 0.0]) < 30.0), "and one in the woods by Eastvale");
+    let _ = pack_of;
 }

@@ -616,6 +616,9 @@ fn the_clubs_heavy_knocks_a_foe_back_and_the_maces_doesnt() {
 #[test]
 fn a_tenderized_foe_takes_more_from_the_next_hit_of_anyone_once() {
     let (mut s, p) = world();
+    // (The hits' damage rolls from the dice: start them from the seed, whatever the content lays
+    // out, so a creature more or less in it doesn't move the rolls past the ranges below.)
+    s.rng = rand::SeedableRng::seed_from_u64(5);
     let q = s.join("bren", "Bren", None);
     s.move_player(q, [0.0, 1.0, 0.0], 0.0, Moving::default());
     wield(&mut s, p, "cookie_tenderizer");
