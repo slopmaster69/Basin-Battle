@@ -7,7 +7,7 @@ use crate::land::FlatLand;
 use crate::sim::*;
 use std::collections::{BTreeMap, BTreeSet};
 
-fn world() -> Survival {
+pub(crate) fn world() -> Survival {
     let mut c = Content::builtin();
     c.pvp = Default::default();
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 1, 1_000_000.0);
@@ -16,7 +16,7 @@ fn world() -> Survival {
     s
 }
 
-fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
+pub(crate) fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
     let mut out = Vec::new();
     for _ in 0..(secs / 0.05).round() as usize {
         out.extend(s.step(0.05));
@@ -25,14 +25,14 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
 }
 
 /// The camp's person called `name`: their prop, and the object that stands for it.
-fn person(s: &Survival, name: &str) -> (usize, Id) {
+pub(crate) fn person(s: &Survival, name: &str) -> (usize, Id) {
     let def = s.content.props.iter().position(|p| p.npc && p.name == name).unwrap_or_else(|| panic!("no {name}"));
     let id = s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Piece { def: d } if d == def)).map(|(id, _)| *id).unwrap_or_else(|| panic!("{name} isn't standing"));
     (def, id)
 }
 
 /// A hero beside `id`, with nothing else in reach to use.
-fn beside(s: &mut Survival, id: Id) -> Id {
+pub(crate) fn beside(s: &mut Survival, id: Id) -> Id {
     let at = s.objs[&id].pos;
     s.objs.retain(|k, o| *k == id || dist2d(o.pos, at) > 6.0);
     let hero = s.join("ayla", "Ayla", None);
@@ -41,7 +41,7 @@ fn beside(s: &mut Survival, id: Id) -> Id {
     hero
 }
 
-fn letters(ev: &[Event]) -> Vec<(String, String, String, Vec<(String, String)>)> {
+pub(crate) fn letters(ev: &[Event]) -> Vec<(String, String, String, Vec<(String, String)>)> {
     ev.iter().filter_map(|e| match e {
         Event::Letter { kind, title, text, links, .. } => Some((kind.clone(), title.clone(), text.clone(), links.clone())),
         _ => None,
@@ -115,7 +115,7 @@ fn what_the_camp_has_killed_and_opened_reads_as_conditions() {
     assert!(s.camp_has("kill:hogger"));
 }
 
-fn source(name: &str) -> String {
+pub(crate) fn source(name: &str) -> String {
     std::fs::read_to_string(format!("{}/../../content/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
 }
 
@@ -207,7 +207,7 @@ fn every_name_the_story_points_at_is_real() {
 use crate::sim::mobs::{Foe, MobState};
 
 /// The built-in world on flat ground with only the Brotherhood expansion's creatures standing.
-fn bh_world() -> Survival {
+pub(crate) fn bh_world() -> Survival {
     let mut c = Content::builtin();
     c.pvp = Default::default();
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
@@ -222,7 +222,7 @@ fn bh_world() -> Survival {
     s
 }
 
-fn bh_hero(s: &mut Survival, at: Vec3) -> Id {
+pub(crate) fn bh_hero(s: &mut Survival, at: Vec3) -> Id {
     let h = s.join("ayla", "Ayla", None);
     s.move_player(h, at, 0.0, Moving::default());
     let _ = s.step(0.0);
@@ -233,13 +233,13 @@ fn bh_hero(s: &mut Survival, at: Vec3) -> Id {
     h
 }
 
-fn chest(s: &Survival, key: &str) -> Option<Id> {
+pub(crate) fn chest(s: &Survival, key: &str) -> Option<Id> {
     let def = s.content.chests.iter().position(|c| c.key == key)?;
     s.objs.iter().find(|(_, o)| matches!(o.kind, ObjKind::Chest { def: d, .. } if d == def)).map(|(id, _)| *id)
 }
 
 /// Stand at a chest and open it, the work and all.
-fn open_at(s: &mut Survival, h: Id, key: &str) -> Vec<Event> {
+pub(crate) fn open_at(s: &mut Survival, h: Id, key: &str) -> Vec<Event> {
     let c = s.content.chests.iter().find(|c| c.key == key).unwrap().clone();
     s.move_player(h, [c.at[0] - 1.5, c.at[1], 0.0], 0.0, Moving::default());
     let o = chest(s, key).expect("the chest is there");
@@ -247,11 +247,11 @@ fn open_at(s: &mut Survival, h: Id, key: &str) -> Vec<Event> {
     run(s, c.secs + 0.3)
 }
 
-fn mob_of(s: &Survival, key: &str) -> Vec<Id> {
+pub(crate) fn mob_of(s: &Survival, key: &str) -> Vec<Id> {
     s.mobs.iter().filter(|(_, m)| s.content.mobs[m.def].key == key && m.health > 0).map(|(id, _)| *id).collect()
 }
 
-fn fell(s: &mut Survival, by: Id, id: Id) {
+pub(crate) fn fell(s: &mut Survival, by: Id, id: Id) {
     let max = s.mobs[&id].max_health;
     s.hurt_mob(id, by, max);
     let _ = s.step(0.0);
@@ -410,7 +410,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
     let mut s = bh_world();
     let at = |s: &Survival, t: &str| s.content.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
     let first = at(&s, "The messenger");
-    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Every corner"];
+    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "Every corner"];
     for (k, t) in titles.iter().enumerate() {
         assert_eq!(at(&s, t), first + k, "{t} in its place");
     }
@@ -437,7 +437,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
 #[test]
 fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_every_corner() {
     let s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price"].into_iter().collect();
+    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite"].into_iter().collect();
     assert_eq!(new.len(), crate::save::ELWYNN_GOALS, "the goals the expansion has put in, counted");
     let goals = &s.content.goals;
     // The journal as it was before: the same goals without the new ones.
@@ -467,7 +467,7 @@ fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_eve
 // --- Stage 3: Nightbane Crossing ---------------------------------------------------------------
 
 /// The built-in world on flat ground, the hero far from everything.
-fn real_world() -> (Survival, Id) {
+pub(crate) fn real_world() -> (Survival, Id) {
     let mut c = Content::builtin();
     c.pvp = Default::default();
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
@@ -476,7 +476,7 @@ fn real_world() -> (Survival, Id) {
     (s, h)
 }
 
-fn pack_of(s: &Survival, mob: &str) -> usize {
+pub(crate) fn pack_of(s: &Survival, mob: &str) -> usize {
     s.content.packs.iter().position(|p| p.mob == mob).unwrap_or_else(|| panic!("no pack of {mob}"))
 }
 
@@ -623,7 +623,7 @@ fn stitches_bare() -> (Survival, Id, Id) {
     (s, p, id)
 }
 
-fn flames_near(s: &Survival, at: Vec3, within: f32) -> usize {
+pub(crate) fn flames_near(s: &Survival, at: Vec3, within: f32) -> usize {
     s.objs.values().filter(|o| matches!(o.kind, ObjKind::Fire { .. }) && dist2d(o.pos, at) <= within).count()
 }
 
