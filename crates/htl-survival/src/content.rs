@@ -886,6 +886,11 @@ pub struct TemperDef {
     /// Its cooldown between strings, times this (under 1: it presses harder).
     #[serde(default = "one_f")]
     pub pace: f32,
+    /// It answers every opening at once: a swing's follow-through (or a cast, a meal) draws its
+    /// blow whatever its cooldown still has to run, within `PRESS_RANGE`. (Without it, only when the
+    /// cooldown has nearly run out.)
+    #[serde(default)]
+    pub answer: bool,
 }
 
 /// A fight's plan (`[[plan]]`): picked as a fight of two creatures or more begins, so the same
@@ -1350,6 +1355,10 @@ pub struct WeaponDef {
     /// much less damage for `RALLY_SECS`.
     #[serde(default)]
     pub rally: f32,
+    /// Its blows do this much more to a creature in its recovery, between its own blows (the
+    /// punisher's dagger: let it strike first).
+    #[serde(default)]
+    pub punish: f32,
 }
 
 /// The shockwave's reach, the build's hits and window, the rockfall's delay and radius, the
@@ -1444,6 +1453,7 @@ impl WeaponDef {
             (self.rage > 0.0, "rage"),
             (self.guillotine > 0.0, "guillotine"),
             (self.rally > 0.0, "rally"),
+            (self.punish > 0.0, "punish"),
         ];
         on.into_iter().filter(|(on, _)| *on).map(|(_, n)| n.to_string()).collect()
     }
@@ -1583,6 +1593,9 @@ impl WeaponDef {
         }
         if self.rally > 0.0 {
             s.push(format!("Heavy attacks rally allies within {} yd, you included: they take {}% less damage for {} sec.", RALLY_RADIUS, (self.rally * 100.0).round(), RALLY_SECS));
+        }
+        if self.punish > 0.0 {
+            s.push(format!("Deals {}% more damage to an enemy recovering from its blow.", (self.punish * 100.0).round()));
         }
         if self.blink_behind {
             s.push("The last blow of a light chain carries you behind the enemy.".into());
@@ -3191,6 +3204,10 @@ pub struct PackDef {
     /// A rare creature: its fall is told to everyone.
     #[serde(default)]
     pub rare: bool,
+    /// It wakes (on its chest's opener, a `wake` pack) only if this holds (a condition as a prop's
+    /// `after`: `chose:remy:arrest`); otherwise it stays asleep.
+    #[serde(default)]
+    pub after: Option<String>,
 }
 
 /// Groups of creatures spread over the whole land (`[[roam]]`): `groups` of them, each of one of
@@ -4257,6 +4274,12 @@ impl Content {
         for p in &self.packs {
             if self.mob(&p.mob).is_none() {
                 bail!("pack: no mob {}", p.mob);
+            }
+            if let Some(cond) = &p.after {
+                self.check_camp_condition(cond, &format!("pack of {}", p.mob))?;
+                if p.wake.is_empty() {
+                    bail!("pack of {}: `after` only decides whether a pack that wakes on a chest wakes", p.mob);
+                }
             }
             if !p.wake.is_empty() && !self.chests.iter().any(|c| c.key == p.wake) {
                 bail!("pack of {}: it wakes on chest {}, and there's none", p.mob, p.wake);

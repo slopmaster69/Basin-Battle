@@ -578,6 +578,10 @@ impl Survival {
     /// Wake an ambush lying in wait (a pack by key) on a hero.
     pub(crate) fn wake_ambush(&mut self, key: &str, on: Id) {
         let Some(k) = self.content.packs.iter().position(|p| p.key == key) else { return };
+        // A pack with a condition that doesn't hold stays asleep (a helper of one side of a choice).
+        if self.content.packs[k].after.as_deref().is_some_and(|a| !self.camp_has(a)) {
+            return;
+        }
         let ids: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack == Some(k) && m.hidden && m.health > 0).map(|(id, _)| *id).collect();
         for m in &ids {
             self.mobs.get_mut(m).unwrap().hidden = false;
@@ -660,6 +664,8 @@ impl Survival {
                     continue;
                 }
                 self.camp.opened.remove(&c.key);
+                // What helped the heroes at it stands down.
+                self.stand_down_allies(def);
                 let old: Vec<Id> = self.objs.iter().filter(|(_, o)| matches!(o.kind, ObjKind::Chest { def: d, .. } if d == def)).map(|(id, _)| *id).collect();
                 for o in old {
                     self.objs.remove(&o);

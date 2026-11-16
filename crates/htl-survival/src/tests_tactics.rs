@@ -185,7 +185,7 @@ fn pack(s: &mut Survival, n: usize, at: [f32; 2]) -> Vec<Id> {
         z: None,
         key: String::new(),
         elite: false,
-        hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+        hidden: 0.0, wake: String::new(), spots: Vec::new(), after: None, rare: false,
     });
     let k = s.content.packs.len() - 1;
     let def = s.content.mob("wolf").unwrap();

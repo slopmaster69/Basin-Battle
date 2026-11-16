@@ -141,6 +141,7 @@ Gorzak's Cleaver, Goldshire Halberd and Zanjin's Spear, and the six staffs.
 | Bazil's Shiv | `bazil_shiv` | Hits poison 3 a sec a stack, up to 5 stacks, for 6 sec | `poison` |
 | Thornspike | `thornspike` | Hits interrupt a casting foe and stagger it 1.5 sec | `interrupt` |
 | Cobrahn's Fang | `cobrahn_fang` | A backstab puts the foe to sleep for 3 sec; damage wakes it | `sleep` |
+| The Silent Blade | `silent_blade` | A punisher: a blow on a foe recovering from its own blow, between its blows, does 75% more | `punish` |
 
 #### Two-handers
 

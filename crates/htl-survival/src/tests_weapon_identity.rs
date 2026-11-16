@@ -1210,3 +1210,38 @@ fn the_shivs_poison_stacks_beside_a_burn_that_is_already_on_the_foe() {
     }
     assert!(h0 - s.mobs[&m].health > 0);
 }
+
+// --- the Silent Blade ---------------------------------------------------------------------------
+
+#[test]
+fn the_silent_blade_does_75_percent_more_to_a_foe_recovering_from_its_blow_and_no_more_otherwise() {
+    let blow = |weapon: &str, recovering: bool| -> u32 {
+        let (mut s, p) = world();
+        wield(&mut s, p, weapon);
+        // (The top of its range: the test is about the extra, not the dice.)
+        for w in s.content.weapons.iter_mut() {
+            w.damage = [w.damage[1], w.damage[1]];
+        }
+        let m = foe(&mut s, "dm_woodcutter");
+        s.mobs.get_mut(&m).unwrap().health = 100_000;
+        s.mobs.get_mut(&m).unwrap().max_health = 100_000;
+        if recovering {
+            s.mobs.get_mut(&m).unwrap().state = MobState::Recover { foe: Foe::Hero(p), until: 1.0e9 };
+        }
+        hits_on(&swing(&mut s, p), m).iter().map(|h| h.0).max().unwrap_or(0)
+    };
+    let (steady, recovering) = (blow("silent_blade", false), blow("silent_blade", true));
+    assert!(steady > 0, "it lands");
+    assert!((recovering as f32 / steady as f32 - 1.75).abs() < 0.06, "{recovering} on a foe in its recovery, {steady} otherwise");
+    // Another dagger gets no such share.
+    let (a, b) = (blow("dagger", false), blow("dagger", true));
+    assert_eq!(a, b, "a plain dagger does the same either way");
+    // It is a punisher and nothing else of the pass's, with a tooltip from its own numbers.
+    let c = Content::dev();
+    let w = c.weapon("silent_blade").unwrap();
+    assert_eq!(w.unique_mechanics(), ["punish"]);
+    let text = &c.items[c.item("silent_blade").unwrap()].text;
+    assert!(text.contains(&format!("Deals {}% more damage to an enemy recovering from its blow.", (w.punish * 100.0).round())), "{text}");
+    assert!(text.contains("Marzon never struck first."), "{text}");
+    assert_eq!(w.subclass, 15, "a dagger");
+}

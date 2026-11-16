@@ -3784,11 +3784,32 @@ what = "sf_wagon"
 reward = { silver = 2, linen = 3 }
 
 [[goal]]
+title = "The Parley Stones"
+text = "Find the Parley Stones in the woods past Jasperlode. The note in the wagon names them."
+kind = "explore"
+what = "parley_stones"
+reward = { silver = 2, stone = 3 }
+
+[[goal]]
+title = "Marzon the Silent Blade"
+text = "Open the price on the parley table and kill Marzon the Silent Blade. He answers every swing, so let him strike first."
+kind = "kill"
+what = "marzon"
+reward = { silver = 3, bronze = 3 }
+
+[[goal]]
+title = "The seal on the letter"
+text = "Open Marzon's satchel and read whose seal is on it."
+kind = "open"
+what = "marzon_satchel"
+reward = { silver = 3, pearl = 2 }
+
+[[goal]]
 title = "Every corner"
 text = "Find every place in Elwynn."
 kind = "explore"
 what = "any"
-count = 37
+count = 38
 reward = { silver = 4, pearl = 2, silk = 4 }
 
 # --- abilities ------------------------------------------------------------------------------------
@@ -10334,6 +10355,283 @@ wake = "sf_wagon"
 
 # === end of Stage 9's block ============================================================================
 
+# === Elwynn expansion, round two, Stage 10: The Parley Stones (docs/elwynn-expansion.md) =============
+# The Brotherhood meets its buyers at the standing stones past Jasperlode. Marzon the Silent Blade
+# sells the Redridge road to a Blackrock envoy, and the satchel at his belt carries Lord Gregor
+# Lescovar's seal. Opening the price on the parley table wakes Marzon (and, on whichever side of
+# Remy's choice the camp took, Marshal Dughan or Remy to help). The Silent Blade is his trophy.
+
+[[site]]
+key = "parley_stones"
+name = "The Parley Stones"
+at = [-9260.0, -800.0]
+radius = 35.0
+kind = "foes"
+text = "Standing stones in the woods past Jasperlode. The Brotherhood meets its buyers here."
+reward = { stone = 3, silver = 1 }
+
+# Silent: answers every swing at once (a punisher), at a slow pace otherwise, and now and then gives
+# ground. Let him strike first.
+[[temper]]
+key = "silent"
+punish = true
+answer = true
+pace = 1.8
+retreat = 0.5
+retreat_yards = 4.0
+
+# Marzon the Silent Blade: a rogue of the Brotherhood who answers every swing. A hero who swings at
+# him is stabbed before the blow has ended, so he is let strike first: a parry of his three stabs
+# ends the string and leaves him open, and he can be hit as he recovers. At half his health, a fan
+# of knives all round him that nothing blocks (it glows red): once, not an enrage.
+[[mob]]
+key = "marzon"
+name = "Marzon the Silent Blade"
+subname = "Defias Brotherhood"
+display = 2338
+clips_from = "OrcFemale"
+scale = 1.15
+health = 700
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 20.0
+leash = 40.0
+weapon = 2699
+grip = "dagger"
+off_hand = 2635
+temper = "silent"
+boss = true
+posture = 180
+drops = { wool = [2, 3], linen = [2, 3], silver = [1, 2] }
+trophy = { silent_blade = 1, silver = 3, bronze = 2 }
+respawn = 1500.0
+aggro_text = "You read the book. Pity."
+death_text = "He'll only send another."
+  [mob.attack]
+  windup = 0.4
+  damage = 14
+  range = 2.6
+  arc = 80.0
+  recovery = 0.7
+  cooldown = 1.3
+  turn_rate = 260.0
+  lock = 0.25
+  blockable = true
+  # Three quick stabs: parry the first and the rest never come.
+  [[mob.pattern]]
+  name = "stabs"
+  weight = 3.0
+  parry_ends = true
+  steps = [ { from = "TrollFemale", clip = 17, take = 0, windup = 0.45, damage = 9, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.25, damage = 9, recovery = 0.08 }, { from = "GnomeMale", clip = 17, take = 0, windup = 0.28, damage = 12, recovery = 1.1 } ]
+  # A lunge to close the gap.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 9.0
+  steps = [ { from = "TrollMale", clip = 17, take = 0, windup = 0.6, lunge = 4.5, damage = 18, recovery = 1.0 } ]
+  # A fan of knives all round him, glowing red: nothing blocks it, so step out of it. Only at half his
+  # health, and only the once.
+  [[mob.pattern]]
+  name = "fan of knives"
+  weight = 0.0
+  steps = [ { from = "OrcFemale", clip = 17, take = 1, windup = 1.0, damage = 20, range = 4.0, arc = 360.0, blockable = false, recovery = 1.3, kit = 124, look = 10860 } ]
+  [[mob.phase]]
+  at = 0.5
+  pattern = "fan of knives"
+  text = "Enough talk."
+
+# The Blackrock's envoy: he pays, and runs from a fight that isn't his.
+[[mob]]
+key = "blackrock_envoy"
+name = "Blackrock Envoy"
+subname = "Blackrock Clan"
+display = 1359
+clips_from = "NightElfFemale"
+scale = 1.1
+health = 130
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 19126
+grip = "1h"
+temper = "coward"
+drops = { ore = [1, 1], linen = [1, 2], bronze = [0, 1] }
+respawn = 400.0
+  [mob.attack]
+  windup = 0.5
+  damage = 14
+  range = 2.8
+  arc = 90.0
+  recovery = 0.8
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "two cuts"
+  weight = 3.0
+  steps = [ { from = "ScourgeFemale", clip = 17, take = 0, windup = 0.45, damage = 11, recovery = 0.2 }, { from = "OrcFemale", clip = 17, take = 1, windup = 0.35, damage = 12, recovery = 0.9 } ]
+
+# Marshal Dughan, if the camp took Remy to the Stockade: a heavy bolt now and then.
+[[mob]]
+key = "parley_dughan"
+name = "Marshal Dughan"
+subname = "Goldshire"
+display = 1504
+scale = 1.0
+health = 200
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+grip = "bow"
+bow = 2826
+friendly = true
+shoots = { damage = 40, range = 30.0, every = 5.0 }
+respawn = 600.0
+  [mob.attack]
+  windup = 0.6
+  damage = 1
+  range = 2.6
+  arc = 90.0
+  recovery = 0.8
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+
+# Remy "Two Times", if the camp let him go: quick knives.
+[[mob]]
+key = "parley_remy"
+name = "Remy \"Two Times\""
+subname = "Lion's Pride"
+display = 1466
+scale = 1.0
+health = 120
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 0.0
+leash = 30.0
+weapon = 2699
+grip = "dagger"
+friendly = true
+shoots = { damage = 6, range = 16.0, every = 0.8 }
+respawn = 600.0
+  [mob.attack]
+  windup = 0.4
+  damage = 1
+  range = 2.6
+  arc = 90.0
+  recovery = 0.6
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.25
+  blockable = true
+
+# The Silent Blade: a punisher. A blow on a foe in its recovery, between its own blows, does 75%
+# more. Let the foe strike first.
+[[weapon]]
+key = "silent_blade"
+windup = 0.2
+active = 0.09
+recovery = 0.26
+stamina = 9.0
+damage = [15, 20]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 2.5
+punish = 0.75
+
+[[item]]
+key = "silent_blade"
+name = "The Silent Blade"
+display = 2699
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "{fx} \"Marzon never struck first.\""
+perks = [{ kind = "might", amount = 0.03 }]
+
+# The parley table, and what it wakes: Marzon, and whichever of Dughan and Remy the camp's choice
+# calls (their `after`); the others stay asleep. The satchel at his belt is shut until he falls.
+[[chest]]
+key = "parley_price"
+name = "The Price of the Roads"
+at = [-9262.0, -798.0]
+display = 259
+respawn = 1800.0
+secs = 2.5
+ambush = ["marzon", "parley_dughan", "parley_remy"]
+loot = { silver = 2 }
+text = "Silver for the Redridge road, counted out for a Blackrock hand."
+
+[[chest]]
+key = "marzon_satchel"
+name = "Marzon's Satchel"
+at = [-9265.0, -795.0]
+display = 5743
+after = "marzon"
+locked = "Marzon keeps the satchel on his belt."
+respawn = 0.0
+loot = { silver = 3, bronze = 2 }
+text = "A letter under a lion's seal, signed only 'G. L.' Every road, every price, in a lord's own hand."
+
+[[pack]]
+mob = "marzon"
+at = [-9256.0, -803.0]
+radius = 0.0
+count = 1
+link = 8.0
+key = "marzon"
+wake = "parley_price"
+
+[[pack]]
+mob = "parley_dughan"
+at = [-9268.0, -800.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "parley_dughan"
+wake = "parley_price"
+after = "chose:remy:arrest"
+
+[[pack]]
+mob = "parley_remy"
+at = [-9254.0, -796.0]
+radius = 0.0
+count = 1
+link = 0.0
+key = "parley_remy"
+wake = "parley_price"
+after = "chose:remy:free"
+
+# The guards, and the envoy who came to buy.
+[[pack]]
+mob = "defias_thug"
+at = [-9250.0, -790.0]
+radius = 2.0
+count = 2
+link = 12.0
+
+[[pack]]
+mob = "defias_archer"
+at = [-9272.0, -812.0]
+radius = 2.0
+count = 2
+link = 12.0
+
+[[pack]]
+mob = "blackrock_envoy"
+at = [-9258.0, -806.0]
+radius = 0.0
+count = 1
+link = 12.0
+
+# === end of Stage 10's block ===========================================================================
+
 # Garrick Padfoot, who robs Northshire's vineyards: a bandit captain with a cutlass, wandering
 # between the rows.
 [[mob]]
@@ -14619,6 +14917,11 @@ text = "Four raids, and the Blackrock came by the Goldshire road we did watch. W
 [[prop.talk]]
 after = "kill:bh_paymaster"
 text = "The Brotherhood paid the Horde's way, and the orders came from below Moonbrook."
+links = [".es lore deadmines~The Deadmines"]
+
+[[prop.talk]]
+after = "open:marzon_satchel"
+text = "Lord Gregor Lescovar. A seat in the House of Nobles. Stormwind hangs a Defias on our word. It won't hang a lord. Not yet."
 links = [".es lore deadmines~The Deadmines"]
 
 [[prop]]

@@ -271,3 +271,16 @@ Built as planned, with these differences, found checking the plan against the co
 - Fedfennel's scale is 1.3 in the content, and every boss is drawn `combat.boss_scale` times that, as Brannick is. His shield rule is the existing one (`block`, in `combat.rs`): Chase or Recover, within 70 degrees, not a heavy, shove or `through_guard`, not while a Bearded Axe hook holds his guard down. The wind-up and the side are the open moments. A kobold with a shield on its arm is unseen in the real client.
 - Tommy Joe's and Fedfennel's looks and the shield are unchecked in the client. Tommy Joe wears display 1408 (human male, brown leathers) with a bow. `ELWYNN_GOALS` is 12; no site was added, so "Every corner" stays 37.
 - Probed with `elwynn_probe near`: the farm spots, the wagon, the ally and the wave spawn are open ground, unchanged.
+
+## Stage 10: The Parley Stones [x] (payoff; engine E5; one new weapon)
+
+Built as planned, with these differences, found checking the plan against the code:
+- **E5.** `PackDef.after` is checked in `wake_ambush` (a pack whose condition doesn't hold stays asleep, and `validate()` refuses a bad condition or an `after` on a pack that doesn't wake on a chest). The helpers' stand-down is new: a friendly creature woken by a chest's `ambush` stands down when the chest fills again (the hold's helpers stood down at the end of the hold). `WeaponDef.punish` adds 75% to a blow on a creature in `MobState::Recover` (in `weapon_share`), with its sentence in `effect_text`, `punish` in `unique_mechanics`, and a row in `docs/weapon-identities.md`.
+- **`punish` alone does not make him answer.** The plan's `silent` temper (`punish = true`, `pace = 1.8`, `retreat = 0.5`, `retreat_yards = 4`) only changes whose turn it is: a creature presses an opening only once its cooldown is nearly run (`ai.press_early` is 1.2 sec), and a pace of 1.8 makes the cooldown long. So "starts his windup within 0.3 sec of a swing that missed" needed one more temper field, `answer` (an opening draws the blow at once within `PRESS_RANGE`, whatever the cooldown). Tempers do apply to bosses (`pace`, `punish`, and `retreat` when the temper sets it, as the code says); the test measures the cooldown he sets after a string (1.3 x 1.8 sec against an ordinary 1.3 sec).
+- The fan of knives is a pattern of weight 0, begun by his 50% phase (`pattern`), so it comes once and is no enrage (`speed` and `might` stay 1). His stabs carry `parry_ends` (and `tests_boss_rules.rs` checks he does not reel from a parry).
+- Marzon's own pack is `marzon` on the chest `parley_price` with the helpers `parley_dughan` and `parley_remy`, all `wake = "parley_price"`. The helpers are friendly shooters named for the people (Dughan, display 1504, a bow, 40 damage every 5 sec to 30 yd; Remy, 1466, a dagger, 6 damage every 0.8 sec to 16 yd). The envoy has no weapon of note (the Blackrock grunt's axe) and is a `coward`.
+- The silent blade is a dagger (display 2699, backstab 2.5, damage 15 to 20) with `punish = 0.75` and nothing else of the pass's. It is Marzon's trophy.
+- `ELWYNN_GOALS` is 15 and "Every corner" is 38 for the 38 sites.
+- Probed with `elwynn_probe near`: the site centre, the guards (the archers' spot has a trunk or wall within 6 yd, none beside it), the envoy, the table, the satchel and the helpers' spots are open ground, unmoved.
+
+Round two is built.

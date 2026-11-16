@@ -31,7 +31,7 @@ fn pack(mob: &str, key: &str, at: [f32; 2], elite: bool) -> PackDef {
         camp: String::new(),
         key: key.into(),
         elite,
-        hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+        hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false, after: None,
     }
 }
 

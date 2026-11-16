@@ -2451,7 +2451,7 @@ fn a_patrol_walks_its_route_together_and_back() {
         z: None,
         key: String::new(),
         elite: false,
-        hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+        hidden: 0.0, wake: String::new(), spots: Vec::new(), after: None, rare: false,
     });
     s.place_packs();
     let ids: Vec<Id> = s.mobs.keys().copied().collect();
@@ -2896,6 +2896,8 @@ fn a_parried_lesser_champion_still_reels_only_a_boss_fills_its_posture_instead()
     let o = mob(&mut s, "overseer", [2.0, 0.0, 0.0]);
     assert!(!s.content.mobs[s.mobs[&o].def].boss && s.posture_limit(o) > 0, "a champion, not a boss");
     s.engage(o, Foe::Hero(p));
+    // (Not a blow of its own in the way: only the one the test strikes.)
+    s.mobs.get_mut(&o).unwrap().ready_at = 1e9;
     s.input(p, Input::GuardUp);
     let wait = s.content.parry.cooldown + 0.05;
     run(&mut s, wait);
@@ -3032,7 +3034,7 @@ fn a_patrol_caught_far_from_its_next_point_fights_rather_than_running_on() {
         z: None,
         key: String::new(),
         elite: false,
-        hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+        hidden: 0.0, wake: String::new(), spots: Vec::new(), after: None, rare: false,
     });
     s.place_packs();
     let k = *s.mobs.keys().next().unwrap();
@@ -3055,7 +3057,7 @@ fn killing_every_fighter_of_a_horde_camp_takes_it_for_a_while() {
             z: None,
             key: String::new(),
             elite: false,
-            hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+            hidden: 0.0, wake: String::new(), spots: Vec::new(), after: None, rare: false,
         });
     }
     s.place_packs();
@@ -3120,7 +3122,7 @@ fn a_camp_isnt_taken_again_by_killing_the_first_of_them_back() {
             z: None,
             key: String::new(),
             elite: false,
-            hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+            hidden: 0.0, wake: String::new(), spots: Vec::new(), after: None, rare: false,
         });
     }
     s.place_packs();
