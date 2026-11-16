@@ -1468,6 +1468,8 @@ kind = "weapon"
 text = "Widens the parry window by 0.08 sec. {fx} \"Silverlaine's. A nobleman's mace.\""
 perks = [{ kind = "ward", amount = 0.02 }]
 
+# The guillotine falls on what can't move: a heavy blow on a stunned, asleep, rooted, frozen or
+# staggered foe does 3 times the damage, so it wants a partner or a shove first.
 [[weapon]]
 key = "guillotine_axe"
 windup = 0.5
@@ -1483,6 +1485,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 1
+guillotine = 3.0
 moveset = "axe_two_hand"
 
 [[item]]
@@ -1491,7 +1494,7 @@ name = "Guillotine Axe"
 display = 8502
 icon = "INV_Axe_17"
 kind = "weapon"
-text = "The Deathsworn Captain's. It has taken heads, and it remembers each one."
+text = "{fx} \"The Deathsworn Captain's. It has taken heads, and it remembers each one.\""
 
 # The shard: a blow from behind bursts in fire for half its damage on the foes within 4 yd of the
 # target, and shatters a frozen foe's ice like any other shatter (SHATTER, `sim::abilities`).

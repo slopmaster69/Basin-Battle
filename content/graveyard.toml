@@ -1096,7 +1096,7 @@ name = "Ironspine's Fist"
 display = 2047
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "{fx} \"Ironspine's. Bone grown around iron.\""
+text = "Staggers enemies it hits. {fx} \"Ironspine's. Bone grown around iron.\""
 
 # The scythe reaps: a 200 degree sweep of up to 5, and 1% of the wielder's health for each foe it
 # strikes (a full sweep of 5 mends 5%).
@@ -1125,6 +1125,8 @@ kind = "weapon"
 text = "Two-handed. A wide sweep that hits up to 5 enemies. {fx} \"The Headless Rider's. It never stops swinging.\""
 perks = [{ kind = "might", amount = 0.05 }]
 
+# The Champion's rally: its heavy sweep calls the Crusade's old line, and every hero within 8 yd (the
+# wielder too) takes 15% less damage for 5 sec.
 [[weapon]]
 key = "champions_greatsword"
 windup = 0.5
@@ -1139,6 +1141,7 @@ two_handed = true
 guard = "blade_guard"
 emote = 37
 subclass = 8
+rally = 0.15
 
 [[item]]
 key = "champions_greatsword"
@@ -1146,7 +1149,7 @@ name = "Fallen Champion's Greatsword"
 display = 5176
 icon = "INV_Sword_15"
 kind = "weapon"
-text = "The Fallen Champion's. It fought for the Crusade once."
+text = "{fx} \"The Fallen Champion's. It fought for the Crusade once.\""
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------

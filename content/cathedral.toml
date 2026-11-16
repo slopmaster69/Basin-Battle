@@ -1088,6 +1088,8 @@ weight = 0.02
 text = "The Abbot's. Blessed, polished, and never once knelt in."
 set = "crusader"
 
+# Mograine's hammer falls like judgment: its heavy sends a holy ring out 6 yd that strikes every foe
+# in it for 0.8 times the hammer's blow, the one who was swung at and the ones behind.
 [[weapon]]
 key = "mograines_might"
 windup = 0.68
@@ -1103,6 +1105,7 @@ two_handed = true
 guard = "haft_guard"
 emote = 37
 subclass = 5
+shockwave = 0.8
 moveset = "maul"
 
 [[item]]
@@ -1111,7 +1114,7 @@ name = "Mograine's Might"
 display = 1726
 icon = "INV_Hammer_03"
 kind = "weapon"
-text = "Scarlet Commander Mograine's. The Crusade's hammer, and it falls like judgment."
+text = "{fx} \"Scarlet Commander Mograine's. The Crusade's hammer, and it falls like judgment.\""
 
 # The Hand mends: each hit heals the most wounded hero within 15 yd, the wielder too, 3% of their
 # health.

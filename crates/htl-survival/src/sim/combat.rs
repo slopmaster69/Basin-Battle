@@ -1537,6 +1537,10 @@ impl Survival {
         let reach = WeaponReach { range: strike.range, arc: strike.arc };
         let f = self.swing_aim_at(id, reach, seen_at);
         let style = if strike.heavy() { Blow::Heavy } else { Blow::Light };
+        // What a heavy swing does round the hero, struck or not (a shockwave, a rally).
+        if first && strike.heavy() {
+            self.weapon_heavy_swing(id, w);
+        }
         // A War Banner in its arc takes the blow too (once a swing, as it first lands).
         if first && !strike.shove() {
             self.swing_on_banners(id, w, strike.damage, f, strike.range, strike.arc);
@@ -1709,8 +1713,8 @@ impl Survival {
             // An executioner's blow on a foe near its end.
             let low = self.mobs.get(&mid).is_some_and(|m| (m.health as f32) < m.max_health as f32 / 3.0);
             let damage = if w.execute > 0.0 && low && !strike.shove() { (damage as f32 * w.execute).round() as u32 } else { damage };
-            let tender = if strike.shove() { 0.0 } else { self.take_tender(mid) };
-            let damage = (damage as f32 * self.taken_share(mid) * self.weapon_share(mid, w, strike) * (1.0 + tender)).round() as u32;
+            let tender = if strike.shove() { 0.0 } else { self.take_tender(mid, id) };
+            let damage = (damage as f32 * self.taken_share(mid) * self.weapon_share(id, mid, w, strike) * (1.0 + tender)).round() as u32;
             // A shard in the back of a frozen foe: the ice shatters (the one shatter, an ability's too).
             let shattered = w.shatter && behind && !strike.shove() && self.has_cc(mid, "petrify");
             let damage = if shattered { (damage as f32 * super::abilities::SHATTER).round() as u32 } else { damage };
