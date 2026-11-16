@@ -1996,3 +1996,164 @@ fn a_wrecking_wave_brings_down_more_than_rock_and_only_behind_its_faces() {
     assert!(!pieces(&s).iter().any(|p| WRECK_PIECES.iter().any(|w| w.0 == p.1)), "no works without the switch");
     assert!(s.collapse_wreck().is_none() && !s.lamps_out(), "and no lamp out");
 }
+
+// --- two heroes, one gone or down: the fight goes on for the other, and is put back when lost --
+
+/// Every hero down or gone ends the fight; nothing the collapse built is left, nothing is owed.
+fn assert_mine_put_back(s: &Survival, boss: Id, pieces_before: &[Id]) {
+    assert_eq!(s.collapse_front(), None, "the collapse is over");
+    assert!(s.collapse_rubble().is_empty() && s.collapse_faces().is_empty(), "no rubble, no face");
+    assert!(pieces(s).is_empty(), "nothing of it left standing (rubble, faces, torches)");
+    assert!(pieces_before.iter().all(|id| !s.objs.contains_key(id)), "every piece taken");
+    assert!(s.collapse_face_lines().is_empty(), "no stop at any face");
+    assert!(s.face_crossing([33.0, 0.0, 0.0], [27.0, 0.0, 0.0]).is_none(), "nothing stops anyone");
+    assert!(s.bosses.thrown.is_empty() && s.bosses.fleeing.is_empty(), "nobody left in the air or running");
+    assert!(!s.lamps_out(), "the lamps can be rested at again");
+    assert!(s.collapse_wreck().is_none(), "nothing wrecked is held");
+    let m = &s.mobs[&boss];
+    assert!(dist2d(m.pos, [POST, 0.0, 0.0]) < 4.0, "back at his post: {:?}", m.pos);
+    assert_eq!(m.health, m.max_health, "whole");
+}
+
+#[test]
+fn a_dead_hero_is_left_where_they_lie_and_the_living_one_is_still_caught() {
+    let (mut s, boss, h) = mine_at(sectioned(8.0), 31, POST);
+    // The dead one at the far end of the door side, the live one in the other far corner.
+    let dead = hero_at(&mut s, "Dead", [3.0, -18.0, 0.0]);
+    let alive = hero_at(&mut s, "Alive", [28.0, 18.0, 0.0]);
+    let hp = s.players[&dead].health;
+    s.hurt_player_by(dead, hp + 1, boss, "a blow");
+    assert_eq!(s.players[&dead].health, 0);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let lay = s.players[&dead].pos;
+    let mut ev = run_to(&mut s, h, (0, "rest"));
+    ev.extend(run_for(&mut s, FACE_FIRST + THROW_GRACE + 2.0 * CATCH_TICK));
+    assert_eq!(caught(&ev, "Dead"), 0, "the dead are not caught again");
+    // (The fallen wake at a lamp after a while; until then they lie where they fell.)
+    let now = s.players[&dead].pos;
+    assert!(now == lay || (s.players[&dead].health > 0 && now[0] > 100.0), "left where they lie, or woken at the lamp: {now:?}");
+    assert_eq!(caught(&ev, "Alive"), 1, "the living one, once");
+    let p = s.players[&alive].pos;
+    assert!(p[0] > LINES[0] && !s.collapse_behind(p), "set clear past the line: {p:?}");
+    assert!(s.collapse_front().is_some(), "one still up: the fight is not lost");
+    // On to the end of the mine with the dead one still behind it: the fight is not lost.
+    run_out(&mut s, h);
+    assert!(s.collapse_state().is_some_and(|c| c.3), "the last face stands");
+}
+
+#[test]
+fn the_boss_goes_on_to_the_living_hero_when_his_foe_falls_and_the_last_one_down_loses_the_fight() {
+    let (mut s, boss, h) = mine_at(sectioned(8.0), 33, POST);
+    let other = hero_at(&mut s, "Other", [POST + 6.0, 4.0, 0.0]);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (1, "wave"));
+    run_for(&mut s, 1.0);
+    let before = pieces(&s).iter().map(|p| p.0).collect::<Vec<_>>();
+    assert!(!before.is_empty());
+    // His foe falls: he goes on to the other, and the collapse goes on.
+    let hp = s.players[&h].health;
+    s.hurt_player_by(h, hp + 1, boss, "a blow");
+    for _ in 0..300 {
+        s.move_player(other, [s.mobs[&boss].pos[0] + 3.0, 2.0, 0.0], 0.0, Moving::default());
+        s.step(DT);
+    }
+    assert!(s.collapse_front().is_some(), "the other hero keeps the fight alive");
+    assert!(s.mobs[&boss].health > 0);
+    // The last one down: lost, and everything put back.
+    let hp = s.players[&other].health;
+    s.hurt_player_by(other, hp + 1, boss, "a blow");
+    run_for(&mut s, 0.5);
+    assert_eq!(s.collapse_front(), None, "lost the moment the last hero is down");
+    run_for(&mut s, LEAVE_HOLD + LEAVE_SECS + 25.0);
+    assert_mine_put_back(&s, boss, &before);
+}
+
+#[test]
+fn a_hero_leaving_mid_fight_leaves_it_to_the_other_and_the_last_to_leave_puts_the_mine_back() {
+    let (mut s, boss, h) = mine_at(sectioned(8.0), 35, POST);
+    let other = hero_at(&mut s, "Other", [14.0, 12.0, 0.0]);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_to(&mut s, h, (0, "wave"));
+    // The one he fights leaves just as the other is caught and in the air.
+    let mut ev = Vec::new();
+    while caught(&ev, "Other") == 0 {
+        ev.extend(s.step(DT));
+        assert!(s.clock < 100.0);
+    }
+    assert!(s.bosses.thrown.contains_key(&other), "in the air");
+    s.leave(h);
+    let mut ev = run_for(&mut s, 3.0);
+    assert!(s.collapse_front().is_some(), "the fight goes on for the one who stays");
+    assert_eq!(caught(&ev, "Mole"), 0);
+    let p = s.players[&other].pos;
+    assert!(!s.collapse_behind(p) && s.land().footing(p).is_some(), "the one who stays is clear: {p:?}");
+    // The boss turns on them, not on nobody.
+    assert!(!matches!(s.mobs[&boss].state, MobState::Return | MobState::Idle { .. }), "{:?}", s.mobs[&boss].state);
+    ev.clear();
+    run_for(&mut s, 12.0);
+    assert!(s.collapse_front().is_some());
+    let before = pieces(&s).iter().map(|p| p.0).collect::<Vec<_>>();
+    assert!(!before.is_empty());
+    // The last one leaves: lost, and everything put back, with nobody left to see it.
+    s.leave(other);
+    // (The world takes no steps with nobody in it: it is put back at once, not on the next hero's
+    // arrival.)
+    assert_mine_put_back(&s, boss, &before);
+    // A hero who comes after finds it all standing and starts from the door.
+    let next = hero_at(&mut s, "Next", [20.0, 0.0, 0.0]);
+    run_for(&mut s, 20.0);
+    assert_eq!(s.mobs[&boss].health, s.mobs[&boss].max_health);
+    s.move_player(next, [POST + 3.0, 0.0, 0.0], 0.0, Moving::default());
+    s.engage(boss, mobs::Foe::Hero(next));
+    begin_at(&mut s, boss, next, [POST + 3.0, 0.0, 0.0]);
+    assert_eq!(s.collapse_state(), Some((0, "warn", 0.0, false)), "from the door again");
+}
+
+#[test]
+fn the_hold_cannot_be_got_round_by_one_big_blow_a_burn_a_hit_from_nobody_or_a_helper() {
+    let (mut s, boss, h) = mine_at(sectioned(2.0), 37, POST);
+    let helper = hero_at(&mut s, "Helper", [POST + 5.0, 3.0, 0.0]);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let max = s.mobs[&boss].max_health;
+    let floor = (0.26 * max as f32).round() as u32;
+    run_to(&mut s, h, (0, "warn"));
+    // One blow far bigger than the gap, and u32 at its most.
+    s.hurt_mob(boss, h, u32::MAX);
+    assert_eq!(s.mobs[&boss].health, floor);
+    // A burn that would take it ten times over: every tick of it, for the whole surge.
+    assert!(s.apply_cc(boss, h, "burn", 60.0, max as f32, 0.0, "Test burn"));
+    for _ in 0..(20.0 / DT) as usize {
+        past_the_line(&mut s, h);
+        s.step(DT);
+        assert!(s.mobs[&boss].health >= floor, "the burn never goes below the hold: {}", s.mobs[&boss].health);
+        if s.collapse_front().is_some_and(|f| f.1) { break; }
+    }
+    // Hits from a second hero, from the world (the raid's hits carry no hero) and from a thrall's
+    // master, one by one and many small ones together: the same hold.
+    s.hurt_mob(boss, helper, max);
+    s.hurt_mob(boss, 0, max);
+    s.hurt_mob_as(boss, helper, max, "Dominate Mind");
+    for _ in 0..200 {
+        s.hurt_mob(boss, helper, max / 50);
+    }
+    assert!(s.mobs[&boss].health >= floor, "{}", s.mobs[&boss].health);
+    assert!(s.mobs[&boss].health > 0);
+}
+
+#[test]
+fn two_heroes_at_the_far_ends_are_each_caught_once_and_neither_is_thrown_into_the_other() {
+    let (mut s, boss, h) = mine_at(sectioned(8.0), 39, POST);
+    // Both at the door end, in the two far corners of the pocket.
+    let a = hero_at(&mut s, "Ayla", [1.0, 19.0, 0.0]);
+    let b = hero_at(&mut s, "Bram", [1.0, -19.0, 0.0]);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    let mut ev = run_to(&mut s, h, (0, "rest"));
+    ev.extend(run_for(&mut s, FACE_FIRST + THROW_GRACE + 2.0 * CATCH_TICK));
+    assert_eq!((caught(&ev, "Ayla"), caught(&ev, "Bram")), (1, 1));
+    let (pa, pb) = (s.players[&a].pos, s.players[&b].pos);
+    assert!(dist2d(pa, pb) >= 1.0, "not on one spot: {pa:?} {pb:?}");
+    for p in [pa, pb] {
+        assert!(p[0] > LINES[0] && !s.collapse_behind(p) && s.land().footing(p).is_some(), "clear: {p:?}");
+        assert!(p[1].abs() < 20.0, "inside the tunnel: {p:?}");
+    }
+}

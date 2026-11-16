@@ -1747,6 +1747,8 @@ impl Survival {
         self.meters.remove(&id);
         // Creatures fighting them turn on whoever else is in the fight, or go home.
         self.foe_gone(id);
+        // Nobody left below in a falling mine: put it back now, the world takes no steps to.
+        self.collapse_abandoned();
         self.events.push(Event::Dirty);
         Some(save)
     }
