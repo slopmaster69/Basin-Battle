@@ -2157,3 +2157,100 @@ fn two_heroes_at_the_far_ends_are_each_caught_once_and_neither_is_thrown_into_th
         assert!(p[1].abs() < 20.0, "inside the tunnel: {p:?}");
     }
 }
+
+// --- the last stand's owner note: lamps, ship and a put-back mine, on every tick ----------------
+
+/// A friend at the lit lamp of `mine_at` (far from the fight), nothing on them.
+fn friend_at_the_lamp(s: &mut Survival) -> Id {
+    let key = s.content.dungeon.as_ref().unwrap().lamps[0].key.clone();
+    let at = s.content.dungeon.as_ref().unwrap().lamps[0].at;
+    s.below.as_mut().unwrap().lit.insert(key);
+    hero_at(s, "Friend", at)
+}
+
+/// Every use of a lamp, tried: rest, travel, the quartermaster's trade and honing. `Err` text of each.
+fn lamp_uses(s: &mut Survival, friend: Id) -> Vec<Result<(), String>> {
+    let trade = s.content.dungeon.as_ref().unwrap().trade.keys().next().cloned().expect("a trade");
+    vec![
+        s.rest(friend),
+        s.travel(friend, "camp"),
+        s.buy(friend, &trade).map(|_| ()),
+        s.hone(friend, "rhahkzor_maul").map(|_| ()),
+    ]
+}
+
+#[test]
+fn no_use_of_a_lamp_is_open_on_any_tick_from_his_blow_to_the_kill() {
+    let (mut s, boss, h) = mine_at(wrecking(2.0, 1), 41, POST);
+    let friend = friend_at_the_lamp(&mut s);
+    // Before the blow the lamp is as ever (the trade and the rest are not refused for a collapse).
+    assert!(lamp_uses(&mut s, friend).iter().all(|r| r.as_ref().err().is_none_or(|e| e != LAMPS_OUT)));
+    strike(&mut s, boss, h);
+    let mut began = false;
+    let mut ticks = 0;
+    // Every tick of the run, from the one the phase begins on to the end of the last stand's rest.
+    while s.collapse_front().is_none_or(|f| !f.1) || !began {
+        assert!(s.clock < 300.0, "never done");
+        s.move_player(h, [POST + 3.0, 0.0, 0.0], 0.0, Moving::default());
+        if began {
+            past_the_line(&mut s, h);
+        }
+        s.step(DT);
+        began |= s.mobs[&boss].phase > 0;
+        if began {
+            ticks += 1;
+            assert!(s.lamps_out(), "tick {ticks}: lamps out");
+            for (i, r) in lamp_uses(&mut s, friend).into_iter().enumerate() {
+                assert_eq!(r, Err(LAMPS_OUT.to_string()), "tick {ticks}: lamp use {i} is refused for the collapse");
+            }
+        }
+    }
+    assert!(ticks > 200, "a whole run was watched: {ticks}");
+    // The last stand: still out until he is down.
+    run_for(&mut s, 3.0);
+    assert!(s.lamps_out() && lamp_uses(&mut s, friend).iter().all(|r| *r == Err(LAMPS_OUT.to_string())));
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, h, max);
+    run_for(&mut s, 0.5);
+    assert!(!s.lamps_out());
+    assert!(lamp_uses(&mut s, friend).iter().all(|r| r.as_ref().err().is_none_or(|e| e != LAMPS_OUT)), "all open again with the kill");
+}
+
+#[test]
+fn the_last_hero_leaving_mid_collapse_puts_back_the_lamps_and_the_wreck_at_once() {
+    for (ship, stage) in [(1usize, (0usize, "wave")), (1, (1, "rest")), (1, (2, "wave"))] {
+        let (mut s, boss, h) = mine_at(wrecking(2.0, ship), 43, POST);
+        let key = s.content.dungeon.as_ref().unwrap().lamps[0].key.clone();
+        s.below.as_mut().unwrap().lit.insert(key);
+        let (lamp, lit) = lamp_of(&s);
+        begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+        run_to(&mut s, h, stage);
+        let before = pieces(&s).iter().map(|p| p.0).collect::<Vec<_>>();
+        assert!(s.lamps_out() && s.collapse_wreck().is_some(), "{stage:?}: wrecked and dark");
+        assert_ne!(lamp_of(&s).1, lit);
+        s.events.clear();
+        s.leave(h);
+        // At once, with nobody left to step the world.
+        assert_mine_put_back(&s, boss, &before);
+        assert_eq!(lamp_of(&s).1, lit, "{stage:?}: the lamp lit as before");
+        assert!(s.events.iter().any(|e| matches!(e, Event::ObjChanged { id } if *id == lamp)), "{stage:?}: and drawn again for the next client");
+        // The next hero finds a lamp that works, and the wreck unstarted.
+        let at = s.content.dungeon.as_ref().unwrap().lamps[0].at;
+        let next = hero_at(&mut s, "Next", at);
+        assert!(lamp_uses(&mut s, next).iter().all(|r| r.as_ref().err().is_none_or(|e| e != LAMPS_OUT)), "{stage:?}");
+        assert!(s.collapse_wreck().is_none() && !s.lamps_out());
+    }
+}
+
+#[test]
+fn a_hero_leaving_after_the_kill_leaves_the_wreck_lying_and_the_lamps_lit() {
+    let (mut s, boss, h) = mine_at(wrecking(2.0, 1), 47, POST);
+    begin_at(&mut s, boss, h, [POST + 3.0, 0.0, 0.0]);
+    run_out(&mut s, h);
+    let max = s.mobs[&boss].max_health;
+    s.hurt_mob(boss, h, max);
+    run_for(&mut s, 0.5);
+    s.leave(h);
+    assert!(!s.lamps_out(), "lit for the next");
+    assert_eq!(s.collapse_wreck().map(|w| (w.fight, w.ship_gone)), Some((false, true)), "the won mine stays wrecked until the dungeon resets");
+}

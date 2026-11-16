@@ -39,7 +39,11 @@ this off and the collapse is rock alone, as before) the collapse wrecks the mine
 - **Lamps.** From his slam to the end of the fight no lamp in the mine can be lit or rested at:
   all three stand dark (none stands in the collapse's sections; the Galleries lamp is 31 yd past
   its end) and a hero who tries is told "Not while the mine is coming down." His death lights
-  them again, and so does a lost fight or a reset.
+  them again, and so does a lost fight, the last hero leaving mid-collapse, or a reset. The lamp's
+  trade, honing and travel are shut the same way as the rest (a lamp is no way out of the fight).
+  The mine's near-route lights are all lanterns (no forge or anvil stands within 40 yd of the
+  route; the anvils are in the Foundry, 230 yd off), so the lanterns are the whole of "the forge".
+  The lanterns near the route that stay lit (about a dozen within 40 yd) would need a client patch to go out.
 - **The wave.** Every other pile its rows lay is topped by one of the ruin's pieces in a rock's
   place: a mine cart, a board, lumber, a barrel, a crate, a barrow, a lumber pile. They are loose
   rubble (no hull), lying behind the wave's line.

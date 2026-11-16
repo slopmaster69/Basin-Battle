@@ -800,6 +800,10 @@ impl Survival {
     fn travel_below(&mut self, id: Id, to: &str) -> Result<(), String> {
         let p = &self.players[&id];
         let lamp = self.lamp_near(p.pos).ok_or("Go to a lit lamp first.")?;
+        // (A collapse's fight is on: a lamp is no way out of it, no more than a place to rest.)
+        if self.lamps_out() {
+            return Err(bosses::LAMPS_OUT.into());
+        }
         if !self.lit(&lamp) {
             return Err("Light the lamp first.".into());
         }
@@ -1517,6 +1521,9 @@ impl Survival {
         if self.lamp_near(p.pos).is_none() {
             return Err("Go to a lamp to find the quartermaster.".into());
         }
+        if self.lamps_out() {
+            return Err(bosses::LAMPS_OUT.into());
+        }
         if self.in_fight(id) {
             return Err("Not while enemies are on you.".into());
         }
@@ -1565,6 +1572,9 @@ impl Survival {
             if self.lamp_near(p.pos).is_none() {
                 return Err("Go to a lamp to find the quartermaster.".into());
             }
+            if self.lamps_out() {
+                return Err(bosses::LAMPS_OUT.into());
+            }
             if self.currency_of(id) < price {
                 return Err(format!("That's {price} {}.", self.currency_name()));
             }
@@ -1587,6 +1597,9 @@ impl Survival {
         let p = self.players.get(&id).ok_or("No hero.")?;
         if self.lamp_near(p.pos).is_none() {
             return Err("Go to a lamp to find the quartermaster.".into());
+        }
+        if self.lamps_out() {
+            return Err(bosses::LAMPS_OUT.into());
         }
         let item = self.content.item(key).ok_or("No such item.")?;
         let plunder = self.content.item(&d.plunder).ok_or("No plunder.")?;

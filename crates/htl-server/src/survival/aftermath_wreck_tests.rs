@@ -322,6 +322,57 @@ fn a_lost_fight_puts_every_lantern_back() {
 }
 
 #[test]
+fn the_last_client_leaving_mid_collapse_leaves_nothing_owed_to_the_next_one() {
+    let mut game = game();
+    let (fighter, frx) = hero(&mut game, 1, [38.0, 0.0, 0.0], LAMPS_LEVEL);
+    let (_friend, orx) = hero(&mut game, 2, [-150.0, 200.0, 0.0], LAMPS_LEVEL);
+    game.wreck.ruin = Some(ruin());
+    let (mut f, mut o) = (Seen::default(), Seen::default());
+    begin(&mut game, fighter);
+    until(&mut game, fighter, (1, "rest"), SHOW_AFTER + 0.5);
+    seen(&frx, &mut f);
+    seen(&orx, &mut o);
+    assert!(o.marker && !f.lamps.is_empty(), "the friend far off lost the ship, and the lanterns are out");
+    // Both leave, the fighter first (the friend far off is a hero below still): the world is empty,
+    // the mine put back on the spot, whatever the fight was by then.
+    game.leave_world(1);
+    tick_world(&mut game);
+    game.leave_world(2);
+    assert!(game.sim.collapse_wreck().is_none() && !game.sim.lamps_out(), "put back with the last hero");
+    assert!(game.sim.collapse_front().is_none(), "no collapse left standing");
+    for _ in 0..4 {
+        tick_world(&mut game);
+    }
+    assert!(game.wreck.sent.is_empty() && game.wreck.lamps.is_empty() && game.wreck.laid.is_none() && game.wreck.down_at.is_empty(), "nothing staged");
+    // The next client comes in, and is owed none of it: no ship gone, no lantern out, no ruin.
+    let (_next, nrx) = hero(&mut game, 3, [-150.0, 240.0, 0.0], LAMPS_LEVEL);
+    for _ in 0..40 {
+        tick_world(&mut game);
+    }
+    let mut n = Seen::default();
+    seen(&nrx, &mut n);
+    assert!(!n.marker && n.lamps.is_empty() && n.made.is_empty(), "the next client finds the mine as it was: {n:?}");
+}
+
+/// One tick of the world with nobody to move.
+fn tick_world(game: &mut SurvivalGame) {
+    let events = game.sim.step(DT);
+    game.play(events);
+    game.wreck_tick();
+}
+
+#[test]
+fn the_ship_goes_well_before_the_last_stand_in_the_contents_collapse() {
+    let c = htl_survival::Content::builtin();
+    let def = c.mob("dm_rhahkzor").unwrap();
+    let col = c.mobs[def].phases.iter().find_map(|p| p.collapse.as_ref()).unwrap();
+    assert!(col.wreck, "the collapse wrecks the mine");
+    let n = col.sections.len();
+    assert!(col.wreck_ship >= 1, "never at the first blow: a reload under a hero in a fight");
+    assert!(col.wreck_ship + 2 <= n, "the ship is gone at least two sections before the last stand ({} of {n})", col.wreck_ship);
+}
+
+#[test]
 fn the_switch_off_asks_no_lantern_out_and_the_rest_of_the_wreck_goes_on() {
     let mut c = htl_survival::Content::builtin().for_dungeon_of("deadmines");
     let def = c.mob("dm_rhahkzor").unwrap();
