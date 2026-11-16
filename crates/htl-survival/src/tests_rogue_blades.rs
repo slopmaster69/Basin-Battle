@@ -521,6 +521,93 @@ fn afterimage_leaves_a_shade_and_the_enemies_on_you_turn_to_it() {
     assert!(!s.mobs.contains_key(&shade), "gone after 2 sec");
 }
 
+/// The copies of a hero's body asked for in these events (`Event::Afterimage`): its time, its spot
+/// and its stand-in.
+fn copies(ev: &[Event], p: Id) -> Vec<(f32, Option<Vec3>, Option<Id>)> {
+    ev.iter()
+        .filter_map(|e| match e {
+            Event::Afterimage { id, secs, at, stand_in } if *id == p => Some((*secs, *at, *stand_in)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Patch 0103's look (docs/rogue-roles.md, "Looks the server can't make"): Afterimage asks for a
+/// copy of the Rogue's own body standing at the shade for its 2 sec, the shade its stand-in; the
+/// shade going takes the copy with it. The shade itself (its body, the Distract) is as before.
+#[test]
+fn afterimage_asks_for_a_copy_of_the_rogue_at_the_shade_and_it_goes_with_the_shade() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let m = foe(&mut s);
+    s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    s.set_valor(p, 25.0);
+    s.events.clear();
+    s.input(p, Input::Ability(key_of("utility"), true));
+    let mut ev = std::mem::take(&mut s.events);
+    ev.extend(s.step(DT));
+    let shade_def = s.content.mob(&s.content.rogue.shade).unwrap();
+    let shade = *s.mobs.iter().find(|(_, x)| x.def == shade_def).map(|(k, _)| k).expect("a shade");
+    let asked = copies(&ev, p);
+    assert_eq!(asked.len(), 1, "one copy: {asked:?}");
+    let (secs, at, stand_in) = asked[0];
+    assert_eq!(secs, 2.0, "for the shade's 2 sec");
+    assert!(dist2d(at.expect("at the shade"), s.mobs[&shade].pos) < 0.01);
+    assert_eq!(stand_in, Some(shade), "the shade's own body stands in for it");
+    // Its time out: the shade goes, and the copy with it.
+    let ev = run(&mut s, 2.1);
+    assert!(!s.mobs.contains_key(&shade));
+    assert_eq!(copies(&ev, p), [(0.0, None, None)], "taken away as the shade goes");
+}
+
+/// A second Afterimage while the first shade stands: the old copy is taken away before the new
+/// one is asked for, so the client never keeps the first.
+#[test]
+fn a_second_afterimage_takes_the_first_copy_away_first() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    s.set_valor(p, 25.0);
+    s.input(p, Input::Ability(key_of("utility"), true));
+    run(&mut s, 0.6);
+    s.players.get_mut(&p).unwrap().cooldowns.clear();
+    s.set_valor(p, 25.0);
+    s.players.get_mut(&p).unwrap().stamina = 100.0;
+    s.events.clear();
+    s.input(p, Input::Ability(key_of("utility"), true));
+    let ev = std::mem::take(&mut s.events);
+    let asked: Vec<f32> = copies(&ev, p).iter().map(|c| c.0).collect();
+    assert_eq!(asked, [0.0, 2.0], "the first taken away, then the second: {asked:?}");
+}
+
+/// A perfect dodge asks for a copy of the Rogue where it stands, for the flicker's 0.3 sec; a
+/// dodge that isn't perfect asks for none, and no other class's dodge ever does.
+#[test]
+fn a_perfect_dodge_leaves_a_copy_for_the_flickers_time() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let m = foe(&mut s);
+    s.events.clear();
+    dodge_for(&mut s, p, 0.1);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    let ev = std::mem::take(&mut s.events);
+    assert_eq!(copies(&ev, p), [(s.content.rogue.flicker_secs, None, None)]);
+    assert_eq!(s.content.rogue.flicker_secs, 0.3);
+    // Early in the dodge: it evades, but isn't perfect: no copy.
+    run(&mut s, 1.0);
+    s.events.clear();
+    dodge_for(&mut s, p, 0.01);
+    let _ = blow(&mut s, m, p);
+    let ev = std::mem::take(&mut s.events);
+    assert!(copies(&ev, p).is_empty(), "no copy for a dodge that isn't perfect");
+    // A Warrior's perfect-timed dodge: nothing.
+    let w = hero_of(&mut s, "Wren", "warrior");
+    s.events.clear();
+    dodge_for(&mut s, w, 0.1);
+    let _ = blow(&mut s, m, w);
+    let ev = std::mem::take(&mut s.events);
+    assert!(copies(&ev, w).is_empty(), "the footwork is the Rogue's");
+}
+
 // --- Evasion and Adrenaline Rush --------------------------------------------------------------------
 
 #[test]

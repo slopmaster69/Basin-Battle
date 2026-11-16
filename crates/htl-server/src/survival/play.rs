@@ -234,21 +234,28 @@ impl SurvivalGame {
                                 htl_survival::StrikeKind::Kick => "kick",
                             };
                             let from = strike.from.as_deref().map(clean).unwrap_or_default();
-                            Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind, from))
+                            // A Rogue's blow trails the blade of the hand that struck (both on the
+                            // finisher), for a client that draws a hand each.
+                            let hands = self.sim.is_rogue(p).then(|| super::ui::rogue_trail(trail, strike.kind == htl_survival::StrikeKind::Off, strike.finish));
+                            Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind, from, hands))
                         }
                         _ => None,
                     });
                     let mine = self.conn_of(attacker);
                     // A creature's swing already came to the clip-playing clients with its wind-up.
                     let creature = self.sim.mobs.contains_key(&attacker);
-                    let conns: Vec<(ConnId, bool)> = self.in_world().map(|(c, _, w)| (*c, w.anim)).collect();
-                    for (c, anim_client) in conns {
+                    let conns: Vec<(ConnId, bool, u8)> = self.in_world().map(|(c, _, w)| (*c, w.anim, w.level)).collect();
+                    for (c, anim_client, level) in conns {
                         if creature && anim_client {
                             continue;
                         }
                         match &clip {
-                            Some((clip, take, impact, recovery, lunge, step, trail, ms, kind, from)) if anim_client => {
+                            Some((clip, take, impact, recovery, lunge, step, trail, ms, kind, from, hands)) if anim_client => {
                                 let me = u8::from(mine == Some(c));
+                                let trail = match hands {
+                                    Some(h) if level >= super::ui::ROGUE_LOOKS_LEVEL => h.as_str(),
+                                    _ => *trail,
+                                };
                                 self.ui_line(
                                     c,
                                     &format!("AN\t{a:#X}\t{clip}\t{impact:.3}\t{trail}\t{ms}\t{me}\t{take}\t{recovery:.3}\t{lunge:.2}\t{kind}\t{step}\t{from}"),
@@ -535,6 +542,17 @@ impl SurvivalGame {
                     };
                     let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
                     self.ui_line(c, &format!("SK	{kind}	{n}	{most}	{g:#X}"));
+                }
+            }
+            Event::Afterimage { id, secs, at, stand_in } => {
+                // A Rogue's afterimage, for the clients that draw a copy of a body (`AI`); the
+                // rest see the flicker and the shade's own body.
+                let Some(g) = self.guid_of(id) else { return };
+                let stand_in = stand_in.and_then(|s| self.guid_of(s));
+                let line = super::ui::afterimage_line(g, secs, at, stand_in);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::ui::ROGUE_LOOKS_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
                 }
             }
             Event::HoldPose { id, clip, secs, from } => {

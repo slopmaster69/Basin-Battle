@@ -401,7 +401,8 @@ fn the_contents_lanterns_are_the_clients_route_lanterns_each_once_by_section() {
     all.sort_unstable();
     assert_eq!(all, htl_map::deadmines::aftermath::ROUTE_LANTERNS, "each of the client's route lanterns, once");
     assert_eq!(col.wreck_lamp_sections[0], FIRST);
-    assert!(LAMPS_LEVEL > doodads::LEVEL && LAMPS_LEVEL == crate::survival::ui::CLIENT_NEWEST, "the round the client reports");
+    // (A round the client reports: 31, before the Rogue's looks made 32 the newest.)
+    assert!(LAMPS_LEVEL > doodads::LEVEL && LAMPS_LEVEL <= crate::survival::ui::CLIENT_NEWEST, "the round the client reports");
 }
 
 /// The real mine: the ruin fitted to the installed data, laid by Rhahk'Zor's own collapse.

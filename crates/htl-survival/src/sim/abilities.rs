@@ -3527,9 +3527,22 @@ impl Survival {
     }
 
     pub(crate) fn remove_totem(&mut self, mid: Id) {
+        self.shade_goes(mid);
         self.totems.retain(|t| t.mob != mid);
         if self.mobs.remove(&mid).is_some() {
             self.events.push(Event::MobGone { id: mid });
+        }
+    }
+
+    /// Afterimage's shade going (its time out, struck down, replaced, its Rogue gone): the copy of
+    /// its Rogue that stood in its place goes with it.
+    fn shade_goes(&mut self, mid: Id) {
+        let Some(shade) = self.content.mob(&self.content.rogue.shade) else { return };
+        if !self.mobs.get(&mid).is_some_and(|m| m.def == shade) {
+            return;
+        }
+        if let Some(owner) = self.totems.iter().find(|t| t.mob == mid).map(|t| t.owner) {
+            self.events.push(Event::Afterimage { id: owner, secs: 0.0, at: None, stand_in: None });
         }
     }
 
@@ -3543,6 +3556,7 @@ impl Survival {
             let due = self.content.abilities[t.ability].detonate > 0.0 && now >= t.next;
             if !alive || (now >= t.until && !due) || !self.players.contains_key(&t.owner) {
                 if !alive {
+                    self.shade_goes(t.mob);
                     self.totems.retain(|x| x.mob != t.mob);
                 } else {
                     self.remove_totem(t.mob);
