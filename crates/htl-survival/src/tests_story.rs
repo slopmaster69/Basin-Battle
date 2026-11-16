@@ -186,6 +186,9 @@ fn every_name_the_story_points_at_is_real() {
     }
     for p in &c.packs {
         assert!(c.mob(&p.mob).is_some(), "pack {} mob {}", p.key, p.mob);
+        if let Some(a) = &p.after {
+            check(a, &format!("pack {} of {}", p.key, p.mob));
+        }
         if !p.wake.is_empty() {
             assert!(c.chests.iter().any(|x| x.key == p.wake), "pack {} wakes on {}", p.key, p.wake);
         }
@@ -416,7 +419,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
     let mut s = bh_world();
     let at = |s: &Survival, t: &str| s.content.goals.iter().position(|g| g.title == t).unwrap_or_else(|| panic!("no goal {t}"));
     let first = at(&s, "The messenger");
-    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "The mason's marks", "Remy Two Times", "The Stonefield wagon", "Every corner"];
+    let titles = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "The mason's marks", "Remy Two Times", "The Stonefield wagon", "The Parley Stones", "Marzon the Silent Blade", "The seal on the letter", "Every corner"];
     for (k, t) in titles.iter().enumerate() {
         assert_eq!(at(&s, t), first + k, "{t} in its place");
     }
@@ -443,7 +446,7 @@ fn the_brotherhoods_hand_follows_in_the_journal_in_order_ahead_of_every_corner()
 #[test]
 fn an_older_save_keeps_its_goal_though_the_expansions_goals_went_in_ahead_of_every_corner() {
     let s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
-    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "The mason's marks", "Remy Two Times", "The Stonefield wagon"].into_iter().collect();
+    let new: BTreeSet<&str> = ["The messenger", "The drop at the dock", "The Smugglers' Ford", "The Paymaster", "The Nightbane Crossing", "Fenros", "Stitches", "The Brotherhood's Price", "Gruff Swiftbite", "The mason's marks", "Remy Two Times", "The Stonefield wagon", "The Parley Stones", "Marzon the Silent Blade", "The seal on the letter"].into_iter().collect();
     assert_eq!(new.len(), crate::save::ELWYNN_GOALS, "the goals the expansion has put in, counted");
     let goals = &s.content.goals;
     // The journal as it was before: the same goals without the new ones.

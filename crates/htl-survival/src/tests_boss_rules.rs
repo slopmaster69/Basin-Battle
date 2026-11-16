@@ -239,7 +239,7 @@ fn a_boss_whose_string_a_parry_ends_still_does_not_reel_from_it() {
     // Corey's rule for bosses (Nov 2): a parry fills a boss's posture, it never stun-locks it. The
     // strings that say "parry the first" end, and that is all they do.
     let c = Content::builtin();
-    for (k, n) in [("goldtooth", "flurry"), ("morgan", "flurry"), ("bh_paymaster", "stabs")] {
+    for (k, n) in [("goldtooth", "flurry"), ("morgan", "flurry"), ("bh_paymaster", "stabs"), ("marzon", "stabs")] {
         let d = &c.mobs[c.mob(k).unwrap()];
         assert!(d.boss && d.posture > 0, "{k} is a boss with a posture");
         assert!(d.patterns.iter().find(|p| p.name == n).unwrap().parry_ends, "{k}/{n} is marked");

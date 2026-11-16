@@ -234,7 +234,9 @@ impl Survival {
     /// done.
     pub(crate) fn presses(&self, id: Id, hero: Id, dist: f32) -> bool {
         let Some(m) = self.mobs.get(&id) else { return false };
-        dist <= mobs::PRESS_RANGE && self.clock + self.content.ai.press_early >= m.ready_at && m.stagger_until <= self.clock && self.hero_open(hero)
+        // (A temper that `answer`s every opening comes at once, whatever its cooldown has to run.)
+        let answers = self.temper(id).is_some_and(|t| t.answer);
+        dist <= mobs::PRESS_RANGE && (answers || self.clock + self.content.ai.press_early >= m.ready_at) && m.stagger_until <= self.clock && self.hero_open(hero)
     }
 
     /// A string done: its cooldown, give or take a little.

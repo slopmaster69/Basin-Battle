@@ -301,7 +301,7 @@ impl Survival {
                     hidden: 0.0,
                     wake: String::new(),
                     spots: Vec::new(),
-                    rare: false,
+                    after: None, rare: false,
                 });
             }
         }

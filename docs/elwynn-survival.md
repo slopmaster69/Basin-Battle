@@ -912,6 +912,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Smugglers' Ford (the river's south bank) | the Brotherhood's paymaster, Paymaster Voss, and his strongbox (guarded), with thugs, lookouts and a conjurer. The Defias Messenger who walks the Goldshire road to Jerod's Landing carries the key to the Messenger's Drop at the dock |
 | Nightbane Crossing (the river's south bank, near the map's south edge) | worgen out of Silverpine (Nightbane Prowlers, Shadow Weavers, Bleak Worgs) holding the crossing; Watcher Dodds of the Night Watch once it is found; Fenros (rare) wandering to the woods west of Eastvale |
 | The Goldshire road, north-west of the crossroads | Stitches (rare), a flesh golem who walks the cobbled road between the bridge and the crossroads |
+| The Parley Stones (the woods past Jasperlode) | the Brotherhood's parley table; Marzon the Silent Blade, who answers every swing, and the Blackrock Envoy; Dughan or Remy helps, as the camp chose; the satchel with the lion's seal |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; the Stonefield Wagon, a hold against three kobold waves with Fedfennel, with Tommy Joe Stonefield helping; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
 | Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista; Gruff Swiftbite (rare, three spots in the west) and the Riverpaw Tribute he sits on |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
@@ -1356,6 +1357,21 @@ camp; one set by a pack stands where it was put, and enemies can't target it.
 degrees, in the chase or between his blows. It doesn't take a heavy blow, a shove, a thrust through the guard or
 a blow struck as he winds up, nor from the side or behind, and not while a Bearded Axe holds his guard down. His
 rule: hit him as he winds up, from the side, or heavy. He chops, and holds his pick high, glowing amber.
+
+**The Parley Stones** (Stage 10 of docs/elwynn-expansion.md). The note under the wagon's grain names the standing stones in
+the woods past Jasperlode, where the Brotherhood meets its buyers: 2 thugs, 2 lookouts and the Blackrock Envoy (a
+coward, who runs from a fight). Using The Price of the Roads on the parley table wakes **Marzon the Silent Blade**
+on the opener, and whichever of Marshal Dughan (a heavy bolt every 5 sec, if the camp had Remy arrested) or Remy (quick
+knives, if the camp let him go) the choice calls: a pack's `after` decides which helper wakes, the other stays asleep,
+and they stand down when the chest fills again. Marzon's rule: he answers every swing. His temper, `silent`, is a punisher
+that answers every opening at once (`answer`: a swing that misses, a cast, a meal, a hero staggered draw his blow
+whatever his cooldown has to run), at a slow pace otherwise (1.8 times his cooldown), and gives ground 50% of the time
+after a string. So let him strike first: parry his three stabs (a parry ends the string without a reel: `parry_ends`)
+and hit him as he recovers. At half his health he says "Enough talk." and throws a fan of knives all round him once,
+glowing red and blocked by nothing (it is not an enrage). His trophy is **The Silent Blade**, a dagger whose punish
+mechanic does 75% more damage to an enemy in its recovery. His satchel stays shut until he falls: a letter under a
+lion's seal, signed "G. L." Marshal Wyle then names Lord Gregor Lescovar and links the Deadmines page. Three goals
+follow (the stones, Marzon, the seal), and "Every corner" counts the 38 places.
 
 
 **The hour and the fog.** The game clock is pinned at ten in the morning (`[world] clock`), set

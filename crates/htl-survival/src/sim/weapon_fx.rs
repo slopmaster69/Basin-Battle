@@ -63,6 +63,10 @@ impl Survival {
                 k += w.rage * (1.0 - p.health as f32 / p.max_health.max(1) as f32).clamp(0.0, 1.0);
             }
         }
+        // The punisher: a foe in its recovery, between its own blows, takes more.
+        if w.punish > 0.0 && !strike.shove() && self.mobs.get(&mid).is_some_and(|m| matches!(m.state, mobs::MobState::Recover { .. })) {
+            k += w.punish;
+        }
         // The guillotine: a heavy blow on what can't move.
         if w.guillotine > 0.0 && strike.heavy() && self.helpless(mid) {
             k *= w.guillotine;

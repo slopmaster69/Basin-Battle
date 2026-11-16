@@ -19,6 +19,8 @@ fn gruff_bare(seed: u64) -> (Survival, Id, Id) {
     s.mobs.clear();
     s.respawns.clear();
     let p = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    // (The dice are this seed's from here, whatever the world's content drew getting this far.)
+    s.rng = rand::SeedableRng::seed_from_u64(seed);
     let def = s.content.mob("gruff_swiftbite").unwrap();
     let g = s.spawn_mob(def, [2.5, 0.0, 0.0], None, false);
     let m = s.mobs.get_mut(&g).unwrap();
@@ -321,7 +323,7 @@ fn the_cairn_is_a_place_and_every_corner_counts_it() {
     let c = Content::builtin();
     let site = c.sites.iter().find(|s| s.key == "mason_cairn").unwrap();
     assert_eq!((site.kind.as_str(), site.radius, site.at), ("landmark", 30.0, [-8890.0, -840.0]));
-    assert_eq!(c.sites.len(), 37);
+    assert!(c.sites.len() >= 37, "the cairn is one of the places");
     let corner = c.goals.iter().find(|g| g.title == "Every corner").unwrap();
     assert_eq!(corner.count as usize, c.sites.len());
     // The stones stand inside it.
@@ -941,7 +943,7 @@ fn fedfennel_is_a_boss_with_a_shield_and_two_blows_one_glowing_amber() {
     assert!(t.friendly);
     let sh = t.shoots.as_ref().unwrap();
     assert_eq!((sh.damage, sh.range, sh.every), (9, 25.0, 2.0));
-    assert_eq!(c.mobs.iter().filter(|m| m.shoots.is_some()).count(), 1);
+    assert!(c.mobs.iter().filter(|m| m.shoots.is_some()).all(|m| m.friendly), "only a friendly creature shoots");
 }
 
 #[test]
@@ -970,9 +972,311 @@ fn a_hold_and_a_shooter_must_be_made_right_or_validate_refuses_them() {
 fn the_wagon_is_a_goal_and_the_journal_keeps_its_place() {
     let c = Content::builtin();
     let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
-    assert_eq!(at("The Stonefield wagon") + 1, at("Every corner"));
+    assert!(at("The Stonefield wagon") < at("Every corner"), "ahead of Every corner");
     let g = &c.goals[at("The Stonefield wagon")];
     assert_eq!((g.kind.as_str(), g.what.as_str()), ("open", "sf_wagon"));
-    assert_eq!(crate::save::ELWYNN_GOALS, 12);
+    assert!(crate::save::ELWYNN_GOALS >= 12, "the wagon is one of the goals the expansion put in");
     assert_eq!(c.goals[at("Every corner")].count as usize, c.sites.len());
+}
+
+// --- Stage 10: The Parley Stones ---------------------------------------------------------------
+
+/// The world with only the parley table's packs standing (Marzon and the two helpers).
+fn parley_world() -> (Survival, Id) {
+    let mut c = Content::builtin();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 5, 1_000_000.0);
+    let keep: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.pack.is_some_and(|k| ["marzon", "parley_dughan", "parley_remy"].contains(&s.content.packs[k].key.as_str()))).map(|(id, _)| *id).collect();
+    s.mobs.retain(|id, _| keep.contains(id));
+    s.respawns.clear();
+    let h = bh_hero(&mut s, [0.0, 0.0, 0.0]);
+    (s, h)
+}
+
+/// The creature of `key` that stands (alive), if any, whether it is seen or not.
+fn parley_mob(s: &Survival, key: &str) -> Id {
+    mob_of(s, key).first().copied().unwrap_or_else(|| panic!("no {key}"))
+}
+
+#[test]
+fn the_packs_after_decides_which_ally_wakes() {
+    for (choice, dughan, remy) in [(Some("chose:remy:arrest"), true, false), (Some("chose:remy:free"), false, true), (None, false, false)] {
+        let (mut s, h) = parley_world();
+        if let Some(c) = choice {
+            s.camp.counts.insert(c.into(), 1);
+        }
+        let (d, r, m) = (parley_mob(&s, "parley_dughan"), parley_mob(&s, "parley_remy"), parley_mob(&s, "marzon"));
+        assert!(s.mobs[&d].hidden && s.mobs[&r].hidden && s.mobs[&m].hidden, "all asleep before the table is opened");
+        open_at(&mut s, h, "parley_price");
+        assert!(!s.mobs[&m].hidden, "Marzon always wakes ({choice:?})");
+        assert_eq!(!s.mobs[&d].hidden, dughan, "Dughan, with {choice:?}");
+        assert_eq!(!s.mobs[&r].hidden, remy, "Remy, with {choice:?}");
+        assert_eq!(s.mobs[&m].state.foe(), Some(Foe::Hero(h)), "on the opener");
+    }
+}
+
+#[test]
+fn the_allies_of_the_parley_shoot_what_fights_a_hero_in_their_own_way() {
+    let c = Content::builtin();
+    let d = c.mobs[c.mob("parley_dughan").unwrap()].shoots.clone().unwrap();
+    let r = c.mobs[c.mob("parley_remy").unwrap()].shoots.clone().unwrap();
+    assert!(d.damage > r.damage * 4 && d.every > r.every * 3.0, "Dughan a heavy bolt, Remy quick knives");
+    for (key, want) in [("parley_dughan", "chose:remy:arrest"), ("parley_remy", "chose:remy:free")] {
+        let p = c.packs.iter().find(|p| p.key == key).unwrap();
+        assert_eq!((p.wake.as_str(), p.after.as_deref()), ("parley_price", Some(want)));
+    }
+    // And a woken Dughan shoots Marzon's guard when it fights the hero.
+    let (mut s, h) = parley_world();
+    s.camp.counts.insert("chose:remy:arrest".into(), 1);
+    open_at(&mut s, h, "parley_price");
+    let dughan = parley_mob(&s, "parley_dughan");
+    let at = s.mobs[&dughan].pos;
+    let thug = s.content.mob("defias_thug").unwrap();
+    let k = s.spawn_mob(thug, [at[0] + 8.0, at[1], at[2]], None, false);
+    s.mobs.get_mut(&k).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    s.mobs.get_mut(&k).unwrap().ready_at = 1e9;
+    let m = parley_mob(&s, "marzon");
+    fell(&mut s, h, m);
+    let mut shot = false;
+    for _ in 0..(8.0 / 0.05) as usize {
+        for e in step_keeping_alive(&mut s, h) {
+            shot |= matches!(e, Event::Missile { caster, target: Target::Unit(t), .. } if caster == dughan && t == k);
+        }
+        s.mobs.get_mut(&k).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+        s.mobs.get_mut(&k).unwrap().pos = [at[0] + 8.0, at[1], at[2]];
+    }
+    assert!(shot, "Dughan shot the one on the hero");
+}
+
+#[test]
+fn the_satchel_stays_shut_until_marzon_dies_and_the_letter_is_read_once_he_has() {
+    let (mut s, h) = parley_world();
+    let ev = open_at(&mut s, h, "marzon_satchel");
+    assert!(told(&ev, "Marzon keeps the satchel on his belt."), "{ev:?}");
+    assert!(chest(&s, "marzon_satchel").is_some());
+    open_at(&mut s, h, "parley_price");
+    let m = parley_mob(&s, "marzon");
+    fell(&mut s, h, m);
+    assert!(s.camp_has("kill:marzon"));
+    let silver = s.content.item("silver").unwrap();
+    let before = s.players[&h].bag.get(&silver).copied().unwrap_or(0);
+    let ev = open_at(&mut s, h, "marzon_satchel");
+    assert!(told(&ev, "A letter under a lion's seal, signed only 'G. L.'"));
+    assert!(s.camp_has("open:marzon_satchel"));
+    assert!(s.players[&h].bag.get(&silver).copied().unwrap_or(0) > before);
+}
+
+#[test]
+fn wyle_names_the_lord_and_the_deadmines_once_the_satchel_is_open() {
+    let mut s = world();
+    s.camp.raids_won = 3;
+    s.camp.counts.insert("kill:bh_paymaster".into(), 1);
+    run(&mut s, 5.5);
+    let (wyle, _) = person(&s, "Marshal Wyle");
+    assert!(s.talk_line(wyle).unwrap().text.starts_with("The Brotherhood paid the Horde's way"));
+    s.camp.counts.insert("open:marzon_satchel".into(), 1);
+    let t = s.talk_line(wyle).unwrap();
+    assert!(t.text.starts_with("Lord Gregor Lescovar. A seat in the House of Nobles."), "{}", t.text);
+    assert_eq!(t.links, [".es lore deadmines~The Deadmines"]);
+    assert!(s.content.dungeons().any(|d| d.key == "deadmines"));
+}
+
+/// The first Windup of `m` after `from` sec, as seconds into the run (None if it never comes in `secs`).
+fn windup_after(s: &mut Survival, h: Id, m: Id, secs: f32, each: &mut dyn FnMut(&mut Survival)) -> Option<f32> {
+    let t0 = s.clock;
+    for _ in 0..(secs / 0.02) as usize {
+        each(s);
+        let _ = s.step(0.02);
+        if let Some(p) = s.players.get_mut(&h) {
+            p.health = 1_000_000;
+        }
+        if matches!(s.mobs[&m].state, MobState::Windup { .. }) {
+            return Some(s.clock - t0);
+        }
+    }
+    None
+}
+
+/// Marzon's rule: he answers every swing. A hero who swings and misses in reach is stabbed within
+/// 0.3 sec of the moment they are open; one who stands still waits about his (slow) pace.
+#[test]
+fn after_a_swing_that_misses_marzon_starts_his_windup_within_a_third_of_a_second() {
+    let (mut s, h) = parley_world();
+    s.mobs.clear();
+    let def = s.content.mob("marzon").unwrap();
+    let m = s.spawn_mob(def, [2.4, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    s.mobs.get_mut(&m).unwrap().ready_at = s.clock + 6.0;
+    s.mobs.get_mut(&m).unwrap().facing = std::f32::consts::PI;
+    // The hero swings the other way: it misses.
+    s.move_player(h, [0.0, 0.0, 0.0], std::f32::consts::PI, Moving::default());
+    let _ = s.step(0.0);
+    s.input(h, Input::Attack);
+    let mut open_at_clock = None;
+    let mut windup_at = None;
+    for _ in 0..(1.5 / 0.02) as usize {
+        let _ = s.step(0.02);
+        if let Some(p) = s.players.get_mut(&h) {
+            p.health = 1_000_000;
+        }
+        let open = matches!(&s.players[&h].action, Action::Swing { t, strike, .. } if *t > strike.windup + strike.active);
+        if open && open_at_clock.is_none() {
+            open_at_clock = Some(s.clock);
+        }
+        if windup_at.is_none() && matches!(s.mobs[&m].state, MobState::Windup { .. }) {
+            windup_at = Some(s.clock);
+        }
+    }
+    let (open, wind) = (open_at_clock.expect("the swing ended"), windup_at.expect("he answered"));
+    assert!(wind - open <= 0.3, "he began {:.2} sec after they were open", wind - open);
+    assert!(wind >= open - 0.001, "and not before: the cooldown still had 6 sec to run");
+}
+
+#[test]
+fn with_no_swing_marzon_waits_about_his_slow_pace_between_strings() {
+    // The cooldown he sets as a string of his ends, with a hero who stands and takes it: his 1.3 sec
+    // times his 1.8 pace, where an ordinary one's is the 1.3 sec.
+    let cooldowns = |temper: &str| -> Vec<f32> {
+        let (mut s, h) = parley_world();
+        s.mobs.clear();
+        let def = s.content.mob("marzon").unwrap();
+        s.content.mobs[def].temper = temper.to_string();
+        // (No dice: only the pace is measured.)
+        s.content.ai.jitter = 0.0;
+        s.content.ai.quirk = 0.0;
+        let m = s.spawn_mob(def, [2.4, 0.0, 0.0], None, false);
+        s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+        let mut out = Vec::new();
+        let mut in_string = false;
+        for _ in 0..(60.0 / 0.02) as usize {
+            let _ = s.step(0.02);
+            if let Some(p) = s.players.get_mut(&h) {
+                p.health = 1_000_000;
+            }
+            let on = s.mobs[&m].pattern.is_some();
+            if in_string && !on {
+                out.push(s.mobs[&m].ready_at - s.clock);
+            }
+            in_string = on;
+        }
+        out
+    };
+    let slow = cooldowns("silent");
+    let plain = cooldowns("");
+    assert!(slow.len() >= 3 && plain.len() >= 3, "strings came and went: {slow:?} / {plain:?}");
+    let c = Content::builtin();
+    let cooldown = c.mobs[c.mob("marzon").unwrap()].attack.cooldown;
+    let near = |v: &[f32], want: f32| v.iter().all(|x| (x - want).abs() < 0.15);
+    assert!(near(&slow, cooldown * 1.8), "his cooldown is {} sec: {slow:?}", cooldown * 1.8);
+    assert!(near(&plain, cooldown), "an ordinary one's is {cooldown} sec: {plain:?}");
+}
+
+#[test]
+fn marzons_fan_of_knives_comes_once_at_half_health_and_nothing_blocks_it() {
+    let c = Content::builtin();
+    let d = &c.mobs[c.mob("marzon").unwrap()];
+    assert!(d.boss && d.health == 700 && d.unparryable == false);
+    assert_eq!((d.aggro_text.as_str(), d.death_text.as_str()), ("You read the book. Pity.", "He'll only send another."));
+    let fan = d.patterns.iter().find(|p| p.name == "fan of knives").unwrap();
+    assert_eq!(fan.weight, 0.0, "kept for the turn alone");
+    let st = &fan.steps[0];
+    assert_eq!((st.arc, st.range, st.blockable, st.kit), (Some(360.0), Some(4.0), Some(false), 124));
+    let phase = d.phases.iter().find(|p| p.at == 0.5).unwrap();
+    assert_eq!((phase.pattern.as_str(), phase.text.as_str()), ("fan of knives", "Enough talk."));
+    assert!(phase.speed == 1.0 && phase.might == 1.0 && phase.summon.is_empty(), "it is not an enrage");
+    let stabs = d.patterns.iter().find(|p| p.name == "stabs").unwrap();
+    assert!(stabs.parry_ends && stabs.steps.len() == 3, "a parryable three-stab string that a parry ends");
+    assert!(d.patterns.iter().any(|p| p.name == "lunge" && p.min_range >= 4.0));
+    // The silent temper.
+    let t = c.tempers.iter().find(|t| t.key == "silent").unwrap();
+    assert_eq!((t.punish, t.pace, t.retreat, t.retreat_yards), (Some(true), 1.8, Some(0.5), Some(4.0)));
+    // In the sim: at half his health the fan is begun at once, with his line, and not again.
+    let (mut s, h) = parley_world();
+    s.mobs.clear();
+    let def = s.content.mob("marzon").unwrap();
+    let m = s.spawn_mob(def, [2.4, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(h) };
+    let max = s.mobs[&m].max_health;
+    s.hurt_mob(m, h, max / 2 + 5);
+    assert!(s.mobs[&m].pattern.is_none(), "not before half");
+    let mut said = Vec::new();
+    let mut fans = 0;
+    s.hurt_mob(m, h, 20);
+    for _ in 0..(8.0 / 0.05) as usize {
+        for e in step_keeping_alive(&mut s, h) {
+            if let Event::Yell { text, .. } = e {
+                said.push(text);
+            }
+        }
+        if s.mobs[&m].pattern.is_some_and(|(k, _)| d.patterns[k].name == "fan of knives") && matches!(s.mobs[&m].state, MobState::Windup { .. }) {
+            fans += 1;
+        }
+    }
+    assert!(said.iter().any(|t| t == "Enough talk."), "{said:?}");
+    assert!(fans > 0, "the fan was begun");
+}
+
+#[test]
+fn the_parley_stones_are_a_place_with_guards_an_envoy_and_a_table() {
+    let c = Content::builtin();
+    let site = c.sites.iter().find(|s| s.key == "parley_stones").unwrap();
+    assert_eq!((site.kind.as_str(), site.radius, site.at), ("foes", 35.0, [-9260.0, -800.0]));
+    let packs = |mob: &str| c.packs.iter().filter(|p| p.mob == mob && dist2d([p.at[0], p.at[1], 0.0], [site.at[0], site.at[1], 0.0]) < site.radius).collect::<Vec<_>>();
+    assert_eq!(packs("defias_thug").iter().map(|p| p.count).sum::<usize>(), 2, "2 thugs");
+    assert_eq!(packs("defias_archer").iter().map(|p| p.count).sum::<usize>(), 2, "2 archers");
+    let envoy = &c.mobs[c.mob("blackrock_envoy").unwrap()];
+    assert_eq!((envoy.display, envoy.scale, envoy.temper.as_str()), (1359, 1.1, "coward"));
+    assert_eq!(packs("blackrock_envoy").len(), 1);
+    // The table and the satchel stand at it.
+    for k in ["parley_price", "marzon_satchel"] {
+        let ch = c.chests.iter().find(|ch| ch.key == k).unwrap();
+        assert!(dist2d([ch.at[0], ch.at[1], 0.0], [site.at[0], site.at[1], 0.0]) < site.radius, "{k}");
+    }
+    assert_eq!(c.chests.iter().find(|ch| ch.key == "parley_price").unwrap().ambush, ["marzon", "parley_dughan", "parley_remy"]);
+    assert_eq!(c.chests.iter().find(|ch| ch.key == "marzon_satchel").unwrap().after, "marzon");
+}
+
+#[test]
+fn the_journal_ends_the_story_with_three_goals_and_every_corner_counts_38_places() {
+    let c = Content::builtin();
+    let at = |t: &str| c.goals.iter().position(|g| g.title == t).unwrap();
+    let wagon = at("The Stonefield wagon");
+    for (k, (t, kind, what)) in [("The Parley Stones", "explore", "parley_stones"), ("Marzon the Silent Blade", "kill", "marzon"), ("The seal on the letter", "open", "marzon_satchel")].into_iter().enumerate() {
+        assert_eq!(at(t), wagon + 1 + k, "{t} in its place");
+        let g = &c.goals[at(t)];
+        assert_eq!((g.kind.as_str(), g.what.as_str()), (kind, what));
+    }
+    assert_eq!(at("Every corner"), wagon + 4);
+    assert_eq!(crate::save::ELWYNN_GOALS, 15);
+    assert_eq!(c.sites.len(), 38);
+    assert_eq!(c.goals[at("Every corner")].count, 38);
+    // Each is done by what the camp does, in order.
+    let mut s = world();
+    s.camp.goal = wagon + 1;
+    s.step_goals();
+    assert_eq!(s.camp.goal, wagon + 1);
+    s.camp.counts.insert("explore:parley_stones".into(), 1);
+    s.camp.counts.insert("open:marzon_satchel".into(), 1);
+    s.step_goals();
+    assert_eq!(s.content.goals[s.camp.goal].title, "Marzon the Silent Blade", "the seal doesn't count before Marzon");
+    s.camp.counts.insert("kill:marzon".into(), 1);
+    s.step_goals();
+    assert_eq!(s.content.goals[s.camp.goal].title, "Every corner");
+}
+
+#[test]
+fn a_pack_after_must_be_real_and_belong_to_a_chest_or_validate_refuses_it() {
+    let text = source("survival.toml");
+    let dungeon = source("deadmines.toml");
+    assert!(Content::parse_with(&text, &dungeon).is_ok());
+    let swap = |from: &str, to: &str| {
+        let at = text.find(from).unwrap_or_else(|| panic!("no {from}"));
+        let mut t = text.clone();
+        t.replace_range(at..at + from.len(), to);
+        Content::parse_with(&t, &dungeon)
+    };
+    let err = swap("after = \"chose:remy:arrest\"\n\n[[pack]]\nmob = \"parley_remy\"", "after = \"chose:remy:nope\"\n\n[[pack]]\nmob = \"parley_remy\"").unwrap_err();
+    assert!(format!("{err:#}").contains("nope"), "{err:#}");
+    let err = swap("key = \"parley_remy\"\nwake = \"parley_price\"\nafter = \"chose:remy:free\"", "key = \"parley_remy\"\nafter = \"chose:remy:free\"").unwrap_err();
+    assert!(format!("{err:#}").contains("only decides whether a pack that wakes"), "{err:#}");
 }
