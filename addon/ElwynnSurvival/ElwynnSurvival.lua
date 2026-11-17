@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 78
+local VERSION = 79
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -3578,11 +3578,12 @@ ES.edge.pieces = hurt.Pieces(ES.edge, 1, 1, 1, 0.45)
 ES.edge.secs, ES.edge.left = 0.4, 0
 ES.edge:SetAlpha(0)
 ES.edge:Hide()
-function ES.Edge(r, g, b, secs)
+function ES.Edge(r, g, b, secs, gain)
   local e = ES.edge
+  local k = tonumber(gain) or 1
   for i = 1, table.getn(e.pieces) do
     local t = e.pieces[i]
-    t:SetVertexColor(r or 1, g or 1, b or 1, t.a)
+    t:SetVertexColor(r or 1, g or 1, b or 1, math.min(1, t.a * k))
   end
   e.secs = math.max(0.05, tonumber(secs) or 0.4)
   e.left = e.secs
@@ -7142,7 +7143,10 @@ events:SetScript("OnEvent", function()
     -- ac30: the collapsed Deadmines' own doodads hidden for the server's knocked-over copies.
     -- ac31: the collapse route's lanterns put out as each section comes down (patch 0096).
     -- ac32: a Rogue's blades trail a hand each, and its afterimage (PlayUnitAfterimage, 0103).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 32 then
+    -- ac33: a Rogue's off-hand and finisher trails wider and longer-lived (patch 0109).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 33 then
+      Say(".es hello " .. VERSION .. " ac33")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 32 then
       Say(".es hello " .. VERSION .. " ac32")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 31 then
       Say(".es hello " .. VERSION .. " ac31")

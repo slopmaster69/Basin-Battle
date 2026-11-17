@@ -579,7 +579,7 @@ fn a_second_afterimage_takes_the_first_copy_away_first() {
     assert_eq!(asked, [0.0, 2.0], "the first taken away, then the second: {asked:?}");
 }
 
-/// A perfect dodge asks for a copy of the Rogue where it stands, for the flicker's 0.3 sec; a
+/// A perfect dodge asks for a copy of the Rogue where it stands, for the flicker's 0.5 sec; a
 /// dodge that isn't perfect asks for none, and no other class's dodge ever does.
 #[test]
 fn a_perfect_dodge_leaves_a_copy_for_the_flickers_time() {
@@ -591,7 +591,7 @@ fn a_perfect_dodge_leaves_a_copy_for_the_flickers_time() {
     assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
     let ev = std::mem::take(&mut s.events);
     assert_eq!(copies(&ev, p), [(s.content.rogue.flicker_secs, None, None)]);
-    assert_eq!(s.content.rogue.flicker_secs, 0.3);
+    assert_eq!(s.content.rogue.flicker_secs, 0.5);
     // Early in the dodge: it evades, but isn't perfect: no copy.
     run(&mut s, 1.0);
     s.events.clear();

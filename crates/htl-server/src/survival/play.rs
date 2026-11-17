@@ -236,7 +236,10 @@ impl SurvivalGame {
                             let from = strike.from.as_deref().map(clean).unwrap_or_default();
                             // A Rogue's blow trails the blade of the hand that struck (both on the
                             // finisher), for a client that draws a hand each.
-                            let hands = self.sim.is_rogue(p).then(|| super::ui::rogue_trail(trail, strike.kind == htl_survival::StrikeKind::Off, strike.finish));
+                            let hands = self.sim.is_rogue(p).then(|| {
+                                let off = strike.kind == htl_survival::StrikeKind::Off;
+                                [super::ui::rogue_trail(trail, off, strike.finish, false), super::ui::rogue_trail(trail, off, strike.finish, true)]
+                            });
                             // Its place in the chain, for the hero's own pips (`Chain.lua`).
                             let chain = format!("{}/{}\t{:.2}\t{}", strike.chain.0, strike.chain.1, self.sim.chain_window(strike.run), u8::from(self.sim.two_hands(p)));
                             Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind, from, hands, chain))
@@ -255,7 +258,8 @@ impl SurvivalGame {
                             Some((clip, take, impact, recovery, lunge, step, trail, ms, kind, from, hands, chain)) if anim_client => {
                                 let me = u8::from(mine == Some(c));
                                 let trail = match hands {
-                                    Some(h) if level >= super::ui::ROGUE_LOOKS_LEVEL => h.as_str(),
+                                    Some(h) if level >= super::ui::TRAIL_BOLD_LEVEL => h[1].as_str(),
+                                    Some(h) if level >= super::ui::ROGUE_LOOKS_LEVEL => h[0].as_str(),
                                     _ => *trail,
                                 };
                                 self.ui_line(

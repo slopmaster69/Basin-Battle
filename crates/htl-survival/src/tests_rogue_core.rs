@@ -276,8 +276,8 @@ fn a_dodge_whose_blow_lands_by_0_18_sec_is_perfect_and_a_later_one_only_evades()
     assert!(cut_open(&s, p), "perfect: the Shadow Cut is open");
     let _ = s.step(DT);
     assert!(s.auras_of(p).contains(&s.content.rogue.flicker_aura), "the body flickers");
-    run(&mut s, 0.4);
-    assert!(!s.auras_of(p).contains(&s.content.rogue.flicker_aura), "for 0.3 sec");
+    run(&mut s, 0.6);
+    assert!(!s.auras_of(p).contains(&s.content.rogue.flicker_aura), "for 0.5 sec");
     // 0.25 sec in: still dodged, not perfect.
     let mut s = world();
     let p = rogue(&mut s);
@@ -620,7 +620,7 @@ fn the_rogue_numbers_say_what_the_doc_says() {
     assert_eq!(c.valor.perfect, 10.0);
     let r = &c.rogue;
     assert_eq!((r.cut_secs, r.cut_reach, r.off_cancel_after, r.jab), (0.6, 6.0, 0.0, 0.5));
-    assert_eq!((r.flicker_aura, r.flicker_secs, r.puff), (5215, 0.3, 1856));
+    assert_eq!((r.flicker_aura, r.flicker_secs, r.puff), (5215, 0.5, 1856));
     assert_eq!((r.weapon.as_str(), r.off_hand.as_str()), ("dagger", "dagger"));
     // An older content file with no [rogue] table loads these.
     let d = crate::content::RogueDef::default();

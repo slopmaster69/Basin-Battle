@@ -1,0 +1,294 @@
+From 98cc6910357ad6a1629367ee7f88695d36c31d97 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 16 Nov 2026 17:40:36 -0600
+Subject: [PATCH] A Rogue's off-hand and finisher trails can be drawn wider and
+ longer-lived
+
+Basin Battle, the thirty-third round (HasActionCombat() 33). A hand's trail colour in
+PlayUnitAnimation's "main/off" form may end "*N" (1 to 4): that hand's ribbon is N times as wide,
+drawn out from the blade's middle, and its swing fades slower, living 1 + 0.6 (N - 1) times as long.
+No mark is the blade's own ribbon, as before. A trail that arms again goes back to the blade's width.
+The off hand's deeper steel did not read a few yards off.
+---
+ .../benilla-app/src/creature_anim/action.rs   |  2 +
+ .../src/creature_anim/action/flurry.rs        |  1 +
+ crates/benilla-app/src/weapon_trail.rs        | 38 +++++++++++++-
+ crates/benilla-app/src/weapon_trail/tests.rs  | 29 +++++++++++
+ crates/benilla-ui/src/action_combat.rs        | 50 +++++++++++++++----
+ 5 files changed, 109 insertions(+), 11 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 5490b8b4..ab01e4e4 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -871,6 +871,7 @@ pub(super) fn drain_action_calls(
+                 from,
+                 hold,
+                 hands,
++                wide,
+             } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+@@ -978,6 +979,7 @@ pub(super) fn drain_action_calls(
+                             };
+                             if let Ok(mut t) = trails.get_mut(*root) {
+                                 t.arm(proc, now_ms);
++                                t.widen(wide[hand]);
+                             }
+                         }
+                     }
+diff --git a/crates/benilla-app/src/creature_anim/action/flurry.rs b/crates/benilla-app/src/creature_anim/action/flurry.rs
+index 85311c4f..1ec5e889 100644
+--- a/crates/benilla-app/src/creature_anim/action/flurry.rs
++++ b/crates/benilla-app/src/creature_anim/action/flurry.rs
+@@ -130,6 +130,7 @@ impl Flurry {
+             from: self.from.clone(),
+             hold: 0.0,
+             hands: None,
++            wide: [1.0; 2],
+         });
+     }
+ }
+diff --git a/crates/benilla-app/src/weapon_trail.rs b/crates/benilla-app/src/weapon_trail.rs
+index 668e4d5b..cbe83d55 100644
+--- a/crates/benilla-app/src/weapon_trail.rs
++++ b/crates/benilla-app/src/weapon_trail.rs
+@@ -105,6 +105,7 @@ impl WeaponTrail {
+                 tail: 0,
+                 rgb: [f32::from(r), f32::from(g), f32::from(b)],
+                 alpha: 0,
++                wide: 1.0,
+                 duration_ms: 0,
+                 start_ms: 0,
+                 last_ms: 0,
+@@ -118,12 +119,34 @@ impl WeaponTrail {
+             f32::from(b) / 255.0,
+         ];
+         swing.alpha = trail.alpha();
++        swing.wide = 1.0;
+         swing.duration_ms = trail.duration_ms;
+         swing.start_ms = now_ms;
+         swing.last_ms = now_ms;
+     }
+ }
+ 
++impl WeaponTrail {
++    /// Patch 0109: draw the live swing `wide` times as wide (1 to 4) and longer-lived. Called right
++    /// after [`WeaponTrail::arm`]; a trail with no swing, or `wide` of 1, is left as it is.
++    pub(crate) fn widen(&mut self, wide: f32) {
++        if let Some(swing) = self.swing.as_mut() {
++            swing.wide = wide.clamp(1.0, 4.0);
++        }
++    }
++}
++
++/// How much longer a widened swing lives: 0.6 of its excess width.
++fn life_of(wide: f32) -> f32 {
++    1.0 + (wide - 1.0) * 0.6
++}
++
++/// A bold swing's edge pair: the blade's own edge, drawn `wide` times as far apart about its middle.
++fn widen_pair(bottom: Vec3, top: Vec3, wide: f32) -> (Vec3, Vec3) {
++    let (mid, half) = ((bottom + top) * 0.5, (top - bottom) * 0.5 * wide);
++    (mid - half, mid + half)
++}
++
+ /// The reference's `SWING` record (pool `0xce86ec`): the ring of blade samples, the packed colour
+ /// at `+0x608` (byte 3 the live alpha) and the clocks that fade it.
+ struct Swing {
+@@ -138,6 +161,8 @@ struct Swing {
+     /// The live alpha byte (`+0x60b`), which also sets the fade rate, the retained segment count
+     /// and the end test.
+     alpha: u8,
++    /// Patch 0109: the ribbon's width and life, 1 as the reference draws it (`WeaponTrail::widen`).
++    wide: f32,
+     /// `+0x60c`: how long the ring appends; the fade outlasts it.
+     duration_ms: u32,
+     /// `+0x610`.
+@@ -190,7 +215,11 @@ impl Swing {
+         }
+         let dt = now_ms.wrapping_sub(self.last_ms);
+         self.last_ms = now_ms;
+-        let step = fade_step(dt, self.alpha);
++        let mut step = fade_step(dt, self.alpha);
++        if self.wide > 1.0 {
++            // A bold swing fades slower, so it lives longer (the segments held grow with it).
++            step = ((step as f32 / life_of(self.wide)).round() as u32).max(1);
++        }
+         // `6c65fa`: one segment or fewer and the trail is over.
+         let segments = u32::from(self.alpha) / step;
+         if segments <= 1 {
+@@ -319,7 +348,7 @@ fn draw_weapon_trails(
+         let Some(swing) = trail.swing.as_mut() else {
+             continue;
+         };
+-        let (rgb, strip) = (swing.rgb, swing.step(now_ms, bottom, top));
++        let (rgb, wide, strip) = (swing.rgb, swing.wide, swing.step(now_ms, bottom, top));
+         let Step::Strip(strip) = strip else {
+             trail.swing = None;
+             continue;
+@@ -346,6 +375,11 @@ fn draw_weapon_trails(
+         let verts = batch.verts_mut();
+         for w in strip.windows(2) {
+             let ((b0, t0, a0), (b1, t1, a1)) = (w[0], w[1]);
++            let ((b0, t0), (b1, t1)) = if wide > 1.0 {
++                (widen_pair(b0, t0, wide), widen_pair(b1, t1, wide))
++            } else {
++                ((b0, t0), (b1, t1))
++            };
+             // The lane indexes a quad `[0,1,2, 0,2,3]`, so `[b0, b1, t1, t0]` reproduces the
+             // reference's strip (`primType 4`).
+             for (pos, a) in [(b0, a0), (b1, a1), (t1, a1), (t0, a0)] {
+diff --git a/crates/benilla-app/src/weapon_trail/tests.rs b/crates/benilla-app/src/weapon_trail/tests.rs
+index e5064d97..51fd407d 100644
+--- a/crates/benilla-app/src/weapon_trail/tests.rs
++++ b/crates/benilla-app/src/weapon_trail/tests.rs
+@@ -563,3 +563,32 @@ fn an_indoor_wearers_committed_ambient_wins_over_the_scenes() {
+         "the room is warmer AND redder than the sky — the hue flip is the visible half: {lit:?}"
+     );
+ }
++
++/// Patch 0109: a bold swing draws twice-and-more as wide about the blade's middle and lives longer.
++#[test]
++fn a_bold_swing_is_wider_and_lives_longer() {
++    let (b, t) = (Vec3::ZERO, Vec3::Y);
++    let (wb, wt) = widen_pair(b, t, 2.4);
++    assert!(((wt - wb).length() - 2.4).abs() < 1e-5, "2.4 times the blade's length");
++    assert!(((wb + wt) * 0.5 - Vec3::Y * 0.5).length() < 1e-5, "about the blade's middle");
++    let frames = |wide: f32| {
++        let mut tr = armed(TrailProc { packed: 0xC83C_8CFF, duration_ms: 450 });
++        tr.widen(wide);
++        let mut n = 0u32;
++        loop {
++            n += 1;
++            let now = n * 1000 / 60;
++            let swing = tr.swing.as_mut().unwrap();
++            if let Step::Ended = swing.step(now, Vec3::X * n as f32, Vec3::X * n as f32 + Vec3::Y) {
++                break n;
++            }
++            assert!(n < 10_000);
++        }
++    };
++    assert!(frames(2.4) > frames(1.0) * 3 / 2, "a bold swing stays on screen longer");
++    // Re-arming puts it back to the blade's own width.
++    let mut tr = armed(kit_324());
++    tr.widen(3.0);
++    tr.arm(kit_324(), 10);
++    assert_eq!(tr.swing.as_ref().unwrap().wide, 1.0);
++}
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index f3eec706..fb7b99f5 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -323,6 +323,11 @@
+ //! lantern's pivot is out; when the marker goes the light is back. A client that is sent no marker
+ //! does nothing. The ship still goes only with the aftermath marker (patch 0087).
+ //!
++//! The thirty-third (`HasActionCombat() >= 33`), a Rogue's bold trails (patch 0109): a hand's trail
++//! colour may end `*N` (`"C83C8CFF*2.4"`, N 1 to 4): that hand's ribbon is N times as wide (the
++//! blade's own length, drawn out from its middle) and lives longer (0.6 of the excess, so 2.4 lives
++//! 1.84 times as long). A trail with no mark is drawn as before.
++//!
+ //! The thirty-second (`HasActionCombat() >= 32`), the Rogue's two blades and its afterimage
+ //! (patch 0103):
+ //!
+@@ -394,6 +399,8 @@ pub enum ActionCall {
+         /// then the off hand's, `None` on a hand that trails nothing; `trail`'s milliseconds for
+         /// both. `None` here: `trail` on both hands, as before.
+         hands: Option<[Option<u32>; 2]>,
++        /// The thirty-third round: each hand's ribbon width (1: as the blade is).
++        wide: [f32; 2],
+     },
+     Stop {
+         unit: String,
+@@ -1272,23 +1279,28 @@ fn colour(v: Option<&Value>) -> Option<u32> {
+ }
+ 
+ /// A trail a hand each, `"AARRGGBB/AARRGGBB"` (the main hand's, then the off hand's; `-` or
+-/// nothing for none on that hand): `None` for one colour (both hands) or a trail that won't parse.
+-fn two_hands(v: Option<&Value>) -> Option<[Option<u32>; 2]> {
++/// nothing for none on that hand), each colour optionally ending `*N`, the ribbon's width (1 to 4;
++/// 1 without): `None` for one colour (both hands) or a trail that won't parse.
++fn two_hands(v: Option<&Value>) -> Option<([Option<u32>; 2], [f32; 2])> {
+     let Some(Value::String(s)) = v else {
+         return None;
+     };
+     let s = s.to_str().ok()?;
+     let (main, off) = s.split_once('/')?;
+-    let hand = |h: &str| {
++    let hand = |h: &str| -> Result<(Option<u32>, f32), ()> {
++        let (h, wide) = match h.split_once('*') {
++            Some((c, w)) => (c, w.trim().parse::<f32>().map_err(|_| ())?.clamp(1.0, 4.0)),
++            None => (h, 1.0),
++        };
+         let h = h.trim().trim_start_matches("0x").trim_start_matches("0X");
+         if h.is_empty() || h == "-" {
+-            Ok(None)
++            Ok((None, 1.0))
+         } else {
+-            u32::from_str_radix(h, 16).map(Some)
++            u32::from_str_radix(h, 16).map(|c| (Some(c), wide)).map_err(|_| ())
+         }
+     };
+-    let (main, off) = (hand(main).ok()?, hand(off).ok()?);
+-    (main.is_some() || off.is_some()).then_some([main, off])
++    let ((main, mw), (off, ow)) = (hand(main).ok()?, hand(off).ok()?);
++    (main.is_some() || off.is_some()).then_some(([main, off], [mw, ow]))
+ }
+ 
+ /// Clips and takes written `"88/0,87/0,18/1"` (a bare `"88"` is take 0); what won't parse is left
+@@ -1369,7 +1381,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(32))?,
++        lua.create_function(|_, _: MultiValue| Ok(33))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1387,7 +1399,10 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             };
+             let impact = number(v.get(2), 0.0, 10.0).unwrap_or(0.0);
+             // Two colours, a hand each (the thirty-second round), or one for both.
+-            let hands = two_hands(v.get(3));
++            let (hands, wide) = match two_hands(v.get(3)) {
++                Some((h, w)) => (Some(h), w),
++                None => (None, [1.0; 2]),
++            };
+             let first = hands.and_then(|[m, o]| m.or(o));
+             let trail = first.or_else(|| colour(v.get(3))).map(|c| {
+                 let ms = number(v.get(4), 50.0, 3000.0).unwrap_or(600.0) as u32;
+@@ -1415,6 +1430,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 from,
+                 hold,
+                 hands,
++                wide,
+             });
+             Ok(())
+         })?,
+@@ -2312,6 +2328,22 @@ mod tests {
+         );
+     }
+ 
++    /// The thirty-third round: a hand's colour may end `*N`, its ribbon's width (1 to 4).
++    #[test]
++    fn a_hands_trail_may_name_its_width() {
++        assert_eq!(two_hands_text("C83C8CFF*2.4/-"), Some(([Some(0xC83C8CFF), None], [2.4, 1.0])));
++        assert_eq!(two_hands_text("-/C83C8CFF*2.4"), Some(([None, Some(0xC83C8CFF)], [1.0, 2.4])));
++        assert_eq!(two_hands_text("DCFFD27A*9/DC3C8CFF*0.1"), Some(([Some(0xDCFFD27A), Some(0xDC3C8CFF)], [4.0, 1.0])));
++        assert_eq!(two_hands_text("78F2EEE4/786E6496"), Some(([Some(0x78F2EEE4), Some(0x786E6496)], [1.0, 1.0])));
++        assert_eq!(two_hands_text("C83C8CFF*x/-"), None);
++    }
++
++    fn two_hands_text(s: &str) -> Option<([Option<u32>; 2], [f32; 2])> {
++        let lua = Lua::new();
++        let v = Value::String(lua.create_string(s).unwrap());
++        two_hands(Some(&v))
++    }
++
+     /// `PlayUnitAfterimage`: a copy with its time, alpha, colour, spot and stand-in; 0 seconds
+     /// takes the unit's copies away; what's missing takes its default.
+     #[test]
+-- 
+2.46.2.windows.1
+

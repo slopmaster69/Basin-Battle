@@ -15,7 +15,7 @@ if not ES then return end
 
 -- Each beat: the hit-stop (ms) on the hero and on the unit, the shake (inches, seconds), the
 -- camera's kick (back, seconds), and an edge: the screen's corners flashed in a colour (r, g, b)
--- that fades over its seconds (ES.Edge; a hurt's red is only ever damage taken). A field left
+-- that fades over its seconds, a fifth number its strength (1 if left out) (ES.Edge; a hurt's red is only ever damage taken). A field left
 -- out isn't played. None of these has been seen in the game yet: they're starting numbers, set
 -- against the blows' own (a heavy blow stops 115 ms and shakes 3.0 for 0.26 s; a parry stops
 -- 150 ms).
@@ -40,8 +40,9 @@ ES.CUE = {
   cheat_death = { stop = 260, shake = { 1.2, 0.4 }, self = true },
   -- A Rogue's perfect dodge (docs/rogue-roles.md): the blow slipped in its last moment. A short
   -- stop on the hero alone (less than a parry's 150: a slip, not a clash), no shake, and the
-  -- corners flashed a shadow's violet, the Shadow Cut's 0.6 s open behind it.
-  perfect_dodge = { stop = 90, self = true, edge = { 0.42, 0.30, 0.62, 0.6 } },
+  -- corners flashed a bright shadow's violet for a full second at twice an edge's strength (Corey,
+  -- Nov 17: the dim 0.6 s violet did not read), the Shadow Cut's open behind it.
+  perfect_dodge = { stop = 90, self = true, edge = { 0.62, 0.40, 1.0, 1.0, 2.0 } },
   -- The mine coming down (Rhahk'Zor's collapse): near its front the ground rumbles under the
   -- hero (a long low shake, each beat running into the next), and rock or a beam landing beside
   -- them jolts the view. Shakes alone: no stop, nothing held, the hero runs on.
@@ -100,7 +101,7 @@ function ES.CueLine(f)
   end
   if c.shake and ShakeCamera then ShakeCamera(c.shake[1], c.shake[2]) end
   if c.kick and CameraKick then CameraKick(c.kick[1], c.kick[2]) end
-  if c.edge and ES.Edge then ES.Edge(c.edge[1], c.edge[2], c.edge[3], c.edge[4]) end
+  if c.edge and ES.Edge then ES.Edge(c.edge[1], c.edge[2], c.edge[3], c.edge[4], c.edge[5]) end
 end
 
 -- The rise's camera let go as its time runs out: back to the aiming camera if one is up (the
