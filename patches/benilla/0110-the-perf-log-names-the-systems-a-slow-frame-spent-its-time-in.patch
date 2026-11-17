@@ -1,0 +1,867 @@
+From bddeb35c1f04eb88b0cb764e000b0eb8563cac1f Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 18:30:43 -0600
+Subject: [PATCH] The perf log names the systems a slow frame spent its time
+ in, and the Lua collector's pauses
+
+Elwynn Forest runs CPU-bound on the main thread (15 ms a frame, 3-5 frames a second at 70-90 ms)
+and the perf log could say only that. Under each ten-second summary it now writes:
+
+- the 8 costliest ECS systems by wall ms a frame, with the main thread's share and the most one
+  frame spent in each;
+- the worst frame: its length, the Lua collections in it and the ms they took, the main thread's
+  ms inside systems, and its 8 costliest systems;
+- the frames over 33 ms: how many, how many held a Lua collection (and its ms), and the systems
+  most often in their top 3, with their average ms there;
+- the Lua heap, the collections this window, their ms and the most in one frame.
+
+Per-system time comes from `bevy_ecs`'s `trace` spans, one around each system run and one around
+applying its commands, made once per system; `benilla_world::system_times` is a tracing layer
+beside the crash log's ring that times them into one slot per system (a relaxed atomic add per run)
+and leaves out a system that runs whole schedules inside itself (`Main::run_main`, the fixed-step
+runner). `debug` comes with it so a player build (no `dev`) names its systems. The Lua VM times its
+full collections, each a stop-the-world pass on the main thread. `WOW_SYSTEM_TIMES=0` turns the
+timing off; the Lua lines stay.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Cargo.lock                               |   1 +
+ crates/benilla-app/src/perf/perf_log.rs  | 276 ++++++++++++++++++-
+ crates/benilla-lua/src/heap.rs           |   6 +
+ crates/benilla-lua/src/vm.rs             |   4 +
+ crates/benilla-mlua/src/lib.rs           |   6 +
+ crates/benilla-world/Cargo.toml          |   3 +
+ crates/benilla-world/src/boot.rs         |  10 +-
+ crates/benilla-world/src/lib.rs          |   2 +
+ crates/benilla-world/src/system_times.rs | 331 +++++++++++++++++++++++
+ 9 files changed, 635 insertions(+), 4 deletions(-)
+ create mode 100644 crates/benilla-world/src/system_times.rs
+
+diff --git a/Cargo.lock b/Cargo.lock
+index ec312311..174444cd 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -689,6 +689,7 @@ dependencies = [
+  "benilla-formats",
+  "benilla-wmo",
+  "bevy",
++ "bevy_ecs",
+  "bytemuck",
+  "image",
+  "objc2 0.5.2",
+diff --git a/crates/benilla-app/src/perf/perf_log.rs b/crates/benilla-app/src/perf/perf_log.rs
+index e3f56fd5..91ff1c8f 100644
+--- a/crates/benilla-app/src/perf/perf_log.rs
++++ b/crates/benilla-app/src/perf/perf_log.rs
+@@ -9,13 +9,18 @@
+ //!   thread's and the whole process's), the GPU per frame and its costliest passes (bevy's per-pass
+ //!   timestamps, where the device has them), the meshes drawn after the frustum cull and the
+ //!   entity count.
++//! - Under each summary, from [`benilla_world::system_times`]: the costliest ECS systems by wall
++//!   ms a frame (with the main thread's share and the most one frame spent), the worst frame's
++//!   systems, the frames over 33 ms with the systems that topped them, and the Lua heap and its
++//!   collections (a collection is one stop-the-world pass on the main thread).
+ //!
+-//! Per frame it pushes one float; the rest runs once a window. The file restarts as
++//! Per frame it pushes one float and folds the systems' slots; the rest runs once a window. The file restarts as
+ //! `perf.old.log` once it passes [`ROTATE_BYTES`], so a long run never grows it without bound.
+ //! The FPS journal (`fpsJournal`) is the finer instrument, a row a second, off by default.
+ 
+ use std::io::Write;
+ use std::path::PathBuf;
++use std::time::Instant;
+ 
+ use bevy::diagnostic::DiagnosticsStore;
+ use bevy::prelude::*;
+@@ -23,6 +28,8 @@ use bevy::render::renderer::RenderAdapterInfo;
+ use bevy::time::Real;
+ use bevy::window::{Monitor, PrimaryWindow};
+ 
++use benilla_world::system_times::{self, SlotTime};
++
+ use super::clock::{main_thread_cpu_secs, process_cpu_secs};
+ 
+ pub(crate) struct PerfLogPlugin;
+@@ -39,6 +46,16 @@ const ADAPTER_WAIT_SECS: f32 = 5.0;
+ /// How many of the costliest GPU passes a summary names.
+ const TOP_PASSES: usize = 6;
+ 
++/// How many systems the window's list and the worst frame's name.
++const TOP_SYSTEMS: usize = 8;
++
++/// A frame longer than this (ms) is a spike: its top systems are tallied.
++const SPIKE_MS: f32 = 33.3;
++
++/// How many of a spike frame's costliest systems are tallied, and how many tallies are printed.
++const SPIKE_TOP: usize = 3;
++const SPIKE_LIST: usize = 6;
++
+ impl Plugin for PerfLogPlugin {
+     fn build(&self, app: &mut App) {
+         app.insert_resource(PerfLog {
+@@ -50,6 +67,10 @@ impl Plugin for PerfLogPlugin {
+             cpu_at: None,
+             main_at: None,
+             settings: String::new(),
++            sys: SysWindow::default(),
++            scratch: Vec::new(),
++            last_frame_at: None,
++            gc_at: None,
+         })
+         .add_systems(Last, write_perf_log);
+     }
+@@ -72,6 +93,186 @@ struct PerfLog {
+     main_at: Option<f64>,
+     /// The last settings line written; a new one goes in only when it differs.
+     settings: String,
++    /// This window's per-system times.
++    sys: SysWindow,
++    /// One frame's slots, reused.
++    scratch: Vec<SlotTime>,
++    /// When this system last ran: one frame of the main schedule, `Last` to `Last`.
++    last_frame_at: Option<Instant>,
++    /// The Lua collections and their nanoseconds counted at the last frame.
++    gc_at: Option<(u64, u64)>,
++}
++
++/// One window's systems: per slot `[ns, main-thread ns, most ns in one frame]`, the worst frame,
++/// and the spike frames' tallies.
++#[derive(Default)]
++struct SysWindow {
++    slots: Vec<[u64; 3]>,
++    worst: Option<WorstFrame>,
++    spikes: u32,
++    spikes_with_gc: u32,
++    /// The Lua collections' ns in the spike frames.
++    spike_gc_ns: u64,
++    /// Per slot in a spike frame's top [`SPIKE_TOP`]: `(frames, ns)`.
++    spike_top: std::collections::HashMap<u32, (u32, u64)>,
++    gc: u64,
++    /// The Lua collections' ns, all told and the most in one frame.
++    gc_ns: u64,
++    gc_ns_max: u64,
++    timed_frames: u32,
++}
++
++/// One frame's Lua collections: how many, and their wall ns.
++#[derive(Clone, Copy, Default)]
++struct FrameGc {
++    runs: u64,
++    ns: u64,
++}
++
++struct WorstFrame {
++    ms: f32,
++    at: f32,
++    gc: FrameGc,
++    /// The main thread's ns inside systems that frame.
++    main_ns: u64,
++    top: Vec<SlotTime>,
++}
++
++impl SysWindow {
++    /// Folds one frame of `ms` (wall, `Last` to `Last`) at `at` s, with `gc` Lua collections in it.
++    fn add_frame(&mut self, at: f32, ms: f32, frame: &[SlotTime], gc: FrameGc) {
++        self.gc += gc.runs;
++        self.gc_ns += gc.ns;
++        self.gc_ns_max = self.gc_ns_max.max(gc.ns);
++        let spike = ms > SPIKE_MS;
++        if spike {
++            self.spikes += 1;
++            if gc.runs > 0 {
++                self.spikes_with_gc += 1;
++                self.spike_gc_ns += gc.ns;
++            }
++        }
++        if frame.is_empty() {
++            return;
++        }
++        self.timed_frames += 1;
++        for t in frame {
++            let i = t.slot as usize;
++            if self.slots.len() <= i {
++                self.slots.resize(i + 1, [0; 3]);
++            }
++            let s = &mut self.slots[i];
++            s[0] += t.ns;
++            s[1] += t.main_ns;
++            s[2] = s[2].max(t.ns);
++        }
++        let worse = self.worst.as_ref().is_none_or(|w| ms > w.ms);
++        if !(spike || worse) {
++            return;
++        }
++        let mut top = frame.to_vec();
++        top.sort_by(|a, b| b.ns.cmp(&a.ns));
++        if spike {
++            for t in top.iter().take(SPIKE_TOP) {
++                let e = self.spike_top.entry(t.slot).or_default();
++                e.0 += 1;
++                e.1 += t.ns;
++            }
++        }
++        if worse {
++            top.truncate(TOP_SYSTEMS);
++            self.worst = Some(WorstFrame {
++                ms,
++                at,
++                gc,
++                main_ns: frame.iter().map(|t| t.main_ns).sum(),
++                top,
++            });
++        }
++    }
++
++    /// The window's lines, each starting with two spaces; `frames` is the window's frame count
++    /// and `name` a slot's printed name.
++    fn lines(
++        &self,
++        frames: usize,
++        lua: Option<(f64, u64)>,
++        name: impl Fn(u32) -> String,
++    ) -> String {
++        let ms = |ns: u64| ns as f64 / 1e6;
++        let per = |ns: u64| ms(ns) / frames.max(1) as f64;
++        let mut out = String::new();
++        if self.timed_frames > 0 {
++            let mut order: Vec<usize> = (0..self.slots.len())
++                .filter(|&i| self.slots[i][0] > 0)
++                .collect();
++            order.sort_by(|&a, &b| self.slots[b][0].cmp(&self.slots[a][0]));
++            let list: Vec<String> = order
++                .iter()
++                .take(TOP_SYSTEMS)
++                .map(|&i| {
++                    let [ns, main, max] = self.slots[i];
++                    format!(
++                        "{} {:.2} ({:.2}) max {:.1}",
++                        name(i as u32),
++                        per(ns),
++                        per(main),
++                        ms(max)
++                    )
++                })
++                .collect();
++            out.push_str(&format!(
++                "  systems, wall ms a frame (main thread's share) and most in one frame: {}\n",
++                list.join(" | ")
++            ));
++        }
++        if let Some(w) = &self.worst {
++            let list: Vec<String> = w
++                .top
++                .iter()
++                .map(|t| format!("{} {:.1}", name(t.slot), ms(t.ns)))
++                .collect();
++            out.push_str(&format!(
++                "  worst frame {:.1} ms at t={:.1}, lua gc {} ({:.1} ms), main thread in systems {:.1} \
++                 ms: {}\n",
++                w.ms,
++                w.at,
++                w.gc.runs,
++                ms(w.gc.ns),
++                ms(w.main_ns),
++                list.join(", ")
++            ));
++        }
++        if self.spikes > 0 {
++            let mut tally: Vec<(&u32, &(u32, u64))> = self.spike_top.iter().collect();
++            tally.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then(b.1 .1.cmp(&a.1 .1)));
++            let list: Vec<String> = tally
++                .iter()
++                .take(SPIKE_LIST)
++                .map(|(&slot, &(n, ns))| {
++                    format!("{} x{n} avg {:.1}", name(slot), ms(ns) / f64::from(n))
++                })
++                .collect();
++            out.push_str(&format!(
++                "  spikes over {SPIKE_MS:.0} ms: {}, {} with a lua gc ({:.1} ms in all); in their top \
++                 {SPIKE_TOP}: {}\n",
++                self.spikes,
++                self.spikes_with_gc,
++                ms(self.spike_gc_ns),
++                list.join(", ")
++            ));
++        }
++        if let Some((mb, total)) = lua {
++            out.push_str(&format!(
++                "  lua: heap {mb:.1} MB, {} collections this window taking {:.1} ms (most in a frame \
++                 {:.1}), {total} in all\n",
++                self.gc,
++                ms(self.gc_ns),
++                ms(self.gc_ns_max)
++            ));
++        }
++        out
++    }
+ }
+ 
+ impl PerfLog {
+@@ -266,6 +467,7 @@ fn write_perf_log(
+     place: PerfPlace,
+     drawn: Query<&ViewVisibility, With<Mesh3d>>,
+     entities: Query<()>,
++    script: Option<NonSend<benilla_ui::script::UiScript>>,
+ ) {
+     if log.path.is_none() {
+         return;
+@@ -273,6 +475,7 @@ fn write_perf_log(
+     let now = time.elapsed_secs();
+     if !log.started {
+         log.started = true;
++        system_times::enable();
+         if let Some(path) = log.path.as_ref() {
+             if std::fs::metadata(path).is_ok_and(|m| m.len() > ROTATE_BYTES) {
+                 let _ = std::fs::rename(path, path.with_file_name("perf.old.log"));
+@@ -284,7 +487,8 @@ fn write_perf_log(
+         log.append(&format!(
+             "\n=== benilla session, unix time {unix}, every {EVERY_SECS:.0} s: fps, wall frame ms \
+              (p50 p95 p99 max), frames over 33/100 ms, CPU ms a frame (main thread, process), GPU \
+-             ms a frame [costliest passes], meshes drawn/with a mesh, entities ===\n"
++             ms a frame [costliest passes], meshes drawn/with a mesh, entities; under each, the \
++             costliest systems, the worst frame, the spikes and the Lua collector ===\n"
+         ));
+     }
+     if !log.header_done && (adapter.is_some() || now > ADAPTER_WAIT_SECS) {
+@@ -300,6 +504,32 @@ fn write_perf_log(
+         log.main_at = main_thread_cpu_secs();
+     }
+     log.frames.push(time.delta_secs() * 1000.0);
++
++    // This frame's systems, `Last` to `Last` on the main thread.
++    let at = Instant::now();
++    let frame_ms = log
++        .last_frame_at
++        .replace(at)
++        .map_or(0.0, |t0| (at - t0).as_secs_f32() * 1000.0);
++    let gc_now = script
++        .as_deref()
++        .map(|s| (s.lua().gc_collections(), s.lua().gc_nanos().0));
++    let gc = match (log.gc_at, gc_now) {
++        (Some(a), Some(b)) => FrameGc {
++            runs: b.0.saturating_sub(a.0),
++            ns: b.1.saturating_sub(a.1),
++        },
++        _ => FrameGc::default(),
++    };
++    log.gc_at = gc_now;
++    let mut scratch = std::mem::take(&mut log.scratch);
++    if system_times::enabled() {
++        system_times::mark_main_thread();
++        system_times::take_frame(&mut scratch);
++    }
++    log.sys.add_frame(now, frame_ms, &scratch, gc);
++    log.scratch = scratch;
++
+     if now - start < EVERY_SECS {
+         return;
+     }
+@@ -342,6 +572,16 @@ fn write_perf_log(
+         entities.iter().len(),
+     );
+     log.append(&text);
++    let lua = script.as_deref().map(|s| {
++        (
++            s.lua().used_memory() as f64 / (1024.0 * 1024.0),
++            s.lua().gc_collections(),
++        )
++    });
++    let sys = std::mem::take(&mut log.sys);
++    log.append(&sys.lines(n, lua, |slot| {
++        system_times::short_name(&system_times::name(slot))
++    }));
+     log.window_start = Some(now);
+ }
+ 
+@@ -357,6 +597,38 @@ mod tests {
+         assert_eq!(percentiles(&[]), (0.0, 0.0, 0.0, 0.0));
+     }
+ 
++    /// The window lists systems by total, names the worst frame's, and tallies the spikes' tops.
++    #[test]
++    fn the_systems_window_names_the_costly_and_the_spikes() {
++        let t = |slot, ms: u64, main_ms: u64| SlotTime {
++            slot,
++            ns: ms * 1_000_000,
++            main_ns: main_ms * 1_000_000,
++        };
++        let mut w = SysWindow::default();
++        let none = FrameGc::default();
++        let one = FrameGc {
++            runs: 1,
++            ns: 50_000_000,
++        };
++        w.add_frame(1.0, 10.0, &[t(0, 2, 2), t(1, 1, 0)], none);
++        w.add_frame(1.1, 80.0, &[t(0, 2, 2), t(1, 60, 60), t(2, 5, 0)], one);
++        w.add_frame(1.2, 12.0, &[t(0, 2, 2)], none);
++        let names = ["a::steady", "b::spiky", "c::other"];
++        let text = w.lines(3, Some((12.5, 40)), |s| names[s as usize].to_string());
++        let lines: Vec<&str> = text.lines().collect();
++        assert_eq!(lines.len(), 4, "{text}");
++        // b: 61 ms over 3 frames.
++        assert!(
++            lines[0].contains("b::spiky 20.33 (20.00) max 60.0 | a::steady 2.00 (2.00) max 2.0"),
++            "{}",
++            lines[0]
++        );
++        assert!(lines[1].starts_with("  worst frame 80.0 ms at t=1.1, lua gc 1 (50.0 ms), main thread in systems 62.0 ms: b::spiky 60.0, c::other 5.0, a::steady 2.0"), "{}", lines[1]);
++        assert!(lines[2].contains("spikes over 33 ms: 1, 1 with a lua gc (50.0 ms in all); in their top 3: b::spiky x1 avg 60.0"), "{}", lines[2]);
++        assert!(lines[3].contains("heap 12.5 MB, 1 collections this window taking 50.0 ms (most in a frame 50.0), 40 in all"), "{}", lines[3]);
++    }
++
+     #[test]
+     fn no_adapter_says_so() {
+         assert!(adapter_lines(None).starts_with("gpu: unknown"));
+diff --git a/crates/benilla-lua/src/heap.rs b/crates/benilla-lua/src/heap.rs
+index 0e1f38d3..20b354dd 100644
+--- a/crates/benilla-lua/src/heap.rs
++++ b/crates/benilla-lua/src/heap.rs
+@@ -482,6 +482,10 @@ pub struct Heap {
+     asked: bool,
+     /// Collections run since the state opened: an instrument for the collector's pacing.
+     pub collections: u64,
++    /// Wall nanoseconds those collections took, all told and the longest one: each is a
++    /// stop-the-world pass on the thread running Lua (`perf.log` reports them).
++    pub gc_nanos: u64,
++    pub gc_nanos_max: u64,
+     /// The chunk names prototypes were compiled under, by source id: the owners a profile and
+     /// a memory census charge to. [`Heap::free_unreferenced_sources`] frees the slot of a chunk
+     /// no function or table refers to any more (a `loadstring` chunk is named by its own code),
+@@ -606,6 +610,8 @@ impl Default for Heap {
+             trigger: 64 * 1024,
+             asked: false,
+             collections: 0,
++            gc_nanos: 0,
++            gc_nanos_max: 0,
+             // Id 0 is the host: whatever no Lua chunk created.
+             sources: vec![Some(Rc::from(&b"=[host]"[..]))],
+             source_ids: Default::default(),
+diff --git a/crates/benilla-lua/src/vm.rs b/crates/benilla-lua/src/vm.rs
+index a2d9d32b..de20be66 100644
+--- a/crates/benilla-lua/src/vm.rs
++++ b/crates/benilla-lua/src/vm.rs
+@@ -2303,6 +2303,7 @@ impl Vm {
+     #[cold]
+     #[inline(never)]
+     pub fn full_gc(&mut self) {
++        let started = std::time::Instant::now();
+         self.heap.collections += 1;
+         self.check_stack_sizes();
+         let mut roots: Vec<Value> = self.stack[..self.top].to_vec();
+@@ -2351,6 +2352,9 @@ impl Vm {
+             .collect(&roots, &open, &self.retired, self.names.mode, &fixed);
+         self.heap.charge(self.state_bytes());
+         self.heap.pace();
++        let ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
++        self.heap.gc_nanos = self.heap.gc_nanos.saturating_add(ns);
++        self.heap.gc_nanos_max = self.heap.gc_nanos_max.max(ns);
+         // The host closures it freed drop last, with no arena borrowed, as host code: their
+         // captures' destructors may use the state.
+         if !self.heap.freed_hosts.is_empty() {
+diff --git a/crates/benilla-mlua/src/lib.rs b/crates/benilla-mlua/src/lib.rs
+index c2c1fa0e..297a9d4b 100644
+--- a/crates/benilla-mlua/src/lib.rs
++++ b/crates/benilla-mlua/src/lib.rs
+@@ -944,6 +944,12 @@ impl Lua {
+         self.vm().heap.collections
+     }
+ 
++    /// Wall nanoseconds every collection since the state opened took, and the longest one's.
++    pub fn gc_nanos(&self) -> (u64, u64) {
++        let heap = &self.vm().heap;
++        (heap.gc_nanos, heap.gc_nanos_max)
++    }
++
+     pub fn gc_collect(&self) -> Result<()> {
+         self.vm().full_gc();
+         Ok(())
+diff --git a/crates/benilla-world/Cargo.toml b/crates/benilla-world/Cargo.toml
+index 2c5bec0c..d2284e1a 100644
+--- a/crates/benilla-world/Cargo.toml
++++ b/crates/benilla-world/Cargo.toml
+@@ -24,6 +24,9 @@ benilla-formats = { path = "../benilla-formats", default-features = false }
+ # For the portal audit, which re-parses a WMO group to check its decode against the file.
+ benilla-wmo = { path = "../benilla-wmo" }
+ bevy.workspace = true
++# `trace` opens a span around each system run, which `system_times` times for `perf.log`; `debug`
++# gives the spans the systems' names in a build without `dev` too. Bevy's own `bevy_ecs`.
++bevy_ecs = { version = "0.18.1", default-features = false, features = ["trace", "debug"] }
+ bytemuck = { version = "1", features = ["derive"] }
+ image = { version = "0.25", default-features = false, features = ["png"] }
+ 
+diff --git a/crates/benilla-world/src/boot.rs b/crates/benilla-world/src/boot.rs
+index 0505d444..2b11b4be 100644
+--- a/crates/benilla-world/src/boot.rs
++++ b/crates/benilla-world/src/boot.rs
+@@ -30,10 +30,16 @@ pub fn tuned_default_plugins(primary_window: Window) -> PluginGroupBuilder {
+         })
+         // Deliberately no `AssetPlugin::file_path`: a baked source path resolves only on the build
+         // machine. Every shader is embedded (`embedded://<crate>/shaders/…`), so no root is read.
+-        // Quiet wgpu/naga; the ring keeps the last stderr lines for the crash report (`log_ring`).
++        // Quiet wgpu/naga; the ring keeps the last stderr lines for the crash report (`log_ring`),
++        // and `system_times` times each system's span for `perf.log`.
+         .set(bevy::log::LogPlugin {
+             filter: "wgpu=error,naga=warn".into(),
+-            custom_layer: |_| Some(Box::new(crate::log_ring::LogRing)),
++            custom_layer: |_| {
++                use bevy::log::tracing_subscriber::Layer as _;
++                Some(Box::new(
++                    crate::log_ring::LogRing.and_then(crate::system_times::SystemTimes),
++                ))
++            },
+             ..default()
+         })
+         // Asset loads parse synchronously on the IO pool, and Bevy's default 4 threads saturate on
+diff --git a/crates/benilla-world/src/lib.rs b/crates/benilla-world/src/lib.rs
+index 04d6a8b8..c3e9ae7e 100644
+--- a/crates/benilla-world/src/lib.rs
++++ b/crates/benilla-world/src/lib.rs
+@@ -126,6 +126,8 @@ pub mod layout_keys;
+ pub mod lighting;
+ pub mod liquid;
+ pub mod log_ring;
++/// Each ECS system's wall time a frame, for `perf.log` (`bevy_ecs`'s `trace` spans).
++pub mod system_times;
+ pub mod look;
+ 
+ /// macOS `Cmd+Q`, re-pointed at the window close so the shutdown systems run.
+diff --git a/crates/benilla-world/src/system_times.rs b/crates/benilla-world/src/system_times.rs
+new file mode 100644
+index 00000000..16d3d3f2
+--- /dev/null
++++ b/crates/benilla-world/src/system_times.rs
+@@ -0,0 +1,331 @@
++//! Each ECS system's wall time, per frame, for `benilla-config/perf.log`: which systems a slow
++//! frame spent its time in, with no profiler attached.
++//!
++//! `bevy_ecs`'s `trace` feature opens a `system` span around every system run (and a
++//! `system_commands` span around applying its commands), each made once when the system is built.
++//! [`SystemTimes`] is a [`Layer`] beside [`crate::log_ring::LogRing`] that times those spans: on
++//! enter it pushes the clock onto the thread's stack, on exit it adds the elapsed nanoseconds to
++//! the system's slot, a relaxed atomic add. A system that runs a whole schedule inside itself
++//! (`Main::run_main`, the fixed-step runner) is a *runner*: its time is its schedules', so it is
++//! left out of every list.
++//!
++//! The reader, once a frame on the main thread, takes the frame's slots ([`take_frame`]) and
++//! clears them. Nothing is timed until [`enable`]; `WOW_SYSTEM_TIMES=0` keeps it off.
++
++use std::cell::{Cell, RefCell};
++use std::collections::HashMap;
++use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::Relaxed};
++use std::sync::{Mutex, OnceLock};
++use std::time::Instant;
++
++use bevy::log::tracing::field::{Field, Visit};
++use bevy::log::tracing::span::{Attributes, Id};
++use bevy::log::tracing::Subscriber;
++use bevy::log::tracing_subscriber::layer::Context;
++use bevy::log::tracing_subscriber::registry::LookupSpan;
++use bevy::log::tracing_subscriber::Layer;
++
++/// The most systems timed; a system past it goes untimed. The client builds about 2,000.
++pub const SLOTS: usize = 8192;
++
++/// This frame's nanoseconds per slot, on any thread.
++static FRAME_NS: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
++/// This frame's nanoseconds per slot on the main thread.
++static MAIN_NS: [AtomicU64; SLOTS] = [const { AtomicU64::new(0) }; SLOTS];
++/// Slots that ran a schedule inside themselves.
++static RUNNER: [AtomicBool; SLOTS] = [const { AtomicBool::new(false) }; SLOTS];
++/// Slots handed out so far.
++static USED: AtomicUsize = AtomicUsize::new(0);
++/// Timing is on.
++static ENABLED: AtomicBool = AtomicBool::new(false);
++
++/// Slot names, and the slot of each name.
++#[derive(Default)]
++struct Names {
++    by_slot: Vec<String>,
++    by_name: HashMap<String, u32>,
++}
++
++fn names() -> &'static Mutex<Names> {
++    static N: OnceLock<Mutex<Names>> = OnceLock::new();
++    N.get_or_init(Mutex::default)
++}
++
++thread_local! {
++    /// The systems open on this thread, innermost last, with the clock at their entry.
++    static STACK: RefCell<Vec<(u32, Instant)>> = const { RefCell::new(Vec::new()) };
++    /// This is the main thread ([`mark_main_thread`]).
++    static IS_MAIN: Cell<bool> = const { Cell::new(false) };
++}
++
++/// Starts timing, unless `WOW_SYSTEM_TIMES=0`. Returns whether it is on.
++pub fn enable() -> bool {
++    let off = std::env::var("WOW_SYSTEM_TIMES").is_ok_and(|v| v.trim() == "0");
++    ENABLED.store(!off, Relaxed);
++    !off
++}
++
++/// Whether timing is on.
++pub fn enabled() -> bool {
++    ENABLED.load(Relaxed)
++}
++
++/// Marks the calling thread as the main thread; called from a main-thread system each frame.
++pub fn mark_main_thread() {
++    IS_MAIN.with(|m| m.set(true));
++}
++
++/// What a span is to the layer, kept in its extensions.
++#[derive(Clone, Copy)]
++enum Kind {
++    /// A system's run or its commands, timed in this slot.
++    Timed(u32),
++    /// A schedule's run: whatever system encloses it on this thread is a runner.
++    Schedule,
++}
++
++/// The slot for `name`, made on first sight; `None` once [`SLOTS`] are taken.
++fn slot_of(name: String) -> Option<u32> {
++    let mut n = names().lock().unwrap_or_else(|p| p.into_inner());
++    if let Some(&s) = n.by_name.get(&name) {
++        return Some(s);
++    }
++    let s = n.by_slot.len();
++    if s >= SLOTS {
++        return None;
++    }
++    n.by_slot.push(name.clone());
++    n.by_name.insert(name, s as u32);
++    USED.store(s + 1, Relaxed);
++    Some(s as u32)
++}
++
++/// A slot's system name, as bevy gives it (the full path).
++pub fn name(slot: u32) -> String {
++    names()
++        .lock()
++        .unwrap_or_else(|p| p.into_inner())
++        .by_slot
++        .get(slot as usize)
++        .cloned()
++        .unwrap_or_default()
++}
++
++/// A slot ran a schedule inside itself.
++pub fn is_runner(slot: u32) -> bool {
++    RUNNER.get(slot as usize).is_some_and(|r| r.load(Relaxed))
++}
++
++/// One system's share of a frame.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct SlotTime {
++    pub slot: u32,
++    /// Nanoseconds on any thread.
++    pub ns: u64,
++    /// Of those, nanoseconds on the main thread.
++    pub main_ns: u64,
++}
++
++/// Moves every slot's time since the last call into `out` (cleared first), runners left out, and
++/// zeroes the slots.
++pub fn take_frame(out: &mut Vec<SlotTime>) {
++    out.clear();
++    let used = USED.load(Relaxed).min(SLOTS);
++    for slot in 0..used {
++        if FRAME_NS[slot].load(Relaxed) == 0 {
++            continue;
++        }
++        let ns = FRAME_NS[slot].swap(0, Relaxed);
++        let main_ns = MAIN_NS[slot].swap(0, Relaxed);
++        if ns == 0 || RUNNER[slot].load(Relaxed) {
++            continue;
++        }
++        out.push(SlotTime {
++            slot: slot as u32,
++            ns,
++            main_ns,
++        });
++    }
++}
++
++/// `full::path::to::system` as `to::system`, a generic argument as its last segment, and a
++/// closure with its function: short enough for a log line, still unique in practice.
++pub fn short_name(name: &str) -> String {
++    let (head, generic) = match name.find('<') {
++        Some(i) => (&name[..i], Some(&name[i + 1..])),
++        None => (name, None),
++    };
++    let segs: Vec<&str> = head.split("::").collect();
++    let keep = if segs.last().is_some_and(|s| s.starts_with('{')) {
++        3
++    } else {
++        2
++    };
++    let base = segs[segs.len().saturating_sub(keep)..].join("::");
++    match generic {
++        Some(g) => {
++            let first = g.split([',', '<', '>']).next().unwrap_or("").trim();
++            let last = first.rsplit("::").next().unwrap_or(first);
++            format!("{base}<{last}>")
++        }
++        None => base,
++    }
++}
++
++/// Reads a span's `name` field.
++struct NameVisitor<'a>(&'a mut String);
++
++impl Visit for NameVisitor<'_> {
++    fn record_str(&mut self, field: &Field, value: &str) {
++        if field.name() == "name" {
++            self.0.push_str(value);
++        }
++    }
++
++    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
++        if field.name() == "name" && self.0.is_empty() {
++            use std::fmt::Write as _;
++            let _ = write!(self.0, "{value:?}");
++        }
++    }
++}
++
++/// The timing layer; see the module docs.
++pub struct SystemTimes;
++
++impl<S> Layer<S> for SystemTimes
++where
++    S: Subscriber + for<'a> LookupSpan<'a>,
++{
++    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
++        let kind = match attrs.metadata().name() {
++            "schedule" => Kind::Schedule,
++            span @ ("system" | "system_commands") => {
++                let mut name = String::new();
++                attrs.record(&mut NameVisitor(&mut name));
++                if span == "system_commands" {
++                    name.push_str(" (commands)");
++                }
++                match slot_of(name) {
++                    Some(slot) => Kind::Timed(slot),
++                    None => return,
++                }
++            }
++            _ => return,
++        };
++        if let Some(span) = ctx.span(id) {
++            span.extensions_mut().insert(kind);
++        }
++    }
++
++    fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
++        if !ENABLED.load(Relaxed) {
++            return;
++        }
++        let Some(kind) = ctx
++            .span(id)
++            .and_then(|s| s.extensions().get::<Kind>().copied())
++        else {
++            return;
++        };
++        STACK.with(|stack| {
++            let Ok(mut stack) = stack.try_borrow_mut() else {
++                return;
++            };
++            match kind {
++                Kind::Timed(slot) => stack.push((slot, Instant::now())),
++                Kind::Schedule => {
++                    if let Some(&(outer, _)) = stack.last() {
++                        RUNNER[outer as usize].store(true, Relaxed);
++                    }
++                }
++            }
++        });
++    }
++
++    fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
++        let Some(Kind::Timed(slot)) = ctx
++            .span(id)
++            .and_then(|s| s.extensions().get::<Kind>().copied())
++        else {
++            return;
++        };
++        STACK.with(|stack| {
++            let Ok(mut stack) = stack.try_borrow_mut() else {
++                return;
++            };
++            // Unwind to this span: an enter seen before timing was on has no entry.
++            let Some(at) = stack.iter().rposition(|&(s, _)| s == slot) else {
++                return;
++            };
++            let (_, t0) = stack[at];
++            stack.truncate(at);
++            let ns = t0.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64;
++            FRAME_NS[slot as usize].fetch_add(ns, Relaxed);
++            if IS_MAIN.with(Cell::get) {
++                MAIN_NS[slot as usize].fetch_add(ns, Relaxed);
++            }
++        });
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use bevy::log::tracing_subscriber::layer::SubscriberExt;
++
++    #[test]
++    fn names_shorten_to_their_last_two_segments() {
++        assert_eq!(
++            short_name("benilla_world::model_render::visibility::apply_model_visibility"),
++            "visibility::apply_model_visibility"
++        );
++        assert_eq!(
++            short_name("bevy_render::extract_component::extract_components<bevy_pbr::Foo>"),
++            "extract_component::extract_components<Foo>"
++        );
++        assert_eq!(
++            short_name("benilla_app::look::plugin::{{closure}}"),
++            "look::plugin::{{closure}}"
++        );
++        assert_eq!(short_name("plain"), "plain");
++    }
++
++    /// One test for the whole contract, as the slots are process-wide statics: a system's span is
++    /// timed into its slot, its commands into their own, and a system that runs a schedule inside
++    /// itself is a runner, left out.
++    #[test]
++    fn the_layer_times_system_spans_and_leaves_runners_out() {
++        use bevy::log::tracing::info_span;
++        let subscriber = bevy::log::tracing_subscriber::registry().with(SystemTimes);
++        ENABLED.store(true, Relaxed);
++        mark_main_thread();
++        bevy::log::tracing::subscriber::with_default(subscriber, || {
++            let sys = info_span!("system", name = "test::slow_system");
++            let cmds = info_span!("system_commands", name = "test::slow_system");
++            let runner = info_span!("system", name = "test::runner");
++            {
++                let _g = sys.enter();
++                std::thread::sleep(std::time::Duration::from_millis(3));
++            }
++            {
++                let _g = cmds.enter();
++            }
++            {
++                let _r = runner.enter();
++                let _s = info_span!("schedule", name = "Inner").entered();
++            }
++        });
++        let mut out = Vec::new();
++        take_frame(&mut out);
++        let by_name = |n: &str| out.iter().find(|t| name(t.slot) == n).copied();
++        let slow = by_name("test::slow_system").expect("the system is timed");
++        assert!(slow.ns >= 3_000_000, "{slow:?}");
++        assert_eq!(slow.ns, slow.main_ns, "it ran on the marked thread");
++        assert!(by_name("test::slow_system (commands)").is_some());
++        assert!(by_name("test::runner").is_none(), "a runner is left out");
++        // The slots were cleared.
++        take_frame(&mut out);
++        assert!(out.iter().all(|t| !name(t.slot).starts_with("test::")));
++    }
++}
+-- 
+2.56.0.windows.4
+
