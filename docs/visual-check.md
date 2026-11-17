@@ -331,12 +331,24 @@ hero: `setup` makes one (a human Rogue, `Vcrogue`; the settings' `rogue` names a
 
 | Scenario | What it films |
 | --- | --- |
-| `rogue-perfect-dodge` | Not yet run, markers off: the rig's bot rolls 0.12 sec before a grunt's blow lands, three times, and attacks 0.2 sec after it: the flicker, Vanish's puff and sound, the stop and violet corners, the step behind the grunt and the stab in its back; then a run of both hands with a roll in it and the two-blade finisher |
+| `rogue-perfect-dodge` | Markers off, the hero's own screen: the rig's bot rolls from each wind-up and steers its margin by the gap it hears between its roll and the blow's impact toward 0.11 sec (the middle of the perfect window), leaving a grunt's 0.65 sec charge alone; the flicker, the 0.9 sec copy (`AI` line), Vanish's puff and sound, the stop and violet corners on each perfect dodge |
 | `rogue-shadow` | Not yet run, markers off: Distract lobbed between two still grunts (the pouch, no ring, both turning to it), Shadowstep to the near one's back (a puff at both ends, Shrouded Step's see-through second) and Backstab; Cloak and Dagger through two grunts, a step and a stab in each back; Sap on a grunt with its back turned (the stun stars) |
 | `rogue-venom` | Not yet run, markers off: a run of both hands on a still grunt to 5 Venom (Poison State's green on its body at each off-hand hit, Poison Cloud's once ripe, a drip and a number each second), Eviscerate with both blades (the look goes out); Rupture, then a run of main-hand blows that coat it; Garrote from behind on a casting Kobold Geomancer (the cast bar breaks, the silence, the blood burst each second); Choking Cloud at the Rogue's feet with two grunts in it (the green cloud, their wind-ups slow) |
 | `rogue-blades` | Not yet run, markers off: the rig's bot dodges a grunt's blows in their last moment five times, the dodge and Quickstep in turn (each perfect dodge's flicker and stop, Slice and Dice's look on the body, five violet diamonds under the reticle lighting with a chime); Blade Flurry's four cuts, hands alternating, the 4th with both blades; a blow taken (the diamonds burst with a crack); two Darting Knives then two blows, the 4th the finisher; Blade Dance on two grunts (see-through 8 sec, a backstab's burst on every striker) |
 | `rogue-pairs` | Not yet run, markers off: at the weapon rack, each pair in turn on still grunts: Twin Fangs' plain finisher (both blades, clip 17); Crossed Swords' finisher striking three grunts side by side; Breaker's Pair on a Defias Overseer, its stance bar jumping on the finisher; Iron Knuckles' six punches (AttackUnarmed, clip 16), the 6th with both fists, the grunt wheeling to show its back for 1 sec, a stab in it. Each pair's words in chat as it's equipped; a fist weapon filling both hands, the claw's off hand its own left-hand model (display 26594) |
 | `rogue-trails` | Not yet run, markers off, on a client built with patch 0103: a run of both hands on a still grunt (the main hand's blow trails the right blade alone, pale; the off hand's the left blade alone, a deeper steel; the finisher both); five perfect dodges, each leaving a pale copy of the Rogue's own body and blades for 0.3 sec; Afterimage, a violet copy of the Rogue standing 2 sec where the Rogue was with the Defias shade hidden and the grunt turning to it; a second Afterimage taking the first copy away. On an older client: the server's fallback (both blades pale, the flicker, the Defias shade) |
+
+The Rogue's Nov 17 review refilms (client patch 0109, #490, #496), each a small scenario by the cameraman
+(`camera duel`), floor markers off:
+
+| Scenario | What it films |
+| --- | --- |
+| `rogue-garrote` | Shadowstep behind a Kobold Geomancer as it casts, then Garrote (no new aim after the step): the cast broken, the silence, the blood |
+| `rogue-cloak-dagger` | Cloak and Dagger on two grunts coming at the Rogue: a step and a stab in each back (an idle pack that it ignores is the unit test's: a debug target counts as fighting) |
+| `rogue-trails-close` | Main hand pale, off hand vivid blue, the finisher gold and blue, on a still grunt 2 yd ahead |
+| `rogue-fists` | Footpad's Knuckles then Cutpurse's Claw, each in both hands, idle and punching, ending on the character sheet |
+| `rogue-distract-close`, `rogue-cloud-close` | Distract between two still grunts, and Choking Cloud's 5 yd between two coming ones, closer than `rogue-shadow` and `rogue-venom` |
+| `rogue-perfect-dodge` | On the hero's own screen: a bot that measures the gap from its roll to the blow's impact line and moves its margin toward 0.11 sec (the middle of the 0.04 to 0.18 sec perfect window); an `AI` line of 0.9 sec in the client log is the proof |
 
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
 `docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine

@@ -1,0 +1,23 @@
+# Distract (Q), closer than the first run, floor markers off, the hero's own screen from the side.
+# Two grunts stand still 5 and 8 yd ahead, facing the Rogue. Distract is lobbed at the ground between
+# them (about 6.5 yd): the pouch's flight and burst, no ring, and both grunts turning to face where
+# it landed (the turn is the tell).
+hero rogue
+cam 90 -12 8
+camera duel
+include _setup
+4.0 .es goto -9638 671
+4.1 .es arm dagger
+4.15 .es arm dagger off
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot q distract
+4.6 .es target clear
+4.7 .es target grunt 5 still
+4.8 .es target grunt 8 still
+5.0 video
+5.0 shots distract 80 0.1
+6.0 .es in ab 0 0                       # Q: Distract, aiming
+6.4 .es in a {facing} -0.3
+6.5 .es in au
+12 end

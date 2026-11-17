@@ -1,46 +1,45 @@
-# The Rogue's perfect dodge (docs/rogue-roles.md, build plan 1): a grunt 4 yd ahead swings at a
-# Rogue; a small player in the interface (RB) reads its wind-up (AN, the time to the blow) and
-# rolls 0.12 s before the blow lands (inside the perfect window, 0.04 to 0.18 s into the dodge),
-# then presses the left button 0.2 s after the blow (inside the Shadow Cut's 0.6 s). Floor markers
-# off. Look for, with no floor marker and no word: the grunt's own wind-up; the Rogue's body
-# flickering see-through (the Stealth look) for 0.3 s; Vanish's puff of smoke and its sound where
-# the blow fell; the short stop and violet corners on the Rogue's own screen; the step behind the
-# grunt (a puff at both ends); the stab in its back (the blood burst, the backstab's sound and
-# stop). Then a few blows with both hands: the off hand (right button) swings AttackOff (clip 87),
-# the 4th blow both blades (clip 17), and a roll in the middle of the run doesn't end it.
-# Needs a Rogue test hero: put a Rogue's name in the settings as `rogue = <name>` (the `setup`
-# scenario makes only the hunter, the warrior and the cameraman). Not run yet.
+# The Rogue's perfect dodge (docs/rogue-roles.md, build plan 1), floor markers off, on the hero's own
+# screen (so the violet corners show). A Warsong Grunt 4 yd ahead swings at a Rogue; a small player
+# in the interface (RB) dodges each blow and, from what it hears, lands the dodge in the blow's
+# perfect moment: the blow must land 0.04 to 0.18 sec into the dodge ([dodge] evade_from and
+# perfect_to), so it aims for the middle, 0.11 sec.
+#
+# Why the Nov 16 runs never got one, and how this does: the bot rolled 0.12 sec before the wind-up
+# ran out, but the blow lands later than the line says (the server settles it once the hero's round
+# trip is up, and the client sees lines a frame late), so every roll came 0.2 to 0.36 sec before its
+# blow; the roll's hop back (3 yd) had already taken the Rogue out of the grunt's 3 yd reach, so the
+# blow whiffed (IM `miss`) and the dodge was never weighed. Now the bot measures, for each swing, the
+# gap between the roll's own echo (RO) and the blow's impact line (IM), and moves its margin by
+# the difference from 0.11 sec for the next swing (a margin for each of the short and long wind-ups).
+# The proof is an `AI` line of 0.9 sec (the perfect dodge's copy) in the run's log after the IM of
+# the swing: `bot PERFECT` lines. A dev setup: the controller reads what the client hears.
+# A grunt's charge (0.65 sec wind-up, lunging 4.5 yd) is left alone: the roll's hop back opens the range
+# it needs and the lunge then ends it short or past, a whiff the dodge never weighs. The slow overhead
+# (1.0 sec) stands where it is and is the one that lands in the window most.
+# Look for, with no floor marker and no word: the grunt's own wind-up; the Rogue's body flickering
+# see-through for 0.5 sec with a copy (alpha 0.85, standing 0.9 sec) left where the blow fell;
+# Vanish's puff and sound; the short stop and violet corners (1.0 sec) on the screen.
 hero rogue
-cam 90 -12 8
+cam 90 -12 6
 include _setup
 4.0 .es goto -9638 671                  # the open grass by the rack: a dodge here never backs into the inn
 4.1 .es arm dagger                      # the Rogue is bare-handed at the rack: Twin Fangs, a Poacher's Knife in each hand
 4.15 .es arm dagger off
 4.2 .es dummy clear
 4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
-4.4 lua RB = { q = {}, on = false, n = 0 }
+4.4 lua RB = { q = {}, on = false, n = 0, most = 30, want = 0.11, ms = -0.04, ml = 0.0, perfect = 0, frames = 0, last = GetTime() }
 4.4 lua function RB.say(t) SendChatMessage(t, "SAY") end
 4.4 lua function RB.after(d, f) table.insert(RB.q, { GetTime() + d, f }) end
 4.4 lua function RB.log(t) if ProbeLog then ProbeLog("visual-check: bot " .. t) end end
 4.4 lua function RB.split(s) local t = {} for p in string.gfind(s .. "\t", "([^\t]*)\t") do table.insert(t, p) end return t end
-4.4 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= 3 then return end RB.n = RB.n + 1 RB.log("wind-up " .. w) RB.after(math.max(0, w - 0.12), function() RB.say(".es in d") end) RB.after(w + 0.2, function() RB.say(".es in a") end) RB.after(w + 0.28, function() RB.say(".es in au") end) end
-4.4 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) end end
+4.4 lua function RB.react(w) if not RB.on or w <= 0 or RB.n >= RB.most then return end if w > 0.62 and w < 0.68 then RB.log("charge, w=" .. w .. ": not dodged (a roll back opens the range and the blow whiffs)") return end RB.n = RB.n + 1 local long = w >= 0.9 RB.cls = long local m = long and RB.ml or RB.ms RB.log("AN w=" .. w .. " m=" .. string.format("%.3f", m) .. " n=" .. RB.n) RB.after(math.max(0, w - m), function() RB.say(".es in d") RB.log("dodge sent n=" .. RB.n) end) end
+4.4 lua function RB.pair() if RB.rot and RB.imt and math.abs(RB.rot - RB.imt) < 0.7 then local d = RB.imt - RB.rot local adj = (RB.want - d) * 0.8 if adj > 0.12 then adj = 0.12 elseif adj < -0.12 then adj = -0.12 end if RB.cls then RB.ml = RB.ml + adj else RB.ms = RB.ms + adj end RB.log("gap " .. string.format("%.3f", d) .. " (roll to impact); margins short " .. string.format("%.3f", RB.ms) .. " long " .. string.format("%.3f", RB.ml)) RB.rot = nil RB.imt = nil end end
+4.4 lua function RB.line(l) local f = RB.split(l) if f[1] == "AN" and f[11] == "mob" then RB.react(tonumber(f[4]) or 0) elseif f[1] == "RO" and f[5] ~= nil then RB.rot = GetTime() RB.pair() elseif f[1] == "IM" and f[3] == "0x6A77DD" then RB.imt = GetTime() RB.log("IM " .. f[5]) RB.pair() elseif f[1] == "AI" then RB.log("AI line " .. (f[3] or "?")) if f[3] ~= nil and tonumber(f[3]) and tonumber(f[3]) > 0 and tonumber(f[3]) < 1.5 then RB.perfect = RB.perfect + 1 RB.log("PERFECT " .. RB.perfect .. " (copy " .. f[3] .. " sec)") end end end
 4.4 lua local old = ElwynnSurvival.Line ElwynnSurvival.Line = function(l) RB.line(l) return old(l) end
-4.4 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end end)
+4.4 lua RB.f = CreateFrame("Frame") RB.f:SetScript("OnUpdate", function() local now = GetTime() RB.frames = RB.frames + 1 if now - RB.last >= 3 then RB.log("frames/s " .. string.format("%.1f", RB.frames / (now - RB.last))) RB.frames = 0 RB.last = now end local i = 1 while i <= table.getn(RB.q) do local a = RB.q[i] if now >= a[1] then table.remove(RB.q, i) a[2]() else i = i + 1 end end end)
 4.6 .es target grunt 4
-5.0 lua RB.on = true
 5.0 video
-5.2 shots dodges 60 0.1
-# Three perfect dodges and their cuts, then the bot stops and the run is played by hand.
-16 lua RB.on = false
-16.5 .es target clear
-16.6 .es target grunt 3 still
-17.0 .es in a
-17.1 .es in au
-17.5 .es in g
-17.9 .es in d
-18.6 .es in a
-18.7 .es in au
-19.1 .es in g
-17.0 shots run 30 0.1
-22 end
+5.0 lua RB.on = true
+5.0 shots cue 1 0
+75 lua RB.on = false
+76 end

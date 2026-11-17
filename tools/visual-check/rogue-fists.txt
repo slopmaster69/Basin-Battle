@@ -1,0 +1,42 @@
+# Cutpurse's Claw and Footpad's Knuckles (#496), floor markers off, close on the hero's own screen,
+# side-on. Footpad's Knuckles first (the gladiator's fist pair, displays 32012 right
+# and 32015 left), then the claw (26593 / 26594). Each stands idle for a moment, then punches: a still
+# grunt 2 yd ahead, main, off, main, off. Look at both fists: the off hand must be its own left-hand model.
+# The last seconds open the character sheet (the off-hand slot's icon).
+hero rogue
+cam 90 -12 8
+camera duel
+include _setup
+4.0 .es goto -9638 671
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.6 .es target grunt 2 still
+4.8 .es arm footpad_knuckles
+5.0 video
+5.0 shots knuckles-idle 6 0.3
+7.0 shots knuckles-punch 30 0.1
+7.1 .es in a
+7.2 .es in au
+7.6 .es in g
+7.7 .es in gu
+8.1 .es in a
+8.2 .es in au
+8.6 .es in g
+8.7 .es in gu
+10.6 .es target clear
+10.8 .es goto -9638 671
+11.0 .es arm cutpurse_claw
+11.2 .es target grunt 2 still
+12.0 shots claw-idle 6 0.3
+14.0 shots claw-punch 30 0.1
+14.1 .es in a
+14.2 .es in au
+14.6 .es in g
+14.7 .es in gu
+15.1 .es in a
+15.2 .es in au
+15.6 .es in g
+15.7 .es in gu
+18.0 lua ToggleCharacter("PaperDollFrame")
+18.8 shots sheet 4 0.4
+21 end
