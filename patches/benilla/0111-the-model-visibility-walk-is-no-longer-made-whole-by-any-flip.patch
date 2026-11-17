@@ -1,0 +1,148 @@
+From 4531bc31dc4d7338006775ca431db84b71047ef5 Mon Sep 17 00:00:00 2001
+From: Corios00 <52224974+Corios00@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 18:30:43 -0600
+Subject: [PATCH] The model visibility walk is no longer made whole by any
+ entity's verdict flipping
+
+`apply_model_visibility` walked every model part on any frame where any entity in the world had
+its `InheritedVisibility` change (`owner_flips`, a `Changed<InheritedVisibility>` over everything).
+In a busy outdoor scene something flips nearly every frame: a unit walks into or out of view, an
+exile spawns at the fade ring, and the parts this very system hid or showed last frame flip their
+own inherited verdict the frame after. So 0107's slices (a quarter of the parts a frame while only
+the camera moves) almost never engaged, and the still-scene skip neither: every frame walked every
+part, and the `is_empty` probe itself scanned every entity's change tick while nothing flipped.
+
+The only part whose verdict reads another entity's `InheritedVisibility` is a billboard card,
+which hides with its owner. A card is now walked whenever its own owner's verdict changed since
+the last run, read per card; nothing else needs the scene-wide trigger. Every verdict is the same
+as before: a card follows its owner on the same frame, and every other part still walks on its own
+row moving, a setting, a portal, a room, the lens, the 4 yd anchor and the first still frame.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/model_render/visibility.rs            | 80 +++++++++++++++++--
+ 1 file changed, 73 insertions(+), 7 deletions(-)
+
+diff --git a/crates/benilla-world/src/model_render/visibility.rs b/crates/benilla-world/src/model_render/visibility.rs
+index 8cd82262..f6b56eeb 100644
+--- a/crates/benilla-world/src/model_render/visibility.rs
++++ b/crates/benilla-world/src/model_render/visibility.rs
+@@ -103,10 +103,11 @@ pub(super) fn apply_model_visibility(
+         ),
+         With<WorldCamera>,
+     >,
+-    // Scene edges the per-part skip cannot read off its own row: a portal set changing (a
+-    // building's asset lands frames after its spawn) and any owner's inherited verdict flipping.
++    // A scene edge the per-part skip cannot read off its own row: a portal set changing (a
++    // building's asset lands frames after its spawn). A card's owner flipping is read per card,
++    // below: any entity's inherited verdict flipping (a unit, an exile, a part this system hid
++    // last frame) once walked every part, so in a busy scene the slices never engaged.
+     new_portals: Query<(), Changed<WmoPortalInstance>>,
+-    owner_flips: Query<(), Changed<InheritedVisibility>>,
+     // A far-side mark the classifier strips under a still camera must un-skip its part.
+     mut unmarked: RemovedComponents<super::FarSideOfWater>,
+     instances: Query<&WmoPortalInstance>,
+@@ -117,8 +118,8 @@ pub(super) fn apply_model_visibility(
+     // Read-only: this system owns the `DoodadFade` handle pick, and the far side composes into it.
+     far_twins: Res<super::FarSideTwins>,
+     // Billboard card owners (a model root or a rig joint): a card is a world root, so nothing
+-    // else carries its owner's hide to it.
+-    card_owners: Query<&InheritedVisibility>,
++    // else carries its owner's hide to it. A card is walked whenever its owner's verdict flipped.
++    card_owners: Query<Ref<InheritedVisibility>>,
+     mut q: Query<(
+         Entity,
+         &ModelPart,
+@@ -163,8 +164,7 @@ pub(super) fn apply_model_visibility(
+         && !windows.is_changed()
+         && !claim.is_changed()
+         && !far_twins.is_changed()
+-        && new_portals.is_empty()
+-        && owner_flips.is_empty();
++        && new_portals.is_empty();
+     let scene_still = camera_still && rest_still;
+     // Only the camera's place or turn moved: its lens is as it was.
+     let camera_only =
+@@ -217,6 +217,9 @@ pub(super) fn apply_model_visibility(
+                 && !group_vis.as_ref().is_some_and(|g| g.is_changed())
+                 && !mat_anim.as_ref().is_some_and(|a| a.is_changed())
+                 && !far_side.as_ref().is_some_and(|f| f.is_changed())
++                && !card
++                    .and_then(crate::billboard::BillboardCard::follows)
++                    .is_some_and(|o| card_owners.get(o).is_ok_and(|v| v.is_changed()))
+             {
+                 return;
+             }
+@@ -623,6 +626,69 @@ mod tests {
+         );
+     }
+ 
++    /// A card is walked when its own owner's verdict flips, not when any entity's does: an
++    /// unrelated unit or part flipping no longer walks every part.
++    #[test]
++    fn only_the_cards_own_owner_flipping_walks_it() {
++        let mut app = App::new();
++        app.init_resource::<DebugState>()
++            .init_resource::<ViewDistance>()
++            .init_resource::<crate::wmo_portal::ExteriorWindows>()
++            .init_resource::<crate::wmo_portal::CameraInteriorClaim>()
++            .init_resource::<super::super::FarSideTwins>()
++            .add_systems(Update, apply_model_visibility);
++        // A still camera, so a frame with nothing changed walks nothing.
++        app.world_mut().spawn((
++            WorldCamera,
++            GlobalTransform::IDENTITY,
++            Projection::default(),
++        ));
++        let owner = app.world_mut().spawn(InheritedVisibility::VISIBLE).id();
++        let bystander = app.world_mut().spawn(InheritedVisibility::VISIBLE).id();
++        let info = BillboardInfo {
++            bone: 0,
++            pivot: Vec3::ZERO,
++            kind: BillboardKind::Spherical,
++            scale_anim: None,
++            seq_translations: vec![],
++        };
++        let card = app
++            .world_mut()
++            .spawn((
++                ModelPart {
++                    kind: ModelKind::GameObject,
++                    blend: ModelBlend::Blend,
++                },
++                GlobalTransform::IDENTITY,
++                Visibility::Inherited,
++                BillboardCard::following(&info, owner),
++            ))
++            .id();
++        app.update();
++        app.update();
++        let vis = |app: &App| *app.world().entity(card).get::<Visibility>().unwrap();
++        // The owner's verdict moved without a change mark: only a walk of every part would see it.
++        *app.world_mut()
++            .entity_mut(owner)
++            .get_mut::<InheritedVisibility>()
++            .unwrap()
++            .bypass_change_detection() = InheritedVisibility::HIDDEN;
++        app.world_mut()
++            .entity_mut(bystander)
++            .insert(InheritedVisibility::HIDDEN);
++        app.update();
++        assert_eq!(
++            vis(&app),
++            Visibility::Inherited,
++            "a bystander's flip leaves the card's row unwalked"
++        );
++        app.world_mut()
++            .entity_mut(owner)
++            .insert(InheritedVisibility::HIDDEN);
++        app.update();
++        assert_eq!(vis(&app), Visibility::Hidden, "its own owner's flip walks it");
++    }
++
+     /// The reference's WMO liquid drain `0x684cd0` gates on the "Map objects" bit
+     /// `[0xc7b2a4] & 0x100` (`ModelKind::Wmo`), not the ADT drains' "Water" bit `0x1000000`.
+     #[test]
+-- 
+2.56.0.windows.4
+
