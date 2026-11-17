@@ -766,6 +766,20 @@ What the design left open, decided in the pull request that built it:
     image was read for this). It stays as it was for every other cue. The add-on harness
     checks the four corners' places (`survival.txt`). Add-on 80.
   - All of it reads with floor markers off: a body and the screen's corners.
+  - **It still showed a dark smoke body after 0112, and the client was the cause (patch 0113).**
+    The filming client was built with 0112 (built 21:40, 0112's files 21:00, its commit 21:21 in
+    the lab's series), the server saw round 34 (`client ac34`) and sends round 34 the lit
+    `B4E0ECFF` (the add-on passes the colour through untouched). But the client's aura tint publish
+    (`aura_visual::apply_aura_tint`) rewrites every rig's tint slot each frame so a recycled slot
+    never keeps a colour, and a copy is a rig with no aura of its own: the colour the copy was made
+    with went back to none on the next frame. So the copy was the dark-clad body itself at 0.6, a
+    dark smoke body, whatever the server sent; #493's cool tint never showed either, and nor did
+    Afterimage's violet shade. Found by reading the client, not seen on a frame.
+    **Patch 0113**: a copy made with a light (round 34's lit colour) or with a stand-in (the
+    shade) carries `OwnTint`, which the publish skips; a freed slot is still cleared by the rig's
+    own hook. A flurry's copies (Bladestorm, the Warrior's) are as they were: nothing changes for
+    another class. No new round: the same `AI` line now draws as it was meant to, so the server
+    and add-on are unchanged.
 
 ## Build plan
 

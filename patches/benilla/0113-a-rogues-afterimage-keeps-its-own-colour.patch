@@ -1,0 +1,174 @@
+From dbed3ca6da809cfd6cbe1dcd07b841edbeac2ef7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 17 Nov 2026 01:06:29 -0600
+Subject: [PATCH] A Rogue's afterimage keeps its own colour, so its pale ghost
+ and violet shade show
+
+Basin Battle. The aura tint publish (aura_visual::apply_aura_tint) rewrites every RigSkin's tint
+slot each frame, and an afterimage copy is a RigSkin with no aura of its own, so the colour
+spawn_afterimages gave it went back to none on the next frame: the perfect dodge's copy, meant to
+be lit pale blue-white (patch 0112), drew as the dark-clad body itself, a dark smear. A copy made
+with a light (the thirty-fourth round's lit tint) or a stand-in (Afterimage's shade) now carries
+OwnTint, which the publish skips; a freed slot is still cleared by RigSkin's hook. A flurry's
+copies (Bladestorm) are as they were. No new round: the same AI line now draws as it was meant to.
+---
+ crates/benilla-app/src/aura_visual.rs         |  9 ++-
+ crates/benilla-app/src/aura_visual/tests.rs   | 55 +++++++++++++++++++
+ crates/benilla-app/src/creature_anim.rs       |  2 +-
+ .../benilla-app/src/creature_anim/action.rs   |  1 +
+ .../src/creature_anim/action/afterimage.rs    | 20 ++++++-
+ 5 files changed, 83 insertions(+), 4 deletions(-)
+
+diff --git a/crates/benilla-app/src/aura_visual.rs b/crates/benilla-app/src/aura_visual.rs
+index 3987d85a..37cd2014 100644
+--- a/crates/benilla-app/src/aura_visual.rs
++++ b/crates/benilla-app/src/aura_visual.rs
+@@ -145,9 +145,14 @@ impl AuraNodes {
+ 
+ /// Publish every rig's head tint to [`benilla_world::instance_tint`], keyed on its rig slot. The
+ /// reference writes the tint as it changes, with none of the alpha's ramp (`unit+0xd04` →
+-/// `0x710cf0`). Every `RigSkin` is rewritten each frame so a recycled slot never keeps a colour.
++/// `0x710cf0`). Every `RigSkin` is rewritten each frame so a recycled slot never keeps a colour,
++/// but a Rogue's afterimage copy, whose colour is its own (Basin Battle,
++/// `creature_anim::OwnTint`; a freed slot is still cleared by `RigSkin`'s hook).
+ pub(crate) fn apply_aura_tint(
+-    rigs: Query<(Entity, &benilla_world::rig_palette::RigSkin)>,
++    rigs: Query<
++        (Entity, &benilla_world::rig_palette::RigSkin),
++        Without<crate::creature_anim::OwnTint>,
++    >,
+     chain: Query<(
+         Option<&AuraNodes>,
+         Option<&benilla_world::model_fade::ParentModel>,
+diff --git a/crates/benilla-app/src/aura_visual/tests.rs b/crates/benilla-app/src/aura_visual/tests.rs
+index b2132e03..bcde10f5 100644
+--- a/crates/benilla-app/src/aura_visual/tests.rs
++++ b/crates/benilla-app/src/aura_visual/tests.rs
+@@ -737,6 +737,61 @@ fn the_rig_free_hook_clears_a_dead_units_tint() {
+     );
+ }
+ 
++/// Basin Battle: a Rogue's afterimage copy keeps the colour it was made with (its lit ghost, its
++/// violet shade): the publish skips its rig, where an untinted rig beside it is put back to none.
++/// Gone, its slot is clean again (`RigSkin`'s free hook), so no next owner inherits the light.
++#[test]
++fn an_afterimage_copy_keeps_its_own_tint() {
++    let mut app = app_with_tint_channel();
++    let mut skin = || {
++        benilla_world::rig_palette::RigSkin::allocate_bones(
++            app.world_mut()
++                .resource_mut::<benilla_world::rig_palette::RigPalettes>()
++                .as_mut(),
++            8,
++            Handle::default(),
++        )
++        .expect("a fresh palette has room")
++    };
++    let (copy, plain) = (skin(), skin());
++    let (copy_slot, plain_slot) = (copy.slot, plain.slot);
++    let copy_rig = app
++        .world_mut()
++        .spawn((copy, crate::creature_anim::OwnTint))
++        .id();
++    app.world_mut().spawn(plain);
++    let lit = benilla_world::instance_tint::pack_lit([0xE0, 0xEC, 0xFF], 0.7);
++    {
++        let mut tints = app
++            .world_mut()
++            .resource_mut::<benilla_world::instance_tint::InstanceTints>();
++        tints.set(copy_slot, lit);
++        tints.set(plain_slot, lit);
++    }
++    app.update();
++    app.update();
++    let tints = app
++        .world()
++        .resource::<benilla_world::instance_tint::InstanceTints>();
++    assert_eq!(tints.get(copy_slot), lit, "the copy's own light stays");
++    assert_eq!(
++        tints.get(plain_slot),
++        benilla_world::instance_tint::IDENTITY,
++        "any other rig with no aura is put back to none, as before"
++    );
++
++    // The copy's time up: its rig goes, and its slot with it, untinted.
++    app.world_mut().entity_mut(copy_rig).despawn();
++    app.update();
++    assert_eq!(
++        app.world()
++            .resource::<benilla_world::instance_tint::InstanceTints>()
++            .get(copy_slot),
++        benilla_world::instance_tint::IDENTITY,
++        "a gone copy's slot is clean before anyone can reallocate it"
++    );
++}
++
+ // ── The freeze (proc 11) ─────────────────────────────────────────────────────────────────────────
+ 
+ fn app_with_freeze() -> App {
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index fc9f1e45..c5208d35 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -38,7 +38,7 @@ pub(crate) use action::{
+ };
+ #[cfg(test)]
+ pub(crate) use action::on_cvar as anim_layer_on_cvar;
+-pub(crate) use action::{anim_layer_on, lock_point, unit_hit, WeaponGlow};
++pub(crate) use action::{anim_layer_on, lock_point, unit_hit, OwnTint, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+ /// paperdoll shows); behaviour reads `armed_main`/`armed_off`, which apply the disarm ladder.
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index ab01e4e4..9f6d586c 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -38,6 +38,7 @@ use super::{find_resolved, AnimData, BodyTwist};
+ 
+ mod donor;
+ mod afterimage;
++pub(crate) use afterimage::OwnTint;
+ mod feet;
+ pub(crate) use feet::PlantedFeet;
+ mod flurry;
+diff --git a/crates/benilla-app/src/creature_anim/action/afterimage.rs b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+index d6ae09f8..495095f2 100644
+--- a/crates/benilla-app/src/creature_anim/action/afterimage.rs
++++ b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+@@ -140,6 +140,21 @@ pub(super) fn apply_call(
+ #[derive(Component)]
+ struct ImageRig;
+ 
++/// Basin Battle: a copy's rig whose tint is its own, set as it is made: the aura tint publish
++/// (`crate::aura_visual::apply_aura_tint`) rewrites every other rig's slot each frame, and a copy
++/// has no aura of its own, so it put the copy's colour back to none on the next frame. A Rogue's
++/// copies keep theirs: the perfect dodge's lit ghost (`light` above 0, the thirty-fourth round) and
++/// Afterimage's violet shade (a copy with a stand-in). A flurry's copies are as they were.
++#[derive(Component)]
++pub(crate) struct OwnTint;
++
++impl AfterimageDue {
++    /// Whether the copy keeps the colour it is made with ([`OwnTint`]).
++    fn keeps_tint(&self) -> bool {
++        self.tint.is_some() && (self.light > 0.0 || self.stand_in.is_some())
++    }
++}
++
+ /// Make the copies that fell due: the unit's drawn parts (the body's and its held items') again
+ /// under a root of their own, each rig's rows frozen into a slot of the copy's.
+ #[allow(clippy::type_complexity)]
+@@ -216,7 +231,10 @@ pub(crate) fn spawn_afterimages(
+                     if let Some(t) = d.tint {
+                         tints.set(slot, instance_tint::pack_lit(t, d.light));
+                     }
+-                    commands.spawn((copy, ImageRig, ChildOf(root)));
++                    let copy_rig = commands.spawn((copy, ImageRig, ChildOf(root))).id();
++                    if d.keeps_tint() {
++                        commands.entity(copy_rig).insert(OwnTint);
++                    }
+                     copies.insert(rig.0, slot);
+                     slot
+                 }
+-- 
+2.46.2.windows.1
+
