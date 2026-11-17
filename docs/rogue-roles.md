@@ -721,6 +721,20 @@ What the design left open, decided in the pull request that built it:
     The reach, the facing from behind, the cast, the effects and the targeting were checked in a
     sim test that plays the scenario's steps (`garrote_pressed_just_after_a_shadowstep_lands_in_the_back_it_was_put_behind`).
     The scenario's comment says so, and its second and third presses are spares.
+  - **It still missed in the Nov 17 refilm (2 casts, 0 hits, 0 foes), and the server and skill
+    were right.** The take played through the server's own key path (`.es` lines at the film's
+    times, the film's keys, the client answering each teleport) lands the cut, silences and bleeds,
+    on flat ground and on Elwynn's own with the film's save. It misses only when the client answers
+    the step with the facing its view still held: the line Shadowstep was clicked along, away from
+    the back. The scripted press carries no line, so the server swings along the hero's facing, and
+    took the client's. The film's logs don't record the client's movement reports, so that is the
+    one explanation left, not a seen packet: the aiming camera turns the body to the view while
+    the reticle is up, and the reticle comes down in the same beat as the step.
+    Fixed in the server: a Rogue's step keeps the facing it put her in for **1 sec**
+    (`STEP_FACING_HOLD`, Shrouded Step's length, past a 0.3 sec art pressed on the next beat)
+    against a standing client's word. A new reticle line (every add-on press carries one), a step
+    of her own or the time ends it. Why not longer: a player's own mouse turn is ignored meanwhile.
+    Other classes' blinks are as before. Tests: `survival/rogue_keys_tests.rs`.
 
 - **The test server listens on this PC alone (Nov 17 filming)**: Windows' firewall prompt for a
   new `htl-server.exe` sat over every frame of the refilm. The server takes its listening address
