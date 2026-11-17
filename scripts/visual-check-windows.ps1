@@ -1293,9 +1293,11 @@ function Invoke-Request($file) {
 # deploy\ as <name>.zip. Only where this copy of the game came from such a zip (no .git here: a
 # checkout is never replaced): a handover script stops the server and this watcher, replaces
 # everything but the build, saves, logs, settings and visual-check files, starts the server on the
-# new source (it builds first) and a new watcher from it. The steps go to watcher.log.
+# new source (it builds first) and a new watcher from it. The steps go to watcher.log. When the
+# settings' host is this PC, the server listens on 127.0.0.1 alone (HTL_BIND): Windows then never
+# asks about its firewall, a prompt that sat over every frame filmed on Nov 17.
 $Handover = @'
-param([string]$Zip, [string]$Root, [string]$Folder, [int]$Watcher)
+param([string]$Zip, [string]$Root, [string]$Folder, [int]$Watcher, [string]$Bind = "")
 $ErrorActionPreference = "Stop"
 $log = Join-Path $Folder "watcher.log"
 function L($t) { Add-Content -Path $log -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') deploy: $t" }
@@ -1311,6 +1313,7 @@ try {
     $now = Get-Date
     Get-ChildItem (Join-Path $Root "crates"), (Join-Path $Root "content") -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.LastWriteTime = $now }
     L "unpacked into $Root; starting the server (it builds first)"
+    if ($Bind) { $env:HTL_BIND = $Bind }
     Start-Process -FilePath (Join-Path $Root "Host Basin Battle.bat") -WorkingDirectory $Root -WindowStyle Minimized
     $until = (Get-Date).AddMinutes(40); $up = $false
     while (-not $up -and (Get-Date) -lt $until) {
@@ -1339,8 +1342,10 @@ function Invoke-Deploy($zip) {
     $script = Join-Path $dir "handover.ps1"
     Set-Content -Path $script -Value $Handover
     Write-WatchLog "deploy $($zip.Name): handing over (this watcher stops; a new one starts once the server is up)"
-    Start-Process powershell -WindowStyle Minimized -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Quote $script),
+    $handArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Quote $script),
         "-Zip", (Quote $staged), "-Root", (Quote $Root), "-Folder", (Quote $Folder), "-Watcher", $PID)
+    if ((Read-Settings).host -in @("127.0.0.1", "localhost")) { $handArgs += @("-Bind", "127.0.0.1") }
+    Start-Process powershell -WindowStyle Minimized -ArgumentList $handArgs
     return $true
 }
 

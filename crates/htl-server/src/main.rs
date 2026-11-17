@@ -27,6 +27,9 @@ OPTIONS:
     --content <file>      A game.toml to use instead of the built-in one (cards.toml and
                           gear.toml are read from the same folder)
     --saves <file>        Where high scores and Renown are kept (default: saves/basin-battle.toml)
+    --bind <address>      The address the server listens on (or set HTL_BIND; default 0.0.0.0,
+                          every network). 127.0.0.1 keeps it to this PC: a test server that
+                          way never brings up Windows' firewall prompt
     --login-port <port>   Default 3724
     --world-port <port>   Default 8085
     --game <which>        both (default), basin or survival: the games to run, each on its own
@@ -43,6 +46,9 @@ OPTIONS:
 fn main() -> Result<()> {
     let mut config = Config { saves: Some("saves/basin-battle.toml".into()), ..Config::default() };
     let mut data: Option<PathBuf> = std::env::var_os("WOW_DATA").map(PathBuf::from);
+    if let Some(bind) = std::env::var("HTL_BIND").ok().filter(|b| !b.trim().is_empty()) {
+        config.bind = bind.trim().to_string();
+    }
     let mut content_path: Option<PathBuf> = None;
     let mut game = String::from("both");
     let mut survival_port = htl_server::SURVIVAL_PORT;
@@ -59,6 +65,7 @@ fn main() -> Result<()> {
             "--realm" => config.realm_name = value("--realm")?,
             "--content" => content_path = Some(value("--content")?.into()),
             "--saves" => config.saves = Some(value("--saves")?.into()),
+            "--bind" => config.bind = value("--bind")?,
             "--login-port" => config.login_port = value("--login-port")?.parse()?,
             "--world-port" => config.world_port = value("--world-port")?.parse()?,
             "--game" => game = value("--game")?.to_lowercase(),
