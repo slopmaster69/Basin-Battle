@@ -1,4 +1,4 @@
-From 4982be077a8d75688a108554c37fe9f9b2b55eac Mon Sep 17 00:00:00 2001
+From eb2062e892028f4bf285770614e2aa869297a769 Mon Sep 17 00:00:00 2001
 From: Corios00 <52224974+Corios00@users.noreply.github.com>
 Date: Mon, 16 Nov 2026 18:30:43 -0600
 Subject: [PATCH] The perf log names the systems a slow frame spent its time
@@ -20,21 +20,23 @@ applying its commands, made once per system; `benilla_world::system_times` is a 
 beside the crash log's ring that times them into one slot per system (a relaxed atomic add per run)
 and leaves out a system that runs whole schedules inside itself (`Main::run_main`, the fixed-step
 runner). `debug` comes with it so a player build (no `dev`) names its systems. The Lua VM times its
-full collections, each a stop-the-world pass on the main thread. `WOW_SYSTEM_TIMES=0` turns the
-timing off; the Lua lines stay.
+full collections, each a stop-the-world pass on the main thread, into a process-wide clock
+(`benilla_lua::gc_clock`), so the perf log reads them without holding the VM. `WOW_SYSTEM_TIMES=0`
+turns the system timing off; the Lua lines stay.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  Cargo.lock                               |   1 +
- crates/benilla-app/src/perf/perf_log.rs  | 276 ++++++++++++++++++-
- crates/benilla-lua/src/heap.rs           |   6 +
- crates/benilla-lua/src/vm.rs             |   4 +
- crates/benilla-mlua/src/lib.rs           |   6 +
+ crates/benilla-app/src/perf/perf_log.rs  | 273 +++++++++++++++++-
+ crates/benilla-lua/src/gc_clock.rs       |  42 +++
+ crates/benilla-lua/src/lib.rs            |   1 +
+ crates/benilla-lua/src/vm.rs             |   2 +
  crates/benilla-world/Cargo.toml          |   3 +
  crates/benilla-world/src/boot.rs         |  10 +-
  crates/benilla-world/src/lib.rs          |   2 +
  crates/benilla-world/src/system_times.rs | 335 +++++++++++++++++++++++
- 9 files changed, 639 insertions(+), 4 deletions(-)
+ 9 files changed, 665 insertions(+), 4 deletions(-)
+ create mode 100644 crates/benilla-lua/src/gc_clock.rs
  create mode 100644 crates/benilla-world/src/system_times.rs
 
 diff --git a/Cargo.lock b/Cargo.lock
@@ -50,7 +52,7 @@ index ec312311..174444cd 100644
   "image",
   "objc2 0.5.2",
 diff --git a/crates/benilla-app/src/perf/perf_log.rs b/crates/benilla-app/src/perf/perf_log.rs
-index e3f56fd5..91ff1c8f 100644
+index e3f56fd5..a44e9d97 100644
 --- a/crates/benilla-app/src/perf/perf_log.rs
 +++ b/crates/benilla-app/src/perf/perf_log.rs
 @@ -9,13 +9,18 @@
@@ -73,16 +75,17 @@ index e3f56fd5..91ff1c8f 100644
  
  use bevy::diagnostic::DiagnosticsStore;
  use bevy::prelude::*;
-@@ -23,6 +28,8 @@ use bevy::render::renderer::RenderAdapterInfo;
+@@ -23,6 +28,9 @@ use bevy::render::renderer::RenderAdapterInfo;
  use bevy::time::Real;
  use bevy::window::{Monitor, PrimaryWindow};
  
++use benilla_ui::mlua::benilla_lua::gc_clock as lua_clock;
 +use benilla_world::system_times::{self, SlotTime};
 +
  use super::clock::{main_thread_cpu_secs, process_cpu_secs};
  
  pub(crate) struct PerfLogPlugin;
-@@ -39,6 +46,16 @@ const ADAPTER_WAIT_SECS: f32 = 5.0;
+@@ -39,6 +47,16 @@ const ADAPTER_WAIT_SECS: f32 = 5.0;
  /// How many of the costliest GPU passes a summary names.
  const TOP_PASSES: usize = 6;
  
@@ -99,7 +102,7 @@ index e3f56fd5..91ff1c8f 100644
  impl Plugin for PerfLogPlugin {
      fn build(&self, app: &mut App) {
          app.insert_resource(PerfLog {
-@@ -50,6 +67,10 @@ impl Plugin for PerfLogPlugin {
+@@ -50,6 +68,10 @@ impl Plugin for PerfLogPlugin {
              cpu_at: None,
              main_at: None,
              settings: String::new(),
@@ -110,7 +113,7 @@ index e3f56fd5..91ff1c8f 100644
          })
          .add_systems(Last, write_perf_log);
      }
-@@ -72,6 +93,186 @@ struct PerfLog {
+@@ -72,6 +94,186 @@ struct PerfLog {
      main_at: Option<f64>,
      /// The last settings line written; a new one goes in only when it differs.
      settings: String,
@@ -285,7 +288,7 @@ index e3f56fd5..91ff1c8f 100644
 +        }
 +        if let Some((mb, total)) = lua {
 +            out.push_str(&format!(
-+                "  lua: heap {mb:.1} MB, {} collections this window taking {:.1} ms (most in a frame \
++                "  lua: heap {mb:.1} MB live after the last collection, {} collections this window taking {:.1} ms (most in a frame \
 +                 {:.1}), {total} in all\n",
 +                self.gc,
 +                ms(self.gc_ns),
@@ -297,14 +300,6 @@ index e3f56fd5..91ff1c8f 100644
  }
  
  impl PerfLog {
-@@ -266,6 +467,7 @@ fn write_perf_log(
-     place: PerfPlace,
-     drawn: Query<&ViewVisibility, With<Mesh3d>>,
-     entities: Query<()>,
-+    script: Option<NonSend<benilla_ui::script::UiScript>>,
- ) {
-     if log.path.is_none() {
-         return;
 @@ -273,6 +475,7 @@ fn write_perf_log(
      let now = time.elapsed_secs();
      if !log.started {
@@ -323,7 +318,7 @@ index e3f56fd5..91ff1c8f 100644
          ));
      }
      if !log.header_done && (adapter.is_some() || now > ADAPTER_WAIT_SECS) {
-@@ -300,6 +504,32 @@ fn write_perf_log(
+@@ -300,6 +504,31 @@ fn write_perf_log(
          log.main_at = main_thread_cpu_secs();
      }
      log.frames.push(time.delta_secs() * 1000.0);
@@ -334,17 +329,16 @@ index e3f56fd5..91ff1c8f 100644
 +        .last_frame_at
 +        .replace(at)
 +        .map_or(0.0, |t0| (at - t0).as_secs_f32() * 1000.0);
-+    let gc_now = script
-+        .as_deref()
-+        .map(|s| (s.lua().gc_collections(), s.lua().gc_nanos().0));
-+    let gc = match (log.gc_at, gc_now) {
-+        (Some(a), Some(b)) => FrameGc {
-+            runs: b.0.saturating_sub(a.0),
-+            ns: b.1.saturating_sub(a.1),
++    // Every Lua state's collections, read off the process-wide clock (no VM held here).
++    let gc_now = lua_clock::totals();
++    let gc = match log.gc_at {
++        Some(a) => FrameGc {
++            runs: gc_now.0.saturating_sub(a.0),
++            ns: gc_now.1.saturating_sub(a.1),
 +        },
-+        _ => FrameGc::default(),
++        None => FrameGc::default(),
 +    };
-+    log.gc_at = gc_now;
++    log.gc_at = Some(gc_now);
 +    let mut scratch = std::mem::take(&mut log.scratch);
 +    if system_times::enabled() {
 +        system_times::mark_main_thread();
@@ -356,16 +350,14 @@ index e3f56fd5..91ff1c8f 100644
      if now - start < EVERY_SECS {
          return;
      }
-@@ -342,6 +572,16 @@ fn write_perf_log(
+@@ -342,6 +571,14 @@ fn write_perf_log(
          entities.iter().len(),
      );
      log.append(&text);
-+    let lua = script.as_deref().map(|s| {
-+        (
-+            s.lua().used_memory() as f64 / (1024.0 * 1024.0),
-+            s.lua().gc_collections(),
-+        )
-+    });
++    let lua = Some((
++        lua_clock::live_bytes() as f64 / (1024.0 * 1024.0),
++        lua_clock::totals().0,
++    ));
 +    let sys = std::mem::take(&mut log.sys);
 +    log.append(&sys.lines(n, lua, |slot| {
 +        system_times::short_name(&system_times::name(slot))
@@ -373,7 +365,7 @@ index e3f56fd5..91ff1c8f 100644
      log.window_start = Some(now);
  }
  
-@@ -357,6 +597,38 @@ mod tests {
+@@ -357,6 +594,38 @@ mod tests {
          assert_eq!(percentiles(&[]), (0.0, 0.0, 0.0, 0.0));
      }
  
@@ -406,38 +398,74 @@ index e3f56fd5..91ff1c8f 100644
 +        );
 +        assert!(lines[1].starts_with("  worst frame 80.0 ms at t=1.1, lua gc 1 (50.0 ms), main thread in systems 62.0 ms: b::spiky 60.0, c::other 5.0, a::steady 2.0"), "{}", lines[1]);
 +        assert!(lines[2].contains("spikes over 33 ms: 1, 1 with a lua gc (50.0 ms in all); in their top 3: b::spiky x1 avg 60.0"), "{}", lines[2]);
-+        assert!(lines[3].contains("heap 12.5 MB, 1 collections this window taking 50.0 ms (most in a frame 50.0), 40 in all"), "{}", lines[3]);
++        assert!(lines[3].contains("heap 12.5 MB live after the last collection, 1 collections this window taking 50.0 ms (most in a frame 50.0), 40 in all"), "{}", lines[3]);
 +    }
 +
      #[test]
      fn no_adapter_says_so() {
          assert!(adapter_lines(None).starts_with("gpu: unknown"));
-diff --git a/crates/benilla-lua/src/heap.rs b/crates/benilla-lua/src/heap.rs
-index 0e1f38d3..20b354dd 100644
---- a/crates/benilla-lua/src/heap.rs
-+++ b/crates/benilla-lua/src/heap.rs
-@@ -482,6 +482,10 @@ pub struct Heap {
-     asked: bool,
-     /// Collections run since the state opened: an instrument for the collector's pacing.
-     pub collections: u64,
-+    /// Wall nanoseconds those collections took, all told and the longest one: each is a
-+    /// stop-the-world pass on the thread running Lua (`perf.log` reports them).
-+    pub gc_nanos: u64,
-+    pub gc_nanos_max: u64,
-     /// The chunk names prototypes were compiled under, by source id: the owners a profile and
-     /// a memory census charge to. [`Heap::free_unreferenced_sources`] frees the slot of a chunk
-     /// no function or table refers to any more (a `loadstring` chunk is named by its own code),
-@@ -606,6 +610,8 @@ impl Default for Heap {
-             trigger: 64 * 1024,
-             asked: false,
-             collections: 0,
-+            gc_nanos: 0,
-+            gc_nanos_max: 0,
-             // Id 0 is the host: whatever no Lua chunk created.
-             sources: vec![Some(Rc::from(&b"=[host]"[..]))],
-             source_ids: Default::default(),
+diff --git a/crates/benilla-lua/src/gc_clock.rs b/crates/benilla-lua/src/gc_clock.rs
+new file mode 100644
+index 00000000..1b1e982e
+--- /dev/null
++++ b/crates/benilla-lua/src/gc_clock.rs
+@@ -0,0 +1,42 @@
++//! What the collectors have cost, process-wide: each full collection is one stop-the-world pass
++//! on the thread running its state, and `perf.log` reports their count and wall time without
++//! reaching into a VM. Every state in the process adds to the same totals.
++
++use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
++use std::time::Duration;
++
++static RUNS: AtomicU64 = AtomicU64::new(0);
++static NANOS: AtomicU64 = AtomicU64::new(0);
++static LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
++
++/// One collection: how long it took and the bytes its state counted after it.
++pub(crate) fn record(took: Duration, live_bytes: usize) {
++    RUNS.fetch_add(1, Relaxed);
++    NANOS.fetch_add(u64::try_from(took.as_nanos()).unwrap_or(u64::MAX), Relaxed);
++    LIVE_BYTES.store(live_bytes as u64, Relaxed);
++}
++
++/// The collections run so far and their wall nanoseconds, all told.
++pub fn totals() -> (u64, u64) {
++    (RUNS.load(Relaxed), NANOS.load(Relaxed))
++}
++
++/// The bytes the last collection's state counted after it ran: its live heap.
++pub fn live_bytes() -> u64 {
++    LIVE_BYTES.load(Relaxed)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn a_collection_adds_to_the_totals() {
++        let (runs, nanos) = totals();
++        record(Duration::from_millis(2), 1234);
++        let (runs2, nanos2) = totals();
++        assert!(runs2 > runs);
++        assert!(nanos2 >= nanos + 2_000_000);
++        assert!(live_bytes() > 0);
++    }
++}
+diff --git a/crates/benilla-lua/src/lib.rs b/crates/benilla-lua/src/lib.rs
+index 17eb86a6..5a775bcb 100644
+--- a/crates/benilla-lua/src/lib.rs
++++ b/crates/benilla-lua/src/lib.rs
+@@ -5,6 +5,7 @@
+ pub mod api;
+ mod cfmt;
+ mod compile;
++pub mod gc_clock;
+ pub mod heap;
+ mod lex;
+ mod lib_base;
 diff --git a/crates/benilla-lua/src/vm.rs b/crates/benilla-lua/src/vm.rs
-index a2d9d32b..de20be66 100644
+index a2d9d32b..8be4e78d 100644
 --- a/crates/benilla-lua/src/vm.rs
 +++ b/crates/benilla-lua/src/vm.rs
 @@ -2303,6 +2303,7 @@ impl Vm {
@@ -448,33 +476,14 @@ index a2d9d32b..de20be66 100644
          self.heap.collections += 1;
          self.check_stack_sizes();
          let mut roots: Vec<Value> = self.stack[..self.top].to_vec();
-@@ -2351,6 +2352,9 @@ impl Vm {
+@@ -2351,6 +2352,7 @@ impl Vm {
              .collect(&roots, &open, &self.retired, self.names.mode, &fixed);
          self.heap.charge(self.state_bytes());
          self.heap.pace();
-+        let ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
-+        self.heap.gc_nanos = self.heap.gc_nanos.saturating_add(ns);
-+        self.heap.gc_nanos_max = self.heap.gc_nanos_max.max(ns);
++        crate::gc_clock::record(started.elapsed(), self.heap.bytes());
          // The host closures it freed drop last, with no arena borrowed, as host code: their
          // captures' destructors may use the state.
          if !self.heap.freed_hosts.is_empty() {
-diff --git a/crates/benilla-mlua/src/lib.rs b/crates/benilla-mlua/src/lib.rs
-index c2c1fa0e..297a9d4b 100644
---- a/crates/benilla-mlua/src/lib.rs
-+++ b/crates/benilla-mlua/src/lib.rs
-@@ -944,6 +944,12 @@ impl Lua {
-         self.vm().heap.collections
-     }
- 
-+    /// Wall nanoseconds every collection since the state opened took, and the longest one's.
-+    pub fn gc_nanos(&self) -> (u64, u64) {
-+        let heap = &self.vm().heap;
-+        (heap.gc_nanos, heap.gc_nanos_max)
-+    }
-+
-     pub fn gc_collect(&self) -> Result<()> {
-         self.vm().full_gc();
-         Ok(())
 diff --git a/crates/benilla-world/Cargo.toml b/crates/benilla-world/Cargo.toml
 index 2c5bec0c..d2284e1a 100644
 --- a/crates/benilla-world/Cargo.toml
