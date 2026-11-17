@@ -130,7 +130,7 @@ starts miss, and rolling through a blow gives 10 stamina and 8 Valor.
   - **Posture**: 12% of a boss's or champion's posture. No stagger: the Rogue's reward is the
     step, not a reel.
 - **How it reads with floor markers off**: the creature's own wind-up is the tell, as for every
-  hero. The payoff reads on your own body and screen: the body flickers see-through for 0.3 sec
+  hero. The payoff reads on your own body and screen: the body flickers see-through for 0.5 sec
   (the Stealth aura, 5215, as Prowl wears it), Vanish's puff of smoke (spell 1856) where the blow
   fell, and a short stop on your screen (a `perfect_dodge` beat, or `readied` if an older add-on
   can't take a new one). The Shadow Cut shows the step's puff at both ends and the backstab's own
@@ -616,6 +616,31 @@ What the design left open, decided in the pull request that built it:
     left-hand display).
   - **The client's own guards**: `PlayUnitAfterimage` is on the list of globals past 1.12
     (`reference_surface.rs`) and in the VM surface golden, both in the patch.
+
+- **Stronger cues (Corey's review, Nov 17; client patch 0109, the thirty-third round)**: the
+  off-hand trail's deeper steel, the finisher's two colours, the 0.3 sec copy, the flicker and the
+  violet corners did not read at filming distance. Decided:
+  - **Trails**: the off hand's blade is a vivid cold blue `3C8CFF` at alpha 0xC8 (it was steel
+    `7C86B4` at 0x5A; the light blow's pale is 0x50), the finisher's main blade a warm gold
+    `FFD27A` and its off blade the same blue, both at 0xDC (they were the pale and the steel at
+    0x78). Patch 0109 lets a hand's colour end `*N` (`C83C8CFF*2.4`): the ribbon N times as wide,
+    drawn out from the blade's middle, and fading 1 + 0.6 (N - 1) times as slowly (2.4 gives 1.84; the swing's clock runs slower, so it holds at any frame rate).
+    The server marks the off hand's and the finisher's blades `*2.4` for a client that says `ac33`
+    (`CLIENT_NEWEST` 33, `TRAIL_BOLD_LEVEL`); an `ac32` client gets the same colours unmarked, an
+    older one the one colour as before. The main hand's plain blow is as it was. Why not width
+    through the AN line's other fields: the add-on passes the trail string straight through, so
+    no add-on code changes for it beyond the hello (`ac33`; `VERSION` and `ADDON_NEWEST` 79).
+  - **The dodge's copy**: alpha 0.85 (was 0.55), a bluer tint `A8B8FF` (was `C8C8FF`), standing
+    0.9 sec (was the flicker's 0.3), at least: `afterimage_line` lifts a dodge copy's time to
+    `DODGE_IMAGE_SECS`, and a copy over half a second keeps most of its alpha until near its end.
+    Server-only, so every `ac32` client gets it.
+  - **The flicker**: `[rogue] flicker_secs` 0.3 to 0.5, the Stealth look on the body for that
+    long. Nothing else reads it (the aura is the look alone).
+  - **The violet corners**: the add-on's `perfect_dodge` edge, `Cues.lua`: `0.62, 0.40, 1.0` (was
+    `0.42, 0.30, 0.62`, a dark violet), 1.0 sec (was 0.6), at twice an edge's strength
+    (`ES.Edge`'s new fifth number, a gain on the corner pieces' alpha, capped at 1).
+  - **No floor marker among them**: a ribbon on the blade, a copy of the body, the body's own
+    look and the screen's edge. Not seen in the client yet: filmed after.
 
 - **Fist weapons fill both hands (Corey, Nov 16)**: a fist weapon is one item that fills both
   hands, a pair of knuckles, and always plays as Iron Knuckles. No fist with a dagger, a sword or

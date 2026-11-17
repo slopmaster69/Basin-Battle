@@ -201,7 +201,7 @@
 //! A Rogue's looks, to a client of the thirty-second round (patch 0103, [`ROGUE_LOOKS_LEVEL`]):
 //! - An `AN` for a Rogue's blow carries its trail a hand each, `<main AARRGGBB>/<off AARRGGBB>`,
 //!   `-` for a hand that trails nothing ([`rogue_trail`]): the main hand's blow its own blade in
-//!   the blow's own colour, the off hand's its blade in a deeper steel, the two-blade finisher
+//!   the blow's own colour, the off hand's its blade in a vivid cold blue (a client of round 33 adds `*N`, wider and longer), the two-blade finisher
 //!   both, stronger. An older client is sent the one colour as before (both blades).
 //! - `AI\t<guid>\t<secs>\t<alpha>\t<RRGGBB>[\t<x>\t<y>\t<z>\t<stand-in guid>]`: a see-through
 //!   copy of that hero's own body and gear left for `secs` ([`afterimage_line`]): where the body
@@ -579,7 +579,7 @@ pub(crate) const VERSION: u32 = 2;
 /// swung, and a line counting down the time left to press the next (a swing's `AN` goes on
 /// `\t<blow>/<of>\t<open secs>\t<two hands>`). The finisher's flash on the swinger plays from the
 /// add-on as its impact comes. An older add-on ignores the fields and is still sent the flash.
-pub(crate) const ADDON_NEWEST: u32 = 78;
+pub(crate) const ADDON_NEWEST: u32 = 79;
 /// The first add-on that plays the finisher's flash on its own hero (`Chain.lua`): the server
 /// leaves that client out of the kit.
 pub(crate) const CHAIN_ADDON: u32 = 78;
@@ -618,23 +618,33 @@ pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// 31: the Deadmines' route lanterns put out on the server's say-so, one game object each, as
 /// Rhahk'Zor's collapse comes down (0096; `aftermath_wreck.rs`).
 /// 32: a Rogue's two blades and its afterimage (0103; [`ROGUE_LOOKS_LEVEL`]).
-pub(crate) const CLIENT_NEWEST: u8 = 32;
+/// 33: a Rogue's off-hand and finisher trails drawn wider and longer-lived (0109; [`TRAIL_BOLD_LEVEL`]).
+pub(crate) const CLIENT_NEWEST: u8 = 33;
 
 /// 32: a Rogue's two blades trail a hand each (`PlayUnitAnimation`'s trail `main/off`), and a copy
 /// of the hero's own body is left behind (`PlayUnitAfterimage`, 0103): [`ROGUE_LOOKS_LEVEL`].
 pub(crate) const ROGUE_LOOKS_LEVEL: u8 = 32;
 
-/// A Rogue's off-hand blade trails a deeper steel than the main hand's pale streak (the blow's own
-/// colour, `play.rs`'s light trail), so the two hands read apart in the rhythm; the two-blade
-/// finisher draws both blades at once, a stronger alpha on each (0x78, a heavy blow's).
-const OFF_TRAIL: &str = "5A7C86B4";
-const FINISH_MAIN_TRAIL: &str = "78F2EEE4";
-const FINISH_OFF_TRAIL: &str = "787C86B4";
+/// A Rogue's off-hand blade trails a vivid cold blue at a strong alpha (0xC8, against the light
+/// blow's 0x50) and, on a client of round 33, wider and longer-lived ([`TRAIL_BOLD`]), so the hands
+/// read apart a few yards off (Corey, Nov 17: the deeper steel did not). The two-blade finisher
+/// draws both blades at once, the main hand's a warm gold and the off hand's the same cold blue, both
+/// bold: two colours side by side, not one pale smear.
+const OFF_TRAIL: &str = "C83C8CFF";
+const FINISH_MAIN_TRAIL: &str = "DCFFD27A";
+const FINISH_OFF_TRAIL: &str = "DC3C8CFF";
+/// Round 33's width mark on a hand's colour (`AARRGGBB*N`): the ribbon N times as wide (the blade's
+/// own length, drawn from its middle) and fading 1 + 0.6 (N - 1) times as slowly (patch 0109).
+const TRAIL_BOLD: &str = "*2.4";
+/// 33: the bold trail's width mark (0109; [`TRAIL_BOLD`]).
+pub(crate) const TRAIL_BOLD_LEVEL: u8 = 33;
 
-/// The perfect dodge's copy: pale, the body's own colours under a cool light, 0.55 so it reads as a
-/// ghost beside the hero who left it, for the flicker's 0.3 sec.
-const DODGE_IMAGE_ALPHA: f32 = 0.55;
-const DODGE_IMAGE_TINT: &str = "C8C8FF";
+/// The perfect dodge's copy: the body's own colours under a cool blue light, 0.85 (was 0.55) so it
+/// reads as a ghost beside the hero who left it, for 0.9 sec (was the flicker's 0.3).
+const DODGE_IMAGE_ALPHA: f32 = 0.85;
+const DODGE_IMAGE_TINT: &str = "A8B8FF";
+/// The copy stands at least this long, past the 0.5 sec body flicker, fading the whole way.
+const DODGE_IMAGE_SECS: f32 = 0.9;
 /// Afterimage's shade: the hero's own body in Shadow's violet, 0.6 and standing most of its 2 sec,
 /// so the enemies turning to it read as turning to the Rogue.
 const SHADE_IMAGE_ALPHA: f32 = 0.6;
@@ -642,12 +652,14 @@ const SHADE_IMAGE_TINT: &str = "A08CDC";
 
 /// A Rogue's blow's trail a hand each (`main/off`, `-` for none): the main hand's blow trails its
 /// own blade in the blow's own colour (`own`), the off hand's its own blade, the two-blade finisher
-/// both.
-pub(crate) fn rogue_trail(own: &str, off_hand: bool, finish: bool) -> String {
+/// both. `bold` (a client of round 33): the off hand's and the finisher's colours carry
+/// [`TRAIL_BOLD`], drawn wider and longer-lived; the main hand's plain blow is as it was.
+pub(crate) fn rogue_trail(own: &str, off_hand: bool, finish: bool, bold: bool) -> String {
+    let b = if bold { TRAIL_BOLD } else { "" };
     if finish {
-        format!("{FINISH_MAIN_TRAIL}/{FINISH_OFF_TRAIL}")
+        format!("{FINISH_MAIN_TRAIL}{b}/{FINISH_OFF_TRAIL}{b}")
     } else if off_hand {
-        format!("-/{OFF_TRAIL}")
+        format!("-/{OFF_TRAIL}{b}")
     } else {
         format!("{own}/-")
     }
@@ -660,6 +672,8 @@ pub(crate) fn afterimage_line(guid: u64, secs: f32, at: Option<htl_survival::Vec
         return format!("AI\t{guid:#X}\t0");
     }
     let (alpha, tint) = if stand_in.is_some() { (SHADE_IMAGE_ALPHA, SHADE_IMAGE_TINT) } else { (DODGE_IMAGE_ALPHA, DODGE_IMAGE_TINT) };
+    // The perfect dodge's copy (no stand-in, where the body is) outlasts the body's own flicker.
+    let secs = if stand_in.is_none() && at.is_none() { secs.max(DODGE_IMAGE_SECS) } else { secs };
     let mut line = format!("AI\t{guid:#X}\t{secs:.2}\t{alpha:.2}\t{tint}");
     if let Some(p) = at {
         let who = stand_in.map_or_else(|| "-".to_string(), |g| format!("{g:#X}"));
@@ -2686,22 +2700,29 @@ mod rogue_looks_tests {
 
     #[test]
     fn a_rogues_blow_trails_the_hand_that_struck_and_the_finisher_both() {
-        assert_eq!(rogue_trail("50F2EEE4", false, false), "50F2EEE4/-", "the main hand's blade alone, in the blow's own colour");
-        assert_eq!(rogue_trail("50F2EEE4", true, false), "-/5A7C86B4", "the off hand's blade alone, a deeper steel");
-        assert_eq!(rogue_trail("50F2EEE4", true, true), "78F2EEE4/787C86B4", "both blades on the finisher, whichever hand pressed it");
-        assert_eq!(rogue_trail("78FF9A3C", false, true), "78F2EEE4/787C86B4");
-        // Each side is a colour the client reads, or none.
-        for t in [rogue_trail("50F2EEE4", false, false), rogue_trail("", true, false), rogue_trail("", false, true)] {
+        assert_eq!(rogue_trail("50F2EEE4", false, false, false), "50F2EEE4/-", "the main hand's blade alone, in the blow's own colour");
+        assert_eq!(rogue_trail("50F2EEE4", true, false, false), "-/C83C8CFF", "the off hand's blade alone, a vivid cold blue");
+        assert_eq!(rogue_trail("50F2EEE4", true, true, false), "DCFFD27A/DC3C8CFF", "both blades on the finisher, gold and blue, whichever hand pressed it");
+        assert_eq!(rogue_trail("78FF9A3C", false, true, false), "DCFFD27A/DC3C8CFF");
+        // Round 33 adds the width mark to the off hand and the finisher, never the main hand's blow.
+        assert_eq!(rogue_trail("50F2EEE4", false, false, true), "50F2EEE4/-");
+        assert_eq!(rogue_trail("50F2EEE4", true, false, true), "-/C83C8CFF*2.4");
+        assert_eq!(rogue_trail("50F2EEE4", true, true, true), "DCFFD27A*2.4/DC3C8CFF*2.4");
+        // Each side is a colour the client reads, or none; without the mark it is eight hex digits.
+        for t in [rogue_trail("50F2EEE4", false, false, false), rogue_trail("", true, false, false), rogue_trail("", false, true, false)] {
             let (m, o) = t.split_once('/').unwrap();
             for h in [m, o] {
                 assert!(h == "-" || (h.len() == 8 && u32::from_str_radix(h, 16).is_ok()), "{t}");
             }
         }
+        // The off hand's blue differs from the main hand's pale in hue and is far stronger.
+        assert!(u32::from_str_radix(&OFF_TRAIL[..2], 16).unwrap() >= 2 * u32::from_str_radix(&"50F2EEE4"[..2], 16).unwrap());
     }
 
     #[test]
     fn the_afterimage_line_is_a_copy_where_the_body_is_or_at_the_shade_or_none() {
-        assert_eq!(afterimage_line(0x2A, 0.3, None, None), "AI\t0x2A\t0.30\t0.55\tC8C8FF");
+        assert_eq!(afterimage_line(0x2A, 0.5, None, None), "AI	0x2A	0.90	0.85	A8B8FF", "the dodge copy outlasts the flicker");
+        assert_eq!(afterimage_line(0x2A, 1.2, None, None), "AI	0x2A	1.20	0.85	A8B8FF");
         assert_eq!(
             afterimage_line(0x2A, 2.0, Some([-9001.25, 120.5, 82.0]), Some(0xF130_0001_2300_0042)),
             "AI\t0x2A\t2.00\t0.60\tA08CDC\t-9001.25\t120.50\t82.00\t0xF130000123000042"
@@ -2709,7 +2730,7 @@ mod rogue_looks_tests {
         assert_eq!(afterimage_line(0x2A, 0.0, None, None), "AI\t0x2A\t0");
         let f: Vec<String> = afterimage_line(0x2A, 2.0, Some([1.0, 2.0, 3.0]), Some(7)).split('\t').map(String::from).collect();
         assert_eq!(f.len(), 9, "the add-on's fields: verb, guid, secs, alpha, colour, x, y, z, stand-in");
-        assert_eq!(ROGUE_LOOKS_LEVEL, CLIENT_NEWEST, "the newest round is the Rogue's looks");
+        assert_eq!(TRAIL_BOLD_LEVEL, CLIENT_NEWEST, "the newest round is the bold trail");
     }
 }
 

@@ -5403,7 +5403,7 @@ impl Default for RogueDef {
             off_cancel_after: 0.0,
             jab: 0.5,
             flicker_aura: 5215,
-            flicker_secs: 0.3,
+            flicker_secs: 0.5,
             puff: 1856,
             trait_keys: 3,
             shroud_secs: 1.0,

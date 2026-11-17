@@ -1845,10 +1845,10 @@ off_cancel_after = 0.0
 # click never guards and the rhythm never goes away.
 jab = 0.5
 # The perfect dodge reads on the body with no floor marker: the Stealth look (5215, as Prowl wears
-# it) flickers the body see-through for 0.3 sec, and Vanish's puff of smoke (1856) bursts where
+# it) flickers the body see-through for 0.5 sec (0.3 read too faint, Nov 17), and Vanish's puff of smoke (1856) bursts where
 # the blow fell and at both ends of the Shadow Cut's step.
 flicker_aura = 5215
-flicker_secs = 0.3
+flicker_secs = 0.5
 puff = 1856
 # Shadow's trait, Shrouded Step (docs/rogue-roles.md, Shadow): on while 3 of the 5 keys hold Shadow's
 # cards. 3 of 5 is most of the bar: a pure tree has its trait, a 3 + 2 mix has one, never two.
