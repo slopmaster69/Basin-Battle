@@ -1,4 +1,4 @@
-From 8a84ab302a76c0e4e564130aa24e8ec4d1ff2c92 Mon Sep 17 00:00:00 2001
+From dbed3ca6da809cfd6cbe1dcd07b841edbeac2ef7 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 17 Nov 2026 01:06:29 -0600
 Subject: [PATCH] A Rogue's afterimage keeps its own colour, so its pale ghost
@@ -12,12 +12,12 @@ with a light (the thirty-fourth round's lit tint) or a stand-in (Afterimage's sh
 OwnTint, which the publish skips; a freed slot is still cleared by RigSkin's hook. A flurry's
 copies (Bladestorm) are as they were. No new round: the same AI line now draws as it was meant to.
 ---
- crates/benilla-app/src/aura_visual.rs         |  9 ++++-
- crates/benilla-app/src/aura_visual/tests.rs   | 40 +++++++++++++++++++
+ crates/benilla-app/src/aura_visual.rs         |  9 ++-
+ crates/benilla-app/src/aura_visual/tests.rs   | 55 +++++++++++++++++++
  crates/benilla-app/src/creature_anim.rs       |  2 +-
  .../benilla-app/src/creature_anim/action.rs   |  1 +
- .../src/creature_anim/action/afterimage.rs    | 20 +++++++++-
- 5 files changed, 68 insertions(+), 4 deletions(-)
+ .../src/creature_anim/action/afterimage.rs    | 20 ++++++-
+ 5 files changed, 83 insertions(+), 4 deletions(-)
 
 diff --git a/crates/benilla-app/src/aura_visual.rs b/crates/benilla-app/src/aura_visual.rs
 index 3987d85a..37cd2014 100644
@@ -41,15 +41,16 @@ index 3987d85a..37cd2014 100644
          Option<&AuraNodes>,
          Option<&benilla_world::model_fade::ParentModel>,
 diff --git a/crates/benilla-app/src/aura_visual/tests.rs b/crates/benilla-app/src/aura_visual/tests.rs
-index b2132e03..d5aa5ebb 100644
+index b2132e03..bcde10f5 100644
 --- a/crates/benilla-app/src/aura_visual/tests.rs
 +++ b/crates/benilla-app/src/aura_visual/tests.rs
-@@ -737,6 +737,46 @@ fn the_rig_free_hook_clears_a_dead_units_tint() {
+@@ -737,6 +737,61 @@ fn the_rig_free_hook_clears_a_dead_units_tint() {
      );
  }
  
 +/// Basin Battle: a Rogue's afterimage copy keeps the colour it was made with (its lit ghost, its
 +/// violet shade): the publish skips its rig, where an untinted rig beside it is put back to none.
++/// Gone, its slot is clean again (`RigSkin`'s free hook), so no next owner inherits the light.
 +#[test]
 +fn an_afterimage_copy_keeps_its_own_tint() {
 +    let mut app = app_with_tint_channel();
@@ -65,7 +66,10 @@ index b2132e03..d5aa5ebb 100644
 +    };
 +    let (copy, plain) = (skin(), skin());
 +    let (copy_slot, plain_slot) = (copy.slot, plain.slot);
-+    app.world_mut().spawn((copy, crate::creature_anim::OwnTint));
++    let copy_rig = app
++        .world_mut()
++        .spawn((copy, crate::creature_anim::OwnTint))
++        .id();
 +    app.world_mut().spawn(plain);
 +    let lit = benilla_world::instance_tint::pack_lit([0xE0, 0xEC, 0xFF], 0.7);
 +    {
@@ -85,6 +89,17 @@ index b2132e03..d5aa5ebb 100644
 +        tints.get(plain_slot),
 +        benilla_world::instance_tint::IDENTITY,
 +        "any other rig with no aura is put back to none, as before"
++    );
++
++    // The copy's time up: its rig goes, and its slot with it, untinted.
++    app.world_mut().entity_mut(copy_rig).despawn();
++    app.update();
++    assert_eq!(
++        app.world()
++            .resource::<benilla_world::instance_tint::InstanceTints>()
++            .get(copy_slot),
++        benilla_world::instance_tint::IDENTITY,
++        "a gone copy's slot is clean before anyone can reallocate it"
 +    );
 +}
 +
