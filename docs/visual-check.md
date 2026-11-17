@@ -348,7 +348,6 @@ The Rogue's Nov 17 review refilms (client patch 0109, #490, #496), each a small 
 | `rogue-trails-close` | Main hand pale, off hand vivid blue, the finisher gold and blue, on a still grunt 2 yd ahead |
 | `rogue-fists` | Footpad's Knuckles then Cutpurse's Claw, each in both hands, idle and punching, ending on the character sheet |
 | `rogue-distract-close`, `rogue-cloud-close` | Distract between two still grunts, and Choking Cloud's 5 yd between two coming ones, closer than `rogue-shadow` and `rogue-venom` |
-| `rogue-perfect-dodge` | On the hero's own screen: a bot that measures the gap from its roll to the blow's impact line and moves its margin toward 0.11 sec (the middle of the 0.04 to 0.18 sec perfect window); an `AI` line of 0.9 sec in the client log is the proof |
 
 Sneed's Shredder's second half (the run back, the crawl, the rigged log and the repair,
 `docs/shredder-encounter.md`) has its own set, sharing `_sneed-shredder-setup.txt` (the mine
