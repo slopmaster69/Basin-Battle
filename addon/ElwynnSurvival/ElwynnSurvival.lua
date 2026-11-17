@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 80
+local VERSION = 81
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -618,14 +618,15 @@ end
 
 -- Play a blow of ours: the clip (its impact and recovery the server's), the trail, the lunge, the
 -- whoosh. A trail a hand each (ac32, a Rogue's: "main/off") is the server's when it sent one; a
--- blow we guess, the main hand's blade alone while the server's blows have come a hand each.
+-- blow we guess, the main hand's blade alone while the server's blows have come a hand each, in
+-- the colour the server's last light main-hand blow had (add-on 81: a Rogue's white-gold).
 local function PlayMine(kind, step, move)
   local heavy = kind == "heavy" or kind == "bash" or kind == "kick" or kind == "leap"
   local trail = heavy and HEAVY_TRAIL or LIGHT_TRAIL
   if move.trail then
     trail = move.trail
   elseif ES.handTrails then
-    trail = trail .. "/-"
+    trail = (not heavy and ES.mainTrail) or (trail .. "/-")
   end
   ES.predictedTrail = trail
   PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery, ES.SwingBody(kind), move.from)
@@ -803,6 +804,8 @@ function ES.SwingLine(f)
     -- now on; one colour, both hands as before.
     local hands = trail and string.find(trail, "/", 1, true) and trail or nil
     ES.handTrails = hands and true or nil
+    -- A light blow's main hand alone ("<colour>/-"): the colour our next guess trails.
+    if hands and kind == "light" and string.find(hands, "/%-$") then ES.mainTrail = hands end
     local same = ES.predicted and GetTime() - ES.predicted < PREDICT_WINDOW and ES.predictedClip == clip and (ES.predictedTake or 0) == take
     -- (The two-blade finisher on the same clip as the blow we guessed: played again, both blades.
     -- A main hand's blow, "<colour>/-", stands as we guessed it.)

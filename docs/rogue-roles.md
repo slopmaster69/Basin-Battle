@@ -781,6 +781,21 @@ What the design left open, decided in the pull request that built it:
     another class. No new round: the same `AI` line now draws as it was meant to, so the server
     and add-on are unchanged.
 
+- **The main hand's trail after the Nov 17 close-ups** (the off hand's blue read; the main hand's
+  pale could not be told from the world at filming distance):
+  - **The main hand's light blow trails a bright white-gold, `C8FFF0B4`**, at the off hand's strong
+    alpha (0xC8, was the blow's own cream at 0x50), and on a round-33 client 1.8 times as wide
+    (0109's width mark, `MAIN_BOLD`; the off hand's is 2.4). Why white-gold and not silver: a
+    near-white silver sits close to the off hand's pale-blue edge in bright light; a warm colour
+    against the off hand's cold one keeps the hands apart by hue, and the narrower ribbon by size.
+    Why not the same width: the off hand's blue stays the boldest, the hand Corey called readable.
+  - A heavy blow keeps its own orange, and the finisher its deeper gold and blue side by side, both
+    bold, so the finisher still shows both colours.
+  - The hero's own screen draws a blow the add-on guesses before the server's word comes; the
+    add-on now guesses the main hand in the colour of the server's last light main-hand blow
+    (add-on 81), else the first take showed the old pale on her own screen. Server only, no patch.
+  - All of it is a trail on the blade: it reads with floor markers off.
+
 ## Build plan
 
 Six pull requests, in order. Each is handed to one subagent with only this page to go on, so each

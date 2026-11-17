@@ -238,7 +238,7 @@ impl SurvivalGame {
                             // finisher), for a client that draws a hand each.
                             let hands = self.sim.is_rogue(p).then(|| {
                                 let off = strike.kind == htl_survival::StrikeKind::Off;
-                                [super::ui::rogue_trail(trail, off, strike.finish, false), super::ui::rogue_trail(trail, off, strike.finish, true)]
+                                [super::ui::rogue_trail(trail, heavy, off, strike.finish, false), super::ui::rogue_trail(trail, heavy, off, strike.finish, true)]
                             });
                             // Its place in the chain, for the hero's own pips (`Chain.lua`).
                             let chain = format!("{}/{}\t{:.2}\t{}", strike.chain.0, strike.chain.1, self.sim.chain_window(strike.run), u8::from(self.sim.two_hands(p)));
