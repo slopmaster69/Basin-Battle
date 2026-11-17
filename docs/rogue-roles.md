@@ -624,7 +624,7 @@ What the design left open, decided in the pull request that built it:
     `7C86B4` at 0x5A; the light blow's pale is 0x50), the finisher's main blade a warm gold
     `FFD27A` and its off blade the same blue, both at 0xDC (they were the pale and the steel at
     0x78). Patch 0109 lets a hand's colour end `*N` (`C83C8CFF*2.4`): the ribbon N times as wide,
-    drawn out from the blade's middle, and living 1 + 0.6 (N - 1) times as long (2.4 gives 1.84).
+    drawn out from the blade's middle, and fading 1 + 0.6 (N - 1) times as slowly (2.4 gives 1.84; the swing's clock runs slower, so it holds at any frame rate).
     The server marks the off hand's and the finisher's blades `*2.4` for a client that says `ac33`
     (`CLIENT_NEWEST` 33, `TRAIL_BOLD_LEVEL`); an `ac32` client gets the same colours unmarked, an
     older one the one colour as before. The main hand's plain blow is as it was. Why not width

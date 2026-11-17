@@ -1,21 +1,22 @@
-From 98cc6910357ad6a1629367ee7f88695d36c31d97 Mon Sep 17 00:00:00 2001
+From b11b9c417e892f235c703d21073de66991bbf20b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 16 Nov 2026 17:40:36 -0600
 Subject: [PATCH] A Rogue's off-hand and finisher trails can be drawn wider and
- longer-lived
+ slower to fade
 
 Basin Battle, the thirty-third round (HasActionCombat() 33). A hand's trail colour in
 PlayUnitAnimation's "main/off" form may end "*N" (1 to 4): that hand's ribbon is N times as wide,
-drawn out from the blade's middle, and its swing fades slower, living 1 + 0.6 (N - 1) times as long.
-No mark is the blade's own ribbon, as before. A trail that arms again goes back to the blade's width.
-The off hand's deeper steel did not read a few yards off.
+drawn out from the blade's middle, and its swing's clock runs 1 + 0.6 (N - 1) times slower, so it
+fades that much more slowly at any frame rate. No mark is the blade's own ribbon, as before. A trail
+that arms again goes back to the blade's width. The off hand's deeper steel did not read a few yards
+off.
 ---
  .../benilla-app/src/creature_anim/action.rs   |  2 +
  .../src/creature_anim/action/flurry.rs        |  1 +
- crates/benilla-app/src/weapon_trail.rs        | 38 +++++++++++++-
- crates/benilla-app/src/weapon_trail/tests.rs  | 29 +++++++++++
+ crates/benilla-app/src/weapon_trail.rs        | 39 ++++++++++++++-
+ crates/benilla-app/src/weapon_trail/tests.rs  | 32 ++++++++++++
  crates/benilla-ui/src/action_combat.rs        | 50 +++++++++++++++----
- 5 files changed, 109 insertions(+), 11 deletions(-)
+ 5 files changed, 114 insertions(+), 10 deletions(-)
 
 diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
 index 5490b8b4..ab01e4e4 100644
@@ -50,7 +51,7 @@ index 85311c4f..1ec5e889 100644
      }
  }
 diff --git a/crates/benilla-app/src/weapon_trail.rs b/crates/benilla-app/src/weapon_trail.rs
-index 668e4d5b..cbe83d55 100644
+index 668e4d5b..da7d99eb 100644
 --- a/crates/benilla-app/src/weapon_trail.rs
 +++ b/crates/benilla-app/src/weapon_trail.rs
 @@ -105,6 +105,7 @@ impl WeaponTrail {
@@ -105,20 +106,21 @@ index 668e4d5b..cbe83d55 100644
      /// `+0x60c`: how long the ring appends; the fade outlasts it.
      duration_ms: u32,
      /// `+0x610`.
-@@ -190,7 +215,11 @@ impl Swing {
+@@ -190,6 +215,13 @@ impl Swing {
          }
          let dt = now_ms.wrapping_sub(self.last_ms);
          self.last_ms = now_ms;
--        let step = fade_step(dt, self.alpha);
-+        let mut step = fade_step(dt, self.alpha);
-+        if self.wide > 1.0 {
-+            // A bold swing fades slower, so it lives longer (the segments held grow with it).
-+            step = ((step as f32 / life_of(self.wide)).round() as u32).max(1);
-+        }
++        // A bold swing's clock runs slower, so it fades slower at any frame rate (scaling the step
++        // itself would do nothing once a short frame's step is already 1).
++        let dt = if self.wide > 1.0 {
++            (dt as f32 / life_of(self.wide)).round() as u32
++        } else {
++            dt
++        };
+         let step = fade_step(dt, self.alpha);
          // `6c65fa`: one segment or fewer and the trail is over.
          let segments = u32::from(self.alpha) / step;
-         if segments <= 1 {
-@@ -319,7 +348,7 @@ fn draw_weapon_trails(
+@@ -319,7 +351,7 @@ fn draw_weapon_trails(
          let Some(swing) = trail.swing.as_mut() else {
              continue;
          };
@@ -127,7 +129,7 @@ index 668e4d5b..cbe83d55 100644
          let Step::Strip(strip) = strip else {
              trail.swing = None;
              continue;
-@@ -346,6 +375,11 @@ fn draw_weapon_trails(
+@@ -346,6 +378,11 @@ fn draw_weapon_trails(
          let verts = batch.verts_mut();
          for w in strip.windows(2) {
              let ((b0, t0, a0), (b1, t1, a1)) = (w[0], w[1]);
@@ -140,10 +142,10 @@ index 668e4d5b..cbe83d55 100644
              // reference's strip (`primType 4`).
              for (pos, a) in [(b0, a0), (b1, a1), (t1, a1), (t0, a0)] {
 diff --git a/crates/benilla-app/src/weapon_trail/tests.rs b/crates/benilla-app/src/weapon_trail/tests.rs
-index e5064d97..51fd407d 100644
+index e5064d97..75b09442 100644
 --- a/crates/benilla-app/src/weapon_trail/tests.rs
 +++ b/crates/benilla-app/src/weapon_trail/tests.rs
-@@ -563,3 +563,32 @@ fn an_indoor_wearers_committed_ambient_wins_over_the_scenes() {
+@@ -563,3 +563,35 @@ fn an_indoor_wearers_committed_ambient_wins_over_the_scenes() {
          "the room is warmer AND redder than the sky — the hue flip is the visible half: {lit:?}"
      );
  }
@@ -155,13 +157,13 @@ index e5064d97..51fd407d 100644
 +    let (wb, wt) = widen_pair(b, t, 2.4);
 +    assert!(((wt - wb).length() - 2.4).abs() < 1e-5, "2.4 times the blade's length");
 +    assert!(((wb + wt) * 0.5 - Vec3::Y * 0.5).length() < 1e-5, "about the blade's middle");
-+    let frames = |wide: f32| {
++    let frames = |wide: f32, hz: u32| {
 +        let mut tr = armed(TrailProc { packed: 0xC83C_8CFF, duration_ms: 450 });
 +        tr.widen(wide);
 +        let mut n = 0u32;
 +        loop {
 +            n += 1;
-+            let now = n * 1000 / 60;
++            let now = n * 1000 / hz;
 +            let swing = tr.swing.as_mut().unwrap();
 +            if let Step::Ended = swing.step(now, Vec3::X * n as f32, Vec3::X * n as f32 + Vec3::Y) {
 +                break n;
@@ -169,7 +171,10 @@ index e5064d97..51fd407d 100644
 +            assert!(n < 10_000);
 +        }
 +    };
-+    assert!(frames(2.4) > frames(1.0) * 3 / 2, "a bold swing stays on screen longer");
++    for hz in [60, 144] {
++        let (bold, plain) = (frames(2.4, hz), frames(1.0, hz));
++        assert!(bold * 10 > plain * 12, "a bold swing stays on screen longer at {hz} Hz: {bold} frames against {plain}");
++    }
 +    // Re-arming puts it back to the blade's own width.
 +    let mut tr = armed(kit_324());
 +    tr.widen(3.0);
@@ -177,7 +182,7 @@ index e5064d97..51fd407d 100644
 +    assert_eq!(tr.swing.as_ref().unwrap().wide, 1.0);
 +}
 diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
-index f3eec706..fb7b99f5 100644
+index f3eec706..5c974d26 100644
 --- a/crates/benilla-ui/src/action_combat.rs
 +++ b/crates/benilla-ui/src/action_combat.rs
 @@ -323,6 +323,11 @@
@@ -186,8 +191,8 @@ index f3eec706..fb7b99f5 100644
  //!
 +//! The thirty-third (`HasActionCombat() >= 33`), a Rogue's bold trails (patch 0109): a hand's trail
 +//! colour may end `*N` (`"C83C8CFF*2.4"`, N 1 to 4): that hand's ribbon is N times as wide (the
-+//! blade's own length, drawn out from its middle) and lives longer (0.6 of the excess, so 2.4 lives
-+//! 1.84 times as long). A trail with no mark is drawn as before.
++//! blade's own length, drawn out from its middle) and fades slower (0.6 of the excess, so 2.4 fades
++//! 1.84 times as slowly). A trail with no mark is drawn as before.
 +//!
  //! The thirty-second (`HasActionCombat() >= 32`), the Rogue's two blades and its afterimage
  //! (patch 0103):

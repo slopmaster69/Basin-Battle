@@ -634,7 +634,7 @@ const OFF_TRAIL: &str = "C83C8CFF";
 const FINISH_MAIN_TRAIL: &str = "DCFFD27A";
 const FINISH_OFF_TRAIL: &str = "DC3C8CFF";
 /// Round 33's width mark on a hand's colour (`AARRGGBB*N`): the ribbon N times as wide (the blade's
-/// own length, drawn from its middle) and living N-fold longer by 0.6 of the excess (patch 0109).
+/// own length, drawn from its middle) and fading 1 + 0.6 (N - 1) times as slowly (patch 0109).
 const TRAIL_BOLD: &str = "*2.4";
 /// 33: the bold trail's width mark (0109; [`TRAIL_BOLD`]).
 pub(crate) const TRAIL_BOLD_LEVEL: u8 = 33;
