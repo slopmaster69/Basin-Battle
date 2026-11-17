@@ -1115,7 +1115,7 @@ impl Survival {
         // With a direction held, the dash is the hero's own run, sped up (set_action sends the
         // speed); with none, a hop back.
         self.set_action(id, Action::Dodge { t: 0.0, dir, dash });
-        self.melee_dodged(id);
+        self.melee_dodge_started(id, quick);
         // A client that runs its own dodge gets no throw; others hop back with no keys held.
         let local = self.players[&id].local_moves;
         let (speed, lift) = if dash || local { (0.0, 0.0) } else { (c.back_step[0], c.back_step[1]) };
@@ -2388,6 +2388,8 @@ impl Survival {
                 }
                 // A Rogue's dodge in its perfect moment pays more, and opens the Shadow Cut.
                 let perfect = self.dodged_perfectly(victim, &doing);
+                let thanks = perfect && !self.dodged_perfectly_plain(victim, &doing);
+                self.melee_evaded(victim, perfect, thanks);
                 self.gain_valor(victim, if perfect { c.valor.perfect } else { c.valor.roll });
                 self.prime_wild(victim);
                 // Rolled through it, not just away: a little breath back.
@@ -2493,7 +2495,7 @@ impl Survival {
                 }
             }
         }
-        self.melee_defended(victim, outcome);
+        self.melee_defended(victim, outcome, warded, damage > 0 && !dashing);
         self.events.push(Event::Swing { attacker, victim: Some(victim), damage: landed, outcome, anim: false, style });
         self.trade_blows(attacker, victim);
         if let Some(p) = self.players.get_mut(&victim) {

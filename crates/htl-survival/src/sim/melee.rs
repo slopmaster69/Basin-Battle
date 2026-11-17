@@ -32,6 +32,20 @@ pub enum ChainEnd {
     Switched,
 }
 
+/// What one ability did in the fight (keyed by the name the damage meter uses).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AbilityTally {
+    pub name: String,
+    pub casts: u32,
+    /// Damage events it dealt (a tick or a blow each), the distinct foes they struck, and the total.
+    pub hits: u32,
+    pub foes: Vec<Id>,
+    pub damage: u64,
+}
+
+/// The most abilities a fight's line lists.
+const MOST_ABILITIES: usize = 12;
+
 /// One hero's melee numbers for the fight they're in.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MeleeTally {
@@ -61,9 +75,49 @@ pub struct MeleeTally {
     pub guards: u32,
     pub broken: u32,
     pub dodges: u32,
+    /// Of those dodges, the ones that slipped a real blow (once per dodge, however many blows it
+    /// slipped), and the ones that did so in the perfect moment (a Rogue's: `dodged_perfectly`).
+    pub evaded: u32,
+    pub perfect_dodges: u32,
+    /// The same three for the dodges that were a Quickstep's (a dodge ability); `dodges`,
+    /// `evaded` and `perfect_dodges` count every kind, so a plain roll's are the difference.
+    pub quick_dodges: u32,
+    pub quick_evaded: u32,
+    pub quick_perfect: u32,
+    /// Parries made with a ward (a staff's perfect ward).
+    pub perfect_parries: u32,
+    /// The dodge now going: a Quickstep's, and what it has already counted.
+    pub dodge_quick: bool,
+    pub dodge_evaded: bool,
+    pub dodge_perfect: bool,
+    /// Evasion: casts, real blows that landed while it was up, real blows dodged while it was up,
+    /// and of those the perfect ones its wider window made perfect (a plain dodge's would not).
+    pub evasion_casts: u32,
+    pub evasion_landed: u32,
+    pub evasion_dodged: u32,
+    pub evasion_perfect: u32,
+    /// Each ability cast or dealing damage (not Melee, which has its own numbers), in the order seen.
+    pub abilities: Vec<AbilityTally>,
+    /// Damage dealt and taken in the fight (what landed), and the hero's lowest health with their
+    /// most then.
+    pub dealt: u64,
+    pub taken: u64,
+    pub lowest: Option<(u32, u32)>,
 }
 
 impl MeleeTally {
+    /// This ability's row, made when first seen (none past the most).
+    fn ability(&mut self, name: &str) -> Option<&mut AbilityTally> {
+        if let Some(i) = self.abilities.iter().position(|a| a.name == name) {
+            return self.abilities.get_mut(i);
+        }
+        if self.abilities.len() >= MOST_ABILITIES {
+            return None;
+        }
+        self.abilities.push(AbilityTally { name: name.to_string(), ..AbilityTally::default() });
+        self.abilities.last_mut()
+    }
+
     pub fn swings(&self) -> u32 {
         self.light + self.heavy + self.other
     }
@@ -74,7 +128,7 @@ impl MeleeTally {
     }
 
     fn touched(&self) -> bool {
-        self.swings() + self.parries + self.guards + self.broken + self.dodges > 0
+        self.swings() + self.parries + self.guards + self.broken + self.dodges + self.evasion_casts > 0 || !self.abilities.is_empty() || self.dealt + self.taken > 0
     }
 
     fn end_chain(&mut self, why: ChainEnd) {
@@ -109,12 +163,48 @@ impl MeleeTally {
             }
             s += &format!("; chains dropped {} (timed out {}, hurt {}, switched {})", self.dropped(), self.timed_out, self.hurt_ends, self.switched);
         }
-        s += &format!("; {} hits, {} whiffed; parries {}, guards {}", self.hits, self.whiffs, self.parries, self.guards);
+        s += &format!("; {} hits, {} whiffed; parries {} (perfect {}), guards {}", self.hits, self.whiffs, self.parries, self.perfect_parries, self.guards);
         if self.broken > 0 {
             s += &format!(" ({} broken)", self.broken);
         }
-        s += &format!(", dodges {}", self.dodges);
+        s += &format!(", dodges {} (perfect {})", self.dodges, self.perfect_dodges);
+        s += &format!("; dealt {}, taken {}", self.dealt, self.taken);
+        if let Some((low, max)) = self.lowest {
+            s += &format!(", lowest health {low}/{max}");
+        }
         Some(s)
+    }
+
+    /// The dodges' line: each kind's dodges, those that slipped a blow and those that were
+    /// perfect, then Evasion. `None` if neither happened.
+    pub fn dodge_line(&self, name: &str) -> Option<String> {
+        if self.dodges + self.evasion_casts + self.evasion_landed == 0 {
+            return None;
+        }
+        let kind = |label: &str, d: u32, e: u32, p: u32| format!("{label} {d} (slipped a blow {e}, perfect {p})");
+        let mut s = format!(
+            "{name}'s dodges: {}, {}",
+            kind("rolls", self.dodges - self.quick_dodges.min(self.dodges), self.evaded.saturating_sub(self.quick_evaded), self.perfect_dodges.saturating_sub(self.quick_perfect)),
+            kind("quickstep", self.quick_dodges, self.quick_evaded, self.quick_perfect),
+        );
+        if self.evasion_casts + self.evasion_landed + self.evasion_dodged > 0 {
+            s += &format!(
+                "; evasion cast {}x: {} blows landed while up, {} dodged ({} perfect only thanks to it)",
+                self.evasion_casts, self.evasion_landed, self.evasion_dodged, self.evasion_perfect
+            );
+        }
+        Some(s)
+    }
+
+    /// The abilities' line, the most damage first. `None` if none was cast or dealt damage.
+    pub fn abilities_line(&self, name: &str) -> Option<String> {
+        if self.abilities.is_empty() {
+            return None;
+        }
+        let mut rows: Vec<&AbilityTally> = self.abilities.iter().collect();
+        rows.sort_by(|a, b| b.damage.cmp(&a.damage).then_with(|| a.name.cmp(&b.name)));
+        let rows: Vec<String> = rows.iter().map(|a| format!("{} cast {}x, {} hits, {} foes, {} damage", a.name, a.casts, a.hits, a.foes.len(), a.damage)).collect();
+        Some(format!("{name}'s abilities: {}", rows.join("; ")))
     }
 }
 
@@ -192,9 +282,71 @@ impl Survival {
         }
     }
 
-    pub(crate) fn melee_dodged(&mut self, id: Id) {
+    /// A dodge starts; `quick`, a Quickstep's.
+    pub(crate) fn melee_dodge_started(&mut self, id: Id, quick: bool) {
         if let Some(t) = self.melee_mut(id) {
             t.dodges += 1;
+            t.quick_dodges += quick as u32;
+            t.dodge_quick = quick;
+            t.dodge_evaded = false;
+            t.dodge_perfect = false;
+        }
+    }
+
+    /// The dodge going slipped a real blow, `perfect` if in the perfect moment (`thanks`: only
+    /// Evasion's wider window made it so). Each counts once per dodge.
+    pub(crate) fn melee_evaded(&mut self, id: Id, perfect: bool, thanks: bool) {
+        if let Some(t) = self.melee_mut(id) {
+            if !std::mem::replace(&mut t.dodge_evaded, true) {
+                t.evaded += 1;
+                t.quick_evaded += t.dodge_quick as u32;
+            }
+            if perfect && !std::mem::replace(&mut t.dodge_perfect, true) {
+                t.perfect_dodges += 1;
+                t.quick_perfect += t.dodge_quick as u32;
+                t.evasion_perfect += thanks as u32;
+            }
+        }
+    }
+
+    /// Hero `id` casts `ability` (by its name; Evasion is counted too).
+    pub(crate) fn melee_cast(&mut self, id: Id, ability: usize) {
+        let d = &self.content.abilities[ability];
+        let (name, evasion) = (d.name.clone(), d.effects.iter().any(|e| e.kind == "evasion"));
+        if let Some(t) = self.melee_mut(id) {
+            t.evasion_casts += evasion as u32;
+            if let Some(a) = t.ability(&name) {
+                a.casts += 1;
+            }
+        }
+    }
+
+    /// Hero `by` dealt `amount` to `victim` as `label` (the damage meter's name for it).
+    pub(crate) fn melee_dealt(&mut self, by: Id, victim: Id, amount: u32, label: &str) {
+        if amount == 0 {
+            return;
+        }
+        if let Some(t) = self.melee_mut(by) {
+            t.dealt += amount as u64;
+            if label != "Melee" {
+                if let Some(a) = t.ability(label) {
+                    a.hits += 1;
+                    a.damage += amount as u64;
+                    if !a.foes.contains(&victim) {
+                        a.foes.push(victim);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Hero `id` took `amount` and has `health` of `max` left.
+    pub(crate) fn melee_taken(&mut self, id: Id, amount: u32, health: u32, max: u32) {
+        if let Some(t) = self.melee_mut(id) {
+            t.taken += amount as u64;
+            if t.lowest.map_or(true, |(low, _)| health < low) {
+                t.lowest = Some((health, max));
+            }
         }
     }
 
@@ -209,13 +361,28 @@ impl Survival {
     }
 
     /// A creature's blow met hero `id`'s defence.
-    pub(crate) fn melee_defended(&mut self, id: Id, outcome: Outcome) {
+    /// `perfect`: a parry made with a ward.
+    /// `real`: a blow with damage, not a dash's untouchable moment.
+    pub(crate) fn melee_defended(&mut self, id: Id, outcome: Outcome, perfect: bool, real: bool) {
+        let evasion = real && self.has_cc(id, "evasion");
+        if evasion && matches!(outcome, Outcome::Hit | Outcome::GuardBroken | Outcome::Dodged) {
+            if let Some(t) = self.melee_mut(id) {
+                if outcome == Outcome::Dodged {
+                    t.evasion_dodged += 1;
+                } else {
+                    t.evasion_landed += 1;
+                }
+            }
+        }
         if !matches!(outcome, Outcome::Parried | Outcome::Blocked | Outcome::GuardBroken) {
             return;
         }
         if let Some(t) = self.melee_mut(id) {
             match outcome {
-                Outcome::Parried => t.parries += 1,
+                Outcome::Parried => {
+                    t.parries += 1;
+                    t.perfect_parries += perfect as u32;
+                }
                 Outcome::Blocked => t.guards += 1,
                 _ => t.broken += 1,
             }
@@ -231,7 +398,7 @@ impl Survival {
         p.melee.end_chain(ChainEnd::TimedOut);
         let tally = std::mem::take(&mut p.melee);
         let name = p.name.clone();
-        if let Some(line) = tally.line(&name) {
+        for line in [tally.line(&name), tally.dodge_line(&name), tally.abilities_line(&name)].into_iter().flatten() {
             self.events.push(super::Event::Log(line));
         }
     }

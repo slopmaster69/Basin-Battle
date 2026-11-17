@@ -88,7 +88,7 @@ fn a_full_light_chain_counts_each_blow_and_prints_one_line_at_the_end() {
     assert!(line.starts_with(&format!("Moneyman's fight: {len} swings (light {len}, heavy 0)")), "{line}");
     assert!(line.contains(&format!("blow {len} (finisher): 1x")), "{line}");
     assert!(line.contains("chains dropped 0"), "{line}");
-    assert!(line.ends_with("parries 0, guards 0, dodges 0"), "{line}");
+    assert!(line.contains("parries 0 (perfect 0), guards 0, dodges 0 (perfect 0); dealt "), "{line}");
     // Cleared for the next fight.
     assert_eq!(s.players[&p].melee, MeleeTally::default());
     assert!(run(&mut s, m, 12.0).iter().all(|l| !l.contains("'s fight")), "no second line");
@@ -134,7 +134,9 @@ fn a_dodge_is_counted_and_the_hero_falling_prints_the_line_at_once() {
     s.hurt_player(p, 1_000_000);
     let logs: Vec<String> = s.step(DT).into_iter().filter_map(|e| if let Event::Log(l) = e { Some(l) } else { None }).collect();
     let line = fight_line(&logs);
-    assert!(line.contains("dodges 1"), "{line}");
+    assert!(line.contains("dodges 1 (perfect 0)"), "{line}");
+    assert!(line.contains("taken "), "{line}");
+    assert!(line.contains("lowest health 0/"), "{line}");
     assert!(line.contains("chains dropped 1"), "{line}");
 }
 
@@ -154,11 +156,16 @@ fn the_line_reads_as_the_example() {
         parries: 2,
         guards: 5,
         dodges: 4,
+        perfect_dodges: 2,
+        perfect_parries: 1,
+        dealt: 900,
+        taken: 120,
+        lowest: Some((40, 100)),
         ..MeleeTally::default()
     };
     assert_eq!(
         t.line("Moneyman").unwrap(),
-        "Moneyman's fight: 31 swings (light 24, heavy 7); light chain started 17x, blow 2: 9x, blow 3: 5x, blow 4 (finisher): 3x; chains dropped 11 (timed out 6, hurt 1, switched 4); 18 hits, 6 whiffed; parries 2, guards 5, dodges 4"
+        "Moneyman's fight: 31 swings (light 24, heavy 7); light chain started 17x, blow 2: 9x, blow 3: 5x, blow 4 (finisher): 3x; chains dropped 11 (timed out 6, hurt 1, switched 4); 18 hits, 6 whiffed; parries 2 (perfect 1), guards 5, dodges 4 (perfect 2); dealt 900, taken 120, lowest health 40/100"
     );
     assert_eq!(MeleeTally::default().line("Moneyman"), None, "an idle hero says nothing");
 }
