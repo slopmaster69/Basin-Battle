@@ -211,6 +211,8 @@ struct App {
     f_game: String,
     f_hero: String,
     log: Option<std::fs::File>,
+    /// Why the update failed, when it did: Play then waits for a choice (Try again / Play anyway).
+    out_of_date: Option<String>,
 }
 
 impl App {
@@ -274,6 +276,7 @@ impl App {
             game_child: None,
             game_since: None,
             log,
+            out_of_date: None,
         };
         app.log(&format!("Play {} in {} ({:?})", app.version, app.paths.root.display(), app.paths.kind));
         app.begin();
@@ -304,7 +307,12 @@ impl App {
         let project = self.project.clone();
         let check = !self.opts.no_update && self.channel != Channel::Fixed && self.paths.kind == Kind::Download;
         let check_checkout = !self.opts.no_update && self.paths.kind == Kind::Checkout;
+        let download = self.paths.kind == Kind::Download;
         thread::spawn(move || {
+            // Backups an earlier update left (Play.exe.old-...): removed if nothing holds them.
+            if download {
+                update::clean_backups(&paths.root);
+            }
             if !wow_known {
                 let found = wow::find_wow_data(&paths.root);
                 let _ = tx.send(Msg::Wow(found));
@@ -493,8 +501,13 @@ impl App {
                 }
                 Msg::UpdateFailed(why) => {
                     self.log(&format!("update failed: {why}"));
+                    // Said in the window and held there: starting the game by itself would play
+                    // an old build without the player knowing.
+                    self.out_of_date = Some(why.clone());
+                    self.stage = Stage::Failed;
+                    self.status = "This game is out of date: the update couldn't be installed.".into();
                     self.note = why;
-                    self.become_ready();
+                    self.progress = Some(0.0);
                 }
                 Msg::Relaunch => {
                     self.log("Play was rebuilt by the update; starting the new one");
@@ -512,18 +525,25 @@ impl App {
                     self.stage = Stage::Playing;
                     self.status = "Have fun.".into();
                     self.progress = Some(1.0);
-                    if let Some(mut server) = self.server_child.take() {
-                        // Running the server for the game: a thread waits for the game to close,
-                        // then stops the server and Play with it. (Not the window's own loop: a
-                        // hidden window stops being drawn, so it would never notice.)
+                    let server = self.server_child.take();
+                    if server.is_some() || self.solo {
+                        // Playing alone, the window stays, hidden. A thread waits for the game to
+                        // close, then stops the server (if this Play started it) and Play with it.
+                        // (Not the window's own loop: a hidden window stops being drawn, so it
+                        // would never notice.) Without this, playing alone on a server that was
+                        // already up left a hidden Play running for hours after the game closed.
                         let log = self.paths.log.clone();
                         thread::spawn(move || {
                             let _ = game.wait();
-                            let _ = server.kill();
-                            let _ = server.wait();
+                            let mut line = "the game closed";
+                            if let Some(mut server) = server {
+                                let _ = server.kill();
+                                let _ = server.wait();
+                                line = "the game closed; your server is stopped";
+                            }
                             if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(&log) {
                                 use std::io::Write;
-                                let _ = writeln!(f, "        the game closed; your server is stopped");
+                                let _ = writeln!(f, "        {line}");
                             }
                             std::process::exit(0);
                         });
@@ -706,9 +726,26 @@ impl eframe::App for App {
                             }
                         }
                         Stage::Failed => {
+                            if let Some(why) = self.out_of_date.clone() {
+                                if ui.add(button("Play anyway")).clicked() {
+                                    self.out_of_date = None;
+                                    self.log("playing the out-of-date version");
+                                    self.become_ready();
+                                    self.status = format!("{} (out of date)", self.status);
+                                    self.note = format!("Out of date. The update didn't install: {why}");
+                                }
+                            }
                             if ui.add(button("Try again")).clicked() {
-                                self.become_ready();
-                                self.ready_since = Some(Instant::now());
+                                if self.out_of_date.take().is_some() {
+                                    // The update again, from the check.
+                                    self.stage = Stage::Opening;
+                                    self.note.clear();
+                                    self.progress = None;
+                                    self.begin();
+                                } else {
+                                    self.become_ready();
+                                    self.ready_since = Some(Instant::now());
+                                }
                             }
                             if ui.add(button("Play alone")).clicked() {
                                 self.launch(true);

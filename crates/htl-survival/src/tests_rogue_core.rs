@@ -289,6 +289,29 @@ fn a_dodge_whose_blow_lands_by_0_18_sec_is_perfect_and_a_later_one_only_evades()
 }
 
 #[test]
+fn the_fight_line_counts_perfect_dodges_once_per_dodge_and_not_plain_ones() {
+    let mut s = world();
+    let p = rogue(&mut s);
+    let m = foe(&mut s, "grunt");
+    // A perfect one, and a second blow slipped by the same dodge: one perfect.
+    dodge_for(&mut s, p, 0.1);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    let t = &s.players[&p].melee;
+    assert_eq!((t.dodges, t.perfect_dodges), (1, 1), "{t:?}");
+    // A late one only evades: a dodge, not a perfect.
+    run(&mut s, 1.5);
+    dodge_for(&mut s, p, 0.24);
+    assert_eq!(blow(&mut s, m, p), Outcome::Dodged);
+    let t = &s.players[&p].melee;
+    assert_eq!((t.dodges, t.perfect_dodges), (2, 1), "{t:?}");
+    let line = t.line("Ayla").unwrap();
+    assert!(line.contains("dodges 2 (perfect 1)"), "{line}");
+    let dodges = t.dodge_line("Ayla").unwrap();
+    assert_eq!(dodges, "Ayla's dodges: rolls 2 (slipped a blow 2, perfect 1), quickstep 0 (slipped a blow 0, perfect 0)", "{dodges}");
+}
+
+#[test]
 fn a_perfect_dodge_gives_20_stamina_and_10_valor_and_a_plain_one_10_and_8() {
     for (secs, stamina, valor) in [(0.1, 20.0, 10.0), (0.24, 10.0, 8.0)] {
         let mut s = world();

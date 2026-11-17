@@ -197,6 +197,13 @@ impl Survival {
     /// A Rogue's dodge took this blow in its perfect moment.
     /// Evasion widens the window (to its `amount`); in Blade Dance every dodge that evades is
     /// perfect.
+    /// The same without Evasion's wider window (Blade Dance still makes every dodge perfect).
+    pub(crate) fn dodged_perfectly_plain(&self, victim: Id, doing: &Action) -> bool {
+        let d = &self.content.dodge;
+        let to = if self.has_cc(victim, "blade_dance") { d.evade_to } else { d.perfect_to };
+        d.perfect_to > 0.0 && self.players.get(&victim).is_some_and(|p| self.is_rogue(p)) && matches!(doing, Action::Dodge { t, .. } if *t >= d.evade_from && *t <= to)
+    }
+
     pub(crate) fn dodged_perfectly(&self, victim: Id, doing: &Action) -> bool {
         let d = &self.content.dodge;
         let to = if self.has_cc(victim, "blade_dance") { d.evade_to } else { d.perfect_to.max(self.effect_amount(victim, "evasion")) };

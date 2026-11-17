@@ -1304,6 +1304,7 @@ impl Survival {
         // A cast brings them out of a veil.
         self.end_veil(id);
         let cost = if free.is_some() { 0.0 } else { self.valor_cost(&d) };
+        self.melee_cast(id, ability);
         // Shadow Word: Death: whether this one is the free one (a kill with it gives no other).
         if d.kill_recast > 0.0 {
             self.light.deaths.insert(id, free.is_some());

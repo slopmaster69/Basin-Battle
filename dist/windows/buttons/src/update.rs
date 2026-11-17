@@ -45,7 +45,7 @@ pub fn not_now(root: &Path) -> Option<&'static str> {
 
 /// The update itself: download, unpack, copy over this folder, write the new version last. On
 /// success the folder is the new release and the caller starts the new Play.exe (this one has
-/// been renamed Play.exe.old, since a running program can't be written over).
+/// been renamed to a fresh Play.exe.old-<time>, since a running program can't be written over).
 pub fn install(paths: &Paths, r: &Release, mut report: impl FnMut(Progress)) -> Result<String, String> {
     let root = &paths.root;
     let tmp = std::env::temp_dir().join(format!("elwynn-update-{}", std::process::id()));
@@ -112,11 +112,21 @@ fn install_in(paths: &Paths, r: &Release, tmp: &Path, report: &mut impl FnMut(Pr
     // From here the folder is being written: a version.txt written last means an update cut short
     // is done again next time, because the folder still says the old version.
     // A running Play.exe or Host.exe can't be written over, but can be renamed out of the way.
+    // Each goes to a name of its own (see `move_aside`), so an older backup still held open by a
+    // Play that never closed can't block this update. If one can't move, the others go back.
+    let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
     for button in ["Play.exe", "Host.exe"] {
         let at = root.join(button);
-        let _ = fs::remove_file(root.join(format!("{button}.old")));
         if at.is_file() && new.join(button).is_file() {
-            fs::rename(&at, root.join(format!("{button}.old"))).map_err(|e| format!("Couldn't move {button} aside ({e}). Is it open twice?"))?;
+            match move_aside(&at) {
+                Ok(aside) => moved.push((at, aside)),
+                Err(e) => {
+                    for (at, aside) in moved.into_iter().rev() {
+                        let _ = fs::rename(aside, at);
+                    }
+                    return Err(format!("Couldn't move {button} aside ({e}). Is it open from another folder or protected by anti-virus?"));
+                }
+            }
         }
     }
     // What the release owns outright is made exactly the new one, so nothing stale is left in it.
@@ -181,9 +191,7 @@ pub fn copy_tree(from: &Path, to: &Path, keep: &dyn Fn(&Path) -> bool) -> std::i
             } else {
                 // A file in use (a running exe) is renamed aside rather than failing the update.
                 if fs::copy(&src, &dst).is_err() {
-                    let aside = dst.with_extension(format!("{}.old", dst.extension().map(|x| x.to_string_lossy().to_string()).unwrap_or_default()));
-                    let _ = fs::remove_file(&aside);
-                    fs::rename(&dst, &aside)?;
+                    move_aside(&dst)?;
                     fs::copy(&src, &dst)?;
                 }
             }
@@ -191,6 +199,58 @@ pub fn copy_tree(from: &Path, to: &Path, keep: &dyn Fn(&Path) -> bool) -> std::i
         Ok(())
     }
     walk(from, from, to, keep)
+}
+
+/// Whether a file name is one `move_aside` made (or an older Play made): "Play.exe.old", or
+/// "Play.exe.old-1731760000" and "Play.exe.old-1731760000-2".
+pub fn is_backup_name(name: &str) -> bool {
+    let name = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    if name.ends_with(".old") {
+        return true;
+    }
+    match name.rfind(".old-") {
+        Some(i) => {
+            let tail = &name[i + 5..];
+            !tail.is_empty() && tail.split('-').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+        }
+        None => false,
+    }
+}
+
+/// A file moved out of the way, to a name beside it that doesn't exist yet
+/// ("Play.exe" -> "Play.exe.old-<seconds>"; "-2", "-3"... if that's taken). A running program
+/// can be renamed but not written over or deleted, and its old backup may still be held by an
+/// earlier copy of it that never closed: a name of its own means nothing held can block the move.
+pub fn move_aside(path: &Path) -> std::io::Result<PathBuf> {
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let mut aside = path.with_file_name(format!("{name}.old-{stamp}"));
+    let mut n = 1;
+    while aside.exists() {
+        n += 1;
+        aside = path.with_file_name(format!("{name}.old-{stamp}-{n}"));
+    }
+    fs::rename(path, &aside)?;
+    Ok(aside)
+}
+
+/// Old backups under `dir` removed, as far as they can be: one still in use (an older Play still
+/// running) refuses and is left for next time. Never an error. The worlds and logs are not looked into.
+pub fn clean_backups(dir: &Path) -> usize {
+    let mut removed = 0;
+    let Ok(entries) = fs::read_dir(dir) else { return 0 };
+    for e in entries.flatten() {
+        let path = e.path();
+        let name = e.file_name().to_string_lossy().to_string();
+        if path.is_dir() {
+            if !matches!(name.as_str(), "saves" | "saves-backups" | "logs" | "cache") {
+                removed += clean_backups(&path);
+            }
+        } else if is_backup_name(&name) && fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 /// A playtest copy of this folder beside it ("<name> (test)"): the same files, its own saves and
@@ -201,7 +261,7 @@ pub fn make_test_folder(paths: &Paths) -> Result<PathBuf, String> {
     let test = root.parent().unwrap_or(root).join(format!("{name} (test)"));
     let keep = |rel: &Path| -> bool {
         let s = rel.to_string_lossy().replace('\\', "/");
-        !(s.starts_with("server/saves") || s.starts_with("server/logs") || s.starts_with("benilla-config/cache") || s.ends_with(".old") || s == "play.log")
+        !(s.starts_with("server/saves") || s.starts_with("server/logs") || s.starts_with("benilla-config/cache") || is_backup_name(&s) || s == "play.log")
     };
     copy_tree(root, &test, &keep).map_err(|e| format!("Couldn't make the test folder ({e})."))?;
     fs::write(test.join("version.txt"), "latest none\r\n").map_err(|e| e.to_string())?;
@@ -232,6 +292,74 @@ mod tests {
         assert_eq!(fs::read_to_string(to.join("a.txt")).unwrap(), "new");
         assert_eq!(fs::read_to_string(to.join("settings.txt")).unwrap(), "mine");
         assert_eq!(fs::read_to_string(to.join("server").join("saves").join("w.toml")).unwrap(), "my world");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    /// A file held open the way a running exe's image is: on Windows no delete or replace.
+    fn hold(path: &Path) -> fs::File {
+        let mut o = fs::OpenOptions::new();
+        o.read(true);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            o.share_mode(1); // FILE_SHARE_READ only
+        }
+        o.open(path).unwrap()
+    }
+
+    #[test]
+    fn a_locked_older_backup_does_not_block_moving_aside() {
+        let dir = std::env::temp_dir().join(format!("launcher-aside-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("Play.exe");
+        // The old backup is held open, as a running Play holds its own image: on Windows it can't
+        // be deleted or replaced while this handle lives.
+        fs::write(dir.join("Play.exe.old"), "running").unwrap();
+        let _held = hold(&dir.join("Play.exe.old"));
+        fs::write(&exe, "current").unwrap();
+        let first = move_aside(&exe).unwrap();
+        assert!(!exe.exists());
+        assert_eq!(fs::read_to_string(&first).unwrap(), "current");
+        assert!(is_backup_name(&first.file_name().unwrap().to_string_lossy()));
+        // Again at once (same second): a different name, nothing overwritten.
+        fs::write(&exe, "newer").unwrap();
+        let second = move_aside(&exe).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(fs::read_to_string(&first).unwrap(), "current");
+        assert_eq!(fs::read_to_string(&second).unwrap(), "newer");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn backups_are_recognised_and_cleaned_without_touching_the_rest() {
+        for yes in ["Play.exe.old", "Play.exe.old-1731760000", "benilla.exe.old-1731760000-2"] {
+            assert!(is_backup_name(yes), "{yes}");
+        }
+        for no in ["Play.exe", "old", "notes.old-draft", "a.old-", "settings.txt"] {
+            assert!(!is_backup_name(no), "{no}");
+        }
+        let dir = std::env::temp_dir().join(format!("launcher-clean-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("server").join("saves")).unwrap();
+        fs::write(dir.join("Play.exe"), "x").unwrap();
+        fs::write(dir.join("Play.exe.old-1"), "x").unwrap();
+        fs::write(dir.join("server").join("htl-server.exe.old"), "x").unwrap();
+        fs::write(dir.join("server").join("saves").join("w.old"), "world").unwrap();
+        let held_path = dir.join("Host.exe.old-2");
+        fs::write(&held_path, "x").unwrap();
+        let held = hold(&held_path);
+        let removed = clean_backups(&dir);
+        assert!(dir.join("Play.exe").exists());
+        assert!(!dir.join("Play.exe.old-1").exists());
+        assert!(!dir.join("server").join("htl-server.exe.old").exists());
+        assert!(dir.join("server").join("saves").join("w.old").exists());
+        // A held one is left on Windows (and deleted elsewhere); either way, no failure.
+        assert!(removed >= 2);
+        if cfg!(windows) {
+            assert!(held_path.exists());
+        }
+        drop(held);
         let _ = fs::remove_dir_all(dir);
     }
 

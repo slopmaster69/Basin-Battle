@@ -159,6 +159,7 @@ impl Survival {
     /// A hero's blow (a card, a burn, their weapon: `label`) took `amount` from someone else.
     pub(crate) fn meter_dealt(&mut self, by: Id, victim: Id, amount: u32, label: &str) {
         if by != victim {
+            self.melee_dealt(by, victim, amount, label);
             self.meter_count(by, Kind::Dealt, amount, label, true);
             self.embrace(by, amount, label);
         }
@@ -209,6 +210,10 @@ impl Survival {
 
     /// A hero lost `amount` of health.
     pub(crate) fn meter_taken(&mut self, id: Id, amount: u32) {
+        if let Some(p) = self.players.get(&id) {
+            let (health, max) = (p.health, p.max_health);
+            self.melee_taken(id, amount, health, max);
+        }
         self.meter_count(id, Kind::Taken, amount, "", true);
     }
 
