@@ -1,0 +1,32 @@
+# Cloak and Dagger (#490), floor markers off, the hero's own screen from the side. It steps only to enemies
+# already in the fight. Two grunts come at the Rogue from 4 and 7 yd; each left click steps her behind
+# the next (a puff at both ends) and stabs its back, the one not yet struck first. (An idle pack
+# nearby that it ignores can't be shown here: a debug target counts as in the fight, and a real
+# Elwynn pack wakes at its aggro radius before it can stand within 8 yd. The unit test
+# cloak_and_dagger_never_steps_to_an_idle_creature_and_never_wakes_it covers it.)
+hero rogue
+cam 90 -12 8
+camera duel
+include _setup
+4.0 .es goto -9638 671                  # the open grass by the rack (.es arm needs it)
+4.1 .es arm dagger
+4.15 .es arm dagger off
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot 3 cloak_and_dagger
+4.6 .es target clear
+4.8 .es target grunt 4
+4.9 .es target grunt 7
+5.0 video
+5.0 shots cloak 60 0.1
+5.4 .es valor full
+5.6 .es in ab 4 0                      # 3: Cloak and Dagger
+6.2 .es in a
+6.3 .es in au
+6.9 .es in a
+7.0 .es in au
+7.6 .es in a
+7.7 .es in au
+8.3 .es in a
+8.4 .es in au
+12 end

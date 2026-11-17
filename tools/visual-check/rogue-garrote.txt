@@ -1,0 +1,27 @@
+# Nov 17 first take: Garrote cast twice, 0 hits (the server's count): the scenario or the skill still misses; see the PR.
+# Garrote after a Shadowstep (#490), floor markers off, the hero's own screen from the side. A Kobold Geomancer
+# comes at the Rogue and begins a cast; Shadowstep (the 1 key) puts her at its back, then the key is
+# changed to Garrote (both are utility abilities) and pressed. A Rogue's step drops the reticle's old line, so Garrote needs no new aim and lands in the
+# back. Look for, with no word: the cast bar breaking, the stagger, the silence's look, a blood burst
+# each second. A spare press follows in case the first was refused (a landing blow spends its cooldown).
+hero rogue
+cam 90 -12 8
+camera duel
+include _setup
+4.0 .es goto -9638 671                  # the open grass by the rack (.es arm needs it)
+4.1 .es arm dagger
+4.15 .es arm dagger off
+4.2 .es dummy clear
+4.3 lua ElwynnSurvivalSettings = ElwynnSurvivalSettings or {}; ElwynnSurvivalSettings.noMarks = 1; if ElwynnSurvival and ElwynnSurvival.ClearMarks then ElwynnSurvival.ClearMarks() end
+4.4 .es slot 1 shadowstep
+4.6 .es target clear
+4.8 .es target kobold_geomancer 12
+5.0 video
+5.0 shots garrote 60 0.1
+6.6 .es in ab 2 0                      # 1: Shadowstep, aiming at the geomancer as it casts
+6.8 .es in a {facing} -0.15
+6.9 .es in au
+7.1 .es slot 1 garrote                 # the utility key holds one of the two: Garrote goes on it once the step is made
+7.5 .es in ab 2 0                      # 1: Garrote, into its back, no new aim
+8.4 .es in ab 2 0                      # a spare
+14 end
