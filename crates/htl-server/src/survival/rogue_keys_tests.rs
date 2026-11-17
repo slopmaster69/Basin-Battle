@@ -57,11 +57,41 @@ fn report(game: &mut SurvivalGame, conn: ConnId, opcode: u16, flags: u32, pos: [
 /// hero's teleports a tick later with a report of where it stands: facing the pose's own way
 /// (`echo` `None`), or the way its view still looked (`Some`). The events seen.
 fn run_to(game: &mut SurvivalGame, conn: ConnId, me: Id, echo: Option<f32>, clock: &mut f32, until: f32, seen: &mut Vec<Event>) {
+    run_client(game, conn, me, Client { view: echo, ..Client::default() }, clock, until, seen);
+}
+
+/// How the film's client answers the server.
+#[derive(Clone, Copy, Default)]
+struct Client {
+    /// After a teleport: the facing its view still holds (`None`: the pose it was put in).
+    view: Option<f32>,
+    /// From the first teleport on, it says that view on every tick while she stands, not once: an
+    /// action client turns the body to its camera, and its camera never turned with the step.
+    steady: bool,
+    /// From this time on (the script's clock), for 0.3 sec, it carries her along its view as a
+    /// forward step on the wire: the art's 0.6 yd lunge, which the add-on plays on its own blow
+    /// (`ActionDash`, whose movement flags are the dash's), the film's "you 0.6 yd/s" in Garrote's
+    /// wind-up and 0.6 yd off where she was put by the next `.es where`.
+    lunge_from: Option<f32>,
+}
+
+/// [`run_to`] with the client `client`.
+fn run_client(game: &mut SurvivalGame, conn: ConnId, me: Id, client: Client, clock: &mut f32, until: f32, seen: &mut Vec<Event>) {
     let dt = TICK.as_secs_f32();
     let mut owed: Option<([f32; 3], f32)> = None;
     while *clock + dt / 2.0 < until {
+        let stepped = game.sim.players[&me].pos[0] > 5.0;
         if let Some((pos, facing)) = owed.take() {
-            report(game, conn, op::MSG_MOVE_SET_FACING, 0, pos, echo.unwrap_or(facing));
+            report(game, conn, op::MSG_MOVE_SET_FACING, 0, pos, client.view.unwrap_or(facing));
+        } else if let (Some(view), true) = (client.view, client.steady && stepped) {
+            let mut pos = game.sim.players[&me].pos;
+            let lunging = client.lunge_from.is_some_and(|t| *clock >= t && *clock < t + 0.3);
+            if lunging {
+                pos[0] += view.cos() * 2.0 * dt;
+                pos[1] += view.sin() * 2.0 * dt;
+            }
+            // (0x1: forward, the dash's flags.)
+            report(game, conn, op::MSG_MOVE_HEARTBEAT, if lunging { 0x1 } else { 0 }, pos, view);
         }
         let events = game.sim.step(dt);
         owed = events.iter().rev().find_map(|e| match e {
@@ -73,7 +103,7 @@ fn run_to(game: &mut SurvivalGame, conn: ConnId, me: Id, echo: Option<f32>, cloc
         *clock += dt;
     }
     if let Some((pos, facing)) = owed {
-        report(game, conn, op::MSG_MOVE_SET_FACING, 0, pos, echo.unwrap_or(facing));
+        report(game, conn, op::MSG_MOVE_SET_FACING, 0, pos, client.view.unwrap_or(facing));
     }
 }
 
@@ -82,6 +112,12 @@ fn run_to(game: &mut SurvivalGame, conn: ConnId, me: Id, echo: Option<f32>, cloc
 /// Backstab, Distract, Cloak and Dagger and Shadowstep, so the step shrouds her). Returns the game,
 /// the Rogue, the kobold and the events.
 fn film_take(echo: Option<f32>) -> (SurvivalGame, Id, Id, Vec<Event>) {
+    film_take_by(Client { view: echo, ..Client::default() }, 0.0)
+}
+
+/// [`film_take`] with the client `client`, and the Garrote presses `late` sec after the film's
+/// (its clock's beat: the film's own runs pressed it 0.69 to 0.72 sec after the step's click).
+fn film_take_by(client: Client, late: f32) -> (SurvivalGame, Id, Id, Vec<Event>) {
     let mut game = game();
     let (me, _rx) = rogue(&mut game, 1, "Vcrogue");
     let script: &[(f32, &str)] = &[
@@ -107,12 +143,14 @@ fn film_take(echo: Option<f32>) -> (SurvivalGame, Id, Id, Vec<Event>) {
     ];
     let mut clock = 0.0;
     let mut seen = Vec::new();
+    let client = Client { lunge_from: client.lunge_from.map(|t| t + late), ..client };
     for (at, line) in script {
-        run_to(&mut game, 1, me, echo, &mut clock, *at, &mut seen);
+        let at = if *at > 7.4 { *at + late } else { *at };
+        run_client(&mut game, 1, me, client, &mut clock, at, &mut seen);
         game.command(1, line);
     }
     let t = clock + 1.0;
-    run_to(&mut game, 1, me, echo, &mut clock, t, &mut seen);
+    run_client(&mut game, 1, me, client, &mut clock, t, &mut seen);
     let kobold = game.sim.mobs.iter().find(|(_, m)| game.sim.content.mobs[m.def].key == "kobold_geomancer").map(|(id, _)| *id).expect("the kobold");
     (game, me, kobold, seen)
 }
@@ -141,6 +179,26 @@ fn garrote_after_a_shadowstep_lands_through_the_servers_key_path() {
 fn garrote_after_a_shadowstep_lands_when_the_client_reports_its_old_view() {
     let (game, me, kobold, seen) = film_take(Some(0.0));
     assert!(garroted(&game, me, kobold, &seen), "the cut lands in the back, as the step put her");
+}
+
+/// The Nov 17 refilm's 1 in 5: the client holds its view's facing (0, the line Shadowstep was
+/// clicked along) on every tick, and lunges along it as Garrote winds up. Garrote pressed 0.7 sec
+/// after the step winds up 0.3 sec, so it struck just as the step's facing hold and Shrouded Step's
+/// veil (1 sec each) ran out: a beat later and it swung along the client's view (0 foes), or the
+/// kobold had turned round (a 50% cut in its face, no silence). A blow begun inside the step's
+/// moment now finishes inside it, its own lunge included, so it lands on any beat of the film's
+/// clock, and on any beat up to the end of the hold.
+#[test]
+fn garrote_after_a_shadowstep_lands_on_any_beat_inside_the_steps_moment() {
+    // The lunge begins a little before the blow's impact (the add-on's dash: impact less its own
+    // length), so on the wire before the server's strike.
+    let client = Client { view: Some(0.0), steady: true, lunge_from: Some(7.51 + 0.12) };
+    // The film's own presses were 0.69 to 0.72 sec after the click (t=7.50, 7.52); up to 0.95.
+    for i in 0..=14 {
+        let late = -0.06 + i as f32 * 0.02;
+        let (game, me, kobold, seen) = film_take_by(client, late);
+        assert!(garroted(&game, me, kobold, &seen), "pressed {late:+.2} sec off the film's beat: the cut lands in the back, silences and bleeds");
+    }
 }
 
 /// The hold is only against a standing client's word, and only for a moment: a hero who moves,

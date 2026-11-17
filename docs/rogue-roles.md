@@ -735,6 +735,28 @@ What the design left open, decided in the pull request that built it:
     against a standing client's word. A new reticle line (every add-on press carries one), a step
     of her own or the time ends it. Why not longer: a player's own mouse turn is ignored meanwhile.
     Other classes' blinks are as before. Tests: `survival/rogue_keys_tests.rs`.
+  - **After #499 it still hit 1 run in 5: a blow begun inside the step's moment now finishes in
+    it.** Garrote is pressed 0.7 sec after the step's click and winds up 0.3 sec, so it struck at
+    1.0 sec, the very moment the step's facing hold and Shrouded Step's veil (1 sec each) ran out.
+    Which side of it the strike fell on was the server's tick and the client's frame: the film's
+    two logged runs pressed 0.69 and 0.72 sec after the click, and both missed. Past the hold the
+    client's view (it never turned with the step; the server's `.es where` 1.4 sec after the step
+    read facing 0.00) was taken, and the cut swung away from the kobold: 0 foes. Past the veil the
+    kobold turned round at once (a caster in reach of its foe faces it), so a cut that did land was
+    the 50% front cut, no silence. The kobold's own turning on the step is not it: the veil holds
+    it still, its back to her. The key-path test replays the take with a client that keeps saying
+    its view's facing and lunges along it as Garrote winds up: before the fix it missed from 0.02
+    sec past the film's beat; with only the facing held it still lost the silence from 0.12 past.
+    Fixed in the server: a blow a Rogue **begins** inside her step's moment holds both the facing
+    hold and the veil on until it has struck, a tick past (`step_moment_covers`), and her client's
+    movement doesn't end the hold meanwhile, since the add-on plays the blow's own lunge along its
+    view as a forward step on the wire (`ActionDash`; the film's "you 0.6 yd/s", and she stood
+    0.6 yd off her spot). Why: Shadowstep lands behind, so the blow pressed on landing must land
+    there; Shrouded Step's own reason is "long enough to land" one blow. A blow begun after the
+    second is as before, and a next blow can't begin before this one has recovered, so it never
+    stretches past one. Nothing changes for a Rogue without the trait (no veil to hold) or for any
+    other class (their steps set no hold). Test:
+    `garrote_after_a_shadowstep_lands_on_any_beat_inside_the_steps_moment`.
 
 - **The test server listens on this PC alone (Nov 17 filming)**: Windows' firewall prompt for a
   new `htl-server.exe` sat over every frame of the refilm. The server takes its listening address

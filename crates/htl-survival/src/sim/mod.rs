@@ -575,7 +575,8 @@ pub(crate) const ARRIVE_HOLD: f32 = 1.5;
 /// A hero set down somewhere far lands from this high over the floor, never level with it.
 pub(crate) const ARRIVE_LIFT: f32 = 0.5;
 /// How long a Rogue's step holds the facing it put her in against a standing client's own word
-/// (sec): past a 0.3 sec art pressed on the next beat, as long as Shrouded Step's veil.
+/// (sec): past a 0.3 sec art pressed on the next beat, as long as Shrouded Step's veil. A blow she
+/// begins inside it holds it on until that blow has struck (`step_moment_covers`).
 pub(crate) const STEP_FACING_HOLD: f32 = 1.0;
 /// A hero carried down from another world is held (no falling) until their client says it has
 /// loaded this one ([`Survival::loaded`]), and for no longer than this if it never says.
@@ -1980,9 +1981,10 @@ impl Survival {
         }
         // Retaliation's answer keeps the facing the parry turned it to until it has struck,
         // whichever way the client's body still faces. A Rogue's step keeps the facing it put
-        // her in a moment against a standing client's word (`drop_aim`); a step of her own ends it.
+        // her in a moment against a standing client's word (`drop_aim`); a step of her own ends it,
+        // but not while a blow she began in it winds up (its lunge on her client: `sim::rogue`).
         let walking = moving.forward || moving.back || moving.left || moving.right;
-        if walking {
+        if walking && now >= p.rogue.step_blow_until {
             p.rogue.step_facing_until = 0.0;
         }
         if facing.is_finite() && now >= p.untouchable_until && now >= p.rogue.step_facing_until {
@@ -2102,6 +2104,7 @@ impl Survival {
             p.aim_line = None;
             p.aim_at = None;
             p.rogue.step_facing_until = until;
+            p.rogue.step_blow_until = 0.0;
         }
     }
 
