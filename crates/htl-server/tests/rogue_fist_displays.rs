@@ -47,13 +47,13 @@ fn every_fist_weapons_display_is_a_fist_in_the_clients_data() {
     }
 }
 
-/// A fist weapon fills both of a Rogue's hands, so the off hand shows it too: where 1.12 keeps a
-/// left-hand model of the fist (`<model>left`, as the claw has), the item's `off_display` is one
-/// with that model and the same skin; where it keeps none (the knuckles), the item names none and
-/// the off hand shows the same model.
+/// A fist weapon fills both of a Rogue's hands, so the off hand shows it too: each fist weapon's
+/// `off_display` is the left-hand model of its own (`<model>left`, same skin), and its icon is the
+/// main display's, so the character sheet's off-hand slot matches the item. (1.12's brass knuckles
+/// have no left-hand model, so the Footpad's Knuckles wear the gladiator's pair instead.)
 #[test]
 #[ignore]
-fn every_fist_weapons_off_hand_look_is_its_left_hand_model_where_the_data_has_one() {
+fn every_fist_weapons_off_hand_is_its_left_hand_model_with_the_same_icon() {
     let Some(data) = data_dir() else {
         eprintln!("No WoW data (WOW_DATA): skipped.");
         return;
@@ -62,17 +62,21 @@ fn every_fist_weapons_off_hand_look_is_its_left_hand_model_where_the_data_has_on
     let cat = load_item_display_catalog(&mut chain).expect("ItemDisplayInfo.dbc");
     let content = htl_survival::Content::builtin();
     let lower = |o: &Option<String>| o.clone().unwrap_or_default().to_ascii_lowercase();
+    let mut seen = 0;
     for w in content.weapons.iter().filter(|w| w.subclass == 13 && !w.key.contains("_honed")) {
         let item = &content.items[content.item(&w.key).unwrap()];
         let main = cat.get(item.display).unwrap();
-        let left = lower(&main.model[0]).replace(".m2", "left.m2");
-        let skin = lower(&main.model_texture[0]);
-        let lefts: Vec<u32> = cat.iter().filter(|(_, d)| lower(&d.model[0]) == left && lower(&d.model_texture[0]) == skin).map(|(i, _)| i).collect();
-        println!("{}: display {} off_display {} (left-hand displays with its skin: {lefts:?})", w.key, item.display, item.off_display);
-        if lefts.is_empty() {
-            assert_eq!(item.off_display, 0, "{}: 1.12 has no {left}, so the off hand shows the same model", w.key);
-        } else {
-            assert!(lefts.contains(&item.off_display), "{}: off_display {} is one of {lefts:?} ({left}, {skin})", w.key, item.off_display);
-        }
+        let left_model = lower(&main.model[0]).replace(".m2", "left.m2");
+        let off = cat.get(item.off_display).unwrap_or_else(|| panic!("{}: off_display {} is not in ItemDisplayInfo", w.key, item.off_display));
+        println!("{}: display {} off_display {} ({}, {})", w.key, item.display, item.off_display, lower(&off.model[0]), lower(&off.icon));
+        assert_eq!(lower(&off.model[0]), left_model, "{}: the off hand is the left-hand model of {}", w.key, lower(&main.model[0]));
+        assert_eq!(lower(&off.model_texture[0]), lower(&main.model_texture[0]), "{}: the same skin", w.key);
+        assert_eq!(lower(&off.icon), lower(&main.icon), "{}: the off-hand slot's icon is the item's", w.key);
+        seen += 1;
     }
+    assert!(seen >= 2, "the fist weapons");
+    // The two decisions (Corey's Nov 17 review), pinned.
+    let id = |k: &str| &content.items[content.item(k).unwrap()];
+    assert_eq!((id("footpad_knuckles").display, id("footpad_knuckles").off_display), (32012, 32015));
+    assert_eq!((id("cutpurse_claw").display, id("cutpurse_claw").off_display), (26593, 26594));
 }

@@ -558,11 +558,10 @@ What the design left open, decided in the pull request that built it:
     second, as every family's), a 0.15 sec wind-up, and `backstab = 2.0` as its family identity
     (the identity test needs one; "the fists' job is making backs"). Two on the rack for anyone,
     each with a mechanic no other weapon has, both for the dodge: **Footpad's Knuckles** (display
-    15720, `hand_1h_knuckle_a_01`) gives 3 stamina back a hit (`wind`); **Cutpurse's Claw** (display
-    4687, `hand_1h_claw_a_01`) does 50% more within 1 sec of a dodge that slipped a blow (`slip`,
-    any dodge that evades, not only a perfect one). The off hand shows the same model as the main
-    hand: 1.12 keeps left-hand fist models as their own displays, to be checked when filmed. (Since
-    Nov 16 the claw's off hand shows its own left-hand model: below.)
+    32012 since Nov 17, `hand_1h_pvpalliance_a_01`) gives 3 stamina back a hit (`wind`); **Cutpurse's
+    Claw** (display 26593, `hand_1h_claw_a_01`) does 50% more within 1 sec of a dodge that slipped a
+    blow (`slip`, any dodge that evades, not only a perfect one). The off hand shows each one's own
+    left-hand model: below.
   - **How a player learns the pair**: equipping a hand at the rack tells a Rogue its pair in one
     line ("Your pair is Iron Knuckles. ..."), built from the numbers (`pair_words`). No add-on
     change: the server's chat line carries it.
@@ -679,14 +678,25 @@ What the design left open, decided in the pull request that built it:
     Iron Knuckles. Your strikes alternate fists, and the 6th is with both. It turns an enemy's back
     to you for 1 sec. On a boss it breaks stances 100% faster instead." (was "Alternating weapons,
     your 6th strike is with both fists", which read as two weapons).
-  - **The off hand's look**: 1.12's `ItemDisplayInfo` has the claw's own left-hand model
-    (`hand_1h_claw_a_01left`) with its silver skin as displays 21144, 21855, 24109 and 26594, and no
-    left-hand knuckles (no `hand_1h_knuckle_a_01left` at all). Cutpurse's Claw names 26594
-    (`off_display`, from the 26592-26597 fist set) and the server sends a Rogue's off hand as its own
-    item template with that display (`LEFT_ENTRY`); the knuckles show the same model in both hands.
-    The ignored test `rogue_fist_displays` checks both against `WOW_DATA` (run on this PC). The
-    off-hand slot's icon on the character sheet is 26594's (`INV_Gauntlets_07`): no left-hand claw
-    display carries the claw's own icon.
+  - **The off hand's look (Nov 17, Corey's review)**: the server sends a Rogue's off hand as its own
+    item template with the item's `off_display` (`LEFT_ENTRY`), and the client takes the character
+    sheet's icon from that display, so the icon must come from the display too. The ignored test
+    `rogue_fist_displays` checks both items against `WOW_DATA` (run on this PC): each off display is
+    the main display's `<model>left` with the same skin and the same icon.
+    - **Cutpurse's Claw: displays 26593 (right) and 26594 (left), icon `INV_Gauntlets_07`.** 1.12 has
+      four silver left claws (21144, 21855, 24109, 26594), with icons `INV_Misc_MonsterClaw_01`,
+      `Ability_Whirlwind`, `INV_Gauntlets_11` and `INV_Gauntlets_07`; none carries the claw's old icon
+      (`INV_Gauntlets_04`, display 4687), and a stand-in item entry would not help, as the sheet's
+      icon follows the display. So the claw moved to the pair that matches itself: 26593 is the same
+      model and silver skin as 4687, with 26594's icon, so both hands and the sheet agree. The
+      item's key is unchanged (saves load); only its look and icon string moved.
+    - **Footpad's Knuckles: displays 32012 (right) and 32015 (left), icon `INV_Gauntlets_31`.** 1.12
+      has no left-hand knuckles at all (no `hand_1h_knuckle_*left`), so (a) of the review's list:
+      the one other fist display that has a left variant and a matching icon pair is the
+      gladiator's pair (`hand_1h_pvpalliance_a_01` and `...left`, one skin, models in the data). The
+      claw and Zul'Gurub models that also have lefts are claws, which the Cutpurse's Claw already
+      is. No client mirror patch was needed (0110 and 0111 were claimed by open PRs anyway). **Not
+      seen in the client**: how this pair reads next to brass is for the playtest.
   - **Anyone but a Rogue is as before**: a fist weapon is a one-hander for them, in either hand,
     beside a shield or another blade, with no pair and its usual look; the rack row says
     "one-handed". Why: the owner kept every other class as it is, and a Warrior's dual wield with

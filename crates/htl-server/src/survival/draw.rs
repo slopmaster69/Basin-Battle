@@ -1717,9 +1717,8 @@ mod saved_look_tests {
         }
     }
 
-    /// A Rogue's fist weapon fills both hands: the off hand shows it too, by its left-hand look
-    /// where it has one (the claw's), else by itself (the knuckles'); in the world and on the
-    /// character screen alike.
+    /// A Rogue's fist weapon fills both hands: the off hand shows it too, by its own left-hand look
+    /// (both fist items have one); in the world and on the character screen alike.
     #[test]
     fn a_rogues_fist_weapon_shows_in_both_hands_the_claw_by_its_left_hand_model() {
         use htl_survival::{content::Content, land::FlatLand};
@@ -1730,7 +1729,7 @@ mod saved_look_tests {
         let mut hero = game.sim.join("ayla", "Ayla", Some(&save));
         let rack = game.sim.objs[&game.sim.rack_id()].pos;
         game.sim.players.get_mut(&hero).unwrap().pos = rack;
-        for (key, left) in [("cutpurse_claw", true), ("footpad_knuckles", false)] {
+        for (key, left) in [("cutpurse_claw", true), ("footpad_knuckles", true)] {
             game.sim.arm(hero, key).unwrap();
             let i = game.sim.content.item(key).unwrap() as u32;
             let worn = game.worn(hero);
