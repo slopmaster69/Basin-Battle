@@ -1,0 +1,226 @@
+From 89055a704bb85bb8aced04b80518682193a06a28 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 16 Nov 2026 21:21:43 -0600
+Subject: [PATCH] A Rogue's afterimage can be lit toward its colour, a pale
+ ghost of light
+
+Basin Battle, the thirty-fourth round (HasActionCombat() 34). The colour PlayUnitAfterimage takes
+may be "AARRGGBB": its top byte is a light (0 to 255), and the copy is lit that far toward the
+colour, after its own lighting and before the fog, so the body's shape and shading still show
+under it. A six-digit colour is a plain tint, as before. A tint only multiplies the light, so a
+copy of a dark-clad Rogue under a cool tint read as a dark smear, never a pale copy. The light
+rides the instance tint word's top byte (instance_tint::pack_lit), which pack keeps at 0xff.
+---
+ .../src/creature_anim/action/afterimage.rs    |  8 +++++-
+ .../benilla-assets/src/shaders/wow_model.wgsl |  7 +++++
+ crates/benilla-ui/src/action_combat.rs        | 28 +++++++++++++++++--
+ crates/benilla-world/src/instance_tint.rs     | 19 +++++++++++++
+ 4 files changed, 59 insertions(+), 3 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action/afterimage.rs b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+index 5564ed12..d6ae09f8 100644
+--- a/crates/benilla-app/src/creature_anim/action/afterimage.rs
++++ b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+@@ -51,6 +51,9 @@ pub(crate) struct AfterimageDue {
+     pub(crate) alpha: f32,
+     /// A colour over it, the trail's; `None` leaves the body's own.
+     pub(crate) tint: Option<[u8; 3]>,
++    /// How far the copy is lit toward `tint` (0 to 1; 0: the tint only colours it), a ghost of
++    /// light (`instance_tint::pack_lit`, the thirty-fourth round).
++    pub(crate) light: f32,
+     /// How far from the body it stands, along the ground (zero: where the body is).
+     pub(crate) shift: Vec3,
+     /// It keeps most of its alpha until near its end (the cubic ramp), rather than fading the
+@@ -98,6 +101,7 @@ pub(super) fn apply_call(
+             secs,
+             alpha,
+             tint,
++            light,
+             at,
+             stand_in,
+         } => {
+@@ -116,6 +120,7 @@ pub(super) fn apply_call(
+                 secs,
+                 alpha,
+                 tint,
++                light,
+                 shift,
+                 lingers: secs > LINGER_FROM,
+                 stand_in: stand_in.as_deref().and_then(super::guid_of),
+@@ -209,7 +214,7 @@ pub(crate) fn spawn_afterimages(
+                         palettes.shift_origin(slot, d.shift);
+                     }
+                     if let Some(t) = d.tint {
+-                        tints.set(slot, instance_tint::pack(t));
++                        tints.set(slot, instance_tint::pack_lit(t, d.light));
+                     }
+                     commands.spawn((copy, ImageRig, ChildOf(root)));
+                     copies.insert(rig.0, slot);
+@@ -507,6 +512,7 @@ mod tests {
+             secs: 2.0,
+             alpha: 0.6,
+             tint: None,
++            light: 0.0,
+             at: Some([13.0, 24.0, 9.0]),
+             stand_in: Some("0xF130000000000123".into()),
+         });
+diff --git a/crates/benilla-assets/src/shaders/wow_model.wgsl b/crates/benilla-assets/src/shaders/wow_model.wgsl
+index eb948e5a..dc6b21a8 100644
+--- a/crates/benilla-assets/src/shaders/wow_model.wgsl
++++ b/crates/benilla-assets/src/shaders/wow_model.wgsl
+@@ -909,6 +909,9 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+         vec3<f32>(1.0),
+         tint_word == 0u,
+     );
++    // Basin Battle: a lit tint (`instance_tint::pack_lit`, a top byte under 0xff) also lights the
++    // body toward its colour, a ghost of light (a Rogue's afterimage), not a shade of the body.
++    let tint_light = select(f32(255u - (tint_word >> 24u)) / 255.0, 0.0, tint_word == 0u);
+     // The blend twin re-applies its source's cutout: the reference scales ALPHAREF with the fade,
+     // so the cutoff stays tex.a < 224/255 on the unfaded alpha. Only for a source batch that
+     // alpha-tests (bit 10): ALPHAREF keys on the stored blend mode.
+@@ -1172,6 +1175,10 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+         // The diffuse alpha is the batch and instance alpha, the shader's `obj_fade`.
+         rgb = stage1_rgb(stage1_preset, rgb, tex1, obj_fade);
+     }
++    // A lit tint's light, before the fog: the body's own shading kept under it.
++    if (tint_light > 0.0 && !is_wmo) {
++        rgb = mix(rgb, inst_tint, tint_light);
++    }
+ 
+     // Linear fog by planar eye depth, as in terrain.wgsl. Per-batch colour policy (`clutter_fade.z`
+     // bits 4-6, the M2 state setter `0x70baf0`): 0 scene, 1 black (additive), 2 white (Mod),
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 5c974d26..6fe474eb 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -323,6 +323,11 @@
+ //! lantern's pivot is out; when the marker goes the light is back. A client that is sent no marker
+ //! does nothing. The ship still goes only with the aftermath marker (patch 0087).
+ //!
++//! The thirty-fourth (`HasActionCombat() >= 34`), a Rogue's pale afterimage (patch 0112): the
++//! colour `PlayUnitAfterimage` takes may be `"AARRGGBB"`, its top byte a light (0 to 255): the copy
++//! is lit that far toward the colour (a pale ghost of light), where a tint alone only takes colour
++//! away and left a dark copy of a dark-clad hero. A six-digit colour is as before.
++//!
+ //! The thirty-third (`HasActionCombat() >= 33`), a Rogue's bold trails (patch 0109): a hand's trail
+ //! colour may end `*N` (`"C83C8CFF*2.4"`, N 1 to 4): that hand's ribbon is N times as wide (the
+ //! blade's own length, drawn out from its middle) and fades slower (0.6 of the excess, so 2.4 fades
+@@ -828,6 +833,9 @@ pub enum AfterimageCall {
+         alpha: f32,
+         /// A colour over it; `None` its own.
+         tint: Option<[u8; 3]>,
++        /// The thirty-fourth round: how far it is lit toward `tint` (0 to 1), a colour's top byte
++        /// (`"B4E0ECFF"`: 0xB4 of the way to pale blue-white). 0: the tint only colours it.
++        light: f32,
+         /// Where it stands instead of where the body is (WoW `x, y, z`).
+         at: Option<[f32; 3]>,
+         /// A unit hidden while the copy stands (a guid).
+@@ -1381,7 +1389,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(33))?,
++        lua.create_function(|_, _: MultiValue| Ok(34))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1486,7 +1494,9 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 return Ok(());
+             }
+             let alpha = number(v.get(2), 0.05, 1.0).unwrap_or(0.6);
+-            let tint = colour(v.get(3)).map(|c| [(c >> 16) as u8, (c >> 8) as u8, c as u8]);
++            let c = colour(v.get(3));
++            let tint = c.map(|c| [(c >> 16) as u8, (c >> 8) as u8, c as u8]);
++            let light = c.map_or(0.0, |c| f32::from((c >> 24) as u8) / 255.0);
+             let at = match (
+                 number(v.get(4), -1.0e6, 1.0e6),
+                 number(v.get(5), -1.0e6, 1.0e6),
+@@ -1501,6 +1511,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 secs,
+                 alpha,
+                 tint,
++                light,
+                 at,
+                 stand_in,
+             });
+@@ -2356,6 +2367,7 @@ mod tests {
+             r#"PlayUnitAfterimage("player", 0.3)
+                PlayUnitAfterimage("0xF1300000AB", 2, 0.5, "8C78C8", 10, -20, 30.5, "0xF130000123")
+                PlayUnitAfterimage("player", 2, 0.5, nil, nil, nil, nil, "-")
++               PlayUnitAfterimage("player", 0.9, 0.6, "B4E0ECFF")
+                PlayUnitAfterimage("player", 0)
+                PlayUnitAfterimage("player")"#,
+         )
+@@ -2369,6 +2381,7 @@ mod tests {
+                     secs: 0.3,
+                     alpha: 0.6,
+                     tint: None,
++                    light: 0.0,
+                     at: None,
+                     stand_in: None,
+                 },
+@@ -2377,6 +2390,7 @@ mod tests {
+                     secs: 2.0,
+                     alpha: 0.5,
+                     tint: Some([0x8C, 0x78, 0xC8]),
++                    light: 0.0,
+                     at: Some([10.0, -20.0, 30.5]),
+                     stand_in: Some("0xF130000123".into()),
+                 },
+@@ -2385,6 +2399,16 @@ mod tests {
+                     secs: 2.0,
+                     alpha: 0.5,
+                     tint: None,
++                    light: 0.0,
++                    at: None,
++                    stand_in: None,
++                },
++                AfterimageCall::Leave {
++                    unit: "player".into(),
++                    secs: 0.9,
++                    alpha: 0.6,
++                    tint: Some([0xE0, 0xEC, 0xFF]),
++                    light: f32::from(0xB4u8) / 255.0,
+                     at: None,
+                     stand_in: None,
+                 },
+diff --git a/crates/benilla-world/src/instance_tint.rs b/crates/benilla-world/src/instance_tint.rs
+index 32356a54..1e81e342 100644
+--- a/crates/benilla-world/src/instance_tint.rs
++++ b/crates/benilla-world/src/instance_tint.rs
+@@ -48,6 +48,15 @@ pub fn pack(rgb: [u8; 3]) -> u32 {
+     0xff00_0000 | (u32::from(rgb[0]) << 16) | (u32::from(rgb[1]) << 8) | u32::from(rgb[2])
+ }
+ 
++/// Basin Battle: a tint that also lights the body toward its colour by `light` (0 to 1), a ghost
++/// of light rather than a shade of the body. `wow_model.wgsl` mixes the lit colour toward the tint
++/// by `(255 - top byte) / 255`, so [`pack`]'s `0xff` top byte lights nothing, and the top byte stays
++/// at least 1 so the word is never [`IDENTITY`].
++pub fn pack_lit(rgb: [u8; 3], light: f32) -> u32 {
++    let lift = (light.clamp(0.0, 1.0) * 255.0).round().min(254.0) as u32;
++    (pack(rgb) & 0x00ff_ffff) | ((0xff - lift) << 24)
++}
++
+ /// Off-world `wow_light`-layout buffers that also carry the tint region, by key; deliberately not
+ /// [`crate::rig_palette::RigPaletteMirrors`]' list. Portraits stay off it: the reference bakes one
+ /// from a fresh CM2 with colour (1,1,1) and alpha 1 (`0x524f60`, ctor `0x70ea60`, set again at
+@@ -142,6 +151,16 @@ pub fn plugin(app: &mut App) {
+ mod tests {
+     use super::*;
+ 
++    /// A lit tint keeps its colour and carries its light in the top byte; none is [`pack`]'s word,
++    /// and a full light on black is still no identity.
++    #[test]
++    fn a_lit_tint_carries_its_light_in_the_top_byte() {
++        assert_eq!(pack_lit([0xE0, 0xEC, 0xFF], 0.0), pack([0xE0, 0xEC, 0xFF]));
++        assert_eq!(pack_lit([0xE0, 0xEC, 0xFF], 0.5), 0x7FE0_ECFF);
++        assert_eq!(pack_lit([0, 0, 0], 1.0), 0x0100_0000);
++        assert_ne!(pack_lit([0, 0, 0], 1.0), IDENTITY);
++    }
++
+     #[test]
+     fn packing_matches_the_reference_and_never_collides_with_identity() {
+         // The ghost aura's node value (`round(9222653) | 0xff000000`).
+-- 
+2.46.2.windows.1
+

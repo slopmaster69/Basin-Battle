@@ -742,6 +742,31 @@ What the design left open, decided in the pull request that built it:
   check's hosting steps and its deploy handover start it on `127.0.0.1`, which Windows never asks
   about. Why an opt-in and not a new default: friends join a player's server from other PCs.
 
+- **The perfect dodge's copy and corners after the Nov 17 refilm** (it showed a dark smear and a
+  faint violet in the top-left corner alone):
+  - **Why the copy was dark**: the client's copy is the hero's own model under its own lighting,
+    and a body tint only multiplies that light (`wow_model.wgsl`: `albedo * clamp(tint * light +
+    highlight)`), so no tint or alpha the server sends can make it lighter than the hero's own
+    leathers. #493's cool `A8B8FF` took a third of the red and green away, and its 0.85 made the
+    darkened body nearly solid. Not the alpha blending and not a missing light: the multiply.
+  - **So the client changes (patch 0112, round 34)**: a colour's top byte (`AARRGGBB`) is a light,
+    and the copy is lit that far toward the colour after its own lighting, keeping its shape and
+    shading under it. The server sends round 34 the copy at **0.6, `B4E0ECFF`**: pale blue-white,
+    71% lit, the ground showing through (`DODGE_IMAGE_LIT_*`, `IMAGE_LIGHT_LEVEL`). Why 71%: enough
+    to read as light on any gear, little enough that the body's own folds still show which way it
+    leaned. An older client is sent the old numbers; an `AARRGGBB` colour would be a plain
+    `RRGGBB` tint to it anyway. The light rides the tint word's top byte (`pack_lit`), which every
+    other tint keeps at `0xff`, so no other look changes. Afterimage's violet shade is unchanged.
+  - **The corners are the Rogue's own four** (`Rogue.lua`, `ES.RogueCorners`; the cue's
+    `corners`), not the shared edge: each corner of the vignette laid twice, on its own corner of
+    the world's frame (single-point anchors), a third of the screen's height, on the HIGH strata
+    over the HUD, full at once and gone over 1 sec. Why: the shared edge sits under the HUD's
+    frames at 0.85 of a vignette whose corners average 45%, so it read faint; the frames over
+    it (bars, minimap, chat) are the likely reason only the top-left showed (not seen: no film
+    image was read for this). It stays as it was for every other cue. The add-on harness
+    checks the four corners' places (`survival.txt`). Add-on 80.
+  - All of it reads with floor markers off: a body and the screen's corners.
+
 ## Build plan
 
 Six pull requests, in order. Each is handed to one subagent with only this page to go on, so each

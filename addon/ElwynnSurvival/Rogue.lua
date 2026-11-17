@@ -11,6 +11,63 @@ if not ES then return end
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local PIP, GAP = 12, 4
 
+-- A perfect dodge's violet corners (Cues.lua's `corners`): four glows of their own, one in each
+-- corner of the screen, each anchored to its own corner and sized by the screen. The shared edge
+-- (ES.Edge) sits under the HUD and drew them faint, the top-left alone showing in the Nov 17 film:
+-- these stand over the HUD (HIGH) on the world's frame, so the interface hidden or not they show, each
+-- the vignette's corner laid twice for a solid colour, full at once and gone over their seconds.
+local cn = CreateFrame("Frame", "ElwynnSurvivalDodgeCorners", WorldFrame)
+cn:SetAllPoints(WorldFrame)
+cn:SetFrameStrata("HIGH")
+cn:Hide()
+cn.pieces = {}
+cn.secs, cn.left = 1, 0
+local CUT = 0.3
+local SPOTS = {
+  { "TOPLEFT", 0, CUT, 0, CUT },
+  { "TOPRIGHT", 1 - CUT, 1, 0, CUT },
+  { "BOTTOMLEFT", 0, CUT, 1 - CUT, 1 },
+  { "BOTTOMRIGHT", 1 - CUT, 1, 1 - CUT, 1 },
+}
+for i = 1, 4 do
+  local s = SPOTS[i]
+  for layer = 1, 2 do
+    local t = cn:CreateTexture(nil, "ARTWORK")
+    t:SetTexture(ART .. "vignette")
+    t:SetTexCoord(s[2], s[3], s[4], s[5])
+    t:SetPoint(s[1], cn, s[1], 0, 0)
+    table.insert(cn.pieces, t)
+  end
+end
+ES.dodgeCorners = cn
+
+-- `corners = { r, g, b, secs }`: the four corners in that colour, a third of the screen's height
+-- each.
+function ES.RogueCorners(r, g, b, secs)
+  local h = WorldFrame:GetHeight() or 768
+  local size = math.floor(math.max(120, h * 0.34))
+  for i = 1, table.getn(cn.pieces) do
+    local t = cn.pieces[i]
+    t:SetWidth(size)
+    t:SetHeight(size)
+    t:SetVertexColor(r or 1, g or 1, b or 1, 1)
+  end
+  cn.secs = math.max(0.05, tonumber(secs) or 1)
+  cn.left = cn.secs
+  cn:SetAlpha(1)
+  cn:Show()
+end
+
+cn:SetScript("OnUpdate", function()
+  this.left = this.left - (arg1 or 0)
+  if this.left <= 0 then
+    this:SetAlpha(0)
+    this:Hide()
+    return
+  end
+  this:SetAlpha(this.left / this.secs)
+end)
+
 local fl = CreateFrame("Frame", "ElwynnSurvivalFlourish", WorldFrame)
 fl:SetWidth(1)
 fl:SetHeight(1)
@@ -45,7 +102,8 @@ local function Lay()
   end
 end
 
--- `AI <guid> <secs> <alpha> <RRGGBB> [<x> <y> <z> <stand-in>]`: a see-through copy of a Rogue's
+-- `AI <guid> <secs> <alpha> <[AA]RRGGBB> [<x> <y> <z> <stand-in>]` (AA: how far a round-34 client
+-- lights the copy toward the colour, patch 0112): a see-through copy of a Rogue's
 -- own body left behind (patch 0103's PlayUnitAfterimage): for a moment where a perfect dodge
 -- slipped a blow, or standing as Afterimage's shade at its spot while the shade's own body is
 -- hidden. `AI <guid> 0` takes the copies away. Without the patch, nothing: the server's flicker and

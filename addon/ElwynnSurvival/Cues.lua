@@ -40,9 +40,11 @@ ES.CUE = {
   cheat_death = { stop = 260, shake = { 1.2, 0.4 }, self = true },
   -- A Rogue's perfect dodge (docs/rogue-roles.md): the blow slipped in its last moment. A short
   -- stop on the hero alone (less than a parry's 150: a slip, not a clash), no shake, and the
-  -- corners flashed a bright shadow's violet for a full second at twice an edge's strength (Corey,
-  -- Nov 17: the dim 0.6 s violet did not read), the Shadow Cut's open behind it.
-  perfect_dodge = { stop = 90, self = true, edge = { 0.62, 0.40, 1.0, 1.0, 2.0 } },
+  -- corners flashed a bright shadow's violet for a full second (Corey, Nov 17: the dim 0.6 s violet
+  -- did not read), the Shadow Cut's open behind it. The corners are the Rogue's own four
+  -- (Rogue.lua: over the HUD, each on its own corner), not the shared edge, which drew them faint
+  -- and only the top-left showed in the Nov 17 film.
+  perfect_dodge = { stop = 90, self = true, corners = { 0.62, 0.40, 1.0, 1.0 } },
   -- The mine coming down (Rhahk'Zor's collapse): near its front the ground rumbles under the
   -- hero (a long low shake, each beat running into the next), and rock or a beam landing beside
   -- them jolts the view. Shakes alone: no stop, nothing held, the hero runs on.
@@ -102,6 +104,7 @@ function ES.CueLine(f)
   if c.shake and ShakeCamera then ShakeCamera(c.shake[1], c.shake[2]) end
   if c.kick and CameraKick then CameraKick(c.kick[1], c.kick[2]) end
   if c.edge and ES.Edge then ES.Edge(c.edge[1], c.edge[2], c.edge[3], c.edge[4], c.edge[5]) end
+  if c.corners and ES.RogueCorners then ES.RogueCorners(c.corners[1], c.corners[2], c.corners[3], c.corners[4]) end
 end
 
 -- The rise's camera let go as its time runs out: back to the aiming camera if one is up (the
