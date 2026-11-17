@@ -579,7 +579,9 @@ pub(crate) const VERSION: u32 = 2;
 /// swung, and a line counting down the time left to press the next (a swing's `AN` goes on
 /// `\t<blow>/<of>\t<open secs>\t<two hands>`). The finisher's flash on the swinger plays from the
 /// add-on as its impact comes. An older add-on ignores the fields and is still sent the flash.
-pub(crate) const ADDON_NEWEST: u32 = 80;
+/// 81: a Rogue's own guessed blows trail the main hand in the colour the server's last light
+/// main-hand blow had (its white-gold). No line changes; an older add-on guesses the old pale.
+pub(crate) const ADDON_NEWEST: u32 = 81;
 /// The first add-on that plays the finisher's flash on its own hero (`Chain.lua`): the server
 /// leaves that client out of the kit.
 pub(crate) const CHAIN_ADDON: u32 = 78;
@@ -637,6 +639,14 @@ const FINISH_OFF_TRAIL: &str = "DC3C8CFF";
 /// Round 33's width mark on a hand's colour (`AARRGGBB*N`): the ribbon N times as wide (the blade's
 /// own length, drawn from its middle) and fading 1 + 0.6 (N - 1) times as slowly (patch 0109).
 const TRAIL_BOLD: &str = "*2.4";
+/// A Rogue's main-hand blade (its light blow, not the heavy's orange) trails a bright white-gold at
+/// the off hand's strong alpha, and on a client of round 33 wide too, a little narrower than the off
+/// hand's ([`MAIN_BOLD`]): the blow's own pale cream (0x50) couldn't be told from the world at
+/// filming distance (Corey, Nov 17). Warm against the off hand's cold blue, so the hands still read
+/// apart; the finisher's deeper gold and blue are as they were.
+const MAIN_TRAIL: &str = "C8FFF0B4";
+/// Round 33's width mark on the main hand's blade: 1.8 times as wide (the off hand's is 2.4).
+const MAIN_BOLD: &str = "*1.8";
 /// 33: the bold trail's width mark (0109; [`TRAIL_BOLD`]).
 pub(crate) const TRAIL_BOLD_LEVEL: u8 = 33;
 
@@ -663,15 +673,19 @@ const SHADE_IMAGE_TINT: &str = "A08CDC";
 /// A Rogue's blow's trail a hand each (`main/off`, `-` for none): the main hand's blow trails its
 /// own blade in the blow's own colour (`own`), the off hand's its own blade, the two-blade finisher
 /// both. `bold` (a client of round 33): the off hand's and the finisher's colours carry
-/// [`TRAIL_BOLD`], drawn wider and longer-lived; the main hand's plain blow is as it was.
-pub(crate) fn rogue_trail(own: &str, off_hand: bool, finish: bool, bold: bool) -> String {
+/// [`TRAIL_BOLD`], drawn wider and longer-lived. The main hand's light blow (`heavy` false) trails
+/// [`MAIN_TRAIL`] instead of its own pale, with [`MAIN_BOLD`] on round 33; a heavy blow keeps its own.
+pub(crate) fn rogue_trail(own: &str, heavy: bool, off_hand: bool, finish: bool, bold: bool) -> String {
     let b = if bold { TRAIL_BOLD } else { "" };
     if finish {
         format!("{FINISH_MAIN_TRAIL}{b}/{FINISH_OFF_TRAIL}{b}")
     } else if off_hand {
         format!("-/{OFF_TRAIL}{b}")
-    } else {
+    } else if heavy {
         format!("{own}/-")
+    } else {
+        let m = if bold { MAIN_BOLD } else { "" };
+        format!("{MAIN_TRAIL}{m}/-")
     }
 }
 
@@ -2717,23 +2731,30 @@ mod rogue_looks_tests {
 
     #[test]
     fn a_rogues_blow_trails_the_hand_that_struck_and_the_finisher_both() {
-        assert_eq!(rogue_trail("50F2EEE4", false, false, false), "50F2EEE4/-", "the main hand's blade alone, in the blow's own colour");
-        assert_eq!(rogue_trail("50F2EEE4", true, false, false), "-/C83C8CFF", "the off hand's blade alone, a vivid cold blue");
-        assert_eq!(rogue_trail("50F2EEE4", true, true, false), "DCFFD27A/DC3C8CFF", "both blades on the finisher, gold and blue, whichever hand pressed it");
-        assert_eq!(rogue_trail("78FF9A3C", false, true, false), "DCFFD27A/DC3C8CFF");
-        // Round 33 adds the width mark to the off hand and the finisher, never the main hand's blow.
-        assert_eq!(rogue_trail("50F2EEE4", false, false, true), "50F2EEE4/-");
-        assert_eq!(rogue_trail("50F2EEE4", true, false, true), "-/C83C8CFF*2.4");
-        assert_eq!(rogue_trail("50F2EEE4", true, true, true), "DCFFD27A*2.4/DC3C8CFF*2.4");
+        assert_eq!(rogue_trail("50F2EEE4", false, false, false, false), "C8FFF0B4/-", "the main hand's blade alone, a bright white-gold");
+        assert_eq!(rogue_trail("78FF9A3C", true, false, false, false), "78FF9A3C/-", "a heavy blow keeps its own orange");
+        assert_eq!(rogue_trail("50F2EEE4", false, true, false, false), "-/C83C8CFF", "the off hand's blade alone, a vivid cold blue");
+        assert_eq!(rogue_trail("50F2EEE4", false, true, true, false), "DCFFD27A/DC3C8CFF", "both blades on the finisher, gold and blue, whichever hand pressed it");
+        assert_eq!(rogue_trail("78FF9A3C", true, false, true, false), "DCFFD27A/DC3C8CFF");
+        // Round 33 adds the width mark: the main hand's light blow 1.8, the off hand and the
+        // finisher 2.4; a heavy blow none.
+        assert_eq!(rogue_trail("50F2EEE4", false, false, false, true), "C8FFF0B4*1.8/-");
+        assert_eq!(rogue_trail("78FF9A3C", true, false, false, true), "78FF9A3C/-");
+        assert_eq!(rogue_trail("50F2EEE4", false, true, false, true), "-/C83C8CFF*2.4");
+        assert_eq!(rogue_trail("50F2EEE4", false, true, true, true), "DCFFD27A*2.4/DC3C8CFF*2.4");
         // Each side is a colour the client reads, or none; without the mark it is eight hex digits.
-        for t in [rogue_trail("50F2EEE4", false, false, false), rogue_trail("", true, false, false), rogue_trail("", false, true, false)] {
+        for t in [rogue_trail("50F2EEE4", false, false, false, false), rogue_trail("", false, true, false, false), rogue_trail("", false, false, true, false)] {
             let (m, o) = t.split_once('/').unwrap();
             for h in [m, o] {
                 assert!(h == "-" || (h.len() == 8 && u32::from_str_radix(h, 16).is_ok()), "{t}");
             }
         }
-        // The off hand's blue differs from the main hand's pale in hue and is far stronger.
-        assert!(u32::from_str_radix(&OFF_TRAIL[..2], 16).unwrap() >= 2 * u32::from_str_radix(&"50F2EEE4"[..2], 16).unwrap());
+        // The main hand's white-gold is as strong as the off hand's blue, warm against cold (more red
+        // than blue, the blue the other way), and its ribbon narrower.
+        let rgb = |c: &str| u32::from_str_radix(c, 16).unwrap();
+        assert_eq!(rgb(&MAIN_TRAIL[..2]), rgb(&OFF_TRAIL[..2]));
+        assert!(rgb(&MAIN_TRAIL[2..4]) > rgb(&MAIN_TRAIL[6..8]) && rgb(&OFF_TRAIL[6..8]) > rgb(&OFF_TRAIL[2..4]));
+        assert!(MAIN_BOLD[1..].parse::<f32>().unwrap() < TRAIL_BOLD[1..].parse::<f32>().unwrap());
     }
 
     #[test]
