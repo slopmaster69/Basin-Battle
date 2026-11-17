@@ -156,6 +156,17 @@ include _setup                # another file's lines, at their own times
 - **The camera** is held where `cam` says from the moment the hero is in the world: yaw is a map
   facing in degrees (0 is behind the hero `.es goto` leaves facing north), pitch below 0 looks down.
   `cam off` holds no camera at all, for a scenario that turns it itself (`lua` steps).
+  `cam` moves the HERO's camera, so it frames what is filmed only when the scenario has no `camera`
+  line (the video is then the hero's own 1280x720 screen). With a `camera` line the video is the
+  cameraman's, its `duel` shot stands 8 to 12 yd out whatever `cam` says, and `cam` only moves the hero's
+  small window (the script says so). For a close-up of the action, drop the `camera` line and use
+  `cam 150 -15 6`: 6 yd back and a little above, the action 2 to 5 yd from the lens. The distance
+  is honoured. The angle is not free: the hero faces where her camera looks and enemies spawn ahead
+  of her, between her and the lens, so the view is never truly side-on (that is the cameraman's).
+  An aimed ability (`{facing}`) aims along the camera, so a scenario that casts one at a spawned
+  enemy wants `cam 0`, or the aim points 90 degrees off it (Garrote's first Nov 17 take). The
+  world-entry loading screen can last 25 s on a cold start and the scenario clock runs under it:
+  raise `settle` (30) when the first stills are the loading screen.
 - **Bursts**: 0.05 to 0.1 s apart is dense enough to step through an animation; the client takes
   at most one still a frame. Keep the count to what the moment needs: each still is a file.
 - **Moving**: a script can't press the movement or jump keys (they're protected), so a strafe is
@@ -343,8 +354,8 @@ hero: `setup` makes one (a human Rogue, `Vcrogue`; the settings' `rogue` names a
 | `rogue-pairs` | Not yet run, markers off: at the weapon rack, each pair in turn on still grunts: Twin Fangs' plain finisher (both blades, clip 17); Crossed Swords' finisher striking three grunts side by side; Breaker's Pair on a Defias Overseer, its stance bar jumping on the finisher; Iron Knuckles' six punches (AttackUnarmed, clip 16), the 6th with both fists, the grunt wheeling to show its back for 1 sec, a stab in it. Each pair's words in chat as it's equipped; a fist weapon filling both hands, the claw's off hand its own left-hand model (display 26594) |
 | `rogue-trails` | Not yet run, markers off, on a client built with patch 0103: a run of both hands on a still grunt (the main hand's blow trails the right blade alone, pale; the off hand's the left blade alone, a deeper steel; the finisher both); five perfect dodges, each leaving a pale copy of the Rogue's own body and blades for 0.3 sec; Afterimage, a violet copy of the Rogue standing 2 sec where the Rogue was with the Defias shade hidden and the grunt turning to it; a second Afterimage taking the first copy away. On an older client: the server's fallback (both blades pale, the flicker, the Defias shade) |
 
-The Rogue's Nov 17 review refilms (client patch 0109, #490, #496), each a small scenario by the cameraman
-(`camera duel`), floor markers off:
+The Rogue's Nov 17 review refilms (client patch 0109, #490, #496), each a small scenario on the hero's own screen
+(no `camera` line, `cam 150 -15 6`: close, see "The camera" above), floor markers off:
 
 | Scenario | What it films |
 | --- | --- |

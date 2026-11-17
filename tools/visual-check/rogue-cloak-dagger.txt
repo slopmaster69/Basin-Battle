@@ -5,8 +5,7 @@
 # Elwynn pack wakes at its aggro radius before it can stand within 8 yd. The unit test
 # cloak_and_dagger_never_steps_to_an_idle_creature_and_never_wakes_it covers it.)
 hero rogue
-cam 90 -12 8
-camera duel
+cam 150 -15 6
 include _setup
 4.0 .es goto -9638 671                  # the open grass by the rack (.es arm needs it)
 4.1 .es arm dagger

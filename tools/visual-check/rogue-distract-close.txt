@@ -3,8 +3,7 @@
 # them (about 6.5 yd): the pouch's flight and burst, no ring, and both grunts turning to face where
 # it landed (the turn is the tell).
 hero rogue
-cam 90 -12 8
-camera duel
+cam 0 -16 7
 include _setup
 4.0 .es goto -9638 671
 4.1 .es arm dagger

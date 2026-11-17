@@ -2,8 +2,7 @@
 # screen: a still grunt 2 yd ahead, main, off, main, off (the finisher), twice over. Look for the main
 # hand's pale trail, the off hand's vivid blue, and the finisher's gold and blue together.
 hero rogue
-cam 90 -12 8
-camera duel
+cam 150 -15 6
 include _setup
 4.0 .es goto -9638 671
 4.1 .es arm dagger

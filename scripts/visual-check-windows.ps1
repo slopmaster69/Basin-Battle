@@ -1077,6 +1077,7 @@ function Invoke-Scenario($s, $name, $out) {
     $hero = $s[$heroKey]
     if (-not $hero) { throw "$name plays the $heroKey hero, and the settings name none (set $heroKey = <name>)." }
     $cam = if ($sc.Cam) { $sc.Cam } else { "0,-10,9@0" }
+    if ($sc.Camera -and $sc.Cam -and $sc.Cam -ne "off") { Say "  note: with a camera line the video is the cameraman's (8 to 12 yd out) and cam only moves the hero's own small window; drop the camera line to film the hero's screen at cam's distance." }
     if (Test-Path $out) { Remove-Item -Recurse -Force $out }
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     $chome = Join-Path $out "client"
