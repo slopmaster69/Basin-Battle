@@ -1344,7 +1344,7 @@ function Invoke-Deploy($zip) {
     Write-WatchLog "deploy $($zip.Name): handing over (this watcher stops; a new one starts once the server is up)"
     $handArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Quote $script),
         "-Zip", (Quote $staged), "-Root", (Quote $Root), "-Folder", (Quote $Folder), "-Watcher", $PID)
-    if ((Read-Settings).host -in @("127.0.0.1", "localhost", "::1")) { $handArgs += @("-Bind", "127.0.0.1") }
+    if ((Read-Settings).host -in @("127.0.0.1", "localhost")) { $handArgs += @("-Bind", "127.0.0.1") }
     Start-Process powershell -WindowStyle Minimized -ArgumentList $handArgs
     return $true
 }
