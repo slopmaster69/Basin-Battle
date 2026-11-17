@@ -1,4 +1,4 @@
-From bddeb35c1f04eb88b0cb764e000b0eb8563cac1f Mon Sep 17 00:00:00 2001
+From 4982be077a8d75688a108554c37fe9f9b2b55eac Mon Sep 17 00:00:00 2001
 From: Corios00 <52224974+Corios00@users.noreply.github.com>
 Date: Mon, 16 Nov 2026 18:30:43 -0600
 Subject: [PATCH] The perf log names the systems a slow frame spent its time
@@ -33,8 +33,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  crates/benilla-world/Cargo.toml          |   3 +
  crates/benilla-world/src/boot.rs         |  10 +-
  crates/benilla-world/src/lib.rs          |   2 +
- crates/benilla-world/src/system_times.rs | 331 +++++++++++++++++++++++
- 9 files changed, 635 insertions(+), 4 deletions(-)
+ crates/benilla-world/src/system_times.rs | 335 +++++++++++++++++++++++
+ 9 files changed, 639 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/system_times.rs
 
 diff --git a/Cargo.lock b/Cargo.lock
@@ -527,10 +527,10 @@ index 04d6a8b8..c3e9ae7e 100644
  /// macOS `Cmd+Q`, re-pointed at the window close so the shutdown systems run.
 diff --git a/crates/benilla-world/src/system_times.rs b/crates/benilla-world/src/system_times.rs
 new file mode 100644
-index 00000000..16d3d3f2
+index 00000000..17cf9d6f
 --- /dev/null
 +++ b/crates/benilla-world/src/system_times.rs
-@@ -0,0 +1,331 @@
+@@ -0,0 +1,335 @@
 +//! Each ECS system's wall time, per frame, for `benilla-config/perf.log`: which systems a slow
 +//! frame spent its time in, with no profiler attached.
 +//!
@@ -543,7 +543,8 @@ index 00000000..16d3d3f2
 +//! left out of every list.
 +//!
 +//! The reader, once a frame on the main thread, takes the frame's slots ([`take_frame`]) and
-+//! clears them. Nothing is timed until [`enable`]; `WOW_SYSTEM_TIMES=0` keeps it off.
++//! clears them. Nothing is timed until [`enable`]; `WOW_SYSTEM_TIMES=0` keeps it off, the layer
++//! returning at once on every enter and exit (`bevy_ecs` still makes and enters its spans).
 +
 +use std::cell::{Cell, RefCell};
 +use std::collections::HashMap;
@@ -777,6 +778,9 @@ index 00000000..16d3d3f2
 +    }
 +
 +    fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
++        if !ENABLED.load(Relaxed) {
++            return;
++        }
 +        let Some(Kind::Timed(slot)) = ctx
 +            .span(id)
 +            .and_then(|s| s.extensions().get::<Kind>().copied())
