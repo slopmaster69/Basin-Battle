@@ -72,6 +72,9 @@ pub struct Rogue {
     pub flicker_until: f32,
     /// Shrouded Step: hidden from creatures (not bosses) until then (0: not shrouded).
     pub shroud_until: f32,
+    /// A step just put her down facing a back: until then a standing client's own facing doesn't
+    /// turn her (`step_facing_holds`).
+    pub step_facing_until: f32,
     /// Cloak and Dagger: the steps it has left, and the enemies struck from them so far.
     pub cloak_steps: u32,
     pub cloak_struck: Vec<Id>,

@@ -37,6 +37,9 @@ mod rail_tests;
 #[cfg(test)]
 #[path = "perf_tests.rs"]
 mod perf_tests;
+#[cfg(test)]
+#[path = "rogue_keys_tests.rs"]
+mod rogue_keys_tests;
 
 pub(crate) const TICK: Duration = Duration::from_millis(50);
 /// Saves at most this often (and when a hero leaves).

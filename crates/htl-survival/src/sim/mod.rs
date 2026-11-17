@@ -574,6 +574,9 @@ const LANDING_FALL: f32 = 10.0;
 pub(crate) const ARRIVE_HOLD: f32 = 1.5;
 /// A hero set down somewhere far lands from this high over the floor, never level with it.
 pub(crate) const ARRIVE_LIFT: f32 = 0.5;
+/// How long a Rogue's step holds the facing it put her in against a standing client's own word
+/// (sec): past a 0.3 sec art pressed on the next beat, as long as Shrouded Step's veil.
+pub(crate) const STEP_FACING_HOLD: f32 = 1.0;
 /// A hero carried down from another world is held (no falling) until their client says it has
 /// loaded this one ([`Survival::loaded`]), and for no longer than this if it never says.
 pub(crate) const LOAD_GRACE: f32 = 20.0;
@@ -1976,8 +1979,13 @@ impl Survival {
             p.pos = pos;
         }
         // Retaliation's answer keeps the facing the parry turned it to until it has struck,
-        // whichever way the client's body still faces.
-        if facing.is_finite() && now >= p.untouchable_until {
+        // whichever way the client's body still faces. A Rogue's step keeps the facing it put
+        // her in a moment against a standing client's word (`drop_aim`); a step of her own ends it.
+        let walking = moving.forward || moving.back || moving.left || moving.right;
+        if walking {
+            p.rogue.step_facing_until = 0.0;
+        }
+        if facing.is_finite() && now >= p.untouchable_until && now >= p.rogue.step_facing_until {
             p.facing = facing;
         }
         p.moving = moving;
@@ -2081,10 +2089,19 @@ impl Survival {
     /// so an art pressed on the next beat would turn them back along it, away from the back a
     /// Rogue's step has just put them behind. Till a new line comes they face where they were put.
     /// (Only the Rogue's steps: a blink that shoots on landing still reads its own line.)
+    ///
+    /// And the facing it put them in holds a moment ([`STEP_FACING_HOLD`]) against their client's
+    /// own word while they stand: a client can answer the step's teleport with the way its view
+    /// still looked (the line the step was clicked along, its aiming camera coming down in the same
+    /// beat), and an art pressed with no line of its own then swung along that, away from the back
+    /// (Garrote in the Nov 17 film: 0 foes, twice). A new line, a step of their own or the time
+    /// ends it.
     pub(crate) fn drop_aim(&mut self, id: Id) {
+        let until = self.clock + STEP_FACING_HOLD;
         if let Some(p) = self.players.get_mut(&id) {
             p.aim_line = None;
             p.aim_at = None;
+            p.rogue.step_facing_until = until;
         }
     }
 
@@ -2437,6 +2454,8 @@ impl Survival {
                 p.aim_line = Some((facing.rem_euclid(std::f32::consts::TAU), elevation.clamp(-1.4, 1.4), now));
                 // A new line: the point sent with the last one no longer goes with it.
                 p.aim_at = None;
+                // And their client's word on where they look counts again (`drop_aim`).
+                p.rogue.step_facing_until = 0.0;
             }
         }
     }
