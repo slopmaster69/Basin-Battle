@@ -555,10 +555,9 @@ impl SurvivalGame {
                 // rest see the flicker and the shade's own body.
                 let Some(g) = self.guid_of(id) else { return };
                 let stand_in = stand_in.and_then(|s| self.guid_of(s));
-                let line = super::ui::afterimage_line(g, secs, at, stand_in);
-                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::ui::ROGUE_LOOKS_LEVEL).map(|(c, _, _)| *c).collect();
-                for c in conns {
-                    self.ui_line(c, &line);
+                let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::ui::ROGUE_LOOKS_LEVEL).map(|(c, _, w)| (*c, w.level)).collect();
+                for (c, level) in conns {
+                    self.ui_line(c, &super::ui::afterimage_line(g, secs, at, stand_in, level));
                 }
             }
             Event::HoldPose { id, clip, secs, from } => {

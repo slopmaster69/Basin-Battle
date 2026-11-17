@@ -579,7 +579,7 @@ pub(crate) const VERSION: u32 = 2;
 /// swung, and a line counting down the time left to press the next (a swing's `AN` goes on
 /// `\t<blow>/<of>\t<open secs>\t<two hands>`). The finisher's flash on the swinger plays from the
 /// add-on as its impact comes. An older add-on ignores the fields and is still sent the flash.
-pub(crate) const ADDON_NEWEST: u32 = 79;
+pub(crate) const ADDON_NEWEST: u32 = 80;
 /// The first add-on that plays the finisher's flash on its own hero (`Chain.lua`): the server
 /// leaves that client out of the kit.
 pub(crate) const CHAIN_ADDON: u32 = 78;
@@ -619,7 +619,8 @@ pub(crate) const THIRD_CHOICE_ADDON: u32 = 71;
 /// Rhahk'Zor's collapse comes down (0096; `aftermath_wreck.rs`).
 /// 32: a Rogue's two blades and its afterimage (0103; [`ROGUE_LOOKS_LEVEL`]).
 /// 33: a Rogue's off-hand and finisher trails drawn wider and longer-lived (0109; [`TRAIL_BOLD_LEVEL`]).
-pub(crate) const CLIENT_NEWEST: u8 = 33;
+/// 34: a Rogue's afterimage lit toward its colour, a pale ghost (0112; [`IMAGE_LIGHT_LEVEL`]).
+pub(crate) const CLIENT_NEWEST: u8 = 34;
 
 /// 32: a Rogue's two blades trail a hand each (`PlayUnitAnimation`'s trail `main/off`), and a copy
 /// of the hero's own body is left behind (`PlayUnitAfterimage`, 0103): [`ROGUE_LOOKS_LEVEL`].
@@ -641,8 +642,17 @@ pub(crate) const TRAIL_BOLD_LEVEL: u8 = 33;
 
 /// The perfect dodge's copy: the body's own colours under a cool blue light, 0.85 (was 0.55) so it
 /// reads as a ghost beside the hero who left it, for 0.9 sec (was the flicker's 0.3).
+/// (A client before round 34: a tint only takes colour away, so on a dark-clad Rogue this read as
+/// a dark smear in the Nov 17 film.)
 const DODGE_IMAGE_ALPHA: f32 = 0.85;
 const DODGE_IMAGE_TINT: &str = "A8B8FF";
+/// The same copy on a client that lights a copy toward its colour (round 34): a pale blue-white
+/// ghost, lit 0xB4 (71%) of the way to it so the body's shape and shading still show under the
+/// light, at 0.6 so the ground shows through it.
+const DODGE_IMAGE_LIT_ALPHA: f32 = 0.6;
+const DODGE_IMAGE_LIT_TINT: &str = "B4E0ECFF";
+/// 34: a colour's top byte is how far the copy is lit toward it (0112; [`DODGE_IMAGE_LIT_TINT`]).
+pub(crate) const IMAGE_LIGHT_LEVEL: u8 = 34;
 /// The copy stands at least this long, past the 0.5 sec body flicker, fading the whole way.
 const DODGE_IMAGE_SECS: f32 = 0.9;
 /// Afterimage's shade: the hero's own body in Shadow's violet, 0.6 and standing most of its 2 sec,
@@ -666,12 +676,19 @@ pub(crate) fn rogue_trail(own: &str, off_hand: bool, finish: bool, bold: bool) -
 }
 
 /// The `AI` line: a copy of the hero's body for `secs` where it stands, or at `at` hiding the
-/// stand-in (Afterimage's shade); `secs` 0 takes the hero's copies away.
-pub(crate) fn afterimage_line(guid: u64, secs: f32, at: Option<htl_survival::Vec3>, stand_in: Option<u64>) -> String {
+/// stand-in (Afterimage's shade); `secs` 0 takes the hero's copies away. A client of `level` 34 or
+/// later is sent the perfect dodge's pale, lit copy; the shade is the same for every client.
+pub(crate) fn afterimage_line(guid: u64, secs: f32, at: Option<htl_survival::Vec3>, stand_in: Option<u64>, level: u8) -> String {
     if secs <= 0.0 {
         return format!("AI\t{guid:#X}\t0");
     }
-    let (alpha, tint) = if stand_in.is_some() { (SHADE_IMAGE_ALPHA, SHADE_IMAGE_TINT) } else { (DODGE_IMAGE_ALPHA, DODGE_IMAGE_TINT) };
+    let (alpha, tint) = if stand_in.is_some() {
+        (SHADE_IMAGE_ALPHA, SHADE_IMAGE_TINT)
+    } else if level >= IMAGE_LIGHT_LEVEL {
+        (DODGE_IMAGE_LIT_ALPHA, DODGE_IMAGE_LIT_TINT)
+    } else {
+        (DODGE_IMAGE_ALPHA, DODGE_IMAGE_TINT)
+    };
     // The perfect dodge's copy (no stand-in, where the body is) outlasts the body's own flicker.
     let secs = if stand_in.is_none() && at.is_none() { secs.max(DODGE_IMAGE_SECS) } else { secs };
     let mut line = format!("AI\t{guid:#X}\t{secs:.2}\t{alpha:.2}\t{tint}");
@@ -2721,16 +2738,26 @@ mod rogue_looks_tests {
 
     #[test]
     fn the_afterimage_line_is_a_copy_where_the_body_is_or_at_the_shade_or_none() {
-        assert_eq!(afterimage_line(0x2A, 0.5, None, None), "AI	0x2A	0.90	0.85	A8B8FF", "the dodge copy outlasts the flicker");
-        assert_eq!(afterimage_line(0x2A, 1.2, None, None), "AI	0x2A	1.20	0.85	A8B8FF");
+        let old = IMAGE_LIGHT_LEVEL - 1;
+        assert_eq!(afterimage_line(0x2A, 0.5, None, None, old), "AI	0x2A	0.90	0.85	A8B8FF", "the dodge copy outlasts the flicker");
+        assert_eq!(afterimage_line(0x2A, 1.2, None, None, old), "AI	0x2A	1.20	0.85	A8B8FF");
+        // Round 34: pale and lit, see-through.
+        assert_eq!(afterimage_line(0x2A, 0.5, None, None, IMAGE_LIGHT_LEVEL), "AI	0x2A	0.90	0.60	B4E0ECFF");
+        // Its colour's low six digits are a plain tint to an older client, which reads no light.
+        assert_eq!(u32::from_str_radix(DODGE_IMAGE_LIT_TINT, 16).unwrap() & 0xFF_FFFF, 0xE0ECFF);
         assert_eq!(
-            afterimage_line(0x2A, 2.0, Some([-9001.25, 120.5, 82.0]), Some(0xF130_0001_2300_0042)),
+            afterimage_line(0x2A, 2.0, Some([-9001.25, 120.5, 82.0]), Some(0xF130_0001_2300_0042), IMAGE_LIGHT_LEVEL),
+            afterimage_line(0x2A, 2.0, Some([-9001.25, 120.5, 82.0]), Some(0xF130_0001_2300_0042), old),
+            "the shade is the same for every client"
+        );
+        assert_eq!(
+            afterimage_line(0x2A, 2.0, Some([-9001.25, 120.5, 82.0]), Some(0xF130_0001_2300_0042), old),
             "AI\t0x2A\t2.00\t0.60\tA08CDC\t-9001.25\t120.50\t82.00\t0xF130000123000042"
         );
-        assert_eq!(afterimage_line(0x2A, 0.0, None, None), "AI\t0x2A\t0");
-        let f: Vec<String> = afterimage_line(0x2A, 2.0, Some([1.0, 2.0, 3.0]), Some(7)).split('\t').map(String::from).collect();
+        assert_eq!(afterimage_line(0x2A, 0.0, None, None, IMAGE_LIGHT_LEVEL), "AI\t0x2A\t0");
+        let f: Vec<String> = afterimage_line(0x2A, 2.0, Some([1.0, 2.0, 3.0]), Some(7), IMAGE_LIGHT_LEVEL).split('\t').map(String::from).collect();
         assert_eq!(f.len(), 9, "the add-on's fields: verb, guid, secs, alpha, colour, x, y, z, stand-in");
-        assert_eq!(TRAIL_BOLD_LEVEL, CLIENT_NEWEST, "the newest round is the bold trail");
+        assert_eq!(IMAGE_LIGHT_LEVEL, CLIENT_NEWEST, "the newest round is the lit afterimage");
     }
 }
 

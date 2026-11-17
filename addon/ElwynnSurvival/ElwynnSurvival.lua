@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 79
+local VERSION = 80
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -7144,7 +7144,10 @@ events:SetScript("OnEvent", function()
     -- ac31: the collapse route's lanterns put out as each section comes down (patch 0096).
     -- ac32: a Rogue's blades trail a hand each, and its afterimage (PlayUnitAfterimage, 0103).
     -- ac33: a Rogue's off-hand and finisher trails wider and longer-lived (patch 0109).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 33 then
+    -- ac34: a Rogue's afterimage lit toward its colour, a pale ghost (patch 0112).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 34 then
+      Say(".es hello " .. VERSION .. " ac34")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 33 then
       Say(".es hello " .. VERSION .. " ac33")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and PlayUnitAfterimage and (tonumber(HasActionCombat()) or 0) >= 32 then
       Say(".es hello " .. VERSION .. " ac32")
