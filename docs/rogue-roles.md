@@ -722,6 +722,12 @@ What the design left open, decided in the pull request that built it:
     sim test that plays the scenario's steps (`garrote_pressed_just_after_a_shadowstep_lands_in_the_back_it_was_put_behind`).
     The scenario's comment says so, and its second and third presses are spares.
 
+- **The test server listens on this PC alone (Nov 17 filming)**: Windows' firewall prompt for a
+  new `htl-server.exe` sat over every frame of the refilm. The server takes its listening address
+  from `HTL_BIND` or `--bind` (default `0.0.0.0`, so a player's hosting is unchanged); the visual
+  check's hosting steps and its deploy handover start it on `127.0.0.1`, which Windows never asks
+  about. Why an opt-in and not a new default: friends join a player's server from other PCs.
+
 ## Build plan
 
 Six pull requests, in order. Each is handed to one subagent with only this page to go on, so each

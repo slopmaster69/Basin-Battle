@@ -14,6 +14,11 @@ watcher, below).
 1. **The test server**, running on that PC: `Host Basin Battle.bat`, built from the branch under
    test. The scenarios use `.es debug quiet`, `.es dummy clear`, `.es target` and `.es give`, which
    servers from before this check don't have.
+   Start it bound to this PC alone, so Windows never asks about its firewall (that prompt sits over
+   the client and spoils every frame): in a command window, `set HTL_BIND=127.0.0.1`, then
+   `"Host Basin Battle.bat"` from the same window (or pass `--bind 127.0.0.1`). The client finds
+   it at `127.0.0.1` as before; nobody on another PC can join it. A server the watcher starts on a
+   deploy (below) does this by itself when `host` is `127.0.0.1`.
 2. **benilla's dev build.** The player build has none of the scripted probes this drives. On
    GitHub: Actions, Release, Run workflow, pick the branch, tick **dev**. (Or
    `gh workflow run release.yml --ref <branch> -f dev=true`.) The run's artifact
