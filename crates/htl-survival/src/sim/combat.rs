@@ -841,8 +841,11 @@ impl Survival {
             }
             p.combo_until = f32::INFINITY;
         }
+        let strikes_in = strike.windup + strike.active;
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
         self.players.get_mut(&id).unwrap().combat_at = self.clock;
+        // Begun inside a Rogue's step's moment: it holds until this blow has struck.
+        self.step_moment_covers(id, strikes_in);
         // The swing plays now; what it strikes shows as it connects.
         let style = if kind == StrikeKind::Heavy { Blow::Heavy } else { Blow::Light };
         self.events.push(Event::Swing { attacker: id, victim: None, damage: 0, outcome: Outcome::Miss, anim: true, style });
@@ -3008,6 +3011,9 @@ impl Survival {
         self.melee_switched(id);
         let windup = strike.windup;
         let (range, arc) = (strike.range, strike.arc);
+        // Begun inside a Rogue's step's moment (Garrote just after a Shadowstep, an Ambush's own
+        // step): it holds until this blow has struck.
+        self.step_moment_covers(id, strike.windup + strike.active);
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
         self.events.push(Event::Swing { attacker: id, victim: None, damage: 0, outcome: Outcome::Miss, anim: true, style: Blow::Heavy });
         // No guard stops it: the weapon goes red for everyone, the striker too (so they know it's

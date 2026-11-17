@@ -75,6 +75,9 @@ pub struct Rogue {
     /// A step just put her down facing a back: until then a standing client's own facing doesn't
     /// turn her (`step_facing_holds`).
     pub step_facing_until: f32,
+    /// A blow begun inside that hold strikes then (`step_moment_covers`): till then her client's
+    /// movement doesn't end the hold either, as its own lunge carries her along its view.
+    pub step_blow_until: f32,
     /// Cloak and Dagger: the steps it has left, and the enemies struck from them so far.
     pub cloak_steps: u32,
     pub cloak_struck: Vec<Id>,
@@ -408,6 +411,9 @@ impl Survival {
 
 /// The Rogue column's tree of a card: its `choice` (1 Shadow, 2 Venom).
 pub const SHADOW: u32 = 1;
+/// A tick past a blow's strike that `step_moment_covers` keeps the step's moment on (sec): the
+/// server's tick is 0.05, and the strike lands on the first tick past the wind-up.
+const STEP_BLOW_GRACE: f32 = 0.1;
 
 impl Survival {
     /// A Rogue tree's trait is on: a hero created as a Rogue with `[rogue] trait_keys` of their 5
@@ -431,6 +437,28 @@ impl Survival {
         let until = self.clock + self.content.rogue.shroud_secs;
         self.players.get_mut(&id).unwrap().rogue.shroud_until = until;
         self.events.push(Event::Auras { id });
+    }
+
+    /// A blow a Rogue begins inside her step's moment finishes inside it, `strikes_in` sec from
+    /// now: the facing the step put her in (`drop_aim`'s hold) and Shrouded Step's veil both last
+    /// until it has struck, a tick past. Garrote pressed 0.7 sec after a Shadowstep winds up 0.3 sec
+    /// and struck right as both ran out (Nov 17 refilm, 1 in 5): her client's own view (away from
+    /// the back) was taken, or the creature turned round. And till it strikes, her client's own
+    /// movement doesn't end the facing's hold: the add-on plays the blow's lunge (`ActionDash`, 0.6
+    /// yd for an art) along the client's view, a forward step on the wire. Nothing is lengthened
+    /// that isn't on, and a blow begun after them is as before. (A next blow can't begin before this one has recovered,
+    /// so it never stretches past one blow.)
+    pub(crate) fn step_moment_covers(&mut self, id: Id, strikes_in: f32) {
+        let now = self.clock;
+        let until = now + strikes_in + STEP_BLOW_GRACE;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        if p.rogue.step_facing_until > now {
+            p.rogue.step_facing_until = p.rogue.step_facing_until.max(until);
+            p.rogue.step_blow_until = until;
+        }
+        if p.rogue.shroud_until > now {
+            p.rogue.shroud_until = p.rogue.shroud_until.max(until);
+        }
     }
 
     /// Hidden by Shrouded Step now.
