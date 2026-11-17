@@ -1465,20 +1465,25 @@ text = "Very quick and light, with short reach and low damage."
 [[item]]
 key = "footpad_knuckles"
 name = "Footpad's Knuckles"
-display = 15720
-icon = "INV_Gauntlets_11"
+# The Alliance gladiator's fist pair (hand_1h_pvpalliance_a_01 and its own ...left model, one skin):
+# 1.12's brass knuckles have no left-hand model, so this pair is the fist look that has both.
+# Its icon is the pair's (32012's and 32015's share INV_Gauntlets_31). Checked in
+# tests/rogue_fist_displays.rs against WOW_DATA.
+display = 32012
+off_display = 32015
+icon = "INV_Gauntlets_31"
 kind = "weapon"
 text = "{fx} \"Brass, worn bright where it meets a jaw.\""
 
 [[item]]
 key = "cutpurse_claw"
 name = "Cutpurse's Claw"
-display = 4687
-# In the off hand, the claw's own left-hand model (hand_1h_claw_a_01left, the same silver skin):
-# 1.12 keeps one for the claw. The knuckles have none (no hand_1h_knuckle_a_01left in the data), so
-# they show the same model in both hands. Checked in tests/rogue_fist_displays.rs against WOW_DATA.
+# The claw's silver skin in both hands: 26593 (hand_1h_claw_a_01) and 26594 (its left-hand model,
+# hand_1h_claw_a_01left). The two displays share an icon (INV_Gauntlets_07), so the character sheet's
+# off-hand slot matches the claw's own. Checked in tests/rogue_fist_displays.rs against WOW_DATA.
+display = 26593
 off_display = 26594
-icon = "INV_Gauntlets_04"
+icon = "INV_Gauntlets_07"
 kind = "weapon"
 text = "{fx} \"Three hooked blades, filed in a Moonbrook cellar.\""
 
