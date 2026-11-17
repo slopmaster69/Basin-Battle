@@ -2,8 +2,7 @@
 # side and above so the cloud's size reads against the grunts: the 5 yd cloud at the Rogue's feet,
 # two grunts coming at her (3 and 4 yd) walking into it, their wind-ups visibly slower.
 hero rogue
-cam 90 -12 8
-camera duel
+cam 150 -15 6
 include _setup
 4.0 .es goto -9638 671
 4.1 .es arm dagger

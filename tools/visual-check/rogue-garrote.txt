@@ -1,12 +1,11 @@
-# Nov 17 first take: Garrote cast twice, 0 hits (the server's count): the scenario or the skill still misses; see the PR.
+# Nov 17 first take: Garrote cast twice, 0 hits, because aim (the camera, yaw 90) pointed 90 degrees off the Kobold: the step went along the aim and she landed facing away. Camera yaw 0 now points the aim at it.
 # Garrote after a Shadowstep (#490), floor markers off, the hero's own screen from the side. A Kobold Geomancer
 # comes at the Rogue and begins a cast; Shadowstep (the 1 key) puts her at its back, then the key is
 # changed to Garrote (both are utility abilities) and pressed. A Rogue's step drops the reticle's old line, so Garrote needs no new aim and lands in the
 # back. Look for, with no word: the cast bar breaking, the stagger, the silence's look, a blood burst
 # each second. A spare press follows in case the first was refused (a landing blow spends its cooldown).
 hero rogue
-cam 90 -12 8
-camera duel
+cam 0 -16 7
 include _setup
 4.0 .es goto -9638 671                  # the open grass by the rack (.es arm needs it)
 4.1 .es arm dagger

@@ -4,8 +4,7 @@
 # grunt 2 yd ahead, main, off, main, off. Look at both fists: the off hand must be its own left-hand model.
 # The last seconds open the character sheet (the off-hand slot's icon).
 hero rogue
-cam 90 -12 8
-camera duel
+cam 150 -15 6
 include _setup
 4.0 .es goto -9638 671
 4.2 .es dummy clear
